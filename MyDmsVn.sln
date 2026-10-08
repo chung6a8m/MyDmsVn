@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Desktop.Tests", "te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Architecture.Tests", "tests\MyDmsVn.Architecture.Tests\MyDmsVn.Architecture.Tests.csproj", "{6C284960-ADFA-486B-B578-900D38C755C5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructure.IntegrationTests", "tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj", "{32D6DCB6-970F-457A-9B6E-CAC80CF31FB9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -100,6 +102,10 @@ Global
 		{6C284960-ADFA-486B-B578-900D38C755C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6C284960-ADFA-486B-B578-900D38C755C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6C284960-ADFA-486B-B578-900D38C755C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{32D6DCB6-970F-457A-9B6E-CAC80CF31FB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{32D6DCB6-970F-457A-9B6E-CAC80CF31FB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{32D6DCB6-970F-457A-9B6E-CAC80CF31FB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{32D6DCB6-970F-457A-9B6E-CAC80CF31FB9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{19B402F7-3500-487D-BDDF-69C76A73AC62} = {D37D8AC9-764D-4B64-810F-A0B495FC0A53}
@@ -116,5 +122,6 @@ Global
 		{DC434AFB-4C18-4EF3-B266-8CA55EEC34CE} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
 		{17479CDC-1848-453A-B411-43AACC472366} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
 		{6C284960-ADFA-486B-B578-900D38C755C5} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
+		{32D6DCB6-970F-457A-9B6E-CAC80CF31FB9} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
 	EndGlobalSection
 EndGlobal

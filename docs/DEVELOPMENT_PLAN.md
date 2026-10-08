@@ -33,7 +33,7 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 
 ## P1 — Persistence foundation
 
-- [ ] P1-T01 select disposable SQL test database naming/configuration and implement safe test provisioning.
+- [x] P1-T01 select disposable SQL test database naming/configuration and implement safe test provisioning.
 - [ ] P1-T02 create `IDbConnectionFactory` returning fresh open connection and SQL Server implementation.
 - [ ] P1-T03 implement Explicit UoW state machine + repository creation and deterministic disposal.
 - [ ] P1-T04 establish RepoDb 1.16.x mappings and Dapper query executor sharing explicit UoW.
