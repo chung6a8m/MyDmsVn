@@ -11,27 +11,35 @@ public sealed class SqlUnitOfWorkFactory : IUnitOfWorkFactory
 {
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IReadOnlyDictionary<Type, Func<ISqlExecutionContext, object>> _repositoryFactories;
+    private readonly RepoDbMappingInitializer? _mappingInitializer;
 
     public SqlUnitOfWorkFactory(IDbConnectionFactory connectionFactory)
-        : this(connectionFactory, new Dictionary<Type, Func<ISqlExecutionContext, object>>())
+        : this(
+            connectionFactory,
+            null,
+            new Dictionary<Type, Func<ISqlExecutionContext, object>>())
     {
     }
 
     internal SqlUnitOfWorkFactory(
         IDbConnectionFactory connectionFactory,
+        RepoDbMappingInitializer? mappingInitializer,
         IReadOnlyDictionary<Type, Func<ISqlExecutionContext, object>> repositoryFactories)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        _mappingInitializer = mappingInitializer;
         _repositoryFactories = repositoryFactories ?? throw new ArgumentNullException(nameof(repositoryFactories));
     }
 
     public IUnitOfWork Create()
     {
+        _mappingInitializer?.Initialize();
         return new SqlUnitOfWork(_connectionFactory.OpenConnection(), _repositoryFactories);
     }
 
     public async Task<IUnitOfWork> CreateAsync(CancellationToken cancellationToken)
     {
+        _mappingInitializer?.Initialize();
         var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         return new SqlUnitOfWork(connection, _repositoryFactories);
     }

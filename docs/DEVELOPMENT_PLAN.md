@@ -35,8 +35,8 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 
 - [x] P1-T01 select disposable SQL test database naming/configuration and implement safe test provisioning.
 - [x] P1-T02 create `IDbConnectionFactory` returning fresh open connection and SQL Server implementation.
-- [ ] P1-T03 implement Explicit UoW state machine + repository creation and deterministic disposal.
-- [ ] P1-T04 establish RepoDb 1.16.x mappings and Dapper query executor sharing explicit UoW.
+- [x] P1-T03 implement Explicit UoW state machine + repository creation and deterministic disposal.
+- [x] P1-T04 establish RepoDb 1.16.x mappings and Dapper query executor sharing explicit UoW.
 - [ ] P1-T05 DbUp migrator skeleton and migration-history verification; test rerun/no-op.
 - [ ] P1-T06 SQL integration tests for nested guard, commit, rollback, disposal, cancellation, concurrent separate UoWs.
 **Exit:** P1 tests in `docs/TEST_STRATEGY.md` green on SQL Server; no static AsyncLocal transaction.
