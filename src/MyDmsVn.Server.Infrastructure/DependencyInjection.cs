@@ -31,11 +31,11 @@ namespace MyDmsVn.Server.Infrastructure
                     .GetServices<SqlRepositoryRegistration>()
                     .ToDictionary(
                         registration => registration.RepositoryType,
-                        registration => new Func<ISqlExecutionContext, object>(
-                            context => registration.Create(serviceProvider, context)));
+                        registration => registration.Create);
                 return new SqlUnitOfWorkFactory(
                     serviceProvider.GetRequiredService<IDbConnectionFactory>(),
                     serviceProvider.GetRequiredService<RepoDbMappingInitializer>(),
+                    serviceProvider.GetRequiredService<IServiceScopeFactory>(),
                     registrations);
             });
             return new SqlPersistenceBuilder(services);

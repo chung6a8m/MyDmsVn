@@ -21,7 +21,7 @@ Prove RepoDb + Dapper + DbUp with **Explicit UnitOfWork** are correct for both n
 
 SQL tests pass on a disposable SQL Server database and can be repeated. UoW and repository APIs have no dependence on HTTP, UI or AsyncLocal. DbUp repeated application produces no additional side effects. If SQL unavailable, P1 is **blocked**, not complete.
 
-Verified on Windows with SQL Server 14.0.2130.4: locked restore succeeded; Release build succeeded with 0 warnings and 0 errors across `net48`, `net8.0`, and `net8.0-windows`; the solution test run passed 69/69 target-specific test executions, including 42/42 SQL integration executions across `net48` and `net8.0`. See `docs/P1_VERIFICATION.md`.
+Verified on Windows with SQL Server 14.0.2130.4: locked restore succeeded; Release build succeeded with 0 warnings and 0 errors across `net48`, `net8.0`, and `net8.0-windows`; the solution test run passed 77/77 target-specific test executions, including 50/50 SQL integration executions across `net48` and `net8.0`. See `docs/P1_VERIFICATION.md`.
 
 ## Avoid
 

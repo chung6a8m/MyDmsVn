@@ -40,7 +40,7 @@ P1 adds SQL Server connection ownership, an explicit UnitOfWork, explicit reposi
 
 - `dotnet restore MyDmsVn.sln --locked-mode`: passed.
 - `dotnet build MyDmsVn.sln -c Release --no-restore`: passed with 0 warnings and 0 errors for all solution targets, including `net48`, `net8.0`, and `net8.0-windows`.
-- `dotnet test MyDmsVn.sln -c Release --no-build --no-restore` with the explicit local SQL test connection: passed 69/69 target-specific test executions with 0 failures and 0 skips.
-- SQL integration subset: 21/21 passed on `net48` and 21/21 passed on `net8.0`; disposable database creation/drop and DbUp no-op replay were exercised repeatedly.
+- `dotnet test MyDmsVn.sln -c Release --no-build --no-restore` with the explicit local SQL test connection: passed 77/77 target-specific test executions with 0 failures and 0 skips.
+- SQL integration subset: 25/25 passed on `net48` and 25/25 passed on `net8.0`; disposable database creation/drop, failure-retry cleanup, scoped repository disposal, exceptional UoW cleanup, and DbUp no-op replay were exercised.
 
 The local verification instance reported SQL Server `14.0.2130.4`. No GUI smoke session was required because P1 changes no UI behavior; existing unattended WinForms tests remained green on both desktop targets.
