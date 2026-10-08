@@ -6,6 +6,8 @@ namespace MyDmsVn.Server.Application
     {
         public static IServiceCollection AddServerApplication(this IServiceCollection services)
         {
+            services.AddMediatR(
+                configuration => configuration.RegisterServicesFromAssemblyContaining<GetFoundationStatusQuery>());
             services.AddSingleton<IFoundationProbe, FoundationProbe>();
             return services;
         }
