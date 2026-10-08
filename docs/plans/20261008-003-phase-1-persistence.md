@@ -1,6 +1,6 @@
 # P1 — Persistence foundation
 
-Status: Not started. Depends on P0. Read `docs/PERSISTENCE.md`, `docs/TEST_STRATEGY.md`, ADR 0002.
+Status: Complete on 2026-10-08. Depends on P0. Read `docs/PERSISTENCE.md`, `docs/TEST_STRATEGY.md`, ADR 0002.
 
 ## Objective
 
@@ -15,11 +15,13 @@ Prove RepoDb + Dapper + DbUp with **Explicit UnitOfWork** are correct for both n
 - [x] **P1-T05 / RepoDb/Dapper:** one sample test-only entity/table exercises RepoDb Write and Dapper Read with same explicit transaction, with mapping init thread-safe on 1.16.x. Do not introduce application master-data entities prematurely.
 - [x] **P1-T06 / DbUp:** dedicated controlled migrator command/library; create an immutable **test-foundation** script and history table; clean migration + repeat as no-op; no migration from client login.
 - [x] **P1-T07 / SQL tests:** cross-repository atomic commit; rollback after second failure; dispose uncommitted; Dapper sees changes in same transaction; parallel distinct scopes; safe resource cleanup; no accidental independent connection.
-- [ ] **P1-T08 / Compatibility:** run tests under all feasible TFMs on Windows; document package API differences (RepoDb 1.16.0/SqlServer 1.16.1/Bulk 1.16.2) and deferred bulk operations if unused.
+- [x] **P1-T08 / Compatibility:** run tests under all feasible TFMs on Windows; document package API differences (RepoDb 1.16.0/SqlServer 1.16.1/Bulk 1.16.2) and deferred bulk operations if unused.
 
 ## Exit evidence
 
 SQL tests pass on a disposable SQL Server database and can be repeated. UoW and repository APIs have no dependence on HTTP, UI or AsyncLocal. DbUp repeated application produces no additional side effects. If SQL unavailable, P1 is **blocked**, not complete.
+
+Verified on Windows with SQL Server 14.0.2130.4: locked restore succeeded; Release build succeeded with 0 warnings and 0 errors across `net48`, `net8.0`, and `net8.0-windows`; the solution test run passed 69/69 target-specific test executions, including 42/42 SQL integration executions across `net48` and `net8.0`. See `docs/P1_VERIFICATION.md`.
 
 ## Avoid
 
