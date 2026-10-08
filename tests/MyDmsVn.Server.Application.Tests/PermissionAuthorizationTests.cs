@@ -19,11 +19,13 @@ namespace MyDmsVn.Server.Application.Tests
             var service = CreateService(ActiveUser(), store);
 
             Assert.False(await service.IsAllowedAsync(PermissionKeys.CatalogProductsWrite, CancellationToken.None));
+            Assert.Equal(1, store.QueryCount);
 
             store.DirectDecision = true;
             store.RoleGrant = false;
 
             Assert.True(await service.IsAllowedAsync(PermissionKeys.CatalogProductsWrite, CancellationToken.None));
+            Assert.Equal(2, store.QueryCount);
         }
 
         [Fact]
@@ -76,6 +78,32 @@ namespace MyDmsVn.Server.Application.Tests
 
             Assert.True(result.IsError);
             Assert.Equal(ErrorType.Forbidden, result.FirstError.Type);
+            Assert.Equal(0, tracker.Count);
+        }
+
+        [Fact]
+        public async Task Anonymous_application_command_returns_unauthorized_without_query_or_mutation()
+        {
+            var services = new ServiceCollection();
+            var tracker = new MutationTracker();
+            var store = new FakePermissionStore { DirectDecision = true, RoleGrant = true };
+            services.AddSingleton(tracker);
+            services.AddSingleton<ICurrentUserAccessor>(
+                new StubCurrentUserAccessor(CurrentUser.Anonymous));
+            services.AddSingleton<IPermissionStore>(store);
+            services.AddTransient<
+                IRequestHandler<ProtectedMutationCommand, ErrorOr<string>>,
+                ProtectedMutationHandler>();
+            services.AddServerApplication();
+
+            using var provider = services.BuildServiceProvider();
+            var result = await provider.GetRequiredService<ISender>().Send(
+                new ProtectedMutationCommand(),
+                CancellationToken.None);
+
+            Assert.True(result.IsError);
+            Assert.Equal(ErrorType.Unauthorized, result.FirstError.Type);
+            Assert.Equal(0, store.QueryCount);
             Assert.Equal(0, tracker.Count);
         }
 

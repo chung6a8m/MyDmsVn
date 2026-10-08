@@ -44,5 +44,20 @@ namespace MyDmsVn.Server.Application.Tests
 
             Assert.Same(CurrentUser.Anonymous, provider.GetRequiredService<ICurrentUserAccessor>().Current);
         }
+
+        [Theory]
+        [InlineData("short")]
+        [InlineData("Password123!")]
+        [InlineData("operator-secure-password-2026")]
+        public void Weak_default_or_username_based_new_password_is_rejected(string password)
+        {
+            Assert.False(NewPasswordPolicy.IsAcceptable(password, "operator"));
+        }
+
+        [Fact]
+        public void Long_non_default_new_password_is_accepted()
+        {
+            Assert.True(NewPasswordPolicy.IsAcceptable("Maple-River-47-Cobalt!", "operator"));
+        }
     }
 }
