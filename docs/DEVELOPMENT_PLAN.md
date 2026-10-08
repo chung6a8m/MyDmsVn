@@ -1,6 +1,6 @@
 # Development Plan — MyDmsVn v1 → v2
 
-**Status:** P0 and P1 complete on 2026-10-08; P2 complete on 2026-10-09; P3 is next. **Codex must not skip prerequisites or mark unverified tests as passed.**
+**Status:** P0 and P1 complete on 2026-10-08; P2 and P3 complete on 2026-10-09; P4 is next. **Codex must not skip prerequisites or mark unverified tests as passed.**
 
 ## Operating rules
 
@@ -16,7 +16,7 @@
 | **P0** | Repository and solution foundation | Dual-target solution, DI/smoke hosts, reference boundaries, test projects; both Windows hosts build | Complete (2026-10-08) |
 | **P1** | Persistence foundation | SQL connection, RepoDb maps, Dapper, DbUp migrator, explicit UoW; SQL commit/rollback tests | Complete (2026-10-08) |
 | **P2** | Application pipeline/contracts | MediatR, validation, ErrorOr, transport-neutral ApiResponse mapping, client APIs; error tests | Complete (2026-10-09) |
-| **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Not started |
+| **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Complete (2026-10-09) |
 | **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Not started |
 | **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | Not started |
 | **P6** | Local v1 hardening | Deployment/migration instructions, logging, secure configuration, two desktop host smoke, release checklist | Not started |
@@ -52,11 +52,11 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 
 ## P3 — Security foundation
 
-- [ ] P3-T01 DbUp Users/Roles/UserRoles/RolePermissions/UserPermissions + uniqueness/indexes.
-- [ ] P3-T02 `IPasswordHasher` and pluggable legacy password verifier (do not guess legacy algorithm).
-- [ ] P3-T03 login/current-user abstractions; fail-closed authorization behavior.
-- [ ] P3-T04 direct permission precedence and role union, optional cache invalidation if introduced.
-- [ ] P3-T05 tests for deactivation, overrides, privilege denial, password migration fixtures.
+- [x] P3-T01 DbUp Users/Roles/UserRoles/RolePermissions/UserPermissions + uniqueness/indexes.
+- [x] P3-T02 `IPasswordHasher` and pluggable legacy password verifier (do not guess legacy algorithm).
+- [x] P3-T03 login/current-user abstractions; fail-closed authorization behavior.
+- [x] P3-T04 direct permission precedence and role union, optional cache invalidation if introduced.
+- [x] P3-T05 tests for deactivation, overrides, privilege denial, password migration fixtures. (Legacy algorithm fixture remains an explicit external prerequisite; unknown algorithms deny.)
 **Exit:** unauthorized commands cannot write; compatibility preserved for PasswordSalt.
 
 ## P4 — WinForms desktop foundation
