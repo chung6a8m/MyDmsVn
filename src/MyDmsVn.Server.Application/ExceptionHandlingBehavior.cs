@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using ErrorOr;
@@ -10,6 +10,13 @@ namespace MyDmsVn.Server.Application
         : IPipelineBehavior<TRequest, TResponse>
         where TRequest : notnull, IRequest<TResponse>, IApplicationErrorResponse<TResponse>
     {
+        private readonly IApplicationExceptionReporter _exceptionReporter;
+
+        public ExceptionHandlingBehavior(IApplicationExceptionReporter exceptionReporter)
+        {
+            _exceptionReporter = exceptionReporter;
+        }
+
         public async Task<TResponse> Handle(
             TRequest request,
             RequestHandlerDelegate<TResponse> next,
@@ -23,8 +30,9 @@ namespace MyDmsVn.Server.Application
             {
                 throw;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                _exceptionReporter.Report(typeof(TRequest), exception);
                 return request.FromErrors(
                     new[]
                     {

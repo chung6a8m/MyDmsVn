@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
@@ -11,7 +11,7 @@ namespace MyDmsVn.Contracts
 
         public static JsonSerializerSettings CreateSerializerSettings()
         {
-            return new JsonSerializerSettings
+            var settings = new JsonSerializerSettings
             {
                 ContractResolver = new CamelCasePropertyNamesContractResolver(),
                 Culture = CultureInfo.InvariantCulture,
@@ -20,6 +20,8 @@ namespace MyDmsVn.Contracts
                 Formatting = Formatting.None,
                 NullValueHandling = NullValueHandling.Ignore,
             };
+            settings.Converters.Add(new ApiResponseJsonConverter());
+            return settings;
         }
 
         public static string ResolvePropertyName(string propertyName)

@@ -1,7 +1,8 @@
-namespace MyDmsVn.Contracts
+﻿namespace MyDmsVn.Contracts
 {
     public enum ApiStatusCode
     {
+        Unspecified = 0,
         Ok = 200,
         NoContent = 204,
         BadRequest = 400,

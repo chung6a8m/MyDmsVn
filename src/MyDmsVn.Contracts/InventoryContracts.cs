@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 
 namespace MyDmsVn.Contracts
 {
@@ -48,6 +49,7 @@ namespace MyDmsVn.Contracts
 
         public long Id { get; }
         public string ReceiptNumber { get; }
+        [JsonConverter(typeof(CalendarDateJsonConverter))]
         public DateTime ReceiptDate { get; }
         public int WarehouseId { get; }
         public int EmployeeId { get; }
@@ -87,6 +89,7 @@ namespace MyDmsVn.Contracts
             Lines = lines.ToArray();
         }
 
+        [JsonConverter(typeof(CalendarDateJsonConverter))]
         public DateTime ReceiptDate { get; }
         public int WarehouseId { get; }
         public int EmployeeId { get; }

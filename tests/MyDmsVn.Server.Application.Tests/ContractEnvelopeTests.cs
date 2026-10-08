@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using MyDmsVn.Contracts;
 using Newtonsoft.Json;
@@ -66,6 +66,42 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
+        public void Serializer_round_trips_success_failure_and_value_type_envelopes()
+        {
+            var settings = ApiJson.CreateSerializerSettings();
+
+            var success = JsonConvert.DeserializeObject<ApiResponse<string>>(
+                "{\"data\":\"ready\"}",
+                settings)!;
+            var failure = JsonConvert.DeserializeObject<ApiResponse<string>>(
+                "{\"error\":{\"code\":\"ValidationError\",\"message\":\"Invalid.\",\"details\":[]}}",
+                settings)!;
+            var valueType = JsonConvert.DeserializeObject<ApiResponse<int>>(
+                "{\"data\":0}",
+                settings)!;
+
+            Assert.True(success.IsSuccess);
+            Assert.Equal("ready", success.Data);
+            Assert.False(failure.IsSuccess);
+            Assert.Equal("ValidationError", failure.Error!.Code);
+            Assert.True(valueType.IsSuccess);
+            Assert.Equal(0, valueType.Data);
+        }
+
+        [Theory]
+        [InlineData("{}")]
+        [InlineData("{\"data\":\"ready\",\"error\":{\"code\":\"Failure\",\"message\":\"Failed.\"}}")]
+        [InlineData("{\"data\":null}")]
+        [InlineData("{\"error\":null}")]
+        public void Serializer_rejects_ambiguous_or_empty_envelopes(string json)
+        {
+            Assert.Throws<JsonSerializationException>(
+                () => JsonConvert.DeserializeObject<ApiResponse<string>>(
+                    json,
+                    ApiJson.CreateSerializerSettings()));
+        }
+
+        [Fact]
         public void Pagination_decimal_and_utc_values_have_a_stable_wire_shape()
         {
             var page = new PagedResult<StockBalanceRow>(
@@ -118,8 +154,31 @@ namespace MyDmsVn.Server.Application.Tests
                 "Initial stock",
                 new[] { new SaveGoodsReceiptLineRequest(7, 2.5000m, 19.9900m) });
             Assert.Equal(
-                "{\"receiptDate\":\"2026-10-08T00:00:00Z\",\"warehouseId\":2,\"employeeId\":3,\"note\":\"Initial stock\",\"lines\":[{\"productId\":7,\"quantity\":2.5000,\"unitCost\":19.9900}]}",
+                "{\"receiptDate\":\"2026-10-08\",\"warehouseId\":2,\"employeeId\":3,\"note\":\"Initial stock\",\"lines\":[{\"productId\":7,\"quantity\":2.5000,\"unitCost\":19.9900}]}",
                 JsonConvert.SerializeObject(receipt, settings));
+        }
+
+        [Theory]
+        [InlineData(DateTimeKind.Utc)]
+        [InlineData(DateTimeKind.Local)]
+        [InlineData(DateTimeKind.Unspecified)]
+        public void Receipt_date_preserves_the_calendar_day_for_every_datetime_kind(DateTimeKind kind)
+        {
+            var request = new SaveGoodsReceiptRequest(
+                new DateTime(2026, 10, 8, 0, 0, 0, kind),
+                2,
+                3,
+                null,
+                Array.Empty<SaveGoodsReceiptLineRequest>());
+
+            var json = JsonConvert.SerializeObject(request, ApiJson.CreateSerializerSettings());
+            var roundTrip = JsonConvert.DeserializeObject<SaveGoodsReceiptRequest>(
+                json,
+                ApiJson.CreateSerializerSettings())!;
+
+            Assert.Contains("\"receiptDate\":\"2026-10-08\"", json);
+            Assert.Equal(new DateTime(2026, 10, 8), roundTrip.ReceiptDate);
+            Assert.Equal(DateTimeKind.Unspecified, roundTrip.ReceiptDate.Kind);
         }
 
         [Fact]

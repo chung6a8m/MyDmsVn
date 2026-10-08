@@ -1,4 +1,4 @@
-namespace MyDmsVn.Contracts
+﻿namespace MyDmsVn.Contracts
 {
     public sealed class UnitResponse
     {

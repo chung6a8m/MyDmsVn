@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,9 +30,10 @@ namespace MyDmsVn.Server.Application
                 return await next().ConfigureAwait(false);
             }
 
-            var context = new ValidationContext<TRequest>(request);
             var validationTasks = _validators
-                .Select(validator => validator.ValidateAsync(context, cancellationToken));
+                .Select(validator => validator.ValidateAsync(
+                    new ValidationContext<TRequest>(request),
+                    cancellationToken));
             var validationResults = await Task.WhenAll(validationTasks).ConfigureAwait(false);
             var failures = validationResults
                 .SelectMany(result => result.Errors)

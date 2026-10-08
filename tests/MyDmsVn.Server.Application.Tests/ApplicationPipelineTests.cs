@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -63,9 +63,43 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
+        public async Task Multiple_async_validators_use_independent_contexts_without_duplicate_failures()
+        {
+            var behavior = new ValidationBehavior<ValidationProbeCommand, ErrorOr<string>>(
+                new IValidator<ValidationProbeCommand>[]
+                {
+                    new ValidationProbeValidator(),
+                    new ValidationProbeCodeValidator(),
+                });
+            var request = new ValidationProbeCommand(
+                new[] { new ValidationProbeLine(0m) });
+
+            var result = await behavior.Handle(
+                request,
+                _ => Task.FromResult<ErrorOr<string>>("handled"),
+                CancellationToken.None);
+
+            Assert.True(result.IsError);
+            Assert.Collection(
+                result.Errors,
+                error =>
+                {
+                    Assert.Equal("Validation.Positive", error.Code);
+                    Assert.Equal("Lines[0].Quantity", error.Metadata!["Field"]);
+                },
+                error =>
+                {
+                    Assert.Equal("Validation.LineRequired", error.Code);
+                    Assert.Equal("Lines[0]", error.Metadata!["Field"]);
+                });
+        }
+
+        [Fact]
         public async Task Handler_exception_becomes_an_unexpected_typed_error()
         {
             var services = new ServiceCollection();
+            var reporter = new CapturingExceptionReporter();
+            services.AddSingleton<IApplicationExceptionReporter>(reporter);
             services.AddTransient<
                 IRequestHandler<ThrowingProbeCommand, ErrorOr<string>>,
                 ThrowingProbeHandler>();
@@ -83,7 +117,28 @@ namespace MyDmsVn.Server.Application.Tests
                 Assert.Equal(ErrorType.Unexpected, result.FirstError.Type);
                 Assert.Equal("InternalError", result.FirstError.Code);
                 Assert.DoesNotContain("secret", result.FirstError.Description);
+                Assert.Same(reporter.Exception, Assert.Single(reporter.Exceptions));
+                Assert.Equal(typeof(ThrowingProbeCommand), reporter.RequestType);
             }
+        }
+
+        [Fact]
+        public async Task Cancellation_is_rethrown_without_exception_reporting()
+        {
+            var reporter = new CapturingExceptionReporter();
+            var behavior = new ExceptionHandlingBehavior<ThrowingProbeCommand, ErrorOr<string>>(reporter);
+            using (var cancellation = new CancellationTokenSource())
+            {
+                cancellation.Cancel();
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => behavior.Handle(
+                        new ThrowingProbeCommand(),
+                        _ => Task.FromCanceled<ErrorOr<string>>(cancellation.Token),
+                        cancellation.Token));
+            }
+
+            Assert.Empty(reporter.Exceptions);
         }
 
         private sealed class ValidationProbeCommand : ApplicationRequest<string>
@@ -116,6 +171,17 @@ namespace MyDmsVn.Server.Application.Tests
                             Task.FromResult(quantity > 0m))
                         .WithErrorCode("Validation.Positive")
                         .WithMessage("Quantity must be greater than zero."));
+            }
+        }
+
+        private sealed class ValidationProbeCodeValidator : AbstractValidator<ValidationProbeCommand>
+        {
+            public ValidationProbeCodeValidator()
+            {
+                RuleForEach(request => request.Lines)
+                    .MustAsync((line, cancellationToken) => Task.FromResult(line.Quantity > 0m))
+                    .WithErrorCode("Validation.LineRequired")
+                    .WithMessage("A valid line is required.");
             }
         }
 
@@ -156,6 +222,21 @@ namespace MyDmsVn.Server.Application.Tests
                 CancellationToken cancellationToken)
             {
                 throw new InvalidOperationException("secret connection detail");
+            }
+        }
+
+        private sealed class CapturingExceptionReporter : IApplicationExceptionReporter
+        {
+            public List<Exception> Exceptions { get; } = new List<Exception>();
+
+            public Exception? Exception => Exceptions.Count == 0 ? null : Exceptions[0];
+
+            public Type? RequestType { get; private set; }
+
+            public void Report(Type requestType, Exception exception)
+            {
+                RequestType = requestType;
+                Exceptions.Add(exception);
             }
         }
     }

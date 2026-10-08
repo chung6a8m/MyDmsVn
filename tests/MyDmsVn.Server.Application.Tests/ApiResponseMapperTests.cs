@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using ErrorOr;
 using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application;
@@ -84,6 +84,31 @@ namespace MyDmsVn.Server.Application.Tests
 
             var response = ApiResponseMapper.Map(result);
 
+            Assert.Equal(ApiStatusCode.InternalServerError, response.Error!.Status);
+            Assert.Equal("InternalError", response.Error.Code);
+            Assert.DoesNotContain("secret", response.Error.Message);
+            Assert.Empty(response.Error.Details);
+        }
+
+        [Fact]
+        public void Unknown_error_types_do_not_expose_internal_details_alone_or_in_mixed_sets()
+        {
+            var custom = Error.Custom(
+                99,
+                "Sql.Custom",
+                "Server=production;Password=secret");
+            var conflict = Error.Conflict("Product.Duplicate", "Duplicate.");
+
+            var alone = ApiResponseMapper.Map<string>(custom);
+            var mixed = ApiResponseMapper.Map(
+                ErrorOrFactory.From<string>(new List<Error> { conflict, custom }));
+
+            AssertSafeInternalError(alone);
+            AssertSafeInternalError(mixed);
+        }
+
+        private static void AssertSafeInternalError(ApiResponse<string> response)
+        {
             Assert.Equal(ApiStatusCode.InternalServerError, response.Error!.Status);
             Assert.Equal("InternalError", response.Error.Code);
             Assert.DoesNotContain("secret", response.Error.Message);

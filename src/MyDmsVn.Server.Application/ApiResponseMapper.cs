@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using ErrorOr;
@@ -18,9 +18,7 @@ namespace MyDmsVn.Server.Application
             }
 
             var errors = result.Errors;
-            if (errors.Any(error =>
-                error.Type == ErrorType.Failure ||
-                error.Type == ErrorType.Unexpected))
+            if (errors.Any(error => !IsPublicErrorType(error.Type)))
             {
                 return ApiResponse<TValue>.Failure(
                     new ApiError(
@@ -42,6 +40,15 @@ namespace MyDmsVn.Server.Application
                     ToAggregateCode(dominantType, dominantError.Code),
                     ToAggregateMessage(dominantType, dominantError.Description),
                     details));
+        }
+
+        private static bool IsPublicErrorType(ErrorType type)
+        {
+            return type == ErrorType.Validation ||
+                type == ErrorType.Unauthorized ||
+                type == ErrorType.Forbidden ||
+                type == ErrorType.NotFound ||
+                type == ErrorType.Conflict;
         }
 
         private static ErrorType GetDominantType(IReadOnlyCollection<Error> errors)

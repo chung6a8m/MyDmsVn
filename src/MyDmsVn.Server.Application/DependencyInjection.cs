@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
 using FluentValidation;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace MyDmsVn.Server.Application
 {
@@ -18,6 +19,7 @@ namespace MyDmsVn.Server.Application
             services.AddValidatorsFromAssemblyContaining<GetFoundationStatusQuery>(
                 includeInternalTypes: true);
             services.AddSingleton<IFoundationProbe, FoundationProbe>();
+            services.TryAddSingleton<IApplicationExceptionReporter, TraceApplicationExceptionReporter>();
             return services;
         }
     }
