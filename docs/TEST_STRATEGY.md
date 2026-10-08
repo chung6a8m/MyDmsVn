@@ -62,6 +62,6 @@ Before marking a roadmap task complete:
 4. SQL integration / Windows UI tests in appropriately configured environment.
 5. Document tests executed, skipped and blocked with reasons.
 
-Build commands are examples for after P0 creates `MyDmsVn.sln`; until then there is no runnable target.
+P0 created `MyDmsVn.sln`; these commands are now runnable on Windows with the .NET 8 SDK and .NET Framework 4.8 targeting pack. SQL scenarios remain unavailable until P1 adds isolated test-database infrastructure.
 
 Do not weaken a test, delete a failing assertion or skip a platform solely to pass CI. Fix cause or document a real environment dependency and preserve coverage.

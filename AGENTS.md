@@ -4,7 +4,7 @@ Applies to the entire repository. This file is authoritative for AI-assisted cha
 
 ## Mission and status
 
-Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **Only plans/docs exist today; do not claim features or tests have been implemented.** Implement in small, reviewable phase-scoped changes.
+Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **P0 foundation code and tests exist; no business features or SQL schema are implemented yet.** Implement in small, reviewable phase-scoped changes and do not claim later-phase capabilities exist.
 
 ## Read-order and precedence
 

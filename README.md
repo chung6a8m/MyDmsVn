@@ -19,7 +19,7 @@ MyDmsVn is a Windows desktop-first business-management platform for Vietnamese S
 1. Read [AGENTS.md](AGENTS.md) and [AI_CONTEXT.md](AI_CONTEXT.md).
 2. Read [Product requirements](docs/PRD.md) and [Architecture](docs/ARCHITECTURE.md).
 3. Work sequentially through the [Development plan](docs/DEVELOPMENT_PLAN.md).
-4. Start implementation at [P0 plan](docs/plans/20261008-002-phase-0-foundation.md); implement P5 only after P0–P4 gates pass.
+4. Continue with P1 in the [Development plan](docs/DEVELOPMENT_PLAN.md); implement P5 only after the P1–P4 gates pass.
 5. Use the [P5 Sales & Inventory plan](docs/plans/20261008-001-sales-inventory-foundation.md) to guide the first vertical slice.
 
 ## Documentation index
@@ -64,4 +64,4 @@ dotnet build MyDmsVn.sln -c Release --no-restore --nologo
 dotnet test MyDmsVn.sln -c Release --no-build --no-restore --nologo
 ```
 
-The Release build completed with 0 warnings and 0 errors across `net48`, `net8.0`, and `net8.0-windows`. The test command passed all 16 test executions across five target runs. P0 performs no SQL integration tests or database actions; those begin in P1 with an explicitly configured isolated disposable database.
+The Release build completed with 0 warnings and 0 errors across `net48`, `net8.0`, and `net8.0-windows`. The test command passed all 22 test executions across five target runs. P0 performs no SQL integration tests or database actions; those begin in P1 with an explicitly configured isolated disposable database.

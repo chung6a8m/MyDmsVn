@@ -51,7 +51,7 @@ dotnet test MyDmsVn.sln -c Release --no-build --no-restore --nologo
 
 - Restore: succeeded for all 14 solution projects using checked-in lock files.
 - Build: succeeded for both desktop hosts and all library/test target frameworks with 0 warnings and 0 errors.
-- Tests: 16 passed, 0 failed, 0 skipped across Architecture (`net8.0`), Server.Application (`net48`, `net8.0`), and Desktop (`net48`, `net8.0-windows`).
+- Tests: 22 passed, 0 failed, 0 skipped across Architecture (`net8.0`), Server.Application (`net48`, `net8.0`), and Desktop (`net48`, `net8.0-windows`).
 - Not run by design: SQL integration tests, database provisioning/migration, interactive GUI smoke, Bootstrap UI/source-grid compatibility, and P1+ packages that are pinned centrally but not referenced in P0.
 - Target-specific difference: WinForms projects use `net48;net8.0-windows`; non-UI shared projects use `net48;net8.0`; the two executable hosts target `net48` and `net8.0-windows` separately.
 
