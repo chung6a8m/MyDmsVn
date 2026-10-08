@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "dependencies": {
+    ".NETFramework,Version=v4.8": {
+      "mydmsvn.sharedkernel": {
+        "type": "Project"
+      }
+    },
+    "net8.0": {
+      "mydmsvn.sharedkernel": {
+        "type": "Project"
+      }
+    }
+  }
+}

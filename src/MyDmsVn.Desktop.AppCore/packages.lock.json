@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net8.0-windows7.0": {
+      "mydmsvn.contracts": {
+        "type": "Project"
+      },
+      "mydmsvn.desktop.application": {
+        "type": "Project",
+        "dependencies": {
+          "MyDmsVn.Contracts": "[1.0.0, )"
+        }
+      },
+      "mydmsvn.desktop.infrastructure.local": {
+        "type": "Project",
+        "dependencies": {
+          "MyDmsVn.Desktop.Application": "[1.0.0, )",
+          "MyDmsVn.Server.Application": "[1.0.0, )"
+        }
+      },
+      "mydmsvn.desktop.winforms": {
+        "type": "Project",
+        "dependencies": {
+          "MyDmsVn.Desktop.Application": "[1.0.0, )"
+        }
+      },
+      "mydmsvn.server.application": {
+        "type": "Project",
+        "dependencies": {
+          "MyDmsVn.Contracts": "[1.0.0, )",
+          "MyDmsVn.Server.Domain": "[1.0.0, )"
+        }
+      },
+      "mydmsvn.server.domain": {
+        "type": "Project",
+        "dependencies": {
+          "MyDmsVn.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "mydmsvn.server.infrastructure": {
+        "type": "Project",
+        "dependencies": {
+          "MyDmsVn.Server.Application": "[1.0.0, )",
+          "MyDmsVn.Server.Domain": "[1.0.0, )"
+        }
+      },
+      "mydmsvn.sharedkernel": {
+        "type": "Project"
+      }
+    }
+  }
+}
