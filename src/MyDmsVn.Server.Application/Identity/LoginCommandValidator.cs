@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 
 namespace MyDmsVn.Server.Application.Identity
 {
@@ -10,8 +10,13 @@ namespace MyDmsVn.Server.Application.Identity
                 .NotEmpty()
                 .WithErrorCode("Validation.Required");
             RuleFor(command => command.Password)
+                .Cascade(CascadeMode.Stop)
                 .NotEmpty()
-                .WithErrorCode("Validation.Required");
+                .WithErrorCode("Validation.Required")
+                .Must(PasswordInputLimits.FitsBcrypt)
+                .WithMessage(
+                    $"Password cannot exceed {PasswordInputLimits.BcryptMaximumUtf8Bytes} UTF-8 bytes.")
+                .WithErrorCode("Validation.MaximumLength");
         }
     }
 }
