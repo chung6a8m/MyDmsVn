@@ -410,6 +410,7 @@
       "mydmsvn.server.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "BCrypt.Net-Next": "[4.2.0, )",
           "Dapper": "[2.1.79, )",
           "Microsoft.Data.SqlClient": "[7.0.2, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.2, )",
@@ -421,6 +422,15 @@
       },
       "mydmsvn.sharedkernel": {
         "type": "Project"
+      },
+      "BCrypt.Net-Next": {
+        "type": "CentralTransitive",
+        "requested": "[4.2.0, )",
+        "resolved": "4.2.0",
+        "contentHash": "gwLD2KfCuwQesP17aVh4h6lpiMPEVt5Lbpndo0ej903hNUUTtyxt3ARdDjmuydBRTAUICc7OVKVbaOvc6SQYXA==",
+        "dependencies": {
+          "System.Memory": "4.6.3"
+        }
       },
       "Dapper": {
         "type": "CentralTransitive",
@@ -790,6 +800,7 @@
       "mydmsvn.server.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "BCrypt.Net-Next": "[4.2.0, )",
           "Dapper": "[2.1.79, )",
           "Microsoft.Data.SqlClient": "[7.0.2, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.2, )",
@@ -801,6 +812,12 @@
       },
       "mydmsvn.sharedkernel": {
         "type": "Project"
+      },
+      "BCrypt.Net-Next": {
+        "type": "CentralTransitive",
+        "requested": "[4.2.0, )",
+        "resolved": "4.2.0",
+        "contentHash": "gwLD2KfCuwQesP17aVh4h6lpiMPEVt5Lbpndo0ej903hNUUTtyxt3ARdDjmuydBRTAUICc7OVKVbaOvc6SQYXA=="
       },
       "Dapper": {
         "type": "CentralTransitive",

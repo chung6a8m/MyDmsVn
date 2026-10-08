@@ -2,6 +2,8 @@
 
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using MyDmsVn.Server.Application.Identity;
+using MyDmsVn.Server.Application.Security;
 
 namespace MyDmsVn.Server.Application
 {
@@ -14,12 +16,18 @@ namespace MyDmsVn.Server.Application
                 {
                     configuration.RegisterServicesFromAssemblyContaining<GetFoundationStatusQuery>();
                     configuration.AddOpenBehavior(typeof(ExceptionHandlingBehavior<,>));
+                    configuration.AddOpenBehavior(typeof(AuthorizationBehavior<,>));
                     configuration.AddOpenBehavior(typeof(ValidationBehavior<,>));
                 });
             services.AddValidatorsFromAssemblyContaining<GetFoundationStatusQuery>(
                 includeInternalTypes: true);
             services.AddSingleton<IFoundationProbe, FoundationProbe>();
             services.TryAddSingleton<IApplicationExceptionReporter, TraceApplicationExceptionReporter>();
+            services.TryAddScoped<ICurrentUserAccessor, AnonymousCurrentUserAccessor>();
+            services.TryAddSingleton<IUtcClock, SystemUtcClock>();
+            services.TryAddSingleton<ISecurityAuditSink, NoOpSecurityAuditSink>();
+            services.TryAddScoped<IPermissionStore, DenyAllPermissionStore>();
+            services.TryAddScoped<IPermissionAuthorizationService, PermissionAuthorizationService>();
             return services;
         }
     }
