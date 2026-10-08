@@ -13,6 +13,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\MyDmsVn.Desktop.Application\MyDmsVn.Desktop.Application.csproj" />
     <ProjectReference Include="..\..\src\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

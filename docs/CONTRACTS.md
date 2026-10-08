@@ -49,6 +49,7 @@ ValidationBehavior / Application handler -> ErrorOr<T>
 
 - The **transport-neutral** ErrorOr-to-ApiResponse mapping should be implemented in an application composition/adapter library without ASP.NET dependency.
 - `Server.Api` wraps the mapped response with HTTP status and headers.
+- HTTP clients deserialize envelopes through `ApiJson.DeserializeResponse<T>(json, responseStatus)`, passing the actual HTTP status so `ApiError.Status` has the same value as Local mode without duplicating status in the JSON body.
 - Application handlers never construct `IResult`, `Results.Ok`, `HttpResponse` or `JsonResult`.
 - Avoid `dynamic` for pipeline result conversion; use a strongly typed generic conversion strategy compatible with ErrorOr version pinned in the solution.
 - Validate handler exceptions as unexpected failures, and log them without exposing details to users.

@@ -7,7 +7,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
     {
         public static IServiceCollection AddLocalDesktopAdapter(this IServiceCollection services)
         {
-            services.AddSingleton<IFoundationApiClient, LocalFoundationApiClient>();
+            services.AddTransient<IFoundationApiClient, LocalFoundationApiClient>();
             return services;
         }
     }

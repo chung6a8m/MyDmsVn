@@ -39,7 +39,7 @@ namespace MyDmsVn.Architecture.Tests
                 ["MyDmsVn.SharedKernel"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
                 ["MyDmsVn.Server.Domain"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
                 ["MyDmsVn.Server.Application"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
-                ["MyDmsVn.Desktop.Application"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
+                ["MyDmsVn.Desktop.Application"] = new[] { "ErrorOr", "MediatR", "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
                 ["MyDmsVn.Desktop.WinForms"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore" },
             };
 

@@ -3,12 +3,30 @@
   "dependencies": {
     ".NETFramework,Version=v4.8": {
       "mydmsvn.contracts": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "Newtonsoft.Json": {
+        "type": "CentralTransitive",
+        "requested": "[13.0.4, )",
+        "resolved": "13.0.4",
+        "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
       }
     },
     "net8.0": {
       "mydmsvn.contracts": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "Newtonsoft.Json": {
+        "type": "CentralTransitive",
+        "requested": "[13.0.4, )",
+        "resolved": "13.0.4",
+        "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
       }
     }
   }
