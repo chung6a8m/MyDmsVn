@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Persistence;
+using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Persistence;
 
@@ -29,6 +30,13 @@ namespace MyDmsVn.Server.Infrastructure
             services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
+            services.TryAddScoped<SqlIdentityStore>();
+            services.Replace(
+                ServiceDescriptor.Scoped<IUserStore>(
+                    serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
+            services.Replace(
+                ServiceDescriptor.Scoped<IPermissionStore>(
+                    serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
             services.AddSingleton<RepoDbMappingInitializer>();
             services.AddScoped<IUnitOfWorkFactory>(serviceProvider =>
             {
