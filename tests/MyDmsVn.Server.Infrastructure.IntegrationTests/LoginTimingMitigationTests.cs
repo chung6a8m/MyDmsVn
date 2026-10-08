@@ -12,8 +12,16 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
 {
     public sealed class LoginTimingMitigationTests
     {
-        private const string OutdatedPasswordHash =
+        private const string PasswordHash09 =
+            "$2a$09$1ZJfv9dZ7l8fISaTkqDpu.9SfA8sipd8Wzi80j03fm.p/Bn5EEXKu";
+        private const string PasswordHash10 =
             "$2a$10$UUw6HvtdyUhWhI7SlbM4Vuz5qxprDwSaqDCVWqXY1e4a3TkCQNZ8a";
+        private const string PasswordHash11 =
+            "$2a$11$ZcIj6bnzbiPkKMCsr4eQIORkyqezH2QZevpmMShm.SZSxdsQk1vuC";
+        private const string PasswordHash12 =
+            "$2a$12$DJ2rREA5/frYEVJVu2oLc.BEwOMyynlSHY/4LQREU8YLQL9QowGsO";
+        private const string PasswordHash13 =
+            "$2a$13$xOX/8DclKtz.wIBCiFAlPO.tk4EVV/Wyo174wU1ZsWLFN/rFKbGZi";
 
         [Theory]
         [InlineData(false)]
@@ -21,7 +29,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
         public async Task Oversized_password_is_rejected_before_user_lookup_with_real_hasher(
             bool useMultibytePassword)
         {
-            var store = new FakeUserStore { User = StoredUser(OutdatedPasswordHash) };
+            var store = new FakeUserStore { User = StoredUser(PasswordHash10) };
             using var provider = CreateProvider(store);
             var password = useMultibytePassword
                 ? new string('\u00e9', 37)
@@ -36,16 +44,44 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             Assert.Equal(0, store.LookupCount);
         }
 
-        [Fact]
-        public async Task Wrong_password_for_cost_10_hash_has_same_work_budget_as_missing_user()
+        [Theory]
+        [InlineData(PasswordHash10)]
+        [InlineData(PasswordHash11)]
+        [InlineData(PasswordHash12)]
+        public async Task Wrong_password_for_supported_hash_has_same_work_budget_as_missing_user(
+            string passwordHash)
         {
-            var store = new FakeUserStore { User = StoredUser(OutdatedPasswordHash) };
+            var store = new FakeUserStore { User = StoredUser(passwordHash) };
             using var provider = CreateProvider(store);
             var sender = provider.GetRequiredService<MediatR.ISender>();
 
             await SendInvalidLoginAsync(sender, "operator");
             await SendInvalidLoginAsync(sender, "missing");
 
+            var existingTicks = await MeasureInvalidLoginsAsync(sender, "operator");
+            var missingTicks = await MeasureInvalidLoginsAsync(sender, "missing");
+            var ratio = (double)existingTicks / missingTicks;
+
+            Assert.InRange(ratio, 0.60, 1.80);
+        }
+
+        [Theory]
+        [InlineData(PasswordHash09)]
+        [InlineData(PasswordHash13)]
+        public async Task Out_of_policy_hash_fails_closed_with_configured_work_budget(
+            string passwordHash)
+        {
+            var store = new FakeUserStore { User = StoredUser(passwordHash) };
+            using var provider = CreateProvider(store);
+            var sender = provider.GetRequiredService<MediatR.ISender>();
+
+            var correctPasswordResult = await sender.Send(
+                new LoginCommand("operator", "correct-password"),
+                CancellationToken.None);
+            Assert.True(correctPasswordResult.IsError);
+            Assert.Equal("Auth.InvalidCredentials", correctPasswordResult.FirstError.Code);
+
+            await SendInvalidLoginAsync(sender, "missing");
             var existingTicks = await MeasureInvalidLoginsAsync(sender, "operator");
             var missingTicks = await MeasureInvalidLoginsAsync(sender, "missing");
             var ratio = (double)existingTicks / missingTicks;

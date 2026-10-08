@@ -65,19 +65,30 @@ namespace MyDmsVn.Server.Infrastructure.Identity
 
             try
             {
+                var hashInformation = BCrypt.Net.BCrypt.InterrogateHash(passwordHash);
+                if (!int.TryParse(hashInformation.WorkFactor, out var storedWorkFactor) ||
+                    storedWorkFactor < 10 ||
+                    storedWorkFactor > _workFactor)
+                {
+                    VerifyForTiming(password);
+                    return false;
+                }
+
                 var verified = BCrypt.Net.BCrypt.Verify(password, passwordHash);
                 if (!verified)
                 {
-                    EqualizeFailedVerification(password, passwordHash);
+                    EqualizeFailedVerification(password, storedWorkFactor);
                 }
 
                 return verified;
             }
             catch (Exception exception) when (
+                exception is BCrypt.Net.HashInformationException ||
                 exception is BCrypt.Net.SaltParseException ||
                 exception is ArgumentException ||
                 exception is FormatException)
             {
+                VerifyForTiming(password);
                 return false;
             }
         }
@@ -87,12 +98,9 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             BCrypt.Net.BCrypt.Verify(password ?? string.Empty, GetTimingHash(_workFactor));
         }
 
-        private void EqualizeFailedVerification(string password, string passwordHash)
+        private void EqualizeFailedVerification(string password, int storedWorkFactor)
         {
-            var hashInformation = BCrypt.Net.BCrypt.InterrogateHash(passwordHash);
-            if (!int.TryParse(hashInformation.WorkFactor, out var storedWorkFactor) ||
-                storedWorkFactor < 10 ||
-                storedWorkFactor >= _workFactor)
+            if (storedWorkFactor >= _workFactor)
             {
                 return;
             }
