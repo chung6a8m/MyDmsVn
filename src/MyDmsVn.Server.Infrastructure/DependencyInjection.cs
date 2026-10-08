@@ -2,7 +2,10 @@
 
 using System;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Persistence;
+using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Persistence;
 
 namespace MyDmsVn.Server.Infrastructure
@@ -24,6 +27,7 @@ namespace MyDmsVn.Server.Infrastructure
             }
 
             services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
+            services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.AddSingleton<RepoDbMappingInitializer>();
             services.AddScoped<IUnitOfWorkFactory>(serviceProvider =>
             {
