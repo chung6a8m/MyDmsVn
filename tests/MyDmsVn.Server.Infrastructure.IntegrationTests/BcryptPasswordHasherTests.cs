@@ -1,4 +1,4 @@
-using MyDmsVn.Server.Infrastructure.Identity;
+﻿using MyDmsVn.Server.Infrastructure.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Identity;
 using Xunit;
@@ -49,6 +49,30 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             using var provider = services.BuildServiceProvider();
 
             Assert.IsType<BcryptPasswordHasher>(provider.GetRequiredService<IPasswordHasher>());
+        }
+
+        [Fact]
+        public void Passwords_past_the_bcrypt_utf8_boundary_are_rejected_instead_of_truncated()
+        {
+            var hasher = new BcryptPasswordHasher(10);
+            var seventyTwoBytes = new string('a', 72);
+            var hash = hasher.Hash(seventyTwoBytes);
+
+            Assert.True(hasher.Verify(seventyTwoBytes, hash));
+            Assert.False(hasher.Verify(seventyTwoBytes + "different-suffix", hash));
+            Assert.Throws<System.ArgumentException>(() => hasher.Hash(seventyTwoBytes + "x"));
+        }
+
+        [Fact]
+        public void Multibyte_passwords_use_utf8_byte_count_for_the_bcrypt_boundary()
+        {
+            var hasher = new BcryptPasswordHasher(10);
+            var seventyTwoBytes = new string('\u00e9', 36);
+            var hash = hasher.Hash(seventyTwoBytes);
+
+            Assert.True(hasher.Verify(seventyTwoBytes, hash));
+            Assert.False(hasher.Verify(seventyTwoBytes + "x", hash));
+            Assert.Throws<System.ArgumentException>(() => hasher.Hash(new string('\u00e9', 37)));
         }
     }
 }

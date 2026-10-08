@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using ErrorOr;
@@ -137,22 +137,13 @@ namespace MyDmsVn.Server.Application.Tests
             public bool RoleGrant { get; set; }
             public int QueryCount { get; private set; }
 
-            public Task<bool?> GetDirectDecisionAsync(
+            public Task<PermissionSnapshot> GetSnapshotAsync(
                 int userId,
                 string permissionKey,
                 CancellationToken cancellationToken)
             {
                 QueryCount++;
-                return Task.FromResult(DirectDecision);
-            }
-
-            public Task<bool> HasRoleGrantAsync(
-                int userId,
-                string permissionKey,
-                CancellationToken cancellationToken)
-            {
-                QueryCount++;
-                return Task.FromResult(RoleGrant);
+                return Task.FromResult(new PermissionSnapshot(DirectDecision, RoleGrant));
             }
         }
 

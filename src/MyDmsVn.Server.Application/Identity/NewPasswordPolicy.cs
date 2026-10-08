@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace MyDmsVn.Server.Application.Identity
@@ -20,6 +20,7 @@ namespace MyDmsVn.Server.Application.Identity
         {
             if (string.IsNullOrWhiteSpace(password) ||
                 password.Length < MinimumLength ||
+                !PasswordInputLimits.FitsBcrypt(password) ||
                 KnownDefaults.Contains(password))
             {
                 return false;

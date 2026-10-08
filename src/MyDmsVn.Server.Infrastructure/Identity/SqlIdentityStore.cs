@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -73,7 +74,7 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             return affected == 1;
         }
 
-        public async Task<bool?> GetDirectDecisionAsync(
+        public async Task<PermissionSnapshot> GetSnapshotAsync(
             int userId,
             string permissionKey,
             CancellationToken cancellationToken)
@@ -81,34 +82,36 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             using var connection = await _connectionFactory
                 .OpenConnectionAsync(cancellationToken)
                 .ConfigureAwait(false);
-            return await connection.QuerySingleOrDefaultAsync<bool?>(
-                new CommandDefinition(
-                    "SELECT up.Granted FROM dbo.UserPermissions AS up " +
-                    "INNER JOIN dbo.Users AS u ON u.UserId = up.UserId AND u.IsActive = 1 " +
-                    "WHERE up.UserId = @userId AND up.PermissionKey = @permissionKey;",
-                    new { userId, permissionKey },
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
-        }
-
-        public async Task<bool> HasRoleGrantAsync(
-            int userId,
-            string permissionKey,
-            CancellationToken cancellationToken)
-        {
-            using var connection = await _connectionFactory
-                .OpenConnectionAsync(cancellationToken)
-                .ConfigureAwait(false);
-            return await connection.QuerySingleAsync<bool>(
-                new CommandDefinition(
-                    "SELECT CAST(CASE WHEN EXISTS (" +
-                    "SELECT 1 FROM dbo.UserRoles AS ur " +
-                    "INNER JOIN dbo.Users AS u ON u.UserId = ur.UserId AND u.IsActive = 1 " +
-                    "INNER JOIN dbo.Roles AS r ON r.RoleId = ur.RoleId AND r.IsActive = 1 " +
-                    "INNER JOIN dbo.RolePermissions AS rp ON rp.RoleId = ur.RoleId " +
-                    "WHERE ur.UserId = @userId AND rp.PermissionKey = @permissionKey" +
-                    ") THEN 1 ELSE 0 END AS bit);",
-                    new { userId, permissionKey },
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+            try
+            {
+                var row = await connection.QuerySingleOrDefaultAsync<PermissionSnapshotRow>(
+                    new CommandDefinition(
+                        "SELECT " +
+                        "CASE WHEN u.IsActive = 1 THEN (" +
+                        "SELECT TOP (1) up.Granted FROM dbo.UserPermissions AS up " +
+                        "WHERE up.UserId = u.UserId AND up.PermissionKey = @permissionKey" +
+                        ") ELSE NULL END AS DirectDecision, " +
+                        "CAST(CASE WHEN u.IsActive = 1 AND EXISTS (" +
+                        "SELECT 1 FROM dbo.UserRoles AS ur " +
+                        "INNER JOIN dbo.Roles AS r ON r.RoleId = ur.RoleId AND r.IsActive = 1 " +
+                        "INNER JOIN dbo.RolePermissions AS rp ON rp.RoleId = ur.RoleId " +
+                        "WHERE ur.UserId = u.UserId AND rp.PermissionKey = @permissionKey" +
+                        ") THEN 1 ELSE 0 END AS bit) AS HasRoleGrant " +
+                        "FROM dbo.Users AS u WHERE u.UserId = @userId;",
+                        new { userId, permissionKey },
+                        transaction,
+                        cancellationToken: cancellationToken)).ConfigureAwait(false);
+                transaction.Commit();
+                return row == null
+                    ? new PermissionSnapshot(null, false)
+                    : new PermissionSnapshot(row.DirectDecision, row.HasRoleGrant);
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
         private sealed class UserAccountRow
@@ -121,6 +124,13 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             public string PasswordHash { get; set; } = string.Empty;
             public string PasswordSalt { get; set; } = string.Empty;
             public string PasswordAlgorithm { get; set; } = string.Empty;
+        }
+
+        private sealed class PermissionSnapshotRow
+        {
+            public bool? DirectDecision { get; set; }
+
+            public bool HasRoleGrant { get; set; }
         }
     }
 }

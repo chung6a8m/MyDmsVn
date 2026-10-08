@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -49,23 +50,23 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                     CancellationToken.None);
                 Assert.NotNull(user);
                 Assert.Equal(userId, user!.UserId);
-                Assert.Null(await permissionStore.GetDirectDecisionAsync(
+                var initialPermission = await permissionStore.GetSnapshotAsync(
                     userId,
                     PermissionKeys.CatalogProductsWrite,
-                    CancellationToken.None));
-                Assert.True(await permissionStore.HasRoleGrantAsync(
-                    userId,
-                    PermissionKeys.CatalogProductsWrite,
-                    CancellationToken.None));
+                    CancellationToken.None);
+                Assert.Null(initialPermission.DirectDecision);
+                Assert.True(initialPermission.HasRoleGrant);
 
                 await connection.ExecuteAsync(
                     "INSERT dbo.UserPermissions (UserId, PermissionKey, Granted) " +
                     "VALUES (@userId, @permissionKey, 0);",
                     new { userId, permissionKey = PermissionKeys.CatalogProductsWrite });
-                Assert.False(await permissionStore.GetDirectDecisionAsync(
+                var overriddenPermission = await permissionStore.GetSnapshotAsync(
                     userId,
                     PermissionKeys.CatalogProductsWrite,
-                    CancellationToken.None));
+                    CancellationToken.None);
+                Assert.False(overriddenPermission.DirectDecision);
+                Assert.True(overriddenPermission.HasRoleGrant);
 
                 var replacement = new PasswordReplacement(
                     userId,
@@ -87,14 +88,12 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                 await connection.ExecuteAsync(
                     "UPDATE dbo.Users SET IsActive = 0 WHERE UserId = @userId;",
                     new { userId });
-                Assert.Null(await permissionStore.GetDirectDecisionAsync(
+                var inactivePermission = await permissionStore.GetSnapshotAsync(
                     userId,
                     PermissionKeys.CatalogProductsWrite,
-                    CancellationToken.None));
-                Assert.False(await permissionStore.HasRoleGrantAsync(
-                    userId,
-                    PermissionKeys.CatalogProductsWrite,
-                    CancellationToken.None));
+                    CancellationToken.None);
+                Assert.Null(inactivePermission.DirectDecision);
+                Assert.False(inactivePermission.HasRoleGrant);
             }
             finally
             {
@@ -173,6 +172,62 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                     "SELECT PasswordHash FROM dbo.Users WHERE NormalizedUsername = N'OPERATOR';");
                 Assert.NotEqual(oldHash, newHash);
                 Assert.True(new BcryptPasswordHasher().Verify(password, newHash));
+            }
+            finally
+            {
+                await database.DisposeAsync();
+            }
+        }
+
+        [SqlServerFact]
+        public async Task Permission_snapshot_never_exposes_role_grant_without_concurrent_direct_deny()
+        {
+            var database = await CreateMigratedDatabaseAsync();
+            try
+            {
+                int userId;
+                int roleId;
+                using (var setupConnection = new SqlConnection(database.ConnectionString))
+                {
+                    userId = await InsertUserAsync(setupConnection, "operator", "OPERATOR");
+                    roleId = await setupConnection.QuerySingleAsync<int>(
+                        "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
+                        "OUTPUT INSERTED.RoleId VALUES (N'Warehouse', N'WAREHOUSE');");
+                }
+
+                var services = new ServiceCollection();
+                services.AddSqlPersistence(database.ConnectionString);
+                using var provider = services.BuildServiceProvider();
+                var permissionStore = provider.GetRequiredService<IPermissionStore>();
+
+                using var adminConnection = new SqlConnection(database.ConnectionString);
+                await adminConnection.OpenAsync();
+                using var adminTransaction = adminConnection.BeginTransaction(IsolationLevel.Serializable);
+                await adminConnection.ExecuteAsync(
+                    "INSERT dbo.UserRoles (UserId, RoleId) VALUES (@userId, @roleId); " +
+                    "INSERT dbo.RolePermissions (RoleId, PermissionKey) VALUES (@roleId, @permissionKey); " +
+                    "INSERT dbo.UserPermissions (UserId, PermissionKey, Granted) VALUES (@userId, @permissionKey, 0);",
+                    new
+                    {
+                        userId,
+                        roleId,
+                        permissionKey = PermissionKeys.CatalogProductsWrite,
+                    },
+                    adminTransaction);
+
+                var snapshotTask = permissionStore.GetSnapshotAsync(
+                    userId,
+                    PermissionKeys.CatalogProductsWrite,
+                    CancellationToken.None);
+                await Task.Delay(150);
+                Assert.False(snapshotTask.IsCompleted);
+
+                adminTransaction.Commit();
+                var completed = await Task.WhenAny(snapshotTask, Task.Delay(TimeSpan.FromSeconds(5)));
+                Assert.Same(snapshotTask, completed);
+                var snapshot = await snapshotTask;
+                Assert.False(snapshot.DirectDecision);
+                Assert.True(snapshot.HasRoleGrant);
             }
             finally
             {

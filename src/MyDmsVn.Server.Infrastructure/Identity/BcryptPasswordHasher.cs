@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using MyDmsVn.Server.Application.Identity;
 
 namespace MyDmsVn.Server.Infrastructure.Identity
@@ -29,12 +29,21 @@ namespace MyDmsVn.Server.Infrastructure.Identity
                 throw new ArgumentException("A password is required.", nameof(password));
             }
 
+            if (!PasswordInputLimits.FitsBcrypt(password))
+            {
+                throw new ArgumentException(
+                    $"A password cannot exceed {PasswordInputLimits.BcryptMaximumUtf8Bytes} UTF-8 bytes for BCrypt.",
+                    nameof(password));
+            }
+
             return BCrypt.Net.BCrypt.HashPassword(password, _workFactor);
         }
 
         public bool Verify(string password, string passwordHash)
         {
-            if (string.IsNullOrEmpty(password) || string.IsNullOrWhiteSpace(passwordHash))
+            if (string.IsNullOrEmpty(password) ||
+                !PasswordInputLimits.FitsBcrypt(password) ||
+                string.IsNullOrWhiteSpace(passwordHash))
             {
                 return false;
             }

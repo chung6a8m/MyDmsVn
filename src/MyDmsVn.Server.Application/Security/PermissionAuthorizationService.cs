@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Server.Application.Identity;
 
@@ -31,23 +31,18 @@ namespace MyDmsVn.Server.Application.Security
                 return false;
             }
 
-            var directDecision = await _permissionStore
-                .GetDirectDecisionAsync(
+            var snapshot = await _permissionStore
+                .GetSnapshotAsync(
                     currentUser.UserId.Value,
                     permissionKey,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (directDecision.HasValue)
+            if (snapshot.DirectDecision.HasValue)
             {
-                return directDecision.Value;
+                return snapshot.DirectDecision.Value;
             }
 
-            return await _permissionStore
-                .HasRoleGrantAsync(
-                    currentUser.UserId.Value,
-                    permissionKey,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            return snapshot.HasRoleGrant;
         }
     }
 }

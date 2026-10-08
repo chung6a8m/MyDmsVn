@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Identity;
@@ -58,6 +58,15 @@ namespace MyDmsVn.Server.Application.Tests
         public void Long_non_default_new_password_is_accepted()
         {
             Assert.True(NewPasswordPolicy.IsAcceptable("Maple-River-47-Cobalt!", "operator"));
+        }
+
+        [Fact]
+        public void New_password_policy_enforces_bcrypt_utf8_byte_boundary()
+        {
+            Assert.True(NewPasswordPolicy.IsAcceptable("Aa1!" + new string('x', 68), "operator"));
+            Assert.False(NewPasswordPolicy.IsAcceptable("Aa1!" + new string('x', 69), "operator"));
+            Assert.True(NewPasswordPolicy.IsAcceptable("Aa1!" + new string('\u00e9', 34), "operator"));
+            Assert.False(NewPasswordPolicy.IsAcceptable("Aa1!" + new string('\u00e9', 35), "operator"));
         }
     }
 }
