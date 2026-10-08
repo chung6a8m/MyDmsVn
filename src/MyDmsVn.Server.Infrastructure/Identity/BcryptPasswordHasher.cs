@@ -8,6 +8,9 @@ namespace MyDmsVn.Server.Infrastructure.Identity
         public const string AlgorithmName = "BCrypt";
         public const int DefaultWorkFactor = 12;
 
+        private const string TimingVerificationHash =
+            "$2a$12$0PHck83ZN3JHVvlAEViX.ui/HKwJGyLrxp56jbAodCpsZZdQYFYH2";
+
         private readonly int _workFactor;
 
         public BcryptPasswordHasher(int workFactor = DefaultWorkFactor)
@@ -59,6 +62,11 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             {
                 return false;
             }
+        }
+
+        public void VerifyForTiming(string password)
+        {
+            BCrypt.Net.BCrypt.Verify(password ?? string.Empty, TimingVerificationHash);
         }
 
         public bool NeedsRehash(string passwordHash)

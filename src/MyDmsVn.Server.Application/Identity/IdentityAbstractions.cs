@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 
 namespace MyDmsVn.Server.Application.Identity
@@ -15,6 +15,8 @@ namespace MyDmsVn.Server.Application.Identity
         string Hash(string password);
 
         bool Verify(string password, string passwordHash);
+
+        void VerifyForTiming(string password);
 
         bool NeedsRehash(string passwordHash);
     }

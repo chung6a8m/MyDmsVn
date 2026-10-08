@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using ErrorOr;
@@ -41,6 +41,7 @@ namespace MyDmsVn.Server.Application.Identity
 
             if (user == null)
             {
+                _passwordHasher.VerifyForTiming(request.Password);
                 await AuditAsync(null, SecurityAuditOutcome.Failed, cancellationToken)
                     .ConfigureAwait(false);
                 return InvalidCredentials();
@@ -48,23 +49,14 @@ namespace MyDmsVn.Server.Application.Identity
 
             if (!user.IsActive)
             {
+                _passwordHasher.VerifyForTiming(request.Password);
                 await AuditAsync(user.UserId, SecurityAuditOutcome.Disabled, cancellationToken)
                     .ConfigureAwait(false);
                 return InvalidCredentials();
             }
 
-            var isCurrentAlgorithm = string.Equals(
-                user.PasswordAlgorithm,
-                _passwordHasher.Algorithm,
-                StringComparison.Ordinal);
-            var verified = isCurrentAlgorithm
-                ? _passwordHasher.Verify(request.Password, user.PasswordHash)
-                : _legacyPasswordVerifier.Supports(user.PasswordAlgorithm) &&
-                    _legacyPasswordVerifier.Verify(
-                        user.PasswordAlgorithm,
-                        request.Password,
-                        user.PasswordHash,
-                        user.PasswordSalt);
+            var isCurrentAlgorithm = IsCurrentAlgorithm(user);
+            var verified = VerifyCredentials(user, request.Password);
 
             if (!verified)
             {
@@ -88,15 +80,53 @@ namespace MyDmsVn.Server.Application.Identity
                     .ConfigureAwait(false);
                 if (!replaced)
                 {
-                    await AuditAsync(user.UserId, SecurityAuditOutcome.RehashFailed, cancellationToken)
+                    var refreshedUser = await _userStore
+                        .FindByNormalizedUsernameAsync(normalizedUsername, cancellationToken)
                         .ConfigureAwait(false);
-                    return InvalidCredentials();
+                    if (refreshedUser == null ||
+                        refreshedUser.UserId != user.UserId ||
+                        !refreshedUser.IsActive ||
+                        !VerifyCredentials(refreshedUser, request.Password))
+                    {
+                        await AuditAsync(
+                                user.UserId,
+                                SecurityAuditOutcome.RehashFailed,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        return InvalidCredentials();
+                    }
+
+                    user = refreshedUser;
                 }
             }
 
             await AuditAsync(user.UserId, SecurityAuditOutcome.Succeeded, cancellationToken)
                 .ConfigureAwait(false);
             return new CurrentUserDto(user.UserId, user.Username, user.DisplayName);
+        }
+
+        private bool VerifyCredentials(UserAccount user, string password)
+        {
+            if (IsCurrentAlgorithm(user))
+            {
+                return _passwordHasher.Verify(password, user.PasswordHash);
+            }
+
+            _passwordHasher.VerifyForTiming(password);
+            return _legacyPasswordVerifier.Supports(user.PasswordAlgorithm) &&
+                _legacyPasswordVerifier.Verify(
+                    user.PasswordAlgorithm,
+                    password,
+                    user.PasswordHash,
+                    user.PasswordSalt);
+        }
+
+        private bool IsCurrentAlgorithm(UserAccount user)
+        {
+            return string.Equals(
+                user.PasswordAlgorithm,
+                _passwordHasher.Algorithm,
+                StringComparison.Ordinal);
         }
 
         private Task AuditAsync(

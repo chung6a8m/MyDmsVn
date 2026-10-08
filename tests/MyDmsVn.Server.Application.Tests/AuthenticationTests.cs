@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -59,6 +59,36 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Null(store.Replacement);
         }
 
+        [Theory]
+        [InlineData("missing")]
+        [InlineData("inactive")]
+        [InlineData("unsupported")]
+        public async Task Non_current_login_paths_still_apply_one_current_hash_verification_cost(
+            string accountState)
+        {
+            var store = new FakeUserStore
+            {
+                User = accountState == "missing"
+                    ? null
+                    : StoredUser(
+                        isActive: accountState != "inactive",
+                        algorithm: accountState == "unsupported" ? "UnknownLegacy" : "BCrypt"),
+            };
+            var hasher = new FakePasswordHasher();
+            using var provider = CreateProvider(
+                store,
+                hasher,
+                new FakeLegacyVerifier(),
+                new CapturingSecurityAuditSink());
+
+            var result = await provider.GetRequiredService<MediatR.ISender>().Send(
+                new LoginCommand("operator", "wrong-password"),
+                CancellationToken.None);
+
+            Assert.True(result.IsError);
+            Assert.Equal(1, hasher.VerificationCount);
+        }
+
         [Fact]
         public async Task Approved_legacy_verification_rehashes_with_bcrypt_and_empty_legacy_salt()
         {
@@ -91,22 +121,53 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
-        public async Task Failed_atomic_rehash_fails_login_without_accepting_stale_credentials()
+        public async Task Concurrent_rehash_with_the_same_password_allows_the_losing_login()
         {
             var store = new FakeUserStore
             {
-                User = StoredUser(isActive: true, algorithm: "ApprovedLegacy"),
+                User = StoredUser(isActive: true, algorithm: "BCrypt"),
+                RefreshedUser = StoredUser(
+                    isActive: true,
+                    algorithm: "BCrypt",
+                    passwordHash: "concurrent-bcrypt-hash"),
                 ReplaceSucceeds = false,
             };
-            var legacyVerifier = new FakeLegacyVerifier
-            {
-                SupportedAlgorithm = "ApprovedLegacy",
-                VerificationResult = true,
-            };
+            var hasher = new FakePasswordHasher { NeedsRehashResult = true };
             using var provider = CreateProvider(
                 store,
-                new FakePasswordHasher(),
-                legacyVerifier,
+                hasher,
+                new FakeLegacyVerifier(),
+                new CapturingSecurityAuditSink());
+
+            var result = await provider.GetRequiredService<MediatR.ISender>().Send(
+                new LoginCommand("operator", "correct-password"),
+                CancellationToken.None);
+
+            Assert.False(result.IsError);
+            Assert.Equal(2, store.LookupCount);
+        }
+
+        [Theory]
+        [InlineData(true, "reset-bcrypt-hash")]
+        [InlineData(false, "concurrent-bcrypt-hash")]
+        public async Task Failed_atomic_rehash_rejects_a_password_reset_or_deactivated_account(
+            bool refreshedIsActive,
+            string refreshedPasswordHash)
+        {
+            var store = new FakeUserStore
+            {
+                User = StoredUser(isActive: true, algorithm: "BCrypt"),
+                RefreshedUser = StoredUser(
+                    refreshedIsActive,
+                    "BCrypt",
+                    refreshedPasswordHash),
+                ReplaceSucceeds = false,
+            };
+            var hasher = new FakePasswordHasher { NeedsRehashResult = true };
+            using var provider = CreateProvider(
+                store,
+                hasher,
+                new FakeLegacyVerifier(),
                 new CapturingSecurityAuditSink());
 
             var result = await provider.GetRequiredService<MediatR.ISender>().Send(
@@ -115,6 +176,7 @@ namespace MyDmsVn.Server.Application.Tests
 
             Assert.True(result.IsError);
             Assert.Equal("Auth.InvalidCredentials", result.FirstError.Code);
+            Assert.Equal(2, store.LookupCount);
         }
 
         [Fact]
@@ -177,7 +239,10 @@ namespace MyDmsVn.Server.Application.Tests
             return services.BuildServiceProvider();
         }
 
-        private static UserAccount StoredUser(bool isActive, string algorithm)
+        private static UserAccount StoredUser(
+            bool isActive,
+            string algorithm,
+            string passwordHash = "legacy-hash")
         {
             return new UserAccount(
                 42,
@@ -185,7 +250,7 @@ namespace MyDmsVn.Server.Application.Tests
                 "OPERATOR",
                 "Operator",
                 isActive,
-                "legacy-hash",
+                passwordHash,
                 "legacy-salt",
                 algorithm);
         }
@@ -193,15 +258,20 @@ namespace MyDmsVn.Server.Application.Tests
         private sealed class FakeUserStore : IUserStore
         {
             public UserAccount? User { get; set; }
+            public UserAccount? RefreshedUser { get; set; }
             public bool ReplaceSucceeds { get; set; } = true;
             public PasswordReplacement? Replacement { get; private set; }
+            public int LookupCount { get; private set; }
 
             public Task<UserAccount?> FindByNormalizedUsernameAsync(
                 string normalizedUsername,
                 CancellationToken cancellationToken)
             {
                 Assert.Equal("OPERATOR", normalizedUsername);
-                return Task.FromResult(User);
+                LookupCount++;
+                return Task.FromResult(LookupCount == 1 || RefreshedUser == null
+                    ? User
+                    : RefreshedUser);
             }
 
             public Task<bool> TryReplacePasswordAsync(
@@ -216,6 +286,8 @@ namespace MyDmsVn.Server.Application.Tests
         private sealed class FakePasswordHasher : IPasswordHasher
         {
             public string Algorithm => "BCrypt";
+            public bool NeedsRehashResult { get; set; }
+            public int VerificationCount { get; private set; }
 
             public string Hash(string password)
             {
@@ -224,12 +296,19 @@ namespace MyDmsVn.Server.Application.Tests
 
             public bool Verify(string password, string passwordHash)
             {
-                return password == "correct-password" && passwordHash == "legacy-hash";
+                VerificationCount++;
+                return password == "correct-password" &&
+                    (passwordHash == "legacy-hash" || passwordHash == "concurrent-bcrypt-hash");
+            }
+
+            public void VerifyForTiming(string password)
+            {
+                VerificationCount++;
             }
 
             public bool NeedsRehash(string passwordHash)
             {
-                return false;
+                return NeedsRehashResult;
             }
         }
 

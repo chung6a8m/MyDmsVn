@@ -6,8 +6,8 @@ Scope: P3 only. No P4 WinForms shell, P5 business feature, HTTP bearer host, or 
 ## Implemented
 
 - DbUp identity schema for `Users`, `Roles`, `UserRoles`, `RolePermissions`, and `UserPermissions`, preserving `PasswordHash` and `PasswordSalt` while adding an explicit `PasswordAlgorithm` marker, normalized-name uniqueness, foreign keys, relationship uniqueness, activity flags, UTC audit fields, and row versions where admin edits need optimistic concurrency.
-- Application identity abstractions for current user, user persistence, current/legacy password verification, login and current-user queries. Missing, anonymous, inactive, wrong-password, and unsupported-algorithm paths fail closed without account-enumerating public messages.
-- BCrypt.Net-Next 4.2.0 hashing for new/current credentials with work-factor rehash detection. Password input is capped at BCrypt's 72-byte UTF-8 boundary in both policy and hashing/verification paths so distinct suffixes cannot authenticate through truncation. Password replacement is a single conditional SQL update matching the prior hash and algorithm; BCrypt's embedded salt is used and the retained legacy `PasswordSalt` column receives the documented empty sentinel.
+- Application identity abstractions for current user, user persistence, current/legacy password verification, login and current-user queries. Missing, inactive, and unsupported-algorithm login paths execute a BCrypt verification against a precomputed sentinel before returning the same public error, reducing active-username timing leakage. Host-level throttling remains a P7 responsibility.
+- BCrypt.Net-Next 4.2.0 hashing for new/current credentials with work-factor rehash detection. Password input is capped at BCrypt's 72-byte UTF-8 boundary in both policy and hashing/verification paths so distinct suffixes cannot authenticate through truncation. Password replacement is a single conditional SQL update matching the prior hash and algorithm; when concurrent login wins that update, the losing request re-reads the active account and re-verifies its current hash instead of rejecting a still-valid password. BCrypt's embedded salt is used and the retained legacy `PasswordSalt` column receives the documented empty sentinel.
 - A deliberately unsupported legacy verifier. No legacy hash algorithm was guessed. The orchestration can rehash only after a separately supplied verifier validates an approved algorithm fixture.
 - Exact, declared permission keys; direct user grant/deny precedence; role union only when no direct row exists; unknown keys, anonymous users, inactive users, inactive roles, and missing grants deny. MediatR authorization runs before validation and handlers, so a denied test mutation cannot write.
 - A typed security-audit contract containing only action, outcome, user ID, and a validated UTC timestamp. Login emits success/failure/disabled/rehash-failure events without passing request payloads or password material to the sink. P6 still owns the production structured-log sink; future privileged mutation handlers must emit their success event only after commit.
@@ -28,13 +28,13 @@ dotnet build MyDmsVn.sln -c Release --no-restore
 Result: succeeded; 0 warnings, 0 errors.
 
 dotnet test MyDmsVn.sln -c Release --no-build --no-restore
-Result: 247 passed, 0 failed, 0 skipped across all eligible target frameworks.
+Result: 257 passed, 0 failed, 0 skipped across all eligible target frameworks.
 ```
 
 Breakdown:
 
 - Architecture: 5 passed (`net8.0`).
-- Server.Application: 62 passed on `net48`; 62 passed on `net8.0`.
+- Server.Application: 67 passed on `net48`; 67 passed on `net8.0`.
 - Desktop: 14 passed on `net48`; 14 passed on `net8.0-windows`.
 - Server.Infrastructure integration: 45 passed on `net48`; 45 passed on `net8.0`.
 
