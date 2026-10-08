@@ -2,6 +2,7 @@
 
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using MyDmsVn.Server.Application.Identity;
 
 namespace MyDmsVn.Server.Application
 {
@@ -20,6 +21,7 @@ namespace MyDmsVn.Server.Application
                 includeInternalTypes: true);
             services.AddSingleton<IFoundationProbe, FoundationProbe>();
             services.TryAddSingleton<IApplicationExceptionReporter, TraceApplicationExceptionReporter>();
+            services.TryAddScoped<ICurrentUserAccessor, AnonymousCurrentUserAccessor>();
             return services;
         }
     }
