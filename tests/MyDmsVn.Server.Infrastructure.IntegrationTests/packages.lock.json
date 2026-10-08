@@ -419,6 +419,7 @@
       "mydmsvn.server.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Data.SqlClient": "[7.0.2, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.2, )",
           "MyDmsVn.Server.Application": "[1.0.0, )",
           "MyDmsVn.Server.Domain": "[1.0.0, )"
@@ -736,6 +737,7 @@
       "mydmsvn.server.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Data.SqlClient": "[7.0.2, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.2, )",
           "MyDmsVn.Server.Application": "[1.0.0, )",
           "MyDmsVn.Server.Domain": "[1.0.0, )"
