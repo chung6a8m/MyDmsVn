@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net48;net8.0</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MyDmsVn.Contracts\MyDmsVn.Contracts.csproj" />
+    <ProjectReference Include="..\MyDmsVn.Server.Domain\MyDmsVn.Server.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MyDmsVn.Desktop.Infrastructure.Local\MyDmsVn.Desktop.Infrastructure.Local.csproj" />
+    <ProjectReference Include="..\MyDmsVn.Desktop.WinForms\MyDmsVn.Desktop.WinForms.csproj" />
+    <ProjectReference Include="..\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
