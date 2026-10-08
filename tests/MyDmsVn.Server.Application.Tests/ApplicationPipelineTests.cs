@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -61,6 +62,30 @@ namespace MyDmsVn.Server.Application.Tests
             }
         }
 
+        [Fact]
+        public async Task Handler_exception_becomes_an_unexpected_typed_error()
+        {
+            var services = new ServiceCollection();
+            services.AddTransient<
+                IRequestHandler<ThrowingProbeCommand, ErrorOr<string>>,
+                ThrowingProbeHandler>();
+            services.AddServerApplication();
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var sender = provider.GetRequiredService<ISender>();
+
+                var result = await sender.Send(
+                    new ThrowingProbeCommand(),
+                    CancellationToken.None);
+
+                Assert.True(result.IsError);
+                Assert.Equal(ErrorType.Unexpected, result.FirstError.Type);
+                Assert.Equal("InternalError", result.FirstError.Code);
+                Assert.DoesNotContain("secret", result.FirstError.Description);
+            }
+        }
+
         private sealed class ValidationProbeCommand : ApplicationRequest<string>
         {
             public ValidationProbeCommand(IReadOnlyList<ValidationProbeLine> lines)
@@ -117,6 +142,21 @@ namespace MyDmsVn.Server.Application.Tests
         private sealed class HandlerInvocationTracker
         {
             public int Count { get; set; }
+        }
+
+        private sealed class ThrowingProbeCommand : ApplicationRequest<string>
+        {
+        }
+
+        private sealed class ThrowingProbeHandler
+            : IRequestHandler<ThrowingProbeCommand, ErrorOr<string>>
+        {
+            public Task<ErrorOr<string>> Handle(
+                ThrowingProbeCommand request,
+                CancellationToken cancellationToken)
+            {
+                throw new InvalidOperationException("secret connection detail");
+            }
         }
     }
 }

@@ -12,6 +12,7 @@ namespace MyDmsVn.Server.Application
                 configuration =>
                 {
                     configuration.RegisterServicesFromAssemblyContaining<GetFoundationStatusQuery>();
+                    configuration.AddOpenBehavior(typeof(ExceptionHandlingBehavior<,>));
                     configuration.AddOpenBehavior(typeof(ValidationBehavior<,>));
                 });
             services.AddValidatorsFromAssemblyContaining<GetFoundationStatusQuery>(

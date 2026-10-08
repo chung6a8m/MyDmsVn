@@ -10,7 +10,7 @@ namespace MyDmsVn.Server.Application
 {
     public sealed class ValidationBehavior<TRequest, TResponse>
         : IPipelineBehavior<TRequest, TResponse>
-        where TRequest : notnull, IRequest<TResponse>, IValidationFailureResponse<TResponse>
+        where TRequest : notnull, IRequest<TResponse>, IApplicationErrorResponse<TResponse>
     {
         private const string FieldMetadataKey = "Field";
         private readonly IReadOnlyCollection<IValidator<TRequest>> _validators;
@@ -56,7 +56,7 @@ namespace MyDmsVn.Server.Application
                     }))
                 .ToArray();
 
-            return request.FromValidationErrors(errors);
+            return request.FromErrors(errors);
         }
     }
 }

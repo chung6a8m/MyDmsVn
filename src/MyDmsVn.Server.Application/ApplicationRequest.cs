@@ -5,15 +5,15 @@ using MediatR;
 
 namespace MyDmsVn.Server.Application
 {
-    public interface IValidationFailureResponse<TResponse>
+    public interface IApplicationErrorResponse<TResponse>
     {
-        TResponse FromValidationErrors(IReadOnlyCollection<Error> errors);
+        TResponse FromErrors(IReadOnlyCollection<Error> errors);
     }
 
     public abstract class ApplicationRequest<TValue>
-        : IRequest<ErrorOr<TValue>>, IValidationFailureResponse<ErrorOr<TValue>>
+        : IRequest<ErrorOr<TValue>>, IApplicationErrorResponse<ErrorOr<TValue>>
     {
-        public ErrorOr<TValue> FromValidationErrors(IReadOnlyCollection<Error> errors)
+        public ErrorOr<TValue> FromErrors(IReadOnlyCollection<Error> errors)
         {
             return ErrorOrFactory.From<TValue>(errors.ToList());
         }
