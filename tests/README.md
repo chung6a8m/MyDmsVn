@@ -27,4 +27,4 @@ The harness creates a unique database named `MyDmsVn_Test_<32 hex digits>`, disa
 
 When the variable is absent, SQL-dependent tests are reported as skipped with the missing-variable reason; guardrail tests still run. The repository acceptance gate sets the variable and runs both `net48` and `net8.0` test targets.
 
-The deployment migrator is a separate executable and is not run by desktop startup. Set `MYDMSVN_SQLSERVER_CONNECTION_STRING` to the already-created target database before invoking `MyDmsVn.Server.DbMigrator`; the migrator does not create or drop databases.
+The deployment migrator is a separate executable and is not run by desktop startup. Set `MYDMSVN_SQLSERVER_CONNECTION_STRING` to the already-created application database before invoking `MyDmsVn.Server.DbMigrator`; the migrator does not create or drop databases and rejects missing catalogs plus the SQL Server system databases `master`, `model`, `msdb`, and `tempdb`. The `dbo.P1TestProbe` fixture is embedded only in this test project and is never loaded by the deployment migrator.

@@ -10,6 +10,17 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class DatabaseMigrationTests
 {
+    [Theory]
+    [InlineData("Server=invalid.invalid;Database=master;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
+    [InlineData("Server=invalid.invalid;Database=model;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
+    [InlineData("Server=invalid.invalid;Database=msdb;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
+    [InlineData("Server=invalid.invalid;Database=tempdb;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
+    [InlineData("Server=invalid.invalid;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
+    public void System_or_unspecified_database_is_rejected_before_connecting(string connectionString)
+    {
+        Assert.Throws<ArgumentException>(() => new DatabaseMigrationRunner().Migrate(connectionString));
+    }
+
     [SqlServerFact]
     public async Task Clean_migration_applies_once_and_repeat_is_a_no_op()
     {
@@ -24,7 +35,7 @@ public sealed class DatabaseMigrationTests
 
             Assert.True(first.Successful, first.Error?.ToString());
             Assert.Single(first.Scripts);
-            Assert.EndsWith("001_TestFoundation.sql", first.Scripts.Single().Name, StringComparison.Ordinal);
+            Assert.EndsWith("001_PersistenceFoundation.sql", first.Scripts.Single().Name, StringComparison.Ordinal);
             Assert.True(second.Successful, second.Error?.ToString());
             Assert.Empty(second.Scripts);
 
@@ -33,7 +44,7 @@ public sealed class DatabaseMigrationTests
                 "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.P1TestProbe');");
             var historyCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;");
-            Assert.Equal(1, tableCount);
+            Assert.Equal(0, tableCount);
             Assert.Equal(1, historyCount);
         }
         finally

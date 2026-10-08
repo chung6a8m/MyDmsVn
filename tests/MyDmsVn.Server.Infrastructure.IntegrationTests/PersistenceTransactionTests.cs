@@ -176,11 +176,14 @@ public sealed class PersistenceTransactionTests
     {
         var database = await SqlTestDatabase.CreateAsync(
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-        if (!result.Successful)
+        try
+        {
+            TestDatabaseMigrationRunner.Migrate(database.ConnectionString);
+        }
+        catch
         {
             await database.DisposeAsync();
-            throw result.Error ?? new InvalidOperationException("Test database migration failed.");
+            throw;
         }
 
         return database;

@@ -12,6 +12,42 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class UnitOfWorkExceptionalCleanupTests
 {
     [Fact]
+    public void Commit_records_terminal_state_before_transaction_disposal_throws()
+    {
+        var connection = new ThrowingTransactionConnection(throwOnRollback: false, throwOnDispose: true);
+        var unitOfWork = new SqlUnitOfWorkFactory(new StubConnectionFactory(connection)).Create();
+        unitOfWork.BeginTransaction();
+
+        Assert.Throws<InvalidOperationException>(() => unitOfWork.Commit());
+
+        Assert.Equal(UnitOfWorkState.Committed, unitOfWork.State);
+        Assert.Equal(1, connection.Transaction.CommitCount);
+        Assert.Equal(0, connection.Transaction.RollbackCount);
+        Assert.Equal(1, connection.Transaction.DisposeCount);
+        unitOfWork.Dispose();
+        Assert.Equal(0, connection.Transaction.RollbackCount);
+        Assert.Equal(1, connection.DisposeCount);
+    }
+
+    [Fact]
+    public void Rollback_records_terminal_state_before_transaction_disposal_throws()
+    {
+        var connection = new ThrowingTransactionConnection(throwOnRollback: false, throwOnDispose: true);
+        var unitOfWork = new SqlUnitOfWorkFactory(new StubConnectionFactory(connection)).Create();
+        unitOfWork.BeginTransaction();
+
+        Assert.Throws<InvalidOperationException>(() => unitOfWork.Rollback());
+
+        Assert.Equal(UnitOfWorkState.RolledBack, unitOfWork.State);
+        Assert.Equal(0, connection.Transaction.CommitCount);
+        Assert.Equal(1, connection.Transaction.RollbackCount);
+        Assert.Equal(1, connection.Transaction.DisposeCount);
+        unitOfWork.Dispose();
+        Assert.Equal(1, connection.Transaction.RollbackCount);
+        Assert.Equal(1, connection.DisposeCount);
+    }
+
+    [Fact]
     public void Dispose_closes_connection_and_records_terminal_state_when_transaction_cleanup_throws()
     {
         var connection = new ThrowingTransactionConnection();
@@ -51,7 +87,14 @@ public sealed class UnitOfWorkExceptionalCleanupTests
 
     private sealed class ThrowingTransactionConnection : IDbConnection
     {
-        public ThrowingTransaction Transaction { get; } = new();
+        public ThrowingTransactionConnection(
+            bool throwOnRollback = true,
+            bool throwOnDispose = true)
+        {
+            Transaction = new ThrowingTransaction(throwOnRollback, throwOnDispose);
+        }
+
+        public ThrowingTransaction Transaction { get; }
 
         public int DisposeCount { get; private set; }
 
@@ -105,6 +148,17 @@ public sealed class UnitOfWorkExceptionalCleanupTests
 
     private sealed class ThrowingTransaction : IDbTransaction
     {
+        private readonly bool _throwOnRollback;
+        private readonly bool _throwOnDispose;
+
+        public ThrowingTransaction(bool throwOnRollback, bool throwOnDispose)
+        {
+            _throwOnRollback = throwOnRollback;
+            _throwOnDispose = throwOnDispose;
+        }
+
+        public int CommitCount { get; private set; }
+
         public int RollbackCount { get; private set; }
 
         public int DisposeCount { get; private set; }
@@ -115,19 +169,25 @@ public sealed class UnitOfWorkExceptionalCleanupTests
 
         public void Commit()
         {
-            throw new NotSupportedException();
+            CommitCount++;
         }
 
         public void Rollback()
         {
             RollbackCount++;
-            throw new InvalidOperationException("Expected rollback failure.");
+            if (_throwOnRollback)
+            {
+                throw new InvalidOperationException("Expected rollback failure.");
+            }
         }
 
         public void Dispose()
         {
             DisposeCount++;
-            throw new InvalidOperationException("Expected transaction disposal failure.");
+            if (_throwOnDispose)
+            {
+                throw new InvalidOperationException("Expected transaction disposal failure.");
+            }
         }
     }
 }

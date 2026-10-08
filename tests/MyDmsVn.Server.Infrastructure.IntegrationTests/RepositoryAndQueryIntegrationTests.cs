@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Persistence;
-using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using RepoDb;
 using Xunit;
@@ -21,8 +20,7 @@ public sealed class RepositoryAndQueryIntegrationTests
         var database = await CreateDatabaseAsync();
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
+            TestDatabaseMigrationRunner.Migrate(database.ConnectionString);
             var services = new ServiceCollection();
             services
                 .AddSqlPersistence(database.ConnectionString)

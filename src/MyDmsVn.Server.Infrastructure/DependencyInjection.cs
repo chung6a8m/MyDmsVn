@@ -25,7 +25,7 @@ namespace MyDmsVn.Server.Infrastructure
 
             services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
             services.AddSingleton<RepoDbMappingInitializer>();
-            services.AddSingleton<IUnitOfWorkFactory>(serviceProvider =>
+            services.AddScoped<IUnitOfWorkFactory>(serviceProvider =>
             {
                 var registrations = serviceProvider
                     .GetServices<SqlRepositoryRegistration>()
@@ -35,7 +35,7 @@ namespace MyDmsVn.Server.Infrastructure
                 return new SqlUnitOfWorkFactory(
                     serviceProvider.GetRequiredService<IDbConnectionFactory>(),
                     serviceProvider.GetRequiredService<RepoDbMappingInitializer>(),
-                    serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+                    serviceProvider,
                     registrations);
             });
             return new SqlPersistenceBuilder(services);

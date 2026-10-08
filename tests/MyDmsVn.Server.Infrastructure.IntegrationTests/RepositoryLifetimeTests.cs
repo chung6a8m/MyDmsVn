@@ -10,7 +10,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class RepositoryLifetimeTests
 {
     [SqlServerFact]
-    public async System.Threading.Tasks.Task Each_unit_of_work_owns_a_scope_and_disposes_created_repositories()
+    public async System.Threading.Tasks.Task Repository_uses_caller_scoped_context_without_taking_ownership_of_it()
     {
         var database = await SqlTestDatabase.CreateAsync(
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
@@ -24,24 +24,29 @@ public sealed class RepositoryLifetimeTests
                 .AddRepository<IRepositoryWithScopedDependency, RepositoryWithScopedDependency>();
             using var provider = services.BuildServiceProvider(
                 new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
-            var factory = provider.GetRequiredService<IUnitOfWorkFactory>();
-
-            Guid firstDependencyId;
-            using (var first = factory.Create())
-            {
-                firstDependencyId = first.Repository<IRepositoryWithScopedDependency>().DependencyId;
-            }
-
-            Guid secondDependencyId;
-            using (var second = factory.Create())
-            {
-                secondDependencyId = second.Repository<IRepositoryWithScopedDependency>().DependencyId;
-            }
-
+            var callerScope = provider.CreateScope();
             var tracker = provider.GetRequiredService<DisposalTracker>();
-            Assert.NotEqual(firstDependencyId, secondDependencyId);
-            Assert.Equal(2, tracker.RepositoryDisposeCount);
-            Assert.Equal(2, tracker.DependencyDisposeCount);
+            try
+            {
+                var callerDependency = callerScope.ServiceProvider.GetRequiredService<ScopedRepositoryDependency>();
+                callerDependency.Value = "caller-context";
+                var factory = callerScope.ServiceProvider.GetRequiredService<IUnitOfWorkFactory>();
+                using (var unitOfWork = factory.Create())
+                {
+                    var repository = unitOfWork.Repository<IRepositoryWithScopedDependency>();
+                    Assert.Equal(callerDependency.Id, repository.DependencyId);
+                    Assert.Equal("caller-context", repository.DependencyValue);
+                }
+
+                Assert.Equal(1, tracker.RepositoryDisposeCount);
+                Assert.Equal(0, tracker.DependencyDisposeCount);
+            }
+            finally
+            {
+                callerScope.Dispose();
+            }
+
+            Assert.Equal(1, tracker.DependencyDisposeCount);
         }
         finally
         {
@@ -52,6 +57,8 @@ public sealed class RepositoryLifetimeTests
     private interface IRepositoryWithScopedDependency
     {
         Guid DependencyId { get; }
+
+        string DependencyValue { get; }
     }
 
     private sealed class RepositoryWithScopedDependency : IRepositoryWithScopedDependency, IDisposable
@@ -66,10 +73,13 @@ public sealed class RepositoryLifetimeTests
         {
             _ = context;
             DependencyId = dependency.Id;
+            DependencyValue = dependency.Value;
             _tracker = tracker;
         }
 
         public Guid DependencyId { get; }
+
+        public string DependencyValue { get; }
 
         public void Dispose()
         {
@@ -90,6 +100,8 @@ public sealed class RepositoryLifetimeTests
         }
 
         public Guid Id { get; } = Guid.NewGuid();
+
+        public string Value { get; set; } = string.Empty;
 
         public void Dispose()
         {
