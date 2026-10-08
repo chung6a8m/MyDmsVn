@@ -4,6 +4,11 @@
     <TargetFrameworks>net48;net8.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="dbup-sqlserver" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
     <ProjectReference Include="..\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Scripts\*.sql" />
   </ItemGroup>
 </Project>

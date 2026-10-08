@@ -1,6 +1,6 @@
 # Development Plan — MyDmsVn v1 → v2
 
-**Status:** P0 complete on 2026-10-08; P1 is next. **Codex must not skip prerequisites or mark unverified tests as passed.**
+**Status:** P0 and P1 complete on 2026-10-08; P2 is next. **Codex must not skip prerequisites or mark unverified tests as passed.**
 
 ## Operating rules
 
@@ -14,7 +14,7 @@
 | Phase | Goal | Required output / exit gate | Status |
 |---|---|---|---|
 | **P0** | Repository and solution foundation | Dual-target solution, DI/smoke hosts, reference boundaries, test projects; both Windows hosts build | Complete (2026-10-08) |
-| **P1** | Persistence foundation | SQL connection, RepoDb maps, Dapper, DbUp migrator, explicit UoW; SQL commit/rollback tests | Not started |
+| **P1** | Persistence foundation | SQL connection, RepoDb maps, Dapper, DbUp migrator, explicit UoW; SQL commit/rollback tests | Complete (2026-10-08) |
 | **P2** | Application pipeline/contracts | MediatR, validation, ErrorOr, transport-neutral ApiResponse mapping, client APIs; error tests | Not started |
 | **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Not started |
 | **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Not started |
@@ -33,12 +33,12 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 
 ## P1 — Persistence foundation
 
-- [ ] P1-T01 select disposable SQL test database naming/configuration and implement safe test provisioning.
-- [ ] P1-T02 create `IDbConnectionFactory` returning fresh open connection and SQL Server implementation.
-- [ ] P1-T03 implement Explicit UoW state machine + repository creation and deterministic disposal.
-- [ ] P1-T04 establish RepoDb 1.16.x mappings and Dapper query executor sharing explicit UoW.
-- [ ] P1-T05 DbUp migrator skeleton and migration-history verification; test rerun/no-op.
-- [ ] P1-T06 SQL integration tests for nested guard, commit, rollback, disposal, cancellation, concurrent separate UoWs.
+- [x] P1-T01 select disposable SQL test database naming/configuration and implement safe test provisioning.
+- [x] P1-T02 create `IDbConnectionFactory` returning fresh open connection and SQL Server implementation.
+- [x] P1-T03 implement Explicit UoW state machine + repository creation and deterministic disposal.
+- [x] P1-T04 establish RepoDb 1.16.x mappings and Dapper query executor sharing explicit UoW.
+- [x] P1-T05 DbUp migrator skeleton and migration-history verification; test rerun/no-op.
+- [x] P1-T06 SQL integration tests for nested guard, commit, rollback, disposal, cancellation, concurrent separate UoWs.
 **Exit:** P1 tests in `docs/TEST_STRATEGY.md` green on SQL Server; no static AsyncLocal transaction.
 
 ## P2 — Application pipeline + contracts

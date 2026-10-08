@@ -30,6 +30,7 @@ Rules:
 1. Factory creates a **fresh opened IDbConnection** and transfers its ownership to the UoW.
 2. UoW owns one connection and at most one active IDbTransaction.
 3. Repositories are **scoped to the UoW** and use that connection; all RepoDb writes/reads get the current transaction explicitly (including async methods).
+   `IUnitOfWorkFactory` is resolved from the caller DI scope so repository constructors receive the same scoped request/user/tenant context. The UoW disposes repository instances it creates, but it does not own or dispose caller-scoped dependencies.
 4. Dapper query services that need to participate in a transaction get the same connection + transaction via a scoped, explicit execution context.
 5. BeginTransaction twice is an error unless a future ADR explicitly defines nested semantics; do **not** silently return or replace.
 6. Commit/Rollback allowed only in legal states, cleanup occurs exactly once; dispose of uncommitted transaction always attempts rollback.
@@ -81,6 +82,7 @@ For P5:
 - DbUp baseline creates tables, indexes, FK and seeding of deterministic permissions using numbered, immutable scripts: `001_Identity.sql`, `002_Catalog.sql`, `003_GoodsReceipt.sql`, `004_Inventory.sql` (names provisional).
 - History table under controlled schema; apply once, in order, with meaningful deployment logs.
 - Run migrator as a **separate controlled deployment command**, not per-desktop login. Client DB logins should not require DDL.
+- Require an explicit application database in the migration connection string and reject SQL Server system databases (`master`, `model`, `msdb`, `tempdb`) before opening a connection.
 - Provide a clean reset script only for clearly named disposable **test** databases, with an explicit safety check; do not auto-drop existing DBs.
 - Migration tests: new database, repeated no-op run, upgrade from last baseline, rollback **operational** procedure (DB backup/restore; DbUp does not automatically downgrade).
 - Schema, RepoDb mapping and DTO projection must evolve together.

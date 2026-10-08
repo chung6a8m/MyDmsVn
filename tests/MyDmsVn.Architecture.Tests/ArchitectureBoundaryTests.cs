@@ -1,5 +1,10 @@
 ﻿using Xunit;
 
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using MyDmsVn.Server.Infrastructure.Persistence;
+
 namespace MyDmsVn.Architecture.Tests
 {
     public sealed class ArchitectureBoundaryTests
@@ -18,6 +23,23 @@ namespace MyDmsVn.Architecture.Tests
             var violations = ProjectReferencePolicy.FindForbiddenCorePackages();
 
             Assert.Empty(violations);
+        }
+
+        [Fact]
+        public void Persistence_infrastructure_has_no_static_ambient_transaction_storage()
+        {
+            var ambientFields = typeof(SqlUnitOfWorkFactory).Assembly
+                .GetTypes()
+                .SelectMany(type => type.GetFields(
+                    BindingFlags.Public |
+                    BindingFlags.NonPublic |
+                    BindingFlags.Static))
+                .Where(field =>
+                    field.FieldType.IsGenericType &&
+                    field.FieldType.GetGenericTypeDefinition() == typeof(AsyncLocal<>))
+                .Select(field => $"{field.DeclaringType?.FullName}.{field.Name}");
+
+            Assert.Empty(ambientFields);
         }
     }
 }

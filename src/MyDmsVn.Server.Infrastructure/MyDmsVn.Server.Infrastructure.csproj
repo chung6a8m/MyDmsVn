@@ -3,7 +3,11 @@
     <TargetFrameworks>net48;net8.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="RepoDb" />
+    <PackageReference Include="RepoDb.SqlServer" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MyDmsVn.Server.Application\MyDmsVn.Server.Application.csproj" />
