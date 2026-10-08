@@ -128,6 +128,11 @@
         "resolved": "1.0.0",
         "contentHash": "N4KeF3cpcm1PUHym1RmakkzfkEv3GRMyofVv40uXsQhCQeglr2OHNcUk2WOG51AKpGO8ynGpo9M/kFXSzghwug=="
       },
+      "System.Collections.Immutable": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "BQY956wwWSjRDoOspL6L1JscbFoSgJK606mO3PYalBHIZRV+Sc2xokvR/NHLlpUEfju6EbW5GbKbNpVYQ65cLw=="
+      },
       "System.Configuration.ConfigurationManager": {
         "type": "Transitive",
         "resolved": "8.0.1",
@@ -150,6 +155,28 @@
           "Microsoft.IdentityModel.JsonWebTokens": "8.16.0",
           "Microsoft.IdentityModel.Tokens": "8.16.0"
         }
+      },
+      "System.Interactive.Async": {
+        "type": "Transitive",
+        "resolved": "7.0.1",
+        "contentHash": "oL1iox7sAJL8i+muGzVMQjDB0axQgOoT5CkwYdap8cQJMkWDWMRErNqhOcZkn31+aKr/uCfgMEdhUARCU4G7gg==",
+        "dependencies": {
+          "System.Linq.AsyncEnumerable": "10.0.6"
+        }
+      },
+      "System.Linq.Async": {
+        "type": "Transitive",
+        "resolved": "7.0.1",
+        "contentHash": "gwQtBHVY/WgqWgAYSe4JspXR+f1FvMbVIW4ixsJpGV/Kj8Nun3zp1ajIdvCWfmac8ektJGVLiJ/OR8JU9nZnMg==",
+        "dependencies": {
+          "System.Interactive.Async": "7.0.1",
+          "System.Linq.AsyncEnumerable": "10.0.6"
+        }
+      },
+      "System.Linq.AsyncEnumerable": {
+        "type": "Transitive",
+        "resolved": "10.0.6",
+        "contentHash": "1Ttf7dyLoKXks2bVBVULmDPOSjxaMEE3JRTe/KGEJl3rfepCc4ipUEGMIKa/iBKLSN8rjEedF8Qv3UCtiwaDBw=="
       },
       "System.Security.Cryptography.Pkcs": {
         "type": "Transitive",
@@ -196,14 +223,23 @@
       "mydmsvn.server.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "Dapper": "[2.1.79, )",
           "Microsoft.Data.SqlClient": "[7.0.2, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.2, )",
           "MyDmsVn.Server.Application": "[1.0.0, )",
-          "MyDmsVn.Server.Domain": "[1.0.0, )"
+          "MyDmsVn.Server.Domain": "[1.0.0, )",
+          "RepoDb": "[1.16.0, )",
+          "RepoDb.SqlServer": "[1.16.1, )"
         }
       },
       "mydmsvn.sharedkernel": {
         "type": "Project"
+      },
+      "Dapper": {
+        "type": "CentralTransitive",
+        "requested": "[2.1.79, )",
+        "resolved": "2.1.79",
+        "contentHash": "8YijbzgTfmqmQOnVNorYM6K++pxqnW3nJ4aC1sRHzxUA2CcuoJ9gsTem3kgBnPRMc38zZHl4Esb6hAezXIEEuw=="
       },
       "Microsoft.Data.SqlClient": {
         "type": "CentralTransitive",
@@ -228,6 +264,26 @@
         "requested": "[8.0.2, )",
         "resolved": "8.0.2",
         "contentHash": "3iE7UF7MQkCv1cxzCahz+Y/guQbTqieyxyaWKhrRO91itI9cOKO76OHeQDahqG4MmW5umr3CcCvGmK92lWNlbg=="
+      },
+      "RepoDb": {
+        "type": "CentralTransitive",
+        "requested": "[1.16.0, )",
+        "resolved": "1.16.0",
+        "contentHash": "lx+wZl40YYrL9bJ9M/B4Na446hXM8xGPzweejkeYH2YEmIGZx7A1aJq+ef7tqv27xLX857OA4SdHCax3CGkKMA==",
+        "dependencies": {
+          "System.Collections.Immutable": "10.0.11",
+          "System.Linq.Async": "7.0.1"
+        }
+      },
+      "RepoDb.SqlServer": {
+        "type": "CentralTransitive",
+        "requested": "[1.16.1, )",
+        "resolved": "1.16.1",
+        "contentHash": "ZxWLxEUQh6jtp69mR25KezbC3OPLlaeAPdwg00fgwSAmWFFET/SY+PbnOsMqpkBIepPBmdqG/441OSonUyLgFg==",
+        "dependencies": {
+          "Microsoft.Data.SqlClient": "7.0.2",
+          "RepoDb": "1.16.0"
+        }
       },
       "System.Security.Cryptography.ProtectedData": {
         "type": "CentralTransitive",
