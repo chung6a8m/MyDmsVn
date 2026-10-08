@@ -76,6 +76,14 @@
           "Microsoft.TestPlatform.ObjectModel": "17.13.0"
         }
       },
+      "dbup-core": {
+        "type": "Transitive",
+        "resolved": "6.1.1",
+        "contentHash": "kgpuyJVEFJHoIj/slnc994Go88aoeZqNDfGHDBr4sh7CsEWwJhOTCt/FJqO4ziUImL5L0NEY0kxxOiNgPKI2Fw==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        }
+      },
       "Microsoft.Bcl.AsyncInterfaces": {
         "type": "Transitive",
         "resolved": "10.0.11",
@@ -490,7 +498,8 @@
       "mydmsvn.server.dbmigrator": {
         "type": "Project",
         "dependencies": {
-          "MyDmsVn.Server.Infrastructure": "[1.0.0, )"
+          "MyDmsVn.Server.Infrastructure": "[1.0.0, )",
+          "dbup-sqlserver": "[7.2.0, )"
         }
       },
       "mydmsvn.server.domain": {
@@ -513,6 +522,16 @@
       },
       "mydmsvn.sharedkernel": {
         "type": "Project"
+      },
+      "dbup-sqlserver": {
+        "type": "CentralTransitive",
+        "requested": "[7.2.0, )",
+        "resolved": "7.2.0",
+        "contentHash": "1xhdu2ZoQEi2nNrirBfkkfn+AbHWQvy8CGilb+5dIjghFJrsMKFM17DiI5Nz+ofWg9N1lqz5WorujzuGvc/+fQ==",
+        "dependencies": {
+          "Microsoft.Data.SqlClient": "6.1.4",
+          "dbup-core": "6.1.1"
+        }
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
         "type": "CentralTransitive",
@@ -613,6 +632,14 @@
         "requested": "[3.1.5, )",
         "resolved": "3.1.5",
         "contentHash": "tKi7dSTwP4m5m9eXPM2Ime4Kn7xNf4x4zT9sdLO/G4hZVnQCRiMTWoSZqI/pYTVeI27oPPqHBKYI/DjJ9GsYgA=="
+      },
+      "dbup-core": {
+        "type": "Transitive",
+        "resolved": "6.1.1",
+        "contentHash": "kgpuyJVEFJHoIj/slnc994Go88aoeZqNDfGHDBr4sh7CsEWwJhOTCt/FJqO4ziUImL5L0NEY0kxxOiNgPKI2Fw==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        }
       },
       "Microsoft.Bcl.Cryptography": {
         "type": "Transitive",
@@ -870,7 +897,8 @@
       "mydmsvn.server.dbmigrator": {
         "type": "Project",
         "dependencies": {
-          "MyDmsVn.Server.Infrastructure": "[1.0.0, )"
+          "MyDmsVn.Server.Infrastructure": "[1.0.0, )",
+          "dbup-sqlserver": "[7.2.0, )"
         }
       },
       "mydmsvn.server.domain": {
@@ -893,6 +921,16 @@
       },
       "mydmsvn.sharedkernel": {
         "type": "Project"
+      },
+      "dbup-sqlserver": {
+        "type": "CentralTransitive",
+        "requested": "[7.2.0, )",
+        "resolved": "7.2.0",
+        "contentHash": "1xhdu2ZoQEi2nNrirBfkkfn+AbHWQvy8CGilb+5dIjghFJrsMKFM17DiI5Nz+ofWg9N1lqz5WorujzuGvc/+fQ==",
+        "dependencies": {
+          "Microsoft.Data.SqlClient": "6.1.4",
+          "dbup-core": "6.1.1"
+        }
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
         "type": "CentralTransitive",

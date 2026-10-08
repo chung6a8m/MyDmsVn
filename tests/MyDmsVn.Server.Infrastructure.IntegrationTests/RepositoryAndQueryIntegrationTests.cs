@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Persistence;
+using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using RepoDb;
 using Xunit;
@@ -20,7 +21,8 @@ public sealed class RepositoryAndQueryIntegrationTests
         var database = await CreateDatabaseAsync();
         try
         {
-            await CreateProbeTableAsync(database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
             var services = new ServiceCollection();
             services
                 .AddSqlPersistence(database.ConnectionString)
@@ -85,15 +87,6 @@ public sealed class RepositoryAndQueryIntegrationTests
         await Task.WhenAll(attempts);
 
         Assert.Equal(2, mapping.Attempts);
-    }
-
-    private static async Task CreateProbeTableAsync(string connectionString)
-    {
-        using var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
-        await connection.ExecuteAsync(
-            "CREATE TABLE dbo.P1TestProbe (" +
-            "ProbeId int IDENTITY(1,1) NOT NULL CONSTRAINT PK_P1TestProbe PRIMARY KEY, " +
-            "ProbeValue nvarchar(128) NOT NULL);");
     }
 
     private static Task<SqlTestDatabase> CreateDatabaseAsync()
