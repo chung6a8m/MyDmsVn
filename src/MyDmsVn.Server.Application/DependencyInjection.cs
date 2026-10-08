@@ -14,7 +14,8 @@ namespace MyDmsVn.Server.Application
                     configuration.RegisterServicesFromAssemblyContaining<GetFoundationStatusQuery>();
                     configuration.AddOpenBehavior(typeof(ValidationBehavior<,>));
                 });
-            services.AddValidatorsFromAssemblyContaining<GetFoundationStatusQuery>();
+            services.AddValidatorsFromAssemblyContaining<GetFoundationStatusQuery>(
+                includeInternalTypes: true);
             services.AddSingleton<IFoundationProbe, FoundationProbe>();
             return services;
         }

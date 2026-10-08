@@ -23,7 +23,7 @@ namespace MyDmsVn.Server.Application.Tests
                 var sender = provider.GetRequiredService<ISender>();
 
                 var result = await sender.Send(
-                    new GetFoundationStatusQuery(),
+                    new GetFoundationStatusQuery("Desktop"),
                     CancellationToken.None);
 
                 Assert.False(result.IsError);

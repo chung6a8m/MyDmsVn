@@ -21,9 +21,13 @@ namespace MyDmsVn.Desktop.Tests
 
         private sealed class ReadyApiClient : IFoundationApiClient
         {
-            public Task<FoundationStatus> GetStatusAsync(CancellationToken cancellationToken)
+            public Task<ApiResponse<FoundationStatus>> GetStatusAsync(
+                FoundationStatusRequest request,
+                CancellationToken cancellationToken)
             {
-                return Task.FromResult(new FoundationStatus(true, "Local"));
+                return Task.FromResult(
+                    ApiResponse<FoundationStatus>.Success(
+                        new FoundationStatus(true, "Local")));
             }
         }
     }

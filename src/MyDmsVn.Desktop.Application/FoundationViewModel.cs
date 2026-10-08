@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
+using MyDmsVn.Contracts;
 
 namespace MyDmsVn.Desktop.Application
 {
@@ -18,9 +19,11 @@ namespace MyDmsVn.Desktop.Application
 
         public async Task InitializeAsync(CancellationToken cancellationToken)
         {
-            var status = await _apiClient.GetStatusAsync(cancellationToken).ConfigureAwait(false);
-            IsReady = status.IsReady;
-            Runtime = status.Runtime;
+            var response = await _apiClient
+                .GetStatusAsync(new FoundationStatusRequest("Desktop"), cancellationToken)
+                .ConfigureAwait(false);
+            IsReady = response.IsSuccess && response.Data!.IsReady;
+            Runtime = response.IsSuccess ? response.Data!.Runtime : null;
         }
     }
 }

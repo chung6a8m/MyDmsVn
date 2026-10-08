@@ -6,6 +6,8 @@ namespace MyDmsVn.Desktop.Application
 {
     public interface IFoundationApiClient
     {
-        Task<FoundationStatus> GetStatusAsync(CancellationToken cancellationToken);
+        Task<ApiResponse<FoundationStatus>> GetStatusAsync(
+            FoundationStatusRequest request,
+            CancellationToken cancellationToken);
     }
 }
