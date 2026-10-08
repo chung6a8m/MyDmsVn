@@ -64,4 +64,4 @@ dotnet build MyDmsVn.sln -c Release --no-restore --nologo
 dotnet test MyDmsVn.sln -c Release --no-build --no-restore --nologo
 ```
 
-The Release build completed with 0 warnings and 0 errors across `net48`, `net8.0`, and `net8.0-windows`. The test command passed all 22 test executions across five target runs. P0 performs no SQL integration tests or database actions; those begin in P1 with an explicitly configured isolated disposable database.
+The Release build completed with 0 warnings and 0 errors across `net48`, `net8.0`, and `net8.0-windows`. The test command passed all 26 test executions across five target runs. P0 performs no SQL integration tests or database actions; those begin in P1 with an explicitly configured isolated disposable database.

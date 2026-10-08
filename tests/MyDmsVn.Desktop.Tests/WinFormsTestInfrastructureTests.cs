@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Xunit;
 
@@ -65,14 +67,34 @@ namespace MyDmsVn.Desktop.Tests
 
                         System.Windows.Forms.Application.OnThreadException(expected);
 
-                        Assert.Same(expected, guard.Exceptions[0]);
+                        var captured = guard.DrainExceptions();
+                        Assert.Same(expected, captured.Single());
                     }
                 },
                 TimeSpan.FromSeconds(10));
         }
 
         [Fact]
-        public void WinFormsTestGuard_suppresses_process_error_dialogs_while_active()
+        public void WinFormsTestGuard_fails_when_captured_exception_is_not_consumed()
+        {
+            var expected = new InvalidOperationException("unexpected UI failure");
+
+            var actual = Assert.Throws<AggregateException>(
+                () => StaTest.Run(
+                    _ =>
+                    {
+                        using (var guard = new WinFormsTestGuard())
+                        {
+                            System.Windows.Forms.Application.OnThreadException(expected);
+                        }
+                    },
+                    TimeSpan.FromSeconds(10)));
+
+            Assert.Same(expected, actual.InnerExceptions.Single());
+        }
+
+        [Fact]
+        public void WinFormsTestGuard_suppresses_error_dialogs_on_current_sta_thread()
         {
             StaTest.Run(
                 _ =>
@@ -83,6 +105,46 @@ namespace MyDmsVn.Desktop.Tests
                     }
                 },
                 TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public async Task WinFormsTestGuard_disposal_does_not_disable_another_sta_thread_guard()
+        {
+            using (var firstReady = new ManualResetEventSlim())
+            using (var secondReady = new ManualResetEventSlim())
+            using (var firstDisposed = new ManualResetEventSlim())
+            {
+                bool secondStillSuppressed = false;
+                var first = Task.Run(
+                    () => StaTest.Run(
+                        cancellationToken =>
+                        {
+                            var guard = new WinFormsTestGuard();
+                            firstReady.Set();
+                            secondReady.Wait(cancellationToken);
+                            guard.Dispose();
+                            firstDisposed.Set();
+                        },
+                        TimeSpan.FromSeconds(10)));
+
+                var second = Task.Run(
+                    () => StaTest.Run(
+                        cancellationToken =>
+                        {
+                            firstReady.Wait(cancellationToken);
+                            using (var guard = new WinFormsTestGuard())
+                            {
+                                secondReady.Set();
+                                firstDisposed.Wait(cancellationToken);
+                                secondStillSuppressed = guard.FatalErrorDialogsSuppressed;
+                            }
+                        },
+                        TimeSpan.FromSeconds(10)));
+
+                await Task.WhenAll(first, second);
+
+                Assert.True(secondStillSuppressed);
+            }
         }
 
         [Fact]
@@ -99,7 +161,8 @@ namespace MyDmsVn.Desktop.Tests
 
                         grid.RaiseDataError(expected);
 
-                        Assert.Same(expected, guard.Exceptions[0]);
+                        var captured = guard.DrainExceptions();
+                        Assert.Same(expected, captured.Single());
                     }
                 },
                 TimeSpan.FromSeconds(10));

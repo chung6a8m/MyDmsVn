@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
@@ -13,13 +15,17 @@ namespace MyDmsVn.Desktop.Tests
 
         private readonly List<Exception> _exceptions = new List<Exception>();
         private readonly List<DataGridView> _grids = new List<DataGridView>();
-        private readonly uint _previousErrorMode;
+        private readonly uint _previousThreadErrorMode;
         private bool _disposed;
 
         public WinFormsTestGuard()
         {
-            _previousErrorMode = GetErrorMode();
-            SetErrorMode(_previousErrorMode | FailCriticalErrors | NoGeneralProtectionFaultErrorBox);
+            var requestedErrorMode =
+                GetThreadErrorMode() | FailCriticalErrors | NoGeneralProtectionFaultErrorBox;
+            if (!SetThreadErrorMode(requestedErrorMode, out _previousThreadErrorMode))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
             System.Windows.Forms.Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             System.Windows.Forms.Application.ThreadException += OnThreadException;
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -28,8 +34,15 @@ namespace MyDmsVn.Desktop.Tests
         public IReadOnlyList<Exception> Exceptions => _exceptions;
 
         public bool FatalErrorDialogsSuppressed =>
-            (GetErrorMode() & (FailCriticalErrors | NoGeneralProtectionFaultErrorBox)) ==
+            (GetThreadErrorMode() & (FailCriticalErrors | NoGeneralProtectionFaultErrorBox)) ==
             (FailCriticalErrors | NoGeneralProtectionFaultErrorBox);
+
+        public IReadOnlyList<Exception> DrainExceptions()
+        {
+            var exceptions = _exceptions.ToArray();
+            _exceptions.Clear();
+            return exceptions;
+        }
 
         public void Attach(DataGridView grid)
         {
@@ -51,8 +64,19 @@ namespace MyDmsVn.Desktop.Tests
 
             System.Windows.Forms.Application.ThreadException -= OnThreadException;
             AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
-            SetErrorMode(_previousErrorMode);
+            if (!SetThreadErrorMode(_previousThreadErrorMode, out _))
+            {
+                _exceptions.Add(new Win32Exception(Marshal.GetLastWin32Error()));
+            }
+
             _disposed = true;
+
+            if (_exceptions.Count > 0)
+            {
+                throw new AggregateException(
+                    "Unexpected WinForms test exceptions were captured.",
+                    _exceptions);
+            }
         }
 
         private void OnThreadException(object? sender, ThreadExceptionEventArgs eventArgs)
@@ -80,9 +104,10 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [DllImport("kernel32.dll")]
-        private static extern uint GetErrorMode();
+        private static extern uint GetThreadErrorMode();
 
-        [DllImport("kernel32.dll")]
-        private static extern uint SetErrorMode(uint errorMode);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetThreadErrorMode(uint newMode, out uint oldMode);
     }
 }
