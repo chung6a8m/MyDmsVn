@@ -28,6 +28,7 @@ namespace MyDmsVn.Server.Infrastructure
 
             services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
+            services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.AddSingleton<RepoDbMappingInitializer>();
             services.AddScoped<IUnitOfWorkFactory>(serviceProvider =>
             {
