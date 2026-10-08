@@ -4,7 +4,7 @@
 A modular, desktop-first SME business application, with a future transition from direct in-process services to ASP.NET Core HTTP APIs. Language for human-facing project discussions: Vietnamese. C# identifiers and core code documentation: English.
 
 ## Current state
-The repository was initialized with `project-idea.md` and Git/editor settings. The present work creates architecture/planning documents; there is no finished solution, database or runnable feature yet.
+P0 is complete: the repository has a buildable dual-target solution, DI/local-adapter smoke seam, architecture tests, and WinForms test scaffolding. There is no business feature, database schema, or production-ready workflow yet. P1 persistence foundation is the next phase.
 
 ## Non-negotiable choices
 - Keep `net48` and `net8.0` (`net8.0-windows` for WinForms); developer uses Visual Studio 2022.

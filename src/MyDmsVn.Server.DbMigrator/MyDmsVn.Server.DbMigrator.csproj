@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net48;net8.0</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

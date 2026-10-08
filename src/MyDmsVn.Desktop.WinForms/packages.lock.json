@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "dependencies": {
+    ".NETFramework,Version=v4.8": {
+      "mydmsvn.contracts": {
+        "type": "Project"
+      },
+      "mydmsvn.desktop.application": {
+        "type": "Project",
+        "dependencies": {
+          "MyDmsVn.Contracts": "[1.0.0, )"
+        }
+      }
+    },
+    "net8.0-windows7.0": {
+      "mydmsvn.contracts": {
+        "type": "Project"
+      },
+      "mydmsvn.desktop.application": {
+        "type": "Project",
+        "dependencies": {
+          "MyDmsVn.Contracts": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}
