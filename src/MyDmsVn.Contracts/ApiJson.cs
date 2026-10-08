@@ -6,6 +6,9 @@ namespace MyDmsVn.Contracts
 {
     public static class ApiJson
     {
+        private static readonly CamelCaseNamingStrategy NamingStrategy =
+            new CamelCaseNamingStrategy();
+
         public static JsonSerializerSettings CreateSerializerSettings()
         {
             return new JsonSerializerSettings
@@ -17,6 +20,11 @@ namespace MyDmsVn.Contracts
                 Formatting = Formatting.None,
                 NullValueHandling = NullValueHandling.Ignore,
             };
+        }
+
+        public static string ResolvePropertyName(string propertyName)
+        {
+            return NamingStrategy.GetPropertyName(propertyName, false);
         }
     }
 }
