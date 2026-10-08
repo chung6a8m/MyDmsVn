@@ -5,9 +5,9 @@ Scope: P2 only. No business persistence, SQL schema, HTTP host, authentication i
 
 ## Implemented
 
-- Transport-neutral `ApiResponse<T>`, typed errors, paging, no-content value, camel-case Newtonsoft.Json settings, one-of factories, and invariant-preserving JSON deserialization.
-- MediatR request dispatch with ordered exception and asynchronous FluentValidation behaviors returning `ErrorOr<T>` without `dynamic`; each validator receives an independent context.
-- Deterministic ErrorOr-to-ApiResponse mapping for validation, unauthorized, forbidden, not-found, conflict, and internal failures; unexpected and unknown error types cannot expose internal details.
+- Transport-neutral `ApiResponse<T>`, typed errors, paging, no-content value, camel-case Newtonsoft.Json settings, one-of factories, invariant-preserving JSON deserialization, and restoration of status metadata from the actual HTTP response status.
+- MediatR request dispatch with ordered exception and asynchronous FluentValidation behaviors returning `ErrorOr<T>` without `dynamic`; each validator receives an independent context and validators run sequentially within the request DI scope.
+- Deterministic ErrorOr-to-ApiResponse mapping for validation, unauthorized, forbidden, not-found, conflict, and internal failures; authorization, unexpected, and unknown error types cannot expose internal details.
 - Catalog, goods-receipt, inventory, and identity DTO/client interface seams in Contracts/Desktop.Application.
 - Local adapter proof dispatching through `ISender`, with success, validation, cancellation, and exception behavior covered at the adapter boundary.
 - Golden JSON fixtures for validation details, paging, decimals, UTC timestamps, calendar-only receipt dates, and planned P5 catalog/receipt command DTOs.
@@ -29,13 +29,13 @@ dotnet build MyDmsVn.sln -c Release --no-restore
 Result: succeeded; 0 warnings, 0 errors.
 
 dotnet test MyDmsVn.sln -c Release --no-build --logger "console;verbosity=minimal"
-Result: 125 passed, 0 failed, 32 skipped across all eligible target frameworks.
+Result: 141 passed, 0 failed, 32 skipped across all eligible target frameworks.
 ```
 
 Breakdown:
 
 - Architecture: 5 passed (`net8.0`).
-- Server.Application: 30 passed on `net48`; 30 passed on `net8.0`.
+- Server.Application: 38 passed on `net48`; 38 passed on `net8.0`.
 - Desktop: 14 passed on `net48`; 14 passed on `net8.0-windows`.
 - Server.Infrastructure integration: 16 passed and 16 skipped on `net48`; 16 passed and 16 skipped on `net8.0`.
 

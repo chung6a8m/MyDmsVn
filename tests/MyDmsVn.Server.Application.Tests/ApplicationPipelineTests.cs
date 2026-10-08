@@ -95,6 +95,29 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
+        public async Task Validators_sharing_a_scoped_dependency_do_not_run_concurrently()
+        {
+            var tracker = new ConcurrentValidationTracker();
+            var behavior = new ValidationBehavior<ValidationProbeCommand, ErrorOr<string>>(
+                new IValidator<ValidationProbeCommand>[]
+                {
+                    new ConcurrencySensitiveValidator(tracker, "Validation.First"),
+                    new ConcurrencySensitiveValidator(tracker, "Validation.Second"),
+                });
+            var request = new ValidationProbeCommand(
+                new[] { new ValidationProbeLine(1m) });
+
+            var result = await behavior.Handle(
+                request,
+                _ => Task.FromResult<ErrorOr<string>>("handled"),
+                CancellationToken.None);
+
+            Assert.True(result.IsError);
+            Assert.False(tracker.Overlapped);
+            Assert.Equal(2, result.Errors.Count);
+        }
+
+        [Fact]
         public async Task Handler_exception_becomes_an_unexpected_typed_error()
         {
             var services = new ServiceCollection();
@@ -182,6 +205,51 @@ namespace MyDmsVn.Server.Application.Tests
                     .MustAsync((line, cancellationToken) => Task.FromResult(line.Quantity > 0m))
                     .WithErrorCode("Validation.LineRequired")
                     .WithMessage("A valid line is required.");
+            }
+        }
+
+        private sealed class ConcurrencySensitiveValidator : AbstractValidator<ValidationProbeCommand>
+        {
+            public ConcurrencySensitiveValidator(
+                ConcurrentValidationTracker tracker,
+                string errorCode)
+            {
+                RuleFor(request => request)
+                    .MustAsync(async (request, cancellationToken) =>
+                    {
+                        tracker.Enter();
+                        try
+                        {
+                            await Task.Delay(50, cancellationToken);
+                            return false;
+                        }
+                        finally
+                        {
+                            tracker.Exit();
+                        }
+                    })
+                    .WithErrorCode(errorCode)
+                    .WithMessage("Validation failed.");
+            }
+        }
+
+        private sealed class ConcurrentValidationTracker
+        {
+            private int _activeCount;
+
+            public bool Overlapped { get; private set; }
+
+            public void Enter()
+            {
+                if (Interlocked.Increment(ref _activeCount) > 1)
+                {
+                    Overlapped = true;
+                }
+            }
+
+            public void Exit()
+            {
+                Interlocked.Decrement(ref _activeCount);
             }
         }
 

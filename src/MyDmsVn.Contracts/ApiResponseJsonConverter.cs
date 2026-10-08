@@ -8,6 +8,18 @@ namespace MyDmsVn.Contracts
 {
     public sealed class ApiResponseJsonConverter : JsonConverter
     {
+        private readonly ApiStatusCode _responseStatus;
+
+        public ApiResponseJsonConverter()
+            : this(ApiStatusCode.Unspecified)
+        {
+        }
+
+        internal ApiResponseJsonConverter(ApiStatusCode responseStatus)
+        {
+            _responseStatus = responseStatus;
+        }
+
         public override bool CanWrite => false;
 
         public override bool CanConvert(Type objectType)
@@ -73,7 +85,7 @@ namespace MyDmsVn.Contracts
             }
         }
 
-        private static ApiError ReadError(JToken token, JsonSerializer serializer)
+        private ApiError ReadError(JToken token, JsonSerializer serializer)
         {
             var code = token.Value<string>("code");
             var message = token.Value<string>("message");
@@ -86,7 +98,7 @@ namespace MyDmsVn.Contracts
             try
             {
                 return new ApiError(
-                    ApiStatusCode.Unspecified,
+                    _responseStatus,
                     code!,
                     message!,
                     details);

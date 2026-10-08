@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ErrorOr;
 using FluentValidation;
+using FluentValidation.Results;
 using MediatR;
 
 namespace MyDmsVn.Server.Application
@@ -30,17 +31,17 @@ namespace MyDmsVn.Server.Application
                 return await next().ConfigureAwait(false);
             }
 
-            var validationTasks = _validators
-                .Select(validator => validator.ValidateAsync(
+            var failures = new List<ValidationFailure>();
+            foreach (var validator in _validators)
+            {
+                var validationResult = await validator.ValidateAsync(
                     new ValidationContext<TRequest>(request),
-                    cancellationToken));
-            var validationResults = await Task.WhenAll(validationTasks).ConfigureAwait(false);
-            var failures = validationResults
-                .SelectMany(result => result.Errors)
-                .Where(failure => failure != null)
-                .ToArray();
+                    cancellationToken).ConfigureAwait(false);
+                failures.AddRange(
+                    validationResult.Errors.Where(failure => failure != null));
+            }
 
-            if (failures.Length == 0)
+            if (failures.Count == 0)
             {
                 return await next().ConfigureAwait(false);
             }

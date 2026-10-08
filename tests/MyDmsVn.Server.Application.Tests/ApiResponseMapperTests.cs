@@ -2,6 +2,7 @@
 using ErrorOr;
 using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application;
+using Newtonsoft.Json;
 using Xunit;
 
 namespace MyDmsVn.Server.Application.Tests
@@ -105,6 +106,34 @@ namespace MyDmsVn.Server.Application.Tests
 
             AssertSafeInternalError(alone);
             AssertSafeInternalError(mixed);
+        }
+
+        [Theory]
+        [InlineData(ErrorType.Unauthorized, ApiStatusCode.Unauthorized, "Auth.Unauthorized")]
+        [InlineData(ErrorType.Forbidden, ApiStatusCode.Forbidden, "Auth.Forbidden")]
+        public void Authorization_errors_do_not_expose_private_details(
+            ErrorType type,
+            ApiStatusCode expectedStatus,
+            string expectedCode)
+        {
+            var authorizationError = type == ErrorType.Unauthorized
+                ? Error.Unauthorized("Auth.PrivatePermission", "secret authorization detail")
+                : Error.Forbidden("Auth.PrivatePermission", "secret authorization detail");
+            var validation = Error.Validation("Validation.Required", "Public validation detail.");
+            var result = ErrorOrFactory.From<string>(
+                new List<Error> { validation, authorizationError });
+
+            var response = ApiResponseMapper.Map(result);
+            var json = JsonConvert.SerializeObject(
+                response,
+                ApiJson.CreateSerializerSettings());
+
+            Assert.Equal(expectedStatus, response.Error!.Status);
+            Assert.Equal(expectedCode, response.Error.Code);
+            Assert.Empty(response.Error.Details);
+            Assert.DoesNotContain("PrivatePermission", json);
+            Assert.DoesNotContain("secret", json);
+            Assert.DoesNotContain("validation detail", json);
         }
 
         private static void AssertSafeInternalError(ApiResponse<string> response)

@@ -32,7 +32,9 @@ namespace MyDmsVn.Server.Application
                 .Where(error => error.Type == dominantType)
                 .OrderBy(error => error.Code, StringComparer.Ordinal)
                 .First();
-            var details = errors.Select(ToDetail).ToArray();
+            var details = IsAuthorizationErrorType(dominantType)
+                ? Array.Empty<ApiErrorDetail>()
+                : errors.Select(ToDetail).ToArray();
 
             return ApiResponse<TValue>.Failure(
                 new ApiError(
@@ -49,6 +51,11 @@ namespace MyDmsVn.Server.Application
                 type == ErrorType.Forbidden ||
                 type == ErrorType.NotFound ||
                 type == ErrorType.Conflict;
+        }
+
+        private static bool IsAuthorizationErrorType(ErrorType type)
+        {
+            return type == ErrorType.Unauthorized || type == ErrorType.Forbidden;
         }
 
         private static ErrorType GetDominantType(IReadOnlyCollection<Error> errors)

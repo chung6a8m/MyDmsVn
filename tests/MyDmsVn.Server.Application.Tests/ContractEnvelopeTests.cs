@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using ErrorOr;
 using MyDmsVn.Contracts;
+using MyDmsVn.Server.Application;
 using Newtonsoft.Json;
 using Xunit;
 
@@ -86,6 +88,28 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Equal("ValidationError", failure.Error!.Code);
             Assert.True(valueType.IsSuccess);
             Assert.Equal(0, valueType.Data);
+        }
+
+        [Theory]
+        [InlineData(ErrorType.Unauthorized, ApiStatusCode.Unauthorized)]
+        [InlineData(ErrorType.Forbidden, ApiStatusCode.Forbidden)]
+        [InlineData(ErrorType.NotFound, ApiStatusCode.NotFound)]
+        [InlineData(ErrorType.Conflict, ApiStatusCode.Conflict)]
+        [InlineData(ErrorType.Unexpected, ApiStatusCode.InternalServerError)]
+        public void Http_deserialization_restores_transport_status_metadata(
+            ErrorType type,
+            ApiStatusCode expectedStatus)
+        {
+            var local = ApiResponseMapper.Map<string>(CreateError(type));
+            var json = JsonConvert.SerializeObject(
+                local,
+                ApiJson.CreateSerializerSettings());
+
+            var http = ApiJson.DeserializeResponse<string>(json, expectedStatus);
+
+            Assert.Equal(local.IsSuccess, http.IsSuccess);
+            Assert.Equal(local.Error!.Code, http.Error!.Code);
+            Assert.Equal(local.Error.Status, http.Error.Status);
         }
 
         [Theory]
@@ -194,6 +218,18 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Equal(
                 "{\"receiptId\":42,\"status\":\"Posted\",\"postedAtUtc\":\"2026-10-08T01:02:03Z\"}",
                 json);
+        }
+
+        private static Error CreateError(ErrorType type)
+        {
+            return type switch
+            {
+                ErrorType.Unauthorized => Error.Unauthorized("Auth.Private", "Private."),
+                ErrorType.Forbidden => Error.Forbidden("Auth.Private", "Private."),
+                ErrorType.NotFound => Error.NotFound("Product.NotFound", "Missing."),
+                ErrorType.Conflict => Error.Conflict("Product.Duplicate", "Duplicate."),
+                _ => Error.Unexpected("Internal.Private", "Private."),
+            };
         }
     }
 }
