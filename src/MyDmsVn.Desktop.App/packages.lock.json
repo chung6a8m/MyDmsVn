@@ -729,6 +729,7 @@
       "mydmsvn.desktop.application": {
         "type": "Project",
         "dependencies": {
+          "CommunityToolkit.Mvvm": "[8.4.2, )",
           "MyDmsVn.Contracts": "[1.0.0, )"
         }
       },
@@ -798,6 +799,18 @@
         "contentHash": "gwLD2KfCuwQesP17aVh4h6lpiMPEVt5Lbpndo0ej903hNUUTtyxt3ARdDjmuydBRTAUICc7OVKVbaOvc6SQYXA==",
         "dependencies": {
           "System.Memory": "4.6.3"
+        }
+      },
+      "CommunityToolkit.Mvvm": {
+        "type": "CentralTransitive",
+        "requested": "[8.4.2, )",
+        "resolved": "8.4.2",
+        "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg==",
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "10.0.1",
+          "System.ComponentModel.Annotations": "5.0.0",
+          "System.Memory": "4.6.3",
+          "System.Runtime.CompilerServices.Unsafe": "6.1.2"
         }
       },
       "Dapper": {

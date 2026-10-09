@@ -233,6 +233,11 @@
         "resolved": "8.0.0",
         "contentHash": "WTlRjL6KWIMr/pAaq3rYqh0TJlzpouaQ/W1eelssHgtlwHAH25jXTkUphTYx9HaIIf7XA6qs/0+YhtLEQRkJ+Q=="
       },
+      "System.ComponentModel.Annotations": {
+        "type": "Transitive",
+        "resolved": "5.0.0",
+        "contentHash": "dMkqfy2el8A8/I76n2Hi1oBFEbG1SfxD2l5nhwXV3XjlnOmwxJlQbYpJH4W51odnU9sARCSAgv7S3CyAFMkpYg=="
+      },
       "System.ComponentModel.Composition": {
         "type": "Transitive",
         "resolved": "8.0.0",
@@ -651,6 +656,7 @@
       "mydmsvn.desktop.application": {
         "type": "Project",
         "dependencies": {
+          "CommunityToolkit.Mvvm": "[8.4.2, )",
           "MyDmsVn.Contracts": "[1.0.0, )"
         }
       },
@@ -661,6 +667,18 @@
           "Microsoft.Windows.Compatibility": "[8.0.30, )",
           "System.Resources.Extensions": "[8.0.0, )",
           "System.Text.Json": "[10.0.3, )"
+        }
+      },
+      "CommunityToolkit.Mvvm": {
+        "type": "CentralTransitive",
+        "requested": "[8.4.2, )",
+        "resolved": "8.4.2",
+        "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg==",
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "10.0.1",
+          "System.ComponentModel.Annotations": "5.0.0",
+          "System.Memory": "4.6.3",
+          "System.Runtime.CompilerServices.Unsafe": "6.1.2"
         }
       },
       "Microsoft.Data.SqlClient": {
@@ -1255,6 +1273,7 @@
       "mydmsvn.desktop.application": {
         "type": "Project",
         "dependencies": {
+          "CommunityToolkit.Mvvm": "[8.4.2, )",
           "MyDmsVn.Contracts": "[1.0.0, )"
         }
       },
@@ -1265,6 +1284,12 @@
           "Microsoft.Windows.Compatibility": "[8.0.30, )",
           "System.Text.Json": "[10.0.3, )"
         }
+      },
+      "CommunityToolkit.Mvvm": {
+        "type": "CentralTransitive",
+        "requested": "[8.4.2, )",
+        "resolved": "8.4.2",
+        "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg=="
       },
       "Microsoft.Data.SqlClient": {
         "type": "CentralTransitive",

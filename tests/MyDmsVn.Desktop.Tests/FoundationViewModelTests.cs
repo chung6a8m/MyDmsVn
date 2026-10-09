@@ -19,6 +19,18 @@ namespace MyDmsVn.Desktop.Tests
             Assert.Equal("Local", viewModel.Runtime);
         }
 
+        [Fact]
+        public async Task InitializeCommand_exposes_the_same_ready_and_empty_state_for_binding()
+        {
+            var viewModel = new FoundationViewModel(new ReadyApiClient());
+
+            await viewModel.InitializeCommand.ExecuteAsync(null);
+
+            Assert.True(viewModel.IsReady);
+            Assert.False(viewModel.IsEmpty);
+            Assert.Equal("Local", viewModel.Runtime);
+        }
+
         private sealed class ReadyApiClient : IFoundationApiClient
         {
             public Task<ApiResponse<FoundationStatus>> GetStatusAsync(

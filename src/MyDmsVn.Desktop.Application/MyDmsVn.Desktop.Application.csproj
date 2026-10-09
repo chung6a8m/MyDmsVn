@@ -3,6 +3,9 @@
     <TargetFrameworks>net48;net8.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\MyDmsVn.Contracts\MyDmsVn.Contracts.csproj" />
   </ItemGroup>
 </Project>
