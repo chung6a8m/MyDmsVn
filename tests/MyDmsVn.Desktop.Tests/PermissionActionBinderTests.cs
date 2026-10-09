@@ -202,6 +202,73 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Previous_sessions_permission_result_cannot_override_a_new_grant()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var session = new TestDesktopSession();
+                    var apiClient = new SequencedPermissionApiClient();
+                    using (var action = new Button { Enabled = true })
+                    using (var binder = new PermissionActionBinder(apiClient, session))
+                    {
+                        var previousSessionCheck = binder.ApplyAsync(
+                            action,
+                            "Catalog.Products.Write",
+                            cancellationToken);
+                        session.SignIn(new CurrentUserDto(84, "manager", "Manager"));
+                        var currentSessionCheck = binder.ApplyAsync(
+                            action,
+                            "Catalog.Products.Write",
+                            cancellationToken);
+
+                        apiClient.Complete(1, isAllowed: true);
+                        currentSessionCheck.GetAwaiter().GetResult();
+                        Assert.True(action.Enabled);
+
+                        apiClient.Complete(0, isAllowed: true);
+                        previousSessionCheck.GetAwaiter().GetResult();
+
+                        Assert.True(action.Enabled);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Older_permission_result_cannot_override_the_latest_same_session_result()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var session = new TestDesktopSession();
+                    var apiClient = new SequencedPermissionApiClient();
+                    using (var action = new Button { Enabled = true })
+                    using (var binder = new PermissionActionBinder(apiClient, session))
+                    {
+                        var olderCheck = binder.ApplyAsync(
+                            action,
+                            "Catalog.Products.Write",
+                            cancellationToken);
+                        var latestCheck = binder.ApplyAsync(
+                            action,
+                            "Catalog.Products.Write",
+                            cancellationToken);
+
+                        apiClient.Complete(1, isAllowed: true);
+                        latestCheck.GetAwaiter().GetResult();
+                        Assert.True(action.Enabled);
+
+                        apiClient.Complete(0, isAllowed: false);
+                        olderCheck.GetAwaiter().GetResult();
+
+                        Assert.True(action.Enabled);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
         private static void QueuePermissionGrantFromWorker(
             Control action,
             PermissionActionBinder binder,
@@ -288,6 +355,44 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        private sealed class SequencedPermissionApiClient : IPermissionApiClient
+        {
+            private readonly object _sync = new object();
+            private readonly System.Collections.Generic.List<
+                TaskCompletionSource<ApiResponse<PermissionDecisionDto>>> _requests =
+                    new System.Collections.Generic.List<
+                        TaskCompletionSource<ApiResponse<PermissionDecisionDto>>>();
+
+            public Task<ApiResponse<PermissionDecisionDto>> CheckAsync(
+                string permissionKey,
+                CancellationToken cancellationToken)
+            {
+                var completion =
+                    new TaskCompletionSource<ApiResponse<PermissionDecisionDto>>();
+                lock (_sync)
+                {
+                    _requests.Add(completion);
+                }
+
+                return completion.Task;
+            }
+
+            public void Complete(int requestIndex, bool isAllowed)
+            {
+                TaskCompletionSource<ApiResponse<PermissionDecisionDto>> completion;
+                lock (_sync)
+                {
+                    completion = _requests[requestIndex];
+                }
+
+                completion.SetResult(
+                    ApiResponse<PermissionDecisionDto>.Success(
+                        new PermissionDecisionDto(
+                            "Catalog.Products.Write",
+                            isAllowed)));
+            }
+        }
+
         private sealed class TestDesktopSession : IDesktopSession
         {
             public TestDesktopSession()
@@ -307,6 +412,13 @@ namespace MyDmsVn.Desktop.Tests
             {
                 Version++;
                 CurrentUser = null;
+                SessionChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            public void SignIn(CurrentUserDto currentUser)
+            {
+                Version++;
+                CurrentUser = currentUser;
                 SessionChanged?.Invoke(this, EventArgs.Empty);
             }
         }

@@ -202,6 +202,15 @@ namespace MyDmsVn.Desktop.WinForms
                 "Your session has expired. Please sign in again.");
         }
 
+        protected override void OnHandleCreated(EventArgs eventArgs)
+        {
+            base.OnHandleCreated(eventArgs);
+            if (_session != null)
+            {
+                ApplySessionState();
+            }
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)

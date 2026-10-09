@@ -78,6 +78,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             lock (_sync)
             {
                 _authenticationGeneration++;
+                _currentUser = null;
                 authenticationGeneration = _authenticationGeneration;
             }
 
@@ -99,6 +100,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                     return false;
                 }
 
+                _authenticationGeneration++;
                 _currentUser = currentUser;
             }
 

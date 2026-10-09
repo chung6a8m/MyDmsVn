@@ -336,6 +336,42 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Session_change_before_handle_creation_is_reconciled_when_handle_is_created()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient()),
+                        session,
+                        new DesktopNotificationCenter()))
+                    {
+                        Assert.False(shell.IsHandleCreated);
+                        var content = new Panel();
+                        shell.OpenWorkspace(
+                            "private",
+                            "Private",
+                            content,
+                            shell.WorkspaceSessionVersion);
+
+                        Task.Run(session.SignOut).GetAwaiter().GetResult();
+                        Assert.False(shell.IsHandleCreated);
+
+                        Assert.NotEqual(IntPtr.Zero, shell.Handle);
+
+                        Assert.Empty(shell.Workspace.TabPages);
+                        Assert.True(content.IsDisposed);
+                        Assert.False(shell.Navigation.Enabled);
+                        Assert.False(shell.Workspace.Enabled);
+                        Assert.Equal("Not signed in", shell.CurrentUserText);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
         private static FoundationShellForm CreateShell()
         {
             return new FoundationShellForm(new FoundationViewModel(new ReadyApiClient()));
