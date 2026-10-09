@@ -16,7 +16,7 @@ public sealed class Employee
 
     public bool IsActive { get; set; } = true;
 
-    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; set; }
 
     public int? CreatedByUserId { get; set; }
 

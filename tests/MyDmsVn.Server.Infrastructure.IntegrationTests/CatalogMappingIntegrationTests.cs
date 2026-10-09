@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Domain.Catalog;
+using MyDmsVn.Server.Infrastructure.Catalog;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using RepoDb;
 using Xunit;
@@ -17,7 +18,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class CatalogMappingIntegrationTests
 {
     [SqlServerFact]
-    public async Task Minimally_created_catalog_entities_persist_as_active_with_a_current_utc_creation_time()
+    public async Task Catalog_inserts_use_database_creation_time_instead_of_entity_creation_time()
     {
         var database = await SqlTestDatabase.CreateAsync(
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
@@ -35,29 +36,59 @@ public sealed class CatalogMappingIntegrationTests
             unitOfWork.BeginTransaction();
             var context = Assert.IsAssignableFrom<ISqlExecutionContext>(unitOfWork);
             var transaction = Assert.IsAssignableFrom<IDbTransaction>(context.Transaction);
-            var beforeCreationUtc = DateTime.UtcNow;
-            var product = new Product { Code = "SP-MIN", Name = "San pham", Unit = "Cai" };
-            var warehouse = new Warehouse { Code = "KHO-MIN", Name = "Kho" };
-            var employee = new Employee { Code = "NV-MIN", Name = "Nhan vien" };
-            var customer = new Customer { Code = "KH-MIN", Name = "Khach hang" };
-            var afterCreationUtc = DateTime.UtcNow;
+            var staleEntityCreationUtc = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var product = new Product
+            {
+                Code = "SP-MIN",
+                Name = "San pham",
+                Unit = "Cai",
+                CreatedAtUtc = staleEntityCreationUtc,
+            };
+            var warehouse = new Warehouse
+            {
+                Code = "KHO-MIN",
+                Name = "Kho",
+                CreatedAtUtc = staleEntityCreationUtc,
+            };
+            var employee = new Employee
+            {
+                Code = "NV-MIN",
+                Name = "Nhan vien",
+                CreatedAtUtc = staleEntityCreationUtc,
+            };
+            var customer = new Customer
+            {
+                Code = "KH-MIN",
+                Name = "Khach hang",
+                CreatedAtUtc = staleEntityCreationUtc,
+            };
+            var beforeInsertUtc = await context.Connection.QuerySingleAsync<DateTime>(
+                "SELECT SYSUTCDATETIME();",
+                transaction: transaction);
 
             var productId = await context.Connection.InsertAsync<Product, int>(
                 product,
+                fields: CatalogRepoDbWriteFields.ProductCreate,
                 transaction: transaction,
                 cancellationToken: CancellationToken.None);
             var warehouseId = await context.Connection.InsertAsync<Warehouse, int>(
                 warehouse,
+                fields: CatalogRepoDbWriteFields.WarehouseCreate,
                 transaction: transaction,
                 cancellationToken: CancellationToken.None);
             var employeeId = await context.Connection.InsertAsync<Employee, int>(
                 employee,
+                fields: CatalogRepoDbWriteFields.EmployeeCreate,
                 transaction: transaction,
                 cancellationToken: CancellationToken.None);
             var customerId = await context.Connection.InsertAsync<Customer, int>(
                 customer,
+                fields: CatalogRepoDbWriteFields.CustomerCreate,
                 transaction: transaction,
                 cancellationToken: CancellationToken.None);
+            var afterInsertUtc = await context.Connection.QuerySingleAsync<DateTime>(
+                "SELECT SYSUTCDATETIME();",
+                transaction: transaction);
 
             var persistedDefaults = (await context.Connection.QueryAsync<CatalogDefaultRow>(
                 "SELECT IsActive, CreatedAtUtc FROM dbo.Products WHERE ProductId = @productId " +
@@ -71,7 +102,7 @@ public sealed class CatalogMappingIntegrationTests
             Assert.All(persistedDefaults, row =>
             {
                 Assert.True(row.IsActive);
-                Assert.InRange(row.CreatedAtUtc, beforeCreationUtc, afterCreationUtc);
+                Assert.InRange(row.CreatedAtUtc, beforeInsertUtc, afterInsertUtc);
             });
             unitOfWork.Rollback();
         }
