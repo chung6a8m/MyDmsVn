@@ -9,6 +9,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
     {
         private readonly object _sync = new object();
         private CurrentUserDto? _currentUser;
+        private long _authenticationGeneration;
 
         public event EventHandler? SessionChanged;
 
@@ -51,22 +52,43 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
         public void SignOut()
         {
-            SetCurrentUser(null);
+            lock (_sync)
+            {
+                _authenticationGeneration++;
+                _currentUser = null;
+            }
+
+            SessionChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        internal void SignIn(CurrentUserDto currentUser)
-        {
-            SetCurrentUser(currentUser ?? throw new ArgumentNullException(nameof(currentUser)));
-        }
-
-        private void SetCurrentUser(CurrentUserDto? currentUser)
+        internal long BeginAuthentication()
         {
             lock (_sync)
             {
+                _authenticationGeneration++;
+                return _authenticationGeneration;
+            }
+        }
+
+        internal bool TrySignIn(CurrentUserDto currentUser, long authenticationGeneration)
+        {
+            if (currentUser == null)
+            {
+                throw new ArgumentNullException(nameof(currentUser));
+            }
+
+            lock (_sync)
+            {
+                if (_authenticationGeneration != authenticationGeneration)
+                {
+                    return false;
+                }
+
                 _currentUser = currentUser;
             }
 
             SessionChanged?.Invoke(this, EventArgs.Empty);
+            return true;
         }
     }
 }

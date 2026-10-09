@@ -5,6 +5,7 @@ using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.Infrastructure.Local;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Security;
+using System;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
@@ -31,6 +32,26 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Fact]
+        public async Task Local_client_maps_permission_service_exceptions_to_a_safe_response()
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<IPermissionAuthorizationService>(
+                new ThrowingPermissionAuthorizationService());
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var response = await provider.GetRequiredService<IPermissionApiClient>()
+                    .CheckAsync(PermissionKeys.CatalogProductsWrite, CancellationToken.None);
+
+                Assert.False(response.IsSuccess);
+                Assert.Equal("InternalError", response.Error!.Code);
+                Assert.Equal("An unexpected error occurred.", response.Error.Message);
+            }
+        }
+
         private sealed class StubPermissionAuthorizationService
             : IPermissionAuthorizationService
         {
@@ -46,6 +67,17 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken cancellationToken)
             {
                 return Task.FromResult(_isAllowed);
+            }
+        }
+
+        private sealed class ThrowingPermissionAuthorizationService
+            : IPermissionAuthorizationService
+        {
+            public Task<bool> IsAllowedAsync(
+                string permissionKey,
+                CancellationToken cancellationToken)
+            {
+                throw new InvalidOperationException("sensitive storage failure");
             }
         }
     }

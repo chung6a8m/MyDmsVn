@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -19,6 +20,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ToolStripProgressBar _busyIndicator;
         private readonly IDesktopSession? _session;
         private readonly IDesktopNotificationService? _notifications;
+        private readonly int _uiThreadId;
 
         public FoundationShellForm(FoundationViewModel viewModel)
             : this(viewModel, null, null, true)
@@ -46,6 +48,7 @@ namespace MyDmsVn.Desktop.WinForms
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             _session = session;
             _notifications = notifications;
+            _uiThreadId = Thread.CurrentThread.ManagedThreadId;
 
             Text = "MyDmsVn";
             StartPosition = FormStartPosition.CenterScreen;
@@ -200,28 +203,51 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnSessionChanged(object? sender, EventArgs eventArgs)
         {
-            SetCurrentUser(_session?.CurrentUser?.DisplayName);
+            DispatchToUi(() => SetCurrentUser(_session?.CurrentUser?.DisplayName));
         }
 
         private void OnNotificationPublished(object? sender, DesktopNotification notification)
         {
-            SetStatus(notification.Message);
+            DispatchToUi(() => SetStatus(notification.Message));
         }
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+        {
+            DispatchToUi(ApplyViewModelState);
+        }
+
+        private void DispatchToUi(Action action)
         {
             if (IsDisposed || Disposing)
             {
                 return;
             }
 
-            if (IsHandleCreated && InvokeRequired)
+            if (Thread.CurrentThread.ManagedThreadId == _uiThreadId)
             {
-                BeginInvoke((Action)ApplyViewModelState);
+                action();
                 return;
             }
 
-            ApplyViewModelState();
+            if (!IsHandleCreated)
+            {
+                return;
+            }
+
+            try
+            {
+                BeginInvoke(
+                    (Action)(() =>
+                    {
+                        if (!IsDisposed && !Disposing)
+                        {
+                            action();
+                        }
+                    }));
+            }
+            catch (InvalidOperationException)
+            {
+            }
         }
 
         private void ApplyViewModelState()

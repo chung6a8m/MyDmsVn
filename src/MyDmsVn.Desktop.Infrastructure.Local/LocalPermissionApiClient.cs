@@ -1,19 +1,21 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using MediatR;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
+using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Security;
 
 namespace MyDmsVn.Desktop.Infrastructure.Local
 {
     internal sealed class LocalPermissionApiClient : IPermissionApiClient
     {
-        private readonly IPermissionAuthorizationService _authorization;
+        private readonly ISender _sender;
 
-        public LocalPermissionApiClient(IPermissionAuthorizationService authorization)
+        public LocalPermissionApiClient(ISender sender)
         {
-            _authorization = authorization ?? throw new ArgumentNullException(nameof(authorization));
+            _sender = sender ?? throw new ArgumentNullException(nameof(sender));
         }
 
         public async Task<ApiResponse<PermissionDecisionDto>> CheckAsync(
@@ -25,11 +27,10 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 throw new ArgumentException("A permission key is required.", nameof(permissionKey));
             }
 
-            var isAllowed = await _authorization
-                .IsAllowedAsync(permissionKey, cancellationToken)
+            var result = await _sender
+                .Send(new CheckPermissionQuery(permissionKey), cancellationToken)
                 .ConfigureAwait(false);
-            return ApiResponse<PermissionDecisionDto>.Success(
-                new PermissionDecisionDto(permissionKey, isAllowed));
+            return ApiResponseMapper.Map(result);
         }
     }
 }

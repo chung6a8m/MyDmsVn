@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Linq;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
@@ -163,9 +164,70 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Session_and_notification_updates_are_marshaled_to_the_shell_thread()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var uiThreadId = Thread.CurrentThread.ManagedThreadId;
+                    var session = new TestDesktopSession();
+                    var notifications = new DesktopNotificationCenter();
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient(), notifications),
+                        session,
+                        notifications))
+                    {
+                        var handle = shell.Handle;
+                        Assert.NotEqual(IntPtr.Zero, handle);
+                        var statusStrip = shell.Controls.OfType<StatusStrip>().Single();
+                        var labels = statusStrip.Items.OfType<ToolStripStatusLabel>().ToArray();
+                        var statusThreadId = 0;
+                        var userThreadId = 0;
+                        labels[0].TextChanged += (_, _) =>
+                            statusThreadId = Thread.CurrentThread.ManagedThreadId;
+                        labels[1].TextChanged += (_, _) =>
+                            userThreadId = Thread.CurrentThread.ManagedThreadId;
+
+                        Task.Run(
+                            () => session.SetCurrentUser(
+                                new CurrentUserDto(42, "operator", "Operator")))
+                            .GetAwaiter()
+                            .GetResult();
+                        Task.Run(
+                            () => notifications.Publish(
+                                new DesktopNotification(
+                                    DesktopNotificationKind.Information,
+                                    "Background update.")))
+                            .GetAwaiter()
+                            .GetResult();
+
+                        PumpMessagesUntil(
+                            () => statusThreadId != 0 && userThreadId != 0,
+                            TimeSpan.FromSeconds(2));
+
+                        Assert.Equal(uiThreadId, statusThreadId);
+                        Assert.Equal(uiThreadId, userThreadId);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
         private static FoundationShellForm CreateShell()
         {
             return new FoundationShellForm(new FoundationViewModel(new ReadyApiClient()));
+        }
+
+        private static void PumpMessagesUntil(Func<bool> condition, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (!condition() && DateTime.UtcNow < deadline)
+            {
+                System.Windows.Forms.Application.DoEvents();
+                Thread.Sleep(10);
+            }
+
+            Assert.True(condition(), "Expected UI update did not arrive before the timeout.");
         }
 
         internal sealed class ReadyApiClient : IFoundationApiClient

@@ -55,6 +55,34 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Fact]
+        public async Task Signing_out_invalidates_a_login_that_is_still_in_flight()
+        {
+            var delayedHandler = new DelayedLoginHandler();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>>(delayedHandler);
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var client = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                var loginTask = client.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None);
+                await delayedHandler.Started;
+
+                session.SignOut();
+                delayedHandler.Complete();
+                var response = await loginTask;
+
+                Assert.True(response.IsSuccess);
+                Assert.False(session.IsAuthenticated);
+            }
+        }
+
         private static ServiceProvider CreateProvider()
         {
             var services = new ServiceCollection();
@@ -76,6 +104,31 @@ namespace MyDmsVn.Desktop.Tests
                 cancellationToken.ThrowIfCancellationRequested();
                 return Task.FromResult<ErrorOr<CurrentUserDto>>(
                     new CurrentUserDto(42, request.Username, "Warehouse Operator"));
+            }
+        }
+
+        private sealed class DelayedLoginHandler
+            : IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>
+        {
+            private readonly TaskCompletionSource<bool> _started =
+                new TaskCompletionSource<bool>();
+            private readonly TaskCompletionSource<ErrorOr<CurrentUserDto>> _completion =
+                new TaskCompletionSource<ErrorOr<CurrentUserDto>>();
+
+            public Task Started => _started.Task;
+
+            public Task<ErrorOr<CurrentUserDto>> Handle(
+                LoginCommand request,
+                CancellationToken cancellationToken)
+            {
+                _started.TrySetResult(true);
+                return _completion.Task;
+            }
+
+            public void Complete()
+            {
+                _completion.SetResult(
+                    new CurrentUserDto(42, "operator", "Warehouse Operator"));
             }
         }
     }

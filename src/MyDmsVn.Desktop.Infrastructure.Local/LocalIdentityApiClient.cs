@@ -29,13 +29,14 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 throw new ArgumentNullException(nameof(request));
             }
 
+            var authenticationGeneration = _session.BeginAuthentication();
             var result = await _sender
                 .Send(new LoginCommand(request.Username, request.Password), cancellationToken)
                 .ConfigureAwait(false);
             var response = ApiResponseMapper.Map(result);
             if (response.IsSuccess)
             {
-                _session.SignIn(response.Data!);
+                _session.TrySignIn(response.Data!, authenticationGeneration);
             }
 
             return response;
