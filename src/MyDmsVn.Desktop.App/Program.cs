@@ -11,14 +11,23 @@ namespace MyDmsVn.Desktop.App
     internal static class Program
     {
         [STAThread]
-        private static void Main()
+        private static int Main(string[] args)
         {
             System.Windows.Forms.Application.EnableVisualStyles();
             System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
             using (var provider = CreateServiceProvider())
             {
-                System.Windows.Forms.Application.Run(provider.GetRequiredService<FoundationShellForm>());
+                return DesktopHostRunner.Run(
+                    provider.GetRequiredService<FoundationShellForm>(),
+                    IsSmokeTest(args));
             }
+        }
+
+        private static bool IsSmokeTest(string[] args)
+        {
+            return Array.Exists(
+                args ?? Array.Empty<string>(),
+                argument => string.Equals(argument, "--smoke-test", StringComparison.Ordinal));
         }
 
         private static ServiceProvider CreateServiceProvider()

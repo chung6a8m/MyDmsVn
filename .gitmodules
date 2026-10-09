@@ -1,0 +1,3 @@
+[submodule "vendor/MyDmsVn.BootstrapSourceGrid"]
+	path = vendor/MyDmsVn.BootstrapSourceGrid
+	url = https://github.com/chung6a8m/MyDmsVn.BootstrapSourceGrid.git

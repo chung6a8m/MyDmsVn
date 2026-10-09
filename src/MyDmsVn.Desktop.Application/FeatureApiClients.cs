@@ -60,4 +60,11 @@ namespace MyDmsVn.Desktop.Application
         Task<ApiResponse<CurrentUserDto>> LoginAsync(LoginRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<CurrentUserDto>> GetCurrentUserAsync(CancellationToken cancellationToken);
     }
+
+    public interface IPermissionApiClient
+    {
+        Task<ApiResponse<PermissionDecisionDto>> CheckAsync(
+            string permissionKey,
+            CancellationToken cancellationToken);
+    }
 }
