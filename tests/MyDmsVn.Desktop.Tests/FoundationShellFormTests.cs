@@ -24,6 +24,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Empty(shell.Workspace.TabPages);
                         Assert.Equal("Ready", shell.StatusText);
                         Assert.Equal("Not signed in", shell.CurrentUserText);
+                        Assert.Equal(AutoScaleMode.Dpi, shell.AutoScaleMode);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -167,7 +168,7 @@ namespace MyDmsVn.Desktop.Tests
             return new FoundationShellForm(new FoundationViewModel(new ReadyApiClient()));
         }
 
-        private sealed class ReadyApiClient : IFoundationApiClient
+        internal sealed class ReadyApiClient : IFoundationApiClient
         {
             public Task<ApiResponse<FoundationStatus>> GetStatusAsync(
                 FoundationStatusRequest request,

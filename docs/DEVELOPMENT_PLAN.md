@@ -1,6 +1,6 @@
 # Development Plan — MyDmsVn v1 → v2
 
-**Status:** P0 and P1 complete on 2026-10-08; P2 and P3 complete on 2026-10-09; P4 is next. **Codex must not skip prerequisites or mark unverified tests as passed.**
+**Status:** P0 and P1 complete on 2026-10-08; P2, P3 and P4 complete on 2026-10-09; P5 is next. **Codex must not skip prerequisites or mark unverified tests as passed.**
 
 ## Operating rules
 
@@ -17,7 +17,7 @@
 | **P1** | Persistence foundation | SQL connection, RepoDb maps, Dapper, DbUp migrator, explicit UoW; SQL commit/rollback tests | Complete (2026-10-08) |
 | **P2** | Application pipeline/contracts | MediatR, validation, ErrorOr, transport-neutral ApiResponse mapping, client APIs; error tests | Complete (2026-10-09) |
 | **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Complete (2026-10-09) |
-| **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Not started |
+| **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Complete (2026-10-09) |
 | **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | Not started |
 | **P6** | Local v1 hardening | Deployment/migration instructions, logging, secure configuration, two desktop host smoke, release checklist | Not started |
 | **P7** | HTTP API v2 & parity | ASP.NET Core 8 API + HTTP adapter, auth and contract parity; no shared DB credentials on remote desktop | Not started |
@@ -61,11 +61,11 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 
 ## P4 — WinForms desktop foundation
 
-- [ ] P4-T01 create shell, bootstrap theme/grid integration validation for both runtimes.
-- [ ] P4-T02 standard bindable VM, async commands, cancellation, busy/error/field messages.
-- [ ] P4-T03 implement LocalApiClient DI wiring and session information.
-- [ ] P4-T04 generic master list + edit form + reusable lookup/grid pattern.
-- [ ] P4-T05 deterministic STA UI test harness without modal dialogs.
+- [x] P4-T01 create shell, bootstrap theme/grid integration validation for both runtimes.
+- [x] P4-T02 standard bindable VM, async commands, cancellation, busy/error/field messages.
+- [x] P4-T03 implement LocalApiClient DI wiring and session information.
+- [x] P4-T04 generic master list + edit form + reusable lookup/grid pattern.
+- [x] P4-T05 deterministic STA UI test harness without modal dialogs.
 **Exit:** two WinForms hosts open same shell and use same desktop abstractions; no direct server infrastructure references from views.
 
 ## P5 — Sales & Inventory Foundation
