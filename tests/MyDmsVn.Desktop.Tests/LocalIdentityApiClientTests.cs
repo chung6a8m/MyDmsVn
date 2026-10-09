@@ -89,6 +89,34 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Canceled_login_cannot_establish_a_session_when_the_handler_ignores_cancellation()
+        {
+            var delayedHandler = new DelayedLoginHandler();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>>(delayedHandler);
+
+            using (var provider = services.BuildServiceProvider())
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var client = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                var login = client.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    cancellation.Token);
+                await delayedHandler.Started;
+
+                cancellation.Cancel();
+                delayedHandler.Complete();
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => login);
+                Assert.False(session.IsAuthenticated);
+            }
+        }
+
+        [Fact]
         public void Pending_login_invalidates_the_old_principals_desktop_requests()
         {
             StaTest.Run(

@@ -372,6 +372,96 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Ready_view_model_state_before_handle_creation_is_reconciled()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var apiClient = new DeferredApiClient();
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(apiClient)))
+                    {
+                        var initialization = Task.Run(
+                            () => shell.ViewModel.InitializeAsync(cancellationToken));
+                        Assert.True(
+                            apiClient.Started.Wait(TimeSpan.FromSeconds(2)),
+                            "Foundation request did not start before the timeout.");
+                        apiClient.Complete(new FoundationStatus(true, "Background"));
+                        initialization.GetAwaiter().GetResult();
+                        Assert.False(shell.IsHandleCreated);
+
+                        Assert.NotEqual(IntPtr.Zero, shell.Handle);
+
+                        Assert.False(shell.BusyIndicatorVisible);
+                        Assert.Equal("Ready (Background)", shell.StatusText);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Busy_view_model_state_before_handle_creation_is_reconciled()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var apiClient = new DeferredApiClient();
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(apiClient)))
+                    {
+                        var initialization = Task.Run(
+                            () => shell.ViewModel.InitializeAsync(cancellationToken));
+                        Assert.True(
+                            apiClient.Started.Wait(TimeSpan.FromSeconds(2)),
+                            "Foundation request did not start before the timeout.");
+                        Assert.False(shell.IsHandleCreated);
+
+                        try
+                        {
+                            Assert.NotEqual(IntPtr.Zero, shell.Handle);
+                            Assert.True(shell.BusyIndicatorVisible);
+                        }
+                        finally
+                        {
+                            apiClient.Complete(new FoundationStatus(true, "Background"));
+                            initialization.GetAwaiter().GetResult();
+                            System.Windows.Forms.Application.DoEvents();
+                        }
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Notification_before_handle_creation_is_reconciled()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var notifications = new DesktopNotificationCenter();
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient(), notifications),
+                        new TestDesktopSession(),
+                        notifications))
+                    {
+                        Task.Run(
+                                () => notifications.Publish(
+                                    new DesktopNotification(
+                                        DesktopNotificationKind.Error,
+                                        "Background failure.")))
+                            .GetAwaiter()
+                            .GetResult();
+                        Assert.False(shell.IsHandleCreated);
+
+                        Assert.NotEqual(IntPtr.Zero, shell.Handle);
+
+                        Assert.Equal("Background failure.", shell.StatusText);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
         private static FoundationShellForm CreateShell()
         {
             return new FoundationShellForm(new FoundationViewModel(new ReadyApiClient()));
@@ -406,11 +496,14 @@ namespace MyDmsVn.Desktop.Tests
             private readonly TaskCompletionSource<ApiResponse<FoundationStatus>> _completion =
                 new TaskCompletionSource<ApiResponse<FoundationStatus>>();
 
+            public ManualResetEventSlim Started { get; } = new ManualResetEventSlim();
+
             public Task<ApiResponse<FoundationStatus>> GetStatusAsync(
                 FoundationStatusRequest request,
                 CancellationToken cancellationToken)
             {
                 cancellationToken.Register(() => _completion.TrySetCanceled());
+                Started.Set();
                 return _completion.Task;
             }
 

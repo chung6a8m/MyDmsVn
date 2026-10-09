@@ -33,6 +33,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             var result = await _sender
                 .Send(new LoginCommand(request.Username, request.Password), cancellationToken)
                 .ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             var response = ApiResponseMapper.Map(result);
             if (response.IsSuccess &&
                 !_session.TrySignIn(response.Data!, authenticationGeneration))

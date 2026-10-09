@@ -205,9 +205,16 @@ namespace MyDmsVn.Desktop.WinForms
         protected override void OnHandleCreated(EventArgs eventArgs)
         {
             base.OnHandleCreated(eventArgs);
+            ApplyViewModelState();
             if (_session != null)
             {
                 ApplySessionState();
+            }
+
+            var lastNotification = _notifications?.LastNotification;
+            if (lastNotification != null)
+            {
+                SetStatus(lastNotification.Message);
             }
         }
 
