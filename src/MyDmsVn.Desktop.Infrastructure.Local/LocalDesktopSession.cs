@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Server.Application.Identity;
@@ -35,6 +35,17 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             }
         }
 
+        public long Version
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _authenticationGeneration;
+                }
+            }
+        }
+
         CurrentUser ICurrentUserAccessor.Current
         {
             get
@@ -63,11 +74,15 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
         internal long BeginAuthentication()
         {
+            long authenticationGeneration;
             lock (_sync)
             {
                 _authenticationGeneration++;
-                return _authenticationGeneration;
+                authenticationGeneration = _authenticationGeneration;
             }
+
+            SessionChanged?.Invoke(this, EventArgs.Empty);
+            return authenticationGeneration;
         }
 
         internal bool TrySignIn(CurrentUserDto currentUser, long authenticationGeneration)

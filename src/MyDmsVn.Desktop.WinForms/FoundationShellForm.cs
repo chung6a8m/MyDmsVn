@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -95,7 +95,7 @@ namespace MyDmsVn.Desktop.WinForms
             if (_session != null)
             {
                 _session.SessionChanged += OnSessionChanged;
-                SetCurrentUser(_session.CurrentUser?.DisplayName);
+                ApplySessionState();
             }
 
             if (_notifications != null)
@@ -203,7 +203,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnSessionChanged(object? sender, EventArgs eventArgs)
         {
-            DispatchToUi(() => SetCurrentUser(_session?.CurrentUser?.DisplayName));
+            DispatchToUi(ApplySessionState);
         }
 
         private void OnNotificationPublished(object? sender, DesktopNotification notification)
@@ -266,6 +266,31 @@ namespace MyDmsVn.Desktop.WinForms
                 SetStatus(string.IsNullOrWhiteSpace(_viewModel.Runtime)
                     ? "Ready"
                     : $"Ready ({_viewModel.Runtime})");
+            }
+        }
+
+        private void ApplySessionState()
+        {
+            var isAuthenticated = _session?.IsAuthenticated ?? true;
+            Navigation.Enabled = isAuthenticated;
+            Workspace.Enabled = isAuthenticated;
+            if (!isAuthenticated)
+            {
+                CloseAllWorkspaces();
+            }
+
+            SetCurrentUser(_session?.CurrentUser?.DisplayName);
+        }
+
+        private void CloseAllWorkspaces()
+        {
+            var pages = new TabPage[_documents.Count];
+            _documents.Values.CopyTo(pages, 0);
+            Workspace.TabPages.Clear();
+            _documents.Clear();
+            foreach (var page in pages)
+            {
+                page.Dispose();
             }
         }
 

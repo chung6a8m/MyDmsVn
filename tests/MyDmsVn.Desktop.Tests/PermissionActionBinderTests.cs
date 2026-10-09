@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -17,16 +17,21 @@ namespace MyDmsVn.Desktop.Tests
             StaTest.Run(
                 cancellationToken =>
                 {
+                    var session = new TestDesktopSession();
                     using (var action = new Button { Enabled = true })
+                    using (var binder = new PermissionActionBinder(
+                        new StubPermissionApiClient(isAllowed: true),
+                        session))
                     {
-                        var binder = new PermissionActionBinder(
-                            new StubPermissionApiClient(isAllowed: true));
-
                         binder.ApplyAsync(action, "Catalog.Products.Write", cancellationToken)
                             .GetAwaiter()
                             .GetResult();
 
                         Assert.True(action.Enabled);
+
+                        session.SignOut();
+
+                        Assert.False(action.Enabled);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -40,18 +45,55 @@ namespace MyDmsVn.Desktop.Tests
                 {
                     using (var denied = new Button { Enabled = true })
                     using (var failed = new Button { Enabled = true })
+                    using (var deniedBinder = new PermissionActionBinder(
+                        new StubPermissionApiClient(isAllowed: false),
+                        new TestDesktopSession()))
+                    using (var failedBinder = new PermissionActionBinder(
+                        new FailingPermissionApiClient(),
+                        new TestDesktopSession()))
                     {
-                        new PermissionActionBinder(new StubPermissionApiClient(isAllowed: false))
-                            .ApplyAsync(denied, "Catalog.Products.Write", cancellationToken)
+                        deniedBinder.ApplyAsync(
+                                denied,
+                                "Catalog.Products.Write",
+                                cancellationToken)
                             .GetAwaiter()
                             .GetResult();
-                        new PermissionActionBinder(new FailingPermissionApiClient())
-                            .ApplyAsync(failed, "Catalog.Products.Write", cancellationToken)
+                        failedBinder.ApplyAsync(
+                                failed,
+                                "Catalog.Products.Write",
+                                cancellationToken)
                             .GetAwaiter()
                             .GetResult();
 
                         Assert.False(denied.Enabled);
                         Assert.False(failed.Enabled);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Delayed_permission_result_cannot_reenable_an_action_after_sign_out()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var session = new TestDesktopSession();
+                    var apiClient = new DeferredPermissionApiClient();
+                    using (var action = new Button { Enabled = true })
+                    using (var binder = new PermissionActionBinder(apiClient, session))
+                    {
+                        var applyTask = binder.ApplyAsync(
+                            action,
+                            "Catalog.Products.Write",
+                            cancellationToken);
+                        Assert.False(action.Enabled);
+
+                        session.SignOut();
+                        apiClient.Complete(isAllowed: true);
+                        applyTask.GetAwaiter().GetResult();
+
+                        Assert.False(action.Enabled);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -88,6 +130,49 @@ namespace MyDmsVn.Desktop.Tests
                             ApiStatusCode.InternalServerError,
                             "Permission.Unavailable",
                             "Permission could not be checked.")));
+            }
+        }
+
+        private sealed class DeferredPermissionApiClient : IPermissionApiClient
+        {
+            private readonly TaskCompletionSource<ApiResponse<PermissionDecisionDto>> _completion =
+                new TaskCompletionSource<ApiResponse<PermissionDecisionDto>>();
+
+            public Task<ApiResponse<PermissionDecisionDto>> CheckAsync(
+                string permissionKey,
+                CancellationToken cancellationToken)
+            {
+                return _completion.Task;
+            }
+
+            public void Complete(bool isAllowed)
+            {
+                _completion.SetResult(
+                    ApiResponse<PermissionDecisionDto>.Success(
+                        new PermissionDecisionDto("Catalog.Products.Write", isAllowed)));
+            }
+        }
+
+        private sealed class TestDesktopSession : IDesktopSession
+        {
+            public TestDesktopSession()
+            {
+                CurrentUser = new CurrentUserDto(42, "operator", "Operator");
+            }
+
+            public event EventHandler? SessionChanged;
+
+            public bool IsAuthenticated => CurrentUser != null;
+
+            public CurrentUserDto? CurrentUser { get; private set; }
+
+            public long Version { get; private set; }
+
+            public void SignOut()
+            {
+                Version++;
+                CurrentUser = null;
+                SessionChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
@@ -34,9 +34,14 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 .Send(new LoginCommand(request.Username, request.Password), cancellationToken)
                 .ConfigureAwait(false);
             var response = ApiResponseMapper.Map(result);
-            if (response.IsSuccess)
+            if (response.IsSuccess &&
+                !_session.TrySignIn(response.Data!, authenticationGeneration))
             {
-                _session.TrySignIn(response.Data!, authenticationGeneration);
+                return ApiResponse<CurrentUserDto>.Failure(
+                    new ApiError(
+                        ApiStatusCode.Unauthorized,
+                        "Auth.SessionChanged",
+                        "The login result is no longer current. Sign in again."));
             }
 
             return response;

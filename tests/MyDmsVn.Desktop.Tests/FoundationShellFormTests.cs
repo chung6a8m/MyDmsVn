@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -121,18 +121,32 @@ namespace MyDmsVn.Desktop.Tests
                         notifications))
                     {
                         session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                        var signedOutContent = new Panel();
+                        shell.OpenWorkspace("private-sign-out", "Private", signedOutContent);
                         shell.SignOut();
 
                         Assert.False(session.IsAuthenticated);
                         Assert.Equal("You have been signed out.", shell.StatusText);
+                        Assert.Empty(shell.Workspace.TabPages);
+                        Assert.True(signedOutContent.IsDisposed);
+                        Assert.False(shell.Workspace.Enabled);
+                        Assert.False(shell.Navigation.Enabled);
 
                         session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                        Assert.True(shell.Workspace.Enabled);
+                        Assert.True(shell.Navigation.Enabled);
+                        var expiredContent = new Panel();
+                        shell.OpenWorkspace("private-expired", "Private", expiredContent);
                         shell.HandleSessionExpired();
 
                         Assert.False(session.IsAuthenticated);
                         Assert.Equal(
                             "Your session has expired. Please sign in again.",
                             shell.StatusText);
+                        Assert.Empty(shell.Workspace.TabPages);
+                        Assert.True(expiredContent.IsDisposed);
+                        Assert.False(shell.Workspace.Enabled);
+                        Assert.False(shell.Navigation.Enabled);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -269,6 +283,8 @@ namespace MyDmsVn.Desktop.Tests
 
             public CurrentUserDto? CurrentUser { get; private set; }
 
+            public long Version { get; private set; }
+
             public void SignOut()
             {
                 SetCurrentUser(null);
@@ -277,6 +293,7 @@ namespace MyDmsVn.Desktop.Tests
             public void SetCurrentUser(CurrentUserDto? currentUser)
             {
                 CurrentUser = currentUser;
+                Version++;
                 SessionChanged?.Invoke(this, EventArgs.Empty);
             }
         }

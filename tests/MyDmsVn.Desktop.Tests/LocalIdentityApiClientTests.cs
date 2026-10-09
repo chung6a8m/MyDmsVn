@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using ErrorOr;
 using MediatR;
@@ -78,7 +78,9 @@ namespace MyDmsVn.Desktop.Tests
                 delayedHandler.Complete();
                 var response = await loginTask;
 
-                Assert.True(response.IsSuccess);
+                Assert.False(response.IsSuccess);
+                Assert.Equal("Auth.SessionChanged", response.Error!.Code);
+                Assert.Equal(ApiStatusCode.Unauthorized, response.Error.Status);
                 Assert.False(session.IsAuthenticated);
             }
         }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using MyDmsVn.Contracts;
 
 namespace MyDmsVn.Desktop.Application
@@ -10,6 +10,8 @@ namespace MyDmsVn.Desktop.Application
         bool IsAuthenticated { get; }
 
         CurrentUserDto? CurrentUser { get; }
+
+        long Version { get; }
 
         void SignOut();
     }
