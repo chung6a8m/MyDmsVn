@@ -1,4 +1,4 @@
-# Application / Desktop API contracts
+﻿# Application / Desktop API contracts
 
 ## Purpose
 
@@ -79,6 +79,8 @@ Recommended initial interfaces:
 - `IIdentityApiClient`: `LoginAsync` / `GetCurrentUserAsync`, after auth contract is defined.
 
 Each call is async and accepts `CancellationToken`. Commands have DTO request and typed response; queries return paginated DTOs with total count and deterministic sort where appropriate.
+
+The P5.1 catalog clients expose Create, Update, SetActive, List, Get and Lookup operations. List queries accept `CatalogListRequest`, sort by Code then stable ID, and return total-count paging. Lookup queries accept `CatalogLookupRequest`, return the shared `CatalogLookupDto`, and include active rows only; Get/List may still return inactive rows when requested so historical selections can be displayed. Local adapters dispatch the matching Application request and map its typed result into `ApiResponse<T>` without exposing Domain entities, RepoDb objects or SQL exceptions.
 
 Example command-level behavior:
 - `PostGoodsReceiptRequest` identifies the receipt and may carry concurrency token; it does **not** send a raw UnitOfWork or EF/RepoDb entity.

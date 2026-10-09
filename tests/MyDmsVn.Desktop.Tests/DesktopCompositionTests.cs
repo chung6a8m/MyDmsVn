@@ -8,6 +8,7 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.Infrastructure.Local;
 using MyDmsVn.Server.Application;
+using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Infrastructure;
 using Xunit;
 
@@ -109,6 +110,30 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Fact]
+        public async Task Local_catalog_clients_are_registered_and_map_application_errors_to_api_responses()
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<IProductQueryService>(new EmptyProductQueryService());
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                Assert.NotNull(provider.GetRequiredService<IProductApiClient>());
+                Assert.NotNull(provider.GetRequiredService<IWarehouseApiClient>());
+                Assert.NotNull(provider.GetRequiredService<IEmployeeApiClient>());
+                Assert.NotNull(provider.GetRequiredService<ICustomerApiClient>());
+
+                var response = await provider.GetRequiredService<IProductApiClient>()
+                    .GetAsync(41, CancellationToken.None);
+
+                Assert.False(response.IsSuccess);
+                Assert.Equal("Auth.Unauthorized", response.Error!.Code);
+                Assert.Equal(ApiStatusCode.Unauthorized, response.Error.Status);
+            }
+        }
+
         private sealed class ThrowingFoundationHandler
             : IRequestHandler<GetFoundationStatusQuery, ErrorOr<FoundationStatus>>
         {
@@ -131,6 +156,20 @@ namespace MyDmsVn.Desktop.Tests
                 RequestType = requestType;
                 Exception = exception;
             }
+        }
+
+        private sealed class EmptyProductQueryService : IProductQueryService
+        {
+            public Task<PagedResult<ProductDto>> ListAsync(CatalogListRequest request, CancellationToken cancellationToken) =>
+                Task.FromResult(new PagedResult<ProductDto>(Array.Empty<ProductDto>(), request.PageNumber, request.PageSize, 0));
+
+            public Task<ProductDto?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
+                Task.FromResult<ProductDto?>(null);
+
+            public Task<System.Collections.Generic.IReadOnlyList<CatalogLookupDto>> LookupAsync(
+                CatalogLookupRequest request,
+                CancellationToken cancellationToken) =>
+                Task.FromResult<System.Collections.Generic.IReadOnlyList<CatalogLookupDto>>(Array.Empty<CatalogLookupDto>());
         }
     }
 }

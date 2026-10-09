@@ -33,6 +33,10 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.TryAddScoped<SqlIdentityStore>();
+            services.TryAddScoped<IProductQueryService, SqlProductQueryService>();
+            services.TryAddScoped<IWarehouseQueryService, SqlWarehouseQueryService>();
+            services.TryAddScoped<IEmployeeQueryService, SqlEmployeeQueryService>();
+            services.TryAddScoped<ICustomerQueryService, SqlCustomerQueryService>();
             services.TryAddEnumerable(
                 ServiceDescriptor.Singleton<IRepoDbMapping, CatalogRepoDbMapping>());
             services.Replace(

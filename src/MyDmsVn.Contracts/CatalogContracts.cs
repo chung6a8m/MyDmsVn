@@ -22,6 +22,34 @@ namespace MyDmsVn.Contracts
         public bool IncludeInactive { get; }
     }
 
+    public sealed class CatalogLookupRequest
+    {
+        public CatalogLookupRequest(string? search, int limit)
+        {
+            Search = search;
+            Limit = limit;
+        }
+
+        public string? Search { get; }
+        public int Limit { get; }
+    }
+
+    public sealed class CatalogLookupDto
+    {
+        public CatalogLookupDto(int id, string code, string name, bool isActive)
+        {
+            Id = id;
+            Code = code;
+            Name = name;
+            IsActive = isActive;
+        }
+
+        public int Id { get; }
+        public string Code { get; }
+        public string Name { get; }
+        public bool IsActive { get; }
+    }
+
     public sealed class ProductDto
     {
         public ProductDto(int id, string code, string name, string unit, bool isActive)
