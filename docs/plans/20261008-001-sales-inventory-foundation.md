@@ -20,13 +20,25 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [ ] Return `ApiResponse<T>` via Local adapter; no raw entity/RepoDb object escapes.
 
 ### P5.1-T03 — UI
-- [ ] WinForms catalogs: list/filter, create/edit, activate/deactivate, async busy/cancel, field-level validation.
+- [ ] WinForms catalogs: list/filter, create/edit, activate/deactivate, async busy/cancel, field-level validation. All free-text List/Filter searches use the shared debouncing/cancellation pattern described in P5.1-T04.
 - [ ] Keyboard-friendly compact layout; provide Warehouse, Employee and Product lookups for receipt entry (only active items selectable). Customer lookup supports later Sales workflows and is not used by Goods Receipts.
-- [ ] Reuse ViewModels and client interfaces for both desktop hosts.
+- [ ] Reuse ViewModels and client interfaces for both desktop hosts; views only bind to state and forward input, not issue queries or publish messages directly.
+
+### P5.1-T04 — Debounced filtering and catalog-change notifications
+- [ ] Provide a reusable, disposable **Debouncer** (or equivalent debounced async command) in the shared desktop ViewModel/UI infrastructure, compatible with both `net48` and `net8.0-windows`. Default text-input idle interval: **300 ms** (configurable per view); avoid extra dependencies unless justified. Apply to Catalog List/Filter and reuse for receipt/inventory free-text searches.
+- [ ] On changed search text, debounce before calling the API, cancel superseded requests, and use a monotonically increasing request generation/version to **discard stale responses even if the API ignores cancellation**. Changing the filter resets paging to page 1. Initial load, explicit Refresh, and other intentional immediate actions must not be unnecessarily delayed. Preserve loading, empty, validation and error states without blocking the WinForms UI thread.
+- [ ] Define a **typed desktop-local** `CatalogChangedMessage` (catalog kind: Product/Warehouse/Employee/Customer; entity ID; operation: Created/Updated/ActiveStatusChanged). Inject `IMessenger` from CommunityToolkit.Mvvm and register a **shared per-host `WeakReferenceMessenger` instance** through desktop composition/DI; do not expose messenger types in Server.Domain, Server.Application or transport DTOs.
+- [ ] Publish `CatalogChangedMessage` **only after** the corresponding Create/Update/SetActive API command has returned success (and server-side transaction has committed). Never publish for validation failures, authorization denials, conflicts, exceptions or cancellation. The catalog editor/list should also refresh its own displayed data after success.
+- [ ] Catalog list and Lookup ViewModels (especially Goods Receipt Product/Warehouse/Employee lookups) subscribe for relevant catalog kinds, invalidate any affected lookup cache, and asynchronously reload through the existing `IxxxApiClient` query. Ignore unrelated catalog events; coalesce bursts and use cancellation/request generations so older reloads cannot overwrite fresher data.
+- [ ] Preserve a selected entity ID and historical display label in an open receipt when its catalog item becomes inactive: do **not** silently clear/change the selected ID. Exclude inactive items from **new** selections, visibly mark an already-selected inactive item as unavailable, and let Application Post revalidation remain authoritative.
+- [ ] Deliver UI-bound ViewModel updates on the owning WinForms UI thread (messenger callbacks may run on the sender's thread). Register receivers for active view/form lifetimes and unregister/dispose on close or navigation to avoid duplicate callbacks, pending requests and retained UI state. Refresh from the API on view activation/open as a fallback for missed messages.
+- [ ] Document messenger scope: it notifies **only screens in the same desktop process** after mutations made through that process. It does not synchronize other running desktop instances or changes made directly in SQL; no cross-process guarantee is assumed for v1/v2. Fresh queries on activation and authoritative server-side validation are mandatory; future real-time remote synchronization requires a separate design.
 
 ### P5.1 gate
 - [ ] Integration tests: uniqueness/collation, FK, deactivated historical reference, permissions.
-- [ ] Manual smoke and safe STA UI smoke for each catalog across `net48` and `net8.0-windows`.
+- [ ] Deterministic ViewModel tests (with fake API and controllable delay/scheduler): rapid typing issues one final debounced query; page resets on filter change; a canceled but late old response cannot overwrite new results; Refresh executes immediately; close/dispose prevents delayed UI work.
+- [ ] Messenger tests: each successful Create/Update/SetActive publishes exactly one correctly typed change, failures publish none; two open recipients refresh only affected catalogs, handle bursts, and stop reacting after disposal; reopening fetches fresh data. A deactivated selected item remains visible but is unavailable for new selection.
+- [ ] Manual smoke and safe STA UI smoke for each catalog and open Goods Receipt lookups across `net48` and `net8.0-windows`: rapid filtering, successful edit/activation/deactivation propagation, thread-safe binding updates, and no modal hangs.
 
 ## P5.2 — Goods Receipt Draft
 
@@ -47,14 +59,15 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 
 ### P5.2-T03 — Queries and UI
 - [ ] List and Get receipt with header/lines via Dapper read models; Get includes the current opaque `rowversion` token for optimistic editing/posting and query permissions are enforced.
-- [ ] Master-detail WinForms form with BootstrapSourceGrid, Product lookups and totals for display only.
+- [ ] Master-detail WinForms form with BootstrapSourceGrid, Product/Warehouse/Employee lookups and totals for display only. Its Lookup ViewModels consume `CatalogChangedMessage` from P5.1-T04 so changes made in an open Catalog screen refresh matching options without reopening Goods Receipt; preserve the current selected ID/historical label even when deactivated.
+- [ ] Apply the shared Debouncer to receipt free-text List/Filter or searchable lookups where applicable, including cancellation and stale-response guards; explicit selection and form validation must not be delayed.
 - [ ] Inline validation and progress/errors; avoid long-running database calls on UI thread.
 
 ### P5.2 gate
 - [ ] SQL tests for rollback of header+lines; enforced FK/unique/CHECK constraints (including direct invalid SQL inserts), duplicate receipt numbers/product lines, state guard, and server-issued number uniqueness.
 - [ ] SQL integration tests with separate UoWs: concurrent UpdateDraft vs UpdateDraft (one stale-token conflict), UpdateDraft vs Post (never mixed header/lines or post-edit mutation), lines-only edit advances version, and failed UpdateDraft rolls back completely.
 - [ ] Authorization tests for CreateDraft/UpdateDraft (Write), List/Get (Read), and Post (Post), including explicit deny and Post-only user attempting Write/Read; denied requests must not mutate business tables.
-- [ ] UI smoke: new Draft → edit → reload → inspect details; both hosts.
+- [ ] UI smoke: new Draft → edit → reload → inspect details; while receipt form stays open, modify/disable/re-enable a Product, Warehouse or Employee in its Catalog form and verify the relevant Lookup reloads without losing the existing selection; both hosts.
 
 ## P5.3 — Posting and stock invariants (critical)
 
@@ -91,7 +104,7 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [ ] Implement StockBalance query (warehouse/product filters, readable names, deterministic sort).
 - [ ] Implement StockCard query (warehouse+product, posting timestamp, document identity, quantity delta).
 - [ ] Permissions `Inventory.Balances.Read` and `Inventory.StockCard.Read`.
-- [ ] WinForms "Tồn kho" and "Thẻ kho", filters, totals, loading/empty/error states.
+- [ ] WinForms "Tồn kho" and "Thẻ kho", filters, totals, loading/empty/error states. Reuse P5.1-T04 debounced free-text filtering, cancel/ignore obsolete reads and refresh the latest request on explicit user action; do not debounce selection changes or a manual Refresh unnecessarily.
 - [ ] LocalApiClient contract tests for all P5 operations.
 - [ ] GUI/manual walkthrough: create catalog items → Draft → Post → balance increases → stock card shows movement → double Post rejected.
 - [ ] Test inactive Products, Warehouses and Employees remain visible historically but cannot be used for new receipt posting; a Draft created before deactivation must fail Post until references become valid again.
@@ -107,8 +120,8 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 **When:** inject exception after ledger insert before commit.
 **Then:** Draft remains, no movement and no balance change.
 
-Add more than one product in a separate case to prove multi-row atomicity. Add a stale-token UpdateDraft/Post race, a master-data deactivation-before-Post case, and a deliberately inconsistent ledger/balance reconciliation fixture. Customers CRUD is independent from this receipt flow; it exists for subsequent Sales modules.
+Add more than one product in a separate case to prove multi-row atomicity. Add a stale-token UpdateDraft/Post race, a master-data deactivation-before-Post case, and a deliberately inconsistent ledger/balance reconciliation fixture. While Goods Receipt remains open, successfully edit/deactivate a Product from its Catalog screen: its lookup should reload from the API without silently replacing the selected historical product; a failed edit should trigger no message. Verify rapid List/Filter typing runs only the final debounced query and that slow obsolete responses never replace current results. Customers CRUD is independent from this receipt flow; it exists for subsequent Sales modules.
 
 ## Definition of Done
 
-All task checkboxes based on evidence, dual-runtime desktop smoke, documented SQL migration/version compatibility, no modal test hangs, architecture references clean, tests green or explicitly documented environmental blockers. Confirm `docs/DATA_MODEL.md` and contract documentation reflect the finalized required uniqueness, rowversion and receipt-number policy before implementing the relevant migrations/DTOs. **Do not mark P5 complete if concurrency, deactivation-race, authorization or rollback test results are unavailable.**
+All task checkboxes based on evidence, dual-runtime desktop smoke, documented SQL migration/version compatibility, no modal test hangs, architecture references clean, tests green or explicitly documented environmental blockers. Require evidence for debounced filtering, stale-result protection and same-process Catalog-to-Lookup refresh without UI-thread violations or subscriber leaks. Confirm `docs/DATA_MODEL.md` and contract documentation reflect the finalized required uniqueness, rowversion and receipt-number policy before implementing the relevant migrations/DTOs. **Do not mark P5 complete if concurrency, deactivation-race, authorization or rollback test results are unavailable.**
