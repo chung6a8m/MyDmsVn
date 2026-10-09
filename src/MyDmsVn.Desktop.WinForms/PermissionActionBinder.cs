@@ -13,6 +13,8 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly HashSet<Control> _actions = new HashSet<Control>();
         private readonly IPermissionApiClient _permissionApiClient;
         private readonly IDesktopSession _session;
+        private readonly SynchronizationContext _uiContext;
+        private readonly int _uiThreadId;
         private bool _disposed;
 
         public PermissionActionBinder(
@@ -22,6 +24,9 @@ namespace MyDmsVn.Desktop.WinForms
             _permissionApiClient = permissionApiClient ??
                 throw new ArgumentNullException(nameof(permissionApiClient));
             _session = session ?? throw new ArgumentNullException(nameof(session));
+            _uiContext = SynchronizationContext.Current ??
+                new WindowsFormsSynchronizationContext();
+            _uiThreadId = Thread.CurrentThread.ManagedThreadId;
             _session.SessionChanged += OnSessionChanged;
         }
 
@@ -41,7 +46,7 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             Register(action);
-            SetEnabled(action, false);
+            SetEnabled(action, false, null);
 
             var sessionVersion = _session.Version;
             if (!_session.IsAuthenticated)
@@ -52,16 +57,10 @@ namespace MyDmsVn.Desktop.WinForms
             var response = await _permissionApiClient
                 .CheckAsync(permissionKey, cancellationToken);
 
-            if (IsDisposed)
-            {
-                return;
-            }
-
-            var sessionIsCurrent = _session.IsAuthenticated &&
-                _session.Version == sessionVersion;
             SetEnabled(
                 action,
-                sessionIsCurrent && response.IsSuccess && response.Data!.IsAllowed);
+                response.IsSuccess && response.Data!.IsAllowed,
+                sessionVersion);
         }
 
         public void Dispose()
@@ -84,18 +83,7 @@ namespace MyDmsVn.Desktop.WinForms
             foreach (var action in actions)
             {
                 action.Disposed -= OnActionDisposed;
-                SetEnabled(action, false);
-            }
-        }
-
-        private bool IsDisposed
-        {
-            get
-            {
-                lock (_sync)
-                {
-                    return _disposed;
-                }
+                SetEnabled(action, false, null);
             }
         }
 
@@ -131,7 +119,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             foreach (var action in actions)
             {
-                SetEnabled(action, false);
+                SetEnabled(action, false, null);
             }
         }
 
@@ -151,27 +139,50 @@ namespace MyDmsVn.Desktop.WinForms
             action.Disposed -= OnActionDisposed;
         }
 
-        private static void SetEnabled(Control action, bool enabled)
+        private void SetEnabled(
+            Control action,
+            bool enabled,
+            long? requiredSessionVersion)
         {
             if (action.IsDisposed || action.Disposing)
             {
                 return;
             }
 
-            if (action.IsHandleCreated && action.InvokeRequired)
+            if (Thread.CurrentThread.ManagedThreadId == _uiThreadId)
             {
-                try
-                {
-                    action.BeginInvoke((Action)(() => SetEnabled(action, enabled)));
-                }
-                catch (InvalidOperationException)
-                {
-                }
-
+                ApplyEnabled(action, enabled, requiredSessionVersion);
                 return;
             }
 
-            action.Enabled = enabled;
+            _uiContext.Post(
+                _ => ApplyEnabled(action, enabled, requiredSessionVersion),
+                null);
+        }
+
+        private void ApplyEnabled(
+            Control action,
+            bool enabled,
+            long? requiredSessionVersion)
+        {
+            if (action.IsDisposed || action.Disposing)
+            {
+                return;
+            }
+
+            action.Enabled = enabled && CanEnable(action, requiredSessionVersion);
+        }
+
+        private bool CanEnable(Control action, long? requiredSessionVersion)
+        {
+            lock (_sync)
+            {
+                return !_disposed &&
+                    _actions.Contains(action) &&
+                    requiredSessionVersion.HasValue &&
+                    _session.IsAuthenticated &&
+                    _session.Version == requiredSessionVersion.Value;
+            }
         }
     }
 }

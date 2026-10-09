@@ -21,6 +21,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly IDesktopSession? _session;
         private readonly IDesktopNotificationService? _notifications;
         private readonly int _uiThreadId;
+        private long? _workspaceSessionVersion;
 
         public FoundationShellForm(FoundationViewModel viewModel)
             : this(viewModel, null, null, true)
@@ -116,7 +117,13 @@ namespace MyDmsVn.Desktop.WinForms
 
         public bool BusyIndicatorVisible => _busyIndicator.Available;
 
-        public TabPage OpenWorkspace(string key, string title, Control content)
+        public long WorkspaceSessionVersion => _session?.Version ?? 0;
+
+        public TabPage? OpenWorkspace(
+            string key,
+            string title,
+            Control content,
+            long sessionVersion)
         {
             if (string.IsNullOrWhiteSpace(key))
             {
@@ -126,6 +133,12 @@ namespace MyDmsVn.Desktop.WinForms
             if (content == null)
             {
                 throw new ArgumentNullException(nameof(content));
+            }
+
+            if (!IsWorkspaceRequestCurrent(sessionVersion))
+            {
+                content.Dispose();
+                return null;
             }
 
             if (_documents.TryGetValue(key, out var existing))
@@ -143,6 +156,13 @@ namespace MyDmsVn.Desktop.WinForms
             _documents.Add(key, page);
             Workspace.TabPages.Add(page);
             Workspace.SelectedTab = page;
+
+            if (!IsWorkspaceRequestCurrent(sessionVersion))
+            {
+                CloseAllWorkspaces();
+                return null;
+            }
+
             return page;
         }
 
@@ -272,13 +292,18 @@ namespace MyDmsVn.Desktop.WinForms
         private void ApplySessionState()
         {
             var isAuthenticated = _session?.IsAuthenticated ?? true;
+            var sessionVersion = _session?.Version;
+            var sessionChanged = _workspaceSessionVersion.HasValue &&
+                sessionVersion.HasValue &&
+                _workspaceSessionVersion.Value != sessionVersion.Value;
             Navigation.Enabled = isAuthenticated;
             Workspace.Enabled = isAuthenticated;
-            if (!isAuthenticated)
+            if (!isAuthenticated || sessionChanged)
             {
                 CloseAllWorkspaces();
             }
 
+            _workspaceSessionVersion = sessionVersion;
             SetCurrentUser(_session?.CurrentUser?.DisplayName);
         }
 
@@ -292,6 +317,12 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 page.Dispose();
             }
+        }
+
+        private bool IsWorkspaceRequestCurrent(long sessionVersion)
+        {
+            return _session == null ||
+                (_session.IsAuthenticated && _session.Version == sessionVersion);
         }
 
         private void PublishSessionMessage(DesktopNotificationKind kind, string message)

@@ -41,12 +41,20 @@ namespace MyDmsVn.Desktop.Tests
                     using (var first = new Panel())
                     using (var duplicate = new Panel())
                     {
-                        var firstPage = shell.OpenWorkspace("home", "Home", first);
-                        var secondPage = shell.OpenWorkspace("home", "Changed title", duplicate);
+                        var firstPage = shell.OpenWorkspace(
+                            "home",
+                            "Home",
+                            first,
+                            shell.WorkspaceSessionVersion);
+                        var secondPage = shell.OpenWorkspace(
+                            "home",
+                            "Changed title",
+                            duplicate,
+                            shell.WorkspaceSessionVersion);
 
                         Assert.Same(firstPage, secondPage);
                         Assert.Single(shell.Workspace.TabPages);
-                        Assert.Same(first, firstPage.Controls[0]);
+                        Assert.Same(first, firstPage!.Controls[0]);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -122,7 +130,11 @@ namespace MyDmsVn.Desktop.Tests
                     {
                         session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
                         var signedOutContent = new Panel();
-                        shell.OpenWorkspace("private-sign-out", "Private", signedOutContent);
+                        shell.OpenWorkspace(
+                            "private-sign-out",
+                            "Private",
+                            signedOutContent,
+                            shell.WorkspaceSessionVersion);
                         shell.SignOut();
 
                         Assert.False(session.IsAuthenticated);
@@ -136,7 +148,11 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.True(shell.Workspace.Enabled);
                         Assert.True(shell.Navigation.Enabled);
                         var expiredContent = new Panel();
-                        shell.OpenWorkspace("private-expired", "Private", expiredContent);
+                        shell.OpenWorkspace(
+                            "private-expired",
+                            "Private",
+                            expiredContent,
+                            shell.WorkspaceSessionVersion);
                         shell.HandleSessionExpired();
 
                         Assert.False(session.IsAuthenticated);
@@ -147,6 +163,99 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.True(expiredContent.IsDisposed);
                         Assert.False(shell.Workspace.Enabled);
                         Assert.False(shell.Navigation.Enabled);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Changing_authenticated_user_closes_the_previous_users_workspace()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient()),
+                        session,
+                        new DesktopNotificationCenter()))
+                    {
+                        var previousUsersContent = new Panel();
+                        shell.OpenWorkspace(
+                            "private",
+                            "Private",
+                            previousUsersContent,
+                            shell.WorkspaceSessionVersion);
+
+                        session.SetCurrentUser(new CurrentUserDto(84, "manager", "Manager"));
+
+                        Assert.Empty(shell.Workspace.TabPages);
+                        Assert.True(previousUsersContent.IsDisposed);
+                        Assert.Equal("Manager", shell.CurrentUserText);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void OpenWorkspace_rejects_content_after_sign_out()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient()),
+                        session,
+                        new DesktopNotificationCenter()))
+                    {
+                        var requestSessionVersion = shell.WorkspaceSessionVersion;
+                        session.SignOut();
+                        var content = new Panel();
+
+                        var page = shell.OpenWorkspace(
+                            "late",
+                            "Late",
+                            content,
+                            requestSessionVersion);
+
+                        Assert.Null(page);
+                        Assert.Empty(shell.Workspace.TabPages);
+                        Assert.True(content.IsDisposed);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void OpenWorkspace_rejects_a_stale_request_after_another_user_signs_in()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient()),
+                        session,
+                        new DesktopNotificationCenter()))
+                    {
+                        var requestSessionVersion = shell.WorkspaceSessionVersion;
+                        session.SignOut();
+                        session.SetCurrentUser(new CurrentUserDto(84, "manager", "Manager"));
+                        var content = new Panel();
+
+                        var page = shell.OpenWorkspace(
+                            "late",
+                            "Late",
+                            content,
+                            requestSessionVersion);
+
+                        Assert.Null(page);
+                        Assert.Empty(shell.Workspace.TabPages);
+                        Assert.True(content.IsDisposed);
                     }
                 },
                 TimeSpan.FromSeconds(10));

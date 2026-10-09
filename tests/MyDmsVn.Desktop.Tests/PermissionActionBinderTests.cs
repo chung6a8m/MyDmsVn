@@ -99,6 +99,138 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Queued_permission_grant_cannot_reenable_an_action_after_sign_out()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var session = new TestDesktopSession();
+                    var apiClient = new DeferredPermissionApiClient();
+                    using (var action = new Button { Enabled = true })
+                    using (var binder = new PermissionActionBinder(apiClient, session))
+                    {
+                        Assert.NotEqual(IntPtr.Zero, action.Handle);
+                        QueuePermissionGrantFromWorker(
+                            action,
+                            binder,
+                            apiClient,
+                            cancellationToken);
+
+                        session.SignOut();
+                        Assert.False(action.Enabled);
+                        System.Windows.Forms.Application.DoEvents();
+
+                        Assert.False(action.Enabled);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Queued_permission_grant_cannot_reenable_an_action_after_binder_disposal()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var session = new TestDesktopSession();
+                    var apiClient = new DeferredPermissionApiClient();
+                    using (var action = new Button { Enabled = true })
+                    {
+                        var binder = new PermissionActionBinder(apiClient, session);
+                        try
+                        {
+                            Assert.NotEqual(IntPtr.Zero, action.Handle);
+                            QueuePermissionGrantFromWorker(
+                                action,
+                                binder,
+                                apiClient,
+                                cancellationToken);
+
+                            binder.Dispose();
+                            Assert.False(action.Enabled);
+                            System.Windows.Forms.Application.DoEvents();
+
+                            Assert.False(action.Enabled);
+                        }
+                        finally
+                        {
+                            binder.Dispose();
+                        }
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Permission_update_without_a_control_handle_is_marshaled_to_the_ui_thread()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var uiThreadId = Thread.CurrentThread.ManagedThreadId;
+                    var session = new TestDesktopSession();
+                    using (var action = new Button { Enabled = true })
+                    using (var binder = new PermissionActionBinder(
+                        new StubPermissionApiClient(isAllowed: false),
+                        session))
+                    {
+                        Assert.False(action.IsHandleCreated);
+                        var enabledChangedThreadId = 0;
+                        action.EnabledChanged += (_, _) =>
+                            enabledChangedThreadId = Thread.CurrentThread.ManagedThreadId;
+
+                        Task.Run(
+                                () => binder.ApplyAsync(
+                                    action,
+                                    "Catalog.Products.Write",
+                                    cancellationToken))
+                            .GetAwaiter()
+                            .GetResult();
+
+                        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+                        while (action.Enabled && DateTime.UtcNow < deadline)
+                        {
+                            System.Windows.Forms.Application.DoEvents();
+                            Thread.Sleep(10);
+                        }
+
+                        Assert.False(action.Enabled);
+                        Assert.Equal(uiThreadId, enabledChangedThreadId);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        private static void QueuePermissionGrantFromWorker(
+            Control action,
+            PermissionActionBinder binder,
+            DeferredPermissionApiClient apiClient,
+            CancellationToken cancellationToken)
+        {
+            var applyTask = Task.Run(
+                () => binder.ApplyAsync(
+                    action,
+                    "Catalog.Products.Write",
+                    cancellationToken));
+            Assert.True(
+                apiClient.Started.Wait(TimeSpan.FromSeconds(2)),
+                "Permission request did not start before the timeout.");
+
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+            while (action.Enabled && DateTime.UtcNow < deadline)
+            {
+                System.Windows.Forms.Application.DoEvents();
+                Thread.Sleep(10);
+            }
+
+            Assert.False(action.Enabled);
+            Task.Run(() => apiClient.Complete(isAllowed: true))
+                .GetAwaiter()
+                .GetResult();
+            applyTask.GetAwaiter().GetResult();
+        }
+
         private sealed class StubPermissionApiClient : IPermissionApiClient
         {
             private readonly bool _isAllowed;
@@ -138,10 +270,13 @@ namespace MyDmsVn.Desktop.Tests
             private readonly TaskCompletionSource<ApiResponse<PermissionDecisionDto>> _completion =
                 new TaskCompletionSource<ApiResponse<PermissionDecisionDto>>();
 
+            public ManualResetEventSlim Started { get; } = new ManualResetEventSlim();
+
             public Task<ApiResponse<PermissionDecisionDto>> CheckAsync(
                 string permissionKey,
                 CancellationToken cancellationToken)
             {
+                Started.Set();
                 return _completion.Task;
             }
 
