@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -15,6 +16,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly FoundationViewModel _viewModel;
         private readonly ToolStripStatusLabel _statusLabel;
         private readonly ToolStripStatusLabel _currentUserLabel;
+        private readonly ToolStripProgressBar _busyIndicator;
         private readonly IDesktopSession? _session;
         private readonly IDesktopNotificationService? _notifications;
 
@@ -69,13 +71,23 @@ namespace MyDmsVn.Desktop.WinForms
                 TextAlign = ContentAlignment.MiddleLeft,
             };
             _currentUserLabel = new ToolStripStatusLabel("Not signed in");
+            _busyIndicator = new ToolStripProgressBar
+            {
+                Style = ProgressBarStyle.Marquee,
+                MarqueeAnimationSpeed = 30,
+                Visible = false,
+            };
             statusBar.Items.Add(_statusLabel);
+            statusBar.Items.Add(_busyIndicator);
             statusBar.Items.Add(_currentUserLabel);
 
             Controls.Add(Workspace);
             Controls.Add(Navigation);
             Controls.Add(topBar);
             Controls.Add(statusBar);
+
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            ApplyViewModelState();
 
             if (_session != null)
             {
@@ -98,6 +110,8 @@ namespace MyDmsVn.Desktop.WinForms
         public string StatusText => _statusLabel.Text ?? string.Empty;
 
         public string CurrentUserText => _currentUserLabel.Text ?? string.Empty;
+
+        public bool BusyIndicatorVisible => _busyIndicator.Available;
 
         public TabPage OpenWorkspace(string key, string title, Control content)
         {
@@ -169,6 +183,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (disposing)
             {
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
                 if (_session != null)
                 {
                     _session.SessionChanged -= OnSessionChanged;
@@ -191,6 +206,41 @@ namespace MyDmsVn.Desktop.WinForms
         private void OnNotificationPublished(object? sender, DesktopNotification notification)
         {
             SetStatus(notification.Message);
+        }
+
+        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+        {
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            if (IsHandleCreated && InvokeRequired)
+            {
+                BeginInvoke((Action)ApplyViewModelState);
+                return;
+            }
+
+            ApplyViewModelState();
+        }
+
+        private void ApplyViewModelState()
+        {
+            _busyIndicator.Available = _viewModel.IsBusy;
+            if (!string.IsNullOrWhiteSpace(_viewModel.ErrorMessage))
+            {
+                SetStatus(_viewModel.ErrorMessage!);
+            }
+            else if (_viewModel.IsEmpty)
+            {
+                SetStatus("No data.");
+            }
+            else if (_viewModel.IsReady)
+            {
+                SetStatus(string.IsNullOrWhiteSpace(_viewModel.Runtime)
+                    ? "Ready"
+                    : $"Ready ({_viewModel.Runtime})");
+            }
         }
 
         private void PublishSessionMessage(DesktopNotificationKind kind, string message)

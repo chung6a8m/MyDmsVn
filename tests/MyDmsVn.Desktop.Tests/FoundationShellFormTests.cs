@@ -136,6 +136,32 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Shell_binding_tracks_async_command_busy_and_ready_state()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var apiClient = new DeferredApiClient();
+                    using (var guard = new WinFormsTestGuard())
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(apiClient)))
+                    {
+                        var command = shell.ViewModel.InitializeCommand.ExecuteAsync(null);
+
+                        Assert.True(shell.BusyIndicatorVisible);
+
+                        apiClient.Complete(new FoundationStatus(true, "Local"));
+                        command.GetAwaiter().GetResult();
+
+                        Assert.False(shell.BusyIndicatorVisible);
+                        Assert.Equal("Ready (Local)", shell.StatusText);
+                        Assert.Empty(guard.Exceptions);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
         private static FoundationShellForm CreateShell()
         {
             return new FoundationShellForm(new FoundationViewModel(new ReadyApiClient()));
@@ -150,6 +176,25 @@ namespace MyDmsVn.Desktop.Tests
                 return Task.FromResult(
                     ApiResponse<FoundationStatus>.Success(
                         new FoundationStatus(true, "Local")));
+            }
+        }
+
+        private sealed class DeferredApiClient : IFoundationApiClient
+        {
+            private readonly TaskCompletionSource<ApiResponse<FoundationStatus>> _completion =
+                new TaskCompletionSource<ApiResponse<FoundationStatus>>();
+
+            public Task<ApiResponse<FoundationStatus>> GetStatusAsync(
+                FoundationStatusRequest request,
+                CancellationToken cancellationToken)
+            {
+                cancellationToken.Register(() => _completion.TrySetCanceled());
+                return _completion.Task;
+            }
+
+            public void Complete(FoundationStatus status)
+            {
+                _completion.SetResult(ApiResponse<FoundationStatus>.Success(status));
             }
         }
 
