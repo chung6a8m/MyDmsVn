@@ -12,9 +12,18 @@
     CreatedByUserId int NULL,
     UpdatedAtUtc datetime2(7) NULL,
     UpdatedByUserId int NULL,
-    CONSTRAINT CK_Products_Code_NotBlank CHECK (LEN(LTRIM(RTRIM(Code))) > 0),
-    CONSTRAINT CK_Products_Name_NotBlank CHECK (LEN(LTRIM(RTRIM(Name))) > 0),
-    CONSTRAINT CK_Products_Unit_NotBlank CHECK (LEN(LTRIM(RTRIM(Unit))) > 0)
+    CONSTRAINT CK_Products_Code_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Code, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0),
+    CONSTRAINT CK_Products_Name_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Name, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0),
+    CONSTRAINT CK_Products_Unit_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Unit, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0)
 );
 
 CREATE UNIQUE INDEX UX_Products_Code
@@ -34,8 +43,14 @@ CREATE TABLE dbo.Warehouses
     CreatedByUserId int NULL,
     UpdatedAtUtc datetime2(7) NULL,
     UpdatedByUserId int NULL,
-    CONSTRAINT CK_Warehouses_Code_NotBlank CHECK (LEN(LTRIM(RTRIM(Code))) > 0),
-    CONSTRAINT CK_Warehouses_Name_NotBlank CHECK (LEN(LTRIM(RTRIM(Name))) > 0)
+    CONSTRAINT CK_Warehouses_Code_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Code, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0),
+    CONSTRAINT CK_Warehouses_Name_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Name, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0)
 );
 
 CREATE UNIQUE INDEX UX_Warehouses_Code
@@ -56,8 +71,14 @@ CREATE TABLE dbo.Employees
     CreatedByUserId int NULL,
     UpdatedAtUtc datetime2(7) NULL,
     UpdatedByUserId int NULL,
-    CONSTRAINT CK_Employees_Code_NotBlank CHECK (LEN(LTRIM(RTRIM(Code))) > 0),
-    CONSTRAINT CK_Employees_Name_NotBlank CHECK (LEN(LTRIM(RTRIM(Name))) > 0),
+    CONSTRAINT CK_Employees_Code_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Code, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0),
+    CONSTRAINT CK_Employees_Name_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Name, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0),
     CONSTRAINT FK_Employees_Users FOREIGN KEY (UserId) REFERENCES dbo.Users (UserId)
 );
 
@@ -84,8 +105,14 @@ CREATE TABLE dbo.Customers
     CreatedByUserId int NULL,
     UpdatedAtUtc datetime2(7) NULL,
     UpdatedByUserId int NULL,
-    CONSTRAINT CK_Customers_Code_NotBlank CHECK (LEN(LTRIM(RTRIM(Code))) > 0),
-    CONSTRAINT CK_Customers_Name_NotBlank CHECK (LEN(LTRIM(RTRIM(Name))) > 0)
+    CONSTRAINT CK_Customers_Code_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Code, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0),
+    CONSTRAINT CK_Customers_Name_NotBlank CHECK
+        (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            Name, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
+            NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0)
 );
 
 CREATE UNIQUE INDEX UX_Customers_Code

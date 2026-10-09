@@ -196,4 +196,139 @@ public sealed class DatabaseMigrationTests
             await database.DisposeAsync();
         }
     }
+
+    [SqlServerFact]
+    public async Task Catalog_required_text_rejects_display_whitespace_only_values()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            var invalidInserts = new[]
+            {
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (NCHAR(9), N'Product', N'Each');",
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P-NAME', NCHAR(10), N'Each');",
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P-UNIT', N'Product', NCHAR(13));",
+                "INSERT dbo.Warehouses (Code, Name) VALUES (NCHAR(11), N'Warehouse');",
+                "INSERT dbo.Warehouses (Code, Name) VALUES (N'W-NAME', NCHAR(12));",
+                "INSERT dbo.Employees (Code, Name) VALUES (NCHAR(13), N'Employee');",
+                "INSERT dbo.Employees (Code, Name) VALUES (N'E-NAME', NCHAR(160));",
+                "INSERT dbo.Customers (Code, Name) VALUES (NCHAR(160), N'Customer');",
+                "INSERT dbo.Customers (Code, Name) VALUES (N'C-NAME', NCHAR(9) + NCHAR(10));",
+            };
+
+            foreach (var invalidInsert in invalidInserts)
+            {
+                var violation = await Assert.ThrowsAsync<SqlException>(
+                    () => connection.ExecuteAsync(invalidInsert));
+                Assert.Equal(547, violation.Number);
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Every_catalog_code_is_unique_case_and_accent_insensitively()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            var catalogInserts = new[]
+            {
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (@Code, @Name, @Unit);",
+                "INSERT dbo.Warehouses (Code, Name) VALUES (@Code, @Name);",
+                "INSERT dbo.Employees (Code, Name) VALUES (@Code, @Name);",
+                "INSERT dbo.Customers (Code, Name) VALUES (@Code, @Name);",
+            };
+
+            foreach (var catalogInsert in catalogInserts)
+            {
+                await connection.ExecuteAsync(catalogInsert, new
+                {
+                    Code = "MÃ-01",
+                    Name = "First row",
+                    Unit = "Each-1",
+                });
+                var duplicate = await Assert.ThrowsAsync<SqlException>(
+                    () => connection.ExecuteAsync(catalogInsert, new
+                    {
+                        Code = "ma-01",
+                        Name = "Second row",
+                        Unit = "Each-2",
+                    }));
+                Assert.Contains(duplicate.Number, new[] { 2601, 2627 });
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Employee_user_link_allows_many_nulls_but_only_one_employee_per_user()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            var userId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Users " +
+                "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, " +
+                "PasswordAlgorithm, IsActive) " +
+                "OUTPUT INSERTED.UserId " +
+                "VALUES (N'catalog-user', N'CATALOG-USER', N'Catalog User', N'Local', N'hash', N'', " +
+                "N'BCrypt', 1);");
+            const string insertEmployee =
+                "INSERT dbo.Employees (Code, Name, UserId) VALUES (@Code, @Name, @UserId);";
+
+            await connection.ExecuteAsync(insertEmployee, new
+            {
+                Code = "NV-LINK-1",
+                Name = "Linked Employee 1",
+                UserId = (int?)userId,
+            });
+            var duplicateLink = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(insertEmployee, new
+                {
+                    Code = "NV-LINK-2",
+                    Name = "Linked Employee 2",
+                    UserId = (int?)userId,
+                }));
+            Assert.Contains(duplicateLink.Number, new[] { 2601, 2627 });
+
+            await connection.ExecuteAsync(insertEmployee, new
+            {
+                Code = "NV-NULL-1",
+                Name = "Unlinked Employee 1",
+                UserId = (int?)null,
+            });
+            await connection.ExecuteAsync(insertEmployee, new
+            {
+                Code = "NV-NULL-2",
+                Name = "Unlinked Employee 2",
+                UserId = (int?)null,
+            });
+            var unlinkedCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.Employees WHERE UserId IS NULL;");
+            Assert.Equal(2, unlinkedCount);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
 }

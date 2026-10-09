@@ -17,7 +17,7 @@
 
 All mutable business tables carry `CreatedAtUtc datetime2`, `CreatedBy`, `UpdatedAtUtc`, `UpdatedBy` (types consistent with identity model). Server-generated times stored UTC. Consider consistent column names across modules rather than mixing `InsertDate`/`CreatedAtUtc` without an explicit compatibility map.
 
-Catalog codes use explicit `Latin1_General_100_CI_AI` collation and unique indexes, so uniqueness is case- and accent-insensitive. `Employees.UserId` is nullable and protected by a filtered unique index, matching the zero-or-one employee relationship for a user. Catalog migrations do not seed production rows.
+Catalog codes use explicit `Latin1_General_100_CI_AI` collation and unique indexes, so uniqueness is case- and accent-insensitive. Required catalog text rejects values made only from spaces, ASCII display-whitespace controls or non-breaking spaces at the SQL boundary. `Employees.UserId` is nullable and protected by a filtered unique index, matching the zero-or-one employee relationship for a user. Catalog migrations do not seed production rows.
 
 `StockLedger` is append-only: business operations do not update/delete historical rows. `StockBalances` is a transactional materialization of ledger totals, **not** an independent source editable by UI.
 

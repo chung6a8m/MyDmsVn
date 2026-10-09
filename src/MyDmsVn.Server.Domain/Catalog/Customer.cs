@@ -16,9 +16,9 @@ public sealed class Customer
 
     public string? TaxCode { get; set; }
 
-    public bool IsActive { get; set; }
+    public bool IsActive { get; set; } = true;
 
-    public DateTime CreatedAtUtc { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public int? CreatedByUserId { get; set; }
 

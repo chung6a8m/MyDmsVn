@@ -17,6 +17,71 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class CatalogMappingIntegrationTests
 {
     [SqlServerFact]
+    public async Task Minimally_created_catalog_entities_persist_as_active_with_a_current_utc_creation_time()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+
+            var services = new ServiceCollection();
+            services.AddSqlPersistence(database.ConnectionString);
+            using var provider = services.BuildServiceProvider();
+            using var unitOfWork = await provider
+                .GetRequiredService<IUnitOfWorkFactory>()
+                .CreateAsync(CancellationToken.None);
+            unitOfWork.BeginTransaction();
+            var context = Assert.IsAssignableFrom<ISqlExecutionContext>(unitOfWork);
+            var transaction = Assert.IsAssignableFrom<IDbTransaction>(context.Transaction);
+            var beforeCreationUtc = DateTime.UtcNow;
+            var product = new Product { Code = "SP-MIN", Name = "San pham", Unit = "Cai" };
+            var warehouse = new Warehouse { Code = "KHO-MIN", Name = "Kho" };
+            var employee = new Employee { Code = "NV-MIN", Name = "Nhan vien" };
+            var customer = new Customer { Code = "KH-MIN", Name = "Khach hang" };
+            var afterCreationUtc = DateTime.UtcNow;
+
+            var productId = await context.Connection.InsertAsync<Product, int>(
+                product,
+                transaction: transaction,
+                cancellationToken: CancellationToken.None);
+            var warehouseId = await context.Connection.InsertAsync<Warehouse, int>(
+                warehouse,
+                transaction: transaction,
+                cancellationToken: CancellationToken.None);
+            var employeeId = await context.Connection.InsertAsync<Employee, int>(
+                employee,
+                transaction: transaction,
+                cancellationToken: CancellationToken.None);
+            var customerId = await context.Connection.InsertAsync<Customer, int>(
+                customer,
+                transaction: transaction,
+                cancellationToken: CancellationToken.None);
+
+            var persistedDefaults = (await context.Connection.QueryAsync<CatalogDefaultRow>(
+                "SELECT IsActive, CreatedAtUtc FROM dbo.Products WHERE ProductId = @productId " +
+                "UNION ALL SELECT IsActive, CreatedAtUtc FROM dbo.Warehouses WHERE WarehouseId = @warehouseId " +
+                "UNION ALL SELECT IsActive, CreatedAtUtc FROM dbo.Employees WHERE EmployeeId = @employeeId " +
+                "UNION ALL SELECT IsActive, CreatedAtUtc FROM dbo.Customers WHERE CustomerId = @customerId;",
+                new { productId, warehouseId, employeeId, customerId },
+                transaction)).ToArray();
+
+            Assert.Equal(4, persistedDefaults.Length);
+            Assert.All(persistedDefaults, row =>
+            {
+                Assert.True(row.IsActive);
+                Assert.InRange(row.CreatedAtUtc, beforeCreationUtc, afterCreationUtc);
+            });
+            unitOfWork.Rollback();
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Catalog_entities_round_trip_through_registered_RepoDb_mappings()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -136,5 +201,12 @@ public sealed class CatalogMappingIntegrationTests
         public DateTime CreatedAtUtc { get; set; }
 
         public DateTime UpdatedAtUtc { get; set; }
+    }
+
+    private sealed class CatalogDefaultRow
+    {
+        public bool IsActive { get; set; }
+
+        public DateTime CreatedAtUtc { get; set; }
     }
 }

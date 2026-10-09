@@ -12,9 +12,9 @@ public sealed class Warehouse
 
     public string? Address { get; set; }
 
-    public bool IsActive { get; set; }
+    public bool IsActive { get; set; } = true;
 
-    public DateTime CreatedAtUtc { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public int? CreatedByUserId { get; set; }
 

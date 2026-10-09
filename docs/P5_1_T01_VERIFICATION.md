@@ -20,10 +20,14 @@ P5.1-T01 adds only the Product, Warehouse, Employee and Customer persistence fou
 - The RepoDb round-trip test was observed failing against the inferred `Product` table before mapping registration, then passing after explicit mappings were added.
 - A mutation that changed `UX_Customers_Code` from unique to non-unique made the catalog schema test fail with 3 rather than 4 unique code indexes; restoring the constraint returned the test to green.
 - The final review's timestamp regression was observed failing for all four entities because RepoDb inferred legacy SQL `datetime`; explicit `DbType.DateTime2` mappings made the fractional-tick audit assertions pass.
-- SQL integration suite: 54/54 passed on `net48` and 54/54 passed on `net8.0`, using disposable `MyDmsVn_Test_<guid>` databases configured by `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING`.
+- PR review round 1 reproduced minimal RepoDb inserts persisting `IsActive = false` and `CreatedAtUtc = DateTime.MinValue`; Domain defaults now align minimal entity creation with SQL defaults, and the persisted behavior is covered for all four catalogs.
+- SQL constraints reject required values made only from spaces, tab, LF, CR, vertical-tab, form-feed or non-breaking spaces.
+- Behavioral tests exercise case- and accent-insensitive duplicate codes independently on all four catalog tables. Mutation checks proved the tests fail when a named unique index targets the wrong column.
+- The filtered unique employee/user relationship is covered with a valid User: a duplicate non-null link is rejected while multiple null links remain allowed. A mutation check proved the test fails when the index loses uniqueness.
+- SQL integration suite: 58/58 passed on `net48` and 58/58 passed on `net8.0`, using disposable `MyDmsVn_Test_<guid>` databases configured by `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING`.
 - `dotnet restore MyDmsVn.sln --locked-mode`: passed.
 - `dotnet build MyDmsVn.sln -c Release --no-restore`: passed with 0 warnings and 0 errors across `net48`, `net8.0` and `net8.0-windows` targets.
-- `dotnet test MyDmsVn.sln -c Release --no-build --no-restore`: passed 351/351 target-specific test executions with 0 failures and 0 skips.
+- `dotnet test MyDmsVn.sln -c Release --no-build --no-restore`: passed 359/359 target-specific test executions with 0 failures and 0 skips.
 
 No manual GUI smoke was required because P5.1-T01 changes no desktop behavior.
 
