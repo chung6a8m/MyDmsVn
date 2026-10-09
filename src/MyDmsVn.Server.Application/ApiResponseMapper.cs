@@ -12,6 +12,13 @@ namespace MyDmsVn.Server.Application
 
         public static ApiResponse<TValue> Map<TValue>(ErrorOr<TValue> result)
         {
+            return Map(result, null);
+        }
+
+        public static ApiResponse<TValue> Map<TValue>(
+            ErrorOr<TValue> result,
+            string? requestFieldRoot)
+        {
             if (!result.IsError)
             {
                 return ApiResponse<TValue>.Success(result.Value);
@@ -34,7 +41,7 @@ namespace MyDmsVn.Server.Application
                 .First();
             var details = IsAuthorizationErrorType(dominantType)
                 ? Array.Empty<ApiErrorDetail>()
-                : errors.Select(ToDetail).ToArray();
+                : errors.Select(error => ToDetail(error, requestFieldRoot)).ToArray();
 
             return ApiResponse<TValue>.Failure(
                 new ApiError(
@@ -115,15 +122,15 @@ namespace MyDmsVn.Server.Application
             };
         }
 
-        private static ApiErrorDetail ToDetail(Error error)
+        private static ApiErrorDetail ToDetail(Error error, string? requestFieldRoot)
         {
             return new ApiErrorDetail(
                 error.Code,
                 error.Description,
-                GetJsonFieldPath(error));
+                GetJsonFieldPath(error, requestFieldRoot));
         }
 
-        private static string? GetJsonFieldPath(Error error)
+        private static string? GetJsonFieldPath(Error error, string? requestFieldRoot)
         {
             if (error.Metadata == null ||
                 !error.Metadata.TryGetValue(FieldMetadataKey, out var fieldValue) ||
@@ -131,6 +138,15 @@ namespace MyDmsVn.Server.Application
                 string.IsNullOrWhiteSpace(field))
             {
                 return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(requestFieldRoot))
+            {
+                var prefix = requestFieldRoot + ".";
+                if (field.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    field = field.Substring(prefix.Length);
+                }
             }
 
             return string.Join(

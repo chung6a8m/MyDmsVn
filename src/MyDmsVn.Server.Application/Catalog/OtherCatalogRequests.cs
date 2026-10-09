@@ -6,35 +6,34 @@ using ErrorOr;
 using FluentValidation;
 using MediatR;
 using MyDmsVn.Contracts;
-using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.Domain.Catalog;
 
 namespace MyDmsVn.Server.Application.Catalog;
 
-public sealed class CreateWarehouseCommand : ApplicationRequest<WarehouseDto>, IAuthorizedRequest
+public sealed class CreateWarehouseCommand : AuthorizedActorApplicationRequest<WarehouseDto>
 {
     public CreateWarehouseCommand(SaveWarehouseRequest request) =>
         Request = request ?? throw new ArgumentNullException(nameof(request));
     public SaveWarehouseRequest Request { get; }
-    public string PermissionKey => PermissionKeys.CatalogWarehousesWrite;
+    public override string PermissionKey => PermissionKeys.CatalogWarehousesWrite;
 }
 
-public sealed class CreateEmployeeCommand : ApplicationRequest<EmployeeDto>, IAuthorizedRequest
+public sealed class CreateEmployeeCommand : AuthorizedActorApplicationRequest<EmployeeDto>
 {
     public CreateEmployeeCommand(SaveEmployeeRequest request) =>
         Request = request ?? throw new ArgumentNullException(nameof(request));
     public SaveEmployeeRequest Request { get; }
-    public string PermissionKey => PermissionKeys.CatalogEmployeesWrite;
+    public override string PermissionKey => PermissionKeys.CatalogEmployeesWrite;
 }
 
-public sealed class CreateCustomerCommand : ApplicationRequest<CustomerDto>, IAuthorizedRequest
+public sealed class CreateCustomerCommand : AuthorizedActorApplicationRequest<CustomerDto>
 {
     public CreateCustomerCommand(SaveCustomerRequest request) =>
         Request = request ?? throw new ArgumentNullException(nameof(request));
     public SaveCustomerRequest Request { get; }
-    public string PermissionKey => PermissionKeys.CatalogCustomersWrite;
+    public override string PermissionKey => PermissionKeys.CatalogCustomersWrite;
 }
 
 public sealed class LookupWarehousesQuery : ApplicationRequest<IReadOnlyList<CatalogLookupDto>>, IAuthorizedRequest
@@ -103,13 +102,9 @@ internal sealed class CreateWarehouseCommandHandler
     : IRequestHandler<CreateWarehouseCommand, ErrorOr<WarehouseDto>>
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
-    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public CreateWarehouseCommandHandler(IUnitOfWorkFactory unitOfWorkFactory, ICurrentUserAccessor currentUserAccessor)
-    {
+    public CreateWarehouseCommandHandler(IUnitOfWorkFactory unitOfWorkFactory) =>
         _unitOfWorkFactory = unitOfWorkFactory;
-        _currentUserAccessor = currentUserAccessor;
-    }
 
     public async Task<ErrorOr<WarehouseDto>> Handle(CreateWarehouseCommand command, CancellationToken cancellationToken)
     {
@@ -118,7 +113,7 @@ internal sealed class CreateWarehouseCommandHandler
             Code = command.Request.Code,
             Name = command.Request.Name,
             Address = command.Request.Address,
-            CreatedByUserId = _currentUserAccessor.Current.UserId,
+            CreatedByUserId = command.AuthorizedUserId,
         };
         using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
         unitOfWork.BeginTransaction();
@@ -141,13 +136,9 @@ internal sealed class CreateCustomerCommandHandler
     : IRequestHandler<CreateCustomerCommand, ErrorOr<CustomerDto>>
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
-    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public CreateCustomerCommandHandler(IUnitOfWorkFactory unitOfWorkFactory, ICurrentUserAccessor currentUserAccessor)
-    {
+    public CreateCustomerCommandHandler(IUnitOfWorkFactory unitOfWorkFactory) =>
         _unitOfWorkFactory = unitOfWorkFactory;
-        _currentUserAccessor = currentUserAccessor;
-    }
 
     public async Task<ErrorOr<CustomerDto>> Handle(CreateCustomerCommand command, CancellationToken cancellationToken)
     {
@@ -158,7 +149,7 @@ internal sealed class CreateCustomerCommandHandler
             Address = command.Request.Address,
             Phone = command.Request.Phone,
             TaxCode = command.Request.TaxCode,
-            CreatedByUserId = _currentUserAccessor.Current.UserId,
+            CreatedByUserId = command.AuthorizedUserId,
         };
         using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
         unitOfWork.BeginTransaction();
@@ -202,15 +193,9 @@ internal sealed class CreateEmployeeCommandHandler
     : IRequestHandler<CreateEmployeeCommand, ErrorOr<EmployeeDto>>
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
-    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public CreateEmployeeCommandHandler(
-        IUnitOfWorkFactory unitOfWorkFactory,
-        ICurrentUserAccessor currentUserAccessor)
-    {
+    public CreateEmployeeCommandHandler(IUnitOfWorkFactory unitOfWorkFactory) =>
         _unitOfWorkFactory = unitOfWorkFactory;
-        _currentUserAccessor = currentUserAccessor;
-    }
 
     public async Task<ErrorOr<EmployeeDto>> Handle(
         CreateEmployeeCommand command,
@@ -222,7 +207,7 @@ internal sealed class CreateEmployeeCommandHandler
             Name = command.Request.Name,
             Phone = command.Request.Phone,
             UserId = command.Request.UserId,
-            CreatedByUserId = _currentUserAccessor.Current.UserId,
+            CreatedByUserId = command.AuthorizedUserId,
         };
         using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
         unitOfWork.BeginTransaction();

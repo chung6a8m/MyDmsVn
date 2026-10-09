@@ -7,19 +7,19 @@ using MyDmsVn.Server.Application.Security;
 
 namespace MyDmsVn.Server.Application.Catalog;
 
-public sealed class UpdateWarehouseCommand : ApplicationRequest<WarehouseDto>, IAuthorizedRequest
+public sealed class UpdateWarehouseCommand : AuthorizedActorApplicationRequest<WarehouseDto>
 {
     public UpdateWarehouseCommand(int id, SaveWarehouseRequest request) { Id = id; Request = request ?? throw new ArgumentNullException(nameof(request)); }
     public int Id { get; }
     public SaveWarehouseRequest Request { get; }
-    public string PermissionKey => PermissionKeys.CatalogWarehousesWrite;
+    public override string PermissionKey => PermissionKeys.CatalogWarehousesWrite;
 }
-public sealed class SetWarehouseActiveCommand : ApplicationRequest<UnitResponse>, IAuthorizedRequest
+public sealed class SetWarehouseActiveCommand : AuthorizedActorApplicationRequest<UnitResponse>
 {
     public SetWarehouseActiveCommand(int id, bool isActive) { Id = id; IsActive = isActive; }
     public int Id { get; }
     public bool IsActive { get; }
-    public string PermissionKey => PermissionKeys.CatalogWarehousesWrite;
+    public override string PermissionKey => PermissionKeys.CatalogWarehousesWrite;
 }
 public sealed class ListWarehousesQuery : ApplicationRequest<PagedResult<WarehouseDto>>, IAuthorizedRequest
 {
@@ -34,19 +34,19 @@ public sealed class GetWarehouseByIdQuery : ApplicationRequest<WarehouseDto>, IA
     public string PermissionKey => PermissionKeys.CatalogWarehousesRead;
 }
 
-public sealed class UpdateEmployeeCommand : ApplicationRequest<EmployeeDto>, IAuthorizedRequest
+public sealed class UpdateEmployeeCommand : AuthorizedActorApplicationRequest<EmployeeDto>
 {
     public UpdateEmployeeCommand(int id, SaveEmployeeRequest request) { Id = id; Request = request ?? throw new ArgumentNullException(nameof(request)); }
     public int Id { get; }
     public SaveEmployeeRequest Request { get; }
-    public string PermissionKey => PermissionKeys.CatalogEmployeesWrite;
+    public override string PermissionKey => PermissionKeys.CatalogEmployeesWrite;
 }
-public sealed class SetEmployeeActiveCommand : ApplicationRequest<UnitResponse>, IAuthorizedRequest
+public sealed class SetEmployeeActiveCommand : AuthorizedActorApplicationRequest<UnitResponse>
 {
     public SetEmployeeActiveCommand(int id, bool isActive) { Id = id; IsActive = isActive; }
     public int Id { get; }
     public bool IsActive { get; }
-    public string PermissionKey => PermissionKeys.CatalogEmployeesWrite;
+    public override string PermissionKey => PermissionKeys.CatalogEmployeesWrite;
 }
 public sealed class ListEmployeesQuery : ApplicationRequest<PagedResult<EmployeeDto>>, IAuthorizedRequest
 {
@@ -61,19 +61,19 @@ public sealed class GetEmployeeByIdQuery : ApplicationRequest<EmployeeDto>, IAut
     public string PermissionKey => PermissionKeys.CatalogEmployeesRead;
 }
 
-public sealed class UpdateCustomerCommand : ApplicationRequest<CustomerDto>, IAuthorizedRequest
+public sealed class UpdateCustomerCommand : AuthorizedActorApplicationRequest<CustomerDto>
 {
     public UpdateCustomerCommand(int id, SaveCustomerRequest request) { Id = id; Request = request ?? throw new ArgumentNullException(nameof(request)); }
     public int Id { get; }
     public SaveCustomerRequest Request { get; }
-    public string PermissionKey => PermissionKeys.CatalogCustomersWrite;
+    public override string PermissionKey => PermissionKeys.CatalogCustomersWrite;
 }
-public sealed class SetCustomerActiveCommand : ApplicationRequest<UnitResponse>, IAuthorizedRequest
+public sealed class SetCustomerActiveCommand : AuthorizedActorApplicationRequest<UnitResponse>
 {
     public SetCustomerActiveCommand(int id, bool isActive) { Id = id; IsActive = isActive; }
     public int Id { get; }
     public bool IsActive { get; }
-    public string PermissionKey => PermissionKeys.CatalogCustomersWrite;
+    public override string PermissionKey => PermissionKeys.CatalogCustomersWrite;
 }
 public sealed class ListCustomersQuery : ApplicationRequest<PagedResult<CustomerDto>>, IAuthorizedRequest
 {

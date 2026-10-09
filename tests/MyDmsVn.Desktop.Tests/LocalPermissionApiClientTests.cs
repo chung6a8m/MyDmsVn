@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Desktop.Application;
@@ -68,12 +68,28 @@ namespace MyDmsVn.Desktop.Tests
             {
                 return Task.FromResult(_isAllowed);
             }
+
+            public Task<bool> IsAllowedAsync(
+                int userId,
+                string permissionKey,
+                CancellationToken cancellationToken)
+            {
+                return Task.FromResult(_isAllowed);
+            }
         }
 
         private sealed class ThrowingPermissionAuthorizationService
             : IPermissionAuthorizationService
         {
             public Task<bool> IsAllowedAsync(
+                string permissionKey,
+                CancellationToken cancellationToken)
+            {
+                throw new InvalidOperationException("sensitive storage failure");
+            }
+
+            public Task<bool> IsAllowedAsync(
+                int userId,
                 string permissionKey,
                 CancellationToken cancellationToken)
             {

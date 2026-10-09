@@ -18,16 +18,15 @@ internal sealed class WarehouseFeatureHandlers :
     IRequestHandler<LookupWarehousesQuery, ErrorOr<IReadOnlyList<CatalogLookupDto>>>
 {
     private readonly IUnitOfWorkFactory _factory;
-    private readonly ICurrentUserAccessor _user;
     private readonly IUtcClock _clock;
     private readonly IWarehouseQueryService _queries;
 
-    public WarehouseFeatureHandlers(IUnitOfWorkFactory factory, ICurrentUserAccessor user, IUtcClock clock, IWarehouseQueryService queries)
-    { _factory = factory; _user = user; _clock = clock; _queries = queries; }
+    public WarehouseFeatureHandlers(IUnitOfWorkFactory factory, IUtcClock clock, IWarehouseQueryService queries)
+    { _factory = factory; _clock = clock; _queries = queries; }
 
     public async Task<ErrorOr<WarehouseDto>> Handle(UpdateWarehouseCommand command, CancellationToken cancellationToken)
     {
-        var entity = new Warehouse { Id = command.Id, Code = command.Request.Code, Name = command.Request.Name, Address = command.Request.Address, UpdatedAtUtc = _clock.UtcNow, UpdatedByUserId = _user.Current.UserId };
+        var entity = new Warehouse { Id = command.Id, Code = command.Request.Code, Name = command.Request.Name, Address = command.Request.Address, UpdatedAtUtc = _clock.UtcNow, UpdatedByUserId = command.AuthorizedUserId };
         using var uow = await _factory.CreateAsync(cancellationToken).ConfigureAwait(false);
         uow.BeginTransaction();
         try
@@ -45,9 +44,10 @@ internal sealed class WarehouseFeatureHandlers :
 
     public async Task<ErrorOr<UnitResponse>> Handle(SetWarehouseActiveCommand command, CancellationToken cancellationToken)
     {
+        var authorizedUserId = command.AuthorizedUserId;
         using var uow = await _factory.CreateAsync(cancellationToken).ConfigureAwait(false);
         uow.BeginTransaction();
-        if (!await uow.Repository<ICatalogWriteRepository>().SetWarehouseActiveAsync(command.Id, command.IsActive, _clock.UtcNow, _user.Current.UserId, cancellationToken).ConfigureAwait(false))
+        if (!await uow.Repository<ICatalogWriteRepository>().SetWarehouseActiveAsync(command.Id, command.IsActive, _clock.UtcNow, authorizedUserId, cancellationToken).ConfigureAwait(false))
             return Error.NotFound("Warehouse.NotFound", "The warehouse was not found.");
         uow.Commit();
         return UnitResponse.Value;
@@ -75,16 +75,15 @@ internal sealed class EmployeeFeatureHandlers :
     IRequestHandler<LookupEmployeesQuery, ErrorOr<IReadOnlyList<CatalogLookupDto>>>
 {
     private readonly IUnitOfWorkFactory _factory;
-    private readonly ICurrentUserAccessor _user;
     private readonly IUtcClock _clock;
     private readonly IEmployeeQueryService _queries;
 
-    public EmployeeFeatureHandlers(IUnitOfWorkFactory factory, ICurrentUserAccessor user, IUtcClock clock, IEmployeeQueryService queries)
-    { _factory = factory; _user = user; _clock = clock; _queries = queries; }
+    public EmployeeFeatureHandlers(IUnitOfWorkFactory factory, IUtcClock clock, IEmployeeQueryService queries)
+    { _factory = factory; _clock = clock; _queries = queries; }
 
     public async Task<ErrorOr<EmployeeDto>> Handle(UpdateEmployeeCommand command, CancellationToken cancellationToken)
     {
-        var entity = new Employee { Id = command.Id, Code = command.Request.Code, Name = command.Request.Name, Phone = command.Request.Phone, UserId = command.Request.UserId, UpdatedAtUtc = _clock.UtcNow, UpdatedByUserId = _user.Current.UserId };
+        var entity = new Employee { Id = command.Id, Code = command.Request.Code, Name = command.Request.Name, Phone = command.Request.Phone, UserId = command.Request.UserId, UpdatedAtUtc = _clock.UtcNow, UpdatedByUserId = command.AuthorizedUserId };
         using var uow = await _factory.CreateAsync(cancellationToken).ConfigureAwait(false);
         uow.BeginTransaction();
         try
@@ -102,9 +101,10 @@ internal sealed class EmployeeFeatureHandlers :
 
     public async Task<ErrorOr<UnitResponse>> Handle(SetEmployeeActiveCommand command, CancellationToken cancellationToken)
     {
+        var authorizedUserId = command.AuthorizedUserId;
         using var uow = await _factory.CreateAsync(cancellationToken).ConfigureAwait(false);
         uow.BeginTransaction();
-        if (!await uow.Repository<ICatalogWriteRepository>().SetEmployeeActiveAsync(command.Id, command.IsActive, _clock.UtcNow, _user.Current.UserId, cancellationToken).ConfigureAwait(false))
+        if (!await uow.Repository<ICatalogWriteRepository>().SetEmployeeActiveAsync(command.Id, command.IsActive, _clock.UtcNow, authorizedUserId, cancellationToken).ConfigureAwait(false))
             return Error.NotFound("Employee.NotFound", "The employee was not found.");
         uow.Commit();
         return UnitResponse.Value;
@@ -139,16 +139,15 @@ internal sealed class CustomerFeatureHandlers :
     IRequestHandler<LookupCustomersQuery, ErrorOr<IReadOnlyList<CatalogLookupDto>>>
 {
     private readonly IUnitOfWorkFactory _factory;
-    private readonly ICurrentUserAccessor _user;
     private readonly IUtcClock _clock;
     private readonly ICustomerQueryService _queries;
 
-    public CustomerFeatureHandlers(IUnitOfWorkFactory factory, ICurrentUserAccessor user, IUtcClock clock, ICustomerQueryService queries)
-    { _factory = factory; _user = user; _clock = clock; _queries = queries; }
+    public CustomerFeatureHandlers(IUnitOfWorkFactory factory, IUtcClock clock, ICustomerQueryService queries)
+    { _factory = factory; _clock = clock; _queries = queries; }
 
     public async Task<ErrorOr<CustomerDto>> Handle(UpdateCustomerCommand command, CancellationToken cancellationToken)
     {
-        var entity = new Customer { Id = command.Id, Code = command.Request.Code, Name = command.Request.Name, Address = command.Request.Address, Phone = command.Request.Phone, TaxCode = command.Request.TaxCode, UpdatedAtUtc = _clock.UtcNow, UpdatedByUserId = _user.Current.UserId };
+        var entity = new Customer { Id = command.Id, Code = command.Request.Code, Name = command.Request.Name, Address = command.Request.Address, Phone = command.Request.Phone, TaxCode = command.Request.TaxCode, UpdatedAtUtc = _clock.UtcNow, UpdatedByUserId = command.AuthorizedUserId };
         using var uow = await _factory.CreateAsync(cancellationToken).ConfigureAwait(false);
         uow.BeginTransaction();
         try
@@ -166,9 +165,10 @@ internal sealed class CustomerFeatureHandlers :
 
     public async Task<ErrorOr<UnitResponse>> Handle(SetCustomerActiveCommand command, CancellationToken cancellationToken)
     {
+        var authorizedUserId = command.AuthorizedUserId;
         using var uow = await _factory.CreateAsync(cancellationToken).ConfigureAwait(false);
         uow.BeginTransaction();
-        if (!await uow.Repository<ICatalogWriteRepository>().SetCustomerActiveAsync(command.Id, command.IsActive, _clock.UtcNow, _user.Current.UserId, cancellationToken).ConfigureAwait(false))
+        if (!await uow.Repository<ICatalogWriteRepository>().SetCustomerActiveAsync(command.Id, command.IsActive, _clock.UtcNow, authorizedUserId, cancellationToken).ConfigureAwait(false))
             return Error.NotFound("Customer.NotFound", "The customer was not found.");
         uow.Commit();
         return UnitResponse.Value;

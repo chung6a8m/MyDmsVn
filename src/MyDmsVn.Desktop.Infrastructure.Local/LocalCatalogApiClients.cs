@@ -20,7 +20,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
         protected async Task<ApiResponse<T>> SendAsync<T>(ApplicationRequest<T> request, CancellationToken cancellationToken)
         {
             var result = await Sender.Send(request, cancellationToken).ConfigureAwait(false);
-            return ApiResponseMapper.Map(result);
+            return ApiResponseMapper.Map(result, "Request");
         }
     }
 

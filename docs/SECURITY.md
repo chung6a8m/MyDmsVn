@@ -43,6 +43,8 @@ Proposed keys for P5:
 
 Check authorization at each command/query use case in Application. The UI may hide/disable actions for usability but must **not** be the enforcement point. HTTP endpoints also require authentication/authorization middleware as appropriate.
 
+Authorization snapshots the authenticated user identifier before its first asynchronous permission lookup and evaluates permissions for that exact user. Mutating requests carry the authorized actor snapshot into their handlers for audit fields. A later Local desktop sign-out or sign-in does not cancel or reattribute an already-authorized in-flight operation; explicit request cancellation remains the cancellation mechanism.
+
 ## 4. Permission cache
 
 P5 can read from SQL without premature complex caches. If caching is added: scope keys by user + permissions version; invalidate on direct-permission change, role assignment, role-permission change, deactivation and user deletion. Never copy every permission into huge authentication claims. Evaluate dynamic permissions server-side.

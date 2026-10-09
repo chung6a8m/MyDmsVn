@@ -24,12 +24,13 @@ P5.1-T02 adds backend use cases for Product, Warehouse, Employee and Customer: C
 
 ## Automated evidence
 
-- Targeted Application catalog suite: 10/10 passed on `net48` and 10/10 passed on `net8.0`.
+- Targeted Application catalog suite: 11/11 passed on `net48` and 11/11 passed on `net8.0`.
 - Targeted SQL catalog backend suite: 1/1 passed on `net48` and 1/1 passed on `net8.0`, using isolated disposable databases configured by `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING`.
 - Targeted Local catalog adapter suite: 1/1 passed on `net48` and 1/1 passed on `net8.0-windows`.
+- Targeted round-two Local field-path and in-flight audit regressions: 2/2 passed on `net48` and 2/2 passed on `net8.0-windows`.
 - `dotnet restore MyDmsVn.sln --locked-mode`: passed.
 - `dotnet build MyDmsVn.sln -c Release --no-restore`: passed with 0 warnings and 0 errors across `net48`, `net8.0` and `net8.0-windows` targets.
-- `dotnet test MyDmsVn.sln -c Release --no-build --no-restore`: passed 383/383 target-specific test executions with 0 failures and 0 skips.
+- `dotnet test MyDmsVn.sln -c Release --no-build --no-restore`: passed 389/389 target-specific test executions with 0 failures and 0 skips.
 
 ## Remaining work
 
@@ -38,3 +39,5 @@ P5.1-T03 is next: catalog list/editor ViewModels and WinForms screens. P5.1-T04 
 ## Review follow-up
 
 PR review identified that unbounded or NUL-containing List/Lookup search text could reach SQL Server `CHARINDEX` and be reported as an internal error. All eight catalog List/Lookup validators now reject search text over 256 characters or containing NUL before invoking a query service. The regression test exercises both invalid forms across Product, Warehouse, Employee and Customer request types and asserts zero query-service calls.
+
+Round-two review identified two additional boundary issues. Catalog Local adapters now strip the internal `Request` validation prefix so List, Lookup, Create and Update return public DTO field paths such as `search` and `code`. Authorization now snapshots the exact user before asynchronous permission evaluation, authorizes that user ID explicitly, and binds it to every catalog mutation for audit propagation. The deterministic Local-mode regression pauses UnitOfWork creation, signs out the shared desktop session, resumes the mutation and verifies the original authorized user remains the audit actor.

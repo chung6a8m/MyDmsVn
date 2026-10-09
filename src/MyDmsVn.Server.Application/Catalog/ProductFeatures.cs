@@ -12,14 +12,14 @@ using MyDmsVn.Server.Domain.Catalog;
 
 namespace MyDmsVn.Server.Application.Catalog;
 
-public sealed class CreateProductCommand : ApplicationRequest<ProductDto>, IAuthorizedRequest
+public sealed class CreateProductCommand : AuthorizedActorApplicationRequest<ProductDto>
 {
     public CreateProductCommand(SaveProductRequest request) =>
         Request = request ?? throw new ArgumentNullException(nameof(request));
 
     public SaveProductRequest Request { get; }
 
-    public string PermissionKey => PermissionKeys.CatalogProductsWrite;
+    public override string PermissionKey => PermissionKeys.CatalogProductsWrite;
 }
 
 public sealed class ListProductsQuery : ApplicationRequest<PagedResult<ProductDto>>, IAuthorizedRequest
@@ -32,7 +32,7 @@ public sealed class ListProductsQuery : ApplicationRequest<PagedResult<ProductDt
     public string PermissionKey => PermissionKeys.CatalogProductsRead;
 }
 
-public sealed class UpdateProductCommand : ApplicationRequest<ProductDto>, IAuthorizedRequest
+public sealed class UpdateProductCommand : AuthorizedActorApplicationRequest<ProductDto>
 {
     public UpdateProductCommand(int id, SaveProductRequest request)
     {
@@ -42,10 +42,10 @@ public sealed class UpdateProductCommand : ApplicationRequest<ProductDto>, IAuth
 
     public int Id { get; }
     public SaveProductRequest Request { get; }
-    public string PermissionKey => PermissionKeys.CatalogProductsWrite;
+    public override string PermissionKey => PermissionKeys.CatalogProductsWrite;
 }
 
-public sealed class SetProductActiveCommand : ApplicationRequest<UnitResponse>, IAuthorizedRequest
+public sealed class SetProductActiveCommand : AuthorizedActorApplicationRequest<UnitResponse>
 {
     public SetProductActiveCommand(int id, bool isActive)
     {
@@ -55,7 +55,7 @@ public sealed class SetProductActiveCommand : ApplicationRequest<UnitResponse>, 
 
     public int Id { get; }
     public bool IsActive { get; }
-    public string PermissionKey => PermissionKeys.CatalogProductsWrite;
+    public override string PermissionKey => PermissionKeys.CatalogProductsWrite;
 }
 
 public sealed class GetProductByIdQuery : ApplicationRequest<ProductDto>, IAuthorizedRequest
@@ -164,14 +164,10 @@ internal sealed class CreateProductCommandHandler
     : IRequestHandler<CreateProductCommand, ErrorOr<ProductDto>>
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
-    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public CreateProductCommandHandler(
-        IUnitOfWorkFactory unitOfWorkFactory,
-        ICurrentUserAccessor currentUserAccessor)
+    public CreateProductCommandHandler(IUnitOfWorkFactory unitOfWorkFactory)
     {
         _unitOfWorkFactory = unitOfWorkFactory;
-        _currentUserAccessor = currentUserAccessor;
     }
 
     public async Task<ErrorOr<ProductDto>> Handle(
@@ -184,7 +180,7 @@ internal sealed class CreateProductCommandHandler
             Code = request.Code,
             Name = request.Name,
             Unit = request.Unit,
-            CreatedByUserId = _currentUserAccessor.Current.UserId,
+            CreatedByUserId = command.AuthorizedUserId,
         };
 
         using var unitOfWork = await _unitOfWorkFactory
@@ -230,18 +226,15 @@ internal sealed class UpdateProductCommandHandler
     : IRequestHandler<UpdateProductCommand, ErrorOr<ProductDto>>
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
-    private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly IUtcClock _clock;
     private readonly IProductQueryService _queryService;
 
     public UpdateProductCommandHandler(
         IUnitOfWorkFactory unitOfWorkFactory,
-        ICurrentUserAccessor currentUserAccessor,
         IUtcClock clock,
         IProductQueryService queryService)
     {
         _unitOfWorkFactory = unitOfWorkFactory;
-        _currentUserAccessor = currentUserAccessor;
         _clock = clock;
         _queryService = queryService;
     }
@@ -257,7 +250,7 @@ internal sealed class UpdateProductCommandHandler
             Name = command.Request.Name,
             Unit = command.Request.Unit,
             UpdatedAtUtc = _clock.UtcNow,
-            UpdatedByUserId = _currentUserAccessor.Current.UserId,
+            UpdatedByUserId = command.AuthorizedUserId,
         };
 
         using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
@@ -290,16 +283,13 @@ internal sealed class SetProductActiveCommandHandler
     : IRequestHandler<SetProductActiveCommand, ErrorOr<UnitResponse>>
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
-    private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly IUtcClock _clock;
 
     public SetProductActiveCommandHandler(
         IUnitOfWorkFactory unitOfWorkFactory,
-        ICurrentUserAccessor currentUserAccessor,
         IUtcClock clock)
     {
         _unitOfWorkFactory = unitOfWorkFactory;
-        _currentUserAccessor = currentUserAccessor;
         _clock = clock;
     }
 
@@ -307,6 +297,7 @@ internal sealed class SetProductActiveCommandHandler
         SetProductActiveCommand command,
         CancellationToken cancellationToken)
     {
+        var authorizedUserId = command.AuthorizedUserId;
         using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
         unitOfWork.BeginTransaction();
         var found = await unitOfWork.Repository<ICatalogWriteRepository>()
@@ -314,7 +305,7 @@ internal sealed class SetProductActiveCommandHandler
                 command.Id,
                 command.IsActive,
                 _clock.UtcNow,
-                _currentUserAccessor.Current.UserId,
+                authorizedUserId,
                 cancellationToken)
             .ConfigureAwait(false);
         if (!found)
