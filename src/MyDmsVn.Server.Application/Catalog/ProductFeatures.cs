@@ -116,6 +116,11 @@ internal sealed class ListProductsQueryValidator : AbstractValidator<ListProduct
         RuleFor(query => query.Request.PageSize)
             .InclusiveBetween(1, 200)
             .WithErrorCode("Validation.Range");
+        RuleFor(query => query.Request.Search)
+            .MaximumLength(CatalogValidation.MaximumSearchLength)
+            .WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters)
+            .WithErrorCode("Validation.InvalidCharacter");
     }
 }
 
@@ -142,10 +147,17 @@ internal sealed class GetProductByIdQueryValidator : AbstractValidator<GetProduc
 
 internal sealed class LookupProductsQueryValidator : AbstractValidator<LookupProductsQuery>
 {
-    public LookupProductsQueryValidator() =>
+    public LookupProductsQueryValidator()
+    {
         RuleFor(query => query.Request.Limit)
             .InclusiveBetween(1, 200)
             .WithErrorCode("Validation.Range");
+        RuleFor(query => query.Request.Search)
+            .MaximumLength(CatalogValidation.MaximumSearchLength)
+            .WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters)
+            .WithErrorCode("Validation.InvalidCharacter");
+    }
 }
 
 internal sealed class CreateProductCommandHandler

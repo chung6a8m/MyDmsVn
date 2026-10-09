@@ -91,6 +91,54 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
+        public async Task Catalog_search_validation_rejects_overlong_and_nul_before_query_services()
+        {
+            var queryServices = new RejectingCatalogQueryServices();
+            var services = new ServiceCollection();
+            services.AddSingleton<IUnitOfWorkFactory>(
+                new FakeUnitOfWorkFactory(new FakeUnitOfWork(new FakeCatalogWriteRepository())));
+            services.AddSingleton<ICurrentUserAccessor>(
+                new StubCurrentUserAccessor(
+                    CurrentUser.Authenticated(42, "operator", "Operator", isActive: true)));
+            services.AddSingleton<IPermissionStore>(new AllowPermissionStore());
+            services.AddSingleton<IUtcClock>(new FixedUtcClock());
+            services.AddSingleton<IProductQueryService>(queryServices);
+            services.AddSingleton<IWarehouseQueryService>(queryServices);
+            services.AddSingleton<IEmployeeQueryService>(queryServices);
+            services.AddSingleton<ICustomerQueryService>(queryServices);
+            services.AddServerApplication();
+            using var provider = services.BuildServiceProvider();
+            var sender = provider.GetRequiredService<MediatR.ISender>();
+
+            await AssertInvalidSearches(
+                sender,
+                search => new ListProductsQuery(new CatalogListRequest(search, 1, 25, false)));
+            await AssertInvalidSearches(
+                sender,
+                search => new ListWarehousesQuery(new CatalogListRequest(search, 1, 25, false)));
+            await AssertInvalidSearches(
+                sender,
+                search => new ListEmployeesQuery(new CatalogListRequest(search, 1, 25, false)));
+            await AssertInvalidSearches(
+                sender,
+                search => new ListCustomersQuery(new CatalogListRequest(search, 1, 25, false)));
+            await AssertInvalidSearches(
+                sender,
+                search => new LookupProductsQuery(new CatalogLookupRequest(search, 25)));
+            await AssertInvalidSearches(
+                sender,
+                search => new LookupWarehousesQuery(new CatalogLookupRequest(search, 25)));
+            await AssertInvalidSearches(
+                sender,
+                search => new LookupEmployeesQuery(new CatalogLookupRequest(search, 25)));
+            await AssertInvalidSearches(
+                sender,
+                search => new LookupCustomersQuery(new CatalogLookupRequest(search, 25)));
+
+            Assert.Equal(0, queryServices.CallCount);
+        }
+
+        [Fact]
         public async Task Update_product_persists_update_audit_and_returns_not_found_when_missing()
         {
             var repository = new FakeCatalogWriteRepository { ProductUpdateFound = false };
@@ -218,6 +266,23 @@ namespace MyDmsVn.Server.Application.Tests
 
             services.AddServerApplication();
             return services.BuildServiceProvider();
+        }
+
+        private static async Task AssertInvalidSearches<TValue>(
+            MediatR.ISender sender,
+            Func<string, MyDmsVn.Server.Application.ApplicationRequest<TValue>> requestFactory)
+        {
+            var overlong = await sender.Send(
+                requestFactory(new string('x', 257)),
+                CancellationToken.None);
+            var nul = await sender.Send(
+                requestFactory("invalid\0search"),
+                CancellationToken.None);
+
+            Assert.True(overlong.IsError);
+            Assert.Contains(overlong.Errors, error => error.Code == "Validation.MaximumLength");
+            Assert.True(nul.IsError);
+            Assert.Contains(nul.Errors, error => error.Code == "Validation.InvalidCharacter");
         }
 
         private sealed class FixedUtcClock : IUtcClock
@@ -386,6 +451,74 @@ namespace MyDmsVn.Server.Application.Tests
                 LastLookupRequest = request;
                 return Task.FromResult<IReadOnlyList<CatalogLookupDto>>(
                     new[] { new CatalogLookupDto(1, "SP001", "Sản phẩm", true) });
+            }
+        }
+
+        private sealed class RejectingCatalogQueryServices :
+            IProductQueryService,
+            IWarehouseQueryService,
+            IEmployeeQueryService,
+            ICustomerQueryService
+        {
+            public int CallCount { get; private set; }
+
+            Task<PagedResult<ProductDto>> IProductQueryService.ListAsync(
+                CatalogListRequest request,
+                CancellationToken cancellationToken) =>
+                Reject<PagedResult<ProductDto>>();
+
+            Task<ProductDto?> IProductQueryService.GetByIdAsync(
+                int id,
+                CancellationToken cancellationToken) => Reject<ProductDto?>();
+
+            Task<IReadOnlyList<CatalogLookupDto>> IProductQueryService.LookupAsync(
+                CatalogLookupRequest request,
+                CancellationToken cancellationToken) => Reject<IReadOnlyList<CatalogLookupDto>>();
+
+            Task<PagedResult<WarehouseDto>> IWarehouseQueryService.ListAsync(
+                CatalogListRequest request,
+                CancellationToken cancellationToken) =>
+                Reject<PagedResult<WarehouseDto>>();
+
+            Task<WarehouseDto?> IWarehouseQueryService.GetByIdAsync(
+                int id,
+                CancellationToken cancellationToken) => Reject<WarehouseDto?>();
+
+            Task<IReadOnlyList<CatalogLookupDto>> IWarehouseQueryService.LookupAsync(
+                CatalogLookupRequest request,
+                CancellationToken cancellationToken) => Reject<IReadOnlyList<CatalogLookupDto>>();
+
+            Task<PagedResult<EmployeeDto>> IEmployeeQueryService.ListAsync(
+                CatalogListRequest request,
+                CancellationToken cancellationToken) =>
+                Reject<PagedResult<EmployeeDto>>();
+
+            Task<EmployeeDto?> IEmployeeQueryService.GetByIdAsync(
+                int id,
+                CancellationToken cancellationToken) => Reject<EmployeeDto?>();
+
+            Task<IReadOnlyList<CatalogLookupDto>> IEmployeeQueryService.LookupAsync(
+                CatalogLookupRequest request,
+                CancellationToken cancellationToken) => Reject<IReadOnlyList<CatalogLookupDto>>();
+
+            Task<PagedResult<CustomerDto>> ICustomerQueryService.ListAsync(
+                CatalogListRequest request,
+                CancellationToken cancellationToken) =>
+                Reject<PagedResult<CustomerDto>>();
+
+            Task<CustomerDto?> ICustomerQueryService.GetByIdAsync(
+                int id,
+                CancellationToken cancellationToken) => Reject<CustomerDto?>();
+
+            Task<IReadOnlyList<CatalogLookupDto>> ICustomerQueryService.LookupAsync(
+                CatalogLookupRequest request,
+                CancellationToken cancellationToken) => Reject<IReadOnlyList<CatalogLookupDto>>();
+
+            private Task<T> Reject<T>()
+            {
+                CallCount++;
+                return Task.FromException<T>(
+                    new InvalidOperationException("Query service must not run for invalid search input."));
             }
         }
     }

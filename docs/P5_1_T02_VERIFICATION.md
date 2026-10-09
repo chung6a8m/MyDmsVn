@@ -34,3 +34,7 @@ P5.1-T02 adds backend use cases for Product, Warehouse, Employee and Customer: C
 ## Remaining work
 
 P5.1-T03 is next: catalog list/editor ViewModels and WinForms screens. P5.1-T04 then adds the shared debouncer, catalog-change messaging and open-lookup refresh behavior. The overall P5.1 gate remains unchecked until those UI, messenger, STA and manual-smoke criteria have evidence.
+
+## Review follow-up
+
+PR review identified that unbounded or NUL-containing List/Lookup search text could reach SQL Server `CHARINDEX` and be reported as an internal error. All eight catalog List/Lookup validators now reject search text over 256 characters or containing NUL before invoking a query service. The regression test exercises both invalid forms across Product, Warehouse, Employee and Customer request types and asserts zero query-service calls.

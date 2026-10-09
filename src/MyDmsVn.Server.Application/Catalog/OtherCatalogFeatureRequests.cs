@@ -93,14 +93,36 @@ internal static class OtherCatalogValidationRules
     public static void AddIdRule<T>(AbstractValidator<T> validator, Expression<Func<T, int>> id) =>
         validator.RuleFor(id).GreaterThan(0).WithErrorCode("Validation.GreaterThan");
 
-    public static void AddListRules<T>(AbstractValidator<T> validator, Expression<Func<T, int>> pageNumber, Expression<Func<T, int>> pageSize)
+    public static void AddListRules<T>(
+        AbstractValidator<T> validator,
+        Expression<Func<T, int>> pageNumber,
+        Expression<Func<T, int>> pageSize,
+        Expression<Func<T, string?>> search)
     {
         validator.RuleFor(pageNumber).GreaterThan(0).WithErrorCode("Validation.GreaterThan");
         validator.RuleFor(pageSize).InclusiveBetween(1, 200).WithErrorCode("Validation.Range");
+        AddSearchRule(validator, search);
     }
 
-    public static void AddLookupRules<T>(AbstractValidator<T> validator, Expression<Func<T, int>> limit) =>
+    public static void AddLookupRules<T>(
+        AbstractValidator<T> validator,
+        Expression<Func<T, int>> limit,
+        Expression<Func<T, string?>> search)
+    {
         validator.RuleFor(limit).InclusiveBetween(1, 200).WithErrorCode("Validation.Range");
+        AddSearchRule(validator, search);
+    }
+
+    private static void AddSearchRule<T>(
+        AbstractValidator<T> validator,
+        Expression<Func<T, string?>> search)
+    {
+        validator.RuleFor(search)
+            .MaximumLength(CatalogValidation.MaximumSearchLength)
+            .WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters)
+            .WithErrorCode("Validation.InvalidCharacter");
+    }
 }
 
 internal sealed class UpdateWarehouseCommandValidator : AbstractValidator<UpdateWarehouseCommand>
@@ -110,30 +132,30 @@ internal sealed class UpdateWarehouseCommandValidator : AbstractValidator<Update
 internal sealed class SetWarehouseActiveCommandValidator : AbstractValidator<SetWarehouseActiveCommand>
 { public SetWarehouseActiveCommandValidator() => OtherCatalogValidationRules.AddIdRule(this, x => x.Id); }
 internal sealed class ListWarehousesQueryValidator : AbstractValidator<ListWarehousesQuery>
-{ public ListWarehousesQueryValidator() => OtherCatalogValidationRules.AddListRules(this, x => x.Request.PageNumber, x => x.Request.PageSize); }
+{ public ListWarehousesQueryValidator() => OtherCatalogValidationRules.AddListRules(this, x => x.Request.PageNumber, x => x.Request.PageSize, x => x.Request.Search); }
 internal sealed class GetWarehouseByIdQueryValidator : AbstractValidator<GetWarehouseByIdQuery>
 { public GetWarehouseByIdQueryValidator() => OtherCatalogValidationRules.AddIdRule(this, x => x.Id); }
 internal sealed class LookupWarehousesQueryValidator : AbstractValidator<LookupWarehousesQuery>
-{ public LookupWarehousesQueryValidator() => OtherCatalogValidationRules.AddLookupRules(this, x => x.Request.Limit); }
+{ public LookupWarehousesQueryValidator() => OtherCatalogValidationRules.AddLookupRules(this, x => x.Request.Limit, x => x.Request.Search); }
 
 internal sealed class UpdateEmployeeCommandValidator : AbstractValidator<UpdateEmployeeCommand>
 { public UpdateEmployeeCommandValidator() { OtherCatalogValidationRules.AddIdRule(this, x => x.Id); RuleFor(x => x.Request).SetValidator(new SaveEmployeeRequestValidator()); } }
 internal sealed class SetEmployeeActiveCommandValidator : AbstractValidator<SetEmployeeActiveCommand>
 { public SetEmployeeActiveCommandValidator() => OtherCatalogValidationRules.AddIdRule(this, x => x.Id); }
 internal sealed class ListEmployeesQueryValidator : AbstractValidator<ListEmployeesQuery>
-{ public ListEmployeesQueryValidator() => OtherCatalogValidationRules.AddListRules(this, x => x.Request.PageNumber, x => x.Request.PageSize); }
+{ public ListEmployeesQueryValidator() => OtherCatalogValidationRules.AddListRules(this, x => x.Request.PageNumber, x => x.Request.PageSize, x => x.Request.Search); }
 internal sealed class GetEmployeeByIdQueryValidator : AbstractValidator<GetEmployeeByIdQuery>
 { public GetEmployeeByIdQueryValidator() => OtherCatalogValidationRules.AddIdRule(this, x => x.Id); }
 internal sealed class LookupEmployeesQueryValidator : AbstractValidator<LookupEmployeesQuery>
-{ public LookupEmployeesQueryValidator() => OtherCatalogValidationRules.AddLookupRules(this, x => x.Request.Limit); }
+{ public LookupEmployeesQueryValidator() => OtherCatalogValidationRules.AddLookupRules(this, x => x.Request.Limit, x => x.Request.Search); }
 
 internal sealed class UpdateCustomerCommandValidator : AbstractValidator<UpdateCustomerCommand>
 { public UpdateCustomerCommandValidator() { OtherCatalogValidationRules.AddIdRule(this, x => x.Id); RuleFor(x => x.Request).SetValidator(new SaveCustomerRequestValidator()); } }
 internal sealed class SetCustomerActiveCommandValidator : AbstractValidator<SetCustomerActiveCommand>
 { public SetCustomerActiveCommandValidator() => OtherCatalogValidationRules.AddIdRule(this, x => x.Id); }
 internal sealed class ListCustomersQueryValidator : AbstractValidator<ListCustomersQuery>
-{ public ListCustomersQueryValidator() => OtherCatalogValidationRules.AddListRules(this, x => x.Request.PageNumber, x => x.Request.PageSize); }
+{ public ListCustomersQueryValidator() => OtherCatalogValidationRules.AddListRules(this, x => x.Request.PageNumber, x => x.Request.PageSize, x => x.Request.Search); }
 internal sealed class GetCustomerByIdQueryValidator : AbstractValidator<GetCustomerByIdQuery>
 { public GetCustomerByIdQueryValidator() => OtherCatalogValidationRules.AddIdRule(this, x => x.Id); }
 internal sealed class LookupCustomersQueryValidator : AbstractValidator<LookupCustomersQuery>
-{ public LookupCustomersQueryValidator() => OtherCatalogValidationRules.AddLookupRules(this, x => x.Request.Limit); }
+{ public LookupCustomersQueryValidator() => OtherCatalogValidationRules.AddLookupRules(this, x => x.Request.Limit, x => x.Request.Search); }
