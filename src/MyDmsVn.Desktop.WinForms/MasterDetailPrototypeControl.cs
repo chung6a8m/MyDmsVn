@@ -85,11 +85,12 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 Dock = DockStyle.Fill,
                 FixedPanel = FixedPanel.Panel2,
-                SplitterDistance = 640,
             };
+            split.SizeChanged += (_, _) => UpdateEditorPanelWidth(split);
             split.Panel1.Controls.Add(Grid);
             split.Panel2.Controls.Add(editor);
             Controls.Add(split);
+            UpdateEditorPanelWidth(split);
             SetRows(Array.Empty<MasterDetailRow>());
         }
 
@@ -205,6 +206,18 @@ namespace MyDmsVn.Desktop.WinForms
             panel.Controls.Add(Lookup);
             panel.Controls.Add(CreateCommandBar());
             return panel;
+        }
+
+        private static void UpdateEditorPanelWidth(SplitContainer split)
+        {
+            var availableWidth = split.ClientSize.Width - split.SplitterWidth;
+            if (availableWidth < 560)
+            {
+                return;
+            }
+
+            var editorWidth = Math.Min(400, Math.Max(280, availableWidth / 3));
+            split.SplitterDistance = availableWidth - editorWidth;
         }
 
         private Control CreateCommandBar()
