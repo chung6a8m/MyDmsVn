@@ -139,6 +139,47 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
+        public async Task Catalog_save_validation_rejects_nul_in_code_and_name_before_writes()
+        {
+            var unitOfWork = new FakeUnitOfWork(new FakeCatalogWriteRepository());
+            var queryServices = new RejectingCatalogQueryServices();
+            var services = new ServiceCollection();
+            services.AddSingleton<IUnitOfWorkFactory>(new FakeUnitOfWorkFactory(unitOfWork));
+            services.AddSingleton<ICurrentUserAccessor>(
+                new StubCurrentUserAccessor(
+                    CurrentUser.Authenticated(42, "operator", "Operator", isActive: true)));
+            services.AddSingleton<IPermissionStore>(new AllowPermissionStore());
+            services.AddSingleton<IUtcClock>(new FixedUtcClock());
+            services.AddSingleton<IProductQueryService>(queryServices);
+            services.AddSingleton<IWarehouseQueryService>(queryServices);
+            services.AddSingleton<IEmployeeQueryService>(queryServices);
+            services.AddSingleton<ICustomerQueryService>(queryServices);
+            services.AddServerApplication();
+            using var provider = services.BuildServiceProvider();
+            var sender = provider.GetRequiredService<MediatR.ISender>();
+
+            await AssertInvalidCatalogSave<ProductDto>(sender,
+                (code, name) => new CreateProductCommand(new SaveProductRequest(code, name, "Each")));
+            await AssertInvalidCatalogSave<ProductDto>(sender,
+                (code, name) => new UpdateProductCommand(1, new SaveProductRequest(code, name, "Each")));
+            await AssertInvalidCatalogSave<WarehouseDto>(sender,
+                (code, name) => new CreateWarehouseCommand(new SaveWarehouseRequest(code, name, null)));
+            await AssertInvalidCatalogSave<WarehouseDto>(sender,
+                (code, name) => new UpdateWarehouseCommand(1, new SaveWarehouseRequest(code, name, null)));
+            await AssertInvalidCatalogSave<EmployeeDto>(sender,
+                (code, name) => new CreateEmployeeCommand(new SaveEmployeeRequest(code, name, null, null)));
+            await AssertInvalidCatalogSave<EmployeeDto>(sender,
+                (code, name) => new UpdateEmployeeCommand(1, new SaveEmployeeRequest(code, name, null, null)));
+            await AssertInvalidCatalogSave<CustomerDto>(sender,
+                (code, name) => new CreateCustomerCommand(new SaveCustomerRequest(code, name, null, null, null)));
+            await AssertInvalidCatalogSave<CustomerDto>(sender,
+                (code, name) => new UpdateCustomerCommand(1, new SaveCustomerRequest(code, name, null, null, null)));
+
+            Assert.False(unitOfWork.BeganTransaction);
+            Assert.Equal(0, queryServices.CallCount);
+        }
+
+        [Fact]
         public async Task Update_product_persists_update_audit_and_returns_not_found_when_missing()
         {
             var repository = new FakeCatalogWriteRepository { ProductUpdateFound = false };
@@ -154,6 +195,66 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Equal(42, repository.UpdatedProduct!.UpdatedByUserId);
             Assert.Equal(new DateTime(2026, 10, 9, 2, 3, 4, DateTimeKind.Utc), repository.UpdatedProduct.UpdatedAtUtc);
             Assert.False(unitOfWork.Committed);
+        }
+
+        [Fact]
+        public async Task Update_product_does_not_read_back_after_committing()
+        {
+            var repository = new FakeCatalogWriteRepository();
+            var unitOfWork = new FakeUnitOfWork(repository);
+            var queryService = new FakeProductQueryService
+            {
+                GetByIdFailure = new InvalidOperationException(
+                    "A post-commit read-back must not be attempted."),
+            };
+            using var provider = CreateProvider(unitOfWork, queryService);
+
+            var result = await provider.GetRequiredService<MediatR.ISender>().Send(
+                new UpdateProductCommand(
+                    41,
+                    new SaveProductRequest("SP041", "Updated", "Box")),
+                CancellationToken.None);
+
+            Assert.False(result.IsError);
+            Assert.True(unitOfWork.Committed);
+            Assert.Equal(0, queryService.GetByIdCalls);
+        }
+
+        [Fact]
+        public async Task Other_catalog_updates_do_not_query_after_committing()
+        {
+            var unitOfWork = new FakeUnitOfWork(new FakeCatalogWriteRepository());
+            var queryServices = new RejectingCatalogQueryServices();
+            var services = new ServiceCollection();
+            services.AddSingleton<IUnitOfWorkFactory>(new FakeUnitOfWorkFactory(unitOfWork));
+            services.AddSingleton<ICurrentUserAccessor>(
+                new StubCurrentUserAccessor(
+                    CurrentUser.Authenticated(42, "operator", "Operator", isActive: true)));
+            services.AddSingleton<IPermissionStore>(new AllowPermissionStore());
+            services.AddSingleton<IUtcClock>(new FixedUtcClock());
+            services.AddSingleton<IProductQueryService>(queryServices);
+            services.AddSingleton<IWarehouseQueryService>(queryServices);
+            services.AddSingleton<IEmployeeQueryService>(queryServices);
+            services.AddSingleton<ICustomerQueryService>(queryServices);
+            services.AddServerApplication();
+            using var provider = services.BuildServiceProvider();
+            var sender = provider.GetRequiredService<MediatR.ISender>();
+
+            var warehouse = await sender.Send(
+                new UpdateWarehouseCommand(1, new SaveWarehouseRequest("W1", "Warehouse", null)),
+                CancellationToken.None);
+            var employee = await sender.Send(
+                new UpdateEmployeeCommand(1, new SaveEmployeeRequest("E1", "Employee", null, null)),
+                CancellationToken.None);
+            var customer = await sender.Send(
+                new UpdateCustomerCommand(1, new SaveCustomerRequest("C1", "Customer", null, null, null)),
+                CancellationToken.None);
+
+            Assert.False(warehouse.IsError);
+            Assert.False(employee.IsError);
+            Assert.False(customer.IsError);
+            Assert.True(unitOfWork.Committed);
+            Assert.Equal(0, queryServices.CallCount);
         }
 
         [Fact]
@@ -285,6 +386,23 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Contains(nul.Errors, error => error.Code == "Validation.InvalidCharacter");
         }
 
+        private static async Task AssertInvalidCatalogSave<TValue>(
+            MediatR.ISender sender,
+            Func<string, string, MyDmsVn.Server.Application.ApplicationRequest<TValue>> requestFactory)
+        {
+            var invalidCode = await sender.Send(
+                requestFactory("invalid\0code", "Valid name"),
+                CancellationToken.None);
+            var invalidName = await sender.Send(
+                requestFactory("VALID-CODE", "invalid\0name"),
+                CancellationToken.None);
+
+            Assert.True(invalidCode.IsError);
+            Assert.Contains(invalidCode.Errors, error => error.Code == "Validation.InvalidCharacter");
+            Assert.True(invalidName.IsError);
+            Assert.Contains(invalidName.Errors, error => error.Code == "Validation.InvalidCharacter");
+        }
+
         private sealed class FixedUtcClock : IUtcClock
         {
             public DateTime UtcNow { get; } =
@@ -387,10 +505,10 @@ namespace MyDmsVn.Server.Application.Tests
             public Task<int> InsertCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
                 InsertOrThrow(customer, 1);
 
-            public Task<bool> UpdateProductAsync(Product product, CancellationToken cancellationToken)
+            public Task<Product?> UpdateProductAsync(Product product, CancellationToken cancellationToken)
             {
                 UpdatedProduct = product;
-                return Task.FromResult(ProductUpdateFound);
+                return Task.FromResult(ProductUpdateFound ? product : null);
             }
 
             public Task<bool> SetProductActiveAsync(
@@ -405,11 +523,11 @@ namespace MyDmsVn.Server.Application.Tests
                 return Task.FromResult(ProductActiveFound);
             }
 
-            public Task<bool> UpdateWarehouseAsync(Warehouse entity, CancellationToken token) => Task.FromResult(true);
+            public Task<Warehouse?> UpdateWarehouseAsync(Warehouse entity, CancellationToken token) => Task.FromResult<Warehouse?>(entity);
             public Task<bool> SetWarehouseActiveAsync(int id, bool active, DateTime at, int? by, CancellationToken token) => Task.FromResult(true);
-            public Task<bool> UpdateEmployeeAsync(Employee entity, CancellationToken token) => Task.FromResult(true);
+            public Task<Employee?> UpdateEmployeeAsync(Employee entity, CancellationToken token) => Task.FromResult<Employee?>(entity);
             public Task<bool> SetEmployeeActiveAsync(int id, bool active, DateTime at, int? by, CancellationToken token) => Task.FromResult(true);
-            public Task<bool> UpdateCustomerAsync(Customer entity, CancellationToken token) => Task.FromResult(true);
+            public Task<Customer?> UpdateCustomerAsync(Customer entity, CancellationToken token) => Task.FromResult<Customer?>(entity);
             public Task<bool> SetCustomerActiveAsync(int id, bool active, DateTime at, int? by, CancellationToken token) => Task.FromResult(true);
 
             private Task<int> InsertOrThrow(object entity, int id)
@@ -427,6 +545,8 @@ namespace MyDmsVn.Server.Application.Tests
         {
             public CatalogListRequest? LastListRequest { get; private set; }
             public CatalogLookupRequest? LastLookupRequest { get; private set; }
+            public Exception? GetByIdFailure { get; set; }
+            public int GetByIdCalls { get; private set; }
 
             public Task<PagedResult<ProductDto>> ListAsync(
                 CatalogListRequest request,
@@ -441,8 +561,16 @@ namespace MyDmsVn.Server.Application.Tests
                         30));
             }
 
-            public Task<ProductDto?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
-                Task.FromResult<ProductDto?>(null);
+            public Task<ProductDto?> GetByIdAsync(int id, CancellationToken cancellationToken)
+            {
+                GetByIdCalls++;
+                if (GetByIdFailure != null)
+                {
+                    throw GetByIdFailure;
+                }
+
+                return Task.FromResult<ProductDto?>(null);
+            }
 
             public Task<IReadOnlyList<CatalogLookupDto>> LookupAsync(
                 CatalogLookupRequest request,

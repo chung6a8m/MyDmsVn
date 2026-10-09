@@ -358,23 +358,23 @@ namespace MyDmsVn.Desktop.Tests
 
             public Task<int> InsertProductAsync(Product product, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
-            public Task<bool> UpdateProductAsync(Product product, CancellationToken cancellationToken) =>
+            public Task<Product?> UpdateProductAsync(Product product, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
             public Task<int> InsertWarehouseAsync(Warehouse warehouse, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
-            public Task<bool> UpdateWarehouseAsync(Warehouse warehouse, CancellationToken cancellationToken) =>
+            public Task<Warehouse?> UpdateWarehouseAsync(Warehouse warehouse, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
             public Task<bool> SetWarehouseActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
             public Task<int> InsertEmployeeAsync(Employee employee, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
-            public Task<bool> UpdateEmployeeAsync(Employee employee, CancellationToken cancellationToken) =>
+            public Task<Employee?> UpdateEmployeeAsync(Employee employee, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
             public Task<bool> SetEmployeeActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
             public Task<int> InsertCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
-            public Task<bool> UpdateCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
+            public Task<Customer?> UpdateCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
             public Task<bool> SetCustomerActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();

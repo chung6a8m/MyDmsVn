@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Server.Application.Catalog;
@@ -27,11 +28,12 @@ internal sealed class SqlCatalogWriteRepository : ICatalogWriteRepository
             cancellationToken);
     }
 
-    public Task<bool> UpdateProductAsync(Product product, CancellationToken cancellationToken)
+    public Task<Product?> UpdateProductAsync(Product product, CancellationToken cancellationToken)
     {
         return UpdateWithConflictTranslationAsync(
             product,
             CatalogRepoDbWriteFields.ProductUpdate,
+            product.Id,
             cancellationToken);
     }
 
@@ -60,8 +62,8 @@ internal sealed class SqlCatalogWriteRepository : ICatalogWriteRepository
             warehouse, CatalogRepoDbWriteFields.WarehouseCreate, cancellationToken);
     }
 
-    public Task<bool> UpdateWarehouseAsync(Warehouse warehouse, CancellationToken cancellationToken) =>
-        UpdateWithConflictTranslationAsync(warehouse, CatalogRepoDbWriteFields.WarehouseUpdate, cancellationToken);
+    public Task<Warehouse?> UpdateWarehouseAsync(Warehouse warehouse, CancellationToken cancellationToken) =>
+        UpdateWithConflictTranslationAsync(warehouse, CatalogRepoDbWriteFields.WarehouseUpdate, warehouse.Id, cancellationToken);
 
     public Task<bool> SetWarehouseActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
         UpdateAsync(new Warehouse { Id = id, IsActive = isActive, UpdatedAtUtc = updatedAtUtc, UpdatedByUserId = updatedByUserId }, CatalogRepoDbWriteFields.WarehouseActiveUpdate, cancellationToken);
@@ -71,7 +73,7 @@ internal sealed class SqlCatalogWriteRepository : ICatalogWriteRepository
         return InsertEmployeeWithConflictTranslationAsync(employee, cancellationToken);
     }
 
-    public Task<bool> UpdateEmployeeAsync(Employee employee, CancellationToken cancellationToken) =>
+    public Task<Employee?> UpdateEmployeeAsync(Employee employee, CancellationToken cancellationToken) =>
         UpdateEmployeeWithConflictTranslationAsync(employee, cancellationToken);
 
     public Task<bool> SetEmployeeActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
@@ -83,8 +85,8 @@ internal sealed class SqlCatalogWriteRepository : ICatalogWriteRepository
             customer, CatalogRepoDbWriteFields.CustomerCreate, cancellationToken);
     }
 
-    public Task<bool> UpdateCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
-        UpdateWithConflictTranslationAsync(customer, CatalogRepoDbWriteFields.CustomerUpdate, cancellationToken);
+    public Task<Customer?> UpdateCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
+        UpdateWithConflictTranslationAsync(customer, CatalogRepoDbWriteFields.CustomerUpdate, customer.Id, cancellationToken);
 
     public Task<bool> SetCustomerActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
         UpdateAsync(new Customer { Id = id, IsActive = isActive, UpdatedAtUtc = updatedAtUtc, UpdatedByUserId = updatedByUserId }, CatalogRepoDbWriteFields.CustomerActiveUpdate, cancellationToken);
@@ -144,11 +146,11 @@ internal sealed class SqlCatalogWriteRepository : ICatalogWriteRepository
         }
     }
 
-    private async Task<bool> UpdateEmployeeWithConflictTranslationAsync(Employee employee, CancellationToken cancellationToken)
+    private async Task<Employee?> UpdateEmployeeWithConflictTranslationAsync(Employee employee, CancellationToken cancellationToken)
     {
         try
         {
-            return await UpdateAsync(employee, CatalogRepoDbWriteFields.EmployeeUpdate, cancellationToken).ConfigureAwait(false);
+            return await UpdateAndReloadAsync(employee, CatalogRepoDbWriteFields.EmployeeUpdate, employee.Id, cancellationToken).ConfigureAwait(false);
         }
         catch (SqlException exception) when (exception.Number == 2601 || exception.Number == 2627)
         {
@@ -163,20 +165,47 @@ internal sealed class SqlCatalogWriteRepository : ICatalogWriteRepository
         }
     }
 
-    private async Task<bool> UpdateWithConflictTranslationAsync<TEntity>(
+    private async Task<TEntity?> UpdateWithConflictTranslationAsync<TEntity>(
         TEntity entity,
         IEnumerable<Field> fields,
+        object primaryKey,
         CancellationToken cancellationToken)
         where TEntity : class
     {
         try
         {
-            return await UpdateAsync(entity, fields, cancellationToken).ConfigureAwait(false);
+            return await UpdateAndReloadAsync(entity, fields, primaryKey, cancellationToken).ConfigureAwait(false);
         }
         catch (SqlException exception) when (exception.Number == 2601 || exception.Number == 2627)
         {
             throw new CatalogWriteConflictException(CatalogWriteConflict.DuplicateCode);
         }
+    }
+
+    private async Task<TEntity?> UpdateAndReloadAsync<TEntity>(
+        TEntity entity,
+        IEnumerable<Field> fields,
+        object primaryKey,
+        CancellationToken cancellationToken)
+        where TEntity : class
+    {
+        var transaction = _context.Transaction
+            ?? throw new InvalidOperationException("Catalog writes require an active transaction.");
+        var affected = await _context.Connection.UpdateAsync(
+            entity,
+            fields: fields,
+            transaction: transaction,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (affected != 1)
+        {
+            return null;
+        }
+
+        var rows = await _context.Connection.QueryAsync<TEntity>(
+            primaryKey,
+            transaction: transaction,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        return rows.SingleOrDefault();
     }
 
     private async Task<bool> UpdateAsync<TEntity>(

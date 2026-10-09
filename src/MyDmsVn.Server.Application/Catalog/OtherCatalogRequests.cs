@@ -65,9 +65,11 @@ internal sealed class SaveWarehouseRequestValidator : AbstractValidator<SaveWare
     public SaveWarehouseRequestValidator()
     {
         RuleFor(request => request.Code).Must(CatalogValidation.HasDisplayText)
-            .WithErrorCode("Validation.Required").MaximumLength(32).WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.Required").MaximumLength(32).WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters).WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Name).Must(CatalogValidation.HasDisplayText)
-            .WithErrorCode("Validation.Required").MaximumLength(256).WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.Required").MaximumLength(256).WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters).WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Address).MaximumLength(500).WithErrorCode("Validation.MaximumLength");
     }
 }
@@ -83,9 +85,11 @@ internal sealed class SaveCustomerRequestValidator : AbstractValidator<SaveCusto
     public SaveCustomerRequestValidator()
     {
         RuleFor(request => request.Code).Must(CatalogValidation.HasDisplayText)
-            .WithErrorCode("Validation.Required").MaximumLength(32).WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.Required").MaximumLength(32).WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters).WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Name).Must(CatalogValidation.HasDisplayText)
-            .WithErrorCode("Validation.Required").MaximumLength(256).WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.Required").MaximumLength(256).WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters).WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Address).MaximumLength(500).WithErrorCode("Validation.MaximumLength");
         RuleFor(request => request.Phone).MaximumLength(64).WithErrorCode("Validation.MaximumLength");
         RuleFor(request => request.TaxCode).MaximumLength(32).WithErrorCode("Validation.MaximumLength");
@@ -174,9 +178,11 @@ internal sealed class SaveEmployeeRequestValidator : AbstractValidator<SaveEmplo
     public SaveEmployeeRequestValidator()
     {
         RuleFor(request => request.Code).Must(CatalogValidation.HasDisplayText)
-            .WithErrorCode("Validation.Required").MaximumLength(32).WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.Required").MaximumLength(32).WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters).WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Name).Must(CatalogValidation.HasDisplayText)
-            .WithErrorCode("Validation.Required").MaximumLength(256).WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.Required").MaximumLength(256).WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters).WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Phone).MaximumLength(64).WithErrorCode("Validation.MaximumLength");
         RuleFor(request => request.UserId).GreaterThan(0).When(request => request.UserId.HasValue)
             .WithErrorCode("Validation.GreaterThan");

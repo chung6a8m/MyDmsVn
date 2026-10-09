@@ -84,17 +84,23 @@ internal sealed class SaveProductRequestValidator : AbstractValidator<SaveProduc
             .Must(CatalogValidation.HasDisplayText)
             .WithErrorCode("Validation.Required")
             .MaximumLength(32)
-            .WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters)
+            .WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Name)
             .Must(CatalogValidation.HasDisplayText)
             .WithErrorCode("Validation.Required")
             .MaximumLength(256)
-            .WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters)
+            .WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Unit)
             .Must(CatalogValidation.HasDisplayText)
             .WithErrorCode("Validation.Required")
             .MaximumLength(32)
-            .WithErrorCode("Validation.MaximumLength");
+            .WithErrorCode("Validation.MaximumLength")
+            .Must(CatalogValidation.HasSupportedSearchCharacters)
+            .WithErrorCode("Validation.InvalidCharacter");
     }
 }
 
@@ -227,16 +233,13 @@ internal sealed class UpdateProductCommandHandler
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
     private readonly IUtcClock _clock;
-    private readonly IProductQueryService _queryService;
 
     public UpdateProductCommandHandler(
         IUnitOfWorkFactory unitOfWorkFactory,
-        IUtcClock clock,
-        IProductQueryService queryService)
+        IUtcClock clock)
     {
         _unitOfWorkFactory = unitOfWorkFactory;
         _clock = clock;
-        _queryService = queryService;
     }
 
     public async Task<ErrorOr<ProductDto>> Handle(
@@ -257,15 +260,17 @@ internal sealed class UpdateProductCommandHandler
         unitOfWork.BeginTransaction();
         try
         {
-            var found = await unitOfWork.Repository<ICatalogWriteRepository>()
+            var persisted = await unitOfWork.Repository<ICatalogWriteRepository>()
                 .UpdateProductAsync(product, cancellationToken)
                 .ConfigureAwait(false);
-            if (!found)
+            if (persisted == null)
             {
                 return Error.NotFound("Product.NotFound", "The product was not found.");
             }
 
+            var response = new ProductDto(persisted.Id, persisted.Code, persisted.Name, persisted.Unit, persisted.IsActive);
             unitOfWork.Commit();
+            return response;
         }
         catch (CatalogWriteConflictException exception)
             when (exception.Conflict == CatalogWriteConflict.DuplicateCode)
@@ -273,9 +278,6 @@ internal sealed class UpdateProductCommandHandler
             return Error.Conflict("Product.DuplicateCode", "A product with this code already exists.");
         }
 
-        var persisted = await _queryService.GetByIdAsync(product.Id, cancellationToken).ConfigureAwait(false);
-        if (persisted == null) return Error.Unexpected("Product.ReadAfterWriteFailed", "The updated product could not be reloaded.");
-        return persisted;
     }
 }
 

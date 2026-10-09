@@ -31,15 +31,15 @@ internal sealed class WarehouseFeatureHandlers :
         uow.BeginTransaction();
         try
         {
-            if (!await uow.Repository<ICatalogWriteRepository>().UpdateWarehouseAsync(entity, cancellationToken).ConfigureAwait(false))
+            var persisted = await uow.Repository<ICatalogWriteRepository>().UpdateWarehouseAsync(entity, cancellationToken).ConfigureAwait(false);
+            if (persisted == null)
                 return Error.NotFound("Warehouse.NotFound", "The warehouse was not found.");
+            var response = new WarehouseDto(persisted.Id, persisted.Code, persisted.Name, persisted.Address, persisted.IsActive);
             uow.Commit();
+            return response;
         }
         catch (CatalogWriteConflictException)
         { return Error.Conflict("Warehouse.DuplicateCode", "A warehouse with this code already exists."); }
-        var persisted = await _queries.GetByIdAsync(entity.Id, cancellationToken).ConfigureAwait(false);
-        if (persisted == null) return Error.Unexpected("Warehouse.ReadAfterWriteFailed", "The updated warehouse could not be reloaded.");
-        return persisted;
     }
 
     public async Task<ErrorOr<UnitResponse>> Handle(SetWarehouseActiveCommand command, CancellationToken cancellationToken)
@@ -88,15 +88,15 @@ internal sealed class EmployeeFeatureHandlers :
         uow.BeginTransaction();
         try
         {
-            if (!await uow.Repository<ICatalogWriteRepository>().UpdateEmployeeAsync(entity, cancellationToken).ConfigureAwait(false))
+            var persisted = await uow.Repository<ICatalogWriteRepository>().UpdateEmployeeAsync(entity, cancellationToken).ConfigureAwait(false);
+            if (persisted == null)
                 return Error.NotFound("Employee.NotFound", "The employee was not found.");
+            var response = new EmployeeDto(persisted.Id, persisted.Code, persisted.Name, persisted.Phone, persisted.UserId, persisted.IsActive);
             uow.Commit();
+            return response;
         }
         catch (CatalogWriteConflictException exception)
         { return MapEmployeeConflict(exception.Conflict); }
-        var persisted = await _queries.GetByIdAsync(entity.Id, cancellationToken).ConfigureAwait(false);
-        if (persisted == null) return Error.Unexpected("Employee.ReadAfterWriteFailed", "The updated employee could not be reloaded.");
-        return persisted;
     }
 
     public async Task<ErrorOr<UnitResponse>> Handle(SetEmployeeActiveCommand command, CancellationToken cancellationToken)
@@ -152,15 +152,15 @@ internal sealed class CustomerFeatureHandlers :
         uow.BeginTransaction();
         try
         {
-            if (!await uow.Repository<ICatalogWriteRepository>().UpdateCustomerAsync(entity, cancellationToken).ConfigureAwait(false))
+            var persisted = await uow.Repository<ICatalogWriteRepository>().UpdateCustomerAsync(entity, cancellationToken).ConfigureAwait(false);
+            if (persisted == null)
                 return Error.NotFound("Customer.NotFound", "The customer was not found.");
+            var response = new CustomerDto(persisted.Id, persisted.Code, persisted.Name, persisted.Address, persisted.Phone, persisted.TaxCode, persisted.IsActive);
             uow.Commit();
+            return response;
         }
         catch (CatalogWriteConflictException)
         { return Error.Conflict("Customer.DuplicateCode", "A customer with this code already exists."); }
-        var persisted = await _queries.GetByIdAsync(entity.Id, cancellationToken).ConfigureAwait(false);
-        if (persisted == null) return Error.Unexpected("Customer.ReadAfterWriteFailed", "The updated customer could not be reloaded.");
-        return persisted;
     }
 
     public async Task<ErrorOr<UnitResponse>> Handle(SetCustomerActiveCommand command, CancellationToken cancellationToken)
