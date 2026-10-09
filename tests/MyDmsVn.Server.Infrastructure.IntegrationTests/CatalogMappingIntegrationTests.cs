@@ -5,10 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
+using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Domain.Catalog;
-using MyDmsVn.Server.Infrastructure.Catalog;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using RepoDb;
 using Xunit;
@@ -18,7 +18,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class CatalogMappingIntegrationTests
 {
     [SqlServerFact]
-    public async Task Catalog_inserts_use_database_creation_time_instead_of_entity_creation_time()
+    public async Task Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time()
     {
         var database = await SqlTestDatabase.CreateAsync(
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
@@ -36,6 +36,7 @@ public sealed class CatalogMappingIntegrationTests
             unitOfWork.BeginTransaction();
             var context = Assert.IsAssignableFrom<ISqlExecutionContext>(unitOfWork);
             var transaction = Assert.IsAssignableFrom<IDbTransaction>(context.Transaction);
+            var repository = unitOfWork.Repository<ICatalogWriteRepository>();
             var staleEntityCreationUtc = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
             var product = new Product
             {
@@ -66,26 +67,10 @@ public sealed class CatalogMappingIntegrationTests
                 "SELECT SYSUTCDATETIME();",
                 transaction: transaction);
 
-            var productId = await context.Connection.InsertAsync<Product, int>(
-                product,
-                fields: CatalogRepoDbWriteFields.ProductCreate,
-                transaction: transaction,
-                cancellationToken: CancellationToken.None);
-            var warehouseId = await context.Connection.InsertAsync<Warehouse, int>(
-                warehouse,
-                fields: CatalogRepoDbWriteFields.WarehouseCreate,
-                transaction: transaction,
-                cancellationToken: CancellationToken.None);
-            var employeeId = await context.Connection.InsertAsync<Employee, int>(
-                employee,
-                fields: CatalogRepoDbWriteFields.EmployeeCreate,
-                transaction: transaction,
-                cancellationToken: CancellationToken.None);
-            var customerId = await context.Connection.InsertAsync<Customer, int>(
-                customer,
-                fields: CatalogRepoDbWriteFields.CustomerCreate,
-                transaction: transaction,
-                cancellationToken: CancellationToken.None);
+            var productId = await repository.InsertProductAsync(product, CancellationToken.None);
+            var warehouseId = await repository.InsertWarehouseAsync(warehouse, CancellationToken.None);
+            var employeeId = await repository.InsertEmployeeAsync(employee, CancellationToken.None);
+            var customerId = await repository.InsertCustomerAsync(customer, CancellationToken.None);
             var afterInsertUtc = await context.Connection.QuerySingleAsync<DateTime>(
                 "SELECT SYSUTCDATETIME();",
                 transaction: transaction);
@@ -113,7 +98,7 @@ public sealed class CatalogMappingIntegrationTests
     }
 
     [SqlServerFact]
-    public async Task Catalog_entities_round_trip_through_registered_RepoDb_mappings()
+    public async Task Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings()
     {
         var database = await SqlTestDatabase.CreateAsync(
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);

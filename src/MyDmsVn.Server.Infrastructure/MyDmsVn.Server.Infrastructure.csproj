@@ -14,7 +14,4 @@
     <ProjectReference Include="..\MyDmsVn.Server.Application\MyDmsVn.Server.Application.csproj" />
     <ProjectReference Include="..\MyDmsVn.Server.Domain\MyDmsVn.Server.Domain.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="MyDmsVn.Server.Infrastructure.IntegrationTests" />
-  </ItemGroup>
 </Project>

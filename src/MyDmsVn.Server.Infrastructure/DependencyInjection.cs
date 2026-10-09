@@ -3,6 +3,7 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Security;
@@ -54,7 +55,8 @@ namespace MyDmsVn.Server.Infrastructure
                     serviceProvider,
                     registrations);
             });
-            return new SqlPersistenceBuilder(services);
+            return new SqlPersistenceBuilder(services)
+                .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>();
         }
     }
 }
