@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
@@ -34,11 +34,12 @@ public sealed class DatabaseMigrationTests
             var second = migrator.Migrate(database.ConnectionString);
 
             Assert.True(first.Successful, first.Error?.ToString());
-            Assert.Equal(2, first.Scripts.Count());
+            Assert.Equal(3, first.Scripts.Count());
             Assert.Collection(
                 first.Scripts.OrderBy(script => script.Name, StringComparer.Ordinal),
                 script => Assert.EndsWith("001_PersistenceFoundation.sql", script.Name, StringComparison.Ordinal),
-                script => Assert.EndsWith("002_Identity.sql", script.Name, StringComparison.Ordinal));
+                script => Assert.EndsWith("002_Identity.sql", script.Name, StringComparison.Ordinal),
+                script => Assert.EndsWith("003_Catalog.sql", script.Name, StringComparison.Ordinal));
             Assert.True(second.Successful, second.Error?.ToString());
             Assert.Empty(second.Scripts);
 
@@ -48,7 +49,7 @@ public sealed class DatabaseMigrationTests
             var historyCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;");
             Assert.Equal(0, tableCount);
-            Assert.Equal(2, historyCount);
+            Assert.Equal(3, historyCount);
         }
         finally
         {
@@ -97,6 +98,233 @@ public sealed class DatabaseMigrationTests
                 DisplayName = "Duplicate",
             }));
             Assert.Contains(duplicate.Number, new[] { 2601, 2627 });
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Catalog_migration_creates_empty_tables_and_enforces_code_uniqueness_and_employee_user_fk()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            var catalogTableCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE name IN " +
+                "(N'Products', N'Warehouses', N'Employees', N'Customers');");
+            Assert.Equal(4, catalogTableCount);
+
+            var seededRowCount = await connection.QuerySingleAsync<int>(
+                "SELECT " +
+                "(SELECT COUNT(*) FROM dbo.Products) + " +
+                "(SELECT COUNT(*) FROM dbo.Warehouses) + " +
+                "(SELECT COUNT(*) FROM dbo.Employees) + " +
+                "(SELECT COUNT(*) FROM dbo.Customers);");
+            Assert.Equal(0, seededRowCount);
+
+            var uniqueCodeIndexCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.indexes WHERE is_unique = 1 AND name IN " +
+                "(N'UX_Products_Code', N'UX_Warehouses_Code', N'UX_Employees_Code', N'UX_Customers_Code');");
+            Assert.Equal(4, uniqueCodeIndexCount);
+
+            var auditColumnCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.columns AS columns " +
+                "INNER JOIN sys.tables AS tables ON tables.object_id = columns.object_id " +
+                "WHERE tables.name IN (N'Products', N'Warehouses', N'Employees', N'Customers') AND (" +
+                "(columns.name = N'CreatedAtUtc' AND TYPE_NAME(columns.user_type_id) = N'datetime2' " +
+                "AND columns.scale = 7 AND columns.is_nullable = 0) OR " +
+                "(columns.name = N'CreatedByUserId' AND TYPE_NAME(columns.user_type_id) = N'int' " +
+                "AND columns.is_nullable = 1) OR " +
+                "(columns.name = N'UpdatedAtUtc' AND TYPE_NAME(columns.user_type_id) = N'datetime2' " +
+                "AND columns.scale = 7 AND columns.is_nullable = 1) OR " +
+                "(columns.name = N'UpdatedByUserId' AND TYPE_NAME(columns.user_type_id) = N'int' " +
+                "AND columns.is_nullable = 1));");
+            Assert.Equal(16, auditColumnCount);
+
+            var catalogSpecificTypeCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.columns AS columns " +
+                "INNER JOIN sys.tables AS tables ON tables.object_id = columns.object_id " +
+                "WHERE " +
+                "(tables.name = N'Products' AND columns.name = N'Unit' " +
+                "AND TYPE_NAME(columns.user_type_id) = N'nvarchar' AND columns.max_length = 64) OR " +
+                "(tables.name = N'Warehouses' AND columns.name = N'Address' " +
+                "AND TYPE_NAME(columns.user_type_id) = N'nvarchar' AND columns.max_length = 1000 " +
+                "AND columns.is_nullable = 1) OR " +
+                "(tables.name = N'Employees' AND columns.name = N'UserId' " +
+                "AND TYPE_NAME(columns.user_type_id) = N'int' AND columns.is_nullable = 1) OR " +
+                "(tables.name = N'Customers' AND columns.name = N'TaxCode' " +
+                "AND TYPE_NAME(columns.user_type_id) = N'nvarchar' AND columns.max_length = 64 " +
+                "AND columns.is_nullable = 1);");
+            Assert.Equal(4, catalogSpecificTypeCount);
+
+            const string insertProduct =
+                "INSERT dbo.Products (Code, Name, Unit, IsActive, CreatedByUserId) " +
+                "VALUES (@Code, @Name, @Unit, 1, NULL);";
+            await connection.ExecuteAsync(insertProduct, new
+            {
+                Code = "SP001",
+                Name = "San pham 1",
+                Unit = "Cai",
+            });
+            var duplicate = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(insertProduct, new
+                {
+                    Code = "sp001",
+                    Name = "San pham trung",
+                    Unit = "Cai",
+                }));
+            Assert.Contains(duplicate.Number, new[] { 2601, 2627 });
+
+            await connection.ExecuteAsync(
+                "INSERT dbo.Employees (Code, Name, UserId, IsActive, CreatedByUserId) " +
+                "VALUES (N'NV001', N'Nhan vien 1', NULL, 1, NULL);");
+            var foreignKeyViolation = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(
+                    "INSERT dbo.Employees (Code, Name, UserId, IsActive, CreatedByUserId) " +
+                    "VALUES (N'NV002', N'Nhan vien 2', 2147483647, 1, NULL);"));
+            Assert.Equal(547, foreignKeyViolation.Number);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Catalog_required_text_rejects_display_whitespace_only_values()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            var invalidInserts = new[]
+            {
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (NCHAR(9), N'Product', N'Each');",
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P-NAME', NCHAR(10), N'Each');",
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P-UNIT', N'Product', NCHAR(13));",
+                "INSERT dbo.Warehouses (Code, Name) VALUES (NCHAR(11), N'Warehouse');",
+                "INSERT dbo.Warehouses (Code, Name) VALUES (N'W-NAME', NCHAR(12));",
+                "INSERT dbo.Employees (Code, Name) VALUES (NCHAR(13), N'Employee');",
+                "INSERT dbo.Employees (Code, Name) VALUES (N'E-NAME', NCHAR(160));",
+                "INSERT dbo.Customers (Code, Name) VALUES (NCHAR(160), N'Customer');",
+                "INSERT dbo.Customers (Code, Name) VALUES (N'C-NAME', NCHAR(9) + NCHAR(10));",
+            };
+
+            foreach (var invalidInsert in invalidInserts)
+            {
+                var violation = await Assert.ThrowsAsync<SqlException>(
+                    () => connection.ExecuteAsync(invalidInsert));
+                Assert.Equal(547, violation.Number);
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Every_catalog_code_is_unique_case_and_accent_insensitively()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            var catalogInserts = new[]
+            {
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (@Code, @Name, @Unit);",
+                "INSERT dbo.Warehouses (Code, Name) VALUES (@Code, @Name);",
+                "INSERT dbo.Employees (Code, Name) VALUES (@Code, @Name);",
+                "INSERT dbo.Customers (Code, Name) VALUES (@Code, @Name);",
+            };
+
+            foreach (var catalogInsert in catalogInserts)
+            {
+                await connection.ExecuteAsync(catalogInsert, new
+                {
+                    Code = "MÃ-01",
+                    Name = "First row",
+                    Unit = "Each-1",
+                });
+                var duplicate = await Assert.ThrowsAsync<SqlException>(
+                    () => connection.ExecuteAsync(catalogInsert, new
+                    {
+                        Code = "ma-01",
+                        Name = "Second row",
+                        Unit = "Each-2",
+                    }));
+                Assert.Contains(duplicate.Number, new[] { 2601, 2627 });
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Employee_user_link_allows_many_nulls_but_only_one_employee_per_user()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            var userId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Users " +
+                "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, " +
+                "PasswordAlgorithm, IsActive) " +
+                "OUTPUT INSERTED.UserId " +
+                "VALUES (N'catalog-user', N'CATALOG-USER', N'Catalog User', N'Local', N'hash', N'', " +
+                "N'BCrypt', 1);");
+            const string insertEmployee =
+                "INSERT dbo.Employees (Code, Name, UserId) VALUES (@Code, @Name, @UserId);";
+
+            await connection.ExecuteAsync(insertEmployee, new
+            {
+                Code = "NV-LINK-1",
+                Name = "Linked Employee 1",
+                UserId = (int?)userId,
+            });
+            var duplicateLink = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(insertEmployee, new
+                {
+                    Code = "NV-LINK-2",
+                    Name = "Linked Employee 2",
+                    UserId = (int?)userId,
+                }));
+            Assert.Contains(duplicateLink.Number, new[] { 2601, 2627 });
+
+            await connection.ExecuteAsync(insertEmployee, new
+            {
+                Code = "NV-NULL-1",
+                Name = "Unlinked Employee 1",
+                UserId = (int?)null,
+            });
+            await connection.ExecuteAsync(insertEmployee, new
+            {
+                Code = "NV-NULL-2",
+                Name = "Unlinked Employee 2",
+                UserId = (int?)null,
+            });
+            var unlinkedCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.Employees WHERE UserId IS NULL;");
+            Assert.Equal(2, unlinkedCount);
         }
         finally
         {

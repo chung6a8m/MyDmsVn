@@ -3,9 +3,11 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Security;
+using MyDmsVn.Server.Infrastructure.Catalog;
 using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Persistence;
 
@@ -31,6 +33,8 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.TryAddScoped<SqlIdentityStore>();
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IRepoDbMapping, CatalogRepoDbMapping>());
             services.Replace(
                 ServiceDescriptor.Scoped<IUserStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
@@ -51,7 +55,8 @@ namespace MyDmsVn.Server.Infrastructure
                     serviceProvider,
                     registrations);
             });
-            return new SqlPersistenceBuilder(services);
+            return new SqlPersistenceBuilder(services)
+                .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>();
         }
     }
 }

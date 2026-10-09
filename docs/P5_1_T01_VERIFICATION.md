@@ -1,0 +1,38 @@
+# P5.1-T01 catalog schema and mapping verification
+
+Date: 2026-10-09
+
+## Scope
+
+P5.1-T01 adds only the Product, Warehouse, Employee and Customer persistence foundation: an additive DbUp migration, Domain entities, an Application repository contract, explicit RepoDb mappings/write implementation and SQL integration coverage. Commands, queries, permissions, Local adapters and WinForms screens remain for P5.1-T02 and later tasks.
+
+## Schema and mapping decisions
+
+- Catalog primary keys are `int IDENTITY` values and codes are `nvarchar(32)` with explicit `Latin1_General_100_CI_AI` collation and unique indexes.
+- Mutable catalog rows carry `IsActive` plus nullable user audit identifiers and UTC `datetime2(7)` timestamps consistent with the Identity schema.
+- `Employees.UserId` is a nullable FK to `dbo.Users(UserId)` and has a filtered unique index to preserve the documented zero-or-one employee relationship for a user.
+- The production migration seeds no Product, Warehouse, Employee or Customer rows.
+- `CatalogRepoDbMapping` explicitly maps every Domain property, SQL `DbType`, table, primary key and identity column, and is registered once through SQL persistence composition. Audit timestamps use `DbType.DateTime2` so RepoDb preserves `datetime2(7)` precision. The registered `ICatalogWriteRepository` is the production create boundary resolved from the explicit UnitOfWork; its RepoDb implementation always uses targeted field sets that omit the database-generated `CreatedAtUtc` and update-only audit columns.
+
+## Automated evidence
+
+- The catalog migration test was observed failing with zero catalog tables before `003_Catalog.sql` was added, then passing after implementation.
+- The RepoDb round-trip test was observed failing against the inferred `Product` table before mapping registration, then passing after explicit mappings were added.
+- A mutation that changed `UX_Customers_Code` from unique to non-unique made the catalog schema test fail with 3 rather than 4 unique code indexes; restoring the constraint returned the test to green.
+- The final review's timestamp regression was observed failing for all four entities because RepoDb inferred legacy SQL `datetime`; explicit `DbType.DateTime2` mappings made the fractional-tick audit assertions pass.
+- PR review round 1 reproduced minimal RepoDb inserts persisting `IsActive = false`; Domain entities now initialize `IsActive = true`, and the persisted behavior is covered for all four catalogs.
+- PR review round 2 reproduced RepoDb persisting a stale entity-construction timestamp for all four catalogs. Domain entities no longer initialize `CreatedAtUtc`; shared create field sets omit that column so SQL Server assigns `SYSUTCDATETIME()` at insert time. The regression test deliberately supplies a timestamp from 2000 and verifies the persisted values fall within the database-write window.
+- PR review round 3 reproduced the same stale timestamp through an unrestricted direct RepoDb insert. The regression test now resolves the registered `ICatalogWriteRepository` through the UnitOfWork and exercises all four production create methods. A mutation that removed `fields` from the repository made all four rows persist the year-2000 timestamp, proving the production-boundary test guards the required policy.
+- SQL constraints reject required values made only from spaces, tab, LF, CR, vertical-tab, form-feed or non-breaking spaces.
+- Behavioral tests exercise case- and accent-insensitive duplicate codes independently on all four catalog tables. Mutation checks proved the tests fail when a named unique index targets the wrong column.
+- The filtered unique employee/user relationship is covered with a valid User: a duplicate non-null link is rejected while multiple null links remain allowed. A mutation check proved the test fails when the index loses uniqueness.
+- SQL integration suite: 58/58 passed on `net48` and 58/58 passed on `net8.0`, using disposable `MyDmsVn_Test_<guid>` databases configured by `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING`.
+- `dotnet restore MyDmsVn.sln --locked-mode`: passed.
+- `dotnet build MyDmsVn.sln -c Release --no-restore`: passed with 0 warnings and 0 errors across `net48`, `net8.0` and `net8.0-windows` targets.
+- `dotnet test MyDmsVn.sln -c Release --no-build --no-restore`: passed 359/359 target-specific test executions with 0 failures and 0 skips.
+
+No manual GUI smoke was required because P5.1-T01 changes no desktop behavior.
+
+## Remaining work
+
+P5.1-T02 is next: catalog commands, validators, deterministic Dapper queries, authorization/audit behavior and Local `ApiResponse<T>` adapters. P5.1 UI and gate scenarios remain unchecked.

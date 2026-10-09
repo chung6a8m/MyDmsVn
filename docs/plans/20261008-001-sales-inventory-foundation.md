@@ -1,6 +1,6 @@
-# P5 — Sales & Inventory Foundation (detailed implementation plan)
+﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **Not started**. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 completed on 2026-10-09; P5.1-T02 is next. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -9,9 +9,9 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 ## P5.1 — Master Data
 
 ### P5.1-T01 — Schema + mappings
-- [ ] Add DbUp migration(s) for Products, Warehouses, Employees, Customers; unique Code indexes, IsActive, audit fields and FK Employee.UserId nullable.
-- [ ] Implement Domain entities and RepoDb column mappings verified against SQL names and types.
-- [ ] Seed **only test fixtures** in test setup; no production default customer/employee without a requirement.
+- [x] Add DbUp migration(s) for Products, Warehouses, Employees, Customers; unique Code indexes, IsActive, audit fields and FK Employee.UserId nullable.
+- [x] Implement Domain entities and RepoDb column mappings verified against SQL names and types.
+- [x] Seed **only test fixtures** in test setup; no production default customer/employee without a requirement. (No production catalog rows are seeded.)
 
 ### P5.1-T02 — Backend features
 - [ ] Create/Update/SetActive commands with validators and conflict codes.

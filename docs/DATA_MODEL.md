@@ -1,6 +1,6 @@
-# P5 Sales & Inventory — proposed SQL data model
+﻿# P5 Sales & Inventory — proposed SQL data model
 
-**Status:** schema blueprint. P1/P5 DbUp scripts are the implementation source of truth once written. The business ID strategy is a reversible proposal; confirm it before SQL baseline migration is frozen.
+**Status:** schema blueprint. `003_Catalog.sql` is now the implementation source of truth for the P5.1 catalog tables; later P5 tables remain proposed until their DbUp scripts are written. The business ID strategy is a reversible proposal for those later tables.
 
 ## 1. Core entities
 
@@ -16,6 +16,8 @@
 | `StockBalances` | WarehouseId int, ProductId int, Quantity decimal(18,4), RowVersion rowversion | composite PK (WarehouseId,ProductId), FK |
 
 All mutable business tables carry `CreatedAtUtc datetime2`, `CreatedBy`, `UpdatedAtUtc`, `UpdatedBy` (types consistent with identity model). Server-generated times stored UTC. Consider consistent column names across modules rather than mixing `InsertDate`/`CreatedAtUtc` without an explicit compatibility map.
+
+Catalog codes use explicit `Latin1_General_100_CI_AI` collation and unique indexes, so uniqueness is case- and accent-insensitive. Required catalog text rejects values made only from spaces, ASCII display-whitespace controls or non-breaking spaces at the SQL boundary. `Employees.UserId` is nullable and protected by a filtered unique index, matching the zero-or-one employee relationship for a user. Catalog migrations do not seed production rows.
 
 `StockLedger` is append-only: business operations do not update/delete historical rows. `StockBalances` is a transactional materialization of ledger totals, **not** an independent source editable by UI.
 
