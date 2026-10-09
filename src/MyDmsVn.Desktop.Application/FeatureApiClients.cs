@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using MyDmsVn.Contracts;
 
 namespace MyDmsVn.Desktop.Application
@@ -11,6 +12,7 @@ namespace MyDmsVn.Desktop.Application
         Task<ApiResponse<ProductDto>> CreateAsync(SaveProductRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<ProductDto>> UpdateAsync(int id, SaveProductRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool isActive, CancellationToken cancellationToken);
+        Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken);
     }
 
     public interface IWarehouseApiClient
@@ -20,6 +22,7 @@ namespace MyDmsVn.Desktop.Application
         Task<ApiResponse<WarehouseDto>> CreateAsync(SaveWarehouseRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<WarehouseDto>> UpdateAsync(int id, SaveWarehouseRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool isActive, CancellationToken cancellationToken);
+        Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken);
     }
 
     public interface IEmployeeApiClient
@@ -29,6 +32,7 @@ namespace MyDmsVn.Desktop.Application
         Task<ApiResponse<EmployeeDto>> CreateAsync(SaveEmployeeRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<EmployeeDto>> UpdateAsync(int id, SaveEmployeeRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool isActive, CancellationToken cancellationToken);
+        Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken);
     }
 
     public interface ICustomerApiClient
@@ -38,6 +42,7 @@ namespace MyDmsVn.Desktop.Application
         Task<ApiResponse<CustomerDto>> CreateAsync(SaveCustomerRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<CustomerDto>> UpdateAsync(int id, SaveCustomerRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool isActive, CancellationToken cancellationToken);
+        Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken);
     }
 
     public interface IGoodsReceiptApiClient

@@ -1,6 +1,6 @@
 ﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **In progress**. P5.1-T01 completed on 2026-10-09; P5.1-T02 is next. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03 is next. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -14,10 +14,10 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [x] Seed **only test fixtures** in test setup; no production default customer/employee without a requirement. (No production catalog rows are seeded.)
 
 ### P5.1-T02 — Backend features
-- [ ] Create/Update/SetActive commands with validators and conflict codes.
-- [ ] List/GetById/Lookup Dapper query services; deterministic order, paging and parameterized filtering.
-- [ ] Apply Catalog.*.Read/Write permissions and user identity audit fields.
-- [ ] Return `ApiResponse<T>` via Local adapter; no raw entity/RepoDb object escapes.
+- [x] Create/Update/SetActive commands with validators and conflict codes.
+- [x] List/GetById/Lookup Dapper query services; deterministic order, paging and parameterized filtering.
+- [x] Apply Catalog.*.Read/Write permissions and user identity audit fields.
+- [x] Return `ApiResponse<T>` via Local adapter; no raw entity/RepoDb object escapes.
 
 ### P5.1-T03 — UI
 - [ ] WinForms catalogs: list/filter, create/edit, activate/deactivate, async busy/cancel, field-level validation. All free-text List/Filter searches use the shared debouncing/cancellation pattern described in P5.1-T04.

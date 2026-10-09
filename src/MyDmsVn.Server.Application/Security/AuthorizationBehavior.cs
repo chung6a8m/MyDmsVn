@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using ErrorOr;
 using MediatR;
@@ -43,8 +43,22 @@ namespace MyDmsVn.Server.Application.Security
                     });
             }
 
+            if (!currentUser.UserId.HasValue)
+            {
+                return request.FromErrors(
+                    new[]
+                    {
+                        Error.Unauthorized(
+                            "Auth.Unauthorized",
+                            "Authentication is required."),
+                    });
+            }
+
             if (!await _authorizationService
-                    .IsAllowedAsync(authorizedRequest.PermissionKey, cancellationToken)
+                    .IsAllowedAsync(
+                        currentUser.UserId.Value,
+                        authorizedRequest.PermissionKey,
+                        cancellationToken)
                     .ConfigureAwait(false))
             {
                 return request.FromErrors(
@@ -54,6 +68,11 @@ namespace MyDmsVn.Server.Application.Security
                             "Auth.Forbidden",
                             "The operation is not permitted."),
                     });
+            }
+
+            if (authorizedRequest is IAuthorizedActorRequest actorRequest)
+            {
+                actorRequest.BindAuthorizedUser(currentUser.UserId.Value);
             }
 
             return await next().ConfigureAwait(false);

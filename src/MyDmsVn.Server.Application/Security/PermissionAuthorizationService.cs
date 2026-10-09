@@ -31,9 +31,27 @@ namespace MyDmsVn.Server.Application.Security
                 return false;
             }
 
+            return await IsAllowedAsync(
+                    currentUser.UserId.Value,
+                    permissionKey,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<bool> IsAllowedAsync(
+            int userId,
+            string permissionKey,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (userId <= 0 || !PermissionKeys.IsDeclared(permissionKey))
+            {
+                return false;
+            }
+
             var snapshot = await _permissionStore
                 .GetSnapshotAsync(
-                    currentUser.UserId.Value,
+                    userId,
                     permissionKey,
                     cancellationToken)
                 .ConfigureAwait(false);

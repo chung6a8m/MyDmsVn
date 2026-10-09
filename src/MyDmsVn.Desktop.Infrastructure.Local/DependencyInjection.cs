@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Server.Application.Identity;
@@ -19,6 +19,10 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             services.AddTransient<IFoundationApiClient, LocalFoundationApiClient>();
             services.AddTransient<IIdentityApiClient, LocalIdentityApiClient>();
             services.AddTransient<IPermissionApiClient, LocalPermissionApiClient>();
+            services.AddTransient<IProductApiClient, LocalProductApiClient>();
+            services.AddTransient<IWarehouseApiClient, LocalWarehouseApiClient>();
+            services.AddTransient<IEmployeeApiClient, LocalEmployeeApiClient>();
+            services.AddTransient<ICustomerApiClient, LocalCustomerApiClient>();
             return services;
         }
     }

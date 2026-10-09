@@ -8,6 +8,11 @@ namespace MyDmsVn.Server.Application.Security
         string PermissionKey { get; }
     }
 
+    public interface IAuthorizedActorRequest : IAuthorizedRequest
+    {
+        void BindAuthorizedUser(int userId);
+    }
+
     public interface IPermissionStore
     {
         Task<PermissionSnapshot> GetSnapshotAsync(
@@ -32,5 +37,10 @@ namespace MyDmsVn.Server.Application.Security
     public interface IPermissionAuthorizationService
     {
         Task<bool> IsAllowedAsync(string permissionKey, CancellationToken cancellationToken);
+
+        Task<bool> IsAllowedAsync(
+            int userId,
+            string permissionKey,
+            CancellationToken cancellationToken);
     }
 }

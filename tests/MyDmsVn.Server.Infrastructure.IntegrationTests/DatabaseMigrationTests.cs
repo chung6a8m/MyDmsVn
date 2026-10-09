@@ -34,12 +34,13 @@ public sealed class DatabaseMigrationTests
             var second = migrator.Migrate(database.ConnectionString);
 
             Assert.True(first.Successful, first.Error?.ToString());
-            Assert.Equal(3, first.Scripts.Count());
+            Assert.Equal(4, first.Scripts.Count());
             Assert.Collection(
                 first.Scripts.OrderBy(script => script.Name, StringComparer.Ordinal),
                 script => Assert.EndsWith("001_PersistenceFoundation.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("002_Identity.sql", script.Name, StringComparison.Ordinal),
-                script => Assert.EndsWith("003_Catalog.sql", script.Name, StringComparison.Ordinal));
+                script => Assert.EndsWith("003_Catalog.sql", script.Name, StringComparison.Ordinal),
+                script => Assert.EndsWith("004_Catalog_Nul_Constraints.sql", script.Name, StringComparison.Ordinal));
             Assert.True(second.Successful, second.Error?.ToString());
             Assert.Empty(second.Scripts);
 
@@ -49,7 +50,7 @@ public sealed class DatabaseMigrationTests
             var historyCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;");
             Assert.Equal(0, tableCount);
-            Assert.Equal(3, historyCount);
+            Assert.Equal(4, historyCount);
         }
         finally
         {
@@ -218,6 +219,42 @@ public sealed class DatabaseMigrationTests
                 "INSERT dbo.Employees (Code, Name) VALUES (N'E-NAME', NCHAR(160));",
                 "INSERT dbo.Customers (Code, Name) VALUES (NCHAR(160), N'Customer');",
                 "INSERT dbo.Customers (Code, Name) VALUES (N'C-NAME', NCHAR(9) + NCHAR(10));",
+            };
+
+            foreach (var invalidInsert in invalidInserts)
+            {
+                var violation = await Assert.ThrowsAsync<SqlException>(
+                    () => connection.ExecuteAsync(invalidInsert));
+                Assert.Equal(547, violation.Number);
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Catalog_searchable_text_rejects_nul_values_at_database_boundary()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            var invalidInserts = new[]
+            {
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P' + NCHAR(0), N'Product', N'Each');",
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P-NAME', N'Product' + NCHAR(0), N'Each');",
+                "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P-UNIT', N'Product', N'Each' + NCHAR(0));",
+                "INSERT dbo.Warehouses (Code, Name) VALUES (N'W' + NCHAR(0), N'Warehouse');",
+                "INSERT dbo.Warehouses (Code, Name) VALUES (N'W-NAME', N'Warehouse' + NCHAR(0));",
+                "INSERT dbo.Employees (Code, Name) VALUES (N'E' + NCHAR(0), N'Employee');",
+                "INSERT dbo.Employees (Code, Name) VALUES (N'E-NAME', N'Employee' + NCHAR(0));",
+                "INSERT dbo.Customers (Code, Name) VALUES (N'C' + NCHAR(0), N'Customer');",
+                "INSERT dbo.Customers (Code, Name) VALUES (N'C-NAME', N'Customer' + NCHAR(0));",
             };
 
             foreach (var invalidInsert in invalidInserts)
