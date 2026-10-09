@@ -78,6 +78,33 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Shell_reflects_shared_session_and_notification_changes()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    var notifications = new DesktopNotificationCenter();
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient(), notifications),
+                        session,
+                        notifications))
+                    {
+                        session.SetCurrentUser(
+                            new CurrentUserDto(42, "operator", "Warehouse Operator"));
+                        notifications.Publish(
+                            new DesktopNotification(
+                                DesktopNotificationKind.Success,
+                                "Signed in."));
+
+                        Assert.Equal("Warehouse Operator", shell.CurrentUserText);
+                        Assert.Equal("Signed in.", shell.StatusText);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
         private static FoundationShellForm CreateShell()
         {
             return new FoundationShellForm(new FoundationViewModel(new ReadyApiClient()));
@@ -92,6 +119,26 @@ namespace MyDmsVn.Desktop.Tests
                 return Task.FromResult(
                     ApiResponse<FoundationStatus>.Success(
                         new FoundationStatus(true, "Local")));
+            }
+        }
+
+        private sealed class TestDesktopSession : IDesktopSession
+        {
+            public event EventHandler? SessionChanged;
+
+            public bool IsAuthenticated => CurrentUser != null;
+
+            public CurrentUserDto? CurrentUser { get; private set; }
+
+            public void SignOut()
+            {
+                SetCurrentUser(null);
+            }
+
+            public void SetCurrentUser(CurrentUserDto? currentUser)
+            {
+                CurrentUser = currentUser;
+                SessionChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }

@@ -15,10 +15,35 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly FoundationViewModel _viewModel;
         private readonly ToolStripStatusLabel _statusLabel;
         private readonly ToolStripStatusLabel _currentUserLabel;
+        private readonly IDesktopSession? _session;
+        private readonly IDesktopNotificationService? _notifications;
 
         public FoundationShellForm(FoundationViewModel viewModel)
+            : this(viewModel, null, null, true)
+        {
+        }
+
+        public FoundationShellForm(
+            FoundationViewModel viewModel,
+            IDesktopSession session,
+            IDesktopNotificationService notifications)
+            : this(
+                viewModel,
+                session ?? throw new ArgumentNullException(nameof(session)),
+                notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                true)
+        {
+        }
+
+        private FoundationShellForm(
+            FoundationViewModel viewModel,
+            IDesktopSession? session,
+            IDesktopNotificationService? notifications,
+            bool initialize)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            _session = session;
+            _notifications = notifications;
 
             Text = "MyDmsVn";
             StartPosition = FormStartPosition.CenterScreen;
@@ -51,6 +76,17 @@ namespace MyDmsVn.Desktop.WinForms
             Controls.Add(Navigation);
             Controls.Add(topBar);
             Controls.Add(statusBar);
+
+            if (_session != null)
+            {
+                _session.SessionChanged += OnSessionChanged;
+                SetCurrentUser(_session.CurrentUser?.DisplayName);
+            }
+
+            if (_notifications != null)
+            {
+                _notifications.NotificationPublished += OnNotificationPublished;
+            }
         }
 
         public FoundationViewModel ViewModel => _viewModel;
@@ -111,6 +147,34 @@ namespace MyDmsVn.Desktop.WinForms
                 ? BootstrapThemeMode.Dark
                 : BootstrapThemeMode.Light;
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(nextMode);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_session != null)
+                {
+                    _session.SessionChanged -= OnSessionChanged;
+                }
+
+                if (_notifications != null)
+                {
+                    _notifications.NotificationPublished -= OnNotificationPublished;
+                }
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void OnSessionChanged(object? sender, EventArgs eventArgs)
+        {
+            SetCurrentUser(_session?.CurrentUser?.DisplayName);
+        }
+
+        private void OnNotificationPublished(object? sender, DesktopNotification notification)
+        {
+            SetStatus(notification.Message);
         }
 
         private static BootstrapSidebar CreateNavigation()

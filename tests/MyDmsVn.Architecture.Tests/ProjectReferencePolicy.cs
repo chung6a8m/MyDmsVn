@@ -21,7 +21,9 @@ namespace MyDmsVn.Architecture.Tests
                 ["MyDmsVn.Desktop.Infrastructure.Local"] = Set(
                     "MyDmsVn.Desktop.Application",
                     "MyDmsVn.Server.Application"),
-                ["MyDmsVn.Desktop.WinForms"] = Set("MyDmsVn.Desktop.Application"),
+                ["MyDmsVn.Desktop.WinForms"] = Set(
+                    "MyDmsVn.Desktop.Application",
+                    "MyDmsVn.BootstrapSourceGrid"),
                 ["MyDmsVn.Desktop.App"] = Set(
                     "MyDmsVn.Desktop.Infrastructure.Local",
                     "MyDmsVn.Desktop.WinForms",
