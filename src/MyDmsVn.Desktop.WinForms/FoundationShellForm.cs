@@ -143,6 +143,11 @@ namespace MyDmsVn.Desktop.WinForms
 
             if (_documents.TryGetValue(key, out var existing))
             {
+                if (!existing.Controls.Contains(content))
+                {
+                    content.Dispose();
+                }
+
                 Workspace.SelectedTab = existing;
                 return existing;
             }

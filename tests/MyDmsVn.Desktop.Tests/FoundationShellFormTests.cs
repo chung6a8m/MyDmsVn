@@ -39,8 +39,8 @@ namespace MyDmsVn.Desktop.Tests
                 {
                     using (var shell = CreateShell())
                     using (var first = new Panel())
-                    using (var duplicate = new Panel())
                     {
+                        var duplicate = new Panel();
                         var firstPage = shell.OpenWorkspace(
                             "home",
                             "Home",
@@ -55,6 +55,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Same(firstPage, secondPage);
                         Assert.Single(shell.Workspace.TabPages);
                         Assert.Same(first, firstPage!.Controls[0]);
+                        Assert.True(duplicate.IsDisposed);
                     }
                 },
                 TimeSpan.FromSeconds(10));
