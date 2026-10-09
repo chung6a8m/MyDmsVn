@@ -1,4 +1,4 @@
-# P5 Sales & Inventory — proposed SQL data model
+﻿# P5 Sales & Inventory — proposed SQL data model
 
 **Status:** schema blueprint. `003_Catalog.sql` is now the implementation source of truth for the P5.1 catalog tables; later P5 tables remain proposed until their DbUp scripts are written. The business ID strategy is a reversible proposal for those later tables.
 

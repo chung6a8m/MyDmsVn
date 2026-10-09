@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Data;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -34,7 +35,9 @@ public sealed class CatalogMappingIntegrationTests
             unitOfWork.BeginTransaction();
             var context = Assert.IsAssignableFrom<ISqlExecutionContext>(unitOfWork);
             var transaction = Assert.IsAssignableFrom<IDbTransaction>(context.Transaction);
-            var createdAtUtc = new DateTime(2026, 10, 9, 3, 4, 5, DateTimeKind.Utc);
+            var createdAtUtc = new DateTime(2026, 10, 9, 3, 4, 5, DateTimeKind.Utc)
+                .AddTicks(1_234_567);
+            var updatedAtUtc = createdAtUtc.AddTicks(2_345_678);
 
             var productId = await context.Connection.InsertAsync<Product, int>(
                 new Product
@@ -45,6 +48,8 @@ public sealed class CatalogMappingIntegrationTests
                     IsActive = true,
                     CreatedAtUtc = createdAtUtc,
                     CreatedByUserId = 7,
+                    UpdatedAtUtc = updatedAtUtc,
+                    UpdatedByUserId = 8,
                 },
                 transaction: transaction,
                 cancellationToken: CancellationToken.None);
@@ -57,6 +62,8 @@ public sealed class CatalogMappingIntegrationTests
                     IsActive = true,
                     CreatedAtUtc = createdAtUtc,
                     CreatedByUserId = 7,
+                    UpdatedAtUtc = updatedAtUtc,
+                    UpdatedByUserId = 8,
                 },
                 transaction: transaction,
                 cancellationToken: CancellationToken.None);
@@ -70,6 +77,8 @@ public sealed class CatalogMappingIntegrationTests
                     IsActive = true,
                     CreatedAtUtc = createdAtUtc,
                     CreatedByUserId = 7,
+                    UpdatedAtUtc = updatedAtUtc,
+                    UpdatedByUserId = 8,
                 },
                 transaction: transaction,
                 cancellationToken: CancellationToken.None);
@@ -84,6 +93,8 @@ public sealed class CatalogMappingIntegrationTests
                     IsActive = true,
                     CreatedAtUtc = createdAtUtc,
                     CreatedByUserId = 7,
+                    UpdatedAtUtc = updatedAtUtc,
+                    UpdatedByUserId = 8,
                 },
                 transaction: transaction,
                 cancellationToken: CancellationToken.None);
@@ -98,11 +109,32 @@ public sealed class CatalogMappingIntegrationTests
                 transaction);
 
             Assert.Equal(4, mappedRows);
+
+            var auditRows = (await context.Connection.QueryAsync<CatalogAuditRow>(
+                "SELECT CreatedAtUtc, UpdatedAtUtc FROM dbo.Products WHERE ProductId = @productId " +
+                "UNION ALL SELECT CreatedAtUtc, UpdatedAtUtc FROM dbo.Warehouses WHERE WarehouseId = @warehouseId " +
+                "UNION ALL SELECT CreatedAtUtc, UpdatedAtUtc FROM dbo.Employees WHERE EmployeeId = @employeeId " +
+                "UNION ALL SELECT CreatedAtUtc, UpdatedAtUtc FROM dbo.Customers WHERE CustomerId = @customerId;",
+                new { productId, warehouseId, employeeId, customerId },
+                transaction)).ToArray();
+            Assert.Equal(4, auditRows.Length);
+            Assert.All(auditRows, row =>
+            {
+                Assert.Equal(createdAtUtc, row.CreatedAtUtc);
+                Assert.Equal(updatedAtUtc, row.UpdatedAtUtc);
+            });
             unitOfWork.Rollback();
         }
         finally
         {
             await database.DisposeAsync();
         }
+    }
+
+    private sealed class CatalogAuditRow
+    {
+        public DateTime CreatedAtUtc { get; set; }
+
+        public DateTime UpdatedAtUtc { get; set; }
     }
 }

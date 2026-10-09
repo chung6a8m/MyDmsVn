@@ -1,4 +1,4 @@
-CREATE TABLE dbo.Products
+﻿CREATE TABLE dbo.Products
 (
     ProductId int IDENTITY(1, 1) NOT NULL
         CONSTRAINT PK_Products PRIMARY KEY,

@@ -1,3 +1,4 @@
+﻿using System.Data;
 using MyDmsVn.Server.Domain.Catalog;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using RepoDb;
@@ -26,6 +27,15 @@ internal sealed class CatalogRepoDbMapping : IRepoDbMapping
         PropertyMapper.Add<Product>(entity => entity.CreatedByUserId!, "CreatedByUserId");
         PropertyMapper.Add<Product>(entity => entity.UpdatedAtUtc!, "UpdatedAtUtc");
         PropertyMapper.Add<Product>(entity => entity.UpdatedByUserId!, "UpdatedByUserId");
+        TypeMapper.Add<Product>(entity => entity.Id, DbType.Int32);
+        TypeMapper.Add<Product>(entity => entity.Code, DbType.String);
+        TypeMapper.Add<Product>(entity => entity.Name, DbType.String);
+        TypeMapper.Add<Product>(entity => entity.Unit, DbType.String);
+        TypeMapper.Add<Product>(entity => entity.IsActive, DbType.Boolean);
+        TypeMapper.Add<Product>(entity => entity.CreatedAtUtc, DbType.DateTime2);
+        TypeMapper.Add<Product>(entity => entity.CreatedByUserId!, DbType.Int32);
+        TypeMapper.Add<Product>(entity => entity.UpdatedAtUtc!, DbType.DateTime2);
+        TypeMapper.Add<Product>(entity => entity.UpdatedByUserId!, DbType.Int32);
         PrimaryMapper.Add<Product>(entity => entity.Id);
         IdentityMapper.Add<Product>(entity => entity.Id);
     }
@@ -42,6 +52,15 @@ internal sealed class CatalogRepoDbMapping : IRepoDbMapping
         PropertyMapper.Add<Warehouse>(entity => entity.CreatedByUserId!, "CreatedByUserId");
         PropertyMapper.Add<Warehouse>(entity => entity.UpdatedAtUtc!, "UpdatedAtUtc");
         PropertyMapper.Add<Warehouse>(entity => entity.UpdatedByUserId!, "UpdatedByUserId");
+        TypeMapper.Add<Warehouse>(entity => entity.Id, DbType.Int32);
+        TypeMapper.Add<Warehouse>(entity => entity.Code, DbType.String);
+        TypeMapper.Add<Warehouse>(entity => entity.Name, DbType.String);
+        TypeMapper.Add<Warehouse>(entity => entity.Address!, DbType.String);
+        TypeMapper.Add<Warehouse>(entity => entity.IsActive, DbType.Boolean);
+        TypeMapper.Add<Warehouse>(entity => entity.CreatedAtUtc, DbType.DateTime2);
+        TypeMapper.Add<Warehouse>(entity => entity.CreatedByUserId!, DbType.Int32);
+        TypeMapper.Add<Warehouse>(entity => entity.UpdatedAtUtc!, DbType.DateTime2);
+        TypeMapper.Add<Warehouse>(entity => entity.UpdatedByUserId!, DbType.Int32);
         PrimaryMapper.Add<Warehouse>(entity => entity.Id);
         IdentityMapper.Add<Warehouse>(entity => entity.Id);
     }
@@ -59,6 +78,16 @@ internal sealed class CatalogRepoDbMapping : IRepoDbMapping
         PropertyMapper.Add<Employee>(entity => entity.CreatedByUserId!, "CreatedByUserId");
         PropertyMapper.Add<Employee>(entity => entity.UpdatedAtUtc!, "UpdatedAtUtc");
         PropertyMapper.Add<Employee>(entity => entity.UpdatedByUserId!, "UpdatedByUserId");
+        TypeMapper.Add<Employee>(entity => entity.Id, DbType.Int32);
+        TypeMapper.Add<Employee>(entity => entity.Code, DbType.String);
+        TypeMapper.Add<Employee>(entity => entity.Name, DbType.String);
+        TypeMapper.Add<Employee>(entity => entity.Phone!, DbType.String);
+        TypeMapper.Add<Employee>(entity => entity.UserId!, DbType.Int32);
+        TypeMapper.Add<Employee>(entity => entity.IsActive, DbType.Boolean);
+        TypeMapper.Add<Employee>(entity => entity.CreatedAtUtc, DbType.DateTime2);
+        TypeMapper.Add<Employee>(entity => entity.CreatedByUserId!, DbType.Int32);
+        TypeMapper.Add<Employee>(entity => entity.UpdatedAtUtc!, DbType.DateTime2);
+        TypeMapper.Add<Employee>(entity => entity.UpdatedByUserId!, DbType.Int32);
         PrimaryMapper.Add<Employee>(entity => entity.Id);
         IdentityMapper.Add<Employee>(entity => entity.Id);
     }
@@ -77,6 +106,17 @@ internal sealed class CatalogRepoDbMapping : IRepoDbMapping
         PropertyMapper.Add<Customer>(entity => entity.CreatedByUserId!, "CreatedByUserId");
         PropertyMapper.Add<Customer>(entity => entity.UpdatedAtUtc!, "UpdatedAtUtc");
         PropertyMapper.Add<Customer>(entity => entity.UpdatedByUserId!, "UpdatedByUserId");
+        TypeMapper.Add<Customer>(entity => entity.Id, DbType.Int32);
+        TypeMapper.Add<Customer>(entity => entity.Code, DbType.String);
+        TypeMapper.Add<Customer>(entity => entity.Name, DbType.String);
+        TypeMapper.Add<Customer>(entity => entity.Address!, DbType.String);
+        TypeMapper.Add<Customer>(entity => entity.Phone!, DbType.String);
+        TypeMapper.Add<Customer>(entity => entity.TaxCode!, DbType.String);
+        TypeMapper.Add<Customer>(entity => entity.IsActive, DbType.Boolean);
+        TypeMapper.Add<Customer>(entity => entity.CreatedAtUtc, DbType.DateTime2);
+        TypeMapper.Add<Customer>(entity => entity.CreatedByUserId!, DbType.Int32);
+        TypeMapper.Add<Customer>(entity => entity.UpdatedAtUtc!, DbType.DateTime2);
+        TypeMapper.Add<Customer>(entity => entity.UpdatedByUserId!, DbType.Int32);
         PrimaryMapper.Add<Customer>(entity => entity.Id);
         IdentityMapper.Add<Customer>(entity => entity.Id);
     }

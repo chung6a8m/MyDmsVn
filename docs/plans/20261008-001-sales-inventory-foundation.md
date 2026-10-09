@@ -1,4 +1,4 @@
-# P5 — Sales & Inventory Foundation (detailed implementation plan)
+﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
 Status: **In progress**. P5.1-T01 completed on 2026-10-09; P5.1-T02 is next. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
