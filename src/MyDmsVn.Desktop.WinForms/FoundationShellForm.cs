@@ -149,6 +149,22 @@ namespace MyDmsVn.Desktop.WinForms
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(nextMode);
         }
 
+        public void SignOut()
+        {
+            _session?.SignOut();
+            PublishSessionMessage(
+                DesktopNotificationKind.Information,
+                "You have been signed out.");
+        }
+
+        public void HandleSessionExpired()
+        {
+            _session?.SignOut();
+            PublishSessionMessage(
+                DesktopNotificationKind.Warning,
+                "Your session has expired. Please sign in again.");
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
@@ -175,6 +191,17 @@ namespace MyDmsVn.Desktop.WinForms
         private void OnNotificationPublished(object? sender, DesktopNotification notification)
         {
             SetStatus(notification.Message);
+        }
+
+        private void PublishSessionMessage(DesktopNotificationKind kind, string message)
+        {
+            if (_notifications == null)
+            {
+                SetStatus(message);
+                return;
+            }
+
+            _notifications.Publish(new DesktopNotification(kind, message));
         }
 
         private static BootstrapSidebar CreateNavigation()
@@ -207,7 +234,13 @@ namespace MyDmsVn.Desktop.WinForms
                 Alignment = ToolStripItemAlignment.Right,
             };
             themeButton.Click += (_, _) => ToggleTheme();
+            var signOutButton = new ToolStripButton("Sign out")
+            {
+                Alignment = ToolStripItemAlignment.Right,
+            };
+            signOutButton.Click += (_, _) => SignOut();
             topBar.Items.Add(title);
+            topBar.Items.Add(signOutButton);
             topBar.Items.Add(themeButton);
             return topBar;
         }

@@ -18,6 +18,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 provider => provider.GetRequiredService<LocalDesktopSession>());
             services.AddTransient<IFoundationApiClient, LocalFoundationApiClient>();
             services.AddTransient<IIdentityApiClient, LocalIdentityApiClient>();
+            services.AddTransient<IPermissionApiClient, LocalPermissionApiClient>();
             return services;
         }
     }

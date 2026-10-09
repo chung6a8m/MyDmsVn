@@ -105,6 +105,37 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Sign_out_and_session_expiry_clear_the_session_with_explicit_status()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    var notifications = new DesktopNotificationCenter();
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient(), notifications),
+                        session,
+                        notifications))
+                    {
+                        session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                        shell.SignOut();
+
+                        Assert.False(session.IsAuthenticated);
+                        Assert.Equal("You have been signed out.", shell.StatusText);
+
+                        session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                        shell.HandleSessionExpired();
+
+                        Assert.False(session.IsAuthenticated);
+                        Assert.Equal(
+                            "Your session has expired. Please sign in again.",
+                            shell.StatusText);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
         private static FoundationShellForm CreateShell()
         {
             return new FoundationShellForm(new FoundationViewModel(new ReadyApiClient()));
