@@ -598,9 +598,10 @@ namespace MyDmsVn.Desktop.Application
 
                 _messageReload.Cancel();
                 messageReloadGeneration = ++_messageReloadGeneration;
+                _generation++;
+                _activeLoad?.Cancel();
             }
 
-            CancelListLoad();
             _ = ScheduleMessageReloadAsync(messageReloadGeneration);
         }
 
