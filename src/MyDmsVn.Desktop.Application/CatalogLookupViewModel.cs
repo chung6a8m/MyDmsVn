@@ -64,6 +64,7 @@ namespace MyDmsVn.Desktop.Application
         private bool _selectedIsActive;
         private long _selectionGeneration;
         private long _generation;
+        private long _messageReloadGeneration;
         private bool _disposed;
 
         public CatalogLookupViewModel(
@@ -111,24 +112,36 @@ namespace MyDmsVn.Desktop.Application
 
         public Task RefreshAsync(CancellationToken cancellationToken)
         {
-            _searchReload.Cancel();
-            _messageReload.Cancel();
-            return LoadAsync(cancellationToken);
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+                _searchReload.Cancel();
+                CancelMessageReloadLocked();
+                return LoadAsync(cancellationToken);
+            }
         }
 
         public Task SetSearch(string? search)
         {
-            ThrowIfDisposed();
-            CancelActiveLoad();
-            _search = search;
-            return _searchReload.Schedule(LoadAsync);
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+                CancelMessageReloadLocked();
+                CancelActiveLoadLocked();
+                _search = search;
+                return _searchReload.Schedule(LoadAsync);
+            }
         }
 
         public void Cancel()
         {
-            _searchReload.Cancel();
-            _messageReload.Cancel();
-            CancelActiveLoad();
+            lock (_sync)
+            {
+                _searchReload.Cancel();
+                CancelMessageReloadLocked();
+                CancelActiveLoadLocked();
+            }
+
             CancelCurrentOperation();
         }
 
@@ -160,6 +173,7 @@ namespace MyDmsVn.Desktop.Application
 
                 _disposed = true;
                 _generation++;
+                _messageReloadGeneration++;
                 activeLoad = _activeLoad;
                 _activeLoad = null;
             }
@@ -326,37 +340,65 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        private void CancelActiveLoad()
+        private void CancelActiveLoadLocked()
         {
-            lock (_sync)
-            {
-                _generation++;
-                _activeLoad?.Cancel();
-            }
+            _generation++;
+            _activeLoad?.Cancel();
         }
 
         private void Receive(CatalogChangedMessage message)
         {
-            if (message.CatalogKind == _source.Kind)
+            if (message.CatalogKind != _source.Kind)
             {
-                CancelActiveLoad();
-                _ = ScheduleMessageReloadAsync();
+                return;
             }
+
+            long messageReloadGeneration;
+            lock (_sync)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _searchReload.Cancel();
+                _messageReload.Cancel();
+                messageReloadGeneration = ++_messageReloadGeneration;
+                CancelActiveLoadLocked();
+            }
+
+            _ = ScheduleMessageReloadAsync(messageReloadGeneration);
         }
 
-        private async Task ScheduleMessageReloadAsync()
+        private async Task ScheduleMessageReloadAsync(long messageReloadGeneration)
         {
             try
             {
                 Task scheduled = Task.CompletedTask;
                 await _dispatcher.InvokeAsync(
-                    () => scheduled = _messageReload.Schedule(LoadAsync),
+                    () =>
+                    {
+                        lock (_sync)
+                        {
+                            if (!_disposed &&
+                                _messageReloadGeneration == messageReloadGeneration)
+                            {
+                                scheduled = _messageReload.Schedule(LoadAsync);
+                            }
+                        }
+                    },
                     CancellationToken.None).ConfigureAwait(false);
                 await scheduled.ConfigureAwait(false);
             }
             catch (ObjectDisposedException)
             {
             }
+        }
+
+        private void CancelMessageReloadLocked()
+        {
+            _messageReloadGeneration++;
+            _messageReload.Cancel();
         }
 
         private void ThrowIfDisposed()

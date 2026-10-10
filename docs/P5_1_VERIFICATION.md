@@ -12,14 +12,14 @@ Interactive Goods Receipt lookup smoke remains a P5.2 dependency and was not per
 
 ## Automated results
 
-- `dotnet build MyDmsVn.sln --no-restore` and `dotnet build MyDmsVn.sln -c Release --no-restore` — both succeeded with 0 warnings and 0 errors. The solution built the `net48`, `net8.0` and `net8.0-windows` target families.
-- `dotnet test MyDmsVn.sln -m:1 -c Debug --no-build --no-restore --logger "console;verbosity=minimal"` and the same command with `-c Release` — 505/505 target executions passed in each configuration. The single MSBuild worker prevents concurrent target-framework test hosts from distorting the BCrypt timing-budget measurements:
+- `dotnet build MyDmsVn.sln -m:1 --no-restore` and `dotnet build MyDmsVn.sln -m:1 -c Release --no-restore` — both succeeded with 0 warnings and 0 errors. The solution built the `net48`, `net8.0` and `net8.0-windows` target families.
+- `dotnet test MyDmsVn.sln -m:1 -c Debug --no-build --no-restore --logger "console;verbosity=minimal"` and the same command with `-c Release` — 513/513 target executions passed in each configuration. The single MSBuild worker prevents concurrent target-framework test hosts from distorting the BCrypt timing-budget measurements:
   - Architecture: 5/5 (`net8.0`).
   - Server Application: 81/81 on `net48` and 81/81 on `net8.0`.
-  - Desktop: 107/107 on `net48` and 107/107 on `net8.0-windows`.
+  - Desktop: 111/111 on `net48` and 111/111 on `net8.0-windows`.
   - SQL Server integration: 62/62 on `net48` and 62/62 on `net8.0`; every test used its disposable `SqlTestDatabase`.
-- `dotnet run --project src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj -c Release -f net48 --no-restore -- --smoke-test` — exited 0.
-- `dotnet run --project src/MyDmsVn.Desktop.AppCore/MyDmsVn.Desktop.AppCore.csproj -c Release -f net8.0-windows --no-restore -- --smoke-test` — exited 0.
+- `dotnet run --project src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj -c Release -f net48 --no-build --no-restore -- --smoke-test` — exited 0.
+- `dotnet run --project src/MyDmsVn.Desktop.AppCore/MyDmsVn.Desktop.AppCore.csproj -c Release -f net8.0-windows --no-build --no-restore -- --smoke-test` — exited 0.
 
 ## Gate mapping
 
@@ -27,7 +27,7 @@ Interactive Goods Receipt lookup smoke remains a P5.2 dependency and was not per
 - Employee.UserId: `Catalog_migration_creates_empty_tables_and_enforces_code_uniqueness_and_employee_user_fk` verifies FK rejection; `Employee_user_link_allows_many_nulls_but_only_one_employee_per_user` verifies nullable and one-user-per-employee-link behavior.
 - Historical inactive references: `Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups` verifies Get/List retain inactive rows while all four Lookup queries exclude them.
 - Authorization: `Explicitly_denied_catalog_write_leaves_business_tables_unchanged` verifies an explicit user deny overrides a role grant and does not insert a Product.
-- Debounce and stale results: deterministic desktop tests cover the 300 ms default, final-call-only execution, page reset, immediate refresh, cancellation, generation-based stale-response rejection and disposal.
+- Debounce and stale results: deterministic desktop tests cover the 300 ms default, final-call-only execution, page reset, immediate refresh, cancellation, generation-based stale-response rejection, queued message callbacks superseded by refresh/search/cancel, search/message coalescing and disposal.
 - Messenger lifetime: deterministic tests cover success-only typed publication, failure suppression, relevant-only two-recipient refresh, burst coalescing, disposal and activation refresh. An inactive selected lookup preserves its ID and label while becoming unavailable for a new selection.
 - UI safety: STA tests cover catalog layout/tab order, commands, inline validation, active/inactive display, read-only list cells, immutable row-ID selection, UI-thread marshaling, tab reuse and disposal. Desktop test parallelization is disabled because WinForms message loops and the Bootstrap theme manager are process-wide state.
 

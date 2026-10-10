@@ -102,6 +102,101 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Refresh_supersedes_a_message_reload_callback_already_queued_for_ui_dispatch()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var delay = new ControllableDelay();
+            var source = ScriptedSource.For(CatalogKind.Product, "P1");
+            var dispatcher = new SwitchableUiDispatcher { Defer = true };
+            using (var viewModel = Create(source, messenger, delay, dispatcher))
+            {
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+
+                dispatcher.Defer = false;
+                await viewModel.RefreshAsync(CancellationToken.None);
+                dispatcher.RunNext();
+
+                Assert.Equal(0, delay.PendingCount);
+                Assert.Equal(1, source.CallCount);
+            }
+        }
+
+        [Fact]
+        public async Task Search_supersedes_a_message_reload_callback_already_queued_for_ui_dispatch()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var delay = new ControllableDelay();
+            var source = ScriptedSource.For(CatalogKind.Product, "P1");
+            var dispatcher = new SwitchableUiDispatcher { Defer = true };
+            using (var viewModel = Create(source, messenger, delay, dispatcher))
+            {
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+                var search = viewModel.SetSearch("new");
+
+                dispatcher.Defer = false;
+                dispatcher.RunNext();
+                Assert.Equal(1, delay.PendingCount);
+                delay.ReleaseAll();
+                await search;
+
+                var request = Assert.Single(source.Requests);
+                Assert.Equal("new", request.Search);
+            }
+        }
+
+        [Fact]
+        public void Cancel_supersedes_a_message_reload_callback_already_queued_for_ui_dispatch()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var delay = new ControllableDelay();
+            var source = ScriptedSource.For(CatalogKind.Product, "P1");
+            var dispatcher = new SwitchableUiDispatcher { Defer = true };
+            using (var viewModel = Create(source, messenger, delay, dispatcher))
+            {
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+
+                dispatcher.Defer = false;
+                viewModel.Cancel();
+                dispatcher.RunNext();
+
+                Assert.Equal(0, delay.PendingCount);
+                Assert.Equal(0, source.CallCount);
+            }
+        }
+
+        [Fact]
+        public async Task Message_reload_supersedes_a_pending_search_instead_of_querying_twice()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var delay = new ControllableDelay();
+            var source = ScriptedSource.For(CatalogKind.Product, "P1");
+            using (var viewModel = Create(source, messenger, delay))
+            {
+                var search = viewModel.SetSearch("new");
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+
+                Assert.Equal(1, delay.IncompletePendingCount);
+                delay.ReleaseAll();
+                await search;
+                await WaitUntilAsync(() => source.CallCount == 1);
+
+                Assert.Single(source.Requests);
+            }
+        }
+
+        [Fact]
         public async Task Inactive_historical_selection_remains_visible_but_inactive_results_are_not_new_options()
         {
             var source = new ScriptedSource(
@@ -199,12 +294,13 @@ namespace MyDmsVn.Desktop.Tests
         private static CatalogLookupViewModel Create(
             ICatalogLookupSource source,
             IMessenger messenger,
-            IAsyncDelay delay)
+            IAsyncDelay delay,
+            IUiDispatcher? dispatcher = null)
         {
             return new CatalogLookupViewModel(
                 source,
                 messenger,
-                new ImmediateUiDispatcher(),
+                dispatcher ?? new ImmediateUiDispatcher(),
                 new DesktopNotificationCenter(),
                 delay);
         }
@@ -230,6 +326,9 @@ namespace MyDmsVn.Desktop.Tests
 
             public int PendingCount => _pending.Count;
 
+            public int IncompletePendingCount =>
+                _pending.Count(completion => !completion.Task.IsCompleted);
+
             public Task DelayAsync(TimeSpan interval, CancellationToken cancellationToken)
             {
                 var completion = new TaskCompletionSource<bool>(
@@ -242,6 +341,14 @@ namespace MyDmsVn.Desktop.Tests
             public void ReleaseLatest()
             {
                 _pending[_pending.Count - 1].TrySetResult(true);
+            }
+
+            public void ReleaseAll()
+            {
+                foreach (var completion in _pending)
+                {
+                    completion.TrySetResult(true);
+                }
             }
         }
 
@@ -266,6 +373,9 @@ namespace MyDmsVn.Desktop.Tests
 
             public int CallCount { get; private set; }
 
+            public IList<CatalogLookupRequest> Requests { get; } =
+                new List<CatalogLookupRequest>();
+
             public static ScriptedSource For(CatalogKind kind, string code)
             {
                 return new ScriptedSource(
@@ -280,6 +390,7 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken cancellationToken)
             {
                 CallCount++;
+                Requests.Add(request);
                 return _lookup(request, cancellationToken);
             }
 
@@ -301,6 +412,37 @@ namespace MyDmsVn.Desktop.Tests
                     : ApiResponse<CatalogLookupDto>.Failure(
                         new ApiError(ApiStatusCode.NotFound, "Catalog.NotFound", "Not found."));
             }
+        }
+
+        private sealed class SwitchableUiDispatcher : IUiDispatcher
+        {
+            private readonly Queue<Action> _pending = new Queue<Action>();
+
+            public bool Defer { get; set; }
+
+            public Task InvokeAsync(Action action, CancellationToken cancellationToken)
+            {
+                if (!Defer)
+                {
+                    action();
+                    return Task.CompletedTask;
+                }
+
+                var completion = new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                _pending.Enqueue(() =>
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        action();
+                    }
+
+                    completion.TrySetResult(true);
+                });
+                return completion.Task;
+            }
+
+            public void RunNext() => _pending.Dequeue()();
         }
 
         private sealed class ControlledSource : ICatalogLookupSource
