@@ -39,6 +39,7 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddScoped<IWarehouseQueryService, SqlWarehouseQueryService>();
             services.TryAddScoped<IEmployeeQueryService, SqlEmployeeQueryService>();
             services.TryAddScoped<ICustomerQueryService, SqlCustomerQueryService>();
+            services.TryAddScoped<IGoodsReceiptQueryService, SqlGoodsReceiptQueryService>();
             services.TryAddEnumerable(
                 ServiceDescriptor.Singleton<IRepoDbMapping, CatalogRepoDbMapping>());
             services.TryAddEnumerable(

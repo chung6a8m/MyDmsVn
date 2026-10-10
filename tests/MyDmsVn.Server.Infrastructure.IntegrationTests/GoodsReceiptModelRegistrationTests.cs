@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using Xunit;
 
@@ -25,5 +26,6 @@ public sealed class GoodsReceiptModelRegistrationTests
         Assert.NotNull(receiptType);
         Assert.NotNull(lineType);
         Assert.Contains("MyDmsVn.Server.Infrastructure.Inventory.InventoryRepoDbMapping", mappingTypes);
+        Assert.NotNull(provider.GetService<IGoodsReceiptQueryService>());
     }
 }
