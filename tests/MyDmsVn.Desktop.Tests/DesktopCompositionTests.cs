@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.Infrastructure.Local;
+using MyDmsVn.Desktop.WinForms;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Identity;
@@ -191,6 +192,28 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.Equal("code", Assert.Single(create.Error!.Details).Field);
                 Assert.Equal("code", Assert.Single(update.Error!.Details).Field);
             }
+        }
+
+        [Fact]
+        public void WinForms_composition_resolves_goods_receipt_factory_and_shell()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var services = new ServiceCollection();
+                    services.AddServerApplication();
+                    services.AddLocalDesktopAdapter();
+                    services.AddMyDmsVnDesktopWinForms(new SynchronizationContext());
+
+                    using (var provider = services.BuildServiceProvider())
+                    using (var control = provider.GetRequiredService<IGoodsReceiptControlFactory>().Create())
+                    using (var shell = provider.GetRequiredService<FoundationShellForm>())
+                    {
+                        Assert.IsType<GoodsReceiptControl>(control);
+                        Assert.NotNull(shell);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
         }
 
         [Fact]

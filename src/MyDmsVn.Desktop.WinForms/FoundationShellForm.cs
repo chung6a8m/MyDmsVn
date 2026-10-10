@@ -21,12 +21,13 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly IDesktopSession? _session;
         private readonly IDesktopNotificationService? _notifications;
         private readonly ICatalogControlFactory? _catalogControlFactory;
+        private readonly IGoodsReceiptControlFactory? _goodsReceiptControlFactory;
         private readonly int _uiThreadId;
         private long? _workspaceSessionVersion;
-        private bool _openingCatalog;
+        private bool _openingWorkspace;
 
         public FoundationShellForm(FoundationViewModel viewModel)
-            : this(viewModel, null, null, null, true)
+            : this(viewModel, null, null, null, null, true)
         {
         }
 
@@ -38,6 +39,7 @@ namespace MyDmsVn.Desktop.WinForms
                 viewModel,
                 session ?? throw new ArgumentNullException(nameof(session)),
                 notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                null,
                 null,
                 true)
         {
@@ -53,6 +55,23 @@ namespace MyDmsVn.Desktop.WinForms
                 session ?? throw new ArgumentNullException(nameof(session)),
                 notifications ?? throw new ArgumentNullException(nameof(notifications)),
                 catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
+                null,
+                true)
+        {
+        }
+
+        public FoundationShellForm(
+            FoundationViewModel viewModel,
+            IDesktopSession session,
+            IDesktopNotificationService notifications,
+            ICatalogControlFactory catalogControlFactory,
+            IGoodsReceiptControlFactory goodsReceiptControlFactory)
+            : this(
+                viewModel,
+                session ?? throw new ArgumentNullException(nameof(session)),
+                notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
+                goodsReceiptControlFactory ?? throw new ArgumentNullException(nameof(goodsReceiptControlFactory)),
                 true)
         {
         }
@@ -62,12 +81,14 @@ namespace MyDmsVn.Desktop.WinForms
             IDesktopSession? session,
             IDesktopNotificationService? notifications,
             ICatalogControlFactory? catalogControlFactory,
+            IGoodsReceiptControlFactory? goodsReceiptControlFactory,
             bool initialize)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             _session = session;
             _notifications = notifications;
             _catalogControlFactory = catalogControlFactory;
+            _goodsReceiptControlFactory = goodsReceiptControlFactory;
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
 
             Text = "MyDmsVn";
@@ -148,7 +169,7 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             var key = "catalog-" + kind.ToString().ToLowerInvariant();
-            _openingCatalog = true;
+            _openingWorkspace = true;
             try
             {
                 if (_documents.TryGetValue(key, out var existing))
@@ -169,7 +190,39 @@ namespace MyDmsVn.Desktop.WinForms
             }
             finally
             {
-                _openingCatalog = false;
+                _openingWorkspace = false;
+            }
+        }
+
+        public TabPage? OpenGoodsReceipts()
+        {
+            if (_goodsReceiptControlFactory == null)
+            {
+                return null;
+            }
+
+            const string key = "goods-receipts";
+            _openingWorkspace = true;
+            try
+            {
+                if (_documents.TryGetValue(key, out var existing))
+                {
+                    Workspace.SelectedTab = existing;
+                    ActivateWorkspace(existing);
+                    return existing;
+                }
+
+                var page = OpenWorkspace(
+                    key,
+                    "Goods Receipts",
+                    _goodsReceiptControlFactory.Create(),
+                    WorkspaceSessionVersion);
+                ActivateWorkspace(page);
+                return page;
+            }
+            finally
+            {
+                _openingWorkspace = false;
             }
         }
 
@@ -314,13 +367,29 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 OpenCatalog(kind);
             }
+            else if (string.Equals(
+                Navigation.SelectedItem?.Tag as string,
+                "goods-receipts",
+                StringComparison.Ordinal))
+            {
+                OpenGoodsReceipts();
+            }
         }
 
         private void OnWorkspaceSelectedIndexChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_openingCatalog)
+            if (!_openingWorkspace)
             {
-                ActivateCatalog(Workspace.SelectedTab);
+                ActivateWorkspace(Workspace.SelectedTab);
+            }
+        }
+
+        private static void ActivateWorkspace(TabPage? page)
+        {
+            ActivateCatalog(page);
+            if (page?.Controls.Count > 0 && page.Controls[0] is GoodsReceiptControl goodsReceipts)
+            {
+                _ = goodsReceipts.ActivateAsync(CancellationToken.None);
             }
         }
 
@@ -455,6 +524,12 @@ namespace MyDmsVn.Desktop.WinForms
             navigation.Items.Add(new BootstrapSidebarItem { Text = "Warehouses", Tag = CatalogKind.Warehouse });
             navigation.Items.Add(new BootstrapSidebarItem { Text = "Employees", Tag = CatalogKind.Employee });
             navigation.Items.Add(new BootstrapSidebarItem { Text = "Customers", Tag = CatalogKind.Customer });
+            navigation.Items.Add(
+                new BootstrapSidebarItem
+                {
+                    Text = "Goods Receipts",
+                    Tag = "goods-receipts",
+                });
             return navigation;
         }
 
