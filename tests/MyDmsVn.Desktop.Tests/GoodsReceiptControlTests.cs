@@ -334,6 +334,114 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Editing_a_line_after_save_updates_the_reloaded_line()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
+
+                        control.SaveButton.PerformClick();
+                        control.LastOperation.GetAwaiter().GetResult();
+                        control.QuantityEditor.Value = 9.125m;
+                        control.SaveButton.PerformClick();
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.Equal(9.125m, fixture.Api.LastUpdate!.Lines[0].Quantity);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Editing_a_line_after_refresh_updates_the_reloaded_line()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
+
+                        control.RefreshButton.PerformClick();
+                        control.LastOperation.GetAwaiter().GetResult();
+                        control.UnitCostEditor.Value = 7.4321m;
+                        control.SaveButton.PerformClick();
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.Equal(7.4321m, fixture.Api.LastUpdate!.Lines[0].UnitCost);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Detail_inputs_stay_disabled_during_the_entire_refresh()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
+                        fixture.Api.ControlGetResponse = true;
+
+                        control.RefreshButton.PerformClick();
+
+                        Assert.False(control.NoteEditor.Enabled);
+                        Assert.False(control.QuantityEditor.Enabled);
+                        Assert.True(control.BusyIndicator.Visible);
+
+                        fixture.Api.CompleteGet();
+                        PumpMessagesUntil(
+                            () => control.LastOperation.IsCompleted,
+                            TimeSpan.FromSeconds(2));
+                        control.LastOperation.GetAwaiter().GetResult();
+                        Assert.True(control.NoteEditor.Enabled);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Reactivation_after_access_revocation_clears_visible_receipt_data()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
+                        Assert.Equal(41, fixture.Editor.Id);
+                        fixture.Api.ListError = new ApiError(
+                            ApiStatusCode.Forbidden,
+                            "Auth.Forbidden",
+                            "Denied.");
+
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+
+                        Assert.Empty(fixture.List.Items);
+                        Assert.Null(fixture.Editor.Id);
+                        Assert.Empty(fixture.Editor.Lines);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void Repeated_activation_refreshes_and_disposal_owns_both_view_models()
         {
             StaTest.Run(
@@ -418,9 +526,11 @@ namespace MyDmsVn.Desktop.Tests
         private sealed class ReceiptApiClient : IGoodsReceiptApiClient
         {
             private TaskCompletionSource<ApiResponse<PagedResult<GoodsReceiptDto>>>? _listCompletion;
+            private TaskCompletionSource<ApiResponse<GoodsReceiptDto>>? _getCompletion;
 
             public int ListCalls { get; private set; }
             public bool ControlListResponse { get; set; }
+            public bool ControlGetResponse { get; set; }
             public ApiError? ListError { get; set; }
             public ApiError? GetError { get; set; }
             public int GetCalls { get; private set; }
@@ -462,10 +572,21 @@ namespace MyDmsVn.Desktop.Tests
             public Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken cancellationToken)
             {
                 GetCalls++;
-                return Task.FromResult(GetError == null
+                var response = GetError == null
                     ? ApiResponse<GoodsReceiptDto>.Success(CurrentReceipt)
-                    : ApiResponse<GoodsReceiptDto>.Failure(GetError));
+                    : ApiResponse<GoodsReceiptDto>.Failure(GetError);
+                if (!ControlGetResponse)
+                {
+                    return Task.FromResult(response);
+                }
+
+                _getCompletion = new TaskCompletionSource<ApiResponse<GoodsReceiptDto>>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                return _getCompletion.Task;
             }
+
+            public void CompleteGet() =>
+                _getCompletion!.TrySetResult(ApiResponse<GoodsReceiptDto>.Success(CurrentReceipt));
 
             public Task<ApiResponse<GoodsReceiptDto>> CreateDraftAsync(
                 SaveGoodsReceiptRequest request,

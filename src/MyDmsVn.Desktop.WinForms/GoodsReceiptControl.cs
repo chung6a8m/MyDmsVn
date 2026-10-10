@@ -34,6 +34,7 @@ namespace MyDmsVn.Desktop.WinForms
         private int? _warehouseFilterId;
         private string? _statusFilter;
         private string? _workflowMessage;
+        private bool _isRefreshing;
         private bool _applyingState;
 
         public GoodsReceiptControl(
@@ -239,7 +240,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             await _list.ActivateAsync(cancellationToken).ConfigureAwait(true);
             await _editor.ActivateAsync(cancellationToken).ConfigureAwait(true);
-            ApplyState();
+            ApplyViewModelState();
         }
 
         private async Task RefreshAsync()
@@ -249,16 +250,32 @@ namespace MyDmsVn.Desktop.WinForms
                 return;
             }
 
-            await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
-            if (_list.IsAccessDenied)
-            {
-                ClearPersistedEditor();
-            }
-            else if (_editor.Id.HasValue)
-            {
-                await _editor.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
-            }
+            var selectedLineId = _selectedLine?.Id;
+            var selectedLineIndex = _selectedLine == null
+                ? -1
+                : _editor.Lines.IndexOf(_selectedLine);
+            _isRefreshing = true;
             ApplyState();
+            try
+            {
+                await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
+                if (_list.IsAccessDenied)
+                {
+                    ClearPersistedEditor();
+                }
+                else if (_editor.Id.HasValue)
+                {
+                    if (await _editor.RefreshAsync(CancellationToken.None).ConfigureAwait(true))
+                    {
+                        RebindSelectedLine(selectedLineId, selectedLineIndex);
+                    }
+                }
+            }
+            finally
+            {
+                _isRefreshing = false;
+                ApplyState();
+            }
         }
 
         private async Task SelectReceiptCoreAsync(long id, CancellationToken cancellationToken)
@@ -289,9 +306,14 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (ApplyEditorsToViewModel())
             {
+                var selectedLineId = _selectedLine?.Id;
+                var selectedLineIndex = _selectedLine == null
+                    ? -1
+                    : _editor.Lines.IndexOf(_selectedLine);
                 var saved = await _editor.SaveAsync(CancellationToken.None).ConfigureAwait(true);
                 if (saved)
                 {
+                    RebindSelectedLine(selectedLineId, selectedLineIndex);
                     _workflowMessage = null;
                     await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
                     if (_list.IsAccessDenied)
@@ -346,6 +368,25 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 _editor.Load(null);
                 _selectedLine = null;
+            }
+        }
+
+        private void RebindSelectedLine(long? selectedLineId, int selectedLineIndex)
+        {
+            var persistedId = selectedLineId.GetValueOrDefault();
+            _selectedLine = persistedId > 0
+                ? _editor.Lines.FirstOrDefault(line => line.Id == persistedId)
+                : null;
+            if (_selectedLine == null &&
+                selectedLineIndex >= 0 &&
+                selectedLineIndex < _editor.Lines.Count)
+            {
+                _selectedLine = _editor.Lines[selectedLineIndex];
+            }
+
+            if (_selectedLine == null)
+            {
+                _selectedLine = _editor.Lines.FirstOrDefault();
             }
         }
 
@@ -563,7 +604,17 @@ namespace MyDmsVn.Desktop.WinForms
         }
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs) =>
-            DispatchToUi(ApplyState);
+            DispatchToUi(ApplyViewModelState);
+
+        private void ApplyViewModelState()
+        {
+            if (_list.IsAccessDenied)
+            {
+                ClearPersistedEditor();
+            }
+
+            ApplyState();
+        }
 
         private void OnErrorsChanged(object? sender, DataErrorsChangedEventArgs eventArgs) =>
             DispatchToUi(ApplyErrors);
@@ -664,7 +715,7 @@ namespace MyDmsVn.Desktop.WinForms
                 QuantityEditor.Value = Clamp(QuantityEditor, _selectedLine?.Quantity ?? 0m);
                 UnitCostEditor.Value = Clamp(UnitCostEditor, _selectedLine?.UnitCost ?? 0m);
 
-                var busy = _list.IsLoading || _list.IsBusy || _editor.IsBusy;
+                var busy = _isRefreshing || _list.IsLoading || _list.IsBusy || _editor.IsBusy;
                 BusyIndicator.Visible = busy;
                 OperationStatusLabel.Text = _workflowMessage ??
                     _editor.ErrorMessage ??

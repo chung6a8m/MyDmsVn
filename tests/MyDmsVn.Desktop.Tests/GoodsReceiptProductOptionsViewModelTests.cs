@@ -26,7 +26,7 @@ namespace MyDmsVn.Desktop.Tests
 
                 Assert.Equal(2, delay.PendingCount);
                 delay.ReleaseLatest();
-                await WaitUntilAsync(() => source.Calls == 1);
+                await WaitUntilAsync(() => viewModel.Items.Count == 1);
                 Assert.Equal(new[] { 1 }, viewModel.Items.Select(item => item.Id));
             }
         }
@@ -126,6 +126,26 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Fact]
+        public async Task Message_triggered_lookup_exception_surfaces_without_faulting_fire_and_forget_work()
+        {
+            var source = new ProductSource
+            {
+                LookupException = new InvalidOperationException("Product lookup failed."),
+            };
+            var messenger = new WeakReferenceMessenger();
+            using (var viewModel = Create(source, messenger, new ImmediateDelay()))
+            {
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+
+                await WaitUntilAsync(() => viewModel.ErrorMessage != null);
+                Assert.Equal("Product lookup failed.", viewModel.ErrorMessage);
+            }
+        }
+
         private static GoodsReceiptProductOptionsViewModel Create(
             ICatalogLookupSource source,
             IMessenger messenger,
@@ -157,6 +177,7 @@ namespace MyDmsVn.Desktop.Tests
             public CatalogKind Kind => CatalogKind.Product;
             public int Calls { get; private set; }
             public bool ProductIsActive { get; set; } = true;
+            public Exception? LookupException { get; set; }
             public IList<CatalogLookupRequest> Requests { get; } = new List<CatalogLookupRequest>();
 
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(
@@ -165,6 +186,10 @@ namespace MyDmsVn.Desktop.Tests
             {
                 Calls++;
                 Requests.Add(request);
+                if (LookupException != null)
+                {
+                    throw LookupException;
+                }
                 return Task.FromResult(ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(
                     new[]
                     {

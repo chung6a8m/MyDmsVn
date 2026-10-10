@@ -215,6 +215,21 @@ namespace MyDmsVn.Desktop.Application
             catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
             {
             }
+            catch (Exception exception)
+            {
+                if (IsCurrent(generation))
+                {
+                    await _dispatcher.InvokeAsync(
+                        () =>
+                        {
+                            if (IsCurrent(generation))
+                            {
+                                ApplyUnexpectedError(exception);
+                            }
+                        },
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+            }
             finally
             {
                 lock (_sync)

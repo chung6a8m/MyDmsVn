@@ -155,6 +155,19 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Fact]
+        public void Lookup_metadata_changes_do_not_dirty_a_posted_receipt()
+        {
+            using (var fixture = Create(new EditorApiClient()))
+            {
+                fixture.Editor.Load(Receipt("posted", "AQIDBAUGBwg=", "Posted"));
+
+                fixture.Editor.Lines[0].SetProduct(7, "P7 - Renamed product", false);
+
+                Assert.False(fixture.Editor.IsDirty);
+            }
+        }
+
         private static Fixture Create(EditorApiClient api)
         {
             var messenger = new WeakReferenceMessenger();

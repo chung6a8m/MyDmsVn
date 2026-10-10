@@ -154,6 +154,27 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Fact]
+        public async Task Unexpected_list_and_detail_exceptions_surface_without_faulting_ui_tasks()
+        {
+            var api = new ScriptedApiClient
+            {
+                ListException = new InvalidOperationException("List connection failed."),
+            };
+            using (var viewModel = Create(api, new ImmediateDelay()))
+            {
+                await viewModel.ActivateAsync(CancellationToken.None);
+                Assert.Equal("List connection failed.", viewModel.ErrorMessage);
+
+                api.ListException = null;
+                api.GetException = new InvalidOperationException("Detail connection failed.");
+                var selected = await viewModel.SelectAsync(41, CancellationToken.None);
+
+                Assert.Null(selected);
+                Assert.Equal("Detail connection failed.", viewModel.ErrorMessage);
+            }
+        }
+
         private static GoodsReceiptListViewModel Create(
             IGoodsReceiptApiClient api,
             IAsyncDelay delay) =>
@@ -223,17 +244,31 @@ namespace MyDmsVn.Desktop.Tests
                 ApiResponse<PagedResult<GoodsReceiptDto>>.Success(
                     new PagedResult<GoodsReceiptDto>(Array.Empty<GoodsReceiptDto>(), 1, 25, 0));
             public ApiResponse<GoodsReceiptDto>? GetResponse { get; set; }
+            public Exception? ListException { get; set; }
+            public Exception? GetException { get; set; }
 
             public Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(
                 GoodsReceiptListRequest request,
                 CancellationToken cancellationToken)
             {
                 ListRequests.Add(request);
+                if (ListException != null)
+                {
+                    throw ListException;
+                }
                 return Task.FromResult(ListResponse);
             }
 
-            public Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken token) =>
-                Task.FromResult(GetResponse ?? ApiResponse<GoodsReceiptDto>.Success(Receipt(id, "GR")));
+            public Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken token)
+            {
+                if (GetException != null)
+                {
+                    throw GetException;
+                }
+
+                return Task.FromResult(
+                    GetResponse ?? ApiResponse<GoodsReceiptDto>.Success(Receipt(id, "GR")));
+            }
             public Task<ApiResponse<GoodsReceiptDto>> CreateDraftAsync(SaveGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(UpdateGoodsReceiptDraftRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(PostGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();

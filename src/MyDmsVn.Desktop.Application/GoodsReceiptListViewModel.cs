@@ -215,6 +215,21 @@ namespace MyDmsVn.Desktop.Application
             catch (OperationCanceledException) when (operation.Cancellation.IsCancellationRequested)
             {
             }
+            catch (Exception exception)
+            {
+                if (IsCurrent(operation.Generation))
+                {
+                    await _dispatcher.InvokeAsync(
+                        () =>
+                        {
+                            if (IsCurrent(operation.Generation))
+                            {
+                                ApplyUnexpectedError(exception);
+                            }
+                        },
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+            }
             finally
             {
                 EndLoad(operation);
@@ -263,6 +278,23 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (OperationCanceledException) when (operation.Cancellation.IsCancellationRequested)
             {
+                return null;
+            }
+            catch (Exception exception)
+            {
+                if (IsCurrent(operation.Generation))
+                {
+                    await _dispatcher.InvokeAsync(
+                        () =>
+                        {
+                            if (IsCurrent(operation.Generation))
+                            {
+                                ApplyUnexpectedError(exception);
+                            }
+                        },
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+
                 return null;
             }
             finally

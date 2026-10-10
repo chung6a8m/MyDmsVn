@@ -432,7 +432,13 @@ namespace MyDmsVn.Desktop.Application
 
         private void OnLinePropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
         {
-            MarkDirty();
+            if (eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.ProductId) ||
+                eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.Quantity) ||
+                eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.UnitCost))
+            {
+                MarkDirty();
+            }
+
             if (eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.LineTotal) ||
                 eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.Quantity) ||
                 eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.UnitCost))

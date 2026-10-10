@@ -140,6 +140,20 @@ namespace MyDmsVn.Desktop.Application
                 new DesktopNotification(DesktopNotificationKind.Error, error.Message));
         }
 
+        protected void ApplyUnexpectedError(Exception exception)
+        {
+            if (exception == null)
+            {
+                throw new ArgumentNullException(nameof(exception));
+            }
+
+            ApplyApiError(
+                new ApiError(
+                    ApiStatusCode.InternalServerError,
+                    "Desktop.UnexpectedError",
+                    exception.Message));
+        }
+
         protected void PublishNotification(DesktopNotificationKind kind, string message)
         {
             _notifications.Publish(new DesktopNotification(kind, message));
