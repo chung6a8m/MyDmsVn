@@ -1,4 +1,4 @@
-# Persistence design — SQL Server / RepoDb / Dapper / Explicit UoW
+﻿# Persistence design — SQL Server / RepoDb / Dapper / Explicit UoW
 
 ## 1. Separation
 
@@ -79,7 +79,7 @@ For P5:
 
 ## 6. Migrations and data safety
 
-- DbUp baseline creates tables, indexes, FK and seeding of deterministic permissions using numbered, immutable scripts: `001_Identity.sql`, `002_Catalog.sql`, `003_GoodsReceipt.sql`, `004_Inventory.sql` (names provisional).
+- DbUp uses numbered, immutable scripts. The implemented chain is `001_PersistenceFoundation.sql`, `002_Identity.sql`, `003_Catalog.sql`, `004_Catalog_Nul_Constraints.sql`, `005_GoodsReceipt.sql` and `006_GoodsReceipt_Number_Sequence.sql`; later Inventory scripts remain future additive migrations.
 - History table under controlled schema; apply once, in order, with meaningful deployment logs.
 - Run migrator as a **separate controlled deployment command**, not per-desktop login. Client DB logins should not require DDL.
 - Require an explicit application database in the migration connection string and reject SQL Server system databases (`master`, `model`, `msdb`, `tempdb`) before opening a connection.

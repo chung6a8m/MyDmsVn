@@ -1,6 +1,6 @@
-# P5 — Sales & Inventory Foundation (detailed implementation plan)
+﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate and P5.2-T01 completed on 2026-10-10. Interactive P5.1 manual smoke remains open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10. Interactive P5.1 manual smoke remains open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -50,12 +50,12 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [x] Add created/updated/posting identity and UTC timestamp audit fields.
 
 ### P5.2-T02 — Commands
-- [ ] CreateDraft / UpdateDraft (header plus lines) atomically with **one explicit UoW and one SQL transaction** per command; rollback the entire aggregate on any failure.
-- [ ] Require `Inventory.GoodsReceipts.Write` for CreateDraft/UpdateDraft and `Inventory.GoodsReceipts.Read` for List/Get, enforced in Application (not only UI). Post uses the separate `Inventory.GoodsReceipts.Post` permission and does not implicitly grant Read or Write; enforce explicit user-deny precedence.
-- [ ] Validators: warehouse/employee/product active, >=1 line, Quantity > 0, UnitCost >= 0, duplicate product line rejected, codes not blank; mirror appropriate invariants with SQL constraints.
-- [ ] **Shared aggregate locking protocol:** UpdateDraft and Post begin a transaction, acquire an update/held lock on the same GoodsReceipts header row **before reading or changing its lines**, and hold it to commit/rollback. Use consistent lock order across both paths; do not load lines on a separate connection or before obtaining the header lock.
-- [ ] UpdateDraft requires the caller's expected GoodsReceipts `rowversion`, verifies `Status = Draft` and token under the header lock, and atomically updates the header plus replaces/modifies lines. Even a lines-only edit must update the header so its `rowversion` advances; return the new version. A stale token returns deterministic `GoodsReceipt.ConcurrencyConflict` (409 in v2); an already Posted receipt returns `GoodsReceipt.AlreadyPosted` (409).
-- [ ] Issue ReceiptNo on the server using a DB SEQUENCE (or equivalent transactional-safe, collision-resistant allocation), with a unique SQL index as final protection. Never trust a client-generated receipt number; gaps caused by transaction rollback are acceptable, reuse is not. Document the exact format before coding (the `GR0001` walkthrough value is illustrative).
+- [x] CreateDraft / UpdateDraft (header plus lines) atomically with **one explicit UoW and one SQL transaction** per command; rollback the entire aggregate on any failure.
+- [x] Require `Inventory.GoodsReceipts.Write` for CreateDraft/UpdateDraft and `Inventory.GoodsReceipts.Read` for List/Get, enforced in Application (not only UI). Post uses the separate `Inventory.GoodsReceipts.Post` permission and does not implicitly grant Read or Write; enforce explicit user-deny precedence. (T02 declares the authorized List/Get request boundaries; their Dapper handlers remain P5.2-T03. The Post handler remains P5.3.)
+- [x] Validators: warehouse/employee/product active, >=1 line, Quantity > 0, UnitCost >= 0, duplicate product line rejected, codes not blank; mirror appropriate invariants with SQL constraints. (ReceiptNo is server-generated and therefore is never accepted as client input.)
+- [x] **Shared aggregate locking protocol:** UpdateDraft and Post begin a transaction, acquire an update/held lock on the same GoodsReceipts header row **before reading or changing its lines**, and hold it to commit/rollback. Use consistent lock order across both paths; do not load lines on a separate connection or before obtaining the header lock. (The shared repository lock primitive and UpdateDraft usage are complete; P5.3 Post must reuse the same primitive.)
+- [x] UpdateDraft requires the caller's expected GoodsReceipts `rowversion`, verifies `Status = Draft` and token under the header lock, and atomically updates the header plus replaces/modifies lines. Even a lines-only edit must update the header so its `rowversion` advances; return the new version. A stale token returns deterministic `GoodsReceipt.ConcurrencyConflict` (409 in v2); an already Posted receipt returns `GoodsReceipt.AlreadyPosted` (409).
+- [x] Issue ReceiptNo on the server using a DB SEQUENCE (or equivalent transactional-safe, collision-resistant allocation), with a unique SQL index as final protection. Never trust a client-generated receipt number; gaps caused by transaction rollback are acceptable, reuse is not. Exact P5 format: `GR` followed by a zero-padded 10-digit sequence value (`GR0000000001` through `GR9999999999`); the sequence is non-cycling.
 
 ### P5.2-T03 — Queries and UI
 - [ ] List and Get receipt with header/lines via Dapper read models; Get includes the current opaque `rowversion` token for optimistic editing/posting and query permissions are enforced.

@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Identity;
+using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.Infrastructure.Catalog;
@@ -63,7 +64,8 @@ namespace MyDmsVn.Server.Infrastructure
                     registrations);
             });
             return new SqlPersistenceBuilder(services)
-                .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>();
+                .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>()
+                .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>();
         }
     }
 }

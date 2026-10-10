@@ -1,6 +1,6 @@
 ﻿# P5 Sales & Inventory — proposed SQL data model
 
-**Status:** schema blueprint. `003_Catalog.sql` is now the implementation source of truth for the P5.1 catalog tables; later P5 tables remain proposed until their DbUp scripts are written. The business ID strategy is a reversible proposal for those later tables.
+**Status:** schema blueprint. `003_Catalog.sql` / `004_Catalog_Nul_Constraints.sql` are the implementation source of truth for the P5.1 catalog tables; `005_GoodsReceipt.sql` and `006_GoodsReceipt_Number_Sequence.sql` are the implementation source of truth for P5.2 Goods Receipt storage and number allocation. Later inventory tables remain proposed until their DbUp scripts are written.
 
 ## 1. Core entities
 
@@ -60,6 +60,8 @@ Stock card order: `PostedAtUtc, LedgerId`; document date retained for user displ
 `rowversion` supports optimistic checks on balance/editable documents where useful; missing balance-row creation needs explicit lock/unique constraint handling. Monetary valuation is **not** implemented solely by storing UnitCost; no COGS algorithm in P5.
 
 `GoodsReceipts.RowVersion` is the aggregate concurrency boundary. Contracts expose it as an opaque Base64 string named `version`; UpdateDraft and Post send the last observed value as `expectedVersion`. Transport clients must not interpret the token or serialize the underlying SQL/RepoDb entity.
+
+Goods Receipt numbers are allocated only by the server from the non-cycling SQL sequence `dbo.GoodsReceiptNumberSequence`. The P5 format is `GR` plus a zero-padded 10-digit value, from `GR0000000001` through `GR9999999999`. Sequence gaps after rolled-back transactions are expected; values are never reused, and `UX_GoodsReceipts_ReceiptNo` remains the final uniqueness boundary.
 
 ## 5. Reporting DTOs
 
