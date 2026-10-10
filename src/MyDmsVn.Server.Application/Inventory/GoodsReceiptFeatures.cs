@@ -194,11 +194,11 @@ internal sealed class UpdateGoodsReceiptDraftCommandValidator
 internal static class GoodsReceiptValidation
 {
     public const int MaximumLinesPerReceipt = 200;
-    public const decimal MaximumQuantity = 99999999999999.9999m;
-    public const decimal MaximumUnitCost = 999999999999999.9999m;
+    public const decimal MaximumQuantity = GoodsReceiptContractLimits.MaximumQuantity;
+    public const decimal MaximumUnitCost = GoodsReceiptContractLimits.MaximumUnitCost;
 
     public static bool HasAtMostFourFractionalDigits(decimal value) =>
-        decimal.Round(value, 4) == value;
+        decimal.Round(value, GoodsReceiptContractLimits.DecimalPlaces) == value;
 }
 
 internal static class GoodsReceiptVersion

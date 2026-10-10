@@ -19,6 +19,8 @@ namespace MyDmsVn.Desktop.Application
         private readonly HashSet<int> _pendingChangedIds = new HashSet<int>();
         private IReadOnlyList<GoodsReceiptLineViewModel> _trackedLines =
             Array.Empty<GoodsReceiptLineViewModel>();
+        private IReadOnlyList<CatalogLookupDto> _sourceItems =
+            Array.Empty<CatalogLookupDto>();
         private IReadOnlyList<CatalogLookupOption> _items = Array.Empty<CatalogLookupOption>();
         private CancellationTokenSource? _activeLoad;
         private string? _search;
@@ -100,6 +102,8 @@ namespace MyDmsVn.Desktop.Application
                 ThrowIfDisposed();
                 _trackedLines = lines.Distinct().ToArray();
             }
+
+            Items = BuildOptions();
         }
 
         public void Dispose()
@@ -194,15 +198,12 @@ namespace MyDmsVn.Desktop.Application
                         if (response.IsSuccess)
                         {
                             ResetValidation();
-                            Items = response.Data!
-                                .Where(item => item.IsActive)
-                                .Select(item => new CatalogLookupOption(
-                                    item.Id,
-                                    item.Code,
-                                    item.Name,
-                                    isAvailableForNewSelection: true))
-                                .ToArray();
+                            lock (_sync)
+                            {
+                                _sourceItems = response.Data!.ToArray();
+                            }
                             ApplyChangedStates(changedStates);
+                            Items = BuildOptions();
                         }
                         else
                         {
@@ -249,6 +250,52 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
+        private IReadOnlyList<CatalogLookupOption> BuildOptions()
+        {
+            IReadOnlyList<CatalogLookupDto> sourceItems;
+            IReadOnlyList<GoodsReceiptLineViewModel> trackedLines;
+            lock (_sync)
+            {
+                sourceItems = _sourceItems;
+                trackedLines = _trackedLines;
+            }
+
+            var options = sourceItems
+                .Where(item => item.IsActive)
+                .Select(item => new CatalogLookupOption(
+                    item.Id,
+                    item.Code,
+                    item.Name,
+                    isAvailableForNewSelection: true))
+                .ToList();
+            foreach (var line in trackedLines
+                .Where(item => item.ProductId > 0)
+                .GroupBy(item => item.ProductId)
+                .Select(group => group.First()))
+            {
+                var activeOption = options.FirstOrDefault(item => item.Id == line.ProductId);
+                if (activeOption != null && line.ProductIsAvailable)
+                {
+                    continue;
+                }
+
+                if (activeOption != null)
+                {
+                    options.Remove(activeOption);
+                }
+
+                options.Add(
+                    new CatalogLookupOption(
+                        line.ProductId,
+                        string.Empty,
+                        string.Empty,
+                        isAvailableForNewSelection: false,
+                        line.ProductDisplayName ?? line.ProductId.ToString()));
+            }
+
+            return options;
+        }
+
         private bool IsCurrent(long generation)
         {
             lock (_sync)
@@ -259,6 +306,7 @@ namespace MyDmsVn.Desktop.Application
 
         private void CancelActiveLoadLocked()
         {
+            _generation++;
             _activeLoad?.Cancel();
             _activeLoad = null;
         }

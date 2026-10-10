@@ -54,6 +54,35 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Search_change_invalidates_an_old_product_response_before_debounce_starts()
+        {
+            var source = new ControlledProductSource();
+            var delay = new ControllableDelay();
+            using (var viewModel = new GoodsReceiptProductOptionsViewModel(
+                source,
+                new WeakReferenceMessenger(),
+                new IgnoringCancellationDispatcher(),
+                new DesktopNotificationCenter(),
+                delay,
+                TimeSpan.FromMilliseconds(300)))
+            {
+                var oldLoad = viewModel.ActivateAsync(CancellationToken.None);
+                var search = viewModel.SetSearch("NEW");
+
+                source.Complete(0, new CatalogLookupDto(1, "OLD", "Old", true));
+                await oldLoad;
+
+                Assert.Empty(viewModel.Items);
+
+                delay.ReleaseLatest();
+                await WaitUntilAsync(() => source.Calls == 2);
+                source.Complete(1, new CatalogLookupDto(2, "NEW", "New", true));
+                await search;
+                Assert.Equal(2, Assert.Single(viewModel.Items).Id);
+            }
+        }
+
+        [Fact]
         public async Task Deactivation_message_marks_tracked_line_unavailable_without_losing_its_label()
         {
             var source = new ProductSource();
@@ -75,6 +104,25 @@ namespace MyDmsVn.Desktop.Tests
 
                 Assert.Equal(1, line.ProductId);
                 Assert.Equal("P1 - Historical label", line.ProductDisplayName);
+            }
+        }
+
+        [Fact]
+        public async Task Tracked_product_outside_the_active_page_remains_a_historical_option()
+        {
+            var source = new ProductSource();
+            var messenger = new WeakReferenceMessenger();
+            using (var viewModel = Create(source, messenger, new ImmediateDelay()))
+            {
+                await viewModel.ActivateAsync(CancellationToken.None);
+                var line = new GoodsReceiptLineViewModel();
+                line.SetProduct(99, "P99 - Historical product", false);
+
+                viewModel.TrackLines(new[] { line });
+
+                var option = Assert.Single(viewModel.Items, item => item.Id == 99);
+                Assert.Equal("P99 - Historical product", option.DisplayName);
+                Assert.False(option.IsAvailableForNewSelection);
             }
         }
 
@@ -130,6 +178,33 @@ namespace MyDmsVn.Desktop.Tests
                     new CatalogLookupDto(id, "P" + id, "Current", ProductIsActive)));
         }
 
+        private sealed class ControlledProductSource : ICatalogLookupSource
+        {
+            private readonly List<TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>> _loads =
+                new List<TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>>();
+
+            public CatalogKind Kind => CatalogKind.Product;
+            public int Calls => _loads.Count;
+
+            public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(
+                CatalogLookupRequest request,
+                CancellationToken cancellationToken)
+            {
+                var completion = new TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                _loads.Add(completion);
+                return completion.Task;
+            }
+
+            public Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) =>
+                Task.FromResult(ApiResponse<CatalogLookupDto>.Success(
+                    new CatalogLookupDto(id, "P" + id, "Product", true)));
+
+            public void Complete(int index, CatalogLookupDto item) =>
+                _loads[index].TrySetResult(
+                    ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(new[] { item }));
+        }
+
         private sealed class ControllableDelay : IAsyncDelay
         {
             private readonly List<TaskCompletionSource<bool>> _pending = new List<TaskCompletionSource<bool>>();
@@ -142,6 +217,21 @@ namespace MyDmsVn.Desktop.Tests
                 return completion.Task;
             }
             public void ReleaseLatest() => _pending[_pending.Count - 1].TrySetResult(true);
+        }
+
+        private sealed class ImmediateDelay : IAsyncDelay
+        {
+            public Task DelayAsync(TimeSpan interval, CancellationToken cancellationToken) =>
+                Task.CompletedTask;
+        }
+
+        private sealed class IgnoringCancellationDispatcher : IUiDispatcher
+        {
+            public Task InvokeAsync(Action action, CancellationToken cancellationToken)
+            {
+                action();
+                return Task.CompletedTask;
+            }
         }
     }
 }

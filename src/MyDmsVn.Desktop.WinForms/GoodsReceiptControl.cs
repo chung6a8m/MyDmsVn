@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using BootstrapGrid = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSourceGrid;
 
@@ -32,6 +33,7 @@ namespace MyDmsVn.Desktop.WinForms
         private GoodsReceiptLineViewModel? _selectedLine;
         private int? _warehouseFilterId;
         private string? _statusFilter;
+        private string? _workflowMessage;
         private bool _applyingState;
 
         public GoodsReceiptControl(
@@ -88,17 +90,17 @@ namespace MyDmsVn.Desktop.WinForms
             QuantityEditor = new BootstrapNumericBox
             {
                 Dock = DockStyle.Top,
-                DecimalPlaces = 3,
+                DecimalPlaces = GoodsReceiptContractLimits.DecimalPlaces,
                 Minimum = 0,
-                Maximum = 1000000000,
+                Maximum = GoodsReceiptContractLimits.MaximumQuantity,
                 AccessibleName = "Quantity",
             };
             UnitCostEditor = new BootstrapNumericBox
             {
                 Dock = DockStyle.Top,
-                DecimalPlaces = 2,
+                DecimalPlaces = GoodsReceiptContractLimits.DecimalPlaces,
                 Minimum = 0,
-                Maximum = 1000000000000,
+                Maximum = GoodsReceiptContractLimits.MaximumUnitCost,
                 AccessibleName = "Unit cost",
             };
             AddLineButton = CreateButton("Add line", AddLine);
@@ -115,13 +117,17 @@ namespace MyDmsVn.Desktop.WinForms
 
             Controls.Add(CreateLayout());
             SearchBox.TextChanged += OnSearchChanged;
+            WarehouseFilterLookup.TextChanged += OnWarehouseLookupSearchChanged;
             WarehouseFilterLookup.SelectedValueChanged += OnWarehouseFilterChanged;
             StatusFilter.SelectedValueChanged += OnStatusFilterChanged;
             ReceiptDateEditor.ValueChanged += OnReceiptDateChanged;
             WarehouseLookup.SelectedValueChanged += OnWarehouseChanged;
+            WarehouseLookup.TextChanged += OnWarehouseLookupSearchChanged;
             EmployeeLookup.SelectedValueChanged += OnEmployeeChanged;
+            EmployeeLookup.TextChanged += OnEmployeeLookupSearchChanged;
             NoteEditor.TextChanged += OnNoteChanged;
             ProductLookup.SelectedValueChanged += OnProductChanged;
+            ProductLookup.TextChanged += OnProductLookupSearchChanged;
             QuantityEditor.ValueChanged += OnQuantityChanged;
             UnitCostEditor.ValueChanged += OnUnitCostChanged;
             _list.PropertyChanged += OnViewModelPropertyChanged;
@@ -200,13 +206,17 @@ namespace MyDmsVn.Desktop.WinForms
             if (disposing)
             {
                 SearchBox.TextChanged -= OnSearchChanged;
+                WarehouseFilterLookup.TextChanged -= OnWarehouseLookupSearchChanged;
                 WarehouseFilterLookup.SelectedValueChanged -= OnWarehouseFilterChanged;
                 StatusFilter.SelectedValueChanged -= OnStatusFilterChanged;
                 ReceiptDateEditor.ValueChanged -= OnReceiptDateChanged;
                 WarehouseLookup.SelectedValueChanged -= OnWarehouseChanged;
+                WarehouseLookup.TextChanged -= OnWarehouseLookupSearchChanged;
                 EmployeeLookup.SelectedValueChanged -= OnEmployeeChanged;
+                EmployeeLookup.TextChanged -= OnEmployeeLookupSearchChanged;
                 NoteEditor.TextChanged -= OnNoteChanged;
                 ProductLookup.SelectedValueChanged -= OnProductChanged;
+                ProductLookup.TextChanged -= OnProductLookupSearchChanged;
                 QuantityEditor.ValueChanged -= OnQuantityChanged;
                 UnitCostEditor.ValueChanged -= OnUnitCostChanged;
                 _list.PropertyChanged -= OnViewModelPropertyChanged;
@@ -234,8 +244,17 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task RefreshAsync()
         {
+            if (!CanAbandonEditor())
+            {
+                return;
+            }
+
             await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
-            if (_editor.Id.HasValue)
+            if (_list.IsAccessDenied)
+            {
+                ClearPersistedEditor();
+            }
+            else if (_editor.Id.HasValue)
             {
                 await _editor.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
             }
@@ -244,8 +263,24 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task SelectReceiptCoreAsync(long id, CancellationToken cancellationToken)
         {
-            await _list.SelectAsync(id, cancellationToken).ConfigureAwait(true);
-            _editor.Load(_list.SelectedReceipt);
+            if (!CanAbandonEditor())
+            {
+                return;
+            }
+
+            var selected = await _list.SelectAsync(id, cancellationToken).ConfigureAwait(true);
+            if (selected == null)
+            {
+                if (_list.IsAccessDenied)
+                {
+                    ClearPersistedEditor();
+                }
+                ApplyState();
+                return;
+            }
+
+            _workflowMessage = null;
+            _editor.Load(selected);
             _selectedLine = _editor.Lines.FirstOrDefault();
             ApplyState();
         }
@@ -257,7 +292,12 @@ namespace MyDmsVn.Desktop.WinForms
                 var saved = await _editor.SaveAsync(CancellationToken.None).ConfigureAwait(true);
                 if (saved)
                 {
+                    _workflowMessage = null;
                     await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
+                    if (_list.IsAccessDenied)
+                    {
+                        ClearPersistedEditor();
+                    }
                 }
             }
             ApplyState();
@@ -276,10 +316,37 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void BeginNew()
         {
+            if (!CanAbandonEditor())
+            {
+                return;
+            }
+
+            _workflowMessage = null;
             _list.NewDraft();
             _editor.Load(null);
             _selectedLine = null;
             ApplyState();
+        }
+
+        private bool CanAbandonEditor()
+        {
+            if (!_editor.IsDirty)
+            {
+                return true;
+            }
+
+            _workflowMessage = "Save the current draft before leaving it.";
+            ApplyState();
+            return false;
+        }
+
+        private void ClearPersistedEditor()
+        {
+            if (_editor.Id.HasValue)
+            {
+                _editor.Load(null);
+                _selectedLine = null;
+            }
         }
 
         private void MovePage(int offset)
@@ -381,6 +448,31 @@ namespace MyDmsVn.Desktop.WinForms
             if (!_applyingState)
             {
                 SetOperation(_list.SetSearch(SearchBox.Text));
+            }
+        }
+
+        private void OnWarehouseLookupSearchChanged(object? sender, EventArgs eventArgs)
+        {
+            var lookup = (BootstrapLookupBox)sender!;
+            if (!_applyingState && lookup.HasPendingText)
+            {
+                SetOperation(_editor.WarehouseLookup.SetSearch(lookup.Text));
+            }
+        }
+
+        private void OnEmployeeLookupSearchChanged(object? sender, EventArgs eventArgs)
+        {
+            if (!_applyingState && EmployeeLookup.HasPendingText)
+            {
+                SetOperation(_editor.EmployeeLookup.SetSearch(EmployeeLookup.Text));
+            }
+        }
+
+        private void OnProductLookupSearchChanged(object? sender, EventArgs eventArgs)
+        {
+            if (!_applyingState && ProductLookup.HasPendingText)
+            {
+                SetOperation(_editor.ProductOptions.SetSearch(ProductLookup.Text));
             }
         }
 
@@ -574,7 +666,8 @@ namespace MyDmsVn.Desktop.WinForms
 
                 var busy = _list.IsLoading || _list.IsBusy || _editor.IsBusy;
                 BusyIndicator.Visible = busy;
-                OperationStatusLabel.Text = _editor.ErrorMessage ??
+                OperationStatusLabel.Text = _workflowMessage ??
+                    _editor.ErrorMessage ??
                     _list.ErrorMessage ??
                     (busy ? "Loading..." : "Ready");
                 ReceiptGrid.Enabled = !busy;

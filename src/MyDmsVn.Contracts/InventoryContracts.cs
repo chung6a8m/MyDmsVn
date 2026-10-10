@@ -5,6 +5,13 @@ using Newtonsoft.Json;
 
 namespace MyDmsVn.Contracts
 {
+    public static class GoodsReceiptContractLimits
+    {
+        public const int DecimalPlaces = 4;
+        public const decimal MaximumQuantity = 99999999999999.9999m;
+        public const decimal MaximumUnitCost = 999999999999999.9999m;
+    }
+
     public sealed class GoodsReceiptLineDto
     {
         public GoodsReceiptLineDto(

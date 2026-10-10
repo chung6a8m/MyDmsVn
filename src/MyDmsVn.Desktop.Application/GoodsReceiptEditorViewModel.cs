@@ -20,6 +20,9 @@ namespace MyDmsVn.Desktop.Application
         private string? _note;
         private string _status = "Draft";
         private string? _version;
+        private int _saveInFlight;
+        private bool _isApplyingReceipt;
+        private bool _isDirty;
         private bool _disposed;
 
         public GoodsReceiptEditorViewModel(
@@ -58,7 +61,13 @@ namespace MyDmsVn.Desktop.Application
         public DateTime ReceiptDate
         {
             get => _receiptDate;
-            set => SetProperty(ref _receiptDate, value.Date);
+            set
+            {
+                if (SetProperty(ref _receiptDate, value.Date))
+                {
+                    MarkDirty();
+                }
+            }
         }
 
         public int? WarehouseId
@@ -76,7 +85,13 @@ namespace MyDmsVn.Desktop.Application
         public string? Note
         {
             get => _note;
-            set => SetProperty(ref _note, value);
+            set
+            {
+                if (SetProperty(ref _note, value))
+                {
+                    MarkDirty();
+                }
+            }
         }
 
         public string Status
@@ -98,11 +113,30 @@ namespace MyDmsVn.Desktop.Application
         }
 
         public bool IsReadOnly => string.Equals(Status, "Posted", StringComparison.Ordinal);
+        public bool IsDirty
+        {
+            get => _isDirty;
+            private set => SetProperty(ref _isDirty, value);
+        }
         public decimal Total => Lines.Sum(line => line.LineTotal);
 
         public void Load(GoodsReceiptDto? receipt)
         {
             ThrowIfDisposed();
+            _isApplyingReceipt = true;
+            try
+            {
+                LoadCore(receipt);
+            }
+            finally
+            {
+                _isApplyingReceipt = false;
+                IsDirty = false;
+            }
+        }
+
+        private void LoadCore(GoodsReceiptDto? receipt)
+        {
             ResetValidation();
             ClearLines();
             if (receipt == null)
@@ -157,14 +191,24 @@ namespace MyDmsVn.Desktop.Application
 
         public void SetWarehouse(int id, string? displayName, bool isAvailable)
         {
+            var changed = WarehouseId != id;
             WarehouseId = id;
             WarehouseLookup.SetSelection(id, displayName, isAvailable);
+            if (changed)
+            {
+                MarkDirty();
+            }
         }
 
         public void SetEmployee(int id, string? displayName, bool isAvailable)
         {
+            var changed = EmployeeId != id;
             EmployeeId = id;
             EmployeeLookup.SetSelection(id, displayName, isAvailable);
+            if (changed)
+            {
+                MarkDirty();
+            }
         }
 
         public GoodsReceiptLineViewModel AddLine()
@@ -174,6 +218,7 @@ namespace MyDmsVn.Desktop.Application
             AddLineCore(line);
             ProductOptions.TrackLines(Lines);
             OnPropertyChanged(nameof(Total));
+            MarkDirty();
             return line;
         }
 
@@ -185,6 +230,7 @@ namespace MyDmsVn.Desktop.Application
                 line.PropertyChanged -= OnLinePropertyChanged;
                 ProductOptions.TrackLines(Lines);
                 OnPropertyChanged(nameof(Total));
+                MarkDirty();
             }
         }
 
@@ -216,6 +262,27 @@ namespace MyDmsVn.Desktop.Application
         public async Task<bool> SaveAsync(CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
+            if (Interlocked.CompareExchange(ref _saveInFlight, 1, 0) != 0)
+            {
+                return false;
+            }
+
+            var saved = false;
+            try
+            {
+                await ExecuteBusyAsync(
+                    async token => saved = await SaveCoreAsync(token).ConfigureAwait(false),
+                    cancellationToken).ConfigureAwait(false);
+                return saved;
+            }
+            finally
+            {
+                Volatile.Write(ref _saveInFlight, 0);
+            }
+        }
+
+        private async Task<bool> SaveCoreAsync(CancellationToken cancellationToken)
+        {
             if (IsReadOnly || !ValidateForSave())
             {
                 return false;
@@ -257,18 +324,31 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
+            ApplyPersistedIdentity(response.Data!);
+            IsDirty = false;
             var refresh = await _apiClient
                 .GetAsync(response.Data!.Id, cancellationToken)
                 .ConfigureAwait(false);
             if (!refresh.IsSuccess)
             {
                 ApplyApiError(refresh.Error!);
-                return false;
+                PublishNotification(
+                    DesktopNotificationKind.Warning,
+                    "Goods receipt was saved, but its latest details could not be refreshed.");
+                return true;
             }
 
             Load(refresh.Data);
             PublishNotification(DesktopNotificationKind.Success, "Goods receipt saved.");
             return true;
+        }
+
+        private void ApplyPersistedIdentity(GoodsReceiptDto receipt)
+        {
+            Id = receipt.Id;
+            ReceiptNumber = receipt.ReceiptNumber;
+            Status = receipt.Status;
+            Version = receipt.Version;
         }
 
         public void Dispose()
@@ -352,11 +432,20 @@ namespace MyDmsVn.Desktop.Application
 
         private void OnLinePropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
         {
+            MarkDirty();
             if (eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.LineTotal) ||
                 eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.Quantity) ||
                 eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.UnitCost))
             {
                 OnPropertyChanged(nameof(Total));
+            }
+        }
+
+        private void MarkDirty()
+        {
+            if (!_isApplyingReceipt)
+            {
+                IsDirty = true;
             }
         }
 

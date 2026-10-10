@@ -65,6 +65,34 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Search_change_invalidates_an_old_response_before_the_debounce_starts()
+        {
+            var api = new ControlledApiClient();
+            var delay = new ControllableDelay();
+            using (var viewModel = new GoodsReceiptListViewModel(
+                api,
+                new IgnoringCancellationDispatcher(),
+                new DesktopNotificationCenter(),
+                delay,
+                TimeSpan.FromMilliseconds(300)))
+            {
+                var oldLoad = viewModel.RefreshAsync(CancellationToken.None);
+                var search = viewModel.SetSearch("NEW");
+
+                api.CompleteList(0, Receipt(1, "OLD"));
+                await oldLoad;
+
+                Assert.Empty(viewModel.Items);
+
+                delay.ReleaseLatest();
+                await WaitUntilAsync(() => api.ListCalls == 2);
+                api.CompleteList(1, Receipt(2, "NEW"));
+                await search;
+                Assert.Equal(2, Assert.Single(viewModel.Items).Id);
+            }
+        }
+
+        [Fact]
         public async Task Activation_fetches_fresh_data_errors_surface_and_disposal_ignores_late_work()
         {
             var notifications = new DesktopNotificationCenter();
@@ -93,6 +121,39 @@ namespace MyDmsVn.Desktop.Tests
             viewModel.Dispose();
         }
 
+        [Fact]
+        public async Task Authorization_failures_clear_cached_list_and_detail_data()
+        {
+            var api = new ScriptedApiClient
+            {
+                ListResponse = ApiResponse<PagedResult<GoodsReceiptDto>>.Success(
+                    new PagedResult<GoodsReceiptDto>(new[] { Receipt(41, "GR41") }, 1, 25, 1)),
+            };
+            using (var viewModel = Create(api, new ImmediateDelay()))
+            {
+                await viewModel.ActivateAsync(CancellationToken.None);
+                await viewModel.SelectAsync(41, CancellationToken.None);
+                Assert.NotEmpty(viewModel.Items);
+                Assert.NotNull(viewModel.SelectedReceipt);
+
+                api.GetResponse = ApiResponse<GoodsReceiptDto>.Failure(
+                    new ApiError(ApiStatusCode.Unauthorized, "Auth.Unauthorized", "Sign in again."));
+                await viewModel.SelectAsync(99, CancellationToken.None);
+                Assert.Null(viewModel.SelectedReceipt);
+
+                await viewModel.SelectAsync(41, CancellationToken.None);
+                api.GetResponse = ApiResponse<GoodsReceiptDto>.Success(Receipt(41, "GR41"));
+                await viewModel.SelectAsync(41, CancellationToken.None);
+                api.ListResponse = ApiResponse<PagedResult<GoodsReceiptDto>>.Failure(
+                    new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Denied."));
+                await viewModel.RefreshAsync(CancellationToken.None);
+
+                Assert.Empty(viewModel.Items);
+                Assert.Equal(0, viewModel.TotalCount);
+                Assert.Null(viewModel.SelectedReceipt);
+            }
+        }
+
         private static GoodsReceiptListViewModel Create(
             IGoodsReceiptApiClient api,
             IAsyncDelay delay) =>
@@ -115,6 +176,20 @@ namespace MyDmsVn.Desktop.Tests
                 null,
                 Convert.ToBase64String(new byte[8]),
                 Array.Empty<GoodsReceiptLineDto>());
+
+        private static async Task WaitUntilAsync(Func<bool> condition)
+        {
+            var timeout = DateTime.UtcNow.AddSeconds(5);
+            while (!condition())
+            {
+                if (DateTime.UtcNow >= timeout)
+                {
+                    throw new TimeoutException();
+                }
+
+                await Task.Delay(10);
+            }
+        }
 
         private sealed class ImmediateDelay : IAsyncDelay
         {
@@ -147,6 +222,7 @@ namespace MyDmsVn.Desktop.Tests
             public ApiResponse<PagedResult<GoodsReceiptDto>> ListResponse { get; set; } =
                 ApiResponse<PagedResult<GoodsReceiptDto>>.Success(
                     new PagedResult<GoodsReceiptDto>(Array.Empty<GoodsReceiptDto>(), 1, 25, 0));
+            public ApiResponse<GoodsReceiptDto>? GetResponse { get; set; }
 
             public Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(
                 GoodsReceiptListRequest request,
@@ -157,7 +233,7 @@ namespace MyDmsVn.Desktop.Tests
             }
 
             public Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken token) =>
-                Task.FromResult(ApiResponse<GoodsReceiptDto>.Success(Receipt(id, "GR")));
+                Task.FromResult(GetResponse ?? ApiResponse<GoodsReceiptDto>.Success(Receipt(id, "GR")));
             public Task<ApiResponse<GoodsReceiptDto>> CreateDraftAsync(SaveGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(UpdateGoodsReceiptDraftRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(PostGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();
@@ -169,6 +245,8 @@ namespace MyDmsVn.Desktop.Tests
                 new List<TaskCompletionSource<ApiResponse<PagedResult<GoodsReceiptDto>>>>();
             private readonly List<TaskCompletionSource<ApiResponse<GoodsReceiptDto>>> _gets =
                 new List<TaskCompletionSource<ApiResponse<GoodsReceiptDto>>>();
+
+            public int ListCalls => _lists.Count;
 
             public Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(GoodsReceiptListRequest request, CancellationToken token)
             {
@@ -192,6 +270,15 @@ namespace MyDmsVn.Desktop.Tests
             public Task<ApiResponse<GoodsReceiptDto>> CreateDraftAsync(SaveGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(UpdateGoodsReceiptDraftRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(PostGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();
+        }
+
+        private sealed class IgnoringCancellationDispatcher : IUiDispatcher
+        {
+            public Task InvokeAsync(Action action, CancellationToken cancellationToken)
+            {
+                action();
+                return Task.CompletedTask;
+            }
         }
     }
 }

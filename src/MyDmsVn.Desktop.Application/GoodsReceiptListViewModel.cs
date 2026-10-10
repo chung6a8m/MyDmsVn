@@ -23,6 +23,7 @@ namespace MyDmsVn.Desktop.Application
         private long _totalCount;
         private long _generation;
         private bool _isLoading;
+        private bool _isAccessDenied;
         private bool _disposed;
 
         public GoodsReceiptListViewModel(
@@ -82,6 +83,12 @@ namespace MyDmsVn.Desktop.Application
             private set => SetProperty(ref _isLoading, value);
         }
 
+        public bool IsAccessDenied
+        {
+            get => _isAccessDenied;
+            private set => SetProperty(ref _isAccessDenied, value);
+        }
+
         public Task ActivateAsync(CancellationToken cancellationToken) =>
             RefreshAsync(cancellationToken);
 
@@ -131,7 +138,7 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        public Task SelectAsync(long id, CancellationToken cancellationToken) =>
+        public Task<GoodsReceiptDto?> SelectAsync(long id, CancellationToken cancellationToken) =>
             LoadDetailAsync(id, cancellationToken);
 
         public void NewDraft() => SelectedReceipt = null;
@@ -187,11 +194,19 @@ namespace MyDmsVn.Desktop.Application
                         if (response.IsSuccess)
                         {
                             ResetValidation();
+                            IsAccessDenied = false;
                             Items = response.Data!.Items;
                             TotalCount = response.Data.TotalCount;
                         }
                         else
                         {
+                            IsAccessDenied = IsAuthorizationFailure(response.Error!);
+                            if (IsAccessDenied)
+                            {
+                                Items = Array.Empty<GoodsReceiptDto>();
+                                TotalCount = 0;
+                                SelectedReceipt = null;
+                            }
                             ApplyApiError(response.Error!);
                         }
                     },
@@ -206,7 +221,7 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        private async Task LoadDetailAsync(long id, CancellationToken cancellationToken)
+        private async Task<GoodsReceiptDto?> LoadDetailAsync(long id, CancellationToken cancellationToken)
         {
             var operation = BeginLoad(cancellationToken);
             try
@@ -216,9 +231,10 @@ namespace MyDmsVn.Desktop.Application
                     .ConfigureAwait(false);
                 if (!IsCurrent(operation.Generation))
                 {
-                    return;
+                    return null;
                 }
 
+                GoodsReceiptDto? selected = null;
                 await _dispatcher.InvokeAsync(
                     () =>
                     {
@@ -227,18 +243,27 @@ namespace MyDmsVn.Desktop.Application
                             if (response.IsSuccess)
                             {
                                 ResetValidation();
+                                IsAccessDenied = false;
                                 SelectedReceipt = response.Data;
+                                selected = response.Data;
                             }
                             else
                             {
+                                IsAccessDenied = IsAuthorizationFailure(response.Error!);
+                                if (IsAccessDenied)
+                                {
+                                    SelectedReceipt = null;
+                                }
                                 ApplyApiError(response.Error!);
                             }
                         }
                     },
                     operation.Cancellation.Token).ConfigureAwait(false);
+                return selected;
             }
             catch (OperationCanceledException) when (operation.Cancellation.IsCancellationRequested)
             {
+                return null;
             }
             finally
             {
@@ -284,6 +309,7 @@ namespace MyDmsVn.Desktop.Application
 
         private void CancelActiveLoadLocked()
         {
+            _generation++;
             _activeLoad?.Cancel();
             _activeLoad = null;
         }
@@ -295,6 +321,10 @@ namespace MyDmsVn.Desktop.Application
                 throw new ObjectDisposedException(nameof(GoodsReceiptListViewModel));
             }
         }
+
+        private static bool IsAuthorizationFailure(ApiError error) =>
+            error.Status == ApiStatusCode.Unauthorized ||
+            error.Status == ApiStatusCode.Forbidden;
 
         private sealed class LoadOperation
         {

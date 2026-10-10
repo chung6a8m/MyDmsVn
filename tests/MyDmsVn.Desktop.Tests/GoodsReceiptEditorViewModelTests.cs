@@ -69,6 +69,52 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Concurrent_save_requests_issue_only_one_create_command()
+        {
+            var api = new EditorApiClient { ControlCreateResponse = true };
+            using (var fixture = Create(api))
+            {
+                PopulateValidDraft(fixture.Editor);
+
+                var first = fixture.Editor.SaveAsync(CancellationToken.None);
+                var second = fixture.Editor.SaveAsync(CancellationToken.None);
+                api.CompleteCreate();
+
+                Assert.True(await first);
+                Assert.False(await second);
+                Assert.Equal(1, api.CreateCalls);
+            }
+        }
+
+        [Fact]
+        public async Task Successful_create_keeps_identity_when_follow_up_refresh_fails()
+        {
+            var api = new EditorApiClient
+            {
+                GetResponse = ApiResponse<GoodsReceiptDto>.Failure(
+                    new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Could not refresh.")),
+            };
+            using (var fixture = Create(api))
+            {
+                PopulateValidDraft(fixture.Editor);
+
+                var saved = await fixture.Editor.SaveAsync(CancellationToken.None);
+
+                Assert.True(saved);
+                Assert.Equal(41, fixture.Editor.Id);
+                Assert.Equal("AQEBAQEBAQE=", fixture.Editor.Version);
+                Assert.Equal("Could not refresh.", fixture.Editor.ErrorMessage);
+
+                api.GetResponse = ApiResponse<GoodsReceiptDto>.Success(
+                    Receipt("server refreshed", "AwMDAwMDAwM="));
+                Assert.True(await fixture.Editor.SaveAsync(CancellationToken.None));
+                Assert.Equal(1, api.CreateCalls);
+                Assert.NotNull(api.LastUpdate);
+                Assert.Equal("AQEBAQEBAQE=", api.LastUpdate!.ExpectedVersion);
+            }
+        }
+
+        [Fact]
         public async Task Immediate_validation_blocks_missing_fields_and_posted_receipts_are_read_only()
         {
             var api = new EditorApiClient();
@@ -84,6 +130,28 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.True(fixture.Editor.IsReadOnly);
                 Assert.False(await fixture.Editor.SaveAsync(CancellationToken.None));
                 Assert.Null(api.LastUpdate);
+            }
+        }
+
+        [Fact]
+        public async Task Dirty_state_tracks_user_edits_and_resets_after_load_or_save()
+        {
+            var api = new EditorApiClient();
+            using (var fixture = Create(api))
+            {
+                fixture.Editor.Load(Receipt("original", "AQIDBAUGBwg="));
+                Assert.False(fixture.Editor.IsDirty);
+
+                fixture.Editor.Note = "changed";
+                Assert.True(fixture.Editor.IsDirty);
+
+                fixture.Editor.Load(Receipt("reloaded", "AQIDBAUGBwg="));
+                Assert.False(fixture.Editor.IsDirty);
+
+                fixture.Editor.Lines[0].Quantity = 9m;
+                Assert.True(fixture.Editor.IsDirty);
+                Assert.True(await fixture.Editor.SaveAsync(CancellationToken.None));
+                Assert.False(fixture.Editor.IsDirty);
             }
         }
 
@@ -103,6 +171,18 @@ namespace MyDmsVn.Desktop.Tests
                 warehouse,
                 employee,
                 products);
+        }
+
+        private static void PopulateValidDraft(GoodsReceiptEditorViewModel editor)
+        {
+            editor.Load(null);
+            editor.ReceiptDate = new DateTime(2026, 10, 10);
+            editor.SetWarehouse(3, "W3 - Main", true);
+            editor.SetEmployee(5, "E5 - Operator", true);
+            var line = editor.AddLine();
+            line.SetProduct(7, "P7 - Product 7", true);
+            line.Quantity = 1m;
+            line.UnitCost = 2m;
         }
 
         private static GoodsReceiptDto Receipt(
@@ -158,16 +238,38 @@ namespace MyDmsVn.Desktop.Tests
 
         private sealed class EditorApiClient : IGoodsReceiptApiClient
         {
+            private TaskCompletionSource<ApiResponse<GoodsReceiptDto>>? _createCompletion;
+
             public SaveGoodsReceiptRequest? LastCreate { get; private set; }
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
             public IList<long> GetIds { get; } = new List<long>();
+            public int CreateCalls { get; private set; }
+            public bool ControlCreateResponse { get; set; }
+            public ApiResponse<GoodsReceiptDto> GetResponse { get; set; } =
+                ApiResponse<GoodsReceiptDto>.Success(Receipt("server refreshed", "AwMDAwMDAwM="));
             public ApiResponse<GoodsReceiptDto> UpdateResponse { get; set; } = ApiResponse<GoodsReceiptDto>.Success(Receipt("updated", "AgICAgICAgI="));
 
             public Task<ApiResponse<GoodsReceiptDto>> CreateDraftAsync(SaveGoodsReceiptRequest request, CancellationToken token)
             {
+                CreateCalls++;
                 LastCreate = request;
-                return Task.FromResult(ApiResponse<GoodsReceiptDto>.Success(Receipt("created", "AQEBAQEBAQE=")));
+                var response = ApiResponse<GoodsReceiptDto>.Success(Receipt("created", "AQEBAQEBAQE="));
+                if (!ControlCreateResponse)
+                {
+                    return Task.FromResult(response);
+                }
+
+                if (_createCompletion == null)
+                {
+                    _createCompletion = new TaskCompletionSource<ApiResponse<GoodsReceiptDto>>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+                return _createCompletion.Task;
             }
+
+            public void CompleteCreate() =>
+                _createCompletion!.TrySetResult(
+                    ApiResponse<GoodsReceiptDto>.Success(Receipt("created", "AQEBAQEBAQE=")));
             public Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(UpdateGoodsReceiptDraftRequest request, CancellationToken token)
             {
                 LastUpdate = request;
@@ -176,7 +278,7 @@ namespace MyDmsVn.Desktop.Tests
             public Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken token)
             {
                 GetIds.Add(id);
-                return Task.FromResult(ApiResponse<GoodsReceiptDto>.Success(Receipt("server refreshed", "AwMDAwMDAwM=")));
+                return Task.FromResult(GetResponse);
             }
             public Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(GoodsReceiptListRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(PostGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();
