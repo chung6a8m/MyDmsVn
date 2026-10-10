@@ -321,6 +321,31 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Message_reload_supersedes_a_search_scheduled_from_another_thread()
+        {
+            var client = new FakeProductClient();
+            var delay = new ControllableDelay();
+            var messenger = new WeakReferenceMessenger();
+            using (var viewModel = CreateProduct(client, delay, messenger))
+            {
+                var search = viewModel.SetSearch("new");
+                await WaitUntilAsync(() => delay.PendingCount == 1);
+
+                await Task.Run(() => messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated)));
+                await WaitUntilAsync(() => delay.PendingCount == 2);
+
+                delay.ReleaseAll();
+                await search;
+                await WaitUntilAsync(() => client.ListRequests.Count >= 1);
+
+                Assert.Single(client.ListRequests);
+            }
+        }
+
+        [Fact]
         public async Task Catalog_messages_refresh_other_open_lists_and_stop_after_disposal()
         {
             var messenger = new WeakReferenceMessenger();
@@ -379,6 +404,49 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Older_selection_cleanup_cannot_clear_a_newer_selection_loading_state()
+        {
+            var client = new FakeProductClient { ControlGetResponses = true };
+            var dispatcher = new SwitchableUiDispatcher { Defer = true };
+            using (var viewModel = new ProductCatalogViewModel(
+                client,
+                new WeakReferenceMessenger(),
+                dispatcher,
+                new DesktopNotificationCenter(),
+                new ControllableDelay()))
+            {
+                var first = viewModel.SelectAsync(1, CancellationToken.None);
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+                dispatcher.RunNext();
+                await WaitUntilAsync(() => client.ControlledGetCount == 1);
+                Assert.True(viewModel.IsEditorLoading);
+
+                client.CompleteGet(0, Product(1, "P1"));
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+                dispatcher.RunNext();
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+
+                var second = viewModel.SelectAsync(2, CancellationToken.None);
+                await WaitUntilAsync(() => dispatcher.PendingCount == 2);
+                dispatcher.RunNext();
+
+                Assert.True(viewModel.IsEditorLoading);
+
+                dispatcher.RunNext();
+                await WaitUntilAsync(() => client.ControlledGetCount == 2);
+                client.CompleteGet(1, Product(2, "P2"));
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+                dispatcher.RunNext();
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+                dispatcher.RunNext();
+                await Task.WhenAll(first, second);
+
+                Assert.False(viewModel.IsEditorLoading);
+                Assert.Equal(2, viewModel.SelectedId);
+            }
+        }
+
+        [Fact]
         public async Task Detail_load_exception_is_reported_without_faulting_the_selection_task()
         {
             var client = new FakeProductClient
@@ -422,9 +490,12 @@ namespace MyDmsVn.Desktop.Tests
 
                 cancellation.Cancel();
                 dispatcher.RunNext();
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+                dispatcher.RunNext();
                 await selection;
 
                 Assert.Null(notifications.LastNotification);
+                Assert.False(viewModel.IsEditorLoading);
             }
         }
 
@@ -645,10 +716,22 @@ namespace MyDmsVn.Desktop.Tests
 
         private sealed class ControllableDelay : IAsyncDelay
         {
+            private readonly object _sync = new object();
             private readonly List<TaskCompletionSource<bool>> _pending =
                 new List<TaskCompletionSource<bool>>();
 
             public TimeSpan LatestInterval { get; private set; }
+
+            public int PendingCount
+            {
+                get
+                {
+                    lock (_sync)
+                    {
+                        return _pending.Count;
+                    }
+                }
+            }
 
             public Task DelayAsync(TimeSpan interval, CancellationToken cancellationToken)
             {
@@ -656,17 +739,45 @@ namespace MyDmsVn.Desktop.Tests
                 var completion = new TaskCompletionSource<bool>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
                 cancellationToken.Register(() => completion.TrySetCanceled());
-                _pending.Add(completion);
+                lock (_sync)
+                {
+                    _pending.Add(completion);
+                }
+
                 return completion.Task;
             }
 
-            public void ReleaseLatest() => _pending[_pending.Count - 1].TrySetResult(true);
+            public void ReleaseLatest()
+            {
+                TaskCompletionSource<bool> completion;
+                lock (_sync)
+                {
+                    completion = _pending[_pending.Count - 1];
+                }
 
-            public void Release(int index) => _pending[index].TrySetResult(true);
+                completion.TrySetResult(true);
+            }
+
+            public void Release(int index)
+            {
+                TaskCompletionSource<bool> completion;
+                lock (_sync)
+                {
+                    completion = _pending[index];
+                }
+
+                completion.TrySetResult(true);
+            }
 
             public void ReleaseAll()
             {
-                foreach (var completion in _pending.ToArray())
+                TaskCompletionSource<bool>[] pending;
+                lock (_sync)
+                {
+                    pending = _pending.ToArray();
+                }
+
+                foreach (var completion in pending)
                 {
                     completion.TrySetResult(true);
                 }
@@ -687,6 +798,7 @@ namespace MyDmsVn.Desktop.Tests
             public bool ControlGetResponses { get; set; }
             public bool ControlCreateResponse { get; set; }
             public int ControlledListCount => _controlledLists.Count;
+            public int ControlledGetCount => _controlledGets.Count;
 
             public ApiResponse<PagedResult<ProductDto>> ListResponse { get; set; } =
                 ApiResponse<PagedResult<ProductDto>>.Success(

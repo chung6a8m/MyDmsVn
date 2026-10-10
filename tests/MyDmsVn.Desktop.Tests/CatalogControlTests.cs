@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -172,6 +173,104 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Editor_fields_are_disabled_while_a_row_selection_is_in_flight()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var product = new ProductDto(1, "P1", "Product", "pcs", true);
+                    var client = new ProductClient
+                    {
+                        Items = new[] { product },
+                        ControlGetResponses = true,
+                    };
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    {
+                        control.CreateControl();
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+
+                        var selection = viewModel.SelectAsync(product.Id, cancellationToken);
+
+                        Assert.All(control.EditorControls.Values, editor => Assert.False(editor.Enabled));
+                        Assert.False(control.SaveButton.Enabled);
+
+                        client.CompleteGet(product);
+                        PumpMessagesUntil(
+                            () => selection.IsCompleted &&
+                                control.EditorControls.Values.All(editor => editor.Enabled),
+                            TimeSpan.FromSeconds(2));
+                        selection.GetAwaiter().GetResult();
+
+                        Assert.All(control.EditorControls.Values, editor => Assert.True(editor.Enabled));
+                        Assert.True(control.SaveButton.Enabled);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Enter_selects_the_active_catalog_row()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var product = new ProductDto(1, "P1", "Product", "pcs", true);
+                    var client = new ProductClient { Items = new[] { product } };
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    using (var host = new Form())
+                    {
+                        host.Controls.Add(control);
+                        host.Show();
+                        System.Windows.Forms.Application.DoEvents();
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        Assert.True(control.Grid.Selection.Focus(new SourceGrid.Position(1, 0), true));
+
+                        RaiseKeyDown(control.Grid, Keys.Enter);
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.Equal(product.Id, viewModel.SelectedId);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Enter_does_not_select_a_row_while_the_active_cell_is_editing()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var product = new ProductDto(1, "P1", "Product", "pcs", true);
+                    var client = new ProductClient { Items = new[] { product } };
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    using (var host = new Form())
+                    {
+                        host.Controls.Add(control);
+                        host.Show();
+                        System.Windows.Forms.Application.DoEvents();
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        var position = new SourceGrid.Position(1, 1);
+                        Assert.True(control.Grid.Selection.Focus(position, true));
+                        var context = new SourceGrid.CellContext(control.Grid, position);
+                        context.StartEdit();
+                        Assert.True(context.IsEditing());
+
+                        RaiseKeyDown(control.Grid, Keys.Enter);
+
+                        Assert.Null(viewModel.SelectedId);
+                        if (context.IsEditing())
+                        {
+                            context.EndEdit(true);
+                        }
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void Background_view_model_updates_are_marshaled_to_the_control_thread()
         {
             StaTest.Run(
@@ -298,14 +397,25 @@ namespace MyDmsVn.Desktop.Tests
             Assert.True(condition(), "Expected UI update did not arrive before the timeout.");
         }
 
+        private static void RaiseKeyDown(Control control, Keys key)
+        {
+            var onKeyDown = control.GetType().GetMethod(
+                "OnKeyDown",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(onKeyDown);
+            onKeyDown!.Invoke(control, new object[] { new KeyEventArgs(key) });
+        }
+
         private sealed class ProductClient : IProductApiClient
         {
             private TaskCompletionSource<ApiResponse<ProductDto>>? _controlledCreate;
+            private TaskCompletionSource<ApiResponse<ProductDto>>? _controlledGet;
 
             public ProductDto[] Items { get; set; } = Array.Empty<ProductDto>();
             public int CreateCount { get; private set; }
             public int ListCount { get; private set; }
             public bool ControlCreateResponse { get; set; }
+            public bool ControlGetResponses { get; set; }
             public ApiResponse<ProductDto> CreateResponse { get; set; } =
                 ApiResponse<ProductDto>.Success(new ProductDto(1, "P1", "Product", "pcs", true));
 
@@ -320,8 +430,21 @@ namespace MyDmsVn.Desktop.Tests
                             request.PageSize,
                             Items.Length)));
             }
-            public Task<ApiResponse<ProductDto>> GetAsync(int id, CancellationToken token) =>
-                Task.FromResult(ApiResponse<ProductDto>.Success(Items.Single(item => item.Id == id)));
+            public Task<ApiResponse<ProductDto>> GetAsync(int id, CancellationToken token)
+            {
+                if (!ControlGetResponses)
+                {
+                    return Task.FromResult(
+                        ApiResponse<ProductDto>.Success(Items.Single(item => item.Id == id)));
+                }
+
+                _controlledGet = new TaskCompletionSource<ApiResponse<ProductDto>>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                return _controlledGet.Task;
+            }
+
+            public void CompleteGet(ProductDto product) =>
+                _controlledGet!.TrySetResult(ApiResponse<ProductDto>.Success(product));
             public Task<ApiResponse<ProductDto>> CreateAsync(SaveProductRequest request, CancellationToken token)
             {
                 CreateCount++;

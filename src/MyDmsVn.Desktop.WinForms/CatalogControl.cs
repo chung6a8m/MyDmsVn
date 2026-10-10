@@ -67,6 +67,7 @@ namespace MyDmsVn.Desktop.WinForms
                 TabStop = true,
             };
             Grid.DoubleClick += (_, __) => SelectActiveRow();
+            Grid.KeyDown += OnGridKeyDown;
 
             RefreshButton = CreateButton("Refresh", 20, () => SetOperation(_binding.RefreshAsync(CancellationToken.None)));
             PreviousPageButton = CreateButton("Previous", 18, () => MovePage(-1));
@@ -242,7 +243,7 @@ namespace MyDmsVn.Desktop.WinForms
                     SearchBox.Text = _binding.Search ?? string.Empty;
                 }
 
-                var busy = _binding.IsBusy || _binding.IsLoading;
+                var busy = _binding.IsBusy || _binding.IsLoading || _binding.IsEditorLoading;
                 foreach (var field in _binding.Fields)
                 {
                     var value = field.GetValue();
@@ -302,18 +303,44 @@ namespace MyDmsVn.Desktop.WinForms
             ApplyState();
         }
 
-        private void SelectActiveRow()
+        private bool SelectActiveRow()
         {
             var row = Grid.Selection.ActivePosition.Row;
             if (row <= 0 || row >= Grid.RowsCount)
             {
-                return;
+                return false;
             }
 
             if (Grid[row, 0].Value is int id)
             {
                 SetOperation(_binding.SelectAsync(id, CancellationToken.None));
+                return true;
             }
+
+            return false;
+        }
+
+        private void OnGridKeyDown(object? sender, KeyEventArgs eventArgs)
+        {
+            if (eventArgs.KeyCode != Keys.Enter ||
+                eventArgs.Modifiers != Keys.None ||
+                IsActiveGridCellEditing())
+            {
+                return;
+            }
+
+            if (SelectActiveRow())
+            {
+                eventArgs.Handled = true;
+                eventArgs.SuppressKeyPress = true;
+            }
+        }
+
+        private bool IsActiveGridCellEditing()
+        {
+            var position = Grid.Selection.ActivePosition;
+            return !position.IsEmpty() &&
+                new SourceGrid.CellContext(Grid, position).IsEditing();
         }
 
         private void SetActive(bool isActive)
@@ -467,6 +494,7 @@ namespace MyDmsVn.Desktop.WinForms
             private readonly Func<string?> _search;
             private readonly Func<bool> _isBusy;
             private readonly Func<bool> _isLoading;
+            private readonly Func<bool> _isEditorLoading;
             private readonly Func<int> _pageNumber;
             private readonly Func<int> _pageSize;
             private readonly Func<long> _totalCount;
@@ -490,6 +518,7 @@ namespace MyDmsVn.Desktop.WinForms
                 Func<string?> search,
                 Func<bool> isBusy,
                 Func<bool> isLoading,
+                Func<bool> isEditorLoading,
                 Func<int> pageNumber,
                 Func<int> pageSize,
                 Func<long> totalCount)
@@ -512,6 +541,7 @@ namespace MyDmsVn.Desktop.WinForms
                 _search = search;
                 _isBusy = isBusy;
                 _isLoading = isLoading;
+                _isEditorLoading = isEditorLoading;
                 _pageNumber = pageNumber;
                 _pageSize = pageSize;
                 _totalCount = totalCount;
@@ -538,6 +568,7 @@ namespace MyDmsVn.Desktop.WinForms
             public string? Search => _search();
             public bool IsBusy => _isBusy();
             public bool IsLoading => _isLoading();
+            public bool IsEditorLoading => _isEditorLoading();
             public int PageNumber => _pageNumber();
             public int PageSize => _pageSize();
             public long TotalCount => _totalCount();
@@ -577,6 +608,7 @@ namespace MyDmsVn.Desktop.WinForms
                     () => viewModel.Search,
                     () => viewModel.IsBusy,
                     () => viewModel.IsLoading,
+                    () => viewModel.IsEditorLoading,
                     () => viewModel.PageNumber,
                     () => viewModel.PageSize,
                     () => viewModel.TotalCount);

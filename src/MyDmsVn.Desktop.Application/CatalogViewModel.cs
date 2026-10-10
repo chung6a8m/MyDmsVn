@@ -26,6 +26,7 @@ namespace MyDmsVn.Desktop.Application
         private long _totalCount;
         private int? _selectedId;
         private bool _isLoading;
+        private bool _isEditorLoading;
         private bool _disposed;
         private long _generation;
         private long _editorGeneration;
@@ -99,26 +100,52 @@ namespace MyDmsVn.Desktop.Application
             private set => SetProperty(ref _isLoading, value);
         }
 
+        public bool IsEditorLoading
+        {
+            get => _isEditorLoading;
+            private set => SetProperty(ref _isEditorLoading, value);
+        }
+
         public Task ActivateAsync(CancellationToken cancellationToken) =>
             RefreshAsync(cancellationToken);
 
         public Task SetSearch(string? search)
         {
-            ThrowIfDisposed();
-            CancelMessageReload();
-            CancelListLoad();
-            _search = search;
+            Task scheduled;
+            var pageChanged = false;
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+                CancelMessageReloadLocked();
+                CancelListLoadLocked();
+                _search = search;
+                if (_pageNumber != 1)
+                {
+                    _pageNumber = 1;
+                    pageChanged = true;
+                }
+
+                scheduled = _searchReload.Schedule(LoadAsync);
+            }
+
             OnPropertyChanged(nameof(Search));
-            PageNumber = 1;
-            return _searchReload.Schedule(LoadAsync);
+            if (pageChanged)
+            {
+                OnPropertyChanged(nameof(PageNumber));
+            }
+
+            return scheduled;
         }
 
         public Task RefreshAsync(CancellationToken cancellationToken)
         {
-            ThrowIfDisposed();
-            _searchReload.Cancel();
-            CancelMessageReload();
-            return LoadAsync(cancellationToken);
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+                _searchReload.Cancel();
+                CancelMessageReloadLocked();
+                return LoadAsync(cancellationToken);
+            }
         }
 
         public Task MoveToPageAsync(int pageNumber, CancellationToken cancellationToken)
@@ -189,6 +216,15 @@ namespace MyDmsVn.Desktop.Application
 
             try
             {
+                await _dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        if (IsEditorCurrent(editorGeneration))
+                        {
+                            IsEditorLoading = true;
+                        }
+                    },
+                    editorCancellation.Token).ConfigureAwait(false);
                 var response = await GetAsync(id, editorCancellation.Token).ConfigureAwait(false);
                 if (!IsEditorCurrent(editorGeneration))
                 {
@@ -239,12 +275,27 @@ namespace MyDmsVn.Desktop.Application
             }
             finally
             {
+                var wasActiveEditorLoad = false;
                 lock (_sync)
                 {
                     if (ReferenceEquals(_activeEditorLoad, editorCancellation))
                     {
                         _activeEditorLoad = null;
+                        wasActiveEditorLoad = true;
                     }
+                }
+
+                if (wasActiveEditorLoad)
+                {
+                    await _dispatcher.InvokeAsync(
+                        () =>
+                        {
+                            if (IsEditorCurrent(editorGeneration))
+                            {
+                                IsEditorLoading = false;
+                            }
+                        },
+                        CancellationToken.None).ConfigureAwait(false);
                 }
 
                 editorCancellation.Dispose();
@@ -560,9 +611,14 @@ namespace MyDmsVn.Desktop.Application
         {
             lock (_sync)
             {
-                _generation++;
-                _activeLoad?.Cancel();
+                CancelListLoadLocked();
             }
+        }
+
+        private void CancelListLoadLocked()
+        {
+            _generation++;
+            _activeLoad?.Cancel();
         }
 
         private void CancelEditorLoad()
@@ -572,6 +628,10 @@ namespace MyDmsVn.Desktop.Application
                 _editorGeneration++;
                 _activeEditorLoad?.Cancel();
                 _activeEditorLoad = null;
+                if (!_disposed)
+                {
+                    IsEditorLoading = false;
+                }
             }
         }
 
@@ -596,6 +656,7 @@ namespace MyDmsVn.Desktop.Application
                     return;
                 }
 
+                _searchReload.Cancel();
                 _messageReload.Cancel();
                 messageReloadGeneration = ++_messageReloadGeneration;
                 _generation++;
@@ -637,9 +698,14 @@ namespace MyDmsVn.Desktop.Application
         {
             lock (_sync)
             {
-                _messageReloadGeneration++;
-                _messageReload.Cancel();
+                CancelMessageReloadLocked();
             }
+        }
+
+        private void CancelMessageReloadLocked()
+        {
+            _messageReloadGeneration++;
+            _messageReload.Cancel();
         }
 
         protected void ThrowIfDisposed()
