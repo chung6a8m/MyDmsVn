@@ -16,6 +16,9 @@ namespace MyDmsVn.Desktop.Application
         private readonly IUiDispatcher _dispatcher;
         private readonly DebouncedAsyncAction _searchReload;
         private readonly DebouncedAsyncAction _messageReload;
+        private readonly HashSet<int> _pendingChangedIds = new HashSet<int>();
+        private IReadOnlyList<GoodsReceiptLineViewModel> _trackedLines =
+            Array.Empty<GoodsReceiptLineViewModel>();
         private IReadOnlyList<CatalogLookupOption> _items = Array.Empty<CatalogLookupOption>();
         private CancellationTokenSource? _activeLoad;
         private string? _search;
@@ -85,6 +88,20 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
+        public void TrackLines(IEnumerable<GoodsReceiptLineViewModel> lines)
+        {
+            if (lines == null)
+            {
+                throw new ArgumentNullException(nameof(lines));
+            }
+
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+                _trackedLines = lines.Distinct().ToArray();
+            }
+        }
+
         public void Dispose()
         {
             CancellationTokenSource? active;
@@ -124,6 +141,7 @@ namespace MyDmsVn.Desktop.Application
 
                 _searchReload.Cancel();
                 CancelActiveLoadLocked();
+                _pendingChangedIds.Add(message.EntityId);
                 _ = _messageReload.Schedule(LoadAsync);
             }
         }
@@ -132,6 +150,7 @@ namespace MyDmsVn.Desktop.Application
         {
             CancellationTokenSource loadCancellation;
             long generation;
+            int[] changedIds;
             lock (_sync)
             {
                 if (_disposed)
@@ -143,6 +162,7 @@ namespace MyDmsVn.Desktop.Application
                 loadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 _activeLoad = loadCancellation;
                 generation = ++_generation;
+                changedIds = _pendingChangedIds.ToArray();
             }
 
             try
@@ -150,6 +170,14 @@ namespace MyDmsVn.Desktop.Application
                 var response = await _source.LookupAsync(
                     new CatalogLookupRequest(_search, 200),
                     loadCancellation.Token).ConfigureAwait(false);
+                var changedStates = new Dictionary<int, bool>();
+                foreach (var changedId in changedIds)
+                {
+                    var changed = await _source
+                        .GetAsync(changedId, loadCancellation.Token)
+                        .ConfigureAwait(false);
+                    changedStates[changedId] = changed.IsSuccess && changed.Data!.IsActive;
+                }
                 if (!IsCurrent(generation))
                 {
                     return;
@@ -174,6 +202,7 @@ namespace MyDmsVn.Desktop.Application
                                     item.Name,
                                     isAvailableForNewSelection: true))
                                 .ToArray();
+                            ApplyChangedStates(changedStates);
                         }
                         else
                         {
@@ -196,6 +225,27 @@ namespace MyDmsVn.Desktop.Application
                 }
 
                 loadCancellation.Dispose();
+            }
+        }
+
+        private void ApplyChangedStates(IReadOnlyDictionary<int, bool> changedStates)
+        {
+            IReadOnlyList<GoodsReceiptLineViewModel> tracked;
+            lock (_sync)
+            {
+                foreach (var changedId in changedStates.Keys)
+                {
+                    _pendingChangedIds.Remove(changedId);
+                }
+                tracked = _trackedLines;
+            }
+
+            foreach (var line in tracked)
+            {
+                if (changedStates.TryGetValue(line.ProductId, out var isActive))
+                {
+                    line.SetProduct(line.ProductId, line.ProductDisplayName, isActive);
+                }
             }
         }
 

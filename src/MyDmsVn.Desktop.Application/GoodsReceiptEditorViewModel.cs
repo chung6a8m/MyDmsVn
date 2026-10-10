@@ -117,6 +117,7 @@ namespace MyDmsVn.Desktop.Application
                 Version = null;
                 WarehouseLookup.SetSelection(null, null, true);
                 EmployeeLookup.SetSelection(null, null, true);
+                ProductOptions.TrackLines(Lines);
                 OnPropertyChanged(nameof(Total));
                 return;
             }
@@ -149,6 +150,8 @@ namespace MyDmsVn.Desktop.Application
                 AddLineCore(line);
             }
 
+            ProductOptions.TrackLines(Lines);
+
             OnPropertyChanged(nameof(Total));
         }
 
@@ -169,6 +172,7 @@ namespace MyDmsVn.Desktop.Application
             ThrowIfReadOnly();
             var line = new GoodsReceiptLineViewModel();
             AddLineCore(line);
+            ProductOptions.TrackLines(Lines);
             OnPropertyChanged(nameof(Total));
             return line;
         }
@@ -179,6 +183,7 @@ namespace MyDmsVn.Desktop.Application
             if (Lines.Remove(line))
             {
                 line.PropertyChanged -= OnLinePropertyChanged;
+                ProductOptions.TrackLines(Lines);
                 OnPropertyChanged(nameof(Total));
             }
         }

@@ -53,6 +53,31 @@ namespace MyDmsVn.Desktop.Tests
             Assert.Equal(2, source.Calls);
         }
 
+        [Fact]
+        public async Task Deactivation_message_marks_tracked_line_unavailable_without_losing_its_label()
+        {
+            var source = new ProductSource();
+            var messenger = new WeakReferenceMessenger();
+            var delay = new ControllableDelay();
+            using (var viewModel = Create(source, messenger, delay))
+            {
+                var line = new GoodsReceiptLineViewModel();
+                line.SetProduct(1, "P1 - Historical label", true);
+                viewModel.TrackLines(new[] { line });
+                source.ProductIsActive = false;
+
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.ActiveStatusChanged));
+                delay.ReleaseLatest();
+                await WaitUntilAsync(() => !line.ProductIsAvailable);
+
+                Assert.Equal(1, line.ProductId);
+                Assert.Equal("P1 - Historical label", line.ProductDisplayName);
+            }
+        }
+
         private static GoodsReceiptProductOptionsViewModel Create(
             ICatalogLookupSource source,
             IMessenger messenger,
@@ -83,6 +108,7 @@ namespace MyDmsVn.Desktop.Tests
         {
             public CatalogKind Kind => CatalogKind.Product;
             public int Calls { get; private set; }
+            public bool ProductIsActive { get; set; } = true;
             public IList<CatalogLookupRequest> Requests { get; } = new List<CatalogLookupRequest>();
 
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(
@@ -100,8 +126,8 @@ namespace MyDmsVn.Desktop.Tests
             }
 
             public Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) =>
-                Task.FromResult(ApiResponse<CatalogLookupDto>.Failure(
-                    new ApiError(ApiStatusCode.NotFound, "Product.NotFound", "Missing.")));
+                Task.FromResult(ApiResponse<CatalogLookupDto>.Success(
+                    new CatalogLookupDto(id, "P" + id, "Current", ProductIsActive)));
         }
 
         private sealed class ControllableDelay : IAsyncDelay
