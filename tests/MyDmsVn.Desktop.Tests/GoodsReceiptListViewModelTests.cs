@@ -33,6 +33,7 @@ namespace MyDmsVn.Desktop.Tests
                 await viewModel.RefreshAsync(CancellationToken.None);
 
                 Assert.Equal(4, api.ListRequests.Count);
+                Assert.Equal(0, viewModel.TotalCount);
                 Assert.Equal(1, viewModel.PageNumber);
                 Assert.Equal(7, api.ListRequests[1].WarehouseId);
                 Assert.Equal("Draft", api.ListRequests[2].Status);

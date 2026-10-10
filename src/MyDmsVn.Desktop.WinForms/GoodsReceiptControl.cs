@@ -30,6 +30,8 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly int _uiThreadId;
         private IReadOnlyList<long> _receiptIds = Array.Empty<long>();
         private GoodsReceiptLineViewModel? _selectedLine;
+        private int? _warehouseFilterId;
+        private string? _statusFilter;
         private bool _applyingState;
 
         public GoodsReceiptControl(
@@ -42,8 +44,20 @@ namespace MyDmsVn.Desktop.WinForms
             Dock = DockStyle.Fill;
 
             SearchBox = new BootstrapTextBox { Dock = DockStyle.Fill, AccessibleName = "Search goods receipts" };
+            WarehouseFilterLookup = CreateLookup("Filter by warehouse");
+            StatusFilter = new ComboBox
+            {
+                Dock = DockStyle.Fill,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                AccessibleName = "Filter by status",
+            };
+            StatusFilter.Items.AddRange(new object[] { "All", "Draft", "Posted" });
+            StatusFilter.SelectedIndex = 0;
             RefreshButton = CreateButton("Refresh", () => SetOperation(RefreshAsync()));
             NewButton = CreateButton("New", BeginNew);
+            PreviousPageButton = CreateButton("Previous", () => MovePage(-1));
+            NextPageButton = CreateButton("Next", () => MovePage(1));
+            PageLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
             ReceiptGrid = new BootstrapGrid { Dock = DockStyle.Fill, TabStop = true };
             ReceiptGrid.DoubleClick += (_, __) => SelectActiveReceipt();
             ReceiptGrid.KeyDown += OnReceiptGridKeyDown;
@@ -53,7 +67,18 @@ namespace MyDmsVn.Desktop.WinForms
             EmployeeLookup = CreateLookup("Employee");
             NoteEditor = new BootstrapTextBox { Dock = DockStyle.Top, AccessibleName = "Note" };
             StatusLabel = new Label { AutoSize = true };
+            VersionLabel = new Label { AutoSize = true };
             TotalLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleRight };
+            OperationStatusLabel = new Label { AutoSize = true, Text = "Ready" };
+            BusyIndicator = new BootstrapProgressBar
+            {
+                Width = 100,
+                Height = 20,
+                Indeterminate = true,
+                Animated = true,
+                ShowText = false,
+                Visible = false,
+            };
             SaveButton = CreateButton("Save", () => SetOperation(SaveAsync()));
 
             LineGrid = new BootstrapGrid { Dock = DockStyle.Fill, TabStop = true };
@@ -90,6 +115,8 @@ namespace MyDmsVn.Desktop.WinForms
 
             Controls.Add(CreateLayout());
             SearchBox.TextChanged += OnSearchChanged;
+            WarehouseFilterLookup.SelectedValueChanged += OnWarehouseFilterChanged;
+            StatusFilter.SelectedValueChanged += OnStatusFilterChanged;
             ReceiptDateEditor.ValueChanged += OnReceiptDateChanged;
             WarehouseLookup.SelectedValueChanged += OnWarehouseChanged;
             EmployeeLookup.SelectedValueChanged += OnEmployeeChanged;
@@ -109,6 +136,8 @@ namespace MyDmsVn.Desktop.WinForms
         }
 
         public BootstrapTextBox SearchBox { get; }
+        public BootstrapLookupBox WarehouseFilterLookup { get; }
+        public ComboBox StatusFilter { get; }
         public BootstrapGrid ReceiptGrid { get; }
         public BootstrapGrid LineGrid { get; }
         public BootstrapDatePicker ReceiptDateEditor { get; }
@@ -119,12 +148,18 @@ namespace MyDmsVn.Desktop.WinForms
         public BootstrapNumericBox QuantityEditor { get; }
         public BootstrapNumericBox UnitCostEditor { get; }
         public BootstrapButton RefreshButton { get; }
+        public BootstrapButton PreviousPageButton { get; }
+        public BootstrapButton NextPageButton { get; }
+        public Label PageLabel { get; }
         public BootstrapButton NewButton { get; }
         public BootstrapButton SaveButton { get; }
         public BootstrapButton AddLineButton { get; }
         public BootstrapButton RemoveLineButton { get; }
         public Label StatusLabel { get; }
+        public Label VersionLabel { get; }
         public Label TotalLabel { get; }
+        public Label OperationStatusLabel { get; }
+        public BootstrapProgressBar BusyIndicator { get; }
         public Task LastOperation { get; private set; } = Task.CompletedTask;
 
         public Task ActivateAsync(CancellationToken cancellationToken)
@@ -165,6 +200,8 @@ namespace MyDmsVn.Desktop.WinForms
             if (disposing)
             {
                 SearchBox.TextChanged -= OnSearchChanged;
+                WarehouseFilterLookup.SelectedValueChanged -= OnWarehouseFilterChanged;
+                StatusFilter.SelectedValueChanged -= OnStatusFilterChanged;
                 ReceiptDateEditor.ValueChanged -= OnReceiptDateChanged;
                 WarehouseLookup.SelectedValueChanged -= OnWarehouseChanged;
                 EmployeeLookup.SelectedValueChanged -= OnEmployeeChanged;
@@ -243,6 +280,17 @@ namespace MyDmsVn.Desktop.WinForms
             _editor.Load(null);
             _selectedLine = null;
             ApplyState();
+        }
+
+        private void MovePage(int offset)
+        {
+            var target = _list.PageNumber + offset;
+            var pageCount = Math.Max(1, (int)Math.Ceiling(_list.TotalCount / (double)_list.PageSize));
+            if (target >= 1 && target <= pageCount)
+            {
+                _list.PageNumber = target;
+                SetOperation(_list.RefreshAsync(CancellationToken.None));
+            }
         }
 
         private void AddLine()
@@ -334,6 +382,36 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 SetOperation(_list.SetSearch(SearchBox.Text));
             }
+        }
+
+        private void OnWarehouseFilterChanged(object? sender, EventArgs eventArgs)
+        {
+            if (_applyingState)
+            {
+                return;
+            }
+
+            _warehouseFilterId = WarehouseFilterLookup.SelectedValue as int?;
+            SetOperation(
+                _list.SetWarehouseFilterAsync(
+                    _warehouseFilterId,
+                    CancellationToken.None));
+        }
+
+        private void OnStatusFilterChanged(object? sender, EventArgs eventArgs)
+        {
+            if (_applyingState)
+            {
+                return;
+            }
+
+            _statusFilter = string.Equals(StatusFilter.SelectedItem as string, "All", StringComparison.Ordinal)
+                ? null
+                : StatusFilter.SelectedItem as string;
+            SetOperation(
+                _list.SetStatusFilterAsync(
+                    _statusFilter,
+                    CancellationToken.None));
         }
 
         private void OnReceiptDateChanged(object? sender, EventArgs eventArgs)
@@ -475,23 +553,40 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 SetReceiptRows();
                 SetLineRows();
+                WarehouseFilterLookup.DataSource = _editor.WarehouseLookup.Items
+                    .Where(item => item.IsAvailableForNewSelection)
+                    .ToArray();
                 WarehouseLookup.DataSource = _editor.WarehouseLookup.Items.ToArray();
                 EmployeeLookup.DataSource = _editor.EmployeeLookup.Items.ToArray();
                 ProductLookup.DataSource = _editor.ProductOptions.Items.ToArray();
+                WarehouseFilterLookup.SelectValue(_warehouseFilterId);
+                StatusFilter.SelectedItem = _statusFilter ?? "All";
                 WarehouseLookup.SelectValue(_editor.WarehouseId);
                 EmployeeLookup.SelectValue(_editor.EmployeeId);
                 ProductLookup.SelectValue(_selectedLine?.ProductId);
                 ReceiptDateEditor.Value = _editor.ReceiptDate;
                 NoteEditor.Text = _editor.Note ?? string.Empty;
                 StatusLabel.Text = _editor.Status;
+                VersionLabel.Text = _editor.Version ?? string.Empty;
                 TotalLabel.Text = _editor.Total.ToString("0.00");
                 QuantityEditor.Value = Clamp(QuantityEditor, _selectedLine?.Quantity ?? 0m);
                 UnitCostEditor.Value = Clamp(UnitCostEditor, _selectedLine?.UnitCost ?? 0m);
 
                 var busy = _list.IsLoading || _list.IsBusy || _editor.IsBusy;
+                BusyIndicator.Visible = busy;
+                OperationStatusLabel.Text = _editor.ErrorMessage ??
+                    _list.ErrorMessage ??
+                    (busy ? "Loading..." : "Ready");
                 ReceiptGrid.Enabled = !busy;
                 RefreshButton.Enabled = !busy;
                 NewButton.Enabled = !busy;
+                WarehouseFilterLookup.Enabled = !busy;
+                StatusFilter.Enabled = !busy;
+                var pageCount = Math.Max(1, (int)Math.Ceiling(
+                    _list.TotalCount / (double)_list.PageSize));
+                PageLabel.Text = $"Page {_list.PageNumber} of {pageCount}";
+                PreviousPageButton.Enabled = !busy && _list.PageNumber > 1;
+                NextPageButton.Enabled = !busy && _list.PageNumber < pageCount;
                 var canEdit = !busy && !_editor.IsReadOnly;
                 ReceiptDateEditor.Enabled = canEdit;
                 WarehouseLookup.Enabled = canEdit;
@@ -604,14 +699,29 @@ namespace MyDmsVn.Desktop.WinForms
         private Control CreateLayout()
         {
             var master = new Panel { Dock = DockStyle.Fill };
-            var masterBar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, Padding = new Padding(8) };
+            var masterBar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 5, Padding = new Padding(8) };
             masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
             masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             masterBar.Controls.Add(SearchBox, 0, 0);
-            masterBar.Controls.Add(RefreshButton, 1, 0);
-            masterBar.Controls.Add(NewButton, 2, 0);
+            masterBar.Controls.Add(WarehouseFilterLookup, 1, 0);
+            masterBar.Controls.Add(StatusFilter, 2, 0);
+            masterBar.Controls.Add(RefreshButton, 3, 0);
+            masterBar.Controls.Add(NewButton, 4, 0);
+            var pagingBar = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                Padding = new Padding(8),
+            };
+            pagingBar.Controls.Add(PreviousPageButton);
+            pagingBar.Controls.Add(PageLabel);
+            pagingBar.Controls.Add(NextPageButton);
             master.Controls.Add(ReceiptGrid);
+            master.Controls.Add(pagingBar);
             master.Controls.Add(masterBar);
 
             var detail = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1 };
@@ -619,7 +729,7 @@ namespace MyDmsVn.Desktop.WinForms
             detail.Panel1.Controls.Add(CreateHeaderEditor());
             detail.Panel2.Controls.Add(CreateLineEditor());
 
-            var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
+            var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
             split.Panel1.Controls.Add(master);
             split.Panel2.Controls.Add(detail);
             return split;
@@ -633,11 +743,14 @@ namespace MyDmsVn.Desktop.WinForms
             AddField(panel, "Employee", EmployeeLookup);
             AddField(panel, "Note", NoteEditor);
             AddField(panel, "Status", StatusLabel);
+            AddField(panel, "Version", VersionLabel);
             var commands = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true };
             commands.Controls.Add(SaveButton);
             commands.Controls.Add(new Label { Text = "Total", AutoSize = true, Padding = new Padding(12, 8, 0, 0) });
             commands.Controls.Add(TotalLabel);
+            commands.Controls.Add(BusyIndicator);
             panel.Controls.Add(commands);
+            panel.Controls.Add(OperationStatusLabel);
             return panel;
         }
 

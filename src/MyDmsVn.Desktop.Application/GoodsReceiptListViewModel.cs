@@ -20,6 +20,7 @@ namespace MyDmsVn.Desktop.Application
         private string? _status;
         private int _pageNumber = 1;
         private int _pageSize = 25;
+        private long _totalCount;
         private long _generation;
         private bool _isLoading;
         private bool _disposed;
@@ -67,6 +68,12 @@ namespace MyDmsVn.Desktop.Application
         {
             get => _pageSize;
             set => SetProperty(ref _pageSize, value);
+        }
+
+        public long TotalCount
+        {
+            get => _totalCount;
+            private set => SetProperty(ref _totalCount, value);
         }
 
         public bool IsLoading
@@ -181,6 +188,7 @@ namespace MyDmsVn.Desktop.Application
                         {
                             ResetValidation();
                             Items = response.Data!.Items;
+                            TotalCount = response.Data.TotalCount;
                         }
                         else
                         {

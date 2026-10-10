@@ -33,6 +33,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal("P7 - Product 7", control.LineGrid[1, 1].Value);
                         Assert.Equal("10.00", control.TotalLabel.Text);
                         Assert.Equal("Posted", control.StatusLabel.Text);
+                        Assert.Equal("AQIDBAUGBwg=", control.VersionLabel.Text);
                         Assert.Single(
                             Assert.IsAssignableFrom<IEnumerable<CatalogLookupOption>>(
                                 control.WarehouseLookup.DataSource));
@@ -92,10 +93,65 @@ namespace MyDmsVn.Desktop.Tests
 
                         Assert.False(control.RefreshButton.Enabled);
                         Assert.False(control.ReceiptGrid.Enabled);
+                        Assert.True(control.BusyIndicator.Visible);
                         fixture.Api.CompleteList();
                         PumpMessagesUntil(() => activation.IsCompleted, TimeSpan.FromSeconds(2));
                         activation.GetAwaiter().GetResult();
                         Assert.True(control.RefreshButton.Enabled);
+                        Assert.False(control.BusyIndicator.Visible);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Operation_errors_render_in_the_non_modal_status_area()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        fixture.Api.ListError = new ApiError(
+                            ApiStatusCode.Forbidden,
+                            "Auth.Forbidden",
+                            "Denied.");
+
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+
+                        Assert.Equal("Denied.", control.OperationStatusLabel.Text);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Paging_and_explicit_filters_refresh_immediately()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        Assert.Equal("Page 1 of 2", control.PageLabel.Text);
+                        Assert.True(control.NextPageButton.Enabled);
+
+                        control.NextPageButton.PerformClick();
+                        control.LastOperation.GetAwaiter().GetResult();
+                        Assert.Equal(2, fixture.Api.ListRequests.Last().PageNumber);
+                        Assert.Equal("Page 2 of 2", control.PageLabel.Text);
+
+                        control.WarehouseFilterLookup.SelectValue(3);
+                        control.LastOperation.GetAwaiter().GetResult();
+                        Assert.Equal(3, fixture.Api.ListRequests.Last().WarehouseId);
+                        Assert.Equal(1, fixture.Api.ListRequests.Last().PageNumber);
+
+                        control.StatusFilter.SelectedItem = "Posted";
+                        control.LastOperation.GetAwaiter().GetResult();
+                        Assert.Equal("Posted", fixture.Api.ListRequests.Last().Status);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -179,14 +235,23 @@ namespace MyDmsVn.Desktop.Tests
 
             public int ListCalls { get; private set; }
             public bool ControlListResponse { get; set; }
+            public ApiError? ListError { get; set; }
+            public IList<GoodsReceiptListRequest> ListRequests { get; } =
+                new List<GoodsReceiptListRequest>();
 
             public Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(
                 GoodsReceiptListRequest request,
                 CancellationToken cancellationToken)
             {
                 ListCalls++;
+                ListRequests.Add(request);
+                if (ListError != null)
+                {
+                    return Task.FromResult(
+                        ApiResponse<PagedResult<GoodsReceiptDto>>.Failure(ListError));
+                }
                 var response = ApiResponse<PagedResult<GoodsReceiptDto>>.Success(
-                    new PagedResult<GoodsReceiptDto>(new[] { Receipt() }, 1, 25, 1));
+                    new PagedResult<GoodsReceiptDto>(new[] { Receipt() }, request.PageNumber, 25, 30));
                 if (!ControlListResponse)
                 {
                     return Task.FromResult(response);
@@ -201,7 +266,7 @@ namespace MyDmsVn.Desktop.Tests
             {
                 _listCompletion!.TrySetResult(
                     ApiResponse<PagedResult<GoodsReceiptDto>>.Success(
-                        new PagedResult<GoodsReceiptDto>(new[] { Receipt() }, 1, 25, 1)));
+                        new PagedResult<GoodsReceiptDto>(new[] { Receipt() }, 1, 25, 30)));
             }
 
             public Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken cancellationToken) =>
