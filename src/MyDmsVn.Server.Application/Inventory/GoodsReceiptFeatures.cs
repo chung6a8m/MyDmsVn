@@ -75,6 +75,11 @@ internal sealed class SaveGoodsReceiptRequestValidator : AbstractValidator<SaveG
             .WithErrorCode("Validation.InvalidCharacter");
         RuleFor(request => request.Lines)
             .NotEmpty()
+            .WithErrorCode("Validation.Required")
+            .Must(lines => lines.Count <= GoodsReceiptValidation.MaximumLinesPerReceipt)
+            .WithErrorCode("Validation.MaximumLength");
+        RuleForEach(request => request.Lines)
+            .NotNull()
             .WithErrorCode("Validation.Required");
         RuleForEach(request => request.Lines)
             .SetValidator(new SaveGoodsReceiptLineRequestValidator());
@@ -89,7 +94,8 @@ internal sealed class SaveGoodsReceiptRequestValidator : AbstractValidator<SaveG
         var seen = new HashSet<int>();
         for (var index = 0; index < lines.Count; index++)
         {
-            if (!seen.Add(lines[index].ProductId))
+            var line = lines[index];
+            if (line != null && !seen.Add(line.ProductId))
             {
                 context.AddFailure(new ValidationFailure(
                     $"Request.Lines[{index}].ProductId",
@@ -112,10 +118,18 @@ internal sealed class SaveGoodsReceiptLineRequestValidator
             .WithErrorCode("Validation.GreaterThan");
         RuleFor(line => line.Quantity)
             .GreaterThan(0m)
-            .WithErrorCode("Validation.GreaterThan");
+            .WithErrorCode("Validation.GreaterThan")
+            .LessThanOrEqualTo(GoodsReceiptValidation.MaximumQuantity)
+            .WithErrorCode("Validation.PrecisionScale")
+            .Must(GoodsReceiptValidation.HasAtMostFourFractionalDigits)
+            .WithErrorCode("Validation.PrecisionScale");
         RuleFor(line => line.UnitCost)
             .GreaterThanOrEqualTo(0m)
-            .WithErrorCode("Validation.GreaterThanOrEqual");
+            .WithErrorCode("Validation.GreaterThanOrEqual")
+            .LessThanOrEqualTo(GoodsReceiptValidation.MaximumUnitCost)
+            .WithErrorCode("Validation.PrecisionScale")
+            .Must(GoodsReceiptValidation.HasAtMostFourFractionalDigits)
+            .WithErrorCode("Validation.PrecisionScale");
     }
 }
 
@@ -167,6 +181,11 @@ internal sealed class UpdateGoodsReceiptDraftCommandValidator
                     .WithErrorCode("Validation.InvalidCharacter");
                 RuleFor(request => request.Lines)
                     .NotEmpty()
+                    .WithErrorCode("Validation.Required")
+                    .Must(lines => lines.Count <= GoodsReceiptValidation.MaximumLinesPerReceipt)
+                    .WithErrorCode("Validation.MaximumLength");
+                RuleForEach(request => request.Lines)
+                    .NotNull()
                     .WithErrorCode("Validation.Required");
                 RuleForEach(request => request.Lines)
                     .SetValidator(new SaveGoodsReceiptLineRequestValidator());
@@ -175,7 +194,8 @@ internal sealed class UpdateGoodsReceiptDraftCommandValidator
                     var seen = new HashSet<int>();
                     for (var index = 0; index < request.Lines.Count; index++)
                     {
-                        if (!seen.Add(request.Lines[index].ProductId))
+                        var line = request.Lines[index];
+                        if (line != null && !seen.Add(line.ProductId))
                         {
                             context.AddFailure(new ValidationFailure(
                                 $"Request.Lines[{index}].ProductId",
@@ -189,6 +209,16 @@ internal sealed class UpdateGoodsReceiptDraftCommandValidator
             }
         }
     }
+}
+
+internal static class GoodsReceiptValidation
+{
+    public const int MaximumLinesPerReceipt = 200;
+    public const decimal MaximumQuantity = 99999999999999.9999m;
+    public const decimal MaximumUnitCost = 999999999999999.9999m;
+
+    public static bool HasAtMostFourFractionalDigits(decimal value) =>
+        decimal.Round(value, 4) == value;
 }
 
 internal static class GoodsReceiptVersion

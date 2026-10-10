@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -41,20 +43,55 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
             employeeId,
             transaction: transaction,
             cancellationToken: cancellationToken).ConfigureAwait(false)).SingleOrDefault();
-        var products = new Dictionary<int, CatalogReferenceState>();
-        foreach (var productId in productIds.Distinct().OrderBy(id => id))
-        {
-            var product = (await _context.Connection.QueryAsync<Product>(
-                productId,
-                transaction: transaction,
-                cancellationToken: cancellationToken).ConfigureAwait(false)).SingleOrDefault();
-            products[productId] = ToReferenceState(product?.IsActive);
-        }
+        var products = await GetProductReferenceStatesAsync(productIds, cancellationToken)
+            .ConfigureAwait(false);
 
         return new GoodsReceiptReferenceSnapshot(
             ToReferenceState(warehouse?.IsActive),
             ToReferenceState(employee?.IsActive),
             products);
+    }
+
+    private async Task<IReadOnlyDictionary<int, CatalogReferenceState>> GetProductReferenceStatesAsync(
+        IEnumerable<int> productIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = productIds.Distinct().OrderBy(id => id).ToArray();
+        var states = ids.ToDictionary(id => id, _ => CatalogReferenceState.Missing);
+        if (ids.Length == 0)
+        {
+            return states;
+        }
+
+        var sql = new StringBuilder("SELECT ProductId, IsActive FROM dbo.Products WHERE ProductId IN (");
+        using var command = new SqlCommand
+        {
+            Connection = GetSqlConnection(),
+            Transaction = GetSqlTransaction(),
+        };
+        for (var index = 0; index < ids.Length; index++)
+        {
+            if (index > 0)
+            {
+                sql.Append(',');
+            }
+
+            var parameterName = "@productId" + index.ToString(CultureInfo.InvariantCulture);
+            sql.Append(parameterName);
+            command.Parameters.Add(parameterName, SqlDbType.Int).Value = ids[index];
+        }
+
+        sql.Append(");");
+        command.CommandText = sql.ToString();
+        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            states[reader.GetInt32(0)] = reader.GetBoolean(1)
+                ? CatalogReferenceState.Active
+                : CatalogReferenceState.Inactive;
+        }
+
+        return states;
     }
 
     public async Task<GoodsReceipt> InsertDraftAsync(

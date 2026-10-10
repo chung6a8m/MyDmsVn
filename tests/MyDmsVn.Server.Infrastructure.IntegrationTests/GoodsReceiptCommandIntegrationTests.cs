@@ -102,6 +102,55 @@ public sealed class GoodsReceiptCommandIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Create_draft_resolves_and_persists_a_multi_line_product_batch()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            var productIds = new int[25];
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                for (var index = 0; index < productIds.Length; index++)
+                {
+                    productIds[index] = await connection.QuerySingleAsync<int>(
+                        "INSERT dbo.Products (Code, Name, Unit) OUTPUT INSERTED.ProductId " +
+                        "VALUES (@code, @name, N'EA');",
+                        new
+                        {
+                            code = "P-BATCH-" + index.ToString("D3", System.Globalization.CultureInfo.InvariantCulture),
+                            name = "Batch Product " + index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        });
+                }
+            }
+
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            using var scope = provider.CreateScope();
+            var result = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                new CreateGoodsReceiptDraftCommand(
+                    new SaveGoodsReceiptRequest(
+                        new DateTime(2026, 10, 10),
+                        seed.WarehouseId,
+                        seed.EmployeeId,
+                        "batch",
+                        productIds.Select((productId, index) =>
+                            new SaveGoodsReceiptLineRequest(productId, index + 1, 2.5m)))),
+                CancellationToken.None);
+
+            Assert.False(result.IsError);
+            Assert.Equal(25, result.Value.Lines.Count);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(25, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE ReceiptId = @id;",
+                new { id = result.Value.Id }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Failed_update_rolls_back_header_version_and_all_line_replacement()
     {
         var database = await CreateDatabaseAsync();

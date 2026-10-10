@@ -98,6 +98,123 @@ public sealed class GoodsReceiptApplicationTests
         Assert.False(unitOfWork.BeganTransaction);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Line_values_outside_sql_decimal_shape_are_rejected_before_a_unit_of_work_is_opened(
+        bool update)
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        using var provider = CreateProvider(unitOfWork);
+        var lines = new[]
+        {
+            new SaveGoodsReceiptLineRequest(7, 0.00001m, 1m),
+            new SaveGoodsReceiptLineRequest(8, 100000000000000m, 1.23456m),
+            new SaveGoodsReceiptLineRequest(9, 1m, 1000000000000000m),
+        };
+        var save = new SaveGoodsReceiptRequest(
+            new DateTime(2026, 10, 10),
+            3,
+            5,
+            null,
+            lines);
+
+        ErrorOr<GoodsReceiptDto> result;
+        if (update)
+        {
+            result = await provider.GetRequiredService<ISender>().Send(
+                new UpdateGoodsReceiptDraftCommand(
+                    new UpdateGoodsReceiptDraftRequest(
+                        41,
+                        VersionToken(1),
+                        save.ReceiptDate,
+                        save.WarehouseId,
+                        save.EmployeeId,
+                        save.Note,
+                        save.Lines)),
+                CancellationToken.None);
+        }
+        else
+        {
+            result = await provider.GetRequiredService<ISender>().Send(
+                new CreateGoodsReceiptDraftCommand(save),
+                CancellationToken.None);
+        }
+
+        Assert.True(result.IsError);
+        Assert.Contains(result.Errors, error => Field(error) == "Request.Lines[0].Quantity");
+        Assert.Contains(result.Errors, error => Field(error) == "Request.Lines[1].Quantity");
+        Assert.Contains(result.Errors, error => Field(error) == "Request.Lines[1].UnitCost");
+        Assert.Contains(result.Errors, error => Field(error) == "Request.Lines[2].UnitCost");
+        Assert.False(unitOfWork.BeganTransaction);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Null_line_entry_is_rejected_before_a_unit_of_work_is_opened(bool update)
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        using var provider = CreateProvider(unitOfWork);
+        var save = new SaveGoodsReceiptRequest(
+            new DateTime(2026, 10, 10),
+            3,
+            5,
+            null,
+            new SaveGoodsReceiptLineRequest[] { null! });
+
+        ErrorOr<GoodsReceiptDto> result;
+        if (update)
+        {
+            result = await provider.GetRequiredService<ISender>().Send(
+                new UpdateGoodsReceiptDraftCommand(
+                    new UpdateGoodsReceiptDraftRequest(
+                        41,
+                        VersionToken(1),
+                        save.ReceiptDate,
+                        save.WarehouseId,
+                        save.EmployeeId,
+                        save.Note,
+                        save.Lines)),
+                CancellationToken.None);
+        }
+        else
+        {
+            result = await provider.GetRequiredService<ISender>().Send(
+                new CreateGoodsReceiptDraftCommand(save),
+                CancellationToken.None);
+        }
+
+        Assert.True(result.IsError);
+        Assert.Contains(result.Errors, error =>
+            error.Code == "Validation.Required" && Field(error) == "Request.Lines[0]");
+        Assert.False(unitOfWork.BeganTransaction);
+    }
+
+    [Fact]
+    public async Task More_than_200_lines_are_rejected_before_a_unit_of_work_is_opened()
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        using var provider = CreateProvider(unitOfWork);
+        var lines = Enumerable.Range(1, 201)
+            .Select(productId => new SaveGoodsReceiptLineRequest(productId, 1m, 1m));
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new CreateGoodsReceiptDraftCommand(
+                new SaveGoodsReceiptRequest(
+                    new DateTime(2026, 10, 10),
+                    3,
+                    5,
+                    null,
+                    lines)),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Contains(result.Errors, error =>
+            error.Code == "Validation.MaximumLength" && Field(error) == "Request.Lines");
+        Assert.False(unitOfWork.BeganTransaction);
+    }
+
     [Fact]
     public async Task Create_draft_commits_one_aggregate_transaction_and_returns_server_values()
     {

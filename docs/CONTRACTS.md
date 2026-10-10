@@ -85,6 +85,7 @@ The P5.1 catalog clients expose Create, Update, SetActive, List, Get and Lookup 
 Example command-level behavior:
 - `UpdateGoodsReceiptDraftRequest` and `PostGoodsReceiptRequest` identify the receipt and carry the required opaque Base64 `expectedVersion` token. `GoodsReceiptDto.version` returns the current token. Clients treat these strings as opaque; no raw UnitOfWork, ADO.NET value or EF/RepoDb entity crosses the contract boundary.
 - `SaveGoodsReceiptRequest` never accepts a receipt number. CreateDraft returns the server-issued number using the P5 format `GR` plus a zero-padded 10-digit non-cycling sequence value (for example `GR0000000001`). Clients display the returned value and must not generate or predict it; gaps are valid.
+- CreateDraft and UpdateDraft accept 1–200 non-null lines. Each line must have a unique positive Product ID, Quantity fitting SQL `decimal(18,4)` and greater than zero, and UnitCost fitting SQL `decimal(19,4)` and greater than or equal to zero. Values with more than four effective fractional digits or precision outside those SQL types return field validation errors before database access.
 - `PostGoodsReceiptResponse` returns receipt identifier, status, posting timestamp; retry of an already posted receipt returns a documented conflict (or a stable idempotent success if an idempotency contract is added later). In either case, **no second stock posting** occurs.
 - Identifiers and date/time formats are consistent in Local/HTTP tests; transport changes cannot alter business semantics.
 
