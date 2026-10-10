@@ -35,26 +35,6 @@ public sealed class UpdateGoodsReceiptDraftCommand : AuthorizedActorApplicationR
     public override string PermissionKey => PermissionKeys.InventoryGoodsReceiptsWrite;
 }
 
-public sealed class GetGoodsReceiptByIdQuery : ApplicationRequest<GoodsReceiptDto>, IAuthorizedRequest
-{
-    public GetGoodsReceiptByIdQuery(long id) => Id = id;
-
-    public long Id { get; }
-
-    public string PermissionKey => PermissionKeys.InventoryGoodsReceiptsRead;
-}
-
-public sealed class ListGoodsReceiptsQuery
-    : ApplicationRequest<PagedResult<GoodsReceiptDto>>, IAuthorizedRequest
-{
-    public ListGoodsReceiptsQuery(GoodsReceiptListRequest request) =>
-        Request = request ?? throw new ArgumentNullException(nameof(request));
-
-    public GoodsReceiptListRequest Request { get; }
-
-    public string PermissionKey => PermissionKeys.InventoryGoodsReceiptsRead;
-}
-
 internal sealed class SaveGoodsReceiptRequestValidator : AbstractValidator<SaveGoodsReceiptRequest>
 {
     public SaveGoodsReceiptRequestValidator()

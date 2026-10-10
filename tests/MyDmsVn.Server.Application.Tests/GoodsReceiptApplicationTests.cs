@@ -318,6 +318,92 @@ public sealed class GoodsReceiptApplicationTests
         Assert.False(unitOfWork.BeganTransaction);
     }
 
+    [Theory]
+    [InlineData(0, 25, null, null)]
+    [InlineData(1, 0, null, null)]
+    [InlineData(1, 201, null, null)]
+    [InlineData(1, 25, "Invalid", null)]
+    [InlineData(1, 25, null, "bad\0search")]
+    public async Task Invalid_list_request_is_rejected_before_query_execution(
+        int pageNumber,
+        int pageSize,
+        string? status,
+        string? search)
+    {
+        var queries = new FakeGoodsReceiptQueryService();
+        using var provider = CreateProvider(
+            new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository()),
+            queryService: queries);
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new ListGoodsReceiptsQuery(
+                new GoodsReceiptListRequest(pageNumber, pageSize, null, status, search)),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(0, queries.ListCalls);
+    }
+
+    [Fact]
+    public async Task Search_longer_than_128_characters_is_rejected_before_query_execution()
+    {
+        var queries = new FakeGoodsReceiptQueryService();
+        using var provider = CreateProvider(
+            new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository()),
+            queryService: queries);
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new ListGoodsReceiptsQuery(
+                new GoodsReceiptListRequest(1, 25, null, null, new string('s', 129))),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(0, queries.ListCalls);
+    }
+
+    [Fact]
+    public async Task List_delegates_once_and_get_maps_missing_receipt()
+    {
+        var queries = new FakeGoodsReceiptQueryService
+        {
+            Page = new PagedResult<GoodsReceiptDto>(Array.Empty<GoodsReceiptDto>(), 1, 25, 0),
+        };
+        using var provider = CreateProvider(
+            new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository()),
+            queryService: queries);
+        var sender = provider.GetRequiredService<ISender>();
+        var request = new GoodsReceiptListRequest(1, 25, 3, "Draft", "GR");
+
+        var list = await sender.Send(new ListGoodsReceiptsQuery(request), CancellationToken.None);
+        var missing = await sender.Send(new GetGoodsReceiptByIdQuery(404), CancellationToken.None);
+
+        Assert.False(list.IsError);
+        Assert.Same(queries.Page, list.Value);
+        Assert.Equal(1, queries.ListCalls);
+        Assert.Same(request, queries.LastRequest);
+        Assert.True(missing.IsError);
+        Assert.Equal("GoodsReceipt.NotFound", missing.FirstError.Code);
+        Assert.Equal(1, queries.GetCalls);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Non_positive_get_id_is_rejected_before_query_execution(long id)
+    {
+        var queries = new FakeGoodsReceiptQueryService();
+        using var provider = CreateProvider(
+            new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository()),
+            queryService: queries);
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new GetGoodsReceiptByIdQuery(id),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(0, queries.GetCalls);
+    }
+
     private static SaveGoodsReceiptRequest ValidSaveRequest() =>
         new SaveGoodsReceiptRequest(
             new DateTime(2026, 10, 10),
@@ -356,10 +442,14 @@ public sealed class GoodsReceiptApplicationTests
             ? value as string
             : null;
 
-    private static ServiceProvider CreateProvider(FakeUnitOfWork unitOfWork, bool allow = true)
+    private static ServiceProvider CreateProvider(
+        FakeUnitOfWork unitOfWork,
+        bool allow = true,
+        IGoodsReceiptQueryService? queryService = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IUnitOfWorkFactory>(new FakeUnitOfWorkFactory(unitOfWork));
+        services.AddSingleton(queryService ?? new FakeGoodsReceiptQueryService());
         services.AddSingleton<ICurrentUserAccessor>(
             new StubCurrentUserAccessor(
                 CurrentUser.Authenticated(42, "operator", "Operator", isActive: true)));
@@ -367,6 +457,31 @@ public sealed class GoodsReceiptApplicationTests
         services.AddSingleton<IUtcClock>(new FixedUtcClock());
         services.AddServerApplication();
         return services.BuildServiceProvider();
+    }
+
+    private sealed class FakeGoodsReceiptQueryService : IGoodsReceiptQueryService
+    {
+        public PagedResult<GoodsReceiptDto> Page { get; set; } =
+            new PagedResult<GoodsReceiptDto>(Array.Empty<GoodsReceiptDto>(), 1, 25, 0);
+
+        public GoodsReceiptListRequest? LastRequest { get; private set; }
+        public int ListCalls { get; private set; }
+        public int GetCalls { get; private set; }
+
+        public Task<PagedResult<GoodsReceiptDto>> ListAsync(
+            GoodsReceiptListRequest request,
+            CancellationToken cancellationToken)
+        {
+            ListCalls++;
+            LastRequest = request;
+            return Task.FromResult(Page);
+        }
+
+        public Task<GoodsReceiptDto?> GetByIdAsync(long id, CancellationToken cancellationToken)
+        {
+            GetCalls++;
+            return Task.FromResult<GoodsReceiptDto?>(null);
+        }
     }
 
     private sealed class FixedUtcClock : IUtcClock

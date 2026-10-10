@@ -231,6 +231,51 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Contains("\"version\":\"AQIDBAUGBwg=\"", JsonConvert.SerializeObject(receipt, settings));
         }
 
+        [Fact]
+        public void Goods_receipt_read_contracts_round_trip_search_and_catalog_display_state()
+        {
+            var request = new GoodsReceiptListRequest(2, 25, 3, "Draft", "GR0001");
+            var receipt = new GoodsReceiptDto(
+                42,
+                "GR0000000042",
+                new DateTime(2026, 10, 10),
+                3,
+                5,
+                "Draft",
+                null,
+                null,
+                "AQIDBAUGBwg=",
+                new[]
+                {
+                    new GoodsReceiptLineDto(
+                        91,
+                        1,
+                        7,
+                        2.5m,
+                        19.99m,
+                        "P-007 - Archived product",
+                        false),
+                },
+                "W-003 - Main warehouse",
+                false,
+                "E-005 - Operator",
+                true);
+            var settings = ApiJson.CreateSerializerSettings();
+
+            var requestJson = JsonConvert.SerializeObject(request, settings);
+            var receiptJson = JsonConvert.SerializeObject(receipt, settings);
+            var requestRoundTrip = JsonConvert.DeserializeObject<GoodsReceiptListRequest>(requestJson, settings)!;
+            var receiptRoundTrip = JsonConvert.DeserializeObject<GoodsReceiptDto>(receiptJson, settings)!;
+
+            Assert.Equal("GR0001", requestRoundTrip.Search);
+            Assert.Equal("W-003 - Main warehouse", receiptRoundTrip.WarehouseDisplayName);
+            Assert.False(receiptRoundTrip.WarehouseIsActive);
+            Assert.Equal("E-005 - Operator", receiptRoundTrip.EmployeeDisplayName);
+            Assert.True(receiptRoundTrip.EmployeeIsActive);
+            Assert.Equal("P-007 - Archived product", receiptRoundTrip.Lines[0].ProductDisplayName);
+            Assert.False(receiptRoundTrip.Lines[0].ProductIsActive);
+        }
+
         [Theory]
         [InlineData(DateTimeKind.Utc)]
         [InlineData(DateTimeKind.Local)]
