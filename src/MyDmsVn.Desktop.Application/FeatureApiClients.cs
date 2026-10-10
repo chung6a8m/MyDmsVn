@@ -48,8 +48,8 @@ namespace MyDmsVn.Desktop.Application
     public interface IGoodsReceiptApiClient
     {
         Task<ApiResponse<GoodsReceiptDto>> CreateDraftAsync(SaveGoodsReceiptRequest request, CancellationToken cancellationToken);
-        Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(long id, SaveGoodsReceiptRequest request, CancellationToken cancellationToken);
-        Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(long id, CancellationToken cancellationToken);
+        Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(UpdateGoodsReceiptDraftRequest request, CancellationToken cancellationToken);
+        Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(PostGoodsReceiptRequest request, CancellationToken cancellationToken);
         Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken cancellationToken);
         Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(GoodsReceiptListRequest request, CancellationToken cancellationToken);
     }

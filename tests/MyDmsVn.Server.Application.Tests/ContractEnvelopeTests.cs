@@ -182,6 +182,55 @@ namespace MyDmsVn.Server.Application.Tests
                 JsonConvert.SerializeObject(receipt, settings));
         }
 
+        [Fact]
+        public void Goods_receipt_contracts_expose_opaque_expected_and_current_version_tokens()
+        {
+            var contractsAssembly = typeof(GoodsReceiptDto).Assembly;
+            var updateRequestType = contractsAssembly.GetType(
+                "MyDmsVn.Contracts.UpdateGoodsReceiptDraftRequest");
+            var postRequestType = contractsAssembly.GetType(
+                "MyDmsVn.Contracts.PostGoodsReceiptRequest");
+
+            Assert.NotNull(updateRequestType);
+            Assert.NotNull(postRequestType);
+            Assert.Equal(typeof(string), updateRequestType!.GetProperty("ExpectedVersion")?.PropertyType);
+            Assert.Equal(typeof(string), postRequestType!.GetProperty("ExpectedVersion")?.PropertyType);
+            Assert.Equal(typeof(string), typeof(GoodsReceiptDto).GetProperty("Version")?.PropertyType);
+
+            var version = "AQIDBAUGBwg=";
+            var updateRequest = Activator.CreateInstance(
+                updateRequestType,
+                42L,
+                version,
+                new DateTime(2026, 10, 10),
+                2,
+                3,
+                "updated",
+                new[] { new SaveGoodsReceiptLineRequest(7, 2.5000m, 19.9900m) });
+            var postRequest = Activator.CreateInstance(postRequestType, 42L, version);
+            var receipt = Activator.CreateInstance(
+                typeof(GoodsReceiptDto),
+                42L,
+                "GR000042",
+                new DateTime(2026, 10, 10),
+                2,
+                3,
+                "Draft",
+                (string?)null,
+                (DateTime?)null,
+                version,
+                Array.Empty<GoodsReceiptLineDto>());
+            var settings = ApiJson.CreateSerializerSettings();
+
+            Assert.Equal(
+                "{\"receiptId\":42,\"expectedVersion\":\"AQIDBAUGBwg=\",\"receiptDate\":\"2026-10-10\",\"warehouseId\":2,\"employeeId\":3,\"note\":\"updated\",\"lines\":[{\"productId\":7,\"quantity\":2.5000,\"unitCost\":19.9900}]}",
+                JsonConvert.SerializeObject(updateRequest, settings));
+            Assert.Equal(
+                "{\"receiptId\":42,\"expectedVersion\":\"AQIDBAUGBwg=\"}",
+                JsonConvert.SerializeObject(postRequest, settings));
+            Assert.Contains("\"version\":\"AQIDBAUGBwg=\"", JsonConvert.SerializeObject(receipt, settings));
+        }
+
         [Theory]
         [InlineData(DateTimeKind.Utc)]
         [InlineData(DateTimeKind.Local)]

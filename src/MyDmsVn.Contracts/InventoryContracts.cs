@@ -34,6 +34,7 @@ namespace MyDmsVn.Contracts
             string status,
             string? note,
             DateTime? postedAtUtc,
+            string version,
             IEnumerable<GoodsReceiptLineDto> lines)
         {
             Id = id;
@@ -44,6 +45,7 @@ namespace MyDmsVn.Contracts
             Status = status;
             Note = note;
             PostedAtUtc = postedAtUtc;
+            Version = version;
             Lines = lines.ToArray();
         }
 
@@ -56,6 +58,7 @@ namespace MyDmsVn.Contracts
         public string Status { get; }
         public string? Note { get; }
         public DateTime? PostedAtUtc { get; }
+        public string Version { get; }
         public IReadOnlyList<GoodsReceiptLineDto> Lines { get; }
     }
 
@@ -111,6 +114,48 @@ namespace MyDmsVn.Contracts
         public int PageSize { get; }
         public int? WarehouseId { get; }
         public string? Status { get; }
+    }
+
+    public sealed class UpdateGoodsReceiptDraftRequest
+    {
+        public UpdateGoodsReceiptDraftRequest(
+            long receiptId,
+            string expectedVersion,
+            DateTime receiptDate,
+            int warehouseId,
+            int employeeId,
+            string? note,
+            IEnumerable<SaveGoodsReceiptLineRequest> lines)
+        {
+            ReceiptId = receiptId;
+            ExpectedVersion = expectedVersion;
+            ReceiptDate = receiptDate;
+            WarehouseId = warehouseId;
+            EmployeeId = employeeId;
+            Note = note;
+            Lines = lines.ToArray();
+        }
+
+        public long ReceiptId { get; }
+        public string ExpectedVersion { get; }
+        [JsonConverter(typeof(CalendarDateJsonConverter))]
+        public DateTime ReceiptDate { get; }
+        public int WarehouseId { get; }
+        public int EmployeeId { get; }
+        public string? Note { get; }
+        public IReadOnlyList<SaveGoodsReceiptLineRequest> Lines { get; }
+    }
+
+    public sealed class PostGoodsReceiptRequest
+    {
+        public PostGoodsReceiptRequest(long receiptId, string expectedVersion)
+        {
+            ReceiptId = receiptId;
+            ExpectedVersion = expectedVersion;
+        }
+
+        public long ReceiptId { get; }
+        public string ExpectedVersion { get; }
     }
 
     public sealed class PostGoodsReceiptResponse

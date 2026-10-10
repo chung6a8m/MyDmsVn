@@ -9,6 +9,7 @@ using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.Infrastructure.Catalog;
 using MyDmsVn.Server.Infrastructure.Identity;
+using MyDmsVn.Server.Infrastructure.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
 
 namespace MyDmsVn.Server.Infrastructure
@@ -39,6 +40,8 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddScoped<ICustomerQueryService, SqlCustomerQueryService>();
             services.TryAddEnumerable(
                 ServiceDescriptor.Singleton<IRepoDbMapping, CatalogRepoDbMapping>());
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IRepoDbMapping, InventoryRepoDbMapping>());
             services.Replace(
                 ServiceDescriptor.Scoped<IUserStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
