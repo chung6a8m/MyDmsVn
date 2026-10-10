@@ -34,13 +34,14 @@ public sealed class DatabaseMigrationTests
             var second = migrator.Migrate(database.ConnectionString);
 
             Assert.True(first.Successful, first.Error?.ToString());
-            Assert.Equal(4, first.Scripts.Count());
+            Assert.Equal(5, first.Scripts.Count());
             Assert.Collection(
                 first.Scripts.OrderBy(script => script.Name, StringComparer.Ordinal),
                 script => Assert.EndsWith("001_PersistenceFoundation.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("002_Identity.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("003_Catalog.sql", script.Name, StringComparison.Ordinal),
-                script => Assert.EndsWith("004_Catalog_Nul_Constraints.sql", script.Name, StringComparison.Ordinal));
+                script => Assert.EndsWith("004_Catalog_Nul_Constraints.sql", script.Name, StringComparison.Ordinal),
+                script => Assert.EndsWith("005_GoodsReceipt.sql", script.Name, StringComparison.Ordinal));
             Assert.True(second.Successful, second.Error?.ToString());
             Assert.Empty(second.Scripts);
 
@@ -50,7 +51,7 @@ public sealed class DatabaseMigrationTests
             var historyCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;");
             Assert.Equal(0, tableCount);
-            Assert.Equal(4, historyCount);
+            Assert.Equal(5, historyCount);
         }
         finally
         {
@@ -58,6 +59,162 @@ public sealed class DatabaseMigrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Goods_receipt_migration_enforces_aggregate_keys_checks_and_rowversion()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+
+            var tableCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE name IN (N'GoodsReceipts', N'GoodsReceiptLines');");
+            Assert.Equal(2, tableCount);
+
+            var requiredIndexCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.indexes WHERE is_unique = 1 AND name IN " +
+                "(N'UX_GoodsReceipts_ReceiptNo', N'UX_GoodsReceiptLines_ReceiptId_LineNo', " +
+                "N'UX_GoodsReceiptLines_ReceiptId_ProductId');");
+            Assert.Equal(3, requiredIndexCount);
+
+            var rowVersionCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.GoodsReceipts') " +
+                "AND name = N'RowVersion' AND TYPE_NAME(user_type_id) = N'timestamp' AND is_nullable = 0;");
+            Assert.Equal(1, rowVersionCount);
+
+            var decimalColumnCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.GoodsReceiptLines') AND (" +
+                "(name = N'Quantity' AND TYPE_NAME(user_type_id) = N'decimal' AND precision = 18 AND scale = 4) OR " +
+                "(name = N'UnitCost' AND TYPE_NAME(user_type_id) = N'decimal' AND precision = 19 AND scale = 4));");
+            Assert.Equal(2, decimalColumnCount);
+
+            var requiredColumnCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.columns AS columns WHERE columns.is_nullable = 0 AND (" +
+                "(columns.object_id = OBJECT_ID(N'dbo.GoodsReceipts') AND columns.name IN " +
+                "(N'ReceiptNo', N'ReceiptDate', N'WarehouseId', N'EmployeeId', N'Status', " +
+                "N'CreatedAtUtc', N'CreatedByUserId', N'RowVersion')) OR " +
+                "(columns.object_id = OBJECT_ID(N'dbo.GoodsReceiptLines') AND columns.name IN " +
+                "(N'ReceiptId', N'LineNo', N'ProductId', N'Quantity', N'UnitCost', " +
+                "N'CreatedAtUtc', N'CreatedByUserId')));");
+            Assert.Equal(15, requiredColumnCount);
+
+            var foreignKeyCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id IN " +
+                "(OBJECT_ID(N'dbo.GoodsReceipts'), OBJECT_ID(N'dbo.GoodsReceiptLines'));");
+            Assert.Equal(9, foreignKeyCount);
+
+            var checkConstraintCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id IN " +
+                "(OBJECT_ID(N'dbo.GoodsReceipts'), OBJECT_ID(N'dbo.GoodsReceiptLines'));");
+            Assert.Equal(7, checkConstraintCount);
+
+            var userId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Users " +
+                "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm, IsActive) " +
+                "OUTPUT INSERTED.UserId VALUES (N'receipt-user', N'RECEIPT-USER', N'Receipt User', N'Local', N'hash', N'', N'BCrypt', 1);");
+            var warehouseId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Warehouses (Code, Name) OUTPUT INSERTED.WarehouseId VALUES (N'WH-GR', N'Receipt Warehouse');");
+            var employeeId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Employees (Code, Name) OUTPUT INSERTED.EmployeeId VALUES (N'EMP-GR', N'Receipt Employee');");
+            var productId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Products (Code, Name, Unit) OUTPUT INSERTED.ProductId VALUES (N'PR-GR', N'Receipt Product', N'EA');");
+            var secondProductId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Products (Code, Name, Unit) OUTPUT INSERTED.ProductId VALUES (N'PR-GR-2', N'Receipt Product 2', N'EA');");
+            var receiptId = await connection.QuerySingleAsync<long>(
+                "INSERT dbo.GoodsReceipts " +
+                "(ReceiptNo, ReceiptDate, WarehouseId, EmployeeId, Status, CreatedByUserId) " +
+                "OUTPUT INSERTED.ReceiptId VALUES (N'GR-TEST-001', '20261010', @warehouseId, @employeeId, 'Draft', @userId);",
+                new { warehouseId, employeeId, userId });
+
+            await connection.ExecuteAsync(
+                "INSERT dbo.GoodsReceiptLines " +
+                "(ReceiptId, [LineNo], ProductId, Quantity, UnitCost, CreatedByUserId) " +
+                "VALUES (@receiptId, 1, @productId, 1.2500, 5.5000, @userId);",
+                new { receiptId, productId, userId });
+
+            var duplicateProduct = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(
+                    "INSERT dbo.GoodsReceiptLines " +
+                    "(ReceiptId, [LineNo], ProductId, Quantity, UnitCost, CreatedByUserId) " +
+                    "VALUES (@receiptId, 2, @productId, 2.0000, 6.0000, @userId);",
+                    new { receiptId, productId, userId }));
+            Assert.Contains(duplicateProduct.Number, new[] { 2601, 2627 });
+
+            var duplicateReceiptNumber = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(
+                    "INSERT dbo.GoodsReceipts " +
+                    "(ReceiptNo, ReceiptDate, WarehouseId, EmployeeId, Status, CreatedByUserId) " +
+                    "VALUES (N'gr-test-001', '20261010', @warehouseId, @employeeId, 'Draft', @userId);",
+                    new { warehouseId, employeeId, userId }));
+            Assert.Contains(duplicateReceiptNumber.Number, new[] { 2601, 2627 });
+
+            var nulReceiptNumber = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(
+                    "INSERT dbo.GoodsReceipts " +
+                    "(ReceiptNo, ReceiptDate, WarehouseId, EmployeeId, Status, CreatedByUserId) " +
+                    "VALUES (N'GR' + NCHAR(0) + N'002', '20261010', @warehouseId, @employeeId, 'Draft', @userId);",
+                    new { warehouseId, employeeId, userId }));
+            Assert.Equal(547, nulReceiptNumber.Number);
+
+            var duplicateLineNumber = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(
+                    "INSERT dbo.GoodsReceiptLines " +
+                    "(ReceiptId, [LineNo], ProductId, Quantity, UnitCost, CreatedByUserId) " +
+                    "VALUES (@receiptId, 1, @secondProductId, 2.0000, 6.0000, @userId);",
+                    new { receiptId, secondProductId, userId }));
+            Assert.Contains(duplicateLineNumber.Number, new[] { 2601, 2627 });
+
+            var foreignKeyViolation = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(
+                    "INSERT dbo.GoodsReceiptLines " +
+                    "(ReceiptId, [LineNo], ProductId, Quantity, UnitCost, CreatedByUserId) " +
+                    "VALUES (@receiptId, 2, 2147483647, 2.0000, 6.0000, @userId);",
+                    new { receiptId, userId }));
+            Assert.Equal(547, foreignKeyViolation.Number);
+
+            var notNullViolation = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(
+                    "INSERT dbo.GoodsReceiptLines " +
+                    "(ReceiptId, [LineNo], ProductId, Quantity, UnitCost, CreatedByUserId) " +
+                    "VALUES (@receiptId, 2, @secondProductId, NULL, 6.0000, @userId);",
+                    new { receiptId, secondProductId, userId }));
+            Assert.Equal(515, notNullViolation.Number);
+
+            var invalidValues = new[]
+            {
+                "UPDATE dbo.GoodsReceipts SET Status = 'Invalid' WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceipts SET Status = 'draft' WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceipts SET Status = 'Draft ' WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceiptLines SET [LineNo] = 0 WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceiptLines SET Quantity = 0 WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceiptLines SET UnitCost = -0.0001 WHERE ReceiptId = @receiptId;",
+                };
+            foreach (var invalidValue in invalidValues)
+            {
+                var violation = await Assert.ThrowsAsync<SqlException>(() =>
+                    connection.ExecuteAsync(invalidValue, new { receiptId }));
+                Assert.Equal(547, violation.Number);
+            }
+
+            var firstVersion = await connection.QuerySingleAsync<byte[]>(
+                "SELECT RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId = @receiptId;",
+                new { receiptId });
+            await connection.ExecuteAsync(
+                "UPDATE dbo.GoodsReceipts SET Note = N'changed' WHERE ReceiptId = @receiptId;",
+                new { receiptId });
+            var secondVersion = await connection.QuerySingleAsync<byte[]>(
+                "SELECT RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId = @receiptId;",
+                new { receiptId });
+            Assert.NotEqual(firstVersion, secondVersion);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
     [SqlServerFact]
     public async Task Identity_migration_creates_required_tables_and_enforces_unique_normalized_names()
     {

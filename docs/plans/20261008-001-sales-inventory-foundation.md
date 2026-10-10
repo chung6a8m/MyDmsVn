@@ -1,6 +1,6 @@
 # P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04 and the automatable P5.1 gate completed on 2026-10-10. Interactive manual smoke remains open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate and P5.2-T01 completed on 2026-10-10. Interactive P5.1 manual smoke remains open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -43,11 +43,11 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 ## P5.2 — Goods Receipt Draft
 
 ### P5.2-T01 — Tables and models
-- [ ] Add GoodsReceipts and GoodsReceiptLines DbUp migrations with required FK constraints; unique ReceiptNo, unique (ReceiptId,LineNo), and **required unique (ReceiptId,ProductId)**. Reject duplicate products at both Application and SQL boundaries; update `docs/DATA_MODEL.md` to reflect the mandatory index before freezing the migration.
-- [ ] Add SQL CHECK constraints: `Status IN ('Draft','Posted')`, `LineNo > 0`, `Quantity > 0`, `UnitCost >= 0`; use NOT NULL for required fields and compatible decimal types (`decimal(18,4)` quantity, `decimal(19,4)` unit cost). Application validators provide field errors; SQL remains the final invariant guard.
-- [ ] Add a `rowversion` column to GoodsReceipts for aggregate-level optimistic concurrency; expose an opaque expected version token in UpdateDraft/Post request DTOs and the current token in Get response DTOs. Never serialize an ADO.NET/RepoDb entity as a token.
-- [ ] Receipt states `Draft` / `Posted` with legal transition Draft → Posted only; enforce state rules in commands and SQL constraints.
-- [ ] Add created/updated/posting identity and UTC timestamp audit fields.
+- [x] Add GoodsReceipts and GoodsReceiptLines DbUp migrations with required FK constraints; unique ReceiptNo, unique (ReceiptId,LineNo), and **required unique (ReceiptId,ProductId)**. Reject duplicate products at both Application and SQL boundaries; update `docs/DATA_MODEL.md` to reflect the mandatory index before freezing the migration. (Schema boundary complete; Application rejection is implemented with P5.2-T02 commands.)
+- [x] Add SQL CHECK constraints: `Status IN ('Draft','Posted')`, `LineNo > 0`, `Quantity > 0`, `UnitCost >= 0`; use NOT NULL for required fields and compatible decimal types (`decimal(18,4)` quantity, `decimal(19,4)` unit cost). Application validators provide field errors; SQL remains the final invariant guard. (SQL boundary complete; validators belong to P5.2-T02.)
+- [x] Add a `rowversion` column to GoodsReceipts for aggregate-level optimistic concurrency; expose an opaque expected version token in UpdateDraft/Post request DTOs and the current token in Get response DTOs. Never serialize an ADO.NET/RepoDb entity as a token.
+- [x] Receipt states `Draft` / `Posted` with legal transition Draft → Posted only; enforce state rules in commands and SQL constraints. (Allowed states are constrained here; the one-way command transition belongs to P5.2-T02/P5.3.)
+- [x] Add created/updated/posting identity and UTC timestamp audit fields.
 
 ### P5.2-T02 — Commands
 - [ ] CreateDraft / UpdateDraft (header plus lines) atomically with **one explicit UoW and one SQL transaction** per command; rollback the entire aggregate on any failure.

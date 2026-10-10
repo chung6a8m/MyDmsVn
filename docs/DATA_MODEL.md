@@ -10,8 +10,8 @@
 | `Warehouses` | WarehouseId int IDENTITY, Code nvarchar(32), Name nvarchar(256), Address nvarchar(500) null, IsActive bit | Code unique |
 | `Employees` | EmployeeId int IDENTITY, Code nvarchar(32), Name nvarchar(256), Phone nvarchar(64) null, UserId int null, IsActive bit | Code unique; nullable FK to Users |
 | `Customers` | CustomerId int IDENTITY, Code nvarchar(32), Name nvarchar(256), Address nvarchar(500) null, Phone nvarchar(64) null, TaxCode nvarchar(32) null, IsActive bit | Code unique; future sales relationship |
-| `GoodsReceipts` | ReceiptId bigint IDENTITY, ReceiptNo nvarchar(32), ReceiptDate date, WarehouseId int, EmployeeId int, Status varchar(16), Note nvarchar(1000) null, PostedAtUtc datetime2 null | ReceiptNo unique, FK, Draft/Posted status |
-| `GoodsReceiptLines` | ReceiptLineId bigint IDENTITY, ReceiptId bigint, LineNo int, ProductId int, Quantity decimal(18,4), UnitCost decimal(19,4) | unique (ReceiptId,LineNo), optionally unique (ReceiptId,ProductId) |
+| `GoodsReceipts` | ReceiptId bigint IDENTITY, ReceiptNo nvarchar(32), ReceiptDate date, WarehouseId int, EmployeeId int, Status varchar(16), Note nvarchar(1000) null, RowVersion rowversion, created/updated/posted UTC and user audit fields | ReceiptNo unique/no-NUL, required Warehouse/Employee/User FKs, canonical case-sensitive Draft/Posted status and posting-audit consistency |
+| `GoodsReceiptLines` | ReceiptLineId bigint IDENTITY, ReceiptId bigint, LineNo int, ProductId int, Quantity decimal(18,4), UnitCost decimal(19,4), created/updated UTC and user audit fields | unique (ReceiptId,LineNo), required unique (ReceiptId,ProductId), required Receipt/Product/User FKs |
 | `StockLedger` | LedgerId bigint IDENTITY, WarehouseId int, ProductId int, DocumentType varchar(32), DocumentId bigint, DocumentLineId bigint, QuantityChange decimal(18,4), PostedAtUtc datetime2 | unique (DocumentType,DocumentLineId), FK, immutable |
 | `StockBalances` | WarehouseId int, ProductId int, Quantity decimal(18,4), RowVersion rowversion | composite PK (WarehouseId,ProductId), FK |
 
@@ -58,6 +58,8 @@ Recommended indexes: GoodsReceipts (ReceiptDate, ReceiptId), GoodsReceipts (Ware
 Stock card order: `PostedAtUtc, LedgerId`; document date retained for user display but posting time defines deterministic movement order. Do not use dates alone as unique movement keys.
 
 `rowversion` supports optimistic checks on balance/editable documents where useful; missing balance-row creation needs explicit lock/unique constraint handling. Monetary valuation is **not** implemented solely by storing UnitCost; no COGS algorithm in P5.
+
+`GoodsReceipts.RowVersion` is the aggregate concurrency boundary. Contracts expose it as an opaque Base64 string named `version`; UpdateDraft and Post send the last observed value as `expectedVersion`. Transport clients must not interpret the token or serialize the underlying SQL/RepoDb entity.
 
 ## 5. Reporting DTOs
 

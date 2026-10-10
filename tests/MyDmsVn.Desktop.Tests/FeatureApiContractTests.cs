@@ -35,5 +35,25 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.Equal(typeof(ApiResponse<>), taskResult.GetGenericTypeDefinition());
             }
         }
+
+        [Fact]
+        public void Goods_receipt_update_and_post_clients_require_versioned_request_dtos()
+        {
+            var updateParameter = typeof(IGoodsReceiptApiClient)
+                .GetMethod(nameof(IGoodsReceiptApiClient.UpdateDraftAsync))!
+                .GetParameters()
+                .First();
+            var postParameter = typeof(IGoodsReceiptApiClient)
+                .GetMethod(nameof(IGoodsReceiptApiClient.PostAsync))!
+                .GetParameters()
+                .First();
+
+            Assert.Equal(
+                "MyDmsVn.Contracts.UpdateGoodsReceiptDraftRequest",
+                updateParameter.ParameterType.FullName);
+            Assert.Equal(
+                "MyDmsVn.Contracts.PostGoodsReceiptRequest",
+                postParameter.ParameterType.FullName);
+        }
     }
 }
