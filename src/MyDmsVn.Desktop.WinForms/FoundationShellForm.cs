@@ -20,11 +20,12 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ToolStripProgressBar _busyIndicator;
         private readonly IDesktopSession? _session;
         private readonly IDesktopNotificationService? _notifications;
+        private readonly ICatalogControlFactory? _catalogControlFactory;
         private readonly int _uiThreadId;
         private long? _workspaceSessionVersion;
 
         public FoundationShellForm(FoundationViewModel viewModel)
-            : this(viewModel, null, null, true)
+            : this(viewModel, null, null, null, true)
         {
         }
 
@@ -36,6 +37,21 @@ namespace MyDmsVn.Desktop.WinForms
                 viewModel,
                 session ?? throw new ArgumentNullException(nameof(session)),
                 notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                null,
+                true)
+        {
+        }
+
+        public FoundationShellForm(
+            FoundationViewModel viewModel,
+            IDesktopSession session,
+            IDesktopNotificationService notifications,
+            ICatalogControlFactory catalogControlFactory)
+            : this(
+                viewModel,
+                session ?? throw new ArgumentNullException(nameof(session)),
+                notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
                 true)
         {
         }
@@ -44,11 +60,13 @@ namespace MyDmsVn.Desktop.WinForms
             FoundationViewModel viewModel,
             IDesktopSession? session,
             IDesktopNotificationService? notifications,
+            ICatalogControlFactory? catalogControlFactory,
             bool initialize)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             _session = session;
             _notifications = notifications;
+            _catalogControlFactory = catalogControlFactory;
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
 
             Text = "MyDmsVn";
@@ -58,6 +76,7 @@ namespace MyDmsVn.Desktop.WinForms
             AutoScaleMode = AutoScaleMode.Dpi;
 
             Navigation = CreateNavigation();
+            Navigation.SelectedItemChanged += OnNavigationSelectedItemChanged;
             Workspace = new BootstrapTabControl
             {
                 Dock = DockStyle.Fill,
@@ -118,6 +137,27 @@ namespace MyDmsVn.Desktop.WinForms
         public bool BusyIndicatorVisible => _busyIndicator.Available;
 
         public long WorkspaceSessionVersion => _session?.Version ?? 0;
+
+        public TabPage? OpenCatalog(CatalogKind kind)
+        {
+            if (_catalogControlFactory == null)
+            {
+                return null;
+            }
+
+            var content = _catalogControlFactory.Create(kind);
+            var page = OpenWorkspace(
+                "catalog-" + kind.ToString().ToLowerInvariant(),
+                GetCatalogTitle(kind),
+                content,
+                WorkspaceSessionVersion);
+            if (page != null && page.Controls.Contains(content) && content is CatalogControl catalog)
+            {
+                _ = catalog.ActivateAsync(CancellationToken.None);
+            }
+
+            return page;
+        }
 
         public TabPage? OpenWorkspace(
             string key,
@@ -228,6 +268,7 @@ namespace MyDmsVn.Desktop.WinForms
             if (disposing)
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+                Navigation.SelectedItemChanged -= OnNavigationSelectedItemChanged;
                 if (_session != null)
                 {
                     _session.SessionChanged -= OnSessionChanged;
@@ -250,6 +291,14 @@ namespace MyDmsVn.Desktop.WinForms
         private void OnNotificationPublished(object? sender, DesktopNotification notification)
         {
             DispatchToUi(() => SetStatus(notification.Message));
+        }
+
+        private void OnNavigationSelectedItemChanged(object? sender, EventArgs eventArgs)
+        {
+            if (Navigation.SelectedItem?.Tag is CatalogKind kind)
+            {
+                OpenCatalog(kind);
+            }
         }
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
@@ -371,7 +420,28 @@ namespace MyDmsVn.Desktop.WinForms
                     Text = "Foundation",
                     Tag = "foundation",
                 });
+            navigation.Items.Add(new BootstrapSidebarItem { Text = "Products", Tag = CatalogKind.Product });
+            navigation.Items.Add(new BootstrapSidebarItem { Text = "Warehouses", Tag = CatalogKind.Warehouse });
+            navigation.Items.Add(new BootstrapSidebarItem { Text = "Employees", Tag = CatalogKind.Employee });
+            navigation.Items.Add(new BootstrapSidebarItem { Text = "Customers", Tag = CatalogKind.Customer });
             return navigation;
+        }
+
+        private static string GetCatalogTitle(CatalogKind kind)
+        {
+            switch (kind)
+            {
+                case CatalogKind.Product:
+                    return "Products";
+                case CatalogKind.Warehouse:
+                    return "Warehouses";
+                case CatalogKind.Employee:
+                    return "Employees";
+                case CatalogKind.Customer:
+                    return "Customers";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind));
+            }
         }
 
         private BootstrapToolStrip CreateTopBar()

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.Infrastructure.Local;
@@ -15,7 +16,10 @@ namespace MyDmsVn.Desktop.App
         {
             System.Windows.Forms.Application.EnableVisualStyles();
             System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
-            using (var provider = CreateServiceProvider())
+            var uiContext = SynchronizationContext.Current ??
+                new System.Windows.Forms.WindowsFormsSynchronizationContext();
+            SynchronizationContext.SetSynchronizationContext(uiContext);
+            using (var provider = CreateServiceProvider(uiContext))
             {
                 return DesktopHostRunner.Run(
                     provider.GetRequiredService<FoundationShellForm>(),
@@ -30,14 +34,13 @@ namespace MyDmsVn.Desktop.App
                 argument => string.Equals(argument, "--smoke-test", StringComparison.Ordinal));
         }
 
-        private static ServiceProvider CreateServiceProvider()
+        private static ServiceProvider CreateServiceProvider(SynchronizationContext uiContext)
         {
             var services = new ServiceCollection();
             services.AddServerApplication();
             services.AddServerInfrastructure();
             services.AddLocalDesktopAdapter();
-            services.AddTransient<FoundationViewModel>();
-            services.AddTransient<FoundationShellForm>();
+            services.AddMyDmsVnDesktopWinForms(uiContext);
             return services.BuildServiceProvider();
         }
     }
