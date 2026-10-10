@@ -146,6 +146,7 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.NotNull(provider.GetRequiredService<IWarehouseApiClient>());
                 Assert.NotNull(provider.GetRequiredService<IEmployeeApiClient>());
                 Assert.NotNull(provider.GetRequiredService<ICustomerApiClient>());
+                Assert.NotNull(provider.GetRequiredService<IGoodsReceiptApiClient>());
 
                 var response = await provider.GetRequiredService<IProductApiClient>()
                     .GetAsync(41, CancellationToken.None);
