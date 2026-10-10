@@ -34,14 +34,15 @@ public sealed class DatabaseMigrationTests
             var second = migrator.Migrate(database.ConnectionString);
 
             Assert.True(first.Successful, first.Error?.ToString());
-            Assert.Equal(5, first.Scripts.Count());
+            Assert.Equal(6, first.Scripts.Count());
             Assert.Collection(
                 first.Scripts.OrderBy(script => script.Name, StringComparer.Ordinal),
                 script => Assert.EndsWith("001_PersistenceFoundation.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("002_Identity.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("003_Catalog.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("004_Catalog_Nul_Constraints.sql", script.Name, StringComparison.Ordinal),
-                script => Assert.EndsWith("005_GoodsReceipt.sql", script.Name, StringComparison.Ordinal));
+                script => Assert.EndsWith("005_GoodsReceipt.sql", script.Name, StringComparison.Ordinal),
+                script => Assert.EndsWith("006_GoodsReceipt_Number_Sequence.sql", script.Name, StringComparison.Ordinal));
             Assert.True(second.Successful, second.Error?.ToString());
             Assert.Empty(second.Scripts);
 
@@ -51,7 +52,13 @@ public sealed class DatabaseMigrationTests
             var historyCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;");
             Assert.Equal(0, tableCount);
-            Assert.Equal(5, historyCount);
+            Assert.Equal(6, historyCount);
+
+            var receiptNumberSequenceCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.sequences WHERE object_id = " +
+                "OBJECT_ID(N'dbo.GoodsReceiptNumberSequence') AND start_value = 1 " +
+                "AND increment = 1 AND maximum_value = 9999999999 AND is_cycling = 0;");
+            Assert.Equal(1, receiptNumberSequenceCount);
         }
         finally
         {
