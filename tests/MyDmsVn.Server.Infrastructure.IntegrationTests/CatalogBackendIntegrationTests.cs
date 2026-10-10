@@ -19,6 +19,96 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class CatalogBackendIntegrationTests
 {
     [SqlServerFact]
+    public async Task Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+
+            using var provider = CreateProvider(database.ConnectionString, new AllowAllPermissionStore());
+            using var scope = provider.CreateScope();
+            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+
+            var product = await sender.Send(
+                new CreateProductCommand(new SaveProductRequest("P-HISTORY", "Historical product", "Each")),
+                CancellationToken.None);
+            var warehouse = await sender.Send(
+                new CreateWarehouseCommand(new SaveWarehouseRequest("W-HISTORY", "Historical warehouse", null)),
+                CancellationToken.None);
+            var employee = await sender.Send(
+                new CreateEmployeeCommand(new SaveEmployeeRequest("E-HISTORY", "Historical employee", null, null)),
+                CancellationToken.None);
+            var customer = await sender.Send(
+                new CreateCustomerCommand(new SaveCustomerRequest("C-HISTORY", "Historical customer", null, null, null)),
+                CancellationToken.None);
+            Assert.All(
+                new[] { product.IsError, warehouse.IsError, employee.IsError, customer.IsError },
+                Assert.False);
+
+            Assert.False((await sender.Send(new SetProductActiveCommand(product.Value.Id, false), CancellationToken.None)).IsError);
+            Assert.False((await sender.Send(new SetWarehouseActiveCommand(warehouse.Value.Id, false), CancellationToken.None)).IsError);
+            Assert.False((await sender.Send(new SetEmployeeActiveCommand(employee.Value.Id, false), CancellationToken.None)).IsError);
+            Assert.False((await sender.Send(new SetCustomerActiveCommand(customer.Value.Id, false), CancellationToken.None)).IsError);
+
+            var productGet = await sender.Send(new GetProductByIdQuery(product.Value.Id), CancellationToken.None);
+            var warehouseGet = await sender.Send(new GetWarehouseByIdQuery(warehouse.Value.Id), CancellationToken.None);
+            var employeeGet = await sender.Send(new GetEmployeeByIdQuery(employee.Value.Id), CancellationToken.None);
+            var customerGet = await sender.Send(new GetCustomerByIdQuery(customer.Value.Id), CancellationToken.None);
+            Assert.All(
+                new[] { productGet.Value.IsActive, warehouseGet.Value.IsActive, employeeGet.Value.IsActive, customerGet.Value.IsActive },
+                Assert.False);
+
+            var listRequest = new CatalogListRequest("HISTORY", 1, 25, includeInactive: true);
+            Assert.Single((await sender.Send(new ListProductsQuery(listRequest), CancellationToken.None)).Value.Items);
+            Assert.Single((await sender.Send(new ListWarehousesQuery(listRequest), CancellationToken.None)).Value.Items);
+            Assert.Single((await sender.Send(new ListEmployeesQuery(listRequest), CancellationToken.None)).Value.Items);
+            Assert.Single((await sender.Send(new ListCustomersQuery(listRequest), CancellationToken.None)).Value.Items);
+
+            var lookupRequest = new CatalogLookupRequest("HISTORY", 25);
+            Assert.Empty((await sender.Send(new LookupProductsQuery(lookupRequest), CancellationToken.None)).Value);
+            Assert.Empty((await sender.Send(new LookupWarehousesQuery(lookupRequest), CancellationToken.None)).Value);
+            Assert.Empty((await sender.Send(new LookupEmployeesQuery(lookupRequest), CancellationToken.None)).Value);
+            Assert.Empty((await sender.Send(new LookupCustomersQuery(lookupRequest), CancellationToken.None)).Value);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Explicitly_denied_catalog_write_leaves_business_tables_unchanged()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+
+            using var provider = CreateProvider(database.ConnectionString, new ExplicitDenyPermissionStore());
+            using var scope = provider.CreateScope();
+            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+
+            var result = await sender.Send(
+                new CreateProductCommand(new SaveProductRequest("P-DENIED", "Denied product", "Each")),
+                CancellationToken.None);
+
+            Assert.True(result.IsError);
+            Assert.Equal(ErrorOr.ErrorType.Forbidden, result.FirstError.Type);
+            using var connection = new Microsoft.Data.SqlClient.SqlConnection(database.ConnectionString);
+            Assert.Equal(0, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.Products;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -186,6 +276,28 @@ public sealed class CatalogBackendIntegrationTests
             string permissionKey,
             CancellationToken cancellationToken) =>
             Task.FromResult(new PermissionSnapshot(true, false));
+    }
+
+    private sealed class ExplicitDenyPermissionStore : IPermissionStore
+    {
+        public Task<PermissionSnapshot> GetSnapshotAsync(
+            int userId,
+            string permissionKey,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new PermissionSnapshot(false, true));
+    }
+
+    private static ServiceProvider CreateProvider(
+        string connectionString,
+        IPermissionStore permissionStore)
+    {
+        var services = new ServiceCollection();
+        services.AddServerApplication();
+        services.AddSqlPersistence(connectionString);
+        services.Replace(ServiceDescriptor.Scoped<ICurrentUserAccessor>(
+            _ => new TestCurrentUserAccessor()));
+        services.Replace(ServiceDescriptor.Scoped<IPermissionStore>(_ => permissionStore));
+        return services.BuildServiceProvider();
     }
 
     private sealed class CatalogAudit

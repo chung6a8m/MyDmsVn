@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -69,6 +69,9 @@ namespace MyDmsVn.Desktop.WinForms
             Grid.DoubleClick += (_, __) => SelectActiveRow();
 
             RefreshButton = CreateButton("Refresh", 20, () => SetOperation(_binding.RefreshAsync(CancellationToken.None)));
+            PreviousPageButton = CreateButton("Previous", 18, () => MovePage(-1));
+            NextPageButton = CreateButton("Next", 19, () => MovePage(1));
+            PageLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
             NewButton = CreateButton("New", 21, BeginCreate);
             SaveButton = CreateButton("Save", 22, () => SetOperation(_binding.SaveAsync(CancellationToken.None)));
             ActivateButton = CreateButton("Activate", 23, () => SetActive(true));
@@ -98,7 +101,19 @@ namespace MyDmsVn.Desktop.WinForms
             searchBar.Controls.Add(SearchBox, 0, 0);
             searchBar.Controls.Add(RefreshButton, 1, 0);
 
+            var pagingBar = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                Padding = new Padding(8),
+            };
+            pagingBar.Controls.Add(PreviousPageButton);
+            pagingBar.Controls.Add(PageLabel);
+            pagingBar.Controls.Add(NextPageButton);
+
             Controls.Add(_split);
+            Controls.Add(pagingBar);
             Controls.Add(searchBar);
             SearchBox.TextChanged += OnSearchTextChanged;
             _binding.PropertyChanged += OnViewModelPropertyChanged;
@@ -113,6 +128,12 @@ namespace MyDmsVn.Desktop.WinForms
         public IReadOnlyDictionary<string, BootstrapTextBox> EditorControls => _editorControls;
 
         public BootstrapButton RefreshButton { get; }
+
+        public BootstrapButton PreviousPageButton { get; }
+
+        public BootstrapButton NextPageButton { get; }
+
+        public Label PageLabel { get; }
 
         public BootstrapButton NewButton { get; }
 
@@ -234,8 +255,15 @@ namespace MyDmsVn.Desktop.WinForms
                 var busy = _binding.IsBusy || _binding.IsLoading;
                 SaveButton.Enabled = !busy;
                 RefreshButton.Enabled = !busy;
+                NewButton.Enabled = !busy;
+                Grid.Enabled = !busy;
                 ActivateButton.Enabled = !busy;
                 DeactivateButton.Enabled = !busy;
+                var pageCount = Math.Max(1, (int)Math.Ceiling(
+                    _binding.TotalCount / (double)_binding.PageSize));
+                PageLabel.Text = $"Page {_binding.PageNumber} of {pageCount}";
+                PreviousPageButton.Enabled = !busy && _binding.PageNumber > 1;
+                NextPageButton.Enabled = !busy && _binding.PageNumber < pageCount;
                 ApplyErrors();
             }
             finally
@@ -292,6 +320,15 @@ namespace MyDmsVn.Desktop.WinForms
             if (id.HasValue)
             {
                 SetOperation(_binding.SetActiveAsync(id.Value, isActive, CancellationToken.None));
+            }
+        }
+
+        private void MovePage(int offset)
+        {
+            var target = _binding.PageNumber + offset;
+            if (target >= 1)
+            {
+                SetOperation(_binding.MoveToPageAsync(target, CancellationToken.None));
             }
         }
 
@@ -399,7 +436,7 @@ namespace MyDmsVn.Desktop.WinForms
                 new CatalogField("code", "Code", () => viewModel.Code, value => viewModel.Code = value),
                 new CatalogField("name", "Name", () => viewModel.Name, value => viewModel.Name = value),
                 new CatalogField("phone", "Phone", () => viewModel.Phone ?? string.Empty, value => viewModel.Phone = value),
-                new CatalogField("userId", "User ID", () => viewModel.UserId?.ToString() ?? string.Empty, value => viewModel.UserId = int.TryParse(value, out var id) ? id : (int?)null));
+                new CatalogField("userId", "User ID", () => viewModel.UserIdText, value => viewModel.UserIdText = value));
 
         private static CatalogBinding CreateBinding(CustomerCatalogViewModel viewModel) =>
             CatalogBinding.Create(
@@ -420,6 +457,7 @@ namespace MyDmsVn.Desktop.WinForms
             private readonly Func<int, Task> _select;
             private readonly Func<Task> _save;
             private readonly Func<int, bool, Task> _setActive;
+            private readonly Func<int, Task> _moveToPage;
             private readonly Action _beginCreate;
             private readonly Action _cancel;
             private readonly Func<IEnumerable> _getErrors;
@@ -427,6 +465,9 @@ namespace MyDmsVn.Desktop.WinForms
             private readonly Func<string?> _search;
             private readonly Func<bool> _isBusy;
             private readonly Func<bool> _isLoading;
+            private readonly Func<int> _pageNumber;
+            private readonly Func<int> _pageSize;
+            private readonly Func<long> _totalCount;
 
             private CatalogBinding(
                 IDisposable disposable,
@@ -440,12 +481,16 @@ namespace MyDmsVn.Desktop.WinForms
                 Func<int, Task> select,
                 Func<Task> save,
                 Func<int, bool, Task> setActive,
+                Func<int, Task> moveToPage,
                 Action beginCreate,
                 Action cancel,
                 Func<int?> selectedId,
                 Func<string?> search,
                 Func<bool> isBusy,
-                Func<bool> isLoading)
+                Func<bool> isLoading,
+                Func<int> pageNumber,
+                Func<int> pageSize,
+                Func<long> totalCount)
             {
                 _disposable = disposable;
                 PropertySource = propertyChanged;
@@ -458,12 +503,16 @@ namespace MyDmsVn.Desktop.WinForms
                 _select = select;
                 _save = save;
                 _setActive = setActive;
+                _moveToPage = moveToPage;
                 _beginCreate = beginCreate;
                 _cancel = cancel;
                 _selectedId = selectedId;
                 _search = search;
                 _isBusy = isBusy;
                 _isLoading = isLoading;
+                _pageNumber = pageNumber;
+                _pageSize = pageSize;
+                _totalCount = totalCount;
                 _getErrors = () => Array.Empty<string>();
             }
 
@@ -487,6 +536,9 @@ namespace MyDmsVn.Desktop.WinForms
             public string? Search => _search();
             public bool IsBusy => _isBusy();
             public bool IsLoading => _isLoading();
+            public int PageNumber => _pageNumber();
+            public int PageSize => _pageSize();
+            public long TotalCount => _totalCount();
             public IEnumerable GetErrors(string field) => ErrorSource.GetErrors(field) ?? _getErrors();
             public Task ActivateAsync(CancellationToken token) => _activate();
             public Task RefreshAsync(CancellationToken token) => _refresh();
@@ -494,6 +546,7 @@ namespace MyDmsVn.Desktop.WinForms
             public Task SelectAsync(int id, CancellationToken token) => _select(id);
             public Task SaveAsync(CancellationToken token) => _save();
             public Task SetActiveAsync(int id, bool active, CancellationToken token) => _setActive(id, active);
+            public Task MoveToPageAsync(int pageNumber, CancellationToken token) => _moveToPage(pageNumber);
             public void BeginCreate() => _beginCreate();
             public void Cancel() => _cancel();
             public void Dispose() => _disposable.Dispose();
@@ -515,12 +568,16 @@ namespace MyDmsVn.Desktop.WinForms
                     id => viewModel.SelectAsync(id, CancellationToken.None),
                     () => viewModel.SaveAsync(CancellationToken.None),
                     (id, active) => viewModel.SetActiveAsync(id, active, CancellationToken.None),
+                    page => viewModel.MoveToPageAsync(page, CancellationToken.None),
                     viewModel.BeginCreate,
-                    viewModel.CancelCurrentOperation,
+                    viewModel.Cancel,
                     () => viewModel.SelectedId,
                     () => viewModel.Search,
                     () => viewModel.IsBusy,
-                    () => viewModel.IsLoading);
+                    () => viewModel.IsLoading,
+                    () => viewModel.PageNumber,
+                    () => viewModel.PageSize,
+                    () => viewModel.TotalCount);
             }
         }
 

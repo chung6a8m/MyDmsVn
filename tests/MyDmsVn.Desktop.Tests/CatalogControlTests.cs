@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -43,6 +43,38 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.True(control.SearchBox.TabIndex < control.Grid.TabIndex);
                         Assert.True(control.Grid.TabIndex < control.EditorControls["code"].TabIndex);
                         Assert.True(control.EditorControls["code"].TabIndex < control.SaveButton.TabIndex);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Catalog_control_pages_beyond_the_first_twenty_five_rows()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var client = new ProductClient
+                    {
+                        Items = Enumerable.Range(1, 30)
+                            .Select(id => new ProductDto(id, "P" + id, "Product " + id, "pcs", true))
+                            .ToArray(),
+                    };
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    {
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        Assert.Equal(26, control.Grid.RowsCount);
+                        Assert.True(control.NextPageButton.Enabled);
+
+                        control.NextPageButton.PerformClick();
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.Equal(2, viewModel.PageNumber);
+                        Assert.Equal(6, control.Grid.RowsCount);
+                        Assert.Equal("Page 2 of 2", control.PageLabel.Text);
+                        Assert.False(control.NextPageButton.Enabled);
+                        Assert.True(control.PreviousPageButton.Enabled);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -151,14 +183,41 @@ namespace MyDmsVn.Desktop.Tests
 
                         Assert.Same(first, second);
                         Assert.Single(shell.Workspace.TabPages);
-                        Assert.Equal(2, factory.Created.Count);
+                        Assert.Single(factory.Created);
                         Assert.False(factory.Created[0].IsDisposed);
-                        Assert.True(factory.Created[1].IsDisposed);
 
                         session.SignOut();
 
                         Assert.True(factory.Created[0].IsDisposed);
                         Assert.Empty(shell.Workspace.TabPages);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Reopening_existing_catalog_tab_refreshes_authoritative_data_without_new_control()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(1, "operator", "Operator"));
+                    var client = new ProductClient();
+                    var factory = new ProductCatalogControlFactory(client);
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient()),
+                        session,
+                        new DesktopNotificationCenter(),
+                        factory))
+                    {
+                        shell.OpenCatalog(CatalogKind.Product);
+                        factory.Control!.LastOperation.GetAwaiter().GetResult();
+                        shell.OpenCatalog(CatalogKind.Product);
+                        factory.Control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.Equal(1, factory.CreateCount);
+                        Assert.Equal(2, client.ListCount);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -191,11 +250,21 @@ namespace MyDmsVn.Desktop.Tests
         {
             public ProductDto[] Items { get; set; } = Array.Empty<ProductDto>();
             public int CreateCount { get; private set; }
+            public int ListCount { get; private set; }
             public ApiResponse<ProductDto> CreateResponse { get; set; } =
                 ApiResponse<ProductDto>.Success(new ProductDto(1, "P1", "Product", "pcs", true));
 
-            public Task<ApiResponse<PagedResult<ProductDto>>> ListAsync(CatalogListRequest request, CancellationToken token) =>
-                Task.FromResult(ApiResponse<PagedResult<ProductDto>>.Success(new PagedResult<ProductDto>(Items, request.PageNumber, request.PageSize, Items.Length)));
+            public Task<ApiResponse<PagedResult<ProductDto>>> ListAsync(CatalogListRequest request, CancellationToken token)
+            {
+                ListCount++;
+                return Task.FromResult(
+                    ApiResponse<PagedResult<ProductDto>>.Success(
+                        new PagedResult<ProductDto>(
+                            Items.Skip((request.PageNumber - 1) * request.PageSize).Take(request.PageSize).ToArray(),
+                            request.PageNumber,
+                            request.PageSize,
+                            Items.Length)));
+            }
             public Task<ApiResponse<ProductDto>> GetAsync(int id, CancellationToken token) =>
                 Task.FromResult(ApiResponse<ProductDto>.Success(Items.Single(item => item.Id == id)));
             public Task<ApiResponse<ProductDto>> CreateAsync(SaveProductRequest request, CancellationToken token)
@@ -206,6 +275,20 @@ namespace MyDmsVn.Desktop.Tests
             public Task<ApiResponse<ProductDto>> UpdateAsync(int id, SaveProductRequest request, CancellationToken token) => Task.FromResult(CreateResponse);
             public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) => throw new NotSupportedException();
+        }
+
+        private sealed class ProductCatalogControlFactory : ICatalogControlFactory
+        {
+            private readonly ProductClient _client;
+            public ProductCatalogControlFactory(ProductClient client) => _client = client;
+            public int CreateCount { get; private set; }
+            public CatalogControl? Control { get; private set; }
+            public Control Create(CatalogKind kind)
+            {
+                CreateCount++;
+                Control = new CatalogControl(CreateViewModel(_client));
+                return Control;
+            }
         }
 
         private sealed class RecordingCatalogControlFactory : ICatalogControlFactory

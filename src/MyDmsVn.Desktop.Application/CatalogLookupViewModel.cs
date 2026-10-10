@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +14,10 @@ namespace MyDmsVn.Desktop.Application
 
         Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(
             CatalogLookupRequest request,
+            CancellationToken cancellationToken);
+
+        Task<ApiResponse<CatalogLookupDto>> GetAsync(
+            int id,
             CancellationToken cancellationToken);
     }
 
@@ -58,6 +62,7 @@ namespace MyDmsVn.Desktop.Application
         private int? _selectedId;
         private string? _selectedHistoricalLabel;
         private bool _selectedIsActive;
+        private long _selectionGeneration;
         private long _generation;
         private bool _disposed;
 
@@ -114,8 +119,17 @@ namespace MyDmsVn.Desktop.Application
         public Task SetSearch(string? search)
         {
             ThrowIfDisposed();
+            CancelActiveLoad();
             _search = search;
             return _searchReload.Schedule(LoadAsync);
+        }
+
+        public void Cancel()
+        {
+            _searchReload.Cancel();
+            _messageReload.Cancel();
+            CancelActiveLoad();
+            CancelCurrentOperation();
         }
 
         public void SetSelection(int? id, string? historicalDisplayName, bool isActive)
@@ -124,6 +138,7 @@ namespace MyDmsVn.Desktop.Application
             SelectedId = id;
             _selectedHistoricalLabel = historicalDisplayName;
             _selectedIsActive = isActive;
+            _selectionGeneration++;
             Items = BuildOptions(
                 Items.Where(item => item.IsAvailableForNewSelection)
                     .Select(item => new CatalogLookupDto(
@@ -159,6 +174,8 @@ namespace MyDmsVn.Desktop.Application
         {
             CancellationTokenSource loadCancellation;
             long generation;
+            long selectionGeneration;
+            int? selectedId;
             lock (_sync)
             {
                 if (_disposed)
@@ -170,6 +187,8 @@ namespace MyDmsVn.Desktop.Application
                 loadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 _activeLoad = loadCancellation;
                 generation = ++_generation;
+                selectionGeneration = _selectionGeneration;
+                selectedId = _selectedId;
             }
 
             try
@@ -177,13 +196,25 @@ namespace MyDmsVn.Desktop.Application
                 var response = await _source.LookupAsync(
                     new CatalogLookupRequest(_search, 25),
                     loadCancellation.Token).ConfigureAwait(false);
+                ApiResponse<CatalogLookupDto>? selectedResponse = null;
+                if (selectedId.HasValue)
+                {
+                    selectedResponse = await _source.GetAsync(
+                        selectedId.Value,
+                        loadCancellation.Token).ConfigureAwait(false);
+                }
                 if (!IsCurrent(generation))
                 {
                     return;
                 }
 
                 await _dispatcher.InvokeAsync(
-                    () => ApplyResponse(response, generation),
+                    () => ApplyResponse(
+                        response,
+                        selectedResponse,
+                        selectedId,
+                        selectionGeneration,
+                        generation),
                     loadCancellation.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
@@ -194,7 +225,13 @@ namespace MyDmsVn.Desktop.Application
                 if (IsCurrent(generation))
                 {
                     await _dispatcher.InvokeAsync(
-                        () => PublishNotification(DesktopNotificationKind.Error, exception.Message),
+                        () =>
+                        {
+                            if (IsCurrent(generation))
+                            {
+                                PublishNotification(DesktopNotificationKind.Error, exception.Message);
+                            }
+                        },
                         CancellationToken.None).ConfigureAwait(false);
                 }
             }
@@ -214,6 +251,9 @@ namespace MyDmsVn.Desktop.Application
 
         private void ApplyResponse(
             ApiResponse<IReadOnlyList<CatalogLookupDto>> response,
+            ApiResponse<CatalogLookupDto>? selectedResponse,
+            int? requestedSelectedId,
+            long selectionGeneration,
             long generation)
         {
             if (!IsCurrent(generation))
@@ -223,6 +263,19 @@ namespace MyDmsVn.Desktop.Application
 
             if (response.IsSuccess)
             {
+                if (selectedResponse != null &&
+                    selectedResponse.IsSuccess &&
+                    requestedSelectedId == SelectedId &&
+                    selectionGeneration == _selectionGeneration)
+                {
+                    _selectedIsActive = selectedResponse.Data!.IsActive;
+                    if (string.IsNullOrWhiteSpace(_selectedHistoricalLabel))
+                    {
+                        _selectedHistoricalLabel =
+                            $"{selectedResponse.Data.Code} - {selectedResponse.Data.Name}";
+                    }
+                }
+
                 Items = BuildOptions(response.Data!);
             }
             else
@@ -242,15 +295,24 @@ namespace MyDmsVn.Desktop.Application
                     item.Name,
                     isAvailableForNewSelection: true))
                 .ToList();
-            if (SelectedId.HasValue && options.All(item => item.Id != SelectedId.Value))
+            if (SelectedId.HasValue)
             {
-                options.Add(
-                    new CatalogLookupOption(
-                        SelectedId.Value,
-                        string.Empty,
-                        string.Empty,
-                        _selectedIsActive,
-                        _selectedHistoricalLabel ?? SelectedId.Value.ToString()));
+                var selected = options.FirstOrDefault(item => item.Id == SelectedId.Value);
+                if (selected != null && !_selectedIsActive)
+                {
+                    options.Remove(selected);
+                }
+
+                if (selected == null || !_selectedIsActive)
+                {
+                    options.Add(
+                        new CatalogLookupOption(
+                            SelectedId.Value,
+                            string.Empty,
+                            string.Empty,
+                            _selectedIsActive,
+                            _selectedHistoricalLabel ?? SelectedId.Value.ToString()));
+                }
             }
 
             return options;
@@ -264,10 +326,20 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
+        private void CancelActiveLoad()
+        {
+            lock (_sync)
+            {
+                _generation++;
+                _activeLoad?.Cancel();
+            }
+        }
+
         private void Receive(CatalogChangedMessage message)
         {
             if (message.CatalogKind == _source.Kind)
             {
+                CancelActiveLoad();
                 _ = ScheduleMessageReloadAsync();
             }
         }
@@ -302,6 +374,8 @@ namespace MyDmsVn.Desktop.Application
         public ProductCatalogLookupSource(IProductApiClient client) => _client = client;
         public CatalogKind Kind => CatalogKind.Product;
         public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken) => _client.LookupAsync(request, cancellationToken);
+        public async Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) => Map(await _client.GetAsync(id, cancellationToken).ConfigureAwait(false));
+        private static ApiResponse<CatalogLookupDto> Map(ApiResponse<ProductDto> response) => response.IsSuccess ? ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(response.Data!.Id, response.Data.Code, response.Data.Name, response.Data.IsActive)) : ApiResponse<CatalogLookupDto>.Failure(response.Error!);
     }
 
     public sealed class WarehouseCatalogLookupSource : ICatalogLookupSource
@@ -310,6 +384,8 @@ namespace MyDmsVn.Desktop.Application
         public WarehouseCatalogLookupSource(IWarehouseApiClient client) => _client = client;
         public CatalogKind Kind => CatalogKind.Warehouse;
         public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken) => _client.LookupAsync(request, cancellationToken);
+        public async Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) => Map(await _client.GetAsync(id, cancellationToken).ConfigureAwait(false));
+        private static ApiResponse<CatalogLookupDto> Map(ApiResponse<WarehouseDto> response) => response.IsSuccess ? ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(response.Data!.Id, response.Data.Code, response.Data.Name, response.Data.IsActive)) : ApiResponse<CatalogLookupDto>.Failure(response.Error!);
     }
 
     public sealed class EmployeeCatalogLookupSource : ICatalogLookupSource
@@ -318,6 +394,8 @@ namespace MyDmsVn.Desktop.Application
         public EmployeeCatalogLookupSource(IEmployeeApiClient client) => _client = client;
         public CatalogKind Kind => CatalogKind.Employee;
         public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken) => _client.LookupAsync(request, cancellationToken);
+        public async Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) => Map(await _client.GetAsync(id, cancellationToken).ConfigureAwait(false));
+        private static ApiResponse<CatalogLookupDto> Map(ApiResponse<EmployeeDto> response) => response.IsSuccess ? ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(response.Data!.Id, response.Data.Code, response.Data.Name, response.Data.IsActive)) : ApiResponse<CatalogLookupDto>.Failure(response.Error!);
     }
 
     public sealed class CustomerCatalogLookupSource : ICatalogLookupSource
@@ -326,5 +404,7 @@ namespace MyDmsVn.Desktop.Application
         public CustomerCatalogLookupSource(ICustomerApiClient client) => _client = client;
         public CatalogKind Kind => CatalogKind.Customer;
         public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken) => _client.LookupAsync(request, cancellationToken);
+        public async Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) => Map(await _client.GetAsync(id, cancellationToken).ConfigureAwait(false));
+        private static ApiResponse<CatalogLookupDto> Map(ApiResponse<CustomerDto> response) => response.IsSuccess ? ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(response.Data!.Id, response.Data.Code, response.Data.Name, response.Data.IsActive)) : ApiResponse<CatalogLookupDto>.Failure(response.Error!);
     }
 }

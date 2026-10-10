@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -127,6 +127,41 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Selected_active_item_becomes_unavailable_after_deactivation_message()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var delay = new ControllableDelay();
+            var active = true;
+            var source = new ScriptedSource(
+                CatalogKind.Product,
+                (_, __) => Task.FromResult(
+                    ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(
+                        new[] { new CatalogLookupDto(7, "P7", "Current renamed product", true) })),
+                (_, __) => Task.FromResult(
+                    ApiResponse<CatalogLookupDto>.Success(
+                        new CatalogLookupDto(7, "P7", "Current renamed product", active))));
+            using (var viewModel = Create(source, messenger, delay))
+            {
+                viewModel.SetSelection(7, "P7 - Selected product", isActive: true);
+                await viewModel.RefreshAsync(CancellationToken.None);
+                Assert.True(viewModel.Items.Single(item => item.Id == 7).IsAvailableForNewSelection);
+
+                active = false;
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    7,
+                    CatalogChangeOperation.ActiveStatusChanged));
+                delay.ReleaseLatest();
+                await WaitUntilAsync(() => source.CallCount == 2);
+
+                Assert.False(viewModel.Items.Single(item => item.Id == 7).IsAvailableForNewSelection);
+                Assert.Equal(
+                    "P7 - Selected product",
+                    viewModel.Items.Single(item => item.Id == 7).DisplayName);
+            }
+        }
+
+        [Fact]
         public async Task Dispose_during_request_prevents_late_state_updates()
         {
             var source = new ControlledSource(CatalogKind.Warehouse);
@@ -138,6 +173,26 @@ namespace MyDmsVn.Desktop.Tests
             await refresh;
 
             Assert.Empty(viewModel.Items);
+        }
+
+        [Fact]
+        public async Task Late_selected_status_response_cannot_change_a_newer_historical_selection()
+        {
+            var source = new ControlledSelectionSource(CatalogKind.Product);
+            using (var viewModel = Create(source, new WeakReferenceMessenger(), new ControllableDelay()))
+            {
+                viewModel.SetSelection(1, "P1 - Original label", isActive: true);
+                var refresh = viewModel.RefreshAsync(CancellationToken.None);
+                viewModel.SetSelection(2, "P2 - Historical label", isActive: false);
+
+                source.CompleteLookup();
+                source.CompleteGet(new CatalogLookupDto(1, "P1", "Changed label", false));
+                await refresh;
+
+                var selected = viewModel.Items.Single(item => item.Id == 2);
+                Assert.Equal("P2 - Historical label", selected.DisplayName);
+                Assert.False(selected.IsAvailableForNewSelection);
+            }
         }
 
         private static CatalogLookupViewModel Create(
@@ -193,14 +248,17 @@ namespace MyDmsVn.Desktop.Tests
         {
             private readonly Func<CatalogLookupRequest, CancellationToken,
                 Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>>> _lookup;
+            private readonly Func<int, CancellationToken, Task<ApiResponse<CatalogLookupDto>>>? _get;
 
             public ScriptedSource(
                 CatalogKind kind,
                 Func<CatalogLookupRequest, CancellationToken,
-                    Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>>> lookup)
+                    Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>>> lookup,
+                Func<int, CancellationToken, Task<ApiResponse<CatalogLookupDto>>>? get = null)
             {
                 Kind = kind;
                 _lookup = lookup;
+                _get = get;
             }
 
             public CatalogKind Kind { get; }
@@ -222,6 +280,25 @@ namespace MyDmsVn.Desktop.Tests
             {
                 CallCount++;
                 return _lookup(request, cancellationToken);
+            }
+
+            public async Task<ApiResponse<CatalogLookupDto>> GetAsync(
+                int id,
+                CancellationToken cancellationToken)
+            {
+                if (_get != null)
+                {
+                    return await _get(id, cancellationToken);
+                }
+
+                var response = await _lookup(
+                    new CatalogLookupRequest(null, 25),
+                    cancellationToken);
+                var item = response.Data?.SingleOrDefault(candidate => candidate.Id == id);
+                return item != null
+                    ? ApiResponse<CatalogLookupDto>.Success(item)
+                    : ApiResponse<CatalogLookupDto>.Failure(
+                        new ApiError(ApiStatusCode.NotFound, "Catalog.NotFound", "Not found."));
             }
         }
 
@@ -254,6 +331,28 @@ namespace MyDmsVn.Desktop.Tests
                 _responses[index].TrySetResult(
                     ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(items));
             }
+
+            public Task<ApiResponse<CatalogLookupDto>> GetAsync(
+                int id,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(
+                    ApiResponse<CatalogLookupDto>.Success(
+                        new CatalogLookupDto(id, id.ToString(), "Selected", true)));
+        }
+
+        private sealed class ControlledSelectionSource : ICatalogLookupSource
+        {
+            private readonly TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>> _lookup =
+                new TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource<ApiResponse<CatalogLookupDto>> _get =
+                new TaskCompletionSource<ApiResponse<CatalogLookupDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public ControlledSelectionSource(CatalogKind kind) => Kind = kind;
+            public CatalogKind Kind { get; }
+            public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken) => _lookup.Task;
+            public Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) => _get.Task;
+            public void CompleteLookup() => _lookup.TrySetResult(ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(Array.Empty<CatalogLookupDto>()));
+            public void CompleteGet(CatalogLookupDto item) => _get.TrySetResult(ApiResponse<CatalogLookupDto>.Success(item));
         }
     }
 }

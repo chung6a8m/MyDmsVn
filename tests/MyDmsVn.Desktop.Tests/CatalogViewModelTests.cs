@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -136,6 +136,37 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Employee_user_id_rejects_invalid_text_and_blank_explicitly_unlinks()
+        {
+            var client = new SuccessfulEmployeeClient();
+            using (var employee = new EmployeeCatalogViewModel(
+                client,
+                new WeakReferenceMessenger(),
+                new ImmediateUiDispatcher(),
+                new DesktopNotificationCenter(),
+                new SystemAsyncDelay(),
+                TimeSpan.Zero))
+            {
+                employee.BeginCreate();
+                employee.Code = "E12";
+                employee.Name = "Employee";
+                employee.UserIdText = "not-a-number";
+                await employee.SaveAsync(CancellationToken.None);
+                Assert.Equal("User ID must be a positive whole number.", Assert.Single(employee.GetErrors("userId")));
+                Assert.Equal(0, client.CreateCount);
+
+                employee.UserIdText = "999999999999999999999";
+                await employee.SaveAsync(CancellationToken.None);
+                Assert.Equal(0, client.CreateCount);
+
+                employee.UserIdText = string.Empty;
+                await employee.SaveAsync(CancellationToken.None);
+                Assert.Equal(1, client.CreateCount);
+                Assert.Null(client.LastRequest!.UserId);
+            }
+        }
+
+        [Fact]
         public async Task Rapid_search_uses_300ms_debounce_issues_one_query_and_resets_page()
         {
             var client = new FakeProductClient();
@@ -193,6 +224,180 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Search_intent_invalidates_an_inflight_refresh_before_debounce_elapses()
+        {
+            var client = new FakeProductClient { ControlListResponses = true };
+            var delay = new ControllableDelay();
+            using (var viewModel = CreateProduct(client, delay))
+            {
+                var refresh = viewModel.RefreshAsync(CancellationToken.None);
+                var search = viewModel.SetSearch("new");
+
+                client.CompleteList(0, Product(1, "OLD"));
+                await refresh;
+                Assert.Empty(viewModel.Items);
+
+                delay.ReleaseLatest();
+                await WaitUntilAsync(() => client.ControlledListCount == 2);
+                client.CompleteList(1, Product(2, "NEW"));
+                await search;
+                Assert.Equal(2, Assert.Single(viewModel.Items).Id);
+            }
+        }
+
+        [Fact]
+        public async Task Catalog_messages_refresh_other_open_lists_and_stop_after_disposal()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var firstDelay = new ControllableDelay();
+            var secondDelay = new ControllableDelay();
+            var firstClient = new FakeProductClient();
+            var secondClient = new FakeProductClient();
+            var first = CreateProduct(firstClient, firstDelay, messenger);
+            using (var second = CreateProduct(secondClient, secondDelay, messenger))
+            {
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+                firstDelay.ReleaseLatest();
+                secondDelay.ReleaseLatest();
+                await WaitUntilAsync(() =>
+                    firstClient.ListRequests.Count == 1 &&
+                    secondClient.ListRequests.Count == 1);
+                Assert.Single(firstClient.ListRequests);
+                Assert.Single(secondClient.ListRequests);
+
+                first.Dispose();
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    2,
+                    CatalogChangeOperation.Updated));
+                secondDelay.ReleaseLatest();
+                await WaitUntilAsync(() => secondClient.ListRequests.Count == 2);
+                Assert.Single(firstClient.ListRequests);
+                Assert.Equal(2, secondClient.ListRequests.Count);
+            }
+        }
+
+        [Fact]
+        public async Task Late_selection_cannot_replace_a_newer_selection_or_new_editor()
+        {
+            var client = new FakeProductClient { ControlGetResponses = true };
+            using (var viewModel = CreateProduct(client, new ControllableDelay()))
+            {
+                var first = viewModel.SelectAsync(1, CancellationToken.None);
+                var second = viewModel.SelectAsync(2, CancellationToken.None);
+                client.CompleteGet(1, Product(2, "P2"));
+                await second;
+                client.CompleteGet(0, Product(1, "P1"));
+                await first;
+                Assert.Equal(2, viewModel.SelectedId);
+
+                var late = viewModel.SelectAsync(3, CancellationToken.None);
+                viewModel.BeginCreate();
+                client.CompleteGet(2, Product(3, "P3"));
+                await late;
+                Assert.Null(viewModel.SelectedId);
+                Assert.Equal(string.Empty, viewModel.Code);
+            }
+        }
+
+        [Fact]
+        public async Task Dispose_during_save_suppresses_late_editor_updates_messages_and_notifications()
+        {
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var messenger = new WeakReferenceMessenger();
+            var messages = new List<CatalogChangedMessage>();
+            var recipient = new object();
+            messenger.Register<CatalogChangedMessage>(recipient, (_, message) => messages.Add(message));
+            var notifications = new DesktopNotificationCenter();
+            var viewModel = new ProductCatalogViewModel(
+                client,
+                messenger,
+                new ImmediateUiDispatcher(),
+                notifications,
+                new ControllableDelay());
+            viewModel.BeginCreate();
+            viewModel.Code = "P-LATE";
+            viewModel.Name = "Late";
+            viewModel.Unit = "pcs";
+            var save = viewModel.SaveAsync(CancellationToken.None);
+
+            viewModel.Dispose();
+            client.CompleteCreate(Product(99, "P-LATE"));
+            await save;
+
+            Assert.Null(viewModel.SelectedId);
+            Assert.Empty(messages);
+            Assert.Null(notifications.LastNotification);
+        }
+
+        [Fact]
+        public async Task Dispose_during_save_suppresses_a_late_client_exception()
+        {
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var notifications = new DesktopNotificationCenter();
+            var viewModel = new ProductCatalogViewModel(
+                client,
+                new WeakReferenceMessenger(),
+                new ImmediateUiDispatcher(),
+                notifications,
+                new ControllableDelay());
+            viewModel.BeginCreate();
+            var save = viewModel.SaveAsync(CancellationToken.None);
+
+            viewModel.Dispose();
+            var propertyChangesAfterDispose = 0;
+            viewModel.PropertyChanged += (_, __) => propertyChangesAfterDispose++;
+            client.FailCreate(new InvalidOperationException("late failure"));
+            await save;
+
+            Assert.Null(notifications.LastNotification);
+            Assert.Equal(0, propertyChangesAfterDispose);
+        }
+
+        [Fact]
+        public async Task Cancel_stops_an_active_refresh_even_when_client_ignores_cancellation()
+        {
+            var client = new FakeProductClient { ControlListResponses = true };
+            using (var viewModel = CreateProduct(client, new ControllableDelay()))
+            {
+                var refresh = viewModel.RefreshAsync(CancellationToken.None);
+                viewModel.Cancel();
+                client.CompleteList(0, Product(1, "LATE"));
+                await refresh;
+
+                Assert.Empty(viewModel.Items);
+                Assert.False(viewModel.IsLoading);
+            }
+        }
+
+        [Fact]
+        public async Task Queued_list_error_is_discarded_when_view_model_is_disposed_before_ui_dispatch()
+        {
+            var client = new FakeProductClient { ControlListResponses = true };
+            var dispatcher = new SwitchableUiDispatcher();
+            var notifications = new DesktopNotificationCenter();
+            var viewModel = new ProductCatalogViewModel(
+                client,
+                new WeakReferenceMessenger(),
+                dispatcher,
+                notifications,
+                new ControllableDelay());
+            var refresh = viewModel.RefreshAsync(CancellationToken.None);
+            dispatcher.Defer = true;
+            client.FailList(0, new InvalidOperationException("late list failure"));
+            await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+
+            viewModel.Dispose();
+            dispatcher.RunNext();
+            await refresh;
+
+            Assert.Null(notifications.LastNotification);
+        }
+
+        [Fact]
         public async Task List_failure_sets_error_and_disposal_blocks_late_updates()
         {
             var failureClient = new FakeProductClient
@@ -234,6 +439,20 @@ namespace MyDmsVn.Desktop.Tests
             return new ProductDto(id, code, code + " name", "pcs", true);
         }
 
+        private static async Task WaitUntilAsync(Func<bool> condition)
+        {
+            var timeout = DateTime.UtcNow.AddSeconds(5);
+            while (!condition())
+            {
+                if (DateTime.UtcNow >= timeout)
+                {
+                    throw new TimeoutException("The expected asynchronous condition was not reached.");
+                }
+
+                await Task.Delay(10);
+            }
+        }
+
         private sealed class ControllableDelay : IAsyncDelay
         {
             private readonly List<TaskCompletionSource<bool>> _pending =
@@ -258,10 +477,16 @@ namespace MyDmsVn.Desktop.Tests
         {
             private readonly List<TaskCompletionSource<ApiResponse<PagedResult<ProductDto>>>>
                 _controlledLists = new List<TaskCompletionSource<ApiResponse<PagedResult<ProductDto>>>>();
+            private readonly List<TaskCompletionSource<ApiResponse<ProductDto>>>
+                _controlledGets = new List<TaskCompletionSource<ApiResponse<ProductDto>>>();
+            private TaskCompletionSource<ApiResponse<ProductDto>>? _controlledCreate;
 
             public List<CatalogListRequest> ListRequests { get; } = new List<CatalogListRequest>();
 
             public bool ControlListResponses { get; set; }
+            public bool ControlGetResponses { get; set; }
+            public bool ControlCreateResponse { get; set; }
+            public int ControlledListCount => _controlledLists.Count;
 
             public ApiResponse<PagedResult<ProductDto>> ListResponse { get; set; } =
                 ApiResponse<PagedResult<ProductDto>>.Success(
@@ -304,18 +529,70 @@ namespace MyDmsVn.Desktop.Tests
                         new PagedResult<ProductDto>(items, 1, 25, items.Length)));
             }
 
-            public Task<ApiResponse<ProductDto>> GetAsync(int id, CancellationToken cancellationToken) =>
-                Task.FromResult(GetResponse);
+            public void FailList(int index, Exception exception) =>
+                _controlledLists[index].TrySetException(exception);
+
+            public Task<ApiResponse<ProductDto>> GetAsync(int id, CancellationToken cancellationToken)
+            {
+                if (!ControlGetResponses)
+                {
+                    return Task.FromResult(GetResponse);
+                }
+
+                var response = new TaskCompletionSource<ApiResponse<ProductDto>>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                _controlledGets.Add(response);
+                return response.Task;
+            }
+
+            public void CompleteGet(int index, ProductDto item) =>
+                _controlledGets[index].TrySetResult(ApiResponse<ProductDto>.Success(item));
             public Task<ApiResponse<ProductDto>> CreateAsync(SaveProductRequest request, CancellationToken cancellationToken) =>
-                CreateException == null
+                ControlCreateResponse
+                    ? (_controlledCreate = new TaskCompletionSource<ApiResponse<ProductDto>>(
+                        TaskCreationOptions.RunContinuationsAsynchronously)).Task
+                    : CreateException == null
                     ? Task.FromResult(CreateResponse)
                     : Task.FromException<ApiResponse<ProductDto>>(CreateException);
+            public void CompleteCreate(ProductDto item) =>
+                _controlledCreate!.TrySetResult(ApiResponse<ProductDto>.Success(item));
+            public void FailCreate(Exception exception) =>
+                _controlledCreate!.TrySetException(exception);
             public Task<ApiResponse<ProductDto>> UpdateAsync(int id, SaveProductRequest request, CancellationToken cancellationToken) =>
                 Task.FromResult(UpdateResponse);
             public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool isActive, CancellationToken cancellationToken) =>
                 Task.FromResult(SetActiveResponse);
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken cancellationToken) =>
                 throw new NotSupportedException();
+        }
+
+        private sealed class SwitchableUiDispatcher : IUiDispatcher
+        {
+            private readonly Queue<Action> _pending = new Queue<Action>();
+            public bool Defer { get; set; }
+            public int PendingCount => _pending.Count;
+            public Task InvokeAsync(Action action, CancellationToken cancellationToken)
+            {
+                if (!Defer)
+                {
+                    action();
+                    return Task.CompletedTask;
+                }
+
+                var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _pending.Enqueue(() =>
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        action();
+                    }
+
+                    completion.TrySetResult(true);
+                });
+                return completion.Task;
+            }
+
+            public void RunNext() => _pending.Dequeue()();
         }
 
         private sealed class SuccessfulWarehouseClient : IWarehouseApiClient
@@ -330,9 +607,11 @@ namespace MyDmsVn.Desktop.Tests
 
         private sealed class SuccessfulEmployeeClient : IEmployeeApiClient
         {
+            public int CreateCount { get; private set; }
+            public SaveEmployeeRequest? LastRequest { get; private set; }
             public Task<ApiResponse<PagedResult<EmployeeDto>>> ListAsync(CatalogListRequest request, CancellationToken token) => Task.FromResult(ApiResponse<PagedResult<EmployeeDto>>.Success(new PagedResult<EmployeeDto>(Array.Empty<EmployeeDto>(), request.PageNumber, request.PageSize, 0)));
             public Task<ApiResponse<EmployeeDto>> GetAsync(int id, CancellationToken token) => throw new NotSupportedException();
-            public Task<ApiResponse<EmployeeDto>> CreateAsync(SaveEmployeeRequest request, CancellationToken token) => Task.FromResult(ApiResponse<EmployeeDto>.Success(new EmployeeDto(12, request.Code, request.Name, request.Phone, request.UserId, true)));
+            public Task<ApiResponse<EmployeeDto>> CreateAsync(SaveEmployeeRequest request, CancellationToken token) { CreateCount++; LastRequest = request; return Task.FromResult(ApiResponse<EmployeeDto>.Success(new EmployeeDto(12, request.Code, request.Name, request.Phone, request.UserId, true))); }
             public Task<ApiResponse<EmployeeDto>> UpdateAsync(int id, SaveEmployeeRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) => throw new NotSupportedException();

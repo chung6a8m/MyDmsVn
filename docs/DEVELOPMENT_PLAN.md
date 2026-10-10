@@ -1,4 +1,4 @@
-﻿# Development Plan — MyDmsVn v1 → v2
+# Development Plan — MyDmsVn v1 → v2
 
 **Status:** P0 and P1 complete on 2026-10-08; P2, P3 and P4 complete on 2026-10-09; P5 is next. **Codex must not skip prerequisites or mark unverified tests as passed.**
 
@@ -71,7 +71,7 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 ## P5 — Sales & Inventory Foundation
 
 See dedicated [P5 detailed plan](plans/20261008-001-sales-inventory-foundation.md).
-- [ ] P5.1 Products/Warehouses/Employees/Customers + lookups, guards and UI.
+- [ ] P5.1 Products/Warehouses/Employees/Customers + lookups, guards and UI. (Implementation and automated gate complete 2026-10-10; interactive manual smoke pending.)
 - [ ] P5.2 GoodsReceipt Draft header/lines with validation and permissions.
 - [ ] P5.3 Post command with atomic ledger/balance updates, idempotency and reconciliation.
 - [ ] P5.4 Stock Balance/Card Dapper queries, desktop UI, concurrency/GUI regression suite.

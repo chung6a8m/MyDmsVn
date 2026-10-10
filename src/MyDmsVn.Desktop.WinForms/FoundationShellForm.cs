@@ -23,6 +23,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ICatalogControlFactory? _catalogControlFactory;
         private readonly int _uiThreadId;
         private long? _workspaceSessionVersion;
+        private bool _openingCatalog;
 
         public FoundationShellForm(FoundationViewModel viewModel)
             : this(viewModel, null, null, null, true)
@@ -81,6 +82,7 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 Dock = DockStyle.Fill,
             };
+            Workspace.SelectedIndexChanged += OnWorkspaceSelectedIndexChanged;
 
             var topBar = CreateTopBar();
             var statusBar = new BootstrapStatusStrip
@@ -145,18 +147,30 @@ namespace MyDmsVn.Desktop.WinForms
                 return null;
             }
 
-            var content = _catalogControlFactory.Create(kind);
-            var page = OpenWorkspace(
-                "catalog-" + kind.ToString().ToLowerInvariant(),
-                GetCatalogTitle(kind),
-                content,
-                WorkspaceSessionVersion);
-            if (page != null && page.Controls.Contains(content) && content is CatalogControl catalog)
+            var key = "catalog-" + kind.ToString().ToLowerInvariant();
+            _openingCatalog = true;
+            try
             {
-                _ = catalog.ActivateAsync(CancellationToken.None);
-            }
+                if (_documents.TryGetValue(key, out var existing))
+                {
+                    Workspace.SelectedTab = existing;
+                    ActivateCatalog(existing);
+                    return existing;
+                }
 
-            return page;
+                var content = _catalogControlFactory.Create(kind);
+                var page = OpenWorkspace(
+                    key,
+                    GetCatalogTitle(kind),
+                    content,
+                    WorkspaceSessionVersion);
+                ActivateCatalog(page);
+                return page;
+            }
+            finally
+            {
+                _openingCatalog = false;
+            }
         }
 
         public TabPage? OpenWorkspace(
@@ -269,6 +283,7 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
                 Navigation.SelectedItemChanged -= OnNavigationSelectedItemChanged;
+                Workspace.SelectedIndexChanged -= OnWorkspaceSelectedIndexChanged;
                 if (_session != null)
                 {
                     _session.SessionChanged -= OnSessionChanged;
@@ -298,6 +313,22 @@ namespace MyDmsVn.Desktop.WinForms
             if (Navigation.SelectedItem?.Tag is CatalogKind kind)
             {
                 OpenCatalog(kind);
+            }
+        }
+
+        private void OnWorkspaceSelectedIndexChanged(object? sender, EventArgs eventArgs)
+        {
+            if (!_openingCatalog)
+            {
+                ActivateCatalog(Workspace.SelectedTab);
+            }
+        }
+
+        private static void ActivateCatalog(TabPage? page)
+        {
+            if (page?.Controls.Count > 0 && page.Controls[0] is CatalogControl catalog)
+            {
+                _ = catalog.ActivateAsync(CancellationToken.None);
             }
         }
 

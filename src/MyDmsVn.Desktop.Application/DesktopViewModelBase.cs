@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -62,12 +62,15 @@ namespace MyDmsVn.Desktop.Application
 
         public void CancelCurrentOperation()
         {
-            _activeOperation?.Cancel();
+            CancelBusyOperation();
         }
+
+        protected void CancelBusyOperation() => _activeOperation?.Cancel();
 
         protected async Task ExecuteBusyAsync(
             Func<CancellationToken, Task> operation,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Func<bool>? publishCancellation = null)
         {
             if (operation == null)
             {
@@ -92,10 +95,13 @@ namespace MyDmsVn.Desktop.Application
                 }
                 catch (OperationCanceledException) when (linkedCancellation.IsCancellationRequested)
                 {
-                    _notifications.Publish(
-                        new DesktopNotification(
-                            DesktopNotificationKind.Information,
-                            "Operation canceled."));
+                    if (publishCancellation == null || publishCancellation())
+                    {
+                        _notifications.Publish(
+                            new DesktopNotification(
+                                DesktopNotificationKind.Information,
+                                "Operation canceled."));
+                    }
                 }
                 finally
                 {
@@ -104,7 +110,10 @@ namespace MyDmsVn.Desktop.Application
                         _activeOperation = null;
                     }
 
-                    IsBusy = false;
+                    if (publishCancellation == null || publishCancellation())
+                    {
+                        IsBusy = false;
+                    }
                 }
             }
         }
