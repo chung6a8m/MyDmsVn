@@ -109,7 +109,7 @@ public sealed class DatabaseMigrationTests
             var checkConstraintCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id IN " +
                 "(OBJECT_ID(N'dbo.GoodsReceipts'), OBJECT_ID(N'dbo.GoodsReceiptLines'));");
-            Assert.Equal(6, checkConstraintCount);
+            Assert.Equal(7, checkConstraintCount);
 
             var userId = await connection.QuerySingleAsync<int>(
                 "INSERT dbo.Users " +
@@ -151,6 +151,14 @@ public sealed class DatabaseMigrationTests
                     new { warehouseId, employeeId, userId }));
             Assert.Contains(duplicateReceiptNumber.Number, new[] { 2601, 2627 });
 
+            var nulReceiptNumber = await Assert.ThrowsAsync<SqlException>(() =>
+                connection.ExecuteAsync(
+                    "INSERT dbo.GoodsReceipts " +
+                    "(ReceiptNo, ReceiptDate, WarehouseId, EmployeeId, Status, CreatedByUserId) " +
+                    "VALUES (N'GR' + NCHAR(0) + N'002', '20261010', @warehouseId, @employeeId, 'Draft', @userId);",
+                    new { warehouseId, employeeId, userId }));
+            Assert.Equal(547, nulReceiptNumber.Number);
+
             var duplicateLineNumber = await Assert.ThrowsAsync<SqlException>(() =>
                 connection.ExecuteAsync(
                     "INSERT dbo.GoodsReceiptLines " +
@@ -177,10 +185,12 @@ public sealed class DatabaseMigrationTests
 
             var invalidValues = new[]
             {
-                    "UPDATE dbo.GoodsReceipts SET Status = 'Invalid' WHERE ReceiptId = @receiptId;",
-                    "UPDATE dbo.GoodsReceiptLines SET [LineNo] = 0 WHERE ReceiptId = @receiptId;",
-                    "UPDATE dbo.GoodsReceiptLines SET Quantity = 0 WHERE ReceiptId = @receiptId;",
-                    "UPDATE dbo.GoodsReceiptLines SET UnitCost = -0.0001 WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceipts SET Status = 'Invalid' WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceipts SET Status = 'draft' WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceipts SET Status = 'Draft ' WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceiptLines SET [LineNo] = 0 WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceiptLines SET Quantity = 0 WHERE ReceiptId = @receiptId;",
+                "UPDATE dbo.GoodsReceiptLines SET UnitCost = -0.0001 WHERE ReceiptId = @receiptId;",
                 };
             foreach (var invalidValue in invalidValues)
             {

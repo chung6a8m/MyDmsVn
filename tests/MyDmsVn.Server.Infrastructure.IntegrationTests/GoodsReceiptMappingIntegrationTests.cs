@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading;
@@ -51,20 +52,41 @@ public sealed class GoodsReceiptMappingIntegrationTests
             var productId = await context.Connection.QuerySingleAsync<int>(
                 "INSERT dbo.Products (Code, Name, Unit) OUTPUT INSERTED.ProductId VALUES (N'PR-MAP', N'Mapping Product', N'EA');",
                 transaction: transaction);
-            var receiptId = await context.Connection.QuerySingleAsync<long>(
-                "INSERT dbo.GoodsReceipts " +
-                "(ReceiptNo, ReceiptDate, WarehouseId, EmployeeId, Status, Note, CreatedAtUtc, CreatedByUserId) " +
-                "OUTPUT INSERTED.ReceiptId VALUES " +
-                "(N'GR-MAP-001', '20261010', @warehouseId, @employeeId, 'Draft', N'Mapped', @createdAtUtc, @userId);",
-                new { warehouseId, employeeId, createdAtUtc, userId },
-                transaction);
-            var lineId = await context.Connection.QuerySingleAsync<long>(
-                "INSERT dbo.GoodsReceiptLines " +
-                "(ReceiptId, [LineNo], ProductId, Quantity, UnitCost, CreatedAtUtc, CreatedByUserId) " +
-                "OUTPUT INSERTED.ReceiptLineId VALUES " +
-                "(@receiptId, 1, @productId, 2.5000, 19.9900, @createdAtUtc, @userId);",
-                new { receiptId, productId, createdAtUtc, userId },
-                transaction);
+            var receiptCreateFields = GetWriteFields("GoodsReceiptCreate");
+            var receiptDraftUpdateFields = GetWriteFields("GoodsReceiptDraftUpdate");
+            var lineCreateFields = GetWriteFields("GoodsReceiptLineCreate");
+            var receiptEntity = new GoodsReceipt
+            {
+                ReceiptNumber = "GR-MAP-001",
+                ReceiptDate = new DateTime(2026, 10, 10),
+                WarehouseId = warehouseId,
+                EmployeeId = employeeId,
+                Status = GoodsReceiptStatuses.Draft,
+                Note = "Mapped",
+                CreatedAtUtc = createdAtUtc,
+                CreatedByUserId = userId,
+                Version = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 },
+            };
+            var receiptId = await context.Connection.InsertAsync<GoodsReceipt, long>(
+                receiptEntity,
+                fields: receiptCreateFields,
+                transaction: transaction,
+                cancellationToken: CancellationToken.None);
+            var lineEntity = new GoodsReceiptLine
+            {
+                ReceiptId = receiptId,
+                LineNumber = 1,
+                ProductId = productId,
+                Quantity = 2.5000m,
+                UnitCost = 19.9900m,
+                CreatedAtUtc = createdAtUtc,
+                CreatedByUserId = userId,
+            };
+            var lineId = await context.Connection.InsertAsync<GoodsReceiptLine, long>(
+                lineEntity,
+                fields: lineCreateFields,
+                transaction: transaction,
+                cancellationToken: CancellationToken.None);
 
             var receipt = (await context.Connection.QueryAsync<GoodsReceipt>(
                 receiptId,
@@ -82,7 +104,7 @@ public sealed class GoodsReceiptMappingIntegrationTests
             Assert.Equal(employeeId, receipt.EmployeeId);
             Assert.Equal(GoodsReceiptStatuses.Draft, receipt.Status);
             Assert.Equal("Mapped", receipt.Note);
-            Assert.Equal(createdAtUtc, receipt.CreatedAtUtc);
+            Assert.NotEqual(createdAtUtc, receipt.CreatedAtUtc);
             Assert.Equal(userId, receipt.CreatedByUserId);
             Assert.Equal(8, receipt.Version.Length);
             Assert.Equal(lineId, line.Id);
@@ -91,8 +113,27 @@ public sealed class GoodsReceiptMappingIntegrationTests
             Assert.Equal(productId, line.ProductId);
             Assert.Equal(2.5000m, line.Quantity);
             Assert.Equal(19.9900m, line.UnitCost);
-            Assert.Equal(createdAtUtc, line.CreatedAtUtc);
+            Assert.NotEqual(createdAtUtc, line.CreatedAtUtc);
             Assert.Equal(userId, line.CreatedByUserId);
+
+            var firstVersion = receipt.Version;
+            receiptEntity.Id = receiptId;
+            receiptEntity.Note = "Updated through explicit fields";
+            receiptEntity.UpdatedAtUtc = createdAtUtc;
+            receiptEntity.UpdatedByUserId = userId;
+            var affected = await context.Connection.UpdateAsync(
+                receiptEntity,
+                fields: receiptDraftUpdateFields,
+                transaction: transaction,
+                cancellationToken: CancellationToken.None);
+            var updatedReceipt = (await context.Connection.QueryAsync<GoodsReceipt>(
+                receiptId,
+                transaction: transaction,
+                cancellationToken: CancellationToken.None)).Single();
+
+            Assert.Equal(1, affected);
+            Assert.Equal("Updated through explicit fields", updatedReceipt.Note);
+            Assert.NotEqual(firstVersion, updatedReceipt.Version);
 
             unitOfWork.Rollback();
         }
@@ -100,5 +141,17 @@ public sealed class GoodsReceiptMappingIntegrationTests
         {
             await database.DisposeAsync();
         }
+    }
+
+    private static IEnumerable<Field> GetWriteFields(string fieldName)
+    {
+        var mappingAssembly = typeof(MyDmsVn.Server.Infrastructure.DependencyInjection).Assembly;
+        var writeFieldsType = mappingAssembly.GetType(
+            "MyDmsVn.Server.Infrastructure.Inventory.InventoryRepoDbWriteFields");
+        Assert.NotNull(writeFieldsType);
+        var writeFields = writeFieldsType!
+            .GetField(fieldName, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)?
+            .GetValue(null);
+        return Assert.IsAssignableFrom<IEnumerable<Field>>(writeFields);
     }
 }

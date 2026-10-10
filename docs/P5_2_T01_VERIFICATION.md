@@ -28,9 +28,9 @@ Per configuration:
 
 - Migration rerun/no-op and ordered history include `005_GoodsReceipt.sql`.
 - SQL integration tests verify required columns, decimal precision/scale, all Goods Receipt foreign keys, unique receipt number, unique line number and mandatory unique product per receipt.
-- Direct invalid SQL verifies duplicate keys, FK and NOT NULL failures, invalid state, nonpositive line number/quantity and negative unit cost.
+- Direct invalid SQL verifies duplicate keys, FK and NOT NULL failures, noncanonical state values (including case and trailing-space variants), ReceiptNo NUL characters, nonpositive line number/quantity and negative unit cost.
 - Updating a header advances its eight-byte SQL `rowversion`.
-- RepoDb integration tests load both aggregate entities through the registered mappings and verify SQL column names and CLR value types.
+- RepoDb integration tests insert/update through explicit Inventory field whitelists, prove SQL-generated `rowversion` is omitted from writes and advances after an update, then load both aggregate entities through the registered mappings to verify SQL column names and CLR value types. Future UpdateDraft/Post handlers must compare the expected version separately in their conditional SQL predicate.
 - Contract golden JSON verifies Base64 `expectedVersion` on UpdateDraft/Post and the current `version` on `GoodsReceiptDto`; desktop client methods require those versioned request DTOs.
 
 ## Remaining risks and next task

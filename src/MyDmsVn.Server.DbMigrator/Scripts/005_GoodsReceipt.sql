@@ -6,7 +6,7 @@
     ReceiptDate date NOT NULL,
     WarehouseId int NOT NULL,
     EmployeeId int NOT NULL,
-    Status varchar(16) NOT NULL
+    Status varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL
         CONSTRAINT DF_GoodsReceipts_Status DEFAULT ('Draft'),
     Note nvarchar(1000) NULL,
     CreatedAtUtc datetime2(7) NOT NULL
@@ -21,7 +21,11 @@
         (LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
             ReceiptNo, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''),
             NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0),
-    CONSTRAINT CK_GoodsReceipts_Status CHECK (Status IN ('Draft', 'Posted')),
+    CONSTRAINT CK_GoodsReceipts_ReceiptNo_NoNul CHECK
+        (dbo.CatalogTextContainsNul(ReceiptNo) = 0),
+    CONSTRAINT CK_GoodsReceipts_Status CHECK
+        ((Status = 'Draft' AND DATALENGTH(Status) = 5) OR
+         (Status = 'Posted' AND DATALENGTH(Status) = 6)),
     CONSTRAINT CK_GoodsReceipts_PostingAudit CHECK
         ((Status = 'Draft' AND PostedAtUtc IS NULL AND PostedByUserId IS NULL) OR
          (Status = 'Posted' AND PostedAtUtc IS NOT NULL AND PostedByUserId IS NOT NULL)),
