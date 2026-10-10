@@ -24,6 +24,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ErrorProvider _errors;
         private readonly Dictionary<string, BootstrapTextBox> _editorControls =
             new Dictionary<string, BootstrapTextBox>(StringComparer.Ordinal);
+        private IReadOnlyList<int> _rowIds = Array.Empty<int>();
         private readonly SplitContainer _split;
         private readonly int _uiThreadId;
         private bool _applyingState;
@@ -277,6 +278,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void SetRows(IReadOnlyList<CatalogDisplayRow> rows)
         {
+            _rowIds = rows.Select(row => row.Id).ToArray();
             Grid.Redim(rows.Count + 1, 4);
             Grid.FixedRows = 1;
             Grid[0, 0] = new SourceGrid.Cells.ColumnHeader("ID");
@@ -286,12 +288,11 @@ namespace MyDmsVn.Desktop.WinForms
             for (var index = 0; index < rows.Count; index++)
             {
                 var gridRow = index + 1;
-                Grid[gridRow, 0] = new SourceGrid.Cells.Cell(rows[index].Id, typeof(int));
-                Grid[gridRow, 1] = new SourceGrid.Cells.Cell(rows[index].Code, typeof(string));
-                Grid[gridRow, 2] = new SourceGrid.Cells.Cell(rows[index].Name, typeof(string));
+                Grid[gridRow, 0] = new SourceGrid.Cells.Cell(rows[index].Id);
+                Grid[gridRow, 1] = new SourceGrid.Cells.Cell(rows[index].Code);
+                Grid[gridRow, 2] = new SourceGrid.Cells.Cell(rows[index].Name);
                 Grid[gridRow, 3] = new SourceGrid.Cells.Cell(
-                    rows[index].IsActive ? "Active" : "Inactive",
-                    typeof(string));
+                    rows[index].IsActive ? "Active" : "Inactive");
             }
 
             Grid.AutoSizeCells();
@@ -311,9 +312,10 @@ namespace MyDmsVn.Desktop.WinForms
                 return false;
             }
 
-            if (Grid[row, 0].Value is int id)
+            var rowIndex = row - 1;
+            if (rowIndex >= 0 && rowIndex < _rowIds.Count)
             {
-                SetOperation(_binding.SelectAsync(id, CancellationToken.None));
+                SetOperation(_binding.SelectAsync(_rowIds[rowIndex], CancellationToken.None));
                 return true;
             }
 

@@ -237,6 +237,67 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void All_catalog_list_cells_are_read_only()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var product = new ProductDto(1, "P1", "Product", "pcs", true);
+                    var client = new ProductClient { Items = new[] { product } };
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    using (var host = new Form())
+                    {
+                        host.Controls.Add(control);
+                        host.Show();
+                        System.Windows.Forms.Application.DoEvents();
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+
+                        foreach (var column in Enumerable.Range(0, 4))
+                        {
+                            var position = new SourceGrid.Position(1, column);
+                            Assert.True(control.Grid.Selection.Focus(position, true));
+                            var context = new SourceGrid.CellContext(control.Grid, position);
+
+                            context.StartEdit();
+
+                            Assert.False(context.IsEditing());
+                        }
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Enter_uses_the_immutable_row_id_instead_of_the_visible_cell_value()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    var first = new ProductDto(1, "P1", "First", "pcs", true);
+                    var other = new ProductDto(999, "P999", "Other", "pcs", true);
+                    var client = new ProductClient { Items = new[] { first, other } };
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    using (var host = new Form())
+                    {
+                        host.Controls.Add(control);
+                        host.Show();
+                        System.Windows.Forms.Application.DoEvents();
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.Grid[1, 0].Value = other.Id;
+                        Assert.True(control.Grid.Selection.Focus(new SourceGrid.Position(1, 0), true));
+
+                        RaiseKeyDown(control.Grid, Keys.Enter);
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.Equal(first.Id, viewModel.SelectedId);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void Enter_does_not_select_a_row_while_the_active_cell_is_editing()
         {
             StaTest.Run(
@@ -253,6 +314,8 @@ namespace MyDmsVn.Desktop.Tests
                         System.Windows.Forms.Application.DoEvents();
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
                         var position = new SourceGrid.Position(1, 1);
+                        control.Grid[position].Editor =
+                            new SourceGrid.Cells.Editors.TextBox(typeof(string));
                         Assert.True(control.Grid.Selection.Focus(position, true));
                         var context = new SourceGrid.CellContext(control.Grid, position);
                         context.StartEdit();
