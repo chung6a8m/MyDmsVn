@@ -598,6 +598,7 @@
       "mydmsvn.desktop.winforms": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
           "MyDmsVn.BootstrapSourceGrid": "[0.1.0-preview.1, )",
           "MyDmsVn.Desktop.Application": "[1.0.0, )"
         }
