@@ -13,10 +13,10 @@ Interactive Goods Receipt lookup smoke remains a P5.2 dependency and was not per
 ## Automated results
 
 - `dotnet build MyDmsVn.sln --no-restore` and `dotnet build MyDmsVn.sln -c Release --no-restore` — both succeeded with 0 warnings and 0 errors. The solution built the `net48`, `net8.0` and `net8.0-windows` target families.
-- `dotnet test MyDmsVn.sln --no-build --no-restore --logger "console;verbosity=minimal"` and the same command with `-c Release` — 487/487 target executions passed in each configuration:
+- `dotnet test MyDmsVn.sln --no-build --no-restore --logger "console;verbosity=minimal"` and the same command with `-c Release` — 491/491 target executions passed in each configuration:
   - Architecture: 5/5 (`net8.0`).
   - Server Application: 81/81 on `net48` and 81/81 on `net8.0`.
-  - Desktop: 98/98 on `net48` and 98/98 on `net8.0-windows`.
+  - Desktop: 100/100 on `net48` and 100/100 on `net8.0-windows`.
   - SQL Server integration: 62/62 on `net48` and 62/62 on `net8.0`; every test used its disposable `SqlTestDatabase`.
 - `dotnet run --project src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj -c Release -f net48 --no-restore -- --smoke-test` — exited 0.
 - `dotnet run --project src/MyDmsVn.Desktop.AppCore/MyDmsVn.Desktop.AppCore.csproj -c Release -f net8.0-windows --no-restore -- --smoke-test` — exited 0.

@@ -29,6 +29,7 @@ namespace MyDmsVn.Desktop.Application
         private bool _disposed;
         private long _generation;
         private long _editorGeneration;
+        private long _messageReloadGeneration;
         private bool _ignoreNextRelevantMessage;
 
         protected CatalogViewModel(
@@ -104,7 +105,7 @@ namespace MyDmsVn.Desktop.Application
         public Task SetSearch(string? search)
         {
             ThrowIfDisposed();
-            _messageReload.Cancel();
+            CancelMessageReload();
             CancelListLoad();
             _search = search;
             OnPropertyChanged(nameof(Search));
@@ -116,7 +117,7 @@ namespace MyDmsVn.Desktop.Application
         {
             ThrowIfDisposed();
             _searchReload.Cancel();
-            _messageReload.Cancel();
+            CancelMessageReload();
             return LoadAsync(cancellationToken);
         }
 
@@ -225,7 +226,8 @@ namespace MyDmsVn.Desktop.Application
                     await _dispatcher.InvokeAsync(
                         () =>
                         {
-                            if (IsEditorCurrent(editorGeneration))
+                            if (!editorCancellation.IsCancellationRequested &&
+                                IsEditorCurrent(editorGeneration))
                             {
                                 PublishNotification(
                                     DesktopNotificationKind.Error,
@@ -252,7 +254,7 @@ namespace MyDmsVn.Desktop.Application
         public void Cancel()
         {
             _searchReload.Cancel();
-            _messageReload.Cancel();
+            CancelMessageReload();
             CancelListLoad();
             CancelEditorLoad();
             CancelBusyOperation();
@@ -580,23 +582,45 @@ namespace MyDmsVn.Desktop.Application
                 return;
             }
 
-            if (_ignoreNextRelevantMessage)
+            long messageReloadGeneration;
+            lock (_sync)
             {
-                _ignoreNextRelevantMessage = false;
-                return;
+                if (_disposed)
+                {
+                    return;
+                }
+
+                if (_ignoreNextRelevantMessage)
+                {
+                    _ignoreNextRelevantMessage = false;
+                    return;
+                }
+
+                _messageReload.Cancel();
+                messageReloadGeneration = ++_messageReloadGeneration;
             }
 
             CancelListLoad();
-            _ = ScheduleMessageReloadAsync();
+            _ = ScheduleMessageReloadAsync(messageReloadGeneration);
         }
 
-        private async Task ScheduleMessageReloadAsync()
+        private async Task ScheduleMessageReloadAsync(long messageReloadGeneration)
         {
             try
             {
                 Task scheduled = Task.CompletedTask;
                 await _dispatcher.InvokeAsync(
-                    () => scheduled = _messageReload.Schedule(LoadAsync),
+                    () =>
+                    {
+                        lock (_sync)
+                        {
+                            if (!_disposed &&
+                                _messageReloadGeneration == messageReloadGeneration)
+                            {
+                                scheduled = _messageReload.Schedule(LoadAsync);
+                            }
+                        }
+                    },
                     _lifetimeCancellation.Token).ConfigureAwait(false);
                 await scheduled.ConfigureAwait(false);
             }
@@ -605,6 +629,15 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (ObjectDisposedException)
             {
+            }
+        }
+
+        private void CancelMessageReload()
+        {
+            lock (_sync)
+            {
+                _messageReloadGeneration++;
+                _messageReload.Cancel();
             }
         }
 

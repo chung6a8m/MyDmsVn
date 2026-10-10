@@ -152,7 +152,8 @@ namespace MyDmsVn.Desktop.Tests
                     7,
                     CatalogChangeOperation.ActiveStatusChanged));
                 delay.ReleaseLatest();
-                await WaitUntilAsync(() => source.CallCount == 2);
+                await WaitUntilAsync(() => viewModel.Items.Any(
+                    item => item.Id == 7 && !item.IsAvailableForNewSelection));
 
                 Assert.False(viewModel.Items.Single(item => item.Id == 7).IsAvailableForNewSelection);
                 Assert.Equal(

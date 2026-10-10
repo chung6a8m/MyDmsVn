@@ -290,6 +290,37 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Search_supersedes_a_message_reload_callback_already_queued_for_ui_dispatch()
+        {
+            var client = new FakeProductClient();
+            var delay = new ControllableDelay();
+            var messenger = new WeakReferenceMessenger();
+            var dispatcher = new SwitchableUiDispatcher { Defer = true };
+            using (var viewModel = new ProductCatalogViewModel(
+                client,
+                messenger,
+                dispatcher,
+                new DesktopNotificationCenter(),
+                delay))
+            {
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+                var search = viewModel.SetSearch("new");
+
+                dispatcher.RunNext();
+                dispatcher.Defer = false;
+                delay.ReleaseAll();
+                await search;
+                await Task.Delay(50);
+
+                var request = Assert.Single(client.ListRequests);
+                Assert.Equal("new", request.Search);
+            }
+        }
+
+        [Fact]
         public async Task Catalog_messages_refresh_other_open_lists_and_stop_after_disposal()
         {
             var messenger = new WeakReferenceMessenger();
@@ -366,6 +397,34 @@ namespace MyDmsVn.Desktop.Tests
 
                 Assert.Equal(DesktopNotificationKind.Error, notifications.LastNotification!.Kind);
                 Assert.Equal("detail unavailable", notifications.LastNotification.Message);
+            }
+        }
+
+        [Fact]
+        public async Task Canceled_selection_suppresses_a_detail_error_already_queued_for_ui_dispatch()
+        {
+            var client = new FakeProductClient
+            {
+                GetException = new InvalidOperationException("detail unavailable"),
+            };
+            var dispatcher = new SwitchableUiDispatcher { Defer = true };
+            var notifications = new DesktopNotificationCenter();
+            using (var cancellation = new CancellationTokenSource())
+            using (var viewModel = new ProductCatalogViewModel(
+                client,
+                new WeakReferenceMessenger(),
+                dispatcher,
+                notifications,
+                new ControllableDelay()))
+            {
+                var selection = viewModel.SelectAsync(1, cancellation.Token);
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+
+                cancellation.Cancel();
+                dispatcher.RunNext();
+                await selection;
+
+                Assert.Null(notifications.LastNotification);
             }
         }
 
@@ -604,6 +663,14 @@ namespace MyDmsVn.Desktop.Tests
             public void ReleaseLatest() => _pending[_pending.Count - 1].TrySetResult(true);
 
             public void Release(int index) => _pending[index].TrySetResult(true);
+
+            public void ReleaseAll()
+            {
+                foreach (var completion in _pending.ToArray())
+                {
+                    completion.TrySetResult(true);
+                }
+            }
         }
 
         private sealed class FakeProductClient : IProductApiClient
