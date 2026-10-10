@@ -242,17 +242,19 @@ namespace MyDmsVn.Desktop.WinForms
                     SearchBox.Text = _binding.Search ?? string.Empty;
                 }
 
+                var busy = _binding.IsBusy || _binding.IsLoading;
                 foreach (var field in _binding.Fields)
                 {
                     var value = field.GetValue();
-                    if (!string.Equals(_editorControls[field.Key].Text, value, StringComparison.Ordinal))
+                    var editor = _editorControls[field.Key];
+                    editor.Enabled = !busy;
+                    if (!string.Equals(editor.Text, value, StringComparison.Ordinal))
                     {
-                        _editorControls[field.Key].Text = value;
+                        editor.Text = value;
                     }
                 }
 
                 SetRows(_binding.Rows());
-                var busy = _binding.IsBusy || _binding.IsLoading;
                 SaveButton.Enabled = !busy;
                 RefreshButton.Enabled = !busy;
                 NewButton.Enabled = !busy;
@@ -451,13 +453,13 @@ namespace MyDmsVn.Desktop.WinForms
         private sealed class CatalogBinding : IDisposable
         {
             private readonly IDisposable _disposable;
-            private readonly Func<Task> _activate;
-            private readonly Func<Task> _refresh;
+            private readonly Func<CancellationToken, Task> _activate;
+            private readonly Func<CancellationToken, Task> _refresh;
             private readonly Func<string?, Task> _setSearch;
-            private readonly Func<int, Task> _select;
-            private readonly Func<Task> _save;
-            private readonly Func<int, bool, Task> _setActive;
-            private readonly Func<int, Task> _moveToPage;
+            private readonly Func<int, CancellationToken, Task> _select;
+            private readonly Func<CancellationToken, Task> _save;
+            private readonly Func<int, bool, CancellationToken, Task> _setActive;
+            private readonly Func<int, CancellationToken, Task> _moveToPage;
             private readonly Action _beginCreate;
             private readonly Action _cancel;
             private readonly Func<IEnumerable> _getErrors;
@@ -475,13 +477,13 @@ namespace MyDmsVn.Desktop.WinForms
                 INotifyDataErrorInfo errors,
                 Func<IReadOnlyList<CatalogDisplayRow>> rows,
                 IReadOnlyList<CatalogField> fields,
-                Func<Task> activate,
-                Func<Task> refresh,
+                Func<CancellationToken, Task> activate,
+                Func<CancellationToken, Task> refresh,
                 Func<string?, Task> setSearch,
-                Func<int, Task> select,
-                Func<Task> save,
-                Func<int, bool, Task> setActive,
-                Func<int, Task> moveToPage,
+                Func<int, CancellationToken, Task> select,
+                Func<CancellationToken, Task> save,
+                Func<int, bool, CancellationToken, Task> setActive,
+                Func<int, CancellationToken, Task> moveToPage,
                 Action beginCreate,
                 Action cancel,
                 Func<int?> selectedId,
@@ -540,13 +542,13 @@ namespace MyDmsVn.Desktop.WinForms
             public int PageSize => _pageSize();
             public long TotalCount => _totalCount();
             public IEnumerable GetErrors(string field) => ErrorSource.GetErrors(field) ?? _getErrors();
-            public Task ActivateAsync(CancellationToken token) => _activate();
-            public Task RefreshAsync(CancellationToken token) => _refresh();
+            public Task ActivateAsync(CancellationToken token) => _activate(token);
+            public Task RefreshAsync(CancellationToken token) => _refresh(token);
             public Task SetSearch(string? search) => _setSearch(search);
-            public Task SelectAsync(int id, CancellationToken token) => _select(id);
-            public Task SaveAsync(CancellationToken token) => _save();
-            public Task SetActiveAsync(int id, bool active, CancellationToken token) => _setActive(id, active);
-            public Task MoveToPageAsync(int pageNumber, CancellationToken token) => _moveToPage(pageNumber);
+            public Task SelectAsync(int id, CancellationToken token) => _select(id, token);
+            public Task SaveAsync(CancellationToken token) => _save(token);
+            public Task SetActiveAsync(int id, bool active, CancellationToken token) => _setActive(id, active, token);
+            public Task MoveToPageAsync(int pageNumber, CancellationToken token) => _moveToPage(pageNumber, token);
             public void BeginCreate() => _beginCreate();
             public void Cancel() => _cancel();
             public void Dispose() => _disposable.Dispose();
@@ -562,13 +564,13 @@ namespace MyDmsVn.Desktop.WinForms
                     viewModel,
                     rows,
                     fields,
-                    () => viewModel.ActivateAsync(CancellationToken.None),
-                    () => viewModel.RefreshAsync(CancellationToken.None),
+                    viewModel.ActivateAsync,
+                    viewModel.RefreshAsync,
                     viewModel.SetSearch,
-                    id => viewModel.SelectAsync(id, CancellationToken.None),
-                    () => viewModel.SaveAsync(CancellationToken.None),
-                    (id, active) => viewModel.SetActiveAsync(id, active, CancellationToken.None),
-                    page => viewModel.MoveToPageAsync(page, CancellationToken.None),
+                    viewModel.SelectAsync,
+                    viewModel.SaveAsync,
+                    viewModel.SetActiveAsync,
+                    viewModel.MoveToPageAsync,
                     viewModel.BeginCreate,
                     viewModel.Cancel,
                     () => viewModel.SelectedId,

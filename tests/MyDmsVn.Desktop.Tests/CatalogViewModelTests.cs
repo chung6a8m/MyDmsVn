@@ -246,6 +246,50 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Search_cancels_a_pending_message_reload_instead_of_querying_twice()
+        {
+            var client = new FakeProductClient();
+            var delay = new ControllableDelay();
+            var messenger = new WeakReferenceMessenger();
+            using (var viewModel = CreateProduct(client, delay, messenger))
+            {
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+                var search = viewModel.SetSearch("new");
+
+                delay.Release(0);
+                delay.ReleaseLatest();
+                await search;
+
+                var request = Assert.Single(client.ListRequests);
+                Assert.Equal("new", request.Search);
+            }
+        }
+
+        [Fact]
+        public async Task Explicit_refresh_cancels_a_pending_message_reload_instead_of_querying_twice()
+        {
+            var client = new FakeProductClient();
+            var delay = new ControllableDelay();
+            var messenger = new WeakReferenceMessenger();
+            using (var viewModel = CreateProduct(client, delay, messenger))
+            {
+                messenger.Send(new CatalogChangedMessage(
+                    CatalogKind.Product,
+                    1,
+                    CatalogChangeOperation.Updated));
+
+                await viewModel.RefreshAsync(CancellationToken.None);
+                delay.Release(0);
+                await Task.Delay(50);
+
+                Assert.Single(client.ListRequests);
+            }
+        }
+
+        [Fact]
         public async Task Catalog_messages_refresh_other_open_lists_and_stop_after_disposal()
         {
             var messenger = new WeakReferenceMessenger();
@@ -300,6 +344,93 @@ namespace MyDmsVn.Desktop.Tests
                 await late;
                 Assert.Null(viewModel.SelectedId);
                 Assert.Equal(string.Empty, viewModel.Code);
+            }
+        }
+
+        [Fact]
+        public async Task Detail_load_exception_is_reported_without_faulting_the_selection_task()
+        {
+            var client = new FakeProductClient
+            {
+                GetException = new InvalidOperationException("detail unavailable"),
+            };
+            var notifications = new DesktopNotificationCenter();
+            using (var viewModel = new ProductCatalogViewModel(
+                client,
+                new WeakReferenceMessenger(),
+                new ImmediateUiDispatcher(),
+                notifications,
+                new ControllableDelay()))
+            {
+                await viewModel.SelectAsync(1, CancellationToken.None);
+
+                Assert.Equal(DesktopNotificationKind.Error, notifications.LastNotification!.Kind);
+                Assert.Equal("detail unavailable", notifications.LastNotification.Message);
+            }
+        }
+
+        [Fact]
+        public async Task Begin_create_clears_validation_from_the_previous_editor_context()
+        {
+            var client = new FakeProductClient
+            {
+                CreateResponse = ApiResponse<ProductDto>.Failure(
+                    new ApiError(
+                        ApiStatusCode.BadRequest,
+                        "ValidationError",
+                        "Correct the fields.",
+                        new[]
+                        {
+                            new ApiErrorDetail(
+                                "Validation.Required",
+                                "Code is required.",
+                                "code"),
+                        })),
+            };
+            using (var viewModel = CreateProduct(client, new ControllableDelay()))
+            {
+                await viewModel.SaveAsync(CancellationToken.None);
+                Assert.True(viewModel.HasErrors);
+                Assert.Equal("Correct the fields.", viewModel.ErrorMessage);
+
+                viewModel.BeginCreate();
+
+                Assert.False(viewModel.HasErrors);
+                Assert.Null(viewModel.ErrorMessage);
+                Assert.Empty(viewModel.GetErrors("code"));
+            }
+        }
+
+        [Fact]
+        public async Task Successful_selection_clears_validation_from_the_previous_editor_context()
+        {
+            var client = new FakeProductClient
+            {
+                CreateResponse = ApiResponse<ProductDto>.Failure(
+                    new ApiError(
+                        ApiStatusCode.BadRequest,
+                        "ValidationError",
+                        "Correct the fields.",
+                        new[]
+                        {
+                            new ApiErrorDetail(
+                                "Validation.Required",
+                                "Code is required.",
+                                "code"),
+                        })),
+                GetResponse = ApiResponse<ProductDto>.Success(Product(2, "P2")),
+            };
+            using (var viewModel = CreateProduct(client, new ControllableDelay()))
+            {
+                await viewModel.SaveAsync(CancellationToken.None);
+                Assert.True(viewModel.HasErrors);
+
+                await viewModel.SelectAsync(2, CancellationToken.None);
+
+                Assert.Equal(2, viewModel.SelectedId);
+                Assert.False(viewModel.HasErrors);
+                Assert.Null(viewModel.ErrorMessage);
+                Assert.Empty(viewModel.GetErrors("code"));
             }
         }
 
@@ -471,6 +602,8 @@ namespace MyDmsVn.Desktop.Tests
             }
 
             public void ReleaseLatest() => _pending[_pending.Count - 1].TrySetResult(true);
+
+            public void Release(int index) => _pending[index].TrySetResult(true);
         }
 
         private sealed class FakeProductClient : IProductApiClient
@@ -505,6 +638,7 @@ namespace MyDmsVn.Desktop.Tests
                 ApiResponse<UnitResponse>.Success(UnitResponse.Value);
 
             public Exception? CreateException { get; set; }
+            public Exception? GetException { get; set; }
 
             public Task<ApiResponse<PagedResult<ProductDto>>> ListAsync(
                 CatalogListRequest request,
@@ -534,6 +668,11 @@ namespace MyDmsVn.Desktop.Tests
 
             public Task<ApiResponse<ProductDto>> GetAsync(int id, CancellationToken cancellationToken)
             {
+                if (GetException != null)
+                {
+                    return Task.FromException<ApiResponse<ProductDto>>(GetException);
+                }
+
                 if (!ControlGetResponses)
                 {
                     return Task.FromResult(GetResponse);

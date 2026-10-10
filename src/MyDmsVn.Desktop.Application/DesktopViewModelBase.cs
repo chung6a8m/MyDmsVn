@@ -145,6 +145,12 @@ namespace MyDmsVn.Desktop.Application
             _notifications.Publish(new DesktopNotification(kind, message));
         }
 
+        protected void ResetValidation()
+        {
+            ClearErrors();
+            ErrorMessage = null;
+        }
+
         private void ClearErrors()
         {
             if (_fieldErrors.Count == 0)

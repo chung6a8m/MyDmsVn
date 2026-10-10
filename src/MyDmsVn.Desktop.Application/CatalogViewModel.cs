@@ -104,6 +104,7 @@ namespace MyDmsVn.Desktop.Application
         public Task SetSearch(string? search)
         {
             ThrowIfDisposed();
+            _messageReload.Cancel();
             CancelListLoad();
             _search = search;
             OnPropertyChanged(nameof(Search));
@@ -115,6 +116,7 @@ namespace MyDmsVn.Desktop.Application
         {
             ThrowIfDisposed();
             _searchReload.Cancel();
+            _messageReload.Cancel();
             return LoadAsync(cancellationToken);
         }
 
@@ -134,6 +136,7 @@ namespace MyDmsVn.Desktop.Application
             ThrowIfDisposed();
             CancelEditorLoad();
             SelectedId = null;
+            ResetValidation();
             ClearEditor();
         }
 
@@ -201,6 +204,7 @@ namespace MyDmsVn.Desktop.Application
 
                         if (response.IsSuccess)
                         {
+                            ResetValidation();
                             SelectedId = GetId(response.Data!);
                             PopulateEditor(response.Data!);
                         }
@@ -213,6 +217,23 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (OperationCanceledException) when (editorCancellation.IsCancellationRequested)
             {
+            }
+            catch (Exception exception)
+            {
+                if (!editorCancellation.IsCancellationRequested && IsEditorCurrent(editorGeneration))
+                {
+                    await _dispatcher.InvokeAsync(
+                        () =>
+                        {
+                            if (IsEditorCurrent(editorGeneration))
+                            {
+                                PublishNotification(
+                                    DesktopNotificationKind.Error,
+                                    exception.Message);
+                            }
+                        },
+                        CancellationToken.None).ConfigureAwait(false);
+                }
             }
             finally
             {

@@ -81,6 +81,27 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Canceled_activation_does_not_start_a_catalog_query()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var client = new ProductClient();
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    using (var cancellation = new CancellationTokenSource())
+                    {
+                        cancellation.Cancel();
+
+                        control.ActivateAsync(cancellation.Token).GetAwaiter().GetResult();
+
+                        Assert.Equal(0, client.ListCount);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void Save_button_forwards_editor_values_and_shows_field_errors_without_modal_dialogs()
         {
             StaTest.Run(
@@ -114,6 +135,37 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(1, client.CreateCount);
                         Assert.Equal("Code is required.", control.GetFieldError("code"));
                         Assert.Empty(guard.Exceptions);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Editor_fields_are_disabled_while_a_save_is_in_flight()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var client = new ProductClient { ControlCreateResponse = true };
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    {
+                        control.NewButton.PerformClick();
+                        control.EditorControls["code"].Text = "P1";
+                        control.EditorControls["name"].Text = "Product";
+                        control.EditorControls["unit"].Text = "pcs";
+
+                        control.SaveButton.PerformClick();
+
+                        Assert.All(control.EditorControls.Values, editor => Assert.False(editor.Enabled));
+
+                        client.CompleteCreate(new ProductDto(1, "P1", "Product", "pcs", true));
+                        PumpMessagesUntil(
+                            () => control.LastOperation.IsCompleted,
+                            TimeSpan.FromSeconds(2));
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.All(control.EditorControls.Values, editor => Assert.True(editor.Enabled));
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -248,9 +300,12 @@ namespace MyDmsVn.Desktop.Tests
 
         private sealed class ProductClient : IProductApiClient
         {
+            private TaskCompletionSource<ApiResponse<ProductDto>>? _controlledCreate;
+
             public ProductDto[] Items { get; set; } = Array.Empty<ProductDto>();
             public int CreateCount { get; private set; }
             public int ListCount { get; private set; }
+            public bool ControlCreateResponse { get; set; }
             public ApiResponse<ProductDto> CreateResponse { get; set; } =
                 ApiResponse<ProductDto>.Success(new ProductDto(1, "P1", "Product", "pcs", true));
 
@@ -270,8 +325,17 @@ namespace MyDmsVn.Desktop.Tests
             public Task<ApiResponse<ProductDto>> CreateAsync(SaveProductRequest request, CancellationToken token)
             {
                 CreateCount++;
-                return Task.FromResult(CreateResponse);
+                if (!ControlCreateResponse)
+                {
+                    return Task.FromResult(CreateResponse);
+                }
+
+                _controlledCreate = new TaskCompletionSource<ApiResponse<ProductDto>>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                return _controlledCreate.Task;
             }
+            public void CompleteCreate(ProductDto product) =>
+                _controlledCreate!.TrySetResult(ApiResponse<ProductDto>.Success(product));
             public Task<ApiResponse<ProductDto>> UpdateAsync(int id, SaveProductRequest request, CancellationToken token) => Task.FromResult(CreateResponse);
             public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) => throw new NotSupportedException();
