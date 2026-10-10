@@ -1,6 +1,7 @@
 ﻿using System.Threading;
 using System;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.Messaging;
 using ErrorOr;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,23 @@ namespace MyDmsVn.Desktop.Tests
 {
     public sealed class DesktopCompositionTests
     {
+        [Fact]
+        public void Local_desktop_services_use_one_shared_weak_reference_messenger()
+        {
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var first = provider.GetRequiredService<IMessenger>();
+                var second = provider.GetRequiredService<IMessenger>();
+
+                Assert.Same(first, second);
+                Assert.IsType<WeakReferenceMessenger>(first);
+            }
+        }
+
         [Fact]
         public async Task Local_desktop_services_resolve_api_without_database_configuration()
         {

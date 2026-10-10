@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using CommunityToolkit.Mvvm.Messaging;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Server.Application.Identity;
 
@@ -10,6 +11,9 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
         public static IServiceCollection AddLocalDesktopAdapter(this IServiceCollection services)
         {
             services.TryAddSingleton<IDesktopNotificationService, DesktopNotificationCenter>();
+            services.TryAddSingleton<IMessenger>(_ => new WeakReferenceMessenger());
+            services.TryAddSingleton<IAsyncDelay, SystemAsyncDelay>();
+            services.TryAddSingleton<IUiDispatcher, ImmediateUiDispatcher>();
             services.TryAddSingleton<LocalDesktopSession>();
             services.TryAddSingleton<IDesktopSession>(
                 provider => provider.GetRequiredService<LocalDesktopSession>());
@@ -23,6 +27,10 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             services.AddTransient<IWarehouseApiClient, LocalWarehouseApiClient>();
             services.AddTransient<IEmployeeApiClient, LocalEmployeeApiClient>();
             services.AddTransient<ICustomerApiClient, LocalCustomerApiClient>();
+            services.AddTransient<ProductCatalogLookupSource>();
+            services.AddTransient<WarehouseCatalogLookupSource>();
+            services.AddTransient<EmployeeCatalogLookupSource>();
+            services.AddTransient<CustomerCatalogLookupSource>();
             return services;
         }
     }
