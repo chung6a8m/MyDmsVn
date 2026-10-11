@@ -733,6 +733,490 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Concurrent_posts_for_same_receipt_commit_exactly_once()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            GoodsReceiptDto created;
+            using (var scope = provider.CreateScope())
+            {
+                var create = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new CreateGoodsReceiptDraftCommand(Save(seed, "same-receipt", seed.Product1Id)),
+                    CancellationToken.None);
+                Assert.False(create.IsError);
+                created = create.Value;
+            }
+
+            var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var first = PostAfterSignalInOwnScopeAsync(provider, created, start.Task);
+            var second = PostAfterSignalInOwnScopeAsync(provider, created, start.Task);
+            start.SetResult(true);
+            var results = await AwaitWithTimeoutAsync(Task.WhenAll(first, second));
+
+            Assert.Single(results, result => !result.IsError);
+            var rejected = Assert.Single(results, result => result.IsError);
+            Assert.Equal(ErrorOr.ErrorType.Conflict, rejected.FirstError.Type);
+            Assert.Equal("GoodsReceipt.AlreadyPosted", rejected.FirstError.Code);
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentId = @receiptId;",
+                new { receiptId = created.Id }));
+            Assert.Equal(1m, await connection.QuerySingleAsync<decimal>(
+                "SELECT Quantity FROM dbo.StockBalances WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
+                new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Update_that_locks_first_wins_and_post_rejects_the_stale_snapshot()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var created = await CreateReceiptAsync(provider, seed, "initial", seed.Product1Id, 1m);
+            await CreateSignalTableAsync(database.ConnectionString);
+            await CreateGoodsReceiptSignalTriggerAsync(
+                database.ConnectionString,
+                "UpdateHasHeaderLock",
+                "EXISTS (SELECT 1 FROM inserted WHERE Note = N'update-wins')");
+
+            var update = UpdateInOwnScopeAsync(provider, created, seed, "update-wins", 7m);
+            await WaitForSignalAsync(database.ConnectionString, "UpdateHasHeaderLock");
+            var post = PostInOwnScopeAsync(provider, created);
+            var results = await AwaitWithTimeoutAsync(Task.WhenAll(
+                ObserveUpdateAsync(update),
+                ObservePostAsync(post)));
+
+            Assert.False(results[0].IsError);
+            Assert.True(results[1].IsError);
+            Assert.Equal("GoodsReceipt.ConcurrencyConflict", results[1].ErrorCode);
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(GoodsReceiptStatuses.Draft, await connection.QuerySingleAsync<string>(
+                "SELECT Status FROM dbo.GoodsReceipts WHERE ReceiptId = @receiptId;",
+                new { receiptId = created.Id }));
+            Assert.Equal(7m, await connection.QuerySingleAsync<decimal>(
+                "SELECT Quantity FROM dbo.GoodsReceiptLines WHERE ReceiptId = @receiptId;",
+                new { receiptId = created.Id }));
+            Assert.Equal(0, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger;"));
+            Assert.Equal(0, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockBalances;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Post_that_locks_first_wins_and_update_cannot_replace_posted_lines()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var created = await CreateReceiptAsync(provider, seed, "initial", seed.Product1Id, 3m);
+            await CreateSignalTableAsync(database.ConnectionString);
+            await CreateGoodsReceiptSignalTriggerAsync(
+                database.ConnectionString,
+                "PostHasAllLocks",
+                "EXISTS (SELECT 1 FROM inserted WHERE Status = 'Posted')");
+
+            var post = PostInOwnScopeAsync(provider, created);
+            await WaitForSignalAsync(database.ConnectionString, "PostHasAllLocks");
+            var update = UpdateInOwnScopeAsync(provider, created, seed, "late-update", 9m);
+            var results = await AwaitWithTimeoutAsync(Task.WhenAll(
+                ObservePostAsync(post),
+                ObserveUpdateAsync(update)));
+
+            Assert.False(results[0].IsError);
+            Assert.True(results[1].IsError);
+            Assert.Equal("GoodsReceipt.AlreadyPosted", results[1].ErrorCode);
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(GoodsReceiptStatuses.Posted, await connection.QuerySingleAsync<string>(
+                "SELECT Status FROM dbo.GoodsReceipts WHERE ReceiptId = @receiptId;",
+                new { receiptId = created.Id }));
+            Assert.Equal("initial", await connection.QuerySingleAsync<string>(
+                "SELECT Note FROM dbo.GoodsReceipts WHERE ReceiptId = @receiptId;",
+                new { receiptId = created.Id }));
+            Assert.Equal(3m, await connection.QuerySingleAsync<decimal>(
+                "SELECT Quantity FROM dbo.GoodsReceiptLines WHERE ReceiptId = @receiptId;",
+                new { receiptId = created.Id }));
+            Assert.Equal(3m, await connection.QuerySingleAsync<decimal>(
+                "SELECT QuantityChange FROM dbo.StockLedger WHERE DocumentId = @receiptId;",
+                new { receiptId = created.Id }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Every_inactive_posting_reference_rejects_post_without_inventory_mutation()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var cases = new[]
+            {
+                new InactiveReferenceCase("Warehouses", "WarehouseId", seed.WarehouseId, "GoodsReceipt.WarehouseInactive"),
+                new InactiveReferenceCase("Employees", "EmployeeId", seed.EmployeeId, "GoodsReceipt.EmployeeInactive"),
+                new InactiveReferenceCase("Products", "ProductId", seed.Product1Id, "GoodsReceipt.ProductInactive"),
+            };
+
+            foreach (var item in cases)
+            {
+                var created = await CreateReceiptAsync(provider, seed, "inactive-" + item.TableName, seed.Product1Id, 1m);
+                await SetReferenceActiveAsync(database.ConnectionString, item, isActive: false);
+                var post = await PostInOwnScopeAsync(provider, created);
+
+                Assert.True(post.IsError);
+                Assert.Equal(item.ExpectedErrorCode, post.FirstError.Code);
+                await AssertDraftHasNoInventoryAsync(database.ConnectionString, created.Id);
+                using (var verification = new SqlConnection(database.ConnectionString))
+                {
+                    Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                        "SELECT COUNT(*) FROM dbo.StockBalances;"));
+                }
+
+                await SetReferenceActiveAsync(database.ConnectionString, item, isActive: true);
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Deactivation_and_post_serialize_in_both_lock_orders_for_every_reference()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            await CreateSignalTableAsync(database.ConnectionString);
+            var cases = new[]
+            {
+                new InactiveReferenceCase("Warehouses", "WarehouseId", seed.WarehouseId, "GoodsReceipt.WarehouseInactive"),
+                new InactiveReferenceCase("Employees", "EmployeeId", seed.EmployeeId, "GoodsReceipt.EmployeeInactive"),
+                new InactiveReferenceCase("Products", "ProductId", seed.Product1Id, "GoodsReceipt.ProductInactive"),
+            };
+
+            foreach (var item in cases)
+            {
+                var deactivationFirst = await CreateReceiptAsync(
+                    provider, seed, "deactivate-first-" + item.TableName, seed.Product1Id, 1m);
+                var deactivationSignal = "DeactivateHasLock" + item.TableName;
+                await CreateReferenceSignalTriggerAsync(database.ConnectionString, item, deactivationSignal);
+                var deactivate = SetReferenceActiveAsync(database.ConnectionString, item, isActive: false);
+                await WaitForSignalAsync(database.ConnectionString, deactivationSignal);
+                var balanceBeforeRejectedPost = await GetBalanceQuantityAsync(
+                    database.ConnectionString, seed.WarehouseId, seed.Product1Id);
+                var blockedPost = PostInOwnScopeAsync(provider, deactivationFirst);
+                await AwaitWithTimeoutAsync(Task.WhenAll(deactivate, ObserveCompletionAsync(blockedPost)));
+                var rejected = await blockedPost;
+                Assert.True(rejected.IsError);
+                Assert.Equal(item.ExpectedErrorCode, rejected.FirstError.Code);
+                await AssertDraftHasNoInventoryAsync(database.ConnectionString, deactivationFirst.Id);
+                Assert.Equal(
+                    balanceBeforeRejectedPost,
+                    await GetBalanceQuantityAsync(database.ConnectionString, seed.WarehouseId, seed.Product1Id));
+                await DropTriggerAsync(database.ConnectionString, "TR_TestReferenceSignal");
+                await SetReferenceActiveAsync(database.ConnectionString, item, isActive: true);
+
+                var postFirst = await CreateReceiptAsync(
+                    provider, seed, "post-first-" + item.TableName, seed.Product1Id, 2m);
+                var postSignal = "PostHasLocks" + item.TableName;
+                await CreateGoodsReceiptSignalTriggerAsync(
+                    database.ConnectionString,
+                    postSignal,
+                    "EXISTS (SELECT 1 FROM inserted WHERE ReceiptId = " + postFirst.Id + " AND Status = 'Posted')");
+                var winningPost = PostInOwnScopeAsync(provider, postFirst);
+                await WaitForSignalAsync(database.ConnectionString, postSignal);
+                var balanceBeforeWinningPost = await GetBalanceQuantityAsync(
+                    database.ConnectionString, seed.WarehouseId, seed.Product1Id);
+                var blockedDeactivate = SetReferenceActiveAsync(database.ConnectionString, item, isActive: false);
+                await AwaitWithTimeoutAsync(Task.WhenAll(ObserveCompletionAsync(winningPost), blockedDeactivate));
+                var posted = await winningPost;
+                Assert.False(posted.IsError);
+                using (var connection = new SqlConnection(database.ConnectionString))
+                {
+                    Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                        "SELECT COUNT(*) FROM dbo." + item.TableName + " WHERE " + item.KeyColumn + " = @id AND IsActive = 1;",
+                        new { id = item.Id }));
+                    Assert.Equal(2m, await connection.QuerySingleAsync<decimal>(
+                        "SELECT QuantityChange FROM dbo.StockLedger WHERE DocumentId = @receiptId;",
+                        new { receiptId = postFirst.Id }));
+                }
+
+                Assert.Equal(
+                    balanceBeforeWinningPost + 2m,
+                    await GetBalanceQuantityAsync(database.ConnectionString, seed.WarehouseId, seed.Product1Id));
+
+                await DropTriggerAsync(database.ConnectionString, "TR_TestGoodsReceiptSignal");
+                await SetReferenceActiveAsync(database.ConnectionString, item, isActive: true);
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Concurrent_receipts_for_same_balance_key_preserve_the_sum()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var first = await CreateReceiptAsync(provider, seed, "balance-one", seed.Product1Id, 4m);
+            var second = await CreateReceiptAsync(provider, seed, "balance-two", seed.Product1Id, 6m);
+            var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var resultsTask = Task.WhenAll(
+                PostAfterSignalInOwnScopeAsync(provider, first, start.Task),
+                PostAfterSignalInOwnScopeAsync(provider, second, start.Task));
+            start.SetResult(true);
+            var results = await AwaitWithTimeoutAsync(resultsTask);
+
+            Assert.All(results, result => Assert.False(result.IsError));
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(10m, await connection.QuerySingleAsync<decimal>(
+                "SELECT Quantity FROM dbo.StockBalances WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
+                new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
+            Assert.Equal(10m, await connection.QuerySingleAsync<decimal>(
+                "SELECT SUM(QuantityChange) FROM dbo.StockLedger WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
+                new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Failure_after_ledger_insert_rolls_back_status_ledger_and_balance()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var created = await CreateReceiptAsync(provider, seed, "balance-failure", seed.Product1Id, 5m);
+            using (var setup = new SqlConnection(database.ConnectionString))
+            {
+                await setup.ExecuteAsync(
+                    "CREATE TRIGGER dbo.TR_StockBalances_TestFailure ON dbo.StockBalances " +
+                    "AFTER INSERT, UPDATE AS BEGIN SET NOCOUNT ON; " +
+                    "THROW 51002, 'Injected failure after ledger insertion.', 1; END;");
+            }
+
+            var failed = await PostInOwnScopeAsync(provider, created);
+
+            Assert.True(failed.IsError);
+            Assert.Equal("InternalError", failed.FirstError.Code);
+            await AssertDraftHasNoInventoryAsync(database.ConnectionString, created.Id);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.StockBalances;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    private static async Task<GoodsReceiptDto> CreateReceiptAsync(
+        ServiceProvider provider,
+        SeedData seed,
+        string note,
+        int productId,
+        decimal quantity)
+    {
+        using var scope = provider.CreateScope();
+        var result = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+            new CreateGoodsReceiptDraftCommand(
+                new SaveGoodsReceiptRequest(
+                    new DateTime(2026, 10, 10),
+                    seed.WarehouseId,
+                    seed.EmployeeId,
+                    note,
+                    new[] { new SaveGoodsReceiptLineRequest(productId, quantity, 2m) })),
+            CancellationToken.None);
+        Assert.False(result.IsError);
+        return result.Value;
+    }
+
+    private static async Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>> PostInOwnScopeAsync(
+        ServiceProvider provider,
+        GoodsReceiptDto receipt)
+    {
+        using var scope = provider.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(receipt.Id, receipt.Version)),
+            CancellationToken.None);
+    }
+
+    private static async Task<ObservedOperation> ObservePostAsync(
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>> task)
+    {
+        var result = await task;
+        return new ObservedOperation(result.IsError, result.IsError ? result.FirstError.Code : null);
+    }
+
+    private static async Task<ObservedOperation> ObserveUpdateAsync(
+        Task<ErrorOr.ErrorOr<GoodsReceiptDto>> task)
+    {
+        var result = await task;
+        return new ObservedOperation(result.IsError, result.IsError ? result.FirstError.Code : null);
+    }
+
+    private static async Task ObserveCompletionAsync<T>(Task<T> task) =>
+        await task;
+
+    private static async Task<T> AwaitWithTimeoutAsync<T>(Task<T> task)
+    {
+        var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(15)));
+        if (!ReferenceEquals(completed, task))
+        {
+            throw new TimeoutException("The SQL concurrency scenario did not complete within 15 seconds.");
+        }
+
+        return await task;
+    }
+
+    private static async Task AwaitWithTimeoutAsync(Task task)
+    {
+        var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(15)));
+        if (!ReferenceEquals(completed, task))
+        {
+            throw new TimeoutException("The SQL concurrency scenario did not complete within 15 seconds.");
+        }
+
+        await task;
+    }
+
+    private static async Task CreateSignalTableAsync(string connectionString)
+    {
+        using var connection = new SqlConnection(connectionString);
+        await connection.ExecuteAsync(
+            "CREATE TABLE dbo.TestConcurrencySignals " +
+            "(SignalName nvarchar(128) NOT NULL CONSTRAINT PK_TestConcurrencySignals PRIMARY KEY);");
+    }
+
+    private static async Task CreateGoodsReceiptSignalTriggerAsync(
+        string connectionString,
+        string signalName,
+        string condition)
+    {
+        await DropTriggerAsync(connectionString, "TR_TestGoodsReceiptSignal");
+        using var connection = new SqlConnection(connectionString);
+        await connection.ExecuteAsync(
+            "CREATE TRIGGER dbo.TR_TestGoodsReceiptSignal ON dbo.GoodsReceipts AFTER UPDATE AS " +
+            "BEGIN SET NOCOUNT ON; IF (" + condition + ") BEGIN " +
+            "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
+            "WAITFOR DELAY '00:00:02'; END; END;");
+    }
+
+    private static async Task CreateReferenceSignalTriggerAsync(
+        string connectionString,
+        InactiveReferenceCase reference,
+        string signalName)
+    {
+        await DropTriggerAsync(connectionString, "TR_TestReferenceSignal");
+        using var connection = new SqlConnection(connectionString);
+        await connection.ExecuteAsync(
+            "CREATE TRIGGER dbo.TR_TestReferenceSignal ON dbo." + reference.TableName + " AFTER UPDATE AS " +
+            "BEGIN SET NOCOUNT ON; IF EXISTS (SELECT 1 FROM inserted WHERE " + reference.KeyColumn +
+            " = " + reference.Id + " AND IsActive = 0) BEGIN " +
+            "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
+            "WAITFOR DELAY '00:00:02'; END; END;");
+    }
+
+    private static async Task DropTriggerAsync(string connectionString, string triggerName)
+    {
+        using var connection = new SqlConnection(connectionString);
+        await connection.ExecuteAsync("DROP TRIGGER IF EXISTS dbo." + triggerName + ";");
+    }
+
+    private static async Task WaitForSignalAsync(string connectionString, string signalName)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        using var connection = new SqlConnection(connectionString);
+        while (DateTime.UtcNow < deadline)
+        {
+            var found = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.TestConcurrencySignals WITH (NOLOCK) WHERE SignalName = @signalName;",
+                new { signalName });
+            if (found == 1)
+            {
+                return;
+            }
+
+            await Task.Delay(25);
+        }
+
+        throw new TimeoutException("The expected SQL lock-order signal was not observed: " + signalName);
+    }
+
+    private static async Task SetReferenceActiveAsync(
+        string connectionString,
+        InactiveReferenceCase reference,
+        bool isActive)
+    {
+        using var connection = new SqlConnection(connectionString);
+        var affected = await connection.ExecuteAsync(
+            "UPDATE dbo." + reference.TableName + " SET IsActive = @isActive WHERE " +
+            reference.KeyColumn + " = @id;",
+            new { isActive, id = reference.Id });
+        Assert.Equal(1, affected);
+    }
+
+    private static async Task AssertDraftHasNoInventoryAsync(string connectionString, long receiptId)
+    {
+        using var connection = new SqlConnection(connectionString);
+        Assert.Equal(GoodsReceiptStatuses.Draft, await connection.QuerySingleAsync<string>(
+            "SELECT Status FROM dbo.GoodsReceipts WHERE ReceiptId = @receiptId;",
+            new { receiptId }));
+        Assert.Equal(0, await connection.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentId = @receiptId;",
+            new { receiptId }));
+    }
+
+    private static async Task<decimal> GetBalanceQuantityAsync(
+        string connectionString,
+        int warehouseId,
+        int productId)
+    {
+        using var connection = new SqlConnection(connectionString);
+        return await connection.QuerySingleAsync<decimal>(
+            "SELECT COALESCE(SUM(Quantity), 0) FROM dbo.StockBalances " +
+            "WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
+            new { warehouseId, productId });
+    }
+
+    private static string EscapeSqlLiteral(string value) =>
+        value.Replace("'", "''");
+
     private static async Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>> PostAfterSignalInOwnScopeAsync(
         ServiceProvider provider,
         GoodsReceiptDto receipt,
@@ -923,6 +1407,42 @@ public sealed class GoodsReceiptCommandIntegrationTests
                     new PermissionSnapshot(
                         directDecision: null,
                         hasRoleGrant: permissionKey == _onlyPermission));
+    }
+
+    private sealed class ObservedOperation
+    {
+        public ObservedOperation(bool isError, string? errorCode)
+        {
+            IsError = isError;
+            ErrorCode = errorCode;
+        }
+
+        public bool IsError { get; }
+
+        public string? ErrorCode { get; }
+    }
+
+    private sealed class InactiveReferenceCase
+    {
+        public InactiveReferenceCase(
+            string tableName,
+            string keyColumn,
+            int id,
+            string expectedErrorCode)
+        {
+            TableName = tableName;
+            KeyColumn = keyColumn;
+            Id = id;
+            ExpectedErrorCode = expectedErrorCode;
+        }
+
+        public string TableName { get; }
+
+        public string KeyColumn { get; }
+
+        public int Id { get; }
+
+        public string ExpectedErrorCode { get; }
     }
 
     private sealed class SeedData

@@ -1,6 +1,6 @@
 ﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03, the non-Post P5.2 gate scenarios, P5.3-T01 and P5.3-T02 completed on 2026-10-11. Interactive P5.1 manual smoke, UpdateDraft-vs-Post concurrency, and P5.3-T03 onward remain open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03, the P5.2 gate, P5.3-T01, P5.3-T02, P5.3-T03 and the P5.3 gate completed on 2026-10-11. Interactive P5.1 manual smoke and P5.4 onward remain open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -65,7 +65,7 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 
 ### P5.2 gate
 - [x] SQL tests for rollback of header+lines; enforced FK/unique/CHECK constraints (including direct invalid SQL inserts), duplicate receipt numbers/product lines, state guard, and server-issued number uniqueness. (Includes concurrent server-number allocation through separate UoWs.)
-- [ ] SQL integration tests with separate UoWs: concurrent UpdateDraft vs UpdateDraft (one stale-token conflict), UpdateDraft vs Post (never mixed header/lines or post-edit mutation), lines-only edit advances version, and failed UpdateDraft rolls back completely. (All non-Post scenarios are complete; UpdateDraft vs Post remains open for P5.3-T03.)
+- [x] SQL integration tests with separate UoWs: concurrent UpdateDraft vs UpdateDraft (one stale-token conflict), UpdateDraft vs Post (never mixed header/lines or post-edit mutation), lines-only edit advances version, and failed UpdateDraft rolls back completely. (UpdateDraft vs Post is verified in both lock acquisition orders by P5.3-T03.)
 - [x] Authorization tests for CreateDraft/UpdateDraft (Write), List/Get (Read), and Post (Post), including explicit deny and Post-only user attempting Write/Read; denied requests must not mutate business tables. (Executable Post authorization and Post-only success are covered on both server TFMs; Local mapping is covered on both desktop TFMs.)
 - [x] UI smoke: new Draft → edit → reload → inspect details; while receipt form stays open, modify/disable/re-enable a Product, Warehouse or Employee in its Catalog form and verify the relevant Lookup reloads without losing the existing selection; both hosts. (Safe STA tests compose catalog change publication with the open receipt subscribers and run on `net48` and `net8.0-windows`.)
 
@@ -88,16 +88,16 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [x] Map a second Post to `GoodsReceipt.AlreadyPosted` (409 in v2) and a stale Draft version to `GoodsReceipt.ConcurrencyConflict` (409); use identical `ApiResponse<T>` semantics in Local and future HTTP adapters.
 
 ### P5.3-T03 — Concurrency and idempotency testing
-- [ ] Concurrent Post same receipt using separate UoWs: exactly one succeeds; no duplicate ledger/balance. Test stale expected versions and deterministic error mappings.
-- [ ] Concurrent UpdateDraft vs Post using separate UoWs: no lost updates, no mixed line snapshot, never edit after Posted; test both lock acquisition orders.
-- [ ] Create a valid Draft, then deactivate its Warehouse, Employee or any Product before Post: Post must fail without status/ledger/balance changes; test deactivation racing with Post to verify locks/serialization.
-- [ ] Concurrent different receipts same warehouse/product: final balance = sum of both quantities.
-- [ ] Fault injection mid-post (after status change/ledger insert) rolls back all changes.
-- [ ] Unique movement constraint prevents accidental duplicate source-line insertion independently from handler checks.
-- [ ] Reconciliation after parallel load yields zero differences. Deliberately create a missing balance row, an extra zero/nonzero balance row, and a mismatched quantity **in isolated test data**; every defect must be detected by the reconciliation query.
+- [x] Concurrent Post same receipt using separate UoWs: exactly one succeeds; no duplicate ledger/balance. Test stale expected versions and deterministic error mappings.
+- [x] Concurrent UpdateDraft vs Post using separate UoWs: no lost updates, no mixed line snapshot, never edit after Posted; test both lock acquisition orders.
+- [x] Create a valid Draft, then deactivate its Warehouse, Employee or any Product before Post: Post must fail without status/ledger/balance changes; test deactivation racing with Post to verify locks/serialization.
+- [x] Concurrent different receipts same warehouse/product: final balance = sum of both quantities.
+- [x] Fault injection mid-post (after status change/ledger insert) rolls back all changes.
+- [x] Unique movement constraint prevents accidental duplicate source-line insertion independently from handler checks.
+- [x] Reconciliation after parallel load yields zero differences. Deliberately create a missing balance row, an extra zero/nonzero balance row, and a mismatched quantity **in isolated test data**; every defect must be detected by the reconciliation query.
 
 ### P5.3 gate
-- [ ] All SQL Server integration scenarios above pass in reproducible isolated test database.
+- [x] All SQL Server integration scenarios above pass in reproducible isolated test database. (Verified on 2026-10-11 on `net48` and `net8.0`; see `docs/P5_3_VERIFICATION.md`.)
 
 ## P5.4 — Inventory read/UI + full slice testing
 
