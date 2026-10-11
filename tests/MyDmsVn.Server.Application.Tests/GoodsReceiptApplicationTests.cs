@@ -318,6 +318,72 @@ public sealed class GoodsReceiptApplicationTests
         Assert.False(unitOfWork.BeganTransaction);
     }
 
+    [Fact]
+    public async Task Explicit_deny_blocks_update_list_and_get_before_storage_access()
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        var queries = new FakeGoodsReceiptQueryService();
+        using var provider = CreateProvider(unitOfWork, allow: false, queryService: queries);
+        var sender = provider.GetRequiredService<ISender>();
+        var save = ValidSaveRequest();
+
+        var update = await sender.Send(
+            new UpdateGoodsReceiptDraftCommand(
+                new UpdateGoodsReceiptDraftRequest(
+                    41,
+                    VersionToken(1),
+                    save.ReceiptDate,
+                    save.WarehouseId,
+                    save.EmployeeId,
+                    save.Note,
+                    save.Lines)),
+            CancellationToken.None);
+        var list = await sender.Send(
+            new ListGoodsReceiptsQuery(new GoodsReceiptListRequest(1, 25, null, null)),
+            CancellationToken.None);
+        var get = await sender.Send(new GetGoodsReceiptByIdQuery(41), CancellationToken.None);
+
+        Assert.True(update.IsError);
+        Assert.Equal(ErrorType.Forbidden, update.FirstError.Type);
+        Assert.True(list.IsError);
+        Assert.Equal(ErrorType.Forbidden, list.FirstError.Type);
+        Assert.True(get.IsError);
+        Assert.Equal(ErrorType.Forbidden, get.FirstError.Type);
+        Assert.False(unitOfWork.BeganTransaction);
+        Assert.Equal(0, queries.ListCalls);
+        Assert.Equal(0, queries.GetCalls);
+    }
+
+    [Fact]
+    public async Task Post_only_user_cannot_write_or_read_goods_receipts()
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        var queries = new FakeGoodsReceiptQueryService();
+        using var provider = CreateProvider(
+            unitOfWork,
+            queryService: queries,
+            permissionStore: new PostOnlyPermissionStore());
+        var sender = provider.GetRequiredService<ISender>();
+
+        var create = await sender.Send(
+            new CreateGoodsReceiptDraftCommand(ValidSaveRequest()),
+            CancellationToken.None);
+        var list = await sender.Send(
+            new ListGoodsReceiptsQuery(new GoodsReceiptListRequest(1, 25, null, null)),
+            CancellationToken.None);
+        var get = await sender.Send(new GetGoodsReceiptByIdQuery(41), CancellationToken.None);
+
+        Assert.True(create.IsError);
+        Assert.Equal(ErrorType.Forbidden, create.FirstError.Type);
+        Assert.True(list.IsError);
+        Assert.Equal(ErrorType.Forbidden, list.FirstError.Type);
+        Assert.True(get.IsError);
+        Assert.Equal(ErrorType.Forbidden, get.FirstError.Type);
+        Assert.False(unitOfWork.BeganTransaction);
+        Assert.Equal(0, queries.ListCalls);
+        Assert.Equal(0, queries.GetCalls);
+    }
+
     [Theory]
     [InlineData(0, 25, null, null)]
     [InlineData(1, 0, null, null)]
@@ -445,7 +511,8 @@ public sealed class GoodsReceiptApplicationTests
     private static ServiceProvider CreateProvider(
         FakeUnitOfWork unitOfWork,
         bool allow = true,
-        IGoodsReceiptQueryService? queryService = null)
+        IGoodsReceiptQueryService? queryService = null,
+        IPermissionStore? permissionStore = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IUnitOfWorkFactory>(new FakeUnitOfWorkFactory(unitOfWork));
@@ -453,7 +520,7 @@ public sealed class GoodsReceiptApplicationTests
         services.AddSingleton<ICurrentUserAccessor>(
             new StubCurrentUserAccessor(
                 CurrentUser.Authenticated(42, "operator", "Operator", isActive: true)));
-        services.AddSingleton<IPermissionStore>(new PermissionStore(allow));
+        services.AddSingleton(permissionStore ?? new PermissionStore(allow));
         services.AddSingleton<IUtcClock>(new FixedUtcClock());
         services.AddServerApplication();
         return services.BuildServiceProvider();
@@ -508,6 +575,18 @@ public sealed class GoodsReceiptApplicationTests
             string permissionKey,
             CancellationToken cancellationToken) =>
             Task.FromResult(new PermissionSnapshot(_allow, hasRoleGrant: true));
+    }
+
+    private sealed class PostOnlyPermissionStore : IPermissionStore
+    {
+        public Task<PermissionSnapshot> GetSnapshotAsync(
+            int userId,
+            string permissionKey,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(
+                new PermissionSnapshot(
+                    directDecision: null,
+                    hasRoleGrant: permissionKey == PermissionKeys.InventoryGoodsReceiptsPost));
     }
 
     private sealed class FakeUnitOfWorkFactory : IUnitOfWorkFactory

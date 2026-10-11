@@ -548,12 +548,85 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Open_draft_refreshes_all_catalog_lookups_without_losing_selected_references()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var guard = new WinFormsTestGuard())
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
+                        var warehouseCalls = fixture.WarehouseSource.Requests.Count;
+                        var employeeCalls = fixture.EmployeeSource.Requests.Count;
+                        var productCalls = fixture.ProductSource.Requests.Count;
+
+                        fixture.WarehouseSource.SelectedIsActive = false;
+                        fixture.EmployeeSource.SelectedIsActive = false;
+                        fixture.ProductSource.SelectedIsActive = false;
+                        fixture.Messenger.Send(new CatalogChangedMessage(
+                            CatalogKind.Warehouse,
+                            3,
+                            CatalogChangeOperation.ActiveStatusChanged));
+                        fixture.Messenger.Send(new CatalogChangedMessage(
+                            CatalogKind.Employee,
+                            5,
+                            CatalogChangeOperation.ActiveStatusChanged));
+                        fixture.Messenger.Send(new CatalogChangedMessage(
+                            CatalogKind.Product,
+                            7,
+                            CatalogChangeOperation.ActiveStatusChanged));
+
+                        PumpMessagesUntil(
+                            () => fixture.WarehouseSource.Requests.Count > warehouseCalls &&
+                                fixture.EmployeeSource.Requests.Count > employeeCalls &&
+                                fixture.ProductSource.Requests.Count > productCalls &&
+                                !fixture.Editor.WarehouseLookup.Items.Single(item => item.Id == 3).IsAvailableForNewSelection &&
+                                !fixture.Editor.EmployeeLookup.Items.Single(item => item.Id == 5).IsAvailableForNewSelection &&
+                                !fixture.Editor.Lines.Single().ProductIsAvailable,
+                            TimeSpan.FromSeconds(5));
+
+                        Assert.Equal(3, fixture.Editor.WarehouseId);
+                        Assert.Equal(5, fixture.Editor.EmployeeId);
+                        Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
+
+                        fixture.WarehouseSource.SelectedIsActive = true;
+                        fixture.EmployeeSource.SelectedIsActive = true;
+                        fixture.ProductSource.SelectedIsActive = true;
+                        fixture.Messenger.Send(new CatalogChangedMessage(
+                            CatalogKind.Warehouse,
+                            3,
+                            CatalogChangeOperation.ActiveStatusChanged));
+                        fixture.Messenger.Send(new CatalogChangedMessage(
+                            CatalogKind.Employee,
+                            5,
+                            CatalogChangeOperation.ActiveStatusChanged));
+                        fixture.Messenger.Send(new CatalogChangedMessage(
+                            CatalogKind.Product,
+                            7,
+                            CatalogChangeOperation.ActiveStatusChanged));
+
+                        PumpMessagesUntil(
+                            () => fixture.Editor.WarehouseLookup.Items.Single(item => item.Id == 3).IsAvailableForNewSelection &&
+                                fixture.Editor.EmployeeLookup.Items.Single(item => item.Id == 5).IsAvailableForNewSelection &&
+                                fixture.Editor.Lines.Single().ProductIsAvailable,
+                            TimeSpan.FromSeconds(5));
+                        Assert.Empty(guard.Exceptions);
+                    }
+                },
+                TimeSpan.FromSeconds(15));
+        }
+
         private sealed class Fixture : IDisposable
         {
             public Fixture()
             {
                 Api = new ReceiptApiClient();
-                var messenger = new WeakReferenceMessenger();
+                Messenger = new WeakReferenceMessenger();
                 Notifications = new DesktopNotificationCenter();
                 var dispatcher = new ImmediateUiDispatcher();
                 var delay = new ImmediateDelay();
@@ -563,14 +636,15 @@ namespace MyDmsVn.Desktop.Tests
                 List = new GoodsReceiptListViewModel(Api, dispatcher, Notifications, delay);
                 Editor = new GoodsReceiptEditorViewModel(
                     Api,
-                    new CatalogLookupViewModel(WarehouseSource, messenger, dispatcher, Notifications, delay),
-                    new CatalogLookupViewModel(EmployeeSource, messenger, dispatcher, Notifications, delay),
-                    new GoodsReceiptProductOptionsViewModel(ProductSource, messenger, dispatcher, Notifications, delay),
+                    new CatalogLookupViewModel(WarehouseSource, Messenger, dispatcher, Notifications, delay),
+                    new CatalogLookupViewModel(EmployeeSource, Messenger, dispatcher, Notifications, delay),
+                    new GoodsReceiptProductOptionsViewModel(ProductSource, Messenger, dispatcher, Notifications, delay),
                     dispatcher,
                     Notifications);
             }
 
             public ReceiptApiClient Api { get; }
+            public WeakReferenceMessenger Messenger { get; }
             public DesktopNotificationCenter Notifications { get; }
             public LookupSource WarehouseSource { get; }
             public LookupSource EmployeeSource { get; }
@@ -595,6 +669,7 @@ namespace MyDmsVn.Desktop.Tests
         {
             public LookupSource(CatalogKind kind) => Kind = kind;
             public CatalogKind Kind { get; }
+            public bool SelectedIsActive { get; set; } = true;
             public IList<CatalogLookupRequest> Requests { get; } = new List<CatalogLookupRequest>();
 
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(
@@ -604,11 +679,11 @@ namespace MyDmsVn.Desktop.Tests
                 Requests.Add(request);
                 return Task.FromResult(
                     ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(
-                        new[] { new CatalogLookupDto(Kind == CatalogKind.Product ? 7 : 3, Kind.ToString(), "Choice", true) }));
+                        new[] { new CatalogLookupDto(Kind == CatalogKind.Product ? 7 : 3, Kind.ToString(), "Choice", SelectedIsActive) }));
             }
 
             public Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) =>
-                Task.FromResult(ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(id, "C" + id, "Choice", true)));
+                Task.FromResult(ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(id, "C" + id, "Choice", SelectedIsActive)));
         }
 
         private sealed class ReceiptApiClient : IGoodsReceiptApiClient
