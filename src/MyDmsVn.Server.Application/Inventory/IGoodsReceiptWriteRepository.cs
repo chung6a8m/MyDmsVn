@@ -31,6 +31,21 @@ public sealed class GoodsReceiptReferenceSnapshot
     public IReadOnlyDictionary<int, CatalogReferenceState> Products { get; }
 }
 
+public sealed class GoodsReceiptPostSnapshot
+{
+    public GoodsReceiptPostSnapshot(
+        IReadOnlyList<GoodsReceiptLine> lines,
+        GoodsReceiptReferenceSnapshot references)
+    {
+        Lines = lines;
+        References = references;
+    }
+
+    public IReadOnlyList<GoodsReceiptLine> Lines { get; }
+
+    public GoodsReceiptReferenceSnapshot References { get; }
+}
+
 public interface IGoodsReceiptWriteRepository
 {
     Task<GoodsReceiptReferenceSnapshot> GetReferenceSnapshotAsync(
@@ -46,6 +61,30 @@ public interface IGoodsReceiptWriteRepository
 
     Task<GoodsReceipt?> LockHeaderAsync(
         long receiptId,
+        CancellationToken cancellationToken);
+
+    Task<GoodsReceiptPostSnapshot> LockPostSnapshotAsync(
+        GoodsReceipt header,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryMarkPostedAsync(
+        long receiptId,
+        byte[] expectedVersion,
+        System.DateTime postedAtUtc,
+        int postedByUserId,
+        CancellationToken cancellationToken);
+
+    Task AppendStockLedgerAsync(
+        long receiptId,
+        int warehouseId,
+        IReadOnlyList<GoodsReceiptLine> lines,
+        System.DateTime postedAtUtc,
+        int postedByUserId,
+        CancellationToken cancellationToken);
+
+    Task ApplyStockBalanceDeltasAsync(
+        int warehouseId,
+        IReadOnlyDictionary<int, decimal> deltasByProductId,
         CancellationToken cancellationToken);
 
     Task<GoodsReceipt> ReplaceDraftAsync(

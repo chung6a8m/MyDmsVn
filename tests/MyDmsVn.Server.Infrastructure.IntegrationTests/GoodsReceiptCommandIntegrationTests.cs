@@ -14,6 +14,7 @@ using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
+using MyDmsVn.Server.Domain.Inventory;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -403,6 +404,273 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Post_commits_status_ledger_and_balances_once()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            GoodsReceiptDto created;
+            using (var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true))
+            using (var scope = provider.CreateScope())
+            {
+                var save = new SaveGoodsReceiptRequest(
+                    new DateTime(2026, 10, 10),
+                    seed.WarehouseId,
+                    seed.EmployeeId,
+                    "post",
+                    new[]
+                    {
+                        new SaveGoodsReceiptLineRequest(seed.Product1Id, 2.5m, 10m),
+                        new SaveGoodsReceiptLineRequest(seed.Product2Id, 1m, 20m),
+                    });
+                var create = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new CreateGoodsReceiptDraftCommand(save),
+                    CancellationToken.None);
+                Assert.False(create.IsError);
+                created = create.Value;
+            }
+
+            using var postProvider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: false,
+                onlyPermission: PermissionKeys.InventoryGoodsReceiptsPost);
+            using (var scope = postProvider.CreateScope())
+            {
+                var post = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new PostGoodsReceiptCommand(
+                        new PostGoodsReceiptRequest(created.Id, created.Version)),
+                    CancellationToken.None);
+                Assert.False(post.IsError);
+                Assert.Equal(GoodsReceiptStatuses.Posted, post.Value.Status);
+            }
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            var stored = await connection.QuerySingleAsync<PostedReceiptRow>(
+                "SELECT Status, PostedAtUtc, PostedByUserId FROM dbo.GoodsReceipts WHERE ReceiptId = @id;",
+                new { id = created.Id });
+            var ledger = (await connection.QueryAsync<LedgerRow>(
+                "SELECT DocumentType, DocumentId, DocumentLineId, WarehouseId, ProductId, QuantityChange, PostedByUserId " +
+                "FROM dbo.StockLedger WHERE DocumentId = @id ORDER BY DocumentLineId;",
+                new { id = created.Id })).ToArray();
+            var balances = (await connection.QueryAsync<BalanceRow>(
+                "SELECT ProductId, Quantity FROM dbo.StockBalances WHERE WarehouseId = @warehouseId ORDER BY ProductId;",
+                new { warehouseId = seed.WarehouseId })).ToArray();
+            Assert.Equal(GoodsReceiptStatuses.Posted, stored.Status);
+            Assert.NotNull(stored.PostedAtUtc);
+            Assert.Equal(seed.UserId, stored.PostedByUserId);
+            Assert.Equal(2, ledger.Length);
+            Assert.All(ledger, row => Assert.Equal("GoodsReceipt", row.DocumentType));
+            Assert.All(ledger, row => Assert.Equal(created.Id, row.DocumentId));
+            Assert.Equal(created.Lines.Select(line => line.Id).OrderBy(id => id), ledger.Select(row => row.DocumentLineId));
+            Assert.Equal(new[] { 2.5m, 1m }, ledger.Select(row => row.QuantityChange));
+            Assert.Equal(2, balances.Length);
+            Assert.Equal(2.5m, balances.Single(row => row.ProductId == seed.Product1Id).Quantity);
+            Assert.Equal(1m, balances.Single(row => row.ProductId == seed.Product2Id).Quantity);
+
+            using (var scope = postProvider.CreateScope())
+            {
+                var second = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new PostGoodsReceiptCommand(
+                        new PostGoodsReceiptRequest(created.Id, created.Version)),
+                    CancellationToken.None);
+                Assert.True(second.IsError);
+                Assert.Equal("GoodsReceipt.AlreadyPosted", second.FirstError.Code);
+            }
+
+            Assert.Equal(2, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger;"));
+            Assert.Equal(3.5m, await connection.QuerySingleAsync<decimal>("SELECT SUM(Quantity) FROM dbo.StockBalances;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Stale_or_denied_post_leaves_status_ledger_and_balances_unchanged()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            GoodsReceiptDto created;
+            GoodsReceiptDto updated;
+            using (var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true))
+            using (var scope = provider.CreateScope())
+            {
+                var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+                var create = await sender.Send(
+                    new CreateGoodsReceiptDraftCommand(Save(seed, "before", seed.Product1Id)),
+                    CancellationToken.None);
+                created = create.Value;
+                var update = await sender.Send(
+                    new UpdateGoodsReceiptDraftCommand(
+                        new UpdateGoodsReceiptDraftRequest(
+                            created.Id,
+                            created.Version,
+                            created.ReceiptDate,
+                            seed.WarehouseId,
+                            seed.EmployeeId,
+                            "updated",
+                            new[] { new SaveGoodsReceiptLineRequest(seed.Product1Id, 2m, 3m) })),
+                    CancellationToken.None);
+                updated = update.Value;
+            }
+
+            using (var postProvider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: false,
+                onlyPermission: PermissionKeys.InventoryGoodsReceiptsPost))
+            using (var scope = postProvider.CreateScope())
+            {
+                var stale = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new PostGoodsReceiptCommand(
+                        new PostGoodsReceiptRequest(created.Id, created.Version)),
+                    CancellationToken.None);
+                Assert.True(stale.IsError);
+                Assert.Equal("GoodsReceipt.ConcurrencyConflict", stale.FirstError.Code);
+            }
+
+            using (var deniedProvider = CreateProvider(database.ConnectionString, seed.UserId, allow: false))
+            using (var scope = deniedProvider.CreateScope())
+            {
+                var denied = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new PostGoodsReceiptCommand(
+                        new PostGoodsReceiptRequest(updated.Id, updated.Version)),
+                    CancellationToken.None);
+                Assert.True(denied.IsError);
+                Assert.Equal(ErrorOr.ErrorType.Forbidden, denied.FirstError.Type);
+            }
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(GoodsReceiptStatuses.Draft, await connection.QuerySingleAsync<string>(
+                "SELECT Status FROM dbo.GoodsReceipts WHERE ReceiptId = @id;",
+                new { id = created.Id }));
+            Assert.Equal(0, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger;"));
+            Assert.Equal(0, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockBalances;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Inactive_product_blocks_post_without_any_inventory_mutation()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            GoodsReceiptDto created;
+            using (var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true))
+            using (var scope = provider.CreateScope())
+            {
+                var create = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new CreateGoodsReceiptDraftCommand(Save(seed, "inactive", seed.Product1Id)),
+                    CancellationToken.None);
+                created = create.Value;
+            }
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE dbo.Products SET IsActive = 0 WHERE ProductId = @id;",
+                    new { id = seed.Product1Id });
+            }
+
+            using (var provider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: false,
+                onlyPermission: PermissionKeys.InventoryGoodsReceiptsPost))
+            using (var scope = provider.CreateScope())
+            {
+                var post = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new PostGoodsReceiptCommand(
+                        new PostGoodsReceiptRequest(created.Id, created.Version)),
+                    CancellationToken.None);
+                Assert.True(post.IsError);
+                Assert.Equal("GoodsReceipt.ProductInactive", post.FirstError.Code);
+            }
+
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(GoodsReceiptStatuses.Draft, await verification.QuerySingleAsync<string>(
+                "SELECT Status FROM dbo.GoodsReceipts WHERE ReceiptId = @id;",
+                new { id = created.Id }));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockBalances;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Ledger_failure_rolls_back_posted_status_and_balance_changes()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            GoodsReceiptDto created;
+            using (var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true))
+            using (var scope = provider.CreateScope())
+            {
+                var create = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new CreateGoodsReceiptDraftCommand(Save(seed, "rollback", seed.Product1Id)),
+                    CancellationToken.None);
+                created = create.Value;
+            }
+
+            using (var setup = new SqlConnection(database.ConnectionString))
+            {
+                await setup.ExecuteAsync(
+                    "INSERT dbo.StockLedger " +
+                    "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) " +
+                    "VALUES (@warehouseId, @productId, 'GoodsReceipt', 999, @lineId, 1, SYSUTCDATETIME(), @userId);",
+                    new
+                    {
+                        warehouseId = seed.WarehouseId,
+                        productId = seed.Product1Id,
+                        lineId = created.Lines.Single().Id,
+                        userId = seed.UserId,
+                    });
+            }
+
+            using (var provider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: false,
+                onlyPermission: PermissionKeys.InventoryGoodsReceiptsPost))
+            using (var scope = provider.CreateScope())
+            {
+                var failed = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new PostGoodsReceiptCommand(
+                        new PostGoodsReceiptRequest(created.Id, created.Version)),
+                    CancellationToken.None);
+                Assert.True(failed.IsError);
+                Assert.Equal("InternalError", failed.FirstError.Code);
+            }
+
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(GoodsReceiptStatuses.Draft, await verification.QuerySingleAsync<string>(
+                "SELECT Status FROM dbo.GoodsReceipts WHERE ReceiptId = @id;",
+                new { id = created.Id }));
+            Assert.Equal(1, await verification.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockBalances;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     private static async Task<ErrorOr.ErrorOr<GoodsReceiptDto>> UpdateInOwnScopeAsync(
         ServiceProvider provider,
         GoodsReceiptDto created,
@@ -612,6 +880,30 @@ public sealed class GoodsReceiptCommandIntegrationTests
         public int ProductId { get; set; }
         public decimal Quantity { get; set; }
         public decimal UnitCost { get; set; }
+    }
+
+    private sealed class PostedReceiptRow
+    {
+        public string Status { get; set; } = string.Empty;
+        public DateTime? PostedAtUtc { get; set; }
+        public int? PostedByUserId { get; set; }
+    }
+
+    private sealed class LedgerRow
+    {
+        public string DocumentType { get; set; } = string.Empty;
+        public long DocumentId { get; set; }
+        public long DocumentLineId { get; set; }
+        public int WarehouseId { get; set; }
+        public int ProductId { get; set; }
+        public decimal QuantityChange { get; set; }
+        public int PostedByUserId { get; set; }
+    }
+
+    private sealed class BalanceRow
+    {
+        public int ProductId { get; set; }
+        public decimal Quantity { get; set; }
     }
 
     private sealed class StoredAggregateSnapshot

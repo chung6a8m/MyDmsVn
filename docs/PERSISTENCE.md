@@ -45,9 +45,11 @@ Rules:
 PostGoodsReceiptHandler
   -> create UoW
   -> begin transaction
-  -> receiptRepo.TryMarkPosted(receiptId, expected Draft, ...)
-  -> ledgerRepo.AppendOnce(documentLine IDs)
-  -> balances.ApplyDeltasByWarehouseProduct(...)
+  -> lock receipt header
+  -> load lines and lock Warehouse, Employee, then Products by ProductId
+  -> receiptRepo.TryMarkPosted(receiptId, expected Draft + rowversion, ...)
+  -> receiptRepo.AppendStockLedger(documentLine IDs)
+  -> receiptRepo.ApplyBalanceDeltas by (WarehouseId, ProductId)
   -> commit
   -> dispose
 ```
@@ -66,6 +68,7 @@ For P5:
 - Suggested SQL strategy: atomic `UPDATE Quantity = Quantity + @delta`; for missing rows use an explicit serializable/UPDLOCK/HOLDLOCK-safe upsert or controlled retry on unique-key violation. Upsert and ledger insert remain **inside one transaction**.
 - Avoid unguarded "read quantity, add in C#, overwrite" or naive concurrent `MERGE`.
 - Sort balance keys before applying multiple increments to reduce deadlock risk. Deadlocks/concurrency faults get bounded, explicitly tested retry only at an operation-safe boundary.
+- Posting uses the consistent lock order GoodsReceipt header → Warehouse → Employee → Products by ProductId → StockBalances by (WarehouseId,ProductId). Catalog SetActive operations use ordinary SQL updates and therefore wait on held master-data locks rather than invalidating an in-flight Post check.
 - `rowversion` can protect UI edits and assist optimistic consistency, but **does not replace** atomic increment locking.
 - Ledger source identity, receipt status and balance update should be verified together in SQL integration tests.
 
@@ -79,7 +82,7 @@ For P5:
 
 ## 6. Migrations and data safety
 
-- DbUp uses numbered, immutable scripts. The implemented chain is `001_PersistenceFoundation.sql`, `002_Identity.sql`, `003_Catalog.sql`, `004_Catalog_Nul_Constraints.sql`, `005_GoodsReceipt.sql` and `006_GoodsReceipt_Number_Sequence.sql`; later Inventory scripts remain future additive migrations.
+- DbUp uses numbered, immutable scripts. The implemented chain is `001_PersistenceFoundation.sql`, `002_Identity.sql`, `003_Catalog.sql`, `004_Catalog_Nul_Constraints.sql`, `005_GoodsReceipt.sql`, `006_GoodsReceipt_Number_Sequence.sql` and `007_Inventory_Stock.sql`; later migrations remain additive.
 - History table under controlled schema; apply once, in order, with meaningful deployment logs.
 - Run migrator as a **separate controlled deployment command**, not per-desktop login. Client DB logins should not require DDL.
 - Require an explicit application database in the migration connection string and reject SQL Server system databases (`master`, `model`, `msdb`, `tempdb`) before opening a connection.

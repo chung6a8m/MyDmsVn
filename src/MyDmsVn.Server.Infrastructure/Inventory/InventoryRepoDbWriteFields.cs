@@ -38,4 +38,16 @@ internal static class InventoryRepoDbWriteFields
         entity.UnitCost,
         entity.CreatedByUserId,
     });
+
+    internal static readonly IEnumerable<Field> StockLedgerCreate = Field.Parse<StockLedgerEntry>(entity => new
+    {
+        entity.WarehouseId,
+        entity.ProductId,
+        entity.DocumentType,
+        entity.DocumentId,
+        entity.DocumentLineId,
+        entity.QuantityChange,
+        entity.PostedAtUtc,
+        entity.PostedByUserId,
+    });
 }

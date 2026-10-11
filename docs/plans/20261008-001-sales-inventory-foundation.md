@@ -1,6 +1,6 @@
 ﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03 and the non-Post P5.2 gate scenarios completed on 2026-10-11. Interactive P5.1 manual smoke and the Post-dependent P5.2 gate scenarios remain open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03, the non-Post P5.2 gate scenarios, P5.3-T01 and P5.3-T02 completed on 2026-10-11. Interactive P5.1 manual smoke, UpdateDraft-vs-Post concurrency, and P5.3-T03 onward remain open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -65,27 +65,27 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 
 ### P5.2 gate
 - [x] SQL tests for rollback of header+lines; enforced FK/unique/CHECK constraints (including direct invalid SQL inserts), duplicate receipt numbers/product lines, state guard, and server-issued number uniqueness. (Includes concurrent server-number allocation through separate UoWs.)
-- [ ] SQL integration tests with separate UoWs: concurrent UpdateDraft vs UpdateDraft (one stale-token conflict), UpdateDraft vs Post (never mixed header/lines or post-edit mutation), lines-only edit advances version, and failed UpdateDraft rolls back completely. (All non-Post scenarios are complete; UpdateDraft vs Post remains blocked until the P5.3 Post handler exists.)
-- [ ] Authorization tests for CreateDraft/UpdateDraft (Write), List/Get (Read), and Post (Post), including explicit deny and Post-only user attempting Write/Read; denied requests must not mutate business tables. (CreateDraft/UpdateDraft/List/Get, explicit deny and Post-only attempts are covered; executable Post authorization remains P5.3.)
+- [ ] SQL integration tests with separate UoWs: concurrent UpdateDraft vs UpdateDraft (one stale-token conflict), UpdateDraft vs Post (never mixed header/lines or post-edit mutation), lines-only edit advances version, and failed UpdateDraft rolls back completely. (All non-Post scenarios are complete; UpdateDraft vs Post remains open for P5.3-T03.)
+- [x] Authorization tests for CreateDraft/UpdateDraft (Write), List/Get (Read), and Post (Post), including explicit deny and Post-only user attempting Write/Read; denied requests must not mutate business tables. (Executable Post authorization and Post-only success are covered on both server TFMs; Local mapping is covered on both desktop TFMs.)
 - [x] UI smoke: new Draft → edit → reload → inspect details; while receipt form stays open, modify/disable/re-enable a Product, Warehouse or Employee in its Catalog form and verify the relevant Lookup reloads without losing the existing selection; both hosts. (Safe STA tests compose catalog change publication with the open receipt subscribers and run on `net48` and `net8.0-windows`.)
 
 ## P5.3 — Posting and stock invariants (critical)
 
 ### P5.3-T01 — Data storage
-- [ ] Add append-only StockLedger with UNIQUE (DocumentType,DocumentLineId) and stock-card index.
-- [ ] Add StockBalances with PK (WarehouseId,ProductId), Quantity decimal(18,4), RowVersion.
-- [ ] Provide reconciliation SQL/test utility using a `FULL OUTER JOIN` between ledger totals grouped by (WarehouseId,ProductId) and StockBalances. Flag missing keys **on either side**, even if the stored balance is zero; compare quantities with `COALESCE` only after checking key presence (never use INNER JOIN, which hides orphan rows).
+- [x] Add append-only StockLedger with UNIQUE (DocumentType,DocumentLineId) and stock-card index.
+- [x] Add StockBalances with PK (WarehouseId,ProductId), Quantity decimal(18,4), RowVersion.
+- [x] Provide reconciliation SQL/test utility using a `FULL OUTER JOIN` between ledger totals grouped by (WarehouseId,ProductId) and StockBalances. Flag missing keys **on either side**, even if the stored balance is zero; compare quantities with `COALESCE` only after checking key presence (never use INNER JOIN, which hides orphan rows).
 
 ### P5.3-T02 — PostGoodsReceiptCommandHandler
-- [ ] Verify authenticated identity and `Inventory.GoodsReceipts.Post` permission before mutation; enforce permission in the Application pipeline/handler, never only in WinForms.
-- [ ] Create **one** explicit UoW and begin a SQL transaction. Acquire the same held GoodsReceipts header update lock as UpdateDraft **before** reading receipt lines; serialize aggregate edits and posting under a documented consistent lock order.
-- [ ] Under that transaction, check `Status = Draft` and the expected receipt `rowversion` to reject stale Post requests; load all header/line data via the same UoW. Before changing status, **revalidate** warehouse and employee active status, every product's active status, >=1 line, positive quantities, nonnegative unit costs and no duplicate products.
-- [ ] Protect active-state checks against concurrent master-data deactivation until posting commits (e.g. acquire and retain `UPDLOCK, HOLDLOCK` on the relevant master rows, in consistent key order; SetActive must use normal SQL updates that honor these locks). Neither a stale preflight check nor UI lookup filtering is sufficient.
-- [ ] Conditionally update receipt status from Draft to Posted with the validated expected version, capturing who/when; affected rows must be exactly one, otherwise return a deterministic conflict.
-- [ ] Insert one positive StockLedger movement per receipt line with stable unique source identity.
-- [ ] Atomically add grouped deltas to balances using safe row locks + unique-key handling in the **same transaction**. Apply (WarehouseId,ProductId) keys in deterministic order and handle unique-key races without unsafe `MERGE`.
-- [ ] Commit; any failure rolls back status/ledger/balance together. Never allow an update of a Posted receipt; concurrent or retried Posts must never post twice.
-- [ ] Map a second Post to `GoodsReceipt.AlreadyPosted` (409 in v2) and a stale Draft version to `GoodsReceipt.ConcurrencyConflict` (409); use identical `ApiResponse<T>` semantics in Local and future HTTP adapters.
+- [x] Verify authenticated identity and `Inventory.GoodsReceipts.Post` permission before mutation; enforce permission in the Application pipeline/handler, never only in WinForms.
+- [x] Create **one** explicit UoW and begin a SQL transaction. Acquire the same held GoodsReceipts header update lock as UpdateDraft **before** reading receipt lines; serialize aggregate edits and posting under a documented consistent lock order.
+- [x] Under that transaction, check `Status = Draft` and the expected receipt `rowversion` to reject stale Post requests; load all header/line data via the same UoW. Before changing status, **revalidate** warehouse and employee active status, every product's active status, >=1 line, positive quantities, nonnegative unit costs and no duplicate products.
+- [x] Protect active-state checks against concurrent master-data deactivation until posting commits (e.g. acquire and retain `UPDLOCK, HOLDLOCK` on the relevant master rows, in consistent key order; SetActive must use normal SQL updates that honor these locks). Neither a stale preflight check nor UI lookup filtering is sufficient.
+- [x] Conditionally update receipt status from Draft to Posted with the validated expected version, capturing who/when; affected rows must be exactly one, otherwise return a deterministic conflict.
+- [x] Insert one positive StockLedger movement per receipt line with stable unique source identity.
+- [x] Atomically add grouped deltas to balances using safe row locks + unique-key handling in the **same transaction**. Apply (WarehouseId,ProductId) keys in deterministic order and handle unique-key races without unsafe `MERGE`.
+- [x] Commit; any failure rolls back status/ledger/balance together. Never allow an update of a Posted receipt; concurrent or retried Posts must never post twice.
+- [x] Map a second Post to `GoodsReceipt.AlreadyPosted` (409 in v2) and a stale Draft version to `GoodsReceipt.ConcurrencyConflict` (409); use identical `ApiResponse<T>` semantics in Local and future HTTP adapters.
 
 ### P5.3-T03 — Concurrency and idempotency testing
 - [ ] Concurrent Post same receipt using separate UoWs: exactly one succeeds; no duplicate ledger/balance. Test stale expected versions and deterministic error mappings.

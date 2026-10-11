@@ -1,6 +1,6 @@
 ﻿# P5 Sales & Inventory — proposed SQL data model
 
-**Status:** schema blueprint. `003_Catalog.sql` / `004_Catalog_Nul_Constraints.sql` are the implementation source of truth for the P5.1 catalog tables; `005_GoodsReceipt.sql` and `006_GoodsReceipt_Number_Sequence.sql` are the implementation source of truth for P5.2 Goods Receipt storage and number allocation. Later inventory tables remain proposed until their DbUp scripts are written.
+**Status:** schema blueprint. `003_Catalog.sql` / `004_Catalog_Nul_Constraints.sql` are the implementation source of truth for the P5.1 catalog tables; `005_GoodsReceipt.sql` and `006_GoodsReceipt_Number_Sequence.sql` are the implementation source of truth for P5.2 Goods Receipt storage and number allocation; `007_Inventory_Stock.sql` is the implementation source of truth for P5.3 StockLedger and StockBalances storage.
 
 ## 1. Core entities
 
@@ -78,4 +78,4 @@ Additional ledger `DocumentType` values for stock issue, transfer, stock correct
 
 ## 7. Data reconciliation
 
-Provide an integration-test/reconciliation query that compares each (WarehouseId,ProductId) StockBalances.Quantity with SUM(StockLedger.QuantityChange) and flags drift. Initially only posted GoodsReceipts contribute; no stock issue/negative movements are in scope.
+`IStockReconciliationQueryService` compares grouped ledger totals with balances through a `FULL OUTER JOIN`. It reports key presence separately on each side before comparing `COALESCE`d quantities, so a ledger-only key and an extra balance key remain defects even when the stored balance is zero. Initially only posted GoodsReceipts contribute; no stock issue/negative movements are in scope.
