@@ -610,6 +610,9 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(3, fixture.Editor.WarehouseId);
                         Assert.Equal(5, fixture.Editor.EmployeeId);
                         Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
+                        Assert.Equal(3, control.WarehouseLookup.SelectedValue);
+                        Assert.Equal(5, control.EmployeeLookup.SelectedValue);
+                        Assert.Equal(7, control.ProductLookup.SelectedValue);
 
                         warehouseControl.ActivateButton.PerformClick();
                         warehouseControl.LastOperation.GetAwaiter().GetResult();
@@ -623,6 +626,13 @@ namespace MyDmsVn.Desktop.Tests
                                 fixture.Editor.EmployeeLookup.Items.Single(item => item.Id == 5).IsAvailableForNewSelection &&
                                 fixture.Editor.Lines.Single().ProductIsAvailable,
                             TimeSpan.FromSeconds(5));
+
+                        Assert.Equal(3, fixture.Editor.WarehouseId);
+                        Assert.Equal(5, fixture.Editor.EmployeeId);
+                        Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
+                        Assert.Equal(3, control.WarehouseLookup.SelectedValue);
+                        Assert.Equal(5, control.EmployeeLookup.SelectedValue);
+                        Assert.Equal(7, control.ProductLookup.SelectedValue);
                         Assert.Empty(guard.Exceptions);
                     }
                 },
