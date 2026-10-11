@@ -442,6 +442,50 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Write_only_create_clears_sensitive_detail_and_locks_save_after_commit()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        var denied = new ApiError(
+                            ApiStatusCode.Forbidden,
+                            "Auth.Forbidden",
+                            "Denied.");
+                        fixture.Api.ListError = denied;
+                        fixture.Api.GetError = denied;
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.NewButton.PerformClick();
+                        fixture.Editor.SetWarehouse(3, "W3 - Main", true);
+                        fixture.Editor.SetEmployee(5, "E5 - Operator", true);
+                        var line = fixture.Editor.AddLine();
+                        line.SetProduct(7, "P7 - Product 7", true);
+                        line.Quantity = 1m;
+                        line.UnitCost = 2m;
+
+                        Assert.True(control.SaveButton.Enabled);
+                        control.SaveButton.PerformClick();
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.Equal(1, fixture.Api.CreateCalls);
+                        Assert.Null(fixture.Editor.Id);
+                        Assert.Empty(fixture.Editor.Lines);
+                        Assert.False(control.SaveButton.Enabled);
+                        Assert.Equal(
+                            "Goods receipt was saved. Read access is required to view or edit it.",
+                            control.OperationStatusLabel.Text);
+
+                        control.SaveButton.PerformClick();
+                        Assert.Equal(1, fixture.Api.CreateCalls);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void Repeated_activation_refreshes_and_disposal_owns_both_view_models()
         {
             StaTest.Run(
@@ -480,6 +524,7 @@ namespace MyDmsVn.Desktop.Tests
                     new CatalogLookupViewModel(WarehouseSource, messenger, dispatcher, notifications, delay),
                     new CatalogLookupViewModel(EmployeeSource, messenger, dispatcher, notifications, delay),
                     new GoodsReceiptProductOptionsViewModel(ProductSource, messenger, dispatcher, notifications, delay),
+                    dispatcher,
                     notifications);
             }
 
@@ -536,6 +581,7 @@ namespace MyDmsVn.Desktop.Tests
             public int GetCalls { get; private set; }
             public GoodsReceiptDto CurrentReceipt { get; set; } = Receipt();
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
+            public int CreateCalls { get; private set; }
             public IList<GoodsReceiptListRequest> ListRequests { get; } =
                 new List<GoodsReceiptListRequest>();
 
@@ -590,8 +636,11 @@ namespace MyDmsVn.Desktop.Tests
 
             public Task<ApiResponse<GoodsReceiptDto>> CreateDraftAsync(
                 SaveGoodsReceiptRequest request,
-                CancellationToken cancellationToken) =>
-                throw new NotSupportedException();
+                CancellationToken cancellationToken)
+            {
+                CreateCalls++;
+                return Task.FromResult(ApiResponse<GoodsReceiptDto>.Success(CurrentReceipt));
+            }
 
             public Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(
                 UpdateGoodsReceiptDraftRequest request,

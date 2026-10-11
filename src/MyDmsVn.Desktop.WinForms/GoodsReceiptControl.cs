@@ -35,6 +35,7 @@ namespace MyDmsVn.Desktop.WinForms
         private string? _statusFilter;
         private string? _workflowMessage;
         private bool _isRefreshing;
+        private bool _isAccessDeniedEditorLocked;
         private bool _applyingState;
 
         public GoodsReceiptControl(
@@ -131,7 +132,7 @@ namespace MyDmsVn.Desktop.WinForms
             ProductLookup.TextChanged += OnProductLookupSearchChanged;
             QuantityEditor.ValueChanged += OnQuantityChanged;
             UnitCostEditor.ValueChanged += OnUnitCostChanged;
-            _list.PropertyChanged += OnViewModelPropertyChanged;
+            _list.PropertyChanged += OnListViewModelPropertyChanged;
             _editor.PropertyChanged += OnViewModelPropertyChanged;
             _editor.WarehouseLookup.PropertyChanged += OnViewModelPropertyChanged;
             _editor.EmployeeLookup.PropertyChanged += OnViewModelPropertyChanged;
@@ -220,7 +221,7 @@ namespace MyDmsVn.Desktop.WinForms
                 ProductLookup.TextChanged -= OnProductLookupSearchChanged;
                 QuantityEditor.ValueChanged -= OnQuantityChanged;
                 UnitCostEditor.ValueChanged -= OnUnitCostChanged;
-                _list.PropertyChanged -= OnViewModelPropertyChanged;
+                _list.PropertyChanged -= OnListViewModelPropertyChanged;
                 _editor.PropertyChanged -= OnViewModelPropertyChanged;
                 _editor.WarehouseLookup.PropertyChanged -= OnViewModelPropertyChanged;
                 _editor.EmployeeLookup.PropertyChanged -= OnViewModelPropertyChanged;
@@ -240,7 +241,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             await _list.ActivateAsync(cancellationToken).ConfigureAwait(true);
             await _editor.ActivateAsync(cancellationToken).ConfigureAwait(true);
-            ApplyViewModelState();
+            ApplyListViewModelState();
         }
 
         private async Task RefreshAsync()
@@ -261,7 +262,7 @@ namespace MyDmsVn.Desktop.WinForms
                 await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
                 if (_list.IsAccessDenied)
                 {
-                    ClearPersistedEditor();
+                    EnterAccessDeniedEditorState(false);
                 }
                 else if (_editor.Id.HasValue)
                 {
@@ -290,7 +291,7 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 if (_list.IsAccessDenied)
                 {
-                    ClearPersistedEditor();
+                    EnterAccessDeniedEditorState(false);
                 }
                 ApplyState();
                 return;
@@ -318,7 +319,7 @@ namespace MyDmsVn.Desktop.WinForms
                     await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
                     if (_list.IsAccessDenied)
                     {
-                        ClearPersistedEditor();
+                        EnterAccessDeniedEditorState(true);
                     }
                 }
             }
@@ -344,6 +345,7 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             _workflowMessage = null;
+            _isAccessDeniedEditorLocked = false;
             _list.NewDraft();
             _editor.Load(null);
             _selectedLine = null;
@@ -369,6 +371,24 @@ namespace MyDmsVn.Desktop.WinForms
                 _editor.Load(null);
                 _selectedLine = null;
             }
+        }
+
+        private void EnterAccessDeniedEditorState(bool saved)
+        {
+            if (saved)
+            {
+                _isAccessDeniedEditorLocked = true;
+                _workflowMessage =
+                    "Goods receipt was saved. Read access is required to view or edit it.";
+            }
+
+            if (!_editor.Id.HasValue)
+            {
+                return;
+            }
+
+            _isAccessDeniedEditorLocked = true;
+            ClearPersistedEditor();
         }
 
         private void RebindSelectedLine(long? selectedLineId, int selectedLineIndex)
@@ -604,13 +624,23 @@ namespace MyDmsVn.Desktop.WinForms
         }
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs) =>
-            DispatchToUi(ApplyViewModelState);
+            DispatchToUi(ApplyState);
 
-        private void ApplyViewModelState()
+        private void OnListViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs) =>
+            DispatchToUi(
+                eventArgs.PropertyName == nameof(GoodsReceiptListViewModel.IsAccessDenied)
+                    ? (Action)ApplyListViewModelState
+                    : ApplyState);
+
+        private void ApplyListViewModelState()
         {
             if (_list.IsAccessDenied)
             {
-                ClearPersistedEditor();
+                EnterAccessDeniedEditorState(false);
+            }
+            else
+            {
+                _isAccessDeniedEditorLocked = false;
             }
 
             ApplyState();
@@ -731,7 +761,7 @@ namespace MyDmsVn.Desktop.WinForms
                 PageLabel.Text = $"Page {_list.PageNumber} of {pageCount}";
                 PreviousPageButton.Enabled = !busy && _list.PageNumber > 1;
                 NextPageButton.Enabled = !busy && _list.PageNumber < pageCount;
-                var canEdit = !busy && !_editor.IsReadOnly;
+                var canEdit = !busy && !_editor.IsReadOnly && !_isAccessDeniedEditorLocked;
                 ReceiptDateEditor.Enabled = canEdit;
                 WarehouseLookup.Enabled = canEdit;
                 EmployeeLookup.Enabled = canEdit;

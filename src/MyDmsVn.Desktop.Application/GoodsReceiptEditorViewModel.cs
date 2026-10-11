@@ -12,6 +12,7 @@ namespace MyDmsVn.Desktop.Application
     public sealed class GoodsReceiptEditorViewModel : DesktopViewModelBase, IDisposable
     {
         private readonly IGoodsReceiptApiClient _apiClient;
+        private readonly IUiDispatcher _dispatcher;
         private long? _id;
         private string? _receiptNumber;
         private DateTime _receiptDate = DateTime.Today;
@@ -30,6 +31,7 @@ namespace MyDmsVn.Desktop.Application
             CatalogLookupViewModel warehouseLookup,
             CatalogLookupViewModel employeeLookup,
             GoodsReceiptProductOptionsViewModel productOptions,
+            IUiDispatcher dispatcher,
             IDesktopNotificationService notifications)
             : base(notifications)
         {
@@ -37,6 +39,7 @@ namespace MyDmsVn.Desktop.Application
             WarehouseLookup = warehouseLookup ?? throw new ArgumentNullException(nameof(warehouseLookup));
             EmployeeLookup = employeeLookup ?? throw new ArgumentNullException(nameof(employeeLookup));
             ProductOptions = productOptions ?? throw new ArgumentNullException(nameof(productOptions));
+            _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         }
 
         public ObservableCollection<GoodsReceiptLineViewModel> Lines { get; } =
@@ -243,19 +246,40 @@ namespace MyDmsVn.Desktop.Application
 
         public async Task<bool> RefreshAsync(CancellationToken cancellationToken)
         {
+            ThrowIfDisposed();
             if (!Id.HasValue)
             {
                 return false;
             }
 
-            var response = await _apiClient.GetAsync(Id.Value, cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccess)
+            ApiResponse<GoodsReceiptDto> response;
+            try
             {
-                ApplyApiError(response.Error!);
+                response = await _apiClient.GetAsync(Id.Value, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                await _dispatcher.InvokeAsync(
+                    () => ApplyUnexpectedError(exception),
+                    CancellationToken.None).ConfigureAwait(false);
                 return false;
             }
 
-            Load(response.Data);
+            if (!response.IsSuccess)
+            {
+                await _dispatcher.InvokeAsync(
+                    () => ApplyApiError(response.Error!),
+                    cancellationToken).ConfigureAwait(false);
+                return false;
+            }
+
+            await _dispatcher.InvokeAsync(
+                () => Load(response.Data),
+                cancellationToken).ConfigureAwait(false);
             return true;
         }
 
@@ -288,58 +312,113 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
-            ApiResponse<GoodsReceiptDto> response;
             var saveLines = Lines.Select(line => new SaveGoodsReceiptLineRequest(
                 line.ProductId,
                 line.Quantity,
                 line.UnitCost)).ToArray();
-            if (Id.HasValue)
+            ApiResponse<GoodsReceiptDto> response;
+            try
             {
-                response = await _apiClient.UpdateDraftAsync(
-                    new UpdateGoodsReceiptDraftRequest(
-                        Id.Value,
-                        Version!,
-                        ReceiptDate,
-                        WarehouseId!.Value,
-                        EmployeeId!.Value,
-                        Note,
-                        saveLines),
-                    cancellationToken).ConfigureAwait(false);
+                if (Id.HasValue)
+                {
+                    response = await _apiClient.UpdateDraftAsync(
+                        new UpdateGoodsReceiptDraftRequest(
+                            Id.Value,
+                            Version!,
+                            ReceiptDate,
+                            WarehouseId!.Value,
+                            EmployeeId!.Value,
+                            Note,
+                            saveLines),
+                        cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    response = await _apiClient.CreateDraftAsync(
+                        new SaveGoodsReceiptRequest(
+                            ReceiptDate,
+                            WarehouseId!.Value,
+                            EmployeeId!.Value,
+                            Note,
+                            saveLines),
+                        cancellationToken).ConfigureAwait(false);
+                }
             }
-            else
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                response = await _apiClient.CreateDraftAsync(
-                    new SaveGoodsReceiptRequest(
-                        ReceiptDate,
-                        WarehouseId!.Value,
-                        EmployeeId!.Value,
-                        Note,
-                        saveLines),
-                    cancellationToken).ConfigureAwait(false);
+                throw;
+            }
+            catch (Exception exception)
+            {
+                await _dispatcher.InvokeAsync(
+                    () => ApplyUnexpectedError(exception),
+                    CancellationToken.None).ConfigureAwait(false);
+                return false;
             }
 
             if (!response.IsSuccess)
             {
-                ApplyApiError(response.Error!);
+                await _dispatcher.InvokeAsync(
+                    () => ApplyApiError(response.Error!),
+                    cancellationToken).ConfigureAwait(false);
                 return false;
             }
 
-            ApplyPersistedIdentity(response.Data!);
-            IsDirty = false;
-            var refresh = await _apiClient
-                .GetAsync(response.Data!.Id, cancellationToken)
-                .ConfigureAwait(false);
-            if (!refresh.IsSuccess)
+            var persisted = response.Data!;
+            await _dispatcher.InvokeAsync(
+                () =>
+                {
+                    ApplyPersistedIdentity(persisted);
+                    IsDirty = false;
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            ApiResponse<GoodsReceiptDto> refresh;
+            try
             {
-                ApplyApiError(refresh.Error!);
-                PublishNotification(
-                    DesktopNotificationKind.Warning,
-                    "Goods receipt was saved, but its latest details could not be refreshed.");
+                refresh = await _apiClient
+                    .GetAsync(persisted.Id, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                await _dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        ApplyUnexpectedError(exception);
+                        PublishNotification(
+                            DesktopNotificationKind.Warning,
+                            "Goods receipt was saved, but its latest details could not be refreshed.");
+                    },
+                    CancellationToken.None).ConfigureAwait(false);
                 return true;
             }
 
-            Load(refresh.Data);
-            PublishNotification(DesktopNotificationKind.Success, "Goods receipt saved.");
+            if (!refresh.IsSuccess)
+            {
+                await _dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        ApplyApiError(refresh.Error!);
+                        PublishNotification(
+                            DesktopNotificationKind.Warning,
+                            "Goods receipt was saved, but its latest details could not be refreshed.");
+                    },
+                    cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+
+            await _dispatcher.InvokeAsync(
+                () =>
+                {
+                    Load(refresh.Data);
+                    PublishNotification(DesktopNotificationKind.Success, "Goods receipt saved.");
+                },
+                cancellationToken).ConfigureAwait(false);
             return true;
         }
 

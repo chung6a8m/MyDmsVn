@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using CommunityToolkit.Mvvm.Messaging;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
@@ -168,22 +169,160 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
-        private static Fixture Create(EditorApiClient api)
+        [Fact]
+        public async Task Throwing_create_is_reported_inline_without_faulting_save()
+        {
+            var api = new EditorApiClient
+            {
+                CreateException = new InvalidOperationException("Create connection failed."),
+            };
+            using (var fixture = Create(api))
+            {
+                PopulateValidDraft(fixture.Editor);
+
+                var saved = await fixture.Editor.SaveAsync(CancellationToken.None);
+
+                Assert.False(saved);
+                Assert.Equal("Create connection failed.", fixture.Editor.ErrorMessage);
+                Assert.Null(fixture.Editor.Id);
+            }
+        }
+
+        [Fact]
+        public async Task Throwing_update_is_reported_inline_without_faulting_save()
+        {
+            var api = new EditorApiClient
+            {
+                UpdateException = new InvalidOperationException("Update connection failed."),
+            };
+            using (var fixture = Create(api))
+            {
+                fixture.Editor.Load(Receipt("original", "AQIDBAUGBwg="));
+                fixture.Editor.Note = "changed";
+
+                var saved = await fixture.Editor.SaveAsync(CancellationToken.None);
+
+                Assert.False(saved);
+                Assert.Equal("Update connection failed.", fixture.Editor.ErrorMessage);
+                Assert.Equal("changed", fixture.Editor.Note);
+            }
+        }
+
+        [Fact]
+        public async Task Throwing_follow_up_get_preserves_successful_create_identity()
+        {
+            var api = new EditorApiClient
+            {
+                GetException = new InvalidOperationException("Refresh connection failed."),
+            };
+            using (var fixture = Create(api))
+            {
+                PopulateValidDraft(fixture.Editor);
+
+                var saved = await fixture.Editor.SaveAsync(CancellationToken.None);
+
+                Assert.True(saved);
+                Assert.Equal(41, fixture.Editor.Id);
+                Assert.Equal("AQEBAQEBAQE=", fixture.Editor.Version);
+                Assert.False(fixture.Editor.IsDirty);
+                Assert.Equal("Refresh connection failed.", fixture.Editor.ErrorMessage);
+            }
+        }
+
+        [Fact]
+        public async Task Throwing_detail_refresh_is_reported_inline_without_replacing_the_editor()
+        {
+            var api = new EditorApiClient
+            {
+                GetException = new InvalidOperationException("Refresh connection failed."),
+            };
+            using (var fixture = Create(api))
+            {
+                fixture.Editor.Load(Receipt("original", "AQIDBAUGBwg="));
+
+                var refreshed = await fixture.Editor.RefreshAsync(CancellationToken.None);
+
+                Assert.False(refreshed);
+                Assert.Equal("Refresh connection failed.", fixture.Editor.ErrorMessage);
+                Assert.Equal("original", fixture.Editor.Note);
+            }
+        }
+
+        [Fact]
+        public void Delayed_refresh_applies_collection_mutations_on_the_owning_sta_thread()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var previousContext = SynchronizationContext.Current;
+                    using (var context = new WindowsFormsSynchronizationContext())
+                    {
+                        SynchronizationContext.SetSynchronizationContext(context);
+                        try
+                        {
+                            var api = new EditorApiClient { ControlGetResponse = true };
+                            var dispatcher = new SynchronizationContextUiDispatcher(context);
+                            using (var fixture = Create(api, dispatcher))
+                            {
+                                fixture.Editor.Load(Receipt("original", "AQIDBAUGBwg="));
+                                var uiThreadId = Thread.CurrentThread.ManagedThreadId;
+                                var mutationThreadIds = new List<int>();
+                                fixture.Editor.Lines.CollectionChanged +=
+                                    (_, __) => mutationThreadIds.Add(Thread.CurrentThread.ManagedThreadId);
+
+                                var refresh = fixture.Editor.RefreshAsync(CancellationToken.None);
+                                Task.Run(() => api.CompleteGet());
+                                PumpMessagesUntil(() => refresh.IsCompleted, TimeSpan.FromSeconds(2));
+
+                                Assert.True(refresh.GetAwaiter().GetResult());
+                                Assert.NotEmpty(mutationThreadIds);
+                                Assert.All(mutationThreadIds, threadId => Assert.Equal(uiThreadId, threadId));
+                            }
+                        }
+                        finally
+                        {
+                            SynchronizationContext.SetSynchronizationContext(previousContext);
+                        }
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        private static Fixture Create(EditorApiClient api, IUiDispatcher? dispatcher = null)
         {
             var messenger = new WeakReferenceMessenger();
             var notifications = new DesktopNotificationCenter();
             var delay = new ImmediateDelay();
+            var uiDispatcher = dispatcher ?? new ImmediateUiDispatcher();
             var warehouse = new CatalogLookupViewModel(
-                new LookupSource(CatalogKind.Warehouse), messenger, new ImmediateUiDispatcher(), notifications, delay);
+                new LookupSource(CatalogKind.Warehouse), messenger, uiDispatcher, notifications, delay);
             var employee = new CatalogLookupViewModel(
-                new LookupSource(CatalogKind.Employee), messenger, new ImmediateUiDispatcher(), notifications, delay);
+                new LookupSource(CatalogKind.Employee), messenger, uiDispatcher, notifications, delay);
             var products = new GoodsReceiptProductOptionsViewModel(
-                new LookupSource(CatalogKind.Product), messenger, new ImmediateUiDispatcher(), notifications, delay);
+                new LookupSource(CatalogKind.Product), messenger, uiDispatcher, notifications, delay);
             return new Fixture(
-                new GoodsReceiptEditorViewModel(api, warehouse, employee, products, notifications),
+                new GoodsReceiptEditorViewModel(
+                    api,
+                    warehouse,
+                    employee,
+                    products,
+                    uiDispatcher,
+                    notifications),
                 warehouse,
                 employee,
                 products);
+        }
+
+        private static void PumpMessagesUntil(Func<bool> condition, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (!condition() && DateTime.UtcNow < deadline)
+            {
+                System.Windows.Forms.Application.DoEvents();
+                Thread.Sleep(10);
+            }
+
+            Assert.True(condition(), "Expected UI update did not arrive before the timeout.");
         }
 
         private static void PopulateValidDraft(GoodsReceiptEditorViewModel editor)
@@ -258,6 +397,10 @@ namespace MyDmsVn.Desktop.Tests
             public IList<long> GetIds { get; } = new List<long>();
             public int CreateCalls { get; private set; }
             public bool ControlCreateResponse { get; set; }
+            public bool ControlGetResponse { get; set; }
+            public Exception? CreateException { get; set; }
+            public Exception? UpdateException { get; set; }
+            public Exception? GetException { get; set; }
             public ApiResponse<GoodsReceiptDto> GetResponse { get; set; } =
                 ApiResponse<GoodsReceiptDto>.Success(Receipt("server refreshed", "AwMDAwMDAwM="));
             public ApiResponse<GoodsReceiptDto> UpdateResponse { get; set; } = ApiResponse<GoodsReceiptDto>.Success(Receipt("updated", "AgICAgICAgI="));
@@ -266,6 +409,10 @@ namespace MyDmsVn.Desktop.Tests
             {
                 CreateCalls++;
                 LastCreate = request;
+                if (CreateException != null)
+                {
+                    return Task.FromException<ApiResponse<GoodsReceiptDto>>(CreateException);
+                }
                 var response = ApiResponse<GoodsReceiptDto>.Success(Receipt("created", "AQEBAQEBAQE="));
                 if (!ControlCreateResponse)
                 {
@@ -286,13 +433,29 @@ namespace MyDmsVn.Desktop.Tests
             public Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(UpdateGoodsReceiptDraftRequest request, CancellationToken token)
             {
                 LastUpdate = request;
+                if (UpdateException != null)
+                {
+                    return Task.FromException<ApiResponse<GoodsReceiptDto>>(UpdateException);
+                }
                 return Task.FromResult(UpdateResponse);
             }
             public Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken token)
             {
                 GetIds.Add(id);
+                if (GetException != null)
+                {
+                    return Task.FromException<ApiResponse<GoodsReceiptDto>>(GetException);
+                }
+                if (ControlGetResponse)
+                {
+                    _getCompletion = new TaskCompletionSource<ApiResponse<GoodsReceiptDto>>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    return _getCompletion.Task;
+                }
                 return Task.FromResult(GetResponse);
             }
+            private TaskCompletionSource<ApiResponse<GoodsReceiptDto>>? _getCompletion;
+            public void CompleteGet() => _getCompletion!.TrySetResult(GetResponse);
             public Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(GoodsReceiptListRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(PostGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();
         }

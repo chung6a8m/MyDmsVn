@@ -63,6 +63,7 @@ namespace MyDmsVn.Desktop.WinForms
                     _dispatcher,
                     _notifications,
                     _delay),
+                _dispatcher,
                 _notifications);
             return new GoodsReceiptControl(list, editor);
         }
