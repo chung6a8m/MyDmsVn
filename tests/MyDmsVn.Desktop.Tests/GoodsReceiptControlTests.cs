@@ -359,6 +359,48 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Canceled_post_save_refresh_still_refreshes_list_and_reports_saved()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.NewButton.PerformClick();
+                        fixture.Editor.SetWarehouse(3, "W3 - Main", true);
+                        fixture.Editor.SetEmployee(5, "E5 - Operator", true);
+                        var line = fixture.Editor.AddLine();
+                        line.SetProduct(7, "P7 - Product 7", true);
+                        line.Quantity = 1m;
+                        line.UnitCost = 2m;
+                        fixture.Api.ControlCreateResponse = true;
+                        var listCallsBeforeSave = fixture.Api.ListCalls;
+
+                        control.SaveButton.PerformClick();
+                        Assert.Equal(1, fixture.Api.CreateCalls);
+                        fixture.Editor.CancelCurrentOperation();
+                        fixture.Api.CompleteCreate();
+                        PumpMessagesUntil(
+                            () => control.LastOperation.IsCompleted,
+                            TimeSpan.FromSeconds(2));
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.Equal(listCallsBeforeSave + 1, fixture.Api.ListCalls);
+                        Assert.NotNull(fixture.Notifications.LastNotification);
+                        Assert.Equal(
+                            DesktopNotificationKind.Warning,
+                            fixture.Notifications.LastNotification!.Kind);
+                        Assert.Equal(
+                            "Goods receipt was saved, but its latest details were not refreshed because the operation was canceled.",
+                            fixture.Notifications.LastNotification.Message);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void Editing_a_line_after_refresh_updates_the_reloaded_line()
         {
             StaTest.Run(
@@ -512,23 +554,24 @@ namespace MyDmsVn.Desktop.Tests
             {
                 Api = new ReceiptApiClient();
                 var messenger = new WeakReferenceMessenger();
-                var notifications = new DesktopNotificationCenter();
+                Notifications = new DesktopNotificationCenter();
                 var dispatcher = new ImmediateUiDispatcher();
                 var delay = new ImmediateDelay();
                 WarehouseSource = new LookupSource(CatalogKind.Warehouse);
                 EmployeeSource = new LookupSource(CatalogKind.Employee);
                 ProductSource = new LookupSource(CatalogKind.Product);
-                List = new GoodsReceiptListViewModel(Api, dispatcher, notifications, delay);
+                List = new GoodsReceiptListViewModel(Api, dispatcher, Notifications, delay);
                 Editor = new GoodsReceiptEditorViewModel(
                     Api,
-                    new CatalogLookupViewModel(WarehouseSource, messenger, dispatcher, notifications, delay),
-                    new CatalogLookupViewModel(EmployeeSource, messenger, dispatcher, notifications, delay),
-                    new GoodsReceiptProductOptionsViewModel(ProductSource, messenger, dispatcher, notifications, delay),
+                    new CatalogLookupViewModel(WarehouseSource, messenger, dispatcher, Notifications, delay),
+                    new CatalogLookupViewModel(EmployeeSource, messenger, dispatcher, Notifications, delay),
+                    new GoodsReceiptProductOptionsViewModel(ProductSource, messenger, dispatcher, Notifications, delay),
                     dispatcher,
-                    notifications);
+                    Notifications);
             }
 
             public ReceiptApiClient Api { get; }
+            public DesktopNotificationCenter Notifications { get; }
             public LookupSource WarehouseSource { get; }
             public LookupSource EmployeeSource { get; }
             public LookupSource ProductSource { get; }
@@ -572,6 +615,7 @@ namespace MyDmsVn.Desktop.Tests
         {
             private TaskCompletionSource<ApiResponse<PagedResult<GoodsReceiptDto>>>? _listCompletion;
             private TaskCompletionSource<ApiResponse<GoodsReceiptDto>>? _getCompletion;
+            private TaskCompletionSource<ApiResponse<GoodsReceiptDto>>? _createCompletion;
 
             public int ListCalls { get; private set; }
             public bool ControlListResponse { get; set; }
@@ -582,6 +626,7 @@ namespace MyDmsVn.Desktop.Tests
             public GoodsReceiptDto CurrentReceipt { get; set; } = Receipt();
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
             public int CreateCalls { get; private set; }
+            public bool ControlCreateResponse { get; set; }
             public IList<GoodsReceiptListRequest> ListRequests { get; } =
                 new List<GoodsReceiptListRequest>();
 
@@ -639,8 +684,19 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken cancellationToken)
             {
                 CreateCalls++;
-                return Task.FromResult(ApiResponse<GoodsReceiptDto>.Success(CurrentReceipt));
+                var response = ApiResponse<GoodsReceiptDto>.Success(CurrentReceipt);
+                if (!ControlCreateResponse)
+                {
+                    return Task.FromResult(response);
+                }
+
+                _createCompletion = new TaskCompletionSource<ApiResponse<GoodsReceiptDto>>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                return _createCompletion.Task;
             }
+
+            public void CompleteCreate() =>
+                _createCompletion!.TrySetResult(ApiResponse<GoodsReceiptDto>.Success(CurrentReceipt));
 
             public Task<ApiResponse<GoodsReceiptDto>> UpdateDraftAsync(
                 UpdateGoodsReceiptDraftRequest request,

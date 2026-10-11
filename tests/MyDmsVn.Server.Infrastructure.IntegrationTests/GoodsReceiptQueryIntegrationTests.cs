@@ -97,6 +97,55 @@ public sealed class GoodsReceiptQueryIntegrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Get_holds_one_revision_while_header_and_lines_are_read()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString);
+            using var scope = provider.CreateScope();
+            var queries = scope.ServiceProvider.GetRequiredService<IGoodsReceiptQueryService>();
+            using var lineBlocker = new SqlConnection(database.ConnectionString);
+            await lineBlocker.OpenAsync();
+            using var lineBlockerTransaction = lineBlocker.BeginTransaction();
+            await lineBlocker.ExecuteAsync(
+                "UPDATE dbo.GoodsReceiptLines SET Quantity = Quantity + 1 " +
+                "WHERE ReceiptId = @receiptId;",
+                new { receiptId = seed.Receipt1Id },
+                lineBlockerTransaction);
+
+            var read = queries.GetByIdAsync(seed.Receipt1Id, CancellationToken.None);
+            await Task.Delay(150);
+            Assert.False(read.IsCompleted);
+
+            using var concurrentUpdate = new SqlConnection(database.ConnectionString);
+            await concurrentUpdate.OpenAsync();
+            await concurrentUpdate.ExecuteAsync("SET LOCK_TIMEOUT 250;");
+            var updateError = await Record.ExceptionAsync(
+                () => concurrentUpdate.ExecuteAsync(
+                    "UPDATE dbo.GoodsReceipts SET Note = N'concurrent update' " +
+                    "WHERE ReceiptId = @receiptId;",
+                    new { receiptId = seed.Receipt1Id }));
+
+            var lockTimeout = Assert.IsType<SqlException>(updateError);
+            Assert.Equal(1222, lockTimeout.Number);
+            lineBlockerTransaction.Rollback();
+            var completed = await Task.WhenAny(read, Task.Delay(TimeSpan.FromSeconds(5)));
+            Assert.Same(read, completed);
+            var receipt = await read;
+
+            Assert.NotNull(receipt);
+            Assert.Equal(seed.Version1, receipt!.Version);
+            Assert.Equal(new[] { 2m, 3m }, receipt.Lines.Select(line => line.Quantity));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     private static ServiceProvider CreateProvider(string connectionString)
     {
         var services = new ServiceCollection();

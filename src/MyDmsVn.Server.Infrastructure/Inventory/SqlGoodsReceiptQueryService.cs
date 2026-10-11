@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,6 +56,7 @@ internal sealed class SqlGoodsReceiptQueryService : IGoodsReceiptQueryService
         using var connection = await _connectionFactory
             .OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         var parameters = new
         {
             request.WarehouseId,
@@ -69,6 +71,7 @@ internal sealed class SqlGoodsReceiptQueryService : IGoodsReceiptQueryService
             "ORDER BY gr.ReceiptDate DESC, gr.ReceiptId DESC " +
             "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;",
             parameters,
+            transaction,
             cancellationToken: cancellationToken);
         long totalCount;
         HeaderRow[] headers;
@@ -80,6 +83,7 @@ internal sealed class SqlGoodsReceiptQueryService : IGoodsReceiptQueryService
 
         if (headers.Length == 0)
         {
+            transaction.Commit();
             return new PagedResult<GoodsReceiptDto>(
                 Array.Empty<GoodsReceiptDto>(),
                 request.PageNumber,
@@ -94,6 +98,7 @@ internal sealed class SqlGoodsReceiptQueryService : IGoodsReceiptQueryService
             "WHERE line.ReceiptId IN @ReceiptIds " +
             "ORDER BY line.ReceiptId, line.[LineNo], line.ReceiptLineId;",
             new { ReceiptIds = receiptIds },
+            transaction,
             cancellationToken: cancellationToken);
         var lines = (await connection.QueryAsync<LineRow>(lineCommand).ConfigureAwait(false)).ToArray();
         var linesByReceipt = lines
@@ -105,6 +110,7 @@ internal sealed class SqlGoodsReceiptQueryService : IGoodsReceiptQueryService
                 linesByReceipt.TryGetValue(header.ReceiptId, out var receiptLines)
                     ? receiptLines
                     : Array.Empty<LineRow>())).ToArray();
+        transaction.Commit();
         return new PagedResult<GoodsReceiptDto>(
             items,
             request.PageNumber,
@@ -119,6 +125,7 @@ internal sealed class SqlGoodsReceiptQueryService : IGoodsReceiptQueryService
         using var connection = await _connectionFactory
             .OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         var command = new CommandDefinition(
             "SELECT " + HeaderColumns +
             " FROM dbo.GoodsReceipts gr " +
@@ -130,10 +137,12 @@ internal sealed class SqlGoodsReceiptQueryService : IGoodsReceiptQueryService
             "WHERE line.ReceiptId = @Id " +
             "ORDER BY line.[LineNo], line.ReceiptLineId;",
             new { Id = id },
+            transaction,
             cancellationToken: cancellationToken);
         using var results = await connection.QueryMultipleAsync(command).ConfigureAwait(false);
         var header = await results.ReadSingleOrDefaultAsync<HeaderRow>().ConfigureAwait(false);
         var lines = (await results.ReadAsync<LineRow>().ConfigureAwait(false)).ToArray();
+        transaction.Commit();
         return header == null ? null : ToDto(header, lines);
     }
 

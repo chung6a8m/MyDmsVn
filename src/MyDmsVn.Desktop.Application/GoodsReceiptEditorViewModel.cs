@@ -470,7 +470,11 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await PublishSavedWithoutRefreshAsync(lifetimeToken).ConfigureAwait(false);
+                return true;
+            }
 
             ApiResponse<GoodsReceiptDto> refresh;
             try
@@ -481,7 +485,8 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                throw;
+                await PublishSavedWithoutRefreshAsync(lifetimeToken).ConfigureAwait(false);
+                return true;
             }
             catch (Exception exception)
             {
@@ -507,7 +512,7 @@ namespace MyDmsVn.Desktop.Application
                             DesktopNotificationKind.Warning,
                             "Goods receipt was saved, but its latest details could not be refreshed.");
                     },
-                    cancellationToken).ConfigureAwait(false);
+                    lifetimeToken).ConfigureAwait(false);
                 return true;
             }
 
@@ -517,9 +522,16 @@ namespace MyDmsVn.Desktop.Application
                     Load(refresh.Data);
                     PublishNotification(DesktopNotificationKind.Success, "Goods receipt saved.");
                 },
-                cancellationToken).ConfigureAwait(false);
+                lifetimeToken).ConfigureAwait(false);
             return true;
         }
+
+        private Task PublishSavedWithoutRefreshAsync(CancellationToken cancellationToken) =>
+            _dispatcher.InvokeAsync(
+                () => PublishNotification(
+                    DesktopNotificationKind.Warning,
+                    "Goods receipt was saved, but its latest details were not refreshed because the operation was canceled."),
+                cancellationToken);
 
         private void ApplyPersistedIdentity(GoodsReceiptDto receipt)
         {

@@ -289,7 +289,7 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
-        public async Task Cancellation_after_create_response_preserves_identity_before_stopping_refresh()
+        public async Task Cancellation_after_create_response_reports_saved_without_refreshing_details()
         {
             var api = new EditorApiClient();
             var dispatcher = new DeferredUiDispatcher();
@@ -303,11 +303,19 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.Equal(1, dispatcher.PendingCount);
                 cancellation.Cancel();
                 dispatcher.RunNext();
-                Assert.False(await save);
+                dispatcher.Defer = false;
+                Assert.True(await save);
 
                 Assert.Equal(41, fixture.Editor.Id);
                 Assert.Equal("AQEBAQEBAQE=", fixture.Editor.Version);
-                dispatcher.Defer = false;
+                Assert.Empty(api.GetIds);
+                Assert.NotNull(fixture.Notifications.LastNotification);
+                Assert.Equal(
+                    DesktopNotificationKind.Warning,
+                    fixture.Notifications.LastNotification!.Kind);
+                Assert.Equal(
+                    "Goods receipt was saved, but its latest details were not refreshed because the operation was canceled.",
+                    fixture.Notifications.LastNotification.Message);
                 Assert.True(await fixture.Editor.SaveAsync(CancellationToken.None));
                 Assert.Equal(1, api.CreateCalls);
                 Assert.NotNull(api.LastUpdate);
@@ -392,6 +400,7 @@ namespace MyDmsVn.Desktop.Tests
                     products,
                     uiDispatcher,
                     notifications),
+                notifications,
                 warehouse,
                 employee,
                 products);
@@ -448,12 +457,17 @@ namespace MyDmsVn.Desktop.Tests
         private sealed class Fixture : IDisposable
         {
             private readonly IDisposable[] _owned;
-            public Fixture(GoodsReceiptEditorViewModel editor, params IDisposable[] owned)
+            public Fixture(
+                GoodsReceiptEditorViewModel editor,
+                DesktopNotificationCenter notifications,
+                params IDisposable[] owned)
             {
                 Editor = editor;
+                Notifications = notifications;
                 _owned = owned;
             }
             public GoodsReceiptEditorViewModel Editor { get; }
+            public DesktopNotificationCenter Notifications { get; }
             public void Dispose()
             {
                 Editor.Dispose();
