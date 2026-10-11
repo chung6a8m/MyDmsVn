@@ -1,3 +1,4 @@
+using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace MyDmsVn.Desktop.Application
@@ -59,7 +60,20 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        public decimal LineTotal => Quantity * UnitCost;
+        public decimal? LineTotal
+        {
+            get
+            {
+                try
+                {
+                    return checked(Quantity * UnitCost);
+                }
+                catch (OverflowException)
+                {
+                    return null;
+                }
+            }
+        }
 
         public void SetProduct(int productId, string? displayName, bool isAvailable)
         {

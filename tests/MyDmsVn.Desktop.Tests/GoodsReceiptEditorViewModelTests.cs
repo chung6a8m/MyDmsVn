@@ -288,6 +288,90 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public async Task Cancellation_after_create_response_preserves_identity_before_stopping_refresh()
+        {
+            var api = new EditorApiClient();
+            var dispatcher = new DeferredUiDispatcher();
+            using (var fixture = Create(api, dispatcher))
+            using (var cancellation = new CancellationTokenSource())
+            {
+                PopulateValidDraft(fixture.Editor);
+                dispatcher.Defer = true;
+
+                var save = fixture.Editor.SaveAsync(cancellation.Token);
+                Assert.Equal(1, dispatcher.PendingCount);
+                cancellation.Cancel();
+                dispatcher.RunNext();
+                Assert.False(await save);
+
+                Assert.Equal(41, fixture.Editor.Id);
+                Assert.Equal("AQEBAQEBAQE=", fixture.Editor.Version);
+                dispatcher.Defer = false;
+                Assert.True(await fixture.Editor.SaveAsync(CancellationToken.None));
+                Assert.Equal(1, api.CreateCalls);
+                Assert.NotNull(api.LastUpdate);
+            }
+        }
+
+        [Fact]
+        public async Task Boundary_line_amount_overflow_is_safe_and_blocks_save()
+        {
+            using (var fixture = Create(new EditorApiClient()))
+            {
+                PopulateValidDraft(fixture.Editor);
+                var line = fixture.Editor.Lines[0];
+                line.Quantity = GoodsReceiptContractLimits.MaximumQuantity;
+                line.UnitCost = GoodsReceiptContractLimits.MaximumUnitCost;
+
+                AssertMissingAmount(line.LineTotal);
+                AssertMissingAmount(fixture.Editor.Total);
+                Assert.False(await fixture.Editor.SaveAsync(CancellationToken.None));
+                Assert.Contains(
+                    "Line total exceeds the supported amount.",
+                    ((IEnumerable)fixture.Editor.GetErrors("lines[0].unitCost")).Cast<string>());
+            }
+        }
+
+        [Fact]
+        public async Task Aggregate_overflow_across_safe_lines_is_safe_and_blocks_save()
+        {
+            using (var fixture = Create(new EditorApiClient()))
+            {
+                PopulateValidDraft(fixture.Editor);
+                var first = fixture.Editor.Lines[0];
+                first.Quantity = GoodsReceiptContractLimits.MaximumQuantity;
+                first.UnitCost = 400000000000000m;
+                var second = fixture.Editor.AddLine();
+                second.SetProduct(8, "P8 - Product 8", true);
+                second.Quantity = GoodsReceiptContractLimits.MaximumQuantity;
+                second.UnitCost = 400000000000000m;
+
+                AssertPresentAmount(first.LineTotal);
+                AssertPresentAmount(second.LineTotal);
+                AssertMissingAmount(fixture.Editor.Total);
+                Assert.False(await fixture.Editor.SaveAsync(CancellationToken.None));
+                Assert.Contains(
+                    "Receipt total exceeds the supported amount.",
+                    ((IEnumerable)fixture.Editor.GetErrors("lines")).Cast<string>());
+            }
+        }
+
+        [Fact]
+        public async Task Dispose_ignores_a_late_detail_refresh_response()
+        {
+            var api = new EditorApiClient { ControlGetResponse = true };
+            var fixture = Create(api);
+            fixture.Editor.Load(Receipt("original", "AQIDBAUGBwg="));
+            var refresh = fixture.Editor.RefreshAsync(CancellationToken.None);
+
+            fixture.Editor.Dispose();
+            api.CompleteGet();
+
+            Assert.False(await refresh);
+            fixture.Dispose();
+        }
+
         private static Fixture Create(EditorApiClient api, IUiDispatcher? dispatcher = null)
         {
             var messenger = new WeakReferenceMessenger();
@@ -324,6 +408,10 @@ namespace MyDmsVn.Desktop.Tests
 
             Assert.True(condition(), "Expected UI update did not arrive before the timeout.");
         }
+
+        private static void AssertMissingAmount(object? amount) => Assert.Null(amount);
+
+        private static void AssertPresentAmount(object? amount) => Assert.NotNull(amount);
 
         private static void PopulateValidDraft(GoodsReceiptEditorViewModel editor)
         {
@@ -376,6 +464,62 @@ namespace MyDmsVn.Desktop.Tests
         private sealed class ImmediateDelay : IAsyncDelay
         {
             public Task DelayAsync(TimeSpan interval, CancellationToken cancellationToken) => Task.CompletedTask;
+        }
+
+        private sealed class DeferredUiDispatcher : IUiDispatcher
+        {
+            private readonly Queue<DispatchOperation> _pending = new Queue<DispatchOperation>();
+
+            public bool Defer { get; set; }
+            public int PendingCount => _pending.Count;
+
+            public Task InvokeAsync(Action action, CancellationToken cancellationToken)
+            {
+                if (!Defer)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    action();
+                    return Task.CompletedTask;
+                }
+
+                var operation = new DispatchOperation(action, cancellationToken);
+                _pending.Enqueue(operation);
+                return operation.Completion.Task;
+            }
+
+            public void RunNext()
+            {
+                var operation = _pending.Dequeue();
+                if (operation.CancellationToken.IsCancellationRequested)
+                {
+                    operation.Completion.TrySetCanceled(operation.CancellationToken);
+                    return;
+                }
+
+                try
+                {
+                    operation.Action();
+                    operation.Completion.TrySetResult(true);
+                }
+                catch (Exception exception)
+                {
+                    operation.Completion.TrySetException(exception);
+                }
+            }
+
+            private sealed class DispatchOperation
+            {
+                public DispatchOperation(Action action, CancellationToken cancellationToken)
+                {
+                    Action = action;
+                    CancellationToken = cancellationToken;
+                }
+
+                public Action Action { get; }
+                public CancellationToken CancellationToken { get; }
+                public TaskCompletionSource<bool> Completion { get; } =
+                    new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
         }
 
         private sealed class LookupSource : ICatalogLookupSource

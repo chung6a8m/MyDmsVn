@@ -13,6 +13,8 @@ namespace MyDmsVn.Desktop.Application
     {
         private readonly IGoodsReceiptApiClient _apiClient;
         private readonly IUiDispatcher _dispatcher;
+        private readonly CancellationTokenSource _lifetimeCancellation =
+            new CancellationTokenSource();
         private long? _id;
         private string? _receiptNumber;
         private DateTime _receiptDate = DateTime.Today;
@@ -121,7 +123,32 @@ namespace MyDmsVn.Desktop.Application
             get => _isDirty;
             private set => SetProperty(ref _isDirty, value);
         }
-        public decimal Total => Lines.Sum(line => line.LineTotal);
+        public decimal? Total
+        {
+            get
+            {
+                var total = 0m;
+                foreach (var line in Lines)
+                {
+                    var lineTotal = line.LineTotal;
+                    if (!lineTotal.HasValue)
+                    {
+                        return null;
+                    }
+
+                    try
+                    {
+                        total = checked(total + lineTotal.Value);
+                    }
+                    catch (OverflowException)
+                    {
+                        return null;
+                    }
+                }
+
+                return total;
+            }
+        }
 
         public void Load(GoodsReceiptDto? receipt)
         {
@@ -252,35 +279,85 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
-            ApiResponse<GoodsReceiptDto> response;
-            try
+            var lifetimeToken = _lifetimeCancellation.Token;
+            using (var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                lifetimeToken))
             {
-                response = await _apiClient.GetAsync(Id.Value, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                await _dispatcher.InvokeAsync(
-                    () => ApplyUnexpectedError(exception),
-                    CancellationToken.None).ConfigureAwait(false);
-                return false;
-            }
+                ApiResponse<GoodsReceiptDto> response;
+                try
+                {
+                    response = await _apiClient
+                        .GetAsync(Id.Value, linkedCancellation.Token)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+                catch (OperationCanceledException) when (linkedCancellation.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    if (lifetimeToken.IsCancellationRequested)
+                    {
+                        return false;
+                    }
 
-            if (!response.IsSuccess)
-            {
-                await _dispatcher.InvokeAsync(
-                    () => ApplyApiError(response.Error!),
-                    cancellationToken).ConfigureAwait(false);
-                return false;
-            }
+                    try
+                    {
+                        await _dispatcher.InvokeAsync(
+                            () =>
+                            {
+                                if (!_disposed)
+                                {
+                                    ApplyUnexpectedError(exception);
+                                }
+                            },
+                            lifetimeToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
+                    {
+                    }
+                    return false;
+                }
 
-            await _dispatcher.InvokeAsync(
-                () => Load(response.Data),
-                cancellationToken).ConfigureAwait(false);
-            return true;
+                if (lifetimeToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                var applied = false;
+                try
+                {
+                    await _dispatcher.InvokeAsync(
+                        () =>
+                        {
+                            if (_disposed)
+                            {
+                                return;
+                            }
+
+                            if (!response.IsSuccess)
+                            {
+                                ApplyApiError(response.Error!);
+                                return;
+                            }
+
+                            Load(response.Data);
+                            applied = true;
+                        },
+                        linkedCancellation.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                return applied;
+            }
         }
 
         public async Task<bool> SaveAsync(CancellationToken cancellationToken)
@@ -291,21 +368,30 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
-            var saved = false;
-            try
+            var lifetimeToken = _lifetimeCancellation.Token;
+            using (var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                lifetimeToken))
             {
-                await ExecuteBusyAsync(
-                    async token => saved = await SaveCoreAsync(token).ConfigureAwait(false),
-                    cancellationToken).ConfigureAwait(false);
-                return saved;
-            }
-            finally
-            {
-                Volatile.Write(ref _saveInFlight, 0);
+                var saved = false;
+                try
+                {
+                    await ExecuteBusyAsync(
+                        async token => saved = await SaveCoreAsync(token, lifetimeToken).ConfigureAwait(false),
+                        linkedCancellation.Token,
+                        () => !_disposed).ConfigureAwait(false);
+                    return saved;
+                }
+                finally
+                {
+                    Volatile.Write(ref _saveInFlight, 0);
+                }
             }
         }
 
-        private async Task<bool> SaveCoreAsync(CancellationToken cancellationToken)
+        private async Task<bool> SaveCoreAsync(
+            CancellationToken cancellationToken,
+            CancellationToken lifetimeToken)
         {
             if (IsReadOnly || !ValidateForSave())
             {
@@ -352,7 +438,7 @@ namespace MyDmsVn.Desktop.Application
             {
                 await _dispatcher.InvokeAsync(
                     () => ApplyUnexpectedError(exception),
-                    CancellationToken.None).ConfigureAwait(false);
+                    lifetimeToken).ConfigureAwait(false);
                 return false;
             }
 
@@ -365,13 +451,26 @@ namespace MyDmsVn.Desktop.Application
             }
 
             var persisted = response.Data!;
+            var identityApplied = false;
             await _dispatcher.InvokeAsync(
                 () =>
                 {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
                     ApplyPersistedIdentity(persisted);
                     IsDirty = false;
+                    identityApplied = true;
                 },
-                cancellationToken).ConfigureAwait(false);
+                lifetimeToken).ConfigureAwait(false);
+            if (!identityApplied)
+            {
+                return false;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             ApiResponse<GoodsReceiptDto> refresh;
             try
@@ -394,7 +493,7 @@ namespace MyDmsVn.Desktop.Application
                             DesktopNotificationKind.Warning,
                             "Goods receipt was saved, but its latest details could not be refreshed.");
                     },
-                    CancellationToken.None).ConfigureAwait(false);
+                    lifetimeToken).ConfigureAwait(false);
                 return true;
             }
 
@@ -438,10 +537,12 @@ namespace MyDmsVn.Desktop.Application
             }
 
             _disposed = true;
+            _lifetimeCancellation.Cancel();
             ClearLines();
             WarehouseLookup.Dispose();
             EmployeeLookup.Dispose();
             ProductOptions.Dispose();
+            _lifetimeCancellation.Dispose();
         }
 
         private bool ValidateForSave()
@@ -478,6 +579,20 @@ namespace MyDmsVn.Desktop.Application
                 {
                     details.Add(new ApiErrorDetail("Validation.GreaterThanOrEqual", "Unit cost cannot be negative.", $"lines[{index}].unitCost"));
                 }
+                if (!line.LineTotal.HasValue)
+                {
+                    details.Add(new ApiErrorDetail(
+                        "Validation.AmountOverflow",
+                        "Line total exceeds the supported amount.",
+                        $"lines[{index}].unitCost"));
+                }
+            }
+            if (Lines.All(line => line.LineTotal.HasValue) && !Total.HasValue)
+            {
+                details.Add(new ApiErrorDetail(
+                    "Validation.AmountOverflow",
+                    "Receipt total exceeds the supported amount.",
+                    "lines"));
             }
 
             if (details.Count == 0)

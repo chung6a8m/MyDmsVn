@@ -741,7 +741,9 @@ namespace MyDmsVn.Desktop.WinForms
                 NoteEditor.Text = _editor.Note ?? string.Empty;
                 StatusLabel.Text = _editor.Status;
                 VersionLabel.Text = _editor.Version ?? string.Empty;
-                TotalLabel.Text = _editor.Total.ToString("0.00");
+                TotalLabel.Text = _editor.Total.HasValue
+                    ? _editor.Total.Value.ToString("0.00")
+                    : "Amount too large";
                 QuantityEditor.Value = Clamp(QuantityEditor, _selectedLine?.Quantity ?? 0m);
                 UnitCostEditor.Value = Clamp(UnitCostEditor, _selectedLine?.UnitCost ?? 0m);
 
@@ -813,7 +815,10 @@ namespace MyDmsVn.Desktop.WinForms
                 LineGrid[row, 1] = new SourceGrid.Cells.Cell(item.ProductDisplayName ?? string.Empty);
                 LineGrid[row, 2] = new SourceGrid.Cells.Cell(item.Quantity);
                 LineGrid[row, 3] = new SourceGrid.Cells.Cell(item.UnitCost);
-                LineGrid[row, 4] = new SourceGrid.Cells.Cell(item.LineTotal);
+                LineGrid[row, 4] = new SourceGrid.Cells.Cell(
+                    item.LineTotal.HasValue
+                        ? (object)item.LineTotal.Value
+                        : "Amount too large");
             }
             LineGrid.AutoSizeCells();
         }
