@@ -14,8 +14,8 @@ The gate remains open for `UpdateDraft` versus `Post` concurrency and executable
 - Existing command integration tests prove header-plus-lines atomic create/update, a lines-only edit advancing the aggregate version, full rollback after an injected second-line failure and concurrent UpdateDraft calls through separate scopes/UoWs yielding one commit plus one stale-token conflict.
 - `Concurrent_creates_in_separate_uows_issue_unique_server_numbers` creates eight Drafts concurrently through independent scopes/UoWs, verifies the exact `GR` plus ten digits format and verifies eight distinct persisted receipt numbers.
 - Application authorization tests cover explicit deny for CreateDraft, UpdateDraft, List and Get before any UoW/query access. A Post-only permission store is denied for Write and Read operations.
-- SQL integration verifies a Post-only user cannot CreateDraft, UpdateDraft, List or Get and that the pre-existing header and line remain unchanged.
-- Safe STA UI coverage exercises new Draft, save/edit/reload/detail display and an open receipt reacting to Warehouse, Employee and Product active-state messages. Disable and re-enable reload each relevant lookup without changing the selected IDs; catalog ViewModel tests verify successful status changes publish the typed messages consumed by the receipt.
+- SQL integration verifies a Post-only user cannot CreateDraft, UpdateDraft, List or Get. It snapshots every persisted header field (including status, audit values and rowversion) plus every ordered line field before the denied requests, compares the full aggregate afterward and verifies the business-table row counts remain unchanged.
+- Safe STA UI coverage exercises new Draft, save/edit/reload/detail display and three real Warehouse, Employee and Product `CatalogControl` instances alongside an open Goods Receipt control. The catalog controls invoke deactivate/reactivate through their production ViewModels and a shared messenger; each relevant receipt lookup reloads without changing the selected IDs.
 
 ## Verification matrix
 
