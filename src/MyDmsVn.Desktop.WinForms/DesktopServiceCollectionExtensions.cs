@@ -29,6 +29,7 @@ namespace MyDmsVn.Desktop.WinForms
                 new SynchronizationContextUiDispatcher(uiContext));
             services.AddTransient<FoundationViewModel>();
             services.AddTransient<ICatalogControlFactory, CatalogControlFactory>();
+            services.AddTransient<IGoodsReceiptControlFactory, GoodsReceiptControlFactory>();
             services.AddTransient<FoundationShellForm>();
             return services;
         }

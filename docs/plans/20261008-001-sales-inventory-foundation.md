@@ -1,6 +1,6 @@
 ﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10. Interactive P5.1 manual smoke remains open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03 completed on 2026-10-11. Interactive P5.1 manual smoke and the P5.2 gate remain open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -58,10 +58,10 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [x] Issue ReceiptNo on the server using a DB SEQUENCE (or equivalent transactional-safe, collision-resistant allocation), with a unique SQL index as final protection. Never trust a client-generated receipt number; gaps caused by transaction rollback are acceptable, reuse is not. Exact P5 format: `GR` followed by a zero-padded 10-digit sequence value (`GR0000000001` through `GR9999999999`); the sequence is non-cycling.
 
 ### P5.2-T03 — Queries and UI
-- [ ] List and Get receipt with header/lines via Dapper read models; Get includes the current opaque `rowversion` token for optimistic editing/posting and query permissions are enforced.
-- [ ] Master-detail WinForms form with BootstrapSourceGrid, Product/Warehouse/Employee lookups and totals for display only. Its Lookup ViewModels consume `CatalogChangedMessage` from P5.1-T04 so changes made in an open Catalog screen refresh matching options without reopening Goods Receipt; preserve the current selected ID/historical label even when deactivated.
-- [ ] Apply the shared Debouncer to receipt free-text List/Filter or searchable lookups where applicable, including cancellation and stale-response guards; explicit selection and form validation must not be delayed.
-- [ ] Inline validation and progress/errors; avoid long-running database calls on UI thread.
+- [x] List and Get receipt with header/lines via Dapper read models; Get includes the current opaque `rowversion` token for optimistic editing/posting and query permissions are enforced. (Verified on 2026-10-11 by Application tests and isolated SQL integration tests on `net48` and `net8.0`.)
+- [x] Master-detail WinForms form with BootstrapSourceGrid, Product/Warehouse/Employee lookups and totals for display only. Its Lookup ViewModels consume `CatalogChangedMessage` from P5.1-T04 so changes made in an open Catalog screen refresh matching options without reopening Goods Receipt; preserve the current selected ID/historical label even when deactivated. (Dedicated control, shell lifecycle and inactive historical-selection behavior are covered by STA/ViewModel tests on `net48` and `net8.0-windows`.)
+- [x] Apply the shared Debouncer to receipt free-text List/Filter or searchable lookups where applicable, including cancellation and stale-response guards; explicit selection and form validation must not be delayed. (Debounced search/message bursts, cancellation generations and late-response rejection are covered by focused ViewModel tests.)
+- [x] Inline validation and progress/errors; avoid long-running database calls on UI thread. (The control binds inline `ErrorProvider` messages and busy/read-only state; query/save operations remain asynchronous and focused STA tests complete without modal errors.)
 
 ### P5.2 gate
 - [ ] SQL tests for rollback of header+lines; enforced FK/unique/CHECK constraints (including direct invalid SQL inserts), duplicate receipt numbers/product lines, state guard, and server-issued number uniqueness.

@@ -463,6 +463,44 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Goods_receipt_navigation_reuses_one_workspace_and_sign_out_disposes_it()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(7, "operator", "Operator"));
+                    var notifications = new DesktopNotificationCenter();
+                    var factory = new RecordingGoodsReceiptControlFactory();
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient(), notifications),
+                        session,
+                        notifications,
+                        new EmptyCatalogControlFactory(),
+                        factory))
+                    {
+                        var first = shell.OpenGoodsReceipts();
+                        var second = shell.OpenGoodsReceipts();
+
+                        Assert.Same(first, second);
+                        Assert.Equal("goods-receipts", first!.Name);
+                        Assert.Equal("Goods Receipts", first.Text);
+                        Assert.Equal(1, factory.CreateCount);
+                        Assert.Contains(
+                            shell.Navigation.Items.Cast<object>(),
+                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                                sidebarItem.Text == "Goods Receipts");
+
+                        shell.SignOut();
+
+                        Assert.Empty(shell.Workspace.TabPages);
+                        Assert.True(factory.CreatedControl!.IsDisposed);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
         private static FoundationShellForm CreateShell()
         {
             return new FoundationShellForm(new FoundationViewModel(new ReadyApiClient()));
@@ -511,6 +549,24 @@ namespace MyDmsVn.Desktop.Tests
             public void Complete(FoundationStatus status)
             {
                 _completion.SetResult(ApiResponse<FoundationStatus>.Success(status));
+            }
+        }
+
+        private sealed class EmptyCatalogControlFactory : ICatalogControlFactory
+        {
+            public Control Create(CatalogKind kind) => new Panel();
+        }
+
+        private sealed class RecordingGoodsReceiptControlFactory : IGoodsReceiptControlFactory
+        {
+            public int CreateCount { get; private set; }
+            public Control? CreatedControl { get; private set; }
+
+            public Control Create()
+            {
+                CreateCount++;
+                CreatedControl = new Panel();
+                return CreatedControl;
             }
         }
 

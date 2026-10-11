@@ -5,15 +5,31 @@ using Newtonsoft.Json;
 
 namespace MyDmsVn.Contracts
 {
+    public static class GoodsReceiptContractLimits
+    {
+        public const int DecimalPlaces = 4;
+        public const decimal MaximumQuantity = 99999999999999.9999m;
+        public const decimal MaximumUnitCost = 999999999999999.9999m;
+    }
+
     public sealed class GoodsReceiptLineDto
     {
-        public GoodsReceiptLineDto(long id, int lineNumber, int productId, decimal quantity, decimal unitCost)
+        public GoodsReceiptLineDto(
+            long id,
+            int lineNumber,
+            int productId,
+            decimal quantity,
+            decimal unitCost,
+            string? productDisplayName = null,
+            bool productIsActive = true)
         {
             Id = id;
             LineNumber = lineNumber;
             ProductId = productId;
             Quantity = quantity;
             UnitCost = unitCost;
+            ProductDisplayName = productDisplayName;
+            ProductIsActive = productIsActive;
         }
 
         public long Id { get; }
@@ -21,6 +37,8 @@ namespace MyDmsVn.Contracts
         public int ProductId { get; }
         public decimal Quantity { get; }
         public decimal UnitCost { get; }
+        public string? ProductDisplayName { get; }
+        public bool ProductIsActive { get; }
     }
 
     public sealed class GoodsReceiptDto
@@ -36,6 +54,40 @@ namespace MyDmsVn.Contracts
             DateTime? postedAtUtc,
             string version,
             IEnumerable<GoodsReceiptLineDto> lines)
+            : this(
+                id,
+                receiptNumber,
+                receiptDate,
+                warehouseId,
+                employeeId,
+                status,
+                note,
+                postedAtUtc,
+                version,
+                lines,
+                null,
+                true,
+                null,
+                true)
+        {
+        }
+
+        [JsonConstructor]
+        public GoodsReceiptDto(
+            long id,
+            string receiptNumber,
+            DateTime receiptDate,
+            int warehouseId,
+            int employeeId,
+            string status,
+            string? note,
+            DateTime? postedAtUtc,
+            string version,
+            IEnumerable<GoodsReceiptLineDto> lines,
+            string? warehouseDisplayName = null,
+            bool warehouseIsActive = true,
+            string? employeeDisplayName = null,
+            bool employeeIsActive = true)
         {
             Id = id;
             ReceiptNumber = receiptNumber;
@@ -47,6 +99,10 @@ namespace MyDmsVn.Contracts
             PostedAtUtc = postedAtUtc;
             Version = version;
             Lines = lines.ToArray();
+            WarehouseDisplayName = warehouseDisplayName;
+            WarehouseIsActive = warehouseIsActive;
+            EmployeeDisplayName = employeeDisplayName;
+            EmployeeIsActive = employeeIsActive;
         }
 
         public long Id { get; }
@@ -60,6 +116,10 @@ namespace MyDmsVn.Contracts
         public DateTime? PostedAtUtc { get; }
         public string Version { get; }
         public IReadOnlyList<GoodsReceiptLineDto> Lines { get; }
+        public string? WarehouseDisplayName { get; }
+        public bool WarehouseIsActive { get; }
+        public string? EmployeeDisplayName { get; }
+        public bool EmployeeIsActive { get; }
     }
 
     public sealed class SaveGoodsReceiptLineRequest
@@ -102,18 +162,25 @@ namespace MyDmsVn.Contracts
 
     public sealed class GoodsReceiptListRequest
     {
-        public GoodsReceiptListRequest(int pageNumber, int pageSize, int? warehouseId, string? status)
+        public GoodsReceiptListRequest(
+            int pageNumber,
+            int pageSize,
+            int? warehouseId,
+            string? status,
+            string? search = null)
         {
             PageNumber = pageNumber;
             PageSize = pageSize;
             WarehouseId = warehouseId;
             Status = status;
+            Search = search;
         }
 
         public int PageNumber { get; }
         public int PageSize { get; }
         public int? WarehouseId { get; }
         public string? Status { get; }
+        public string? Search { get; }
     }
 
     public sealed class UpdateGoodsReceiptDraftRequest
