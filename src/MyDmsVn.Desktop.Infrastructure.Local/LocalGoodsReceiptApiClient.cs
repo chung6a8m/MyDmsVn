@@ -38,16 +38,8 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
         public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(
             PostGoodsReceiptRequest request,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(
-                ApiResponse<PostGoodsReceiptResponse>.Failure(
-                    new ApiError(
-                        ApiStatusCode.InternalServerError,
-                        "GoodsReceipt.PostNotAvailable",
-                        "Posting goods receipts is not available in this release phase.")));
-        }
+            CancellationToken cancellationToken) =>
+            SendAsync(new PostGoodsReceiptCommand(request), cancellationToken);
 
         private async Task<ApiResponse<T>> SendAsync<T>(
             ApplicationRequest<T> request,

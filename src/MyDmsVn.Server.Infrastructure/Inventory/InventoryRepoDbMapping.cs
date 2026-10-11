@@ -11,6 +11,7 @@ internal sealed class InventoryRepoDbMapping : IRepoDbMapping
     {
         ConfigureGoodsReceipt();
         ConfigureGoodsReceiptLine();
+        ConfigureStockLedgerEntry();
     }
 
     private static void ConfigureGoodsReceipt()
@@ -74,4 +75,30 @@ internal sealed class InventoryRepoDbMapping : IRepoDbMapping
         PrimaryMapper.Add<GoodsReceiptLine>(entity => entity.Id);
         IdentityMapper.Add<GoodsReceiptLine>(entity => entity.Id);
     }
+
+    private static void ConfigureStockLedgerEntry()
+    {
+        ClassMapper.Add<StockLedgerEntry>("dbo.StockLedger");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.Id, "LedgerId");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.WarehouseId, "WarehouseId");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.ProductId, "ProductId");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.DocumentType, "DocumentType");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.DocumentId, "DocumentId");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.DocumentLineId, "DocumentLineId");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.QuantityChange, "QuantityChange");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.PostedAtUtc, "PostedAtUtc");
+        PropertyMapper.Add<StockLedgerEntry>(entity => entity.PostedByUserId, "PostedByUserId");
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.Id, DbType.Int64);
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.WarehouseId, DbType.Int32);
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.ProductId, DbType.Int32);
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.DocumentType, DbType.String);
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.DocumentId, DbType.Int64);
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.DocumentLineId, DbType.Int64);
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.QuantityChange, DbType.Decimal);
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.PostedAtUtc, DbType.DateTime2);
+        TypeMapper.Add<StockLedgerEntry>(entity => entity.PostedByUserId, DbType.Int32);
+        PrimaryMapper.Add<StockLedgerEntry>(entity => entity.Id);
+        IdentityMapper.Add<StockLedgerEntry>(entity => entity.Id);
+    }
+
 }

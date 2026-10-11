@@ -90,7 +90,7 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
-        public async Task Post_is_explicitly_unavailable_without_dispatch_before_p5_3()
+        public async Task Post_dispatches_the_matching_application_request_and_maps_success()
         {
             var handler = new RecordingHandler();
             using (var provider = CreateProvider(handler, allow: true))
@@ -100,10 +100,10 @@ namespace MyDmsVn.Desktop.Tests
                         new PostGoodsReceiptRequest(41, VersionToken()),
                         CancellationToken.None);
 
-                Assert.False(response.IsSuccess);
-                Assert.Equal(ApiStatusCode.InternalServerError, response.Error!.Status);
-                Assert.Equal("GoodsReceipt.PostNotAvailable", response.Error.Code);
-                Assert.Empty(handler.RequestTypes);
+                Assert.True(response.IsSuccess);
+                Assert.Equal(41, response.Data!.ReceiptId);
+                Assert.Equal("Posted", response.Data.Status);
+                Assert.Equal(new[] { typeof(PostGoodsReceiptCommand) }, handler.RequestTypes);
             }
         }
 
@@ -124,6 +124,8 @@ namespace MyDmsVn.Desktop.Tests
                 IRequestHandler<ListGoodsReceiptsQuery, ErrorOr<PagedResult<GoodsReceiptDto>>>>(handler);
             services.AddSingleton<
                 IRequestHandler<GetGoodsReceiptByIdQuery, ErrorOr<GoodsReceiptDto>>>(handler);
+            services.AddSingleton<
+                IRequestHandler<PostGoodsReceiptCommand, ErrorOr<PostGoodsReceiptResponse>>>(handler);
             return services.BuildServiceProvider();
         }
 
@@ -155,7 +157,8 @@ namespace MyDmsVn.Desktop.Tests
             IRequestHandler<CreateGoodsReceiptDraftCommand, ErrorOr<GoodsReceiptDto>>,
             IRequestHandler<UpdateGoodsReceiptDraftCommand, ErrorOr<GoodsReceiptDto>>,
             IRequestHandler<ListGoodsReceiptsQuery, ErrorOr<PagedResult<GoodsReceiptDto>>>,
-            IRequestHandler<GetGoodsReceiptByIdQuery, ErrorOr<GoodsReceiptDto>>
+            IRequestHandler<GetGoodsReceiptByIdQuery, ErrorOr<GoodsReceiptDto>>,
+            IRequestHandler<PostGoodsReceiptCommand, ErrorOr<PostGoodsReceiptResponse>>
         {
             public List<Type> RequestTypes { get; } = new List<Type>();
             public GoodsReceiptListRequest? ListRequest { get; private set; }
@@ -196,6 +199,18 @@ namespace MyDmsVn.Desktop.Tests
                     ReturnMissingGet
                         ? Error.NotFound("GoodsReceipt.NotFound", "The goods receipt was not found.")
                         : Receipt());
+            }
+
+            public Task<ErrorOr<PostGoodsReceiptResponse>> Handle(
+                PostGoodsReceiptCommand request,
+                CancellationToken cancellationToken)
+            {
+                RequestTypes.Add(request.GetType());
+                return Task.FromResult<ErrorOr<PostGoodsReceiptResponse>>(
+                    new PostGoodsReceiptResponse(
+                        request.Request.ReceiptId,
+                        "Posted",
+                        new DateTime(2026, 10, 10, 1, 2, 3, DateTimeKind.Utc)));
             }
         }
 

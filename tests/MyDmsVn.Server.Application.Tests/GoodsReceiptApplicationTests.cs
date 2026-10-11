@@ -39,6 +39,10 @@ public sealed class GoodsReceiptApplicationTests
             PermissionKeys.InventoryGoodsReceiptsRead,
             ((IAuthorizedRequest)new ListGoodsReceiptsQuery(
                 new GoodsReceiptListRequest(1, 25, null, null))).PermissionKey);
+        Assert.Equal(
+            PermissionKeys.InventoryGoodsReceiptsPost,
+            ((IAuthorizedRequest)new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(1, VersionToken(1)))).PermissionKey);
     }
 
     [Fact]
@@ -470,6 +474,169 @@ public sealed class GoodsReceiptApplicationTests
         Assert.Equal(0, queries.GetCalls);
     }
 
+    [Theory]
+    [InlineData(0, "AQID")]
+    [InlineData(41, "not-base64")]
+    public async Task Invalid_post_is_rejected_before_a_unit_of_work_is_opened(
+        long receiptId,
+        string expectedVersion)
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        using var provider = CreateProvider(unitOfWork);
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(receiptId, expectedVersion)),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.False(unitOfWork.BeganTransaction);
+    }
+
+    [Fact]
+    public async Task Post_locks_revalidates_and_mutates_the_aggregate_in_one_transaction()
+    {
+        var repository = new FakeGoodsReceiptWriteRepository();
+        var unitOfWork = new FakeUnitOfWork(repository);
+        using var provider = CreateProvider(unitOfWork, permissionStore: new PostOnlyPermissionStore());
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.True(unitOfWork.Committed);
+        Assert.Equal(
+            new[] { "header", "snapshot", "mark", "ledger", "balance" },
+            repository.Operations);
+        Assert.Equal(42, repository.PostedByUserId);
+        Assert.Equal(new DateTime(2026, 10, 10, 1, 2, 3, DateTimeKind.Utc), repository.PostedAtUtc);
+        Assert.Equal(2.5m, repository.LastBalanceDeltas[7]);
+        Assert.Equal(1m, repository.LastBalanceDeltas[8]);
+        Assert.Equal(GoodsReceiptStatuses.Posted, result.Value.Status);
+    }
+
+    [Theory]
+    [InlineData(GoodsReceiptStatuses.Posted, 1, "GoodsReceipt.AlreadyPosted")]
+    [InlineData(GoodsReceiptStatuses.Draft, 2, "GoodsReceipt.ConcurrencyConflict")]
+    public async Task Post_maps_locked_header_conflicts_before_loading_lines(
+        string status,
+        byte versionByte,
+        string expectedError)
+    {
+        var repository = new FakeGoodsReceiptWriteRepository
+        {
+            Locked = Receipt(41, "GR0000000041", versionByte, status),
+        };
+        var unitOfWork = new FakeUnitOfWork(repository);
+        using var provider = CreateProvider(unitOfWork, permissionStore: new PostOnlyPermissionStore());
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(expectedError, result.FirstError.Code);
+        Assert.Equal(new[] { "header" }, repository.Operations);
+        Assert.False(unitOfWork.Committed);
+    }
+
+    [Fact]
+    public async Task Post_rejects_inactive_references_before_status_ledger_or_balance_changes()
+    {
+        var repository = new FakeGoodsReceiptWriteRepository
+        {
+            PostSnapshot = new GoodsReceiptPostSnapshot(
+                ValidPostLines(),
+                new GoodsReceiptReferenceSnapshot(
+                    CatalogReferenceState.Inactive,
+                    CatalogReferenceState.Inactive,
+                    new Dictionary<int, CatalogReferenceState>
+                    {
+                        [7] = CatalogReferenceState.Active,
+                        [8] = CatalogReferenceState.Inactive,
+                    })),
+        };
+        var unitOfWork = new FakeUnitOfWork(repository);
+        using var provider = CreateProvider(unitOfWork, permissionStore: new PostOnlyPermissionStore());
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.WarehouseInactive");
+        Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.EmployeeInactive");
+        Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.ProductInactive");
+        Assert.Equal(new[] { "header", "snapshot" }, repository.Operations);
+        Assert.False(unitOfWork.Committed);
+    }
+
+    [Fact]
+    public async Task Post_revalidates_line_invariants_before_mutation()
+    {
+        var repository = new FakeGoodsReceiptWriteRepository
+        {
+            PostSnapshot = new GoodsReceiptPostSnapshot(
+                new[]
+                {
+                    new GoodsReceiptLine { Id = 701, ProductId = 7, Quantity = 0m, UnitCost = -1m },
+                    new GoodsReceiptLine { Id = 702, ProductId = 7, Quantity = 1m, UnitCost = 0m },
+                },
+                ActivePostReferences()),
+        };
+        var unitOfWork = new FakeUnitOfWork(repository);
+        using var provider = CreateProvider(unitOfWork, permissionStore: new PostOnlyPermissionStore());
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.InvalidQuantity");
+        Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.InvalidUnitCost");
+        Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.DuplicateProduct");
+        Assert.Equal(new[] { "header", "snapshot" }, repository.Operations);
+    }
+
+    [Fact]
+    public async Task Post_conditional_transition_failure_returns_concurrency_conflict()
+    {
+        var repository = new FakeGoodsReceiptWriteRepository { TryMarkPosted = false };
+        var unitOfWork = new FakeUnitOfWork(repository);
+        using var provider = CreateProvider(unitOfWork, permissionStore: new PostOnlyPermissionStore());
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("GoodsReceipt.ConcurrencyConflict", result.FirstError.Code);
+        Assert.Equal(new[] { "header", "snapshot", "mark" }, repository.Operations);
+        Assert.False(unitOfWork.Committed);
+    }
+
+    [Fact]
+    public async Task Explicit_post_deny_never_opens_a_unit_of_work()
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        using var provider = CreateProvider(unitOfWork, allow: false);
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ErrorType.Forbidden, result.FirstError.Type);
+        Assert.False(unitOfWork.BeganTransaction);
+    }
+
     private static SaveGoodsReceiptRequest ValidSaveRequest() =>
         new SaveGoodsReceiptRequest(
             new DateTime(2026, 10, 10),
@@ -499,6 +666,23 @@ public sealed class GoodsReceiptApplicationTests
             CreatedByUserId = 42,
             Version = Enumerable.Repeat(versionByte, 8).ToArray(),
         };
+
+    private static IReadOnlyList<GoodsReceiptLine> ValidPostLines() =>
+        new[]
+        {
+            new GoodsReceiptLine { Id = 701, ReceiptId = 41, LineNumber = 1, ProductId = 7, Quantity = 2.5m, UnitCost = 19.99m },
+            new GoodsReceiptLine { Id = 702, ReceiptId = 41, LineNumber = 2, ProductId = 8, Quantity = 1m, UnitCost = 0m },
+        };
+
+    private static GoodsReceiptReferenceSnapshot ActivePostReferences() =>
+        new GoodsReceiptReferenceSnapshot(
+            CatalogReferenceState.Active,
+            CatalogReferenceState.Active,
+            new Dictionary<int, CatalogReferenceState>
+            {
+                [7] = CatalogReferenceState.Active,
+                [8] = CatalogReferenceState.Active,
+            });
 
     private static string VersionToken(byte value) =>
         Convert.ToBase64String(Enumerable.Repeat(value, 8).ToArray());
@@ -644,6 +828,14 @@ public sealed class GoodsReceiptApplicationTests
                     [7] = CatalogReferenceState.Active,
                     [8] = CatalogReferenceState.Active,
                 });
+        public GoodsReceiptPostSnapshot PostSnapshot { get; set; } =
+            new GoodsReceiptPostSnapshot(ValidPostLines(), ActivePostReferences());
+        public bool TryMarkPosted { get; set; } = true;
+        public List<string> Operations { get; } = new List<string>();
+        public DateTime PostedAtUtc { get; private set; }
+        public int PostedByUserId { get; private set; }
+        public IReadOnlyDictionary<int, decimal> LastBalanceDeltas { get; private set; } =
+            new Dictionary<int, decimal>();
 
         public GoodsReceipt? LastHeader { get; private set; }
         public IReadOnlyList<GoodsReceiptLine> LastLines { get; private set; } = Array.Empty<GoodsReceiptLine>();
@@ -667,8 +859,54 @@ public sealed class GoodsReceiptApplicationTests
             return Task.FromResult(Inserted);
         }
 
-        public Task<GoodsReceipt?> LockHeaderAsync(long receiptId, CancellationToken cancellationToken) =>
-            Task.FromResult(Locked);
+        public Task<GoodsReceipt?> LockHeaderAsync(long receiptId, CancellationToken cancellationToken)
+        {
+            Operations.Add("header");
+            return Task.FromResult(Locked);
+        }
+
+        public Task<GoodsReceiptPostSnapshot> LockPostSnapshotAsync(
+            GoodsReceipt header,
+            CancellationToken cancellationToken)
+        {
+            Operations.Add("snapshot");
+            return Task.FromResult(PostSnapshot);
+        }
+
+        public Task<bool> TryMarkPostedAsync(
+            long receiptId,
+            byte[] expectedVersion,
+            DateTime postedAtUtc,
+            int postedByUserId,
+            CancellationToken cancellationToken)
+        {
+            Operations.Add("mark");
+            PostedAtUtc = postedAtUtc;
+            PostedByUserId = postedByUserId;
+            return Task.FromResult(TryMarkPosted);
+        }
+
+        public Task AppendStockLedgerAsync(
+            long receiptId,
+            int warehouseId,
+            IReadOnlyList<GoodsReceiptLine> lines,
+            DateTime postedAtUtc,
+            int postedByUserId,
+            CancellationToken cancellationToken)
+        {
+            Operations.Add("ledger");
+            return Task.CompletedTask;
+        }
+
+        public Task ApplyStockBalanceDeltasAsync(
+            int warehouseId,
+            IReadOnlyDictionary<int, decimal> deltasByProductId,
+            CancellationToken cancellationToken)
+        {
+            Operations.Add("balance");
+            LastBalanceDeltas = deltasByProductId;
+            return Task.CompletedTask;
+        }
 
         public Task<GoodsReceipt> ReplaceDraftAsync(
             GoodsReceipt header,

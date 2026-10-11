@@ -35,6 +35,16 @@ public sealed class UpdateGoodsReceiptDraftCommand : AuthorizedActorApplicationR
     public override string PermissionKey => PermissionKeys.InventoryGoodsReceiptsWrite;
 }
 
+public sealed class PostGoodsReceiptCommand : AuthorizedActorApplicationRequest<PostGoodsReceiptResponse>
+{
+    public PostGoodsReceiptCommand(PostGoodsReceiptRequest request) =>
+        Request = request ?? throw new ArgumentNullException(nameof(request));
+
+    public PostGoodsReceiptRequest Request { get; }
+
+    public override string PermissionKey => PermissionKeys.InventoryGoodsReceiptsPost;
+}
+
 internal sealed class SaveGoodsReceiptRequestValidator : AbstractValidator<SaveGoodsReceiptRequest>
 {
     public SaveGoodsReceiptRequestValidator()
@@ -188,6 +198,20 @@ internal sealed class UpdateGoodsReceiptDraftCommandValidator
                 });
             }
         }
+    }
+}
+
+internal sealed class PostGoodsReceiptCommandValidator
+    : AbstractValidator<PostGoodsReceiptCommand>
+{
+    public PostGoodsReceiptCommandValidator()
+    {
+        RuleFor(command => command.Request.ReceiptId)
+            .GreaterThan(0)
+            .WithErrorCode("Validation.GreaterThan");
+        RuleFor(command => command.Request.ExpectedVersion)
+            .Must(GoodsReceiptVersion.IsValidToken)
+            .WithErrorCode("Validation.InvalidVersion");
     }
 }
 
@@ -378,11 +402,184 @@ internal sealed class UpdateGoodsReceiptDraftCommandHandler
     }
 }
 
+internal sealed class PostGoodsReceiptCommandHandler
+    : IRequestHandler<PostGoodsReceiptCommand, ErrorOr<PostGoodsReceiptResponse>>
+{
+    private readonly IUnitOfWorkFactory _unitOfWorkFactory;
+    private readonly IUtcClock _clock;
+
+    public PostGoodsReceiptCommandHandler(
+        IUnitOfWorkFactory unitOfWorkFactory,
+        IUtcClock clock)
+    {
+        _unitOfWorkFactory = unitOfWorkFactory;
+        _clock = clock;
+    }
+
+    public async Task<ErrorOr<PostGoodsReceiptResponse>> Handle(
+        PostGoodsReceiptCommand command,
+        CancellationToken cancellationToken)
+    {
+        using var unitOfWork = await _unitOfWorkFactory
+            .CreateAsync(cancellationToken)
+            .ConfigureAwait(false);
+        unitOfWork.BeginTransaction();
+        var repository = unitOfWork.Repository<IGoodsReceiptWriteRepository>();
+        var header = await repository
+            .LockHeaderAsync(command.Request.ReceiptId, cancellationToken)
+            .ConfigureAwait(false);
+        if (header == null)
+        {
+            return Error.NotFound("GoodsReceipt.NotFound", "The goods receipt was not found.");
+        }
+
+        if (string.Equals(header.Status, GoodsReceiptStatuses.Posted, StringComparison.Ordinal))
+        {
+            return Error.Conflict("GoodsReceipt.AlreadyPosted", "The goods receipt is already posted.");
+        }
+
+        var expectedVersion = Convert.FromBase64String(command.Request.ExpectedVersion);
+        if (!header.Version.SequenceEqual(expectedVersion))
+        {
+            return ConcurrencyConflict();
+        }
+
+        var snapshot = await repository
+            .LockPostSnapshotAsync(header, cancellationToken)
+            .ConfigureAwait(false);
+        var validationErrors = ValidateSnapshot(snapshot);
+        if (validationErrors.Count > 0)
+        {
+            return ErrorOrFactory.From<PostGoodsReceiptResponse>(validationErrors);
+        }
+
+        var postedAtUtc = _clock.UtcNow;
+        var marked = await repository.TryMarkPostedAsync(
+            header.Id,
+            expectedVersion,
+            postedAtUtc,
+            command.AuthorizedUserId,
+            cancellationToken).ConfigureAwait(false);
+        if (!marked)
+        {
+            return ConcurrencyConflict();
+        }
+
+        await repository.AppendStockLedgerAsync(
+            header.Id,
+            header.WarehouseId,
+            snapshot.Lines,
+            postedAtUtc,
+            command.AuthorizedUserId,
+            cancellationToken).ConfigureAwait(false);
+        var deltas = snapshot.Lines
+            .GroupBy(line => line.ProductId)
+            .OrderBy(group => group.Key)
+            .ToDictionary(group => group.Key, group => group.Sum(line => line.Quantity));
+        await repository.ApplyStockBalanceDeltasAsync(
+            header.WarehouseId,
+            deltas,
+            cancellationToken).ConfigureAwait(false);
+
+        unitOfWork.Commit();
+        return new PostGoodsReceiptResponse(header.Id, GoodsReceiptStatuses.Posted, postedAtUtc);
+    }
+
+    private static List<Error> ValidateSnapshot(GoodsReceiptPostSnapshot snapshot)
+    {
+        var errors = GoodsReceiptReferenceErrors.Create(snapshot.References, snapshot.Lines);
+        if (snapshot.Lines.Count == 0 || snapshot.Lines.Count > GoodsReceiptValidation.MaximumLinesPerReceipt)
+        {
+            errors.Add(PostValidationError(
+                "GoodsReceipt.InvalidLineCount",
+                "The goods receipt must contain between 1 and 200 lines.",
+                "Request.Lines"));
+        }
+
+        var productIds = new HashSet<int>();
+        for (var index = 0; index < snapshot.Lines.Count; index++)
+        {
+            var line = snapshot.Lines[index];
+            if (line.Id <= 0 || line.ProductId <= 0)
+            {
+                errors.Add(PostValidationError(
+                    "GoodsReceipt.InvalidLine",
+                    "The goods receipt contains an invalid line identity.",
+                    $"Request.Lines[{index}]"));
+            }
+
+            if (line.Quantity <= 0m ||
+                line.Quantity > GoodsReceiptValidation.MaximumQuantity ||
+                !GoodsReceiptValidation.HasAtMostFourFractionalDigits(line.Quantity))
+            {
+                errors.Add(PostValidationError(
+                    "GoodsReceipt.InvalidQuantity",
+                    "The goods receipt contains an invalid quantity.",
+                    $"Request.Lines[{index}].Quantity"));
+            }
+
+            if (line.UnitCost < 0m ||
+                line.UnitCost > GoodsReceiptValidation.MaximumUnitCost ||
+                !GoodsReceiptValidation.HasAtMostFourFractionalDigits(line.UnitCost))
+            {
+                errors.Add(PostValidationError(
+                    "GoodsReceipt.InvalidUnitCost",
+                    "The goods receipt contains an invalid unit cost.",
+                    $"Request.Lines[{index}].UnitCost"));
+            }
+
+            if (!productIds.Add(line.ProductId))
+            {
+                errors.Add(PostValidationError(
+                    "GoodsReceipt.DuplicateProduct",
+                    "A product can appear only once in a goods receipt.",
+                    $"Request.Lines[{index}].ProductId"));
+            }
+        }
+
+        return errors;
+    }
+
+    private static Error PostValidationError(string code, string description, string field) =>
+        Error.Validation(
+            code,
+            description,
+            new Dictionary<string, object> { ["Field"] = field });
+
+    private static Error ConcurrencyConflict() =>
+        Error.Conflict(
+            "GoodsReceipt.ConcurrencyConflict",
+            "The goods receipt was changed by another operation.");
+}
+
 internal static class GoodsReceiptReferenceErrors
 {
     public static List<Error> Create(
         GoodsReceiptReferenceSnapshot snapshot,
         IReadOnlyList<SaveGoodsReceiptLineRequest> lines)
+    {
+        var errors = new List<Error>();
+        AddReferenceError(errors, snapshot.Warehouse, "GoodsReceipt.Warehouse", "Request.WarehouseId");
+        AddReferenceError(errors, snapshot.Employee, "GoodsReceipt.Employee", "Request.EmployeeId");
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var productId = lines[index].ProductId;
+            var state = snapshot.Products.TryGetValue(productId, out var found)
+                ? found
+                : CatalogReferenceState.Missing;
+            AddReferenceError(
+                errors,
+                state,
+                "GoodsReceipt.Product",
+                $"Request.Lines[{index}].ProductId");
+        }
+
+        return errors;
+    }
+
+    public static List<Error> Create(
+        GoodsReceiptReferenceSnapshot snapshot,
+        IReadOnlyList<GoodsReceiptLine> lines)
     {
         var errors = new List<Error>();
         AddReferenceError(errors, snapshot.Warehouse, "GoodsReceipt.Warehouse", "Request.WarehouseId");
