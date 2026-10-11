@@ -2,6 +2,8 @@
 
 Date: 2026-10-11
 
+Review follow-up: 2026-10-12
+
 ## Scope
 
 - P5.3-T01/T02 storage, reconciliation and posting behavior remains covered by the existing migration, Application and SQL integration tests.
@@ -9,7 +11,7 @@ Date: 2026-10-11
 - Mid-post failure injection occurs from a StockBalances trigger, after the handler has changed the receipt status and inserted its ledger movement; disposal rolls the transaction back to Draft with no ledger or balance row.
 - The independent stock-ledger source uniqueness test proves duplicate source-line insertion is rejected by SQL. Reconciliation tests cover clean parallel posting plus ledger-only, extra zero balance, extra nonzero balance and mismatched-quantity defects in isolated test data.
 
-The concurrency tests use a test-only signal table and SQL triggers inside each disposable database. Triggers expose the point at which a transaction owns the relevant locks and delay that transaction briefly; the competing operation then runs through a separate dependency-injection scope and UoW. No test hook or synchronization behavior is present in production code.
+The concurrency tests use a test-only signal table and SQL triggers inside each disposable database. Triggers expose the point at which a transaction owns the relevant locks and delay that transaction briefly; the competing operation then runs through a separate dependency-injection scope and UoW. The deactivation-race test records each competing SQL session and verifies an actual `LCK_M_*` wait through SQL Server DMVs before allowing the lock holder to finish, so final-state assertions cannot pass if Post releases the catalog locks early. No test hook or synchronization behavior is present in production code.
 
 ## Automated evidence
 
@@ -24,6 +26,7 @@ Commands were run sequentially by target framework against the disposable SQL Se
 - Desktop tests: 165 passed on `net48` and 165 passed on `net8.0-windows`, with 0 failed/skipped.
 - Architecture tests, Release `net8.0`: 5 passed, 0 failed, 0 skipped.
 - Mutation check: temporarily mapping the losing concurrent Post to `GoodsReceipt.ConcurrencyConflict` made `Concurrent_posts_for_same_receipt_commit_exactly_once` fail with the expected mapping mismatch; restoring `GoodsReceipt.AlreadyPosted` returned the suite to green.
+- Lock mutation check: temporarily removing `UPDLOCK, HOLDLOCK` from Post's catalog reads made `Deactivation_and_post_serialize_in_both_lock_orders_for_every_reference` fail because the competing deactivation never entered an `LCK_M_*` wait; restoring the lock hints returned the focused test to green on both server TFMs.
 
 ## Remaining P5 work
 

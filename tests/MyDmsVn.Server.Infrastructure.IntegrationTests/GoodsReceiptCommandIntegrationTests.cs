@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Concurrent;
+using System.Data;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -15,6 +17,7 @@ using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Domain.Inventory;
+using MyDmsVn.Server.Infrastructure.Persistence;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -910,7 +913,12 @@ public sealed class GoodsReceiptCommandIntegrationTests
         try
         {
             var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
+            using var provider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: true,
+                connectionFactory: recordingConnectionFactory);
             await CreateSignalTableAsync(database.ConnectionString);
             var cases = new[]
             {
@@ -923,6 +931,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             {
                 var deactivationFirst = await CreateReceiptAsync(
                     provider, seed, "deactivate-first-" + item.TableName, seed.Product1Id, 1m);
+                recordingConnectionFactory.Clear();
                 var deactivationSignal = "DeactivateHasLock" + item.TableName;
                 await CreateReferenceSignalTriggerAsync(database.ConnectionString, item, deactivationSignal);
                 var deactivate = SetReferenceActiveAsync(database.ConnectionString, item, isActive: false);
@@ -930,6 +939,9 @@ public sealed class GoodsReceiptCommandIntegrationTests
                 var balanceBeforeRejectedPost = await GetBalanceQuantityAsync(
                     database.ConnectionString, seed.WarehouseId, seed.Product1Id);
                 var blockedPost = PostInOwnScopeAsync(provider, deactivationFirst);
+                var blockedPostSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+                await WaitForSqlLockWaitAsync(database.ConnectionString, blockedPostSessionId);
+                Assert.False(blockedPost.IsCompleted);
                 await AwaitWithTimeoutAsync(Task.WhenAll(deactivate, ObserveCompletionAsync(blockedPost)));
                 var rejected = await blockedPost;
                 Assert.True(rejected.IsError);
@@ -943,16 +955,27 @@ public sealed class GoodsReceiptCommandIntegrationTests
 
                 var postFirst = await CreateReceiptAsync(
                     provider, seed, "post-first-" + item.TableName, seed.Product1Id, 2m);
+                recordingConnectionFactory.Clear();
                 var postSignal = "PostHasLocks" + item.TableName;
                 await CreateGoodsReceiptSignalTriggerAsync(
                     database.ConnectionString,
                     postSignal,
                     "EXISTS (SELECT 1 FROM inserted WHERE ReceiptId = " + postFirst.Id + " AND Status = 'Posted')");
                 var winningPost = PostInOwnScopeAsync(provider, postFirst);
+                await recordingConnectionFactory.TakeNextSessionIdAsync();
                 await WaitForSignalAsync(database.ConnectionString, postSignal);
                 var balanceBeforeWinningPost = await GetBalanceQuantityAsync(
                     database.ConnectionString, seed.WarehouseId, seed.Product1Id);
-                var blockedDeactivate = SetReferenceActiveAsync(database.ConnectionString, item, isActive: false);
+                var deactivationSession = new TaskCompletionSource<int>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                var blockedDeactivate = SetReferenceActiveAsync(
+                    database.ConnectionString,
+                    item,
+                    isActive: false,
+                    deactivationSession);
+                var blockedDeactivationSessionId = await AwaitWithTimeoutAsync(deactivationSession.Task);
+                await WaitForSqlLockWaitAsync(database.ConnectionString, blockedDeactivationSessionId);
+                Assert.False(blockedDeactivate.IsCompleted);
                 await AwaitWithTimeoutAsync(Task.WhenAll(ObserveCompletionAsync(winningPost), blockedDeactivate));
                 var posted = await winningPost;
                 Assert.False(posted.IsError);
@@ -1134,7 +1157,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             "CREATE TRIGGER dbo.TR_TestGoodsReceiptSignal ON dbo.GoodsReceipts AFTER UPDATE AS " +
             "BEGIN SET NOCOUNT ON; IF (" + condition + ") BEGIN " +
             "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
-            "WAITFOR DELAY '00:00:02'; END; END;");
+            "WAITFOR DELAY '00:00:05'; END; END;");
     }
 
     private static async Task CreateReferenceSignalTriggerAsync(
@@ -1149,7 +1172,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             "BEGIN SET NOCOUNT ON; IF EXISTS (SELECT 1 FROM inserted WHERE " + reference.KeyColumn +
             " = " + reference.Id + " AND IsActive = 0) BEGIN " +
             "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
-            "WAITFOR DELAY '00:00:02'; END; END;");
+            "WAITFOR DELAY '00:00:05'; END; END;");
     }
 
     private static async Task DropTriggerAsync(string connectionString, string triggerName)
@@ -1178,12 +1201,41 @@ public sealed class GoodsReceiptCommandIntegrationTests
         throw new TimeoutException("The expected SQL lock-order signal was not observed: " + signalName);
     }
 
+    private static async Task WaitForSqlLockWaitAsync(string connectionString, int sessionId)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        using var connection = new SqlConnection(connectionString);
+        while (DateTime.UtcNow < deadline)
+        {
+            var waitType = await connection.QuerySingleOrDefaultAsync<string>(
+                "SELECT wait_type FROM sys.dm_exec_requests " +
+                "WHERE session_id = @sessionId AND blocking_session_id > 0;",
+                new { sessionId });
+            if (waitType != null && waitType.StartsWith("LCK_M_", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            await Task.Delay(25);
+        }
+
+        throw new TimeoutException(
+            "SQL session " + sessionId + " did not enter an LCK_M_* wait before the lock holder completed.");
+    }
+
     private static async Task SetReferenceActiveAsync(
         string connectionString,
         InactiveReferenceCase reference,
-        bool isActive)
+        bool isActive,
+        TaskCompletionSource<int>? openedSession = null)
     {
         using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        if (openedSession != null)
+        {
+            openedSession.SetResult(await connection.QuerySingleAsync<int>("SELECT @@SPID;"));
+        }
+
         var affected = await connection.ExecuteAsync(
             "UPDATE dbo." + reference.TableName + " SET IsActive = @isActive WHERE " +
             reference.KeyColumn + " = @id;",
@@ -1366,16 +1418,99 @@ public sealed class GoodsReceiptCommandIntegrationTests
         string connectionString,
         int userId,
         bool allow,
-        string? onlyPermission = null)
+        string? onlyPermission = null,
+        IDbConnectionFactory? connectionFactory = null)
     {
         var services = new ServiceCollection();
         services.AddServerApplication();
         services.AddSqlPersistence(connectionString);
+        if (connectionFactory != null)
+        {
+            services.Replace(ServiceDescriptor.Singleton(connectionFactory));
+        }
+
         services.Replace(ServiceDescriptor.Scoped<ICurrentUserAccessor>(
             _ => new TestCurrentUserAccessor(userId)));
         services.Replace(ServiceDescriptor.Scoped<IPermissionStore>(
             _ => new TestPermissionStore(allow, onlyPermission)));
         return services.BuildServiceProvider();
+    }
+
+    private sealed class SessionRecordingConnectionFactory : IDbConnectionFactory
+    {
+        private readonly string _connectionString;
+        private readonly ConcurrentQueue<int> _sessionIds = new ConcurrentQueue<int>();
+        private readonly SemaphoreSlim _sessionAvailable = new SemaphoreSlim(0);
+
+        public SessionRecordingConnectionFactory(string connectionString) =>
+            _connectionString = connectionString;
+
+        public IDbConnection OpenConnection()
+        {
+            var connection = new SqlConnection(_connectionString);
+            try
+            {
+                connection.Open();
+                using var command = new SqlCommand("SELECT @@SPID;", connection);
+                Record(Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture));
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
+        }
+
+        public async Task<IDbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
+        {
+            var connection = new SqlConnection(_connectionString);
+            try
+            {
+                await connection.OpenAsync(cancellationToken);
+                using var command = new SqlCommand("SELECT @@SPID;", connection);
+                var sessionId = await command.ExecuteScalarAsync(cancellationToken);
+                Record(Convert.ToInt32(sessionId, System.Globalization.CultureInfo.InvariantCulture));
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
+        }
+
+        public void Clear()
+        {
+            while (_sessionIds.TryDequeue(out _))
+            {
+            }
+
+            while (_sessionAvailable.Wait(0))
+            {
+            }
+        }
+
+        public async Task<int> TakeNextSessionIdAsync()
+        {
+            if (!await _sessionAvailable.WaitAsync(TimeSpan.FromSeconds(10)))
+            {
+                throw new TimeoutException("No UnitOfWork SQL session was opened within 10 seconds.");
+            }
+
+            if (!_sessionIds.TryDequeue(out var sessionId))
+            {
+                throw new InvalidOperationException("A recorded SQL session signal had no matching session ID.");
+            }
+
+            return sessionId;
+        }
+
+        private void Record(int sessionId)
+        {
+            _sessionIds.Enqueue(sessionId);
+            _sessionAvailable.Release();
+        }
     }
 
     private sealed class TestCurrentUserAccessor : ICurrentUserAccessor
