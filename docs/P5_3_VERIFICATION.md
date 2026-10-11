@@ -11,7 +11,7 @@ Review follow-up: 2026-10-12
 - Mid-post failure injection occurs from a StockBalances trigger, after the handler has changed the receipt status and inserted its ledger movement; disposal rolls the transaction back to Draft with no ledger or balance row.
 - The independent stock-ledger source uniqueness test proves duplicate source-line insertion is rejected by SQL. Reconciliation tests cover clean parallel posting plus ledger-only, extra zero balance, extra nonzero balance and mismatched-quantity defects in isolated test data.
 
-The concurrency tests use a test-only signal table and SQL triggers inside each disposable database. Triggers expose the point at which a transaction owns the relevant locks and delay that transaction briefly; the competing operation then runs through a separate dependency-injection scope and UoW. The same-receipt test holds the first Post after its status update, while the shared-balance test holds the first Post after its initial balance insert. Those tests and the catalog-deactivation race record the competing SQL session, verify an actual `LCK_M_*` wait through SQL Server DMVs and assert the competing task is incomplete before allowing the lock holder to finish. Final-state assertions therefore cannot pass through merely sequential execution. Cross-session visibility in `sys.dm_exec_requests` requires `VIEW SERVER STATE` on SQL Server 2019 (15.x) and earlier, or `VIEW SERVER PERFORMANCE STATE` on SQL Server 2022 (16.x) and later. The gates preflight that version-specific server permission and report the exact required `GRANT` instead of timing out when it is absent. No test hook or synchronization behavior is present in production code.
+The concurrency tests use a test-only signal table and SQL triggers inside each disposable database. Triggers expose the point at which a transaction owns the relevant locks and delay that transaction briefly; the competing operation then runs through a separate dependency-injection scope and UoW. The same-receipt test holds the first Post after its status update. The Post-level shared-balance scenario holds the first Post after its initial balance insert and confirms that the second Post is still serialized upstream on `dbo.Warehouses`, matching the documented header-to-catalog-to-balance lock order. A separate lower-level test drives the production balance upsert through two independent UoWs/repositories, holds the first missing-row insert uncommitted, verifies that the competing session waits specifically on `dbo.StockBalances`, and checks that one balance row contains the summed quantity. These tests and the catalog-deactivation race assert the competing task is incomplete before allowing the lock holder to finish, so final-state assertions cannot pass through merely sequential execution. Cross-session visibility in `sys.dm_exec_requests` and `sys.dm_tran_locks` requires `VIEW SERVER STATE` on SQL Server 2019 (15.x) and earlier, or `VIEW SERVER PERFORMANCE STATE` on SQL Server 2022 (16.x) and later. The gates preflight that version-specific server permission and report the exact required `GRANT` instead of timing out when it is absent. No test hook or synchronization behavior is present in production code.
 
 ## Automated evidence
 
@@ -19,9 +19,9 @@ Commands were run sequentially by target framework against the disposable SQL Se
 
 - `dotnet restore MyDmsVn.sln --locked-mode --nologo`: succeeded after initializing the repository's declared UI submodules in the isolated worktree.
 - `dotnet build MyDmsVn.sln -c Release --no-restore --nologo -m:1`: succeeded with 0 warnings and 0 errors, covering `net48`, `net8.0` and `net8.0-windows` projects.
-- Server Infrastructure integration tests, Release `net48`: 94 passed, 0 failed, 0 skipped.
-- Server Infrastructure integration tests, Release `net8.0`: 94 passed, 0 failed, 0 skipped.
-- Focused Goods Receipt command integration tests: 23 passed on each server TFM.
+- Server Infrastructure integration tests, Release `net48`: 95 passed, 0 failed, 0 skipped.
+- Server Infrastructure integration tests, Release `net8.0`: 95 passed, 0 failed, 0 skipped.
+- Focused Goods Receipt command integration tests: 24 passed on each server TFM.
 - Server Application tests: 116 passed on `net48` and 116 passed on `net8.0`, with 0 failed/skipped.
 - Desktop tests: 165 passed on `net48` and 165 passed on `net8.0-windows`, with 0 failed/skipped.
 - Architecture tests, Release `net8.0`: 5 passed, 0 failed, 0 skipped.
@@ -29,6 +29,7 @@ Commands were run sequentially by target framework against the disposable SQL Se
 - Lock mutation check: temporarily removing `UPDLOCK, HOLDLOCK` from Post's catalog reads made `Deactivation_and_post_serialize_in_both_lock_orders_for_every_reference` fail because the competing deactivation never entered an `LCK_M_*` wait; restoring the lock hints returned the focused test to green on both server TFMs.
 - DMV-permission mutation check: forcing the preflight result to denied made the concurrency gate fail in under one second with the SQL Server major version, required server permission and example `GRANT`, rather than the former 10-second lock-wait timeout.
 - Post-overlap mutation checks: replacing both start-gated scenarios with fully sequential Posts still left their old assertions green, reproducing the review finding. After adding SQL barriers and exact-session wait assertions, removing the trigger delays made both tests fail because the competing sessions never entered an `LCK_M_*` wait.
+- Balance-resource mutation check: changing the direct-upsert test's expected blocked object from `dbo.StockBalances` to `dbo.Warehouses` made the test fail despite an active lock wait, proving the assertion identifies the contended balance resource rather than accepting any `LCK_M_*` wait.
 
 ## Remaining P5 work
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -14,6 +15,7 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Inventory;
+using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Domain.Inventory;
@@ -1046,7 +1048,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
     }
 
     [SqlServerFact]
-    public async Task Concurrent_receipts_for_same_balance_key_preserve_the_sum()
+    public async Task Concurrent_receipt_posts_serialize_on_catalog_locks_and_preserve_the_balance_sum()
     {
         var database = await CreateDatabaseAsync();
         try
@@ -1074,7 +1076,10 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await WaitForSignalAsync(database.ConnectionString, "FirstBalanceInsertIsUncommitted");
             var secondPost = PostInOwnScopeAsync(provider, second);
             var secondSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
-            await WaitForSqlLockWaitAsync(database.ConnectionString, secondSessionId);
+            await WaitForSqlLockWaitOnObjectAsync(
+                database.ConnectionString,
+                secondSessionId,
+                "dbo.Warehouses");
             Assert.False(secondPost.IsCompleted);
 
             var results = await AwaitWithTimeoutAsync(Task.WhenAll(firstPost, secondPost));
@@ -1086,6 +1091,57 @@ public sealed class GoodsReceiptCommandIntegrationTests
                 new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
             Assert.Equal(10m, await connection.QuerySingleAsync<decimal>(
                 "SELECT SUM(QuantityChange) FROM dbo.StockLedger WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
+                new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Concurrent_balance_upserts_block_on_StockBalances_and_preserve_the_sum()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
+            var seed = await SeedAsync(database.ConnectionString);
+            var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
+            using var provider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: true,
+                connectionFactory: recordingConnectionFactory);
+            await CreateSignalTableAsync(database.ConnectionString);
+            await CreateStockBalanceSignalTriggerAsync(
+                database.ConnectionString,
+                "FirstDirectBalanceInsertIsUncommitted",
+                "EXISTS (SELECT 1 FROM inserted WHERE WarehouseId = " + seed.WarehouseId +
+                " AND ProductId = " + seed.Product1Id + " AND Quantity = 4)");
+            recordingConnectionFactory.Clear();
+
+            var first = ApplyBalanceDeltaInOwnUnitOfWorkAsync(
+                provider, seed.WarehouseId, seed.Product1Id, 4m);
+            await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await WaitForSignalAsync(database.ConnectionString, "FirstDirectBalanceInsertIsUncommitted");
+            var second = ApplyBalanceDeltaInOwnUnitOfWorkAsync(
+                provider, seed.WarehouseId, seed.Product1Id, 6m);
+            var secondSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await WaitForSqlLockWaitOnObjectAsync(
+                database.ConnectionString,
+                secondSessionId,
+                "dbo.StockBalances");
+            Assert.False(second.IsCompleted);
+
+            await AwaitWithTimeoutAsync(Task.WhenAll(first, second));
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.StockBalances WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
+                new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
+            Assert.Equal(10m, await connection.QuerySingleAsync<decimal>(
+                "SELECT Quantity FROM dbo.StockBalances WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
                 new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
         }
         finally
@@ -1156,6 +1212,23 @@ public sealed class GoodsReceiptCommandIntegrationTests
             new PostGoodsReceiptCommand(
                 new PostGoodsReceiptRequest(receipt.Id, receipt.Version)),
             CancellationToken.None);
+    }
+
+    private static async Task ApplyBalanceDeltaInOwnUnitOfWorkAsync(
+        ServiceProvider provider,
+        int warehouseId,
+        int productId,
+        decimal delta)
+    {
+        using var scope = provider.CreateScope();
+        var factory = scope.ServiceProvider.GetRequiredService<IUnitOfWorkFactory>();
+        using var unitOfWork = await factory.CreateAsync(CancellationToken.None);
+        unitOfWork.BeginTransaction();
+        await unitOfWork.Repository<IGoodsReceiptWriteRepository>().ApplyStockBalanceDeltasAsync(
+            warehouseId,
+            new Dictionary<int, decimal> { [productId] = delta },
+            CancellationToken.None);
+        unitOfWork.Commit();
     }
 
     private static async Task<ObservedOperation> ObservePostAsync(
@@ -1294,6 +1367,40 @@ public sealed class GoodsReceiptCommandIntegrationTests
 
         throw new TimeoutException(
             "SQL session " + sessionId + " did not enter an LCK_M_* wait before the lock holder completed.");
+    }
+
+    private static async Task WaitForSqlLockWaitOnObjectAsync(
+        string connectionString,
+        int sessionId,
+        string qualifiedTableName)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        using var connection = new SqlConnection(connectionString);
+        while (DateTime.UtcNow < deadline)
+        {
+            var waitType = await connection.QuerySingleOrDefaultAsync<string>(
+                "SELECT TOP (1) request.wait_type " +
+                "FROM sys.dm_exec_requests AS request " +
+                "INNER JOIN sys.dm_tran_locks AS waitingLock " +
+                "ON waitingLock.request_session_id = request.session_id " +
+                "INNER JOIN sys.partitions AS partitionInfo " +
+                "ON partitionInfo.hobt_id = waitingLock.resource_associated_entity_id " +
+                "WHERE request.session_id = @sessionId AND request.blocking_session_id > 0 " +
+                "AND request.wait_type LIKE N'LCK[_]M[_]%' AND waitingLock.request_status = N'WAIT' " +
+                "AND waitingLock.resource_database_id = DB_ID() " +
+                "AND partitionInfo.object_id = OBJECT_ID(@qualifiedTableName);",
+                new { sessionId, qualifiedTableName });
+            if (waitType != null && waitType.StartsWith("LCK_M_", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            await Task.Delay(25);
+        }
+
+        throw new TimeoutException(
+            "SQL session " + sessionId + " did not enter an LCK_M_* wait on " + qualifiedTableName +
+            " before the lock holder completed.");
     }
 
     private static async Task EnsureCrossSessionDmvPermissionAsync(string connectionString)
