@@ -1,6 +1,6 @@
 ﻿# Development Plan — MyDmsVn v1 → v2
 
-**Status:** P0 and P1 complete on 2026-10-08; P2, P3 and P4 complete on 2026-10-09; P5 is in progress through P5.3-T02 on 2026-10-11. **Codex must not skip prerequisites or mark unverified tests as passed.**
+**Status:** P0 and P1 complete on 2026-10-08; P2, P3 and P4 complete on 2026-10-09; P5 is in progress through the P5.3 gate on 2026-10-11. **Codex must not skip prerequisites or mark unverified tests as passed.**
 
 ## Operating rules
 
@@ -18,7 +18,7 @@
 | **P2** | Application pipeline/contracts | MediatR, validation, ErrorOr, transport-neutral ApiResponse mapping, client APIs; error tests | Complete (2026-10-09) |
 | **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Complete (2026-10-09) |
 | **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Complete (2026-10-09) |
-| **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | In progress (through P5.3-T02 complete 2026-10-11; P5.1 interactive smoke, Update/Post concurrency and P5.3-T03+ pending) |
+| **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | In progress (through P5.3 gate complete 2026-10-11; P5.1 interactive smoke and P5.4+ pending) |
 | **P6** | Local v1 hardening | Deployment/migration instructions, logging, secure configuration, two desktop host smoke, release checklist | Not started |
 | **P7** | HTTP API v2 & parity | ASP.NET Core 8 API + HTTP adapter, auth and contract parity; no shared DB credentials on remote desktop | Not started |
 
@@ -72,8 +72,8 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 
 See dedicated [P5 detailed plan](plans/20261008-001-sales-inventory-foundation.md).
 - [ ] P5.1 Products/Warehouses/Employees/Customers + lookups, guards and UI. (Implementation and automated gate complete 2026-10-10; interactive manual smoke pending.)
-- [ ] P5.2 GoodsReceipt Draft header/lines with validation and permissions.
-- [ ] P5.3 Post command with atomic ledger/balance updates, idempotency and reconciliation.
+- [x] P5.2 GoodsReceipt Draft header/lines with validation and permissions.
+- [x] P5.3 Post command with atomic ledger/balance updates, idempotency and reconciliation.
 - [ ] P5.4 Stock Balance/Card Dapper queries, desktop UI, concurrency/GUI regression suite.
 **Exit:** all P5 acceptance cases and SQL integration tests pass.
 

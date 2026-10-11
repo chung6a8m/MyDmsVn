@@ -22,6 +22,6 @@ All commands were run sequentially by TFM against the repository's disposable SQ
 
 The focused SQL evidence includes migration shape and rerun, append-only enforcement, source uniqueness, reconciliation defects on either side (including an extra zero balance), enforced serializable reconciliation during concurrent Post, successful multi-line posting, stale and denied Post, line-order-correct inactive-product errors, rollback after ledger failure, second-Post rejection and Local adapter dispatch.
 
-## Remaining P5.3 work
+## Follow-up status
 
-P5.3-T03 remains open. It owns the full separate-UoW concurrency matrix: concurrent same-receipt Post, UpdateDraft versus Post in both acquisition orders, master-data deactivation races, concurrent different receipts sharing a balance key, explicit mid-post fault injection and reconciliation after parallel load. The P5.3 gate and P5.4 are not marked complete.
+P5.3-T03 and the P5.3 gate were completed on 2026-10-11 with the full separate-UoW concurrency matrix, explicit mid-post fault injection and reconciliation evidence. See `docs/P5_3_VERIFICATION.md`. P5.4 remains open.
