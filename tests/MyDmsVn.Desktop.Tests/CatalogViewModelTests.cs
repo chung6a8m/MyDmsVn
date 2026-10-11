@@ -136,6 +136,41 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Warehouse_and_employee_status_changes_publish_typed_messages()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var messages = new List<CatalogChangedMessage>();
+            var recipient = new object();
+            messenger.Register<CatalogChangedMessage>(recipient, (_, message) => messages.Add(message));
+            var dispatcher = new ImmediateUiDispatcher();
+            var notifications = new DesktopNotificationCenter();
+            var delay = new SystemAsyncDelay();
+
+            using (var warehouse = new WarehouseCatalogViewModel(
+                new SuccessfulWarehouseClient(), messenger, dispatcher, notifications, delay, TimeSpan.Zero))
+            using (var employee = new EmployeeCatalogViewModel(
+                new SuccessfulEmployeeClient(), messenger, dispatcher, notifications, delay, TimeSpan.Zero))
+            {
+                await warehouse.SetActiveAsync(11, false, CancellationToken.None);
+                await employee.SetActiveAsync(12, false, CancellationToken.None);
+                await warehouse.SetActiveAsync(11, true, CancellationToken.None);
+                await employee.SetActiveAsync(12, true, CancellationToken.None);
+            }
+
+            Assert.Equal(
+                new[]
+                {
+                    (CatalogKind.Warehouse, 11),
+                    (CatalogKind.Employee, 12),
+                    (CatalogKind.Warehouse, 11),
+                    (CatalogKind.Employee, 12),
+                },
+                messages.Select(message => (message.CatalogKind, message.EntityId)));
+            Assert.All(messages, message =>
+                Assert.Equal(CatalogChangeOperation.ActiveStatusChanged, message.Operation));
+        }
+
+        [Fact]
         public async Task Employee_user_id_rejects_invalid_text_and_blank_explicitly_unlinks()
         {
             var client = new SuccessfulEmployeeClient();
@@ -919,7 +954,7 @@ namespace MyDmsVn.Desktop.Tests
             public Task<ApiResponse<WarehouseDto>> GetAsync(int id, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<WarehouseDto>> CreateAsync(SaveWarehouseRequest request, CancellationToken token) => Task.FromResult(ApiResponse<WarehouseDto>.Success(new WarehouseDto(11, request.Code, request.Name, request.Address, true)));
             public Task<ApiResponse<WarehouseDto>> UpdateAsync(int id, SaveWarehouseRequest request, CancellationToken token) => throw new NotSupportedException();
-            public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) => throw new NotSupportedException();
         }
 
@@ -931,7 +966,7 @@ namespace MyDmsVn.Desktop.Tests
             public Task<ApiResponse<EmployeeDto>> GetAsync(int id, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<EmployeeDto>> CreateAsync(SaveEmployeeRequest request, CancellationToken token) { CreateCount++; LastRequest = request; return Task.FromResult(ApiResponse<EmployeeDto>.Success(new EmployeeDto(12, request.Code, request.Name, request.Phone, request.UserId, true))); }
             public Task<ApiResponse<EmployeeDto>> UpdateAsync(int id, SaveEmployeeRequest request, CancellationToken token) => throw new NotSupportedException();
-            public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) => throw new NotSupportedException();
         }
 

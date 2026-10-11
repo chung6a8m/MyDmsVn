@@ -1,6 +1,6 @@
 ﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03 completed on 2026-10-11. Interactive P5.1 manual smoke and the P5.2 gate remain open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03 and the non-Post P5.2 gate scenarios completed on 2026-10-11. Interactive P5.1 manual smoke and the Post-dependent P5.2 gate scenarios remain open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -64,10 +64,10 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [x] Inline validation and progress/errors; avoid long-running database calls on UI thread. (The control binds inline `ErrorProvider` messages and busy/read-only state; query/save operations remain asynchronous and focused STA tests complete without modal errors.)
 
 ### P5.2 gate
-- [ ] SQL tests for rollback of header+lines; enforced FK/unique/CHECK constraints (including direct invalid SQL inserts), duplicate receipt numbers/product lines, state guard, and server-issued number uniqueness.
-- [ ] SQL integration tests with separate UoWs: concurrent UpdateDraft vs UpdateDraft (one stale-token conflict), UpdateDraft vs Post (never mixed header/lines or post-edit mutation), lines-only edit advances version, and failed UpdateDraft rolls back completely.
-- [ ] Authorization tests for CreateDraft/UpdateDraft (Write), List/Get (Read), and Post (Post), including explicit deny and Post-only user attempting Write/Read; denied requests must not mutate business tables.
-- [ ] UI smoke: new Draft → edit → reload → inspect details; while receipt form stays open, modify/disable/re-enable a Product, Warehouse or Employee in its Catalog form and verify the relevant Lookup reloads without losing the existing selection; both hosts.
+- [x] SQL tests for rollback of header+lines; enforced FK/unique/CHECK constraints (including direct invalid SQL inserts), duplicate receipt numbers/product lines, state guard, and server-issued number uniqueness. (Includes concurrent server-number allocation through separate UoWs.)
+- [ ] SQL integration tests with separate UoWs: concurrent UpdateDraft vs UpdateDraft (one stale-token conflict), UpdateDraft vs Post (never mixed header/lines or post-edit mutation), lines-only edit advances version, and failed UpdateDraft rolls back completely. (All non-Post scenarios are complete; UpdateDraft vs Post remains blocked until the P5.3 Post handler exists.)
+- [ ] Authorization tests for CreateDraft/UpdateDraft (Write), List/Get (Read), and Post (Post), including explicit deny and Post-only user attempting Write/Read; denied requests must not mutate business tables. (CreateDraft/UpdateDraft/List/Get, explicit deny and Post-only attempts are covered; executable Post authorization remains P5.3.)
+- [x] UI smoke: new Draft → edit → reload → inspect details; while receipt form stays open, modify/disable/re-enable a Product, Warehouse or Employee in its Catalog form and verify the relevant Lookup reloads without losing the existing selection; both hosts. (Safe STA tests compose catalog change publication with the open receipt subscribers and run on `net48` and `net8.0-windows`.)
 
 ## P5.3 — Posting and stock invariants (critical)
 

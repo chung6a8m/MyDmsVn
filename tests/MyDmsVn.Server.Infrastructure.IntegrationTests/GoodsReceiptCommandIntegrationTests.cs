@@ -258,6 +258,108 @@ public sealed class GoodsReceiptCommandIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Concurrent_creates_in_separate_uows_issue_unique_server_numbers()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+
+            var tasks = Enumerable.Range(1, 8)
+                .Select(index => CreateInOwnScopeAsync(provider, seed, "concurrent-" + index))
+                .ToArray();
+            var results = await Task.WhenAll(tasks);
+
+            Assert.All(results, result => Assert.False(result.IsError));
+            var numbers = results.Select(result => result.Value.ReceiptNumber).ToArray();
+            Assert.Equal(numbers.Length, numbers.Distinct(StringComparer.Ordinal).Count());
+            Assert.All(numbers, number =>
+                Assert.Matches(new Regex("^GR[0-9]{10}$", RegexOptions.CultureInvariant), number));
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(8, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(DISTINCT ReceiptNo) FROM dbo.GoodsReceipts;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Post_only_user_cannot_read_or_write_and_leaves_the_aggregate_unchanged()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            GoodsReceiptDto created;
+            using (var allowedProvider = CreateProvider(database.ConnectionString, seed.UserId, allow: true))
+            using (var scope = allowedProvider.CreateScope())
+            {
+                var result = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new CreateGoodsReceiptDraftCommand(Save(seed, "before", seed.Product1Id)),
+                    CancellationToken.None);
+                Assert.False(result.IsError);
+                created = result.Value;
+            }
+            var before = await LoadAggregateSnapshotAsync(database.ConnectionString, created.Id);
+
+            using (var postOnlyProvider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: false,
+                onlyPermission: PermissionKeys.InventoryGoodsReceiptsPost))
+            using (var scope = postOnlyProvider.CreateScope())
+            {
+                var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+                var create = await sender.Send(
+                    new CreateGoodsReceiptDraftCommand(Save(seed, "forbidden-create", seed.Product2Id)),
+                    CancellationToken.None);
+                var update = await sender.Send(
+                    new UpdateGoodsReceiptDraftCommand(
+                        new UpdateGoodsReceiptDraftRequest(
+                            created.Id,
+                            created.Version,
+                            created.ReceiptDate,
+                            seed.WarehouseId,
+                            seed.EmployeeId,
+                            "forbidden-update",
+                            new[] { new SaveGoodsReceiptLineRequest(seed.Product2Id, 9m, 9m) })),
+                    CancellationToken.None);
+                var list = await sender.Send(
+                    new ListGoodsReceiptsQuery(new GoodsReceiptListRequest(1, 25, null, null)),
+                    CancellationToken.None);
+                var get = await sender.Send(
+                    new GetGoodsReceiptByIdQuery(created.Id),
+                    CancellationToken.None);
+
+                Assert.True(create.IsError);
+                Assert.True(update.IsError);
+                Assert.True(list.IsError);
+                Assert.True(get.IsError);
+                Assert.All(create.Errors, error => Assert.Equal(ErrorOr.ErrorType.Forbidden, error.Type));
+                Assert.All(update.Errors, error => Assert.Equal(ErrorOr.ErrorType.Forbidden, error.Type));
+                Assert.All(list.Errors, error => Assert.Equal(ErrorOr.ErrorType.Forbidden, error.Type));
+                Assert.All(get.Errors, error => Assert.Equal(ErrorOr.ErrorType.Forbidden, error.Type));
+            }
+
+            var after = await LoadAggregateSnapshotAsync(database.ConnectionString, created.Id);
+            AssertAggregateEqual(before, after);
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+            Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.GoodsReceiptLines;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Inactive_reference_and_explicit_write_deny_leave_receipt_tables_empty()
     {
         var database = await CreateDatabaseAsync();
@@ -322,6 +424,73 @@ public sealed class GoodsReceiptCommandIntegrationTests
             CancellationToken.None);
     }
 
+    private static async Task<StoredAggregateSnapshot> LoadAggregateSnapshotAsync(
+        string connectionString,
+        long receiptId)
+    {
+        using var connection = new SqlConnection(connectionString);
+        var header = await connection.QuerySingleAsync<StoredAggregateHeader>(
+            "SELECT ReceiptId, ReceiptNo AS ReceiptNumber, ReceiptDate, WarehouseId, EmployeeId, Status, Note, " +
+            "CreatedAtUtc, CreatedByUserId, UpdatedAtUtc, UpdatedByUserId, PostedAtUtc, " +
+            "PostedByUserId, RowVersion AS Version " +
+            "FROM dbo.GoodsReceipts WHERE ReceiptId = @receiptId;",
+            new { receiptId });
+        var lines = (await connection.QueryAsync<StoredAggregateLine>(
+            "SELECT ReceiptLineId, ReceiptId, [LineNo] AS LineNumber, ProductId, Quantity, UnitCost, " +
+            "CreatedAtUtc, CreatedByUserId, UpdatedAtUtc, UpdatedByUserId " +
+            "FROM dbo.GoodsReceiptLines WHERE ReceiptId = @receiptId " +
+            "ORDER BY [LineNo], ReceiptLineId;",
+            new { receiptId })).ToArray();
+        return new StoredAggregateSnapshot(header, lines);
+    }
+
+    private static void AssertAggregateEqual(
+        StoredAggregateSnapshot expected,
+        StoredAggregateSnapshot actual)
+    {
+        Assert.Equal(expected.Header.ReceiptId, actual.Header.ReceiptId);
+        Assert.Equal(expected.Header.ReceiptNumber, actual.Header.ReceiptNumber);
+        Assert.Equal(expected.Header.ReceiptDate, actual.Header.ReceiptDate);
+        Assert.Equal(expected.Header.WarehouseId, actual.Header.WarehouseId);
+        Assert.Equal(expected.Header.EmployeeId, actual.Header.EmployeeId);
+        Assert.Equal(expected.Header.Status, actual.Header.Status);
+        Assert.Equal(expected.Header.Note, actual.Header.Note);
+        Assert.Equal(expected.Header.CreatedAtUtc, actual.Header.CreatedAtUtc);
+        Assert.Equal(expected.Header.CreatedByUserId, actual.Header.CreatedByUserId);
+        Assert.Equal(expected.Header.UpdatedAtUtc, actual.Header.UpdatedAtUtc);
+        Assert.Equal(expected.Header.UpdatedByUserId, actual.Header.UpdatedByUserId);
+        Assert.Equal(expected.Header.PostedAtUtc, actual.Header.PostedAtUtc);
+        Assert.Equal(expected.Header.PostedByUserId, actual.Header.PostedByUserId);
+        Assert.Equal(expected.Header.Version, actual.Header.Version);
+        Assert.Equal(expected.Lines.Length, actual.Lines.Length);
+        for (var index = 0; index < expected.Lines.Length; index++)
+        {
+            var expectedLine = expected.Lines[index];
+            var actualLine = actual.Lines[index];
+            Assert.Equal(expectedLine.ReceiptLineId, actualLine.ReceiptLineId);
+            Assert.Equal(expectedLine.ReceiptId, actualLine.ReceiptId);
+            Assert.Equal(expectedLine.LineNumber, actualLine.LineNumber);
+            Assert.Equal(expectedLine.ProductId, actualLine.ProductId);
+            Assert.Equal(expectedLine.Quantity, actualLine.Quantity);
+            Assert.Equal(expectedLine.UnitCost, actualLine.UnitCost);
+            Assert.Equal(expectedLine.CreatedAtUtc, actualLine.CreatedAtUtc);
+            Assert.Equal(expectedLine.CreatedByUserId, actualLine.CreatedByUserId);
+            Assert.Equal(expectedLine.UpdatedAtUtc, actualLine.UpdatedAtUtc);
+            Assert.Equal(expectedLine.UpdatedByUserId, actualLine.UpdatedByUserId);
+        }
+    }
+
+    private static async Task<ErrorOr.ErrorOr<GoodsReceiptDto>> CreateInOwnScopeAsync(
+        ServiceProvider provider,
+        SeedData seed,
+        string note)
+    {
+        using var scope = provider.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+            new CreateGoodsReceiptDraftCommand(Save(seed, note, seed.Product1Id)),
+            CancellationToken.None);
+    }
+
     private static SaveGoodsReceiptRequest Save(SeedData seed, string? note, int productId) =>
         new SaveGoodsReceiptRequest(
             new DateTime(2026, 10, 10),
@@ -366,7 +535,11 @@ public sealed class GoodsReceiptCommandIntegrationTests
         return new SeedData(userId, warehouseId, employeeId, product1Id, product2Id);
     }
 
-    private static ServiceProvider CreateProvider(string connectionString, int userId, bool allow)
+    private static ServiceProvider CreateProvider(
+        string connectionString,
+        int userId,
+        bool allow,
+        string? onlyPermission = null)
     {
         var services = new ServiceCollection();
         services.AddServerApplication();
@@ -374,7 +547,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         services.Replace(ServiceDescriptor.Scoped<ICurrentUserAccessor>(
             _ => new TestCurrentUserAccessor(userId)));
         services.Replace(ServiceDescriptor.Scoped<IPermissionStore>(
-            _ => new TestPermissionStore(allow)));
+            _ => new TestPermissionStore(allow, onlyPermission)));
         return services.BuildServiceProvider();
     }
 
@@ -389,14 +562,24 @@ public sealed class GoodsReceiptCommandIntegrationTests
     private sealed class TestPermissionStore : IPermissionStore
     {
         private readonly bool _allow;
+        private readonly string? _onlyPermission;
 
-        public TestPermissionStore(bool allow) => _allow = allow;
+        public TestPermissionStore(bool allow, string? onlyPermission)
+        {
+            _allow = allow;
+            _onlyPermission = onlyPermission;
+        }
 
         public Task<PermissionSnapshot> GetSnapshotAsync(
             int userId,
             string permissionKey,
             CancellationToken cancellationToken) =>
-            Task.FromResult(new PermissionSnapshot(_allow, hasRoleGrant: true));
+            _onlyPermission == null
+                ? Task.FromResult(new PermissionSnapshot(_allow, hasRoleGrant: true))
+                : Task.FromResult(
+                    new PermissionSnapshot(
+                        directDecision: null,
+                        hasRoleGrant: permissionKey == _onlyPermission));
     }
 
     private sealed class SeedData
@@ -429,5 +612,49 @@ public sealed class GoodsReceiptCommandIntegrationTests
         public int ProductId { get; set; }
         public decimal Quantity { get; set; }
         public decimal UnitCost { get; set; }
+    }
+
+    private sealed class StoredAggregateSnapshot
+    {
+        public StoredAggregateSnapshot(StoredAggregateHeader header, StoredAggregateLine[] lines)
+        {
+            Header = header;
+            Lines = lines;
+        }
+
+        public StoredAggregateHeader Header { get; }
+        public StoredAggregateLine[] Lines { get; }
+    }
+
+    private sealed class StoredAggregateHeader
+    {
+        public long ReceiptId { get; set; }
+        public string ReceiptNumber { get; set; } = string.Empty;
+        public DateTime ReceiptDate { get; set; }
+        public int WarehouseId { get; set; }
+        public int EmployeeId { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? Note { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public int CreatedByUserId { get; set; }
+        public DateTime? UpdatedAtUtc { get; set; }
+        public int? UpdatedByUserId { get; set; }
+        public DateTime? PostedAtUtc { get; set; }
+        public int? PostedByUserId { get; set; }
+        public byte[] Version { get; set; } = Array.Empty<byte>();
+    }
+
+    private sealed class StoredAggregateLine
+    {
+        public long ReceiptLineId { get; set; }
+        public long ReceiptId { get; set; }
+        public int LineNumber { get; set; }
+        public int ProductId { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal UnitCost { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public int CreatedByUserId { get; set; }
+        public DateTime? UpdatedAtUtc { get; set; }
+        public int? UpdatedByUserId { get; set; }
     }
 }

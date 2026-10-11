@@ -548,12 +548,103 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Open_catalog_controls_refresh_receipt_lookups_without_losing_selected_references()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var guard = new WinFormsTestGuard())
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        var dispatcher = new ImmediateUiDispatcher();
+                        var delay = new ImmediateDelay();
+                        var warehouseViewModel = new WarehouseCatalogViewModel(
+                            new WarehouseCatalogClient(fixture.WarehouseSource),
+                            fixture.Messenger,
+                            dispatcher,
+                            fixture.Notifications,
+                            delay,
+                            TimeSpan.Zero);
+                        var employeeViewModel = new EmployeeCatalogViewModel(
+                            new EmployeeCatalogClient(fixture.EmployeeSource),
+                            fixture.Messenger,
+                            dispatcher,
+                            fixture.Notifications,
+                            delay,
+                            TimeSpan.Zero);
+                        var productViewModel = new ProductCatalogViewModel(
+                            new ProductCatalogClient(fixture.ProductSource),
+                            fixture.Messenger,
+                            dispatcher,
+                            fixture.Notifications,
+                            delay,
+                            TimeSpan.Zero);
+                        using var warehouseControl = new CatalogControl(warehouseViewModel);
+                        using var employeeControl = new CatalogControl(employeeViewModel);
+                        using var productControl = new CatalogControl(productViewModel);
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
+                        warehouseControl.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        employeeControl.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        productControl.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        warehouseViewModel.SelectAsync(3, cancellationToken).GetAwaiter().GetResult();
+                        employeeViewModel.SelectAsync(5, cancellationToken).GetAwaiter().GetResult();
+                        productViewModel.SelectAsync(7, cancellationToken).GetAwaiter().GetResult();
+
+                        warehouseControl.DeactivateButton.PerformClick();
+                        warehouseControl.LastOperation.GetAwaiter().GetResult();
+                        employeeControl.DeactivateButton.PerformClick();
+                        employeeControl.LastOperation.GetAwaiter().GetResult();
+                        productControl.DeactivateButton.PerformClick();
+                        productControl.LastOperation.GetAwaiter().GetResult();
+
+                        PumpMessagesUntil(
+                            () => !fixture.Editor.WarehouseLookup.Items.Single(item => item.Id == 3).IsAvailableForNewSelection &&
+                                !fixture.Editor.EmployeeLookup.Items.Single(item => item.Id == 5).IsAvailableForNewSelection &&
+                                !fixture.Editor.Lines.Single().ProductIsAvailable,
+                            TimeSpan.FromSeconds(5));
+
+                        Assert.Equal(3, fixture.Editor.WarehouseId);
+                        Assert.Equal(5, fixture.Editor.EmployeeId);
+                        Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
+                        Assert.Equal(3, control.WarehouseLookup.SelectedValue);
+                        Assert.Equal(5, control.EmployeeLookup.SelectedValue);
+                        Assert.Equal(7, control.ProductLookup.SelectedValue);
+
+                        warehouseControl.ActivateButton.PerformClick();
+                        warehouseControl.LastOperation.GetAwaiter().GetResult();
+                        employeeControl.ActivateButton.PerformClick();
+                        employeeControl.LastOperation.GetAwaiter().GetResult();
+                        productControl.ActivateButton.PerformClick();
+                        productControl.LastOperation.GetAwaiter().GetResult();
+
+                        PumpMessagesUntil(
+                            () => fixture.Editor.WarehouseLookup.Items.Single(item => item.Id == 3).IsAvailableForNewSelection &&
+                                fixture.Editor.EmployeeLookup.Items.Single(item => item.Id == 5).IsAvailableForNewSelection &&
+                                fixture.Editor.Lines.Single().ProductIsAvailable,
+                            TimeSpan.FromSeconds(5));
+
+                        Assert.Equal(3, fixture.Editor.WarehouseId);
+                        Assert.Equal(5, fixture.Editor.EmployeeId);
+                        Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
+                        Assert.Equal(3, control.WarehouseLookup.SelectedValue);
+                        Assert.Equal(5, control.EmployeeLookup.SelectedValue);
+                        Assert.Equal(7, control.ProductLookup.SelectedValue);
+                        Assert.Empty(guard.Exceptions);
+                    }
+                },
+                TimeSpan.FromSeconds(15));
+        }
+
         private sealed class Fixture : IDisposable
         {
             public Fixture()
             {
                 Api = new ReceiptApiClient();
-                var messenger = new WeakReferenceMessenger();
+                Messenger = new WeakReferenceMessenger();
                 Notifications = new DesktopNotificationCenter();
                 var dispatcher = new ImmediateUiDispatcher();
                 var delay = new ImmediateDelay();
@@ -563,14 +654,15 @@ namespace MyDmsVn.Desktop.Tests
                 List = new GoodsReceiptListViewModel(Api, dispatcher, Notifications, delay);
                 Editor = new GoodsReceiptEditorViewModel(
                     Api,
-                    new CatalogLookupViewModel(WarehouseSource, messenger, dispatcher, Notifications, delay),
-                    new CatalogLookupViewModel(EmployeeSource, messenger, dispatcher, Notifications, delay),
-                    new GoodsReceiptProductOptionsViewModel(ProductSource, messenger, dispatcher, Notifications, delay),
+                    new CatalogLookupViewModel(WarehouseSource, Messenger, dispatcher, Notifications, delay),
+                    new CatalogLookupViewModel(EmployeeSource, Messenger, dispatcher, Notifications, delay),
+                    new GoodsReceiptProductOptionsViewModel(ProductSource, Messenger, dispatcher, Notifications, delay),
                     dispatcher,
                     Notifications);
             }
 
             public ReceiptApiClient Api { get; }
+            public WeakReferenceMessenger Messenger { get; }
             public DesktopNotificationCenter Notifications { get; }
             public LookupSource WarehouseSource { get; }
             public LookupSource EmployeeSource { get; }
@@ -595,6 +687,7 @@ namespace MyDmsVn.Desktop.Tests
         {
             public LookupSource(CatalogKind kind) => Kind = kind;
             public CatalogKind Kind { get; }
+            public bool SelectedIsActive { get; set; } = true;
             public IList<CatalogLookupRequest> Requests { get; } = new List<CatalogLookupRequest>();
 
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(
@@ -604,11 +697,89 @@ namespace MyDmsVn.Desktop.Tests
                 Requests.Add(request);
                 return Task.FromResult(
                     ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(
-                        new[] { new CatalogLookupDto(Kind == CatalogKind.Product ? 7 : 3, Kind.ToString(), "Choice", true) }));
+                        new[] { new CatalogLookupDto(Kind == CatalogKind.Product ? 7 : 3, Kind.ToString(), "Choice", SelectedIsActive) }));
             }
 
             public Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken cancellationToken) =>
-                Task.FromResult(ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(id, "C" + id, "Choice", true)));
+                Task.FromResult(ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(id, "C" + id, "Choice", SelectedIsActive)));
+        }
+
+        private sealed class WarehouseCatalogClient : IWarehouseApiClient
+        {
+            private readonly LookupSource _source;
+
+            public WarehouseCatalogClient(LookupSource source) => _source = source;
+
+            public Task<ApiResponse<PagedResult<WarehouseDto>>> ListAsync(CatalogListRequest request, CancellationToken token) =>
+                Task.FromResult(ApiResponse<PagedResult<WarehouseDto>>.Success(
+                    new PagedResult<WarehouseDto>(
+                        new[] { new WarehouseDto(3, "W3", "Main", null, _source.SelectedIsActive) },
+                        request.PageNumber,
+                        request.PageSize,
+                        1)));
+            public Task<ApiResponse<WarehouseDto>> GetAsync(int id, CancellationToken token) =>
+                Task.FromResult(ApiResponse<WarehouseDto>.Success(
+                    new WarehouseDto(id, "W" + id, "Main", null, _source.SelectedIsActive)));
+            public Task<ApiResponse<WarehouseDto>> CreateAsync(SaveWarehouseRequest request, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<WarehouseDto>> UpdateAsync(int id, SaveWarehouseRequest request, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token)
+            {
+                _source.SelectedIsActive = active;
+                return Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
+            }
+            public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) => throw new NotSupportedException();
+        }
+
+        private sealed class EmployeeCatalogClient : IEmployeeApiClient
+        {
+            private readonly LookupSource _source;
+
+            public EmployeeCatalogClient(LookupSource source) => _source = source;
+
+            public Task<ApiResponse<PagedResult<EmployeeDto>>> ListAsync(CatalogListRequest request, CancellationToken token) =>
+                Task.FromResult(ApiResponse<PagedResult<EmployeeDto>>.Success(
+                    new PagedResult<EmployeeDto>(
+                        new[] { new EmployeeDto(5, "E5", "Operator", null, null, _source.SelectedIsActive) },
+                        request.PageNumber,
+                        request.PageSize,
+                        1)));
+            public Task<ApiResponse<EmployeeDto>> GetAsync(int id, CancellationToken token) =>
+                Task.FromResult(ApiResponse<EmployeeDto>.Success(
+                    new EmployeeDto(id, "E" + id, "Operator", null, null, _source.SelectedIsActive)));
+            public Task<ApiResponse<EmployeeDto>> CreateAsync(SaveEmployeeRequest request, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<EmployeeDto>> UpdateAsync(int id, SaveEmployeeRequest request, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token)
+            {
+                _source.SelectedIsActive = active;
+                return Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
+            }
+            public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) => throw new NotSupportedException();
+        }
+
+        private sealed class ProductCatalogClient : IProductApiClient
+        {
+            private readonly LookupSource _source;
+
+            public ProductCatalogClient(LookupSource source) => _source = source;
+
+            public Task<ApiResponse<PagedResult<ProductDto>>> ListAsync(CatalogListRequest request, CancellationToken token) =>
+                Task.FromResult(ApiResponse<PagedResult<ProductDto>>.Success(
+                    new PagedResult<ProductDto>(
+                        new[] { new ProductDto(7, "P7", "Product 7", "EA", _source.SelectedIsActive) },
+                        request.PageNumber,
+                        request.PageSize,
+                        1)));
+            public Task<ApiResponse<ProductDto>> GetAsync(int id, CancellationToken token) =>
+                Task.FromResult(ApiResponse<ProductDto>.Success(
+                    new ProductDto(id, "P" + id, "Product 7", "EA", _source.SelectedIsActive)));
+            public Task<ApiResponse<ProductDto>> CreateAsync(SaveProductRequest request, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<ProductDto>> UpdateAsync(int id, SaveProductRequest request, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token)
+            {
+                _source.SelectedIsActive = active;
+                return Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
+            }
+            public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) => throw new NotSupportedException();
         }
 
         private sealed class ReceiptApiClient : IGoodsReceiptApiClient
