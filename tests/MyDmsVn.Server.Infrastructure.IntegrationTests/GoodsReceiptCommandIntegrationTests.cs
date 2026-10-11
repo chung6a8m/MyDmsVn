@@ -570,8 +570,18 @@ public sealed class GoodsReceiptCommandIntegrationTests
             using (var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true))
             using (var scope = provider.CreateScope())
             {
+                var save = new SaveGoodsReceiptRequest(
+                    new DateTime(2026, 10, 10),
+                    seed.WarehouseId,
+                    seed.EmployeeId,
+                    "inactive",
+                    new[]
+                    {
+                        new SaveGoodsReceiptLineRequest(seed.Product2Id, 1m, 2m),
+                        new SaveGoodsReceiptLineRequest(seed.Product1Id, 1m, 2m),
+                    });
                 var create = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
-                    new CreateGoodsReceiptDraftCommand(Save(seed, "inactive", seed.Product1Id)),
+                    new CreateGoodsReceiptDraftCommand(save),
                     CancellationToken.None);
                 created = create.Value;
             }
@@ -596,6 +606,8 @@ public sealed class GoodsReceiptCommandIntegrationTests
                     CancellationToken.None);
                 Assert.True(post.IsError);
                 Assert.Equal("GoodsReceipt.ProductInactive", post.FirstError.Code);
+                Assert.NotNull(post.FirstError.Metadata);
+                Assert.Equal("Request.Lines[1].ProductId", post.FirstError.Metadata["Field"]);
             }
 
             using var verification = new SqlConnection(database.ConnectionString);
@@ -669,6 +681,69 @@ public sealed class GoodsReceiptCommandIntegrationTests
         {
             await database.DisposeAsync();
         }
+    }
+
+    [SqlServerFact]
+    public async Task Reconciliation_reports_no_transient_difference_while_receipts_post_concurrently()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var receipts = new GoodsReceiptDto[16];
+            for (var index = 0; index < receipts.Length; index++)
+            {
+                using var createScope = provider.CreateScope();
+                var productId = index % 2 == 0 ? seed.Product1Id : seed.Product2Id;
+                var create = await createScope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new CreateGoodsReceiptDraftCommand(
+                        Save(seed, "concurrent-post-" + index, productId)),
+                    CancellationToken.None);
+                Assert.False(create.IsError);
+                receipts[index] = create.Value;
+            }
+
+            var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var postTasks = receipts
+                .Select(receipt => PostAfterSignalInOwnScopeAsync(provider, receipt, start.Task))
+                .ToArray();
+            var allPosts = Task.WhenAll(postTasks);
+            start.SetResult(true);
+
+            using var reconciliationScope = provider.CreateScope();
+            var reconciliation = reconciliationScope.ServiceProvider
+                .GetRequiredService<IStockReconciliationQueryService>();
+            var snapshots = 0;
+            do
+            {
+                var differences = await reconciliation.FindDifferencesAsync(CancellationToken.None);
+                Assert.Empty(differences);
+                snapshots++;
+            }
+            while (!allPosts.IsCompleted && snapshots < 50);
+
+            var results = await allPosts;
+            Assert.All(results, result => Assert.False(result.IsError));
+            Assert.Empty(await reconciliation.FindDifferencesAsync(CancellationToken.None));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    private static async Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>> PostAfterSignalInOwnScopeAsync(
+        ServiceProvider provider,
+        GoodsReceiptDto receipt,
+        Task start)
+    {
+        await start;
+        using var scope = provider.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(receipt.Id, receipt.Version)),
+            CancellationToken.None);
     }
 
     private static async Task<ErrorOr.ErrorOr<GoodsReceiptDto>> UpdateInOwnScopeAsync(

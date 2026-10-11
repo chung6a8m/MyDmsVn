@@ -332,7 +332,7 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
             "SELECT ReceiptLineId, ReceiptId, [LineNo], ProductId, Quantity, UnitCost, " +
             "CreatedAtUtc, CreatedByUserId, UpdatedAtUtc, UpdatedByUserId " +
             "FROM dbo.GoodsReceiptLines WHERE ReceiptId = @receiptId " +
-            "ORDER BY ProductId, ReceiptLineId;",
+            "ORDER BY [LineNo], ReceiptLineId;",
             GetSqlConnection(),
             GetSqlTransaction());
         command.Parameters.Add("@receiptId", SqlDbType.BigInt).Value = receiptId;

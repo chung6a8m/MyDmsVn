@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +11,11 @@ namespace MyDmsVn.Server.Infrastructure.Inventory;
 
 internal sealed class SqlStockReconciliationQueryService : IStockReconciliationQueryService
 {
+    private const string AcquireReconciliationLocksSql =
+        "SELECT TOP (1) LedgerId FROM dbo.StockLedger WITH (TABLOCK, HOLDLOCK) ORDER BY LedgerId; " +
+        "SELECT TOP (1) WarehouseId FROM dbo.StockBalances WITH (TABLOCK, HOLDLOCK) " +
+        "ORDER BY WarehouseId, ProductId;";
+
     private const string ReconciliationSql =
         "WITH LedgerTotals AS (" +
         "SELECT WarehouseId, ProductId, SUM(QuantityChange) AS LedgerQuantity " +
@@ -39,12 +45,21 @@ internal sealed class SqlStockReconciliationQueryService : IStockReconciliationQ
         using var connection = await _connectionFactory
             .OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+        var lockCommand = new CommandDefinition(
+            AcquireReconciliationLocksSql,
+            transaction: transaction,
+            cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(lockCommand).ConfigureAwait(false);
         var command = new CommandDefinition(
             ReconciliationSql,
+            transaction: transaction,
             cancellationToken: cancellationToken);
-        return (await connection
+        var differences = (await connection
             .QueryAsync<StockReconciliationDifference>(command)
             .ConfigureAwait(false))
             .ToArray();
+        transaction.Commit();
+        return differences;
     }
 }

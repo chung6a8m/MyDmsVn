@@ -1,12 +1,16 @@
 ﻿using System;
+using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.DbMigrator;
+using MyDmsVn.Server.Infrastructure.Persistence;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -130,6 +134,31 @@ public sealed class InventoryStorageIntegrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Reconciliation_executes_in_a_serializable_transaction()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var recordingFactory = new RecordingConnectionFactory(database.ConnectionString);
+            var services = new ServiceCollection();
+            services.AddSqlPersistence(database.ConnectionString);
+            services.Replace(ServiceDescriptor.Singleton<IDbConnectionFactory>(recordingFactory));
+            using var provider = services.BuildServiceProvider();
+
+            var differences = await provider
+                .GetRequiredService<IStockReconciliationQueryService>()
+                .FindDifferencesAsync(CancellationToken.None);
+
+            Assert.Empty(differences);
+            Assert.Equal(IsolationLevel.Serializable, recordingFactory.LastIsolationLevel);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     private static async Task<SqlTestDatabase> CreateDatabaseAsync()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -171,5 +200,83 @@ public sealed class InventoryStorageIntegrationTests
         public int UserId { get; }
         public int WarehouseId { get; }
         public int[] ProductIds { get; }
+    }
+
+    private sealed class RecordingConnectionFactory : IDbConnectionFactory
+    {
+        private readonly string _connectionString;
+
+        public RecordingConnectionFactory(string connectionString) =>
+            _connectionString = connectionString;
+
+        public IsolationLevel? LastIsolationLevel { get; private set; }
+
+        public IDbConnection OpenConnection()
+        {
+            var connection = new SqlConnection(_connectionString);
+            connection.Open();
+            return new RecordingConnection(connection, RecordIsolationLevel);
+        }
+
+        public async Task<IDbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
+        {
+            var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            return new RecordingConnection(connection, RecordIsolationLevel);
+        }
+
+        private void RecordIsolationLevel(IsolationLevel isolationLevel) =>
+            LastIsolationLevel = isolationLevel;
+    }
+
+    private sealed class RecordingConnection : IDbConnection
+    {
+        private readonly IDbConnection _inner;
+        private readonly Action<IsolationLevel> _recordIsolationLevel;
+
+        public RecordingConnection(
+            IDbConnection inner,
+            Action<IsolationLevel> recordIsolationLevel)
+        {
+            _inner = inner;
+            _recordIsolationLevel = recordIsolationLevel;
+        }
+
+#if NET8_0_OR_GREATER
+        [AllowNull]
+#endif
+        public string ConnectionString
+        {
+            get => _inner.ConnectionString;
+            set => _inner.ConnectionString = value;
+        }
+
+        public int ConnectionTimeout => _inner.ConnectionTimeout;
+        public string Database => _inner.Database;
+        public ConnectionState State => _inner.State;
+
+        public IDbTransaction BeginTransaction() =>
+            _inner.BeginTransaction();
+
+        public IDbTransaction BeginTransaction(IsolationLevel isolationLevel)
+        {
+            _recordIsolationLevel(isolationLevel);
+            return _inner.BeginTransaction(isolationLevel);
+        }
+
+        public void ChangeDatabase(string databaseName) =>
+            _inner.ChangeDatabase(databaseName);
+
+        public void Close() =>
+            _inner.Close();
+
+        public IDbCommand CreateCommand() =>
+            _inner.CreateCommand();
+
+        public void Open() =>
+            _inner.Open();
+
+        public void Dispose() =>
+            _inner.Dispose();
     }
 }

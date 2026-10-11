@@ -69,6 +69,7 @@ For P5:
 - Avoid unguarded "read quantity, add in C#, overwrite" or naive concurrent `MERGE`.
 - Sort balance keys before applying multiple increments to reduce deadlock risk. Deadlocks/concurrency faults get bounded, explicitly tested retry only at an operation-safe boundary.
 - Posting uses the consistent lock order GoodsReceipt header → Warehouse → Employee → Products by ProductId → StockBalances by (WarehouseId,ProductId). Catalog SetActive operations use ordinary SQL updates and therefore wait on held master-data locks rather than invalidating an in-flight Post check.
+- Reconciliation reads grouped ledger totals and balances inside one explicit `SERIALIZABLE` transaction. It first acquires shared table locks in the same StockLedger → StockBalances order as Post, so it neither reports two different committed states nor creates a join-plan lock-order inversion while Post is in flight.
 - `rowversion` can protect UI edits and assist optimistic consistency, but **does not replace** atomic increment locking.
 - Ledger source identity, receipt status and balance update should be verified together in SQL integration tests.
 
