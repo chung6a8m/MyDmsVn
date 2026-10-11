@@ -16,6 +16,8 @@ WinForms tests create and dispose controls on an STA thread through `StaTest`. E
 
 P1 SQL tests require a reachable SQL Server instance and a test administrator login that can create and drop databases. The connection string must be supplied explicitly through `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` and must target the `master` database. There is no fallback connection string.
 
+The P5.3 catalog-deactivation concurrency gate also observes a blocked request through `sys.dm_exec_requests` from a separate SQL session. Its test login therefore requires the server-level `VIEW SERVER STATE` permission on SQL Server 2019 (15.x) and earlier, or `VIEW SERVER PERFORMANCE STATE` on SQL Server 2022 (16.x) and later. The test preflights the version-specific permission and fails immediately with the required `GRANT` when it is absent. Grant this monitoring permission only on the disposable-test SQL Server instance.
+
 For a local Windows-authenticated development instance:
 
 ```powershell

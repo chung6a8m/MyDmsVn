@@ -24,6 +24,30 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class GoodsReceiptCommandIntegrationTests
 {
+    [Theory]
+    [InlineData(15, "VIEW SERVER STATE")]
+    [InlineData(16, "VIEW SERVER PERFORMANCE STATE")]
+    public void Cross_session_DMV_permission_changes_at_SQL_Server_2022(
+        int majorVersion,
+        string expectedPermission)
+    {
+        Assert.Equal(expectedPermission, GetRequiredCrossSessionDmvPermission(majorVersion));
+    }
+
+    [Theory]
+    [InlineData(15, "VIEW SERVER STATE")]
+    [InlineData(16, "VIEW SERVER PERFORMANCE STATE")]
+    public void Missing_cross_session_DMV_permission_reports_the_required_grant(
+        int majorVersion,
+        string expectedPermission)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => ThrowIfCrossSessionDmvPermissionMissing(majorVersion, hasPermission: false));
+
+        Assert.Contains("sys.dm_exec_requests", exception.Message);
+        Assert.Contains(expectedPermission, exception.Message);
+    }
+
     [SqlServerFact]
     public async Task Create_and_update_draft_use_server_numbers_atomic_lines_and_advancing_versions()
     {
@@ -912,6 +936,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         var database = await CreateDatabaseAsync();
         try
         {
+            await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
             using var provider = CreateProvider(
@@ -1221,6 +1246,38 @@ public sealed class GoodsReceiptCommandIntegrationTests
 
         throw new TimeoutException(
             "SQL session " + sessionId + " did not enter an LCK_M_* wait before the lock holder completed.");
+    }
+
+    private static async Task EnsureCrossSessionDmvPermissionAsync(string connectionString)
+    {
+        using var connection = new SqlConnection(connectionString);
+        var majorVersion = await connection.QuerySingleAsync<int>(
+            "SELECT CONVERT(int, SERVERPROPERTY('ProductMajorVersion'));");
+        var requiredPermission = GetRequiredCrossSessionDmvPermission(majorVersion);
+        var hasPermission = await connection.QuerySingleAsync<int?>(
+            "SELECT HAS_PERMS_BY_NAME(NULL, NULL, @requiredPermission);",
+            new { requiredPermission });
+
+        ThrowIfCrossSessionDmvPermissionMissing(majorVersion, hasPermission == 1);
+    }
+
+    private static string GetRequiredCrossSessionDmvPermission(int majorVersion) =>
+        majorVersion >= 16 ? "VIEW SERVER PERFORMANCE STATE" : "VIEW SERVER STATE";
+
+    private static void ThrowIfCrossSessionDmvPermissionMissing(int majorVersion, bool hasPermission)
+    {
+        if (hasPermission)
+        {
+            return;
+        }
+
+        var requiredPermission = GetRequiredCrossSessionDmvPermission(majorVersion);
+        throw new InvalidOperationException(
+            "The P5.3 concurrency gate reads sys.dm_exec_requests from a different SQL session. " +
+            "SQL Server major version " + majorVersion + " requires server permission " +
+            requiredPermission + " for the login in " +
+            SqlTestDatabase.ConnectionStringEnvironmentVariable + ". Grant it only on the disposable-test " +
+            "SQL Server instance, for example: GRANT " + requiredPermission + " TO [test_login].");
     }
 
     private static async Task SetReferenceActiveAsync(

@@ -11,7 +11,7 @@ Review follow-up: 2026-10-12
 - Mid-post failure injection occurs from a StockBalances trigger, after the handler has changed the receipt status and inserted its ledger movement; disposal rolls the transaction back to Draft with no ledger or balance row.
 - The independent stock-ledger source uniqueness test proves duplicate source-line insertion is rejected by SQL. Reconciliation tests cover clean parallel posting plus ledger-only, extra zero balance, extra nonzero balance and mismatched-quantity defects in isolated test data.
 
-The concurrency tests use a test-only signal table and SQL triggers inside each disposable database. Triggers expose the point at which a transaction owns the relevant locks and delay that transaction briefly; the competing operation then runs through a separate dependency-injection scope and UoW. The deactivation-race test records each competing SQL session and verifies an actual `LCK_M_*` wait through SQL Server DMVs before allowing the lock holder to finish, so final-state assertions cannot pass if Post releases the catalog locks early. No test hook or synchronization behavior is present in production code.
+The concurrency tests use a test-only signal table and SQL triggers inside each disposable database. Triggers expose the point at which a transaction owns the relevant locks and delay that transaction briefly; the competing operation then runs through a separate dependency-injection scope and UoW. The deactivation-race test records each competing SQL session and verifies an actual `LCK_M_*` wait through SQL Server DMVs before allowing the lock holder to finish, so final-state assertions cannot pass if Post releases the catalog locks early. Cross-session visibility in `sys.dm_exec_requests` requires `VIEW SERVER STATE` on SQL Server 2019 (15.x) and earlier, or `VIEW SERVER PERFORMANCE STATE` on SQL Server 2022 (16.x) and later. The gate preflights that version-specific server permission and reports the exact required `GRANT` instead of timing out when it is absent. No test hook or synchronization behavior is present in production code.
 
 ## Automated evidence
 
@@ -19,14 +19,15 @@ Commands were run sequentially by target framework against the disposable SQL Se
 
 - `dotnet restore MyDmsVn.sln --locked-mode --nologo`: succeeded after initializing the repository's declared UI submodules in the isolated worktree.
 - `dotnet build MyDmsVn.sln -c Release --no-restore --nologo -m:1`: succeeded with 0 warnings and 0 errors, covering `net48`, `net8.0` and `net8.0-windows` projects.
-- Server Infrastructure integration tests, Release `net48`: 90 passed, 0 failed, 0 skipped.
-- Server Infrastructure integration tests, Release `net8.0`: 90 passed, 0 failed, 0 skipped.
-- Focused Goods Receipt command integration tests: 19 passed on each server TFM.
+- Server Infrastructure integration tests, Release `net48`: 94 passed, 0 failed, 0 skipped.
+- Server Infrastructure integration tests, Release `net8.0`: 94 passed, 0 failed, 0 skipped.
+- Focused Goods Receipt command integration tests: 23 passed on each server TFM.
 - Server Application tests: 116 passed on `net48` and 116 passed on `net8.0`, with 0 failed/skipped.
 - Desktop tests: 165 passed on `net48` and 165 passed on `net8.0-windows`, with 0 failed/skipped.
 - Architecture tests, Release `net8.0`: 5 passed, 0 failed, 0 skipped.
 - Mutation check: temporarily mapping the losing concurrent Post to `GoodsReceipt.ConcurrencyConflict` made `Concurrent_posts_for_same_receipt_commit_exactly_once` fail with the expected mapping mismatch; restoring `GoodsReceipt.AlreadyPosted` returned the suite to green.
 - Lock mutation check: temporarily removing `UPDLOCK, HOLDLOCK` from Post's catalog reads made `Deactivation_and_post_serialize_in_both_lock_orders_for_every_reference` fail because the competing deactivation never entered an `LCK_M_*` wait; restoring the lock hints returned the focused test to green on both server TFMs.
+- DMV-permission mutation check: forcing the preflight result to denied made the concurrency gate fail in under one second with the SQL Server major version, required server permission and example `GRANT`, rather than the former 10-second lock-wait timeout.
 
 ## Remaining P5 work
 
