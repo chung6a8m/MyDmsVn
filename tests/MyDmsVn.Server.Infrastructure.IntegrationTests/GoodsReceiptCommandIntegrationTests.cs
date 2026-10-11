@@ -766,8 +766,14 @@ public sealed class GoodsReceiptCommandIntegrationTests
         var database = await CreateDatabaseAsync();
         try
         {
+            await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
+            using var provider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: true,
+                connectionFactory: recordingConnectionFactory);
             GoodsReceiptDto created;
             using (var scope = provider.CreateScope())
             {
@@ -778,10 +784,21 @@ public sealed class GoodsReceiptCommandIntegrationTests
                 created = create.Value;
             }
 
-            var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var first = PostAfterSignalInOwnScopeAsync(provider, created, start.Task);
-            var second = PostAfterSignalInOwnScopeAsync(provider, created, start.Task);
-            start.SetResult(true);
+            await CreateSignalTableAsync(database.ConnectionString);
+            await CreateGoodsReceiptSignalTriggerAsync(
+                database.ConnectionString,
+                "FirstSameReceiptPostHasHeaderLock",
+                "EXISTS (SELECT 1 FROM inserted WHERE ReceiptId = " + created.Id + " AND Status = 'Posted')");
+            recordingConnectionFactory.Clear();
+
+            var first = PostInOwnScopeAsync(provider, created);
+            await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await WaitForSignalAsync(database.ConnectionString, "FirstSameReceiptPostHasHeaderLock");
+            var second = PostInOwnScopeAsync(provider, created);
+            var secondSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await WaitForSqlLockWaitAsync(database.ConnectionString, secondSessionId);
+            Assert.False(second.IsCompleted);
+
             var results = await AwaitWithTimeoutAsync(Task.WhenAll(first, second));
 
             Assert.Single(results, result => !result.IsError);
@@ -1034,16 +1051,33 @@ public sealed class GoodsReceiptCommandIntegrationTests
         var database = await CreateDatabaseAsync();
         try
         {
+            await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
+            using var provider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: true,
+                connectionFactory: recordingConnectionFactory);
             var first = await CreateReceiptAsync(provider, seed, "balance-one", seed.Product1Id, 4m);
             var second = await CreateReceiptAsync(provider, seed, "balance-two", seed.Product1Id, 6m);
-            var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var resultsTask = Task.WhenAll(
-                PostAfterSignalInOwnScopeAsync(provider, first, start.Task),
-                PostAfterSignalInOwnScopeAsync(provider, second, start.Task));
-            start.SetResult(true);
-            var results = await AwaitWithTimeoutAsync(resultsTask);
+            await CreateSignalTableAsync(database.ConnectionString);
+            await CreateStockBalanceSignalTriggerAsync(
+                database.ConnectionString,
+                "FirstBalanceInsertIsUncommitted",
+                "EXISTS (SELECT 1 FROM inserted WHERE WarehouseId = " + seed.WarehouseId +
+                " AND ProductId = " + seed.Product1Id + " AND Quantity = 4)");
+            recordingConnectionFactory.Clear();
+
+            var firstPost = PostInOwnScopeAsync(provider, first);
+            await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await WaitForSignalAsync(database.ConnectionString, "FirstBalanceInsertIsUncommitted");
+            var secondPost = PostInOwnScopeAsync(provider, second);
+            var secondSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await WaitForSqlLockWaitAsync(database.ConnectionString, secondSessionId);
+            Assert.False(secondPost.IsCompleted);
+
+            var results = await AwaitWithTimeoutAsync(Task.WhenAll(firstPost, secondPost));
 
             Assert.All(results, result => Assert.False(result.IsError));
             using var connection = new SqlConnection(database.ConnectionString);
@@ -1196,6 +1230,20 @@ public sealed class GoodsReceiptCommandIntegrationTests
             "CREATE TRIGGER dbo.TR_TestReferenceSignal ON dbo." + reference.TableName + " AFTER UPDATE AS " +
             "BEGIN SET NOCOUNT ON; IF EXISTS (SELECT 1 FROM inserted WHERE " + reference.KeyColumn +
             " = " + reference.Id + " AND IsActive = 0) BEGIN " +
+            "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
+            "WAITFOR DELAY '00:00:05'; END; END;");
+    }
+
+    private static async Task CreateStockBalanceSignalTriggerAsync(
+        string connectionString,
+        string signalName,
+        string condition)
+    {
+        await DropTriggerAsync(connectionString, "TR_TestStockBalanceSignal");
+        using var connection = new SqlConnection(connectionString);
+        await connection.ExecuteAsync(
+            "CREATE TRIGGER dbo.TR_TestStockBalanceSignal ON dbo.StockBalances AFTER INSERT, UPDATE AS " +
+            "BEGIN SET NOCOUNT ON; IF (" + condition + ") BEGIN " +
             "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
             "WAITFOR DELAY '00:00:05'; END; END;");
     }
