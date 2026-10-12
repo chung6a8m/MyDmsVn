@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -45,6 +45,7 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
         "AND objectPermission.permission_name IN (N'ALTER', N'CONTROL', N'TAKE OWNERSHIP')) OR " +
         "EXISTS (SELECT 1 FROM sys.fn_my_permissions(NULL, N'DATABASE') " +
         "WHERE permission_name NOT IN (N'CONNECT', " +
+        "N'VIEW DEFINITION', " +
         "N'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION', " +
         "N'VIEW ANY COLUMN MASTER KEY DEFINITION')) " +
         "THEN 1 ELSE 0 END;";

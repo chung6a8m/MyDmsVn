@@ -50,6 +50,7 @@ SELECT @RuntimeHasElevatedPermissions = CASE WHEN
         WHERE permission_name NOT IN
         (
             N'CONNECT',
+            N'VIEW DEFINITION',
             N'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION',
             N'VIEW ANY COLUMN MASTER KEY DEFINITION'
         )
@@ -71,6 +72,8 @@ IF IS_ROLEMEMBER(N'MyDmsVnRuntimeRole', N'$(RuntimeUser)') <> 1
 
 IF IS_ROLEMEMBER(N'MyDmsVnMigrationRole', N'$(MigrationUser)') <> 1
     ALTER ROLE [MyDmsVnMigrationRole] ADD MEMBER [$(MigrationUser)];
+
+GRANT VIEW DEFINITION TO [MyDmsVnRuntimeRole];
 
 REVOKE INSERT ON OBJECT::dbo.Users FROM [MyDmsVnRuntimeRole];
 REVOKE UPDATE ON OBJECT::dbo.Users FROM [MyDmsVnRuntimeRole];

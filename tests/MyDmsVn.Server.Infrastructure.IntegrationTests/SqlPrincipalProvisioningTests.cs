@@ -138,8 +138,7 @@ public sealed class SqlPrincipalProvisioningTests
             await connection.OpenAsync();
             await connection.ExecuteAsync(
                 "CREATE USER [P6RuntimeProbe] WITHOUT LOGIN; " +
-                "CREATE USER [P6MigrationProbe] WITHOUT LOGIN; " +
-                "CREATE TABLE dbo.P6UnlistedSecret (SecretId int NOT NULL); ");
+                "CREATE USER [P6MigrationProbe] WITHOUT LOGIN;");
 
             var script = ReadProvisioningScript("P6RuntimeProbe", "P6MigrationProbe");
             await connection.ExecuteAsync(script);
@@ -162,8 +161,7 @@ public sealed class SqlPrincipalProvisioningTests
                 "HAS_PERMS_BY_NAME(N'dbo.StockLedger', N'OBJECT', N'VIEW DEFINITION') AS CanInspectAppendOnlyTriggerDefinition, " +
                 "HAS_PERMS_BY_NAME(N'dbo', N'SCHEMA', N'ALTER') AS CanAlterSchema, " +
                 "HAS_PERMS_BY_NAME(N'dbo.SchemaVersions', N'OBJECT', N'SELECT') AS CanReadJournal, " +
-                "HAS_PERMS_BY_NAME(N'dbo.SchemaVersions', N'OBJECT', N'UPDATE') AS CanUpdateJournal, " +
-                "HAS_PERMS_BY_NAME(N'dbo.P6UnlistedSecret', N'OBJECT', N'SELECT') AS CanReadUnlistedObject; " +
+                "HAS_PERMS_BY_NAME(N'dbo.SchemaVersions', N'OBJECT', N'UPDATE') AS CanUpdateJournal; " +
                 "REVERT;");
 
             Assert.Equal(1, permissions.CanReadProducts);
@@ -179,7 +177,6 @@ public sealed class SqlPrincipalProvisioningTests
             Assert.Equal(0, permissions.CanAlterSchema);
             Assert.Equal(1, permissions.CanReadJournal);
             Assert.Equal(0, permissions.CanUpdateJournal);
-            Assert.Equal(0, permissions.CanReadUnlistedObject);
 
             var protectedUserId = await connection.QuerySingleAsync<int>(
                 "INSERT dbo.Users " +
@@ -311,6 +308,55 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Runtime_preflight_detects_unlisted_object_without_data_grants()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6MetadataRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6MetadataMigrationProbe] WITHOUT LOGIN;");
+            await connection.ExecuteAsync(
+                ReadProvisioningScript(
+                    "P6MetadataRuntimeProbe",
+                    "P6MetadataMigrationProbe"));
+            await connection.ExecuteAsync(
+                "CREATE TABLE dbo.P6InvisibleUnlistedData (SecretId int NOT NULL);");
+
+            var adminCompatibility = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckConnectionAsync(connection, System.Threading.CancellationToken.None);
+
+            await connection.ExecuteAsync("EXECUTE AS USER = N'P6MetadataRuntimeProbe';");
+            try
+            {
+                var canReadUnlistedObject = await connection.QuerySingleAsync<int>(
+                    "SELECT HAS_PERMS_BY_NAME(" +
+                    "N'dbo.P6InvisibleUnlistedData', N'OBJECT', N'SELECT');");
+                var runtimeCompatibility = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                    .CheckConnectionAsync(connection, System.Threading.CancellationToken.None);
+
+                Assert.Equal(0, canReadUnlistedObject);
+                Assert.Equal(SchemaCompatibilityStatus.UnknownHistory, adminCompatibility.Status);
+                Assert.Equal(adminCompatibility.Status, runtimeCompatibility.Status);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     private static string FindProvisioningScript()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -367,7 +413,6 @@ public sealed class SqlPrincipalProvisioningTests
 
         public int CanUpdateJournal { get; set; }
 
-        public int CanReadUnlistedObject { get; set; }
     }
 
     private sealed class ProtectedUserProbe
