@@ -11,10 +11,59 @@ namespace MyDmsVn.Server.Infrastructure.Operations;
 public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
 {
     private const string CheckDefinitionHashSql =
-        "CONVERT(varchar(64), HASHBYTES('SHA2_256', " +
-        "UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
-        "candidate.definition, N'N'' ''', N'SPACE_LITERAL'), N'[', N''), N']', N''), " +
-        "N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(13), N''))), 2)";
+        "CONVERT(varchar(64), HASHBYTES('SHA2_256', candidate.definition), 2)";
+
+    private const string ColumnArtifactSql =
+        "WITH ManagedColumnSignatures AS (SELECT CASE " +
+        "WHEN ownerTable.name = N'SchemaVersions' THEN N'Persistence' " +
+        "WHEN ownerTable.name IN (N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions') THEN N'Identity' " +
+        "WHEN ownerTable.name IN (N'Products', N'Warehouses', N'Employees', N'Customers') THEN N'Catalog' " +
+        "WHEN ownerTable.name IN (N'GoodsReceipts', N'GoodsReceiptLines') THEN N'GoodsReceipt' " +
+        "ELSE N'Inventory' END AS GroupName, ownerTable.name AS TableName, candidate.column_id, " +
+        "CONCAT(ownerTable.name, N'|', candidate.column_id, N'|', candidate.name, N'|', " +
+        "TYPE_NAME(candidate.user_type_id), N'|', candidate.max_length, N'|', candidate.precision, N'|', " +
+        "candidate.scale, N'|', candidate.is_nullable, N'|', candidate.is_ansi_padded, N'|', " +
+        "candidate.is_rowguidcol, N'|', candidate.is_identity, N'|', candidate.is_computed, N'|', " +
+        "candidate.is_filestream, N'|', candidate.is_replicated, N'|', candidate.is_sparse, N'|', " +
+        "candidate.is_column_set, N'|', candidate.generated_always_type, N'|', " +
+        "ISNULL(CONVERT(nvarchar(10), candidate.encryption_type), N''), N'|', " +
+        "ISNULL(candidate.collation_name, N''), N'|', ISNULL(defaultConstraint.name, N''), N'|', " +
+        "ISNULL(defaultConstraint.definition, N''), N'|', " +
+        "ISNULL(CONVERT(nvarchar(100), identityColumn.seed_value), N''), N'|', " +
+        "ISNULL(CONVERT(nvarchar(100), identityColumn.increment_value), N''), N'|', " +
+        "ISNULL(CONVERT(nvarchar(1), identityColumn.is_not_for_replication), N''), N'|', " +
+        "ISNULL(computedColumn.definition, N''), N'|', " +
+        "ISNULL(CONVERT(nvarchar(1), computedColumn.is_persisted), N'')) AS Signature " +
+        "FROM sys.tables AS ownerTable " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = ownerTable.schema_id " +
+        "INNER JOIN sys.columns AS candidate ON candidate.object_id = ownerTable.object_id " +
+        "LEFT JOIN sys.default_constraints AS defaultConstraint " +
+        "ON defaultConstraint.parent_object_id = candidate.object_id " +
+        "AND defaultConstraint.parent_column_id = candidate.column_id " +
+        "LEFT JOIN sys.identity_columns AS identityColumn ON identityColumn.object_id = candidate.object_id " +
+        "AND identityColumn.column_id = candidate.column_id " +
+        "LEFT JOIN sys.computed_columns AS computedColumn ON computedColumn.object_id = candidate.object_id " +
+        "AND computedColumn.column_id = candidate.column_id " +
+        "WHERE ownerSchema.name = N'dbo' AND ownerTable.name IN (" +
+        "N'SchemaVersions', N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
+        "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', N'GoodsReceiptLines', " +
+        "N'StockLedger', N'StockBalances')), " +
+        "ManagedColumnFingerprints AS (SELECT GroupName, CONVERT(varchar(64), " +
+        "HASHBYTES('SHA2_256', STRING_AGG(CAST(Signature AS nvarchar(max)), N';') " +
+        "WITHIN GROUP (ORDER BY TableName, column_id)), 2) AS DefinitionHash " +
+        "FROM ManagedColumnSignatures GROUP BY GroupName) " +
+        "SELECT ArtifactKey FROM (" +
+        "SELECT N'Invariant:PersistenceColumns' AS ArtifactKey, (SELECT 1 FROM ManagedColumnFingerprints " +
+        "WHERE GroupName = N'Persistence' AND DefinitionHash = N'FED09938A268A9B35F8F717E56DAB46AF2B2A0A12CB03C53F38B267FE8950E44') AS ObjectId UNION ALL " +
+        "SELECT N'Invariant:IdentityColumns', (SELECT 1 FROM ManagedColumnFingerprints " +
+        "WHERE GroupName = N'Identity' AND DefinitionHash = N'8AB4CE51C0DC70E21C658EE8CFBCB259FABEA28E93CA95F124E14247065C05F9') UNION ALL " +
+        "SELECT N'Invariant:CatalogColumns', (SELECT 1 FROM ManagedColumnFingerprints " +
+        "WHERE GroupName = N'Catalog' AND DefinitionHash = N'15F743045CEEC388F0F4E9C330B9D0A663AC0175D67EE485EAFA270AF5938980') UNION ALL " +
+        "SELECT N'Invariant:GoodsReceiptColumns', (SELECT 1 FROM ManagedColumnFingerprints " +
+        "WHERE GroupName = N'GoodsReceipt' AND DefinitionHash = N'282B57D0FE026037BA622DC9A2C378ED83FF2F24C3D9186538FBD8098FEA00D2') UNION ALL " +
+        "SELECT N'Invariant:InventoryColumns', (SELECT 1 FROM ManagedColumnFingerprints " +
+        "WHERE GroupName = N'Inventory' AND DefinitionHash = N'9B9B546EB802B5B3ABB62EE35086356AF482682D24E2F83673F6E7E3068A417B')) " +
+        "AS Artifacts WHERE ObjectId IS NOT NULL;";
 
     private const string ArtifactSql =
         "SELECT ArtifactKey FROM (" +
@@ -24,17 +73,19 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "SELECT N'Table:RolePermissions', OBJECT_ID(N'dbo.RolePermissions', N'U') UNION ALL " +
         "SELECT N'Table:UserPermissions', OBJECT_ID(N'dbo.UserPermissions', N'U') UNION ALL " +
         "SELECT N'Invariant:IdentityChecks', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
-        "(N'CK_Users_Username_NotBlank', N'3B15153EA71E991806E379519D8D37C2786CFCC36E34E19EFEA691E479FD92A0'), " +
-        "(N'CK_Users_NormalizedUsername_NotBlank', N'85ACE4F632F361662D674275F0B8EABAE5C08094A02D2478350917FBC98305BE'), " +
-        "(N'CK_Users_DisplayName_NotBlank', N'80397D4D00619B4546C77C8B17ADD4E80196816542BD593FAC1380D176078B8D'), " +
-        "(N'CK_Users_Source_NotBlank', N'78F1441993475AC4BDFE2061E8782223ACF302F23F7D5BAB6592A44B34FC96EC'), " +
-        "(N'CK_Users_PasswordAlgorithm_NotBlank', N'77B87B6BB359C25CA6F908E81521AED421E9DF0429B723ABE8FFB0CB7E7F728B'), " +
-        "(N'CK_Roles_RoleName_NotBlank', N'C4C80660CD7BB61436F6E3DE301011FC904FCC226235734DD293CAAF654DBA7D'), " +
-        "(N'CK_Roles_NormalizedRoleName_NotBlank', N'CFAB0343432A8BA8E66A4E93245FCEAF0293C71C9BC9797C1826C4BFD5AE3939'), " +
-        "(N'CK_RolePermissions_PermissionKey_NotBlank', N'CDCA87E34C8A2199DA85385882397E6B56D3EC877ABA875086B1853824922ABC'), " +
-        "(N'CK_UserPermissions_PermissionKey_NotBlank', N'CDCA87E34C8A2199DA85385882397E6B56D3EC877ABA875086B1853824922ABC')) " +
-        "AS expected(ConstraintName, DefinitionHash) INNER JOIN sys.check_constraints AS candidate " +
-        "ON candidate.name = expected.ConstraintName WHERE SCHEMA_NAME(candidate.schema_id) = N'dbo' " +
+        "(N'Users', N'CK_Users_Username_NotBlank', N'2872BEB326EEDB8889356C7EC712C93948FF90A980039E0F32DD5FCC6D41B640'), " +
+        "(N'Users', N'CK_Users_NormalizedUsername_NotBlank', N'10551A196B3EA3311377167CF5C2362983606E445277E018346581CB1E988082'), " +
+        "(N'Users', N'CK_Users_DisplayName_NotBlank', N'D7D96A4A6A2C42E718ACF2253BE05394C5473C630EE75DD9952AC33013C6DB49'), " +
+        "(N'Users', N'CK_Users_Source_NotBlank', N'B17D8B94E17F6C3F2B3C26F2ED9322AB3E7804AF5F03409AF207BAAFB2ABEC67'), " +
+        "(N'Users', N'CK_Users_PasswordAlgorithm_NotBlank', N'B8DF013ECED4587A9A4C8CDACE69996D990EBDBFCC7294E4CDE00F6AED2EAF9A'), " +
+        "(N'Roles', N'CK_Roles_RoleName_NotBlank', N'F9C99D823FB4CA24C6C6D1AD6A47AEF7F394194D79D9942379D8F7337CE61C87'), " +
+        "(N'Roles', N'CK_Roles_NormalizedRoleName_NotBlank', N'FDB72AF36AAE73861FD8CC66A2AC2C8FAAC4B04A7F54E22E2411099AECE1BF08'), " +
+        "(N'RolePermissions', N'CK_RolePermissions_PermissionKey_NotBlank', N'B7C138CDE71723BD91C9DA71142F8528A64A6D64236DDA207FAC28F8E8461772'), " +
+        "(N'UserPermissions', N'CK_UserPermissions_PermissionKey_NotBlank', N'B7C138CDE71723BD91C9DA71142F8528A64A6D64236DDA207FAC28F8E8461772')) " +
+        "AS expected(TableName, ConstraintName, DefinitionHash) INNER JOIN sys.check_constraints AS candidate " +
+        "ON candidate.name = expected.ConstraintName " +
+        "AND candidate.parent_object_id = OBJECT_ID(N'dbo.' + expected.TableName, N'U') " +
+        "WHERE SCHEMA_NAME(candidate.schema_id) = N'dbo' " +
         "AND candidate.is_disabled = 0 AND candidate.is_not_trusted = 0 AND " +
         CheckDefinitionHashSql + " = expected.DefinitionHash) = 9 THEN 1 END UNION ALL " +
         "SELECT N'Invariant:IdentityPrimaryKeys', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
@@ -113,17 +164,18 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "SELECT N'Table:Employees', OBJECT_ID(N'dbo.Employees', N'U') UNION ALL " +
         "SELECT N'Table:Customers', OBJECT_ID(N'dbo.Customers', N'U') UNION ALL " +
         "SELECT N'Invariant:CatalogChecks', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
-        "(N'CK_Products_Code_NotBlank', N'08DF8F041A746F6F91477CA9907AFE9EEE6A7CB992F10ED47274CB2D1E2FD46E'), " +
-        "(N'CK_Products_Name_NotBlank', N'86756261A05666C0F33B5F34F44AD3891DDA77644376073F0D76EDC8BA425176'), " +
-        "(N'CK_Products_Unit_NotBlank', N'6F64D0750561687B85B5FCA4BF33D64633826EC1167BD4E3F3096307DF561F19'), " +
-        "(N'CK_Warehouses_Code_NotBlank', N'08DF8F041A746F6F91477CA9907AFE9EEE6A7CB992F10ED47274CB2D1E2FD46E'), " +
-        "(N'CK_Warehouses_Name_NotBlank', N'86756261A05666C0F33B5F34F44AD3891DDA77644376073F0D76EDC8BA425176'), " +
-        "(N'CK_Employees_Code_NotBlank', N'08DF8F041A746F6F91477CA9907AFE9EEE6A7CB992F10ED47274CB2D1E2FD46E'), " +
-        "(N'CK_Employees_Name_NotBlank', N'86756261A05666C0F33B5F34F44AD3891DDA77644376073F0D76EDC8BA425176'), " +
-        "(N'CK_Customers_Code_NotBlank', N'08DF8F041A746F6F91477CA9907AFE9EEE6A7CB992F10ED47274CB2D1E2FD46E'), " +
-        "(N'CK_Customers_Name_NotBlank', N'86756261A05666C0F33B5F34F44AD3891DDA77644376073F0D76EDC8BA425176')) " +
-        "AS expected(ConstraintName, DefinitionHash) " +
+        "(N'Products', N'CK_Products_Code_NotBlank', N'23FCEB161C71A42FEC25AC9AF6841A808FF0D0F3E38C3E78D9DFEDF7A4EDA94A'), " +
+        "(N'Products', N'CK_Products_Name_NotBlank', N'EEE8C692DF3DB15031900C2CE3E79E9E96A0BDC4F164BEC3448D0B2240898AFE'), " +
+        "(N'Products', N'CK_Products_Unit_NotBlank', N'85465FFFF967FFD759157FAC4ED802B6BF5ECB62F9A5D7C3ABCA6DD13C1C1ADE'), " +
+        "(N'Warehouses', N'CK_Warehouses_Code_NotBlank', N'23FCEB161C71A42FEC25AC9AF6841A808FF0D0F3E38C3E78D9DFEDF7A4EDA94A'), " +
+        "(N'Warehouses', N'CK_Warehouses_Name_NotBlank', N'EEE8C692DF3DB15031900C2CE3E79E9E96A0BDC4F164BEC3448D0B2240898AFE'), " +
+        "(N'Employees', N'CK_Employees_Code_NotBlank', N'23FCEB161C71A42FEC25AC9AF6841A808FF0D0F3E38C3E78D9DFEDF7A4EDA94A'), " +
+        "(N'Employees', N'CK_Employees_Name_NotBlank', N'EEE8C692DF3DB15031900C2CE3E79E9E96A0BDC4F164BEC3448D0B2240898AFE'), " +
+        "(N'Customers', N'CK_Customers_Code_NotBlank', N'23FCEB161C71A42FEC25AC9AF6841A808FF0D0F3E38C3E78D9DFEDF7A4EDA94A'), " +
+        "(N'Customers', N'CK_Customers_Name_NotBlank', N'EEE8C692DF3DB15031900C2CE3E79E9E96A0BDC4F164BEC3448D0B2240898AFE')) " +
+        "AS expected(TableName, ConstraintName, DefinitionHash) " +
         "INNER JOIN sys.check_constraints AS candidate ON candidate.name = expected.ConstraintName " +
+        "AND candidate.parent_object_id = OBJECT_ID(N'dbo.' + expected.TableName, N'U') " +
         "WHERE SCHEMA_NAME(candidate.schema_id) = N'dbo' AND candidate.is_disabled = 0 " +
         "AND candidate.is_not_trusted = 0 AND " + CheckDefinitionHashSql + " = expected.DefinitionHash) " +
         "= 9 THEN 1 END UNION ALL " +
@@ -188,34 +240,40 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "AND candidate.is_disabled = 0 AND candidate.is_not_trusted = 0 " +
         "AND candidate.delete_referential_action = 0 AND candidate.update_referential_action = 0 " +
         "AND candidate.is_not_for_replication = 0) THEN 1 END UNION ALL " +
-        "SELECT N'Function:CatalogTextContainsNul', OBJECT_ID(N'dbo.CatalogTextContainsNul', N'FN') UNION ALL " +
+        "SELECT N'Function:CatalogTextContainsNul', (SELECT candidate.object_id FROM sys.objects AS candidate " +
+        "INNER JOIN sys.sql_modules AS module ON module.object_id = candidate.object_id " +
+        "WHERE candidate.object_id = OBJECT_ID(N'dbo.CatalogTextContainsNul', N'FN') " +
+        "AND module.is_schema_bound = 1 AND CONVERT(varchar(64), HASHBYTES('SHA2_256', module.definition), 2) " +
+        "= N'01E1398093EDEF37C189633F5326D1A341AB0F1F92818A1D14966977096711EA') UNION ALL " +
         "SELECT N'Invariant:CatalogNulChecks', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
-        "(N'CK_Products_Code_NoNul', N'A1900299F6F0350C720043B087F6714964EBD218B0314C015181D59F89966199'), " +
-        "(N'CK_Products_Name_NoNul', N'C34902DB9A1B1E6B195FB924F3B15E10755CBE04971158C639C0C4294AE2BF1E'), " +
-        "(N'CK_Products_Unit_NoNul', N'89A745006832C28F8AFF58A31DFC0CB50EA5242F778891D9DBCEB2D534231D7D'), " +
-        "(N'CK_Warehouses_Code_NoNul', N'A1900299F6F0350C720043B087F6714964EBD218B0314C015181D59F89966199'), " +
-        "(N'CK_Warehouses_Name_NoNul', N'C34902DB9A1B1E6B195FB924F3B15E10755CBE04971158C639C0C4294AE2BF1E'), " +
-        "(N'CK_Employees_Code_NoNul', N'A1900299F6F0350C720043B087F6714964EBD218B0314C015181D59F89966199'), " +
-        "(N'CK_Employees_Name_NoNul', N'C34902DB9A1B1E6B195FB924F3B15E10755CBE04971158C639C0C4294AE2BF1E'), " +
-        "(N'CK_Customers_Code_NoNul', N'A1900299F6F0350C720043B087F6714964EBD218B0314C015181D59F89966199'), " +
-        "(N'CK_Customers_Name_NoNul', N'C34902DB9A1B1E6B195FB924F3B15E10755CBE04971158C639C0C4294AE2BF1E')) " +
-        "AS expected(ConstraintName, DefinitionHash) " +
+        "(N'Products', N'CK_Products_Code_NoNul', N'E9DB7942EED2E287580FF319821B2D43EABD3382376C44F960475E94AE0708B1'), " +
+        "(N'Products', N'CK_Products_Name_NoNul', N'A7833AA0BE5F9F44B010989AD1732737836CE8665BD0F97A533A2A7429ED134B'), " +
+        "(N'Products', N'CK_Products_Unit_NoNul', N'13F4C1476ED0B7FA5CF0AB8DD7ED2D7F93BE7EF92DF485F88C340F66D929F64B'), " +
+        "(N'Warehouses', N'CK_Warehouses_Code_NoNul', N'E9DB7942EED2E287580FF319821B2D43EABD3382376C44F960475E94AE0708B1'), " +
+        "(N'Warehouses', N'CK_Warehouses_Name_NoNul', N'A7833AA0BE5F9F44B010989AD1732737836CE8665BD0F97A533A2A7429ED134B'), " +
+        "(N'Employees', N'CK_Employees_Code_NoNul', N'E9DB7942EED2E287580FF319821B2D43EABD3382376C44F960475E94AE0708B1'), " +
+        "(N'Employees', N'CK_Employees_Name_NoNul', N'A7833AA0BE5F9F44B010989AD1732737836CE8665BD0F97A533A2A7429ED134B'), " +
+        "(N'Customers', N'CK_Customers_Code_NoNul', N'E9DB7942EED2E287580FF319821B2D43EABD3382376C44F960475E94AE0708B1'), " +
+        "(N'Customers', N'CK_Customers_Name_NoNul', N'A7833AA0BE5F9F44B010989AD1732737836CE8665BD0F97A533A2A7429ED134B')) " +
+        "AS expected(TableName, ConstraintName, DefinitionHash) " +
         "INNER JOIN sys.check_constraints AS candidate ON candidate.name = expected.ConstraintName " +
+        "AND candidate.parent_object_id = OBJECT_ID(N'dbo.' + expected.TableName, N'U') " +
         "WHERE SCHEMA_NAME(candidate.schema_id) = N'dbo' AND candidate.is_disabled = 0 " +
         "AND candidate.is_not_trusted = 0 AND " + CheckDefinitionHashSql +
         " = expected.DefinitionHash) = 9 THEN 1 END UNION ALL " +
         "SELECT N'Table:GoodsReceipts', OBJECT_ID(N'dbo.GoodsReceipts', N'U') UNION ALL " +
         "SELECT N'Table:GoodsReceiptLines', OBJECT_ID(N'dbo.GoodsReceiptLines', N'U') UNION ALL " +
         "SELECT N'Invariant:GoodsReceiptChecks', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
-        "(N'CK_GoodsReceipts_ReceiptNo_NotBlank', N'00EE6BD571110CD06F5A31C02126EC7EB66A4E0C13BB2B08404DCAFEAC4DECDB'), " +
-        "(N'CK_GoodsReceipts_ReceiptNo_NoNul', N'278E3265DD76A4BC8DA0C3888718C29615EB7ED234BD75152DFC1DF77FFC3EA2'), " +
-        "(N'CK_GoodsReceipts_Status', N'348D3846CFC4048CA4B9D048ECD4E908B549648F7DAA616325BBCFA070A6607E'), " +
-        "(N'CK_GoodsReceipts_PostingAudit', N'51BFFAC329F9AABE30D08495FC8D30BB03FB777391EE6CB3E7122BAC4AB3255F'), " +
-        "(N'CK_GoodsReceiptLines_LineNo', N'51254FD0B514B76C710C685F7547F2EEA3A7485DEF215224E2EF38336396EB85'), " +
-        "(N'CK_GoodsReceiptLines_Quantity', N'4110CCAF327CFE913F134B3DEEC9938D39B89D0E2B46D8A2667080B113FDAFC5'), " +
-        "(N'CK_GoodsReceiptLines_UnitCost', N'022388DF4EDA22571599130311FC8F3118B529C4DD316A54C3F47424F4B97DAD')) " +
-        "AS expected(ConstraintName, DefinitionHash) " +
+        "(N'GoodsReceipts', N'CK_GoodsReceipts_ReceiptNo_NotBlank', N'3D0358848A37394FF49216C835A00A9F05E599C613C359E70A3B7D30D82DD1D7'), " +
+        "(N'GoodsReceipts', N'CK_GoodsReceipts_ReceiptNo_NoNul', N'D4C15759ABE188C90E3AD4068427FEF438E2D09867441D1A8B9B29D5E5212ED6'), " +
+        "(N'GoodsReceipts', N'CK_GoodsReceipts_Status', N'8344730B300FB3ED5D0A6FF393665103C9DE7EA2E15E760B3D49E0500749265F'), " +
+        "(N'GoodsReceipts', N'CK_GoodsReceipts_PostingAudit', N'327AA8B6BFA0CBB490B3B2BD5316A8D0A1847A681026C9EBC407812688C3AB5B'), " +
+        "(N'GoodsReceiptLines', N'CK_GoodsReceiptLines_LineNo', N'965B6391581EA73F0E5722208E50B64D29EB79476DD28A2CDF64E3232E51ED03'), " +
+        "(N'GoodsReceiptLines', N'CK_GoodsReceiptLines_Quantity', N'C2C67FAFEFA3E52357BF08DE91DE08AD93DCC89AB9A112ACCBF265D14EE835DE'), " +
+        "(N'GoodsReceiptLines', N'CK_GoodsReceiptLines_UnitCost', N'D623BB8D3536CD0C49E7ABB973C5AF40A556F173F4971E50E7ADBC8A1F9D02E1')) " +
+        "AS expected(TableName, ConstraintName, DefinitionHash) " +
         "INNER JOIN sys.check_constraints AS candidate ON candidate.name = expected.ConstraintName " +
+        "AND candidate.parent_object_id = OBJECT_ID(N'dbo.' + expected.TableName, N'U') " +
         "WHERE SCHEMA_NAME(candidate.schema_id) = N'dbo' AND candidate.is_disabled = 0 " +
         "AND candidate.is_not_trusted = 0 AND " + CheckDefinitionHashSql +
         " = expected.DefinitionHash) = 7 THEN 1 END UNION ALL " +
@@ -296,11 +354,13 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "SELECT N'Table:StockLedger', OBJECT_ID(N'dbo.StockLedger', N'U') UNION ALL " +
         "SELECT N'Table:StockBalances', OBJECT_ID(N'dbo.StockBalances', N'U') UNION ALL " +
         "SELECT N'Invariant:InventoryChecks', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
-        "(N'CK_StockLedger_DocumentType_NotBlank', N'414C299D02F2681BF4C48183E699FF4DE2CED06786DF0ACFEA3C4DE0FBAF5010'), " +
-        "(N'CK_StockLedger_DocumentType_NoNul', N'5BD99E0033178BA6DBE339255F1258F6FED48EC2332AA8AB2B8496F40A6B991F'), " +
-        "(N'CK_StockLedger_QuantityChange_NonZero', N'CEAF9F21B05EE6D05B36C8295321AAE80E40CEE8045D17402D8F8725664ED75E')) " +
-        "AS expected(ConstraintName, DefinitionHash) INNER JOIN sys.check_constraints AS candidate " +
-        "ON candidate.name = expected.ConstraintName WHERE SCHEMA_NAME(candidate.schema_id) = N'dbo' " +
+        "(N'StockLedger', N'CK_StockLedger_DocumentType_NotBlank', N'0C092258E5E7154925A31288A8984D884C038C259693CF02698C44DB02B12951'), " +
+        "(N'StockLedger', N'CK_StockLedger_DocumentType_NoNul', N'C90D111F206E7DEB209C1594FC875A6743EE219763EF96B3703402C57534894F'), " +
+        "(N'StockLedger', N'CK_StockLedger_QuantityChange_NonZero', N'EB2C31FB555286D2AE222F5273CEE87F5A26834BB640B7331D4FD430F32F9FEA')) " +
+        "AS expected(TableName, ConstraintName, DefinitionHash) INNER JOIN sys.check_constraints AS candidate " +
+        "ON candidate.name = expected.ConstraintName " +
+        "AND candidate.parent_object_id = OBJECT_ID(N'dbo.' + expected.TableName, N'U') " +
+        "WHERE SCHEMA_NAME(candidate.schema_id) = N'dbo' " +
         "AND candidate.is_disabled = 0 AND candidate.is_not_trusted = 0 AND " +
         CheckDefinitionHashSql + " = expected.DefinitionHash) = 3 THEN 1 END UNION ALL " +
         "SELECT N'Invariant:InventoryPrimaryKeys', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
@@ -369,9 +429,8 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "AND (SELECT COUNT(*) FROM sys.trigger_events AS event WHERE event.object_id = candidate.object_id " +
         "AND event.type_desc IN (N'UPDATE', N'DELETE')) = 2 " +
         "AND (SELECT COUNT(*) FROM sys.trigger_events AS event WHERE event.object_id = candidate.object_id) = 2 " +
-        "AND UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(module.definition, N'[', N''), N']', N''), " +
-        "N' ', N''), NCHAR(10), N''), NCHAR(13), N'')) = " +
-        "N'CREATETRIGGERDBO.TR_STOCKLEDGER_APPENDONLYONDBO.STOCKLEDGERINSTEADOFUPDATE,DELETEASBEGINSETNOCOUNTON;THROW51000,''STOCKLEDGERISAPPEND-ONLY.'',1;END;')" +
+        "AND CONVERT(varchar(64), HASHBYTES('SHA2_256', module.definition), 2) = " +
+        "N'1E44C8680130FF964973EF5E580CC0FE09C459DA3B5A1DE5433C20F7BBDD513B')" +
         ") AS Artifacts WHERE ObjectId IS NOT NULL " +
         "UNION ALL SELECT N'Unknown:UserObject' WHERE EXISTS (" +
         "SELECT 1 FROM sys.objects AS candidate " +
@@ -448,6 +507,15 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
                 ArtifactSql,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         var artifacts = new HashSet<string>(artifactRows, StringComparer.Ordinal);
+
+        if (journalExists)
+        {
+            var columnArtifactRows = await connection.QueryAsync<string>(
+                new CommandDefinition(
+                    ColumnArtifactSql,
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            artifacts.UnionWith(columnArtifactRows);
+        }
 
         return SchemaCompatibilityPolicy.Evaluate(
             journalExists,

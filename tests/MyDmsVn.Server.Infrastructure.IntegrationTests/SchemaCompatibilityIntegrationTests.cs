@@ -175,6 +175,132 @@ public sealed class SchemaCompatibilityIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Required_check_constraint_with_case_changed_literal_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.GoodsReceipts DROP CONSTRAINT CK_GoodsReceipts_Status; " +
+                    "ALTER TABLE dbo.GoodsReceipts WITH CHECK ADD CONSTRAINT CK_GoodsReceipts_Status CHECK " +
+                    "((Status = 'draft' AND DATALENGTH(Status) = 5) OR " +
+                    "(Status = 'posted' AND DATALENGTH(Status) = 6));");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Required_check_constraint_on_wrong_table_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.Products DROP CONSTRAINT CK_Products_Name_NotBlank; " +
+                    "ALTER TABLE dbo.Warehouses WITH CHECK ADD CONSTRAINT CK_Products_Name_NotBlank CHECK " +
+                    "(LEN(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
+                    "Name, N' ', N''), NCHAR(9), N''), NCHAR(10), N''), NCHAR(11), N''), " +
+                    "NCHAR(12), N''), NCHAR(13), N''), NCHAR(160), N'')) > 0);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Required_column_nullability_and_default_change_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.StockBalances DROP CONSTRAINT DF_StockBalances_Quantity; " +
+                    "ALTER TABLE dbo.StockBalances ALTER COLUMN Quantity decimal(18, 4) NULL;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Catalog_nul_function_with_wrong_body_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.Products DROP CONSTRAINT CK_Products_Code_NoNul, " +
+                    "CK_Products_Name_NoNul, CK_Products_Unit_NoNul; " +
+                    "ALTER TABLE dbo.Warehouses DROP CONSTRAINT CK_Warehouses_Code_NoNul, " +
+                    "CK_Warehouses_Name_NoNul; " +
+                    "ALTER TABLE dbo.Employees DROP CONSTRAINT CK_Employees_Code_NoNul, " +
+                    "CK_Employees_Name_NoNul; " +
+                    "ALTER TABLE dbo.Customers DROP CONSTRAINT CK_Customers_Code_NoNul, " +
+                    "CK_Customers_Name_NoNul; " +
+                    "ALTER TABLE dbo.GoodsReceipts DROP CONSTRAINT CK_GoodsReceipts_ReceiptNo_NoNul; " +
+                    "EXEC(N'ALTER FUNCTION dbo.CatalogTextContainsNul(@Value nvarchar(max)) RETURNS bit " +
+                    "WITH SCHEMABINDING AS BEGIN RETURN 0; END;'); " +
+                    "ALTER TABLE dbo.Products ADD " +
+                    "CONSTRAINT CK_Products_Code_NoNul CHECK (dbo.CatalogTextContainsNul(Code) = 0), " +
+                    "CONSTRAINT CK_Products_Name_NoNul CHECK (dbo.CatalogTextContainsNul(Name) = 0), " +
+                    "CONSTRAINT CK_Products_Unit_NoNul CHECK (dbo.CatalogTextContainsNul(Unit) = 0); " +
+                    "ALTER TABLE dbo.Warehouses ADD " +
+                    "CONSTRAINT CK_Warehouses_Code_NoNul CHECK (dbo.CatalogTextContainsNul(Code) = 0), " +
+                    "CONSTRAINT CK_Warehouses_Name_NoNul CHECK (dbo.CatalogTextContainsNul(Name) = 0); " +
+                    "ALTER TABLE dbo.Employees ADD " +
+                    "CONSTRAINT CK_Employees_Code_NoNul CHECK (dbo.CatalogTextContainsNul(Code) = 0), " +
+                    "CONSTRAINT CK_Employees_Name_NoNul CHECK (dbo.CatalogTextContainsNul(Name) = 0); " +
+                    "ALTER TABLE dbo.Customers ADD " +
+                    "CONSTRAINT CK_Customers_Code_NoNul CHECK (dbo.CatalogTextContainsNul(Code) = 0), " +
+                    "CONSTRAINT CK_Customers_Name_NoNul CHECK (dbo.CatalogTextContainsNul(Name) = 0); " +
+                    "ALTER TABLE dbo.GoodsReceipts ADD " +
+                    "CONSTRAINT CK_GoodsReceipts_ReceiptNo_NoNul " +
+                    "CHECK (dbo.CatalogTextContainsNul(ReceiptNo) = 0);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Missing_required_unique_index_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();

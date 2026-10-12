@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -56,11 +56,13 @@ public static class SchemaCompatibilityPolicy
 
     private static readonly SchemaArtifact[] KnownArtifacts =
     {
+        new SchemaArtifact("Invariant:PersistenceColumns", 1),
         new SchemaArtifact("Table:Users", 2),
         new SchemaArtifact("Table:Roles", 2),
         new SchemaArtifact("Table:UserRoles", 2),
         new SchemaArtifact("Table:RolePermissions", 2),
         new SchemaArtifact("Table:UserPermissions", 2),
+        new SchemaArtifact("Invariant:IdentityColumns", 2),
         new SchemaArtifact("Invariant:IdentityChecks", 2),
         new SchemaArtifact("Invariant:IdentityPrimaryKeys", 2),
         new SchemaArtifact("Invariant:IdentityUniqueIndexes", 2),
@@ -69,6 +71,7 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Table:Warehouses", 3),
         new SchemaArtifact("Table:Employees", 3),
         new SchemaArtifact("Table:Customers", 3),
+        new SchemaArtifact("Invariant:CatalogColumns", 3),
         new SchemaArtifact("Invariant:CatalogChecks", 3),
         new SchemaArtifact("Invariant:CatalogPrimaryKeys", 3),
         new SchemaArtifact("Invariant:CatalogUniqueIndexes", 3),
@@ -77,6 +80,7 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Invariant:CatalogNulChecks", 4),
         new SchemaArtifact("Table:GoodsReceipts", 5),
         new SchemaArtifact("Table:GoodsReceiptLines", 5),
+        new SchemaArtifact("Invariant:GoodsReceiptColumns", 5),
         new SchemaArtifact("Invariant:GoodsReceiptChecks", 5),
         new SchemaArtifact("Invariant:GoodsReceiptPrimaryKeys", 5),
         new SchemaArtifact("Invariant:GoodsReceiptUniqueIndexes", 5),
@@ -84,6 +88,7 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Sequence:GoodsReceiptNumberSequence", 6),
         new SchemaArtifact("Table:StockLedger", 7),
         new SchemaArtifact("Table:StockBalances", 7),
+        new SchemaArtifact("Invariant:InventoryColumns", 7),
         new SchemaArtifact("Invariant:InventoryChecks", 7),
         new SchemaArtifact("Invariant:InventoryPrimaryKeys", 7),
         new SchemaArtifact("Invariant:InventoryUniqueIndexes", 7),

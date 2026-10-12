@@ -82,6 +82,7 @@ GRANT UPDATE
 GRANT SELECT ON OBJECT::dbo.Roles TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.Roles TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.UserRoles TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.UserRoles TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.RolePermissions TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.RolePermissions TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
@@ -105,8 +106,10 @@ GRANT UPDATE ON OBJECT::dbo.GoodsReceiptNumberSequence TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT ON OBJECT::dbo.StockLedger TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.StockLedger TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.StockBalances TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.StockBalances TO [MyDmsVnRuntimeRole];
 
 GRANT SELECT ON OBJECT::dbo.SchemaVersions TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.SchemaVersions TO [MyDmsVnRuntimeRole];
 DENY INSERT, UPDATE, DELETE ON OBJECT::dbo.SchemaVersions TO [MyDmsVnRuntimeRole];
 
 GRANT CONTROL TO [MyDmsVnMigrationRole];

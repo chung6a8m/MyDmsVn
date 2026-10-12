@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using MyDmsVn.Server.Infrastructure.Operations;
 using Xunit;
 
@@ -19,11 +19,13 @@ public sealed class SchemaCompatibilityPolicyTests
 
     private static readonly string[] CurrentArtifacts =
     {
+        "Invariant:PersistenceColumns",
         "Table:Users",
         "Table:Roles",
         "Table:UserRoles",
         "Table:RolePermissions",
         "Table:UserPermissions",
+        "Invariant:IdentityColumns",
         "Invariant:IdentityChecks",
         "Invariant:IdentityPrimaryKeys",
         "Invariant:IdentityUniqueIndexes",
@@ -32,6 +34,7 @@ public sealed class SchemaCompatibilityPolicyTests
         "Table:Warehouses",
         "Table:Employees",
         "Table:Customers",
+        "Invariant:CatalogColumns",
         "Invariant:CatalogChecks",
         "Invariant:CatalogPrimaryKeys",
         "Invariant:CatalogUniqueIndexes",
@@ -40,6 +43,7 @@ public sealed class SchemaCompatibilityPolicyTests
         "Invariant:CatalogNulChecks",
         "Table:GoodsReceipts",
         "Table:GoodsReceiptLines",
+        "Invariant:GoodsReceiptColumns",
         "Invariant:GoodsReceiptChecks",
         "Invariant:GoodsReceiptPrimaryKeys",
         "Invariant:GoodsReceiptUniqueIndexes",
@@ -47,6 +51,7 @@ public sealed class SchemaCompatibilityPolicyTests
         "Sequence:GoodsReceiptNumberSequence",
         "Table:StockLedger",
         "Table:StockBalances",
+        "Invariant:InventoryColumns",
         "Invariant:InventoryChecks",
         "Invariant:InventoryPrimaryKeys",
         "Invariant:InventoryUniqueIndexes",
@@ -92,15 +97,18 @@ public sealed class SchemaCompatibilityPolicyTests
             },
             new[]
             {
+                "Invariant:PersistenceColumns",
                 "Table:Users",
                 "Table:Roles",
                 "Table:UserRoles",
                 "Table:RolePermissions",
                 "Table:UserPermissions",
+                "Invariant:IdentityColumns",
                 "Table:Products",
                 "Table:Warehouses",
                 "Table:Employees",
                 "Table:Customers",
+                "Invariant:CatalogColumns",
                 "Function:CatalogTextContainsNul",
                 "Invariant:IdentityChecks",
                 "Invariant:IdentityPrimaryKeys",
@@ -113,6 +121,7 @@ public sealed class SchemaCompatibilityPolicyTests
                 "Invariant:CatalogNulChecks",
                 "Table:GoodsReceipts",
                 "Table:GoodsReceiptLines",
+                "Invariant:GoodsReceiptColumns",
                 "Invariant:GoodsReceiptChecks",
                 "Invariant:GoodsReceiptPrimaryKeys",
                 "Invariant:GoodsReceiptUniqueIndexes",
