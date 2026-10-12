@@ -41,7 +41,7 @@ Khi nâng cấp từ bản provisioning cũ, chạy lại script hiện tại b�
 | `StockBalances` | Có | Có | Có | Không |
 | `SchemaVersions` | Có | Không | Không | Không |
 
-Runtime role còn có `VIEW DEFINITION` chỉ trên `dbo.CatalogTextContainsNul` để schema preflight xác nhận manifest; quyền này không cấp đọc dữ liệu hay DDL.
+Runtime role còn có `VIEW DEFINITION` trên `dbo.CatalogTextContainsNul` và `dbo.Employees` để schema preflight xác nhận function cùng predicate của filtered unique index `UX_Employees_UserId`; quyền này không cấp đọc dữ liệu hay DDL.
 
 Mọi object mới phải được xem xét và thêm rõ ràng vào script; không cấp `SELECT/EXECUTE` toàn schema. Runtime không được đọc object chưa liệt kê, `ALTER/DROP`, tự cấp quyền, hoặc thay đổi migration history.
 

@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
+using DbUp;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
 using Xunit;
@@ -10,6 +11,36 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class DatabaseMigrationTests
 {
+    [SqlServerFact]
+    public async Task Managed_name_with_wrong_object_type_is_rejected_without_creating_the_journal()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "CREATE SYNONYM dbo.Users FOR LegacyDatabase.dbo.Users;");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.synonyms " +
+                "WHERE object_id = OBJECT_ID(N'dbo.Users', N'SN');"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     [SqlServerFact]
     public async Task Unmanaged_synonym_is_rejected_without_creating_the_journal()
     {
@@ -201,6 +232,88 @@ public sealed class DatabaseMigrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Losing_the_migration_lock_session_stops_the_active_DbUp_script()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var assembly = typeof(DatabaseMigrationRunner).Assembly;
+            var prefix = DeployChanges.To
+                .SqlDatabase(database.ConnectionString)
+                .WithScriptsEmbeddedInAssembly(
+                    assembly,
+                    resourceName =>
+                        resourceName.Contains(".Scripts.") &&
+                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal))
+                .JournalToSqlTable("dbo", "SchemaVersions")
+                .WithTransactionPerScript()
+                .LogToNowhere()
+                .Build()
+                .PerformUpgrade();
+            Assert.True(prefix.Successful, prefix.Error?.ToString());
+
+            var runnerConnectionString = new SqlConnectionStringBuilder(database.ConnectionString)
+            {
+                ApplicationName = "P6-Lock-Session-Probe",
+            }.ConnectionString;
+            using var blocker = new SqlConnection(database.ConnectionString);
+            await blocker.OpenAsync();
+            var blockerSessionId = await blocker.QuerySingleAsync<int>("SELECT @@SPID;");
+            using var blockerTransaction = blocker.BeginTransaction();
+            await blocker.ExecuteAsync(
+                "SELECT COUNT(*) FROM dbo.Products WITH (TABLOCKX, HOLDLOCK);",
+                transaction: blockerTransaction);
+
+            var migrationTask = Task.Run(() =>
+            {
+                try
+                {
+                    return new DatabaseMigrationRunner().Migrate(runnerConnectionString).Successful;
+                }
+                catch (SqlException)
+                {
+                    return false;
+                }
+            });
+
+            using var observer = new SqlConnection(database.ConnectionString);
+            await observer.OpenAsync();
+            var blockedSessionId = await WaitForSessionAsync(
+                observer,
+                "SELECT TOP (1) session_id FROM sys.dm_exec_requests " +
+                "WHERE blocking_session_id = @blockerSessionId;",
+                new { blockerSessionId });
+            var lockSessionId = await WaitForSessionAsync(
+                observer,
+                "SELECT TOP (1) request_session_id FROM sys.dm_tran_locks " +
+                "WHERE resource_type = N'APPLICATION' AND resource_database_id = DB_ID() " +
+                "AND request_status = N'GRANT';",
+                new { });
+
+            Assert.NotEqual(blockerSessionId, blockedSessionId);
+            await observer.ExecuteAsync("KILL " + lockSessionId + ";");
+            blockerTransaction.Rollback();
+
+            var migrationSucceeded = await migrationTask;
+            Assert.False(migrationSucceeded);
+            Assert.Equal(0, await observer.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SchemaVersions " +
+                "WHERE ScriptName LIKE N'%007_Inventory_Stock.sql';"));
+            Assert.Null(await observer.ExecuteScalarAsync<int?>(
+                "SELECT OBJECT_ID(N'dbo.StockLedger', N'U');"));
+
+            var recovery = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(recovery.Successful, recovery.Error?.ToString());
+            Assert.Single(recovery.Scripts);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     [Theory]
     [InlineData("Server=invalid.invalid;Database=master;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
     [InlineData("Server=invalid.invalid;Database=model;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
@@ -210,6 +323,26 @@ public sealed class DatabaseMigrationTests
     public void System_or_unspecified_database_is_rejected_before_connecting(string connectionString)
     {
         Assert.Throws<ArgumentException>(() => new DatabaseMigrationRunner().Migrate(connectionString));
+    }
+
+    private static async Task<int> WaitForSessionAsync(
+        SqlConnection connection,
+        string sql,
+        object parameters)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var sessionId = await connection.QuerySingleOrDefaultAsync<int?>(sql, parameters);
+            if (sessionId.HasValue)
+            {
+                return sessionId.Value;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("The expected SQL migration session was not observed.");
     }
 
     [SqlServerFact]

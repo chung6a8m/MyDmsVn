@@ -158,6 +158,7 @@ public sealed class SqlPrincipalProvisioningTests
                 "HAS_PERMS_BY_NAME(N'dbo.StockBalances', N'OBJECT', N'UPDATE') AS CanUpdateBalances, " +
                 "HAS_PERMS_BY_NAME(N'dbo.GoodsReceiptNumberSequence', N'OBJECT', N'UPDATE') AS CanUseReceiptSequence, " +
                 "HAS_PERMS_BY_NAME(N'dbo.CatalogTextContainsNul', N'OBJECT', N'VIEW DEFINITION') AS CanInspectManifestFunction, " +
+                "HAS_PERMS_BY_NAME(N'dbo.Employees', N'OBJECT', N'VIEW DEFINITION') AS CanInspectEmployeeIndexDefinition, " +
                 "HAS_PERMS_BY_NAME(N'dbo', N'SCHEMA', N'ALTER') AS CanAlterSchema, " +
                 "HAS_PERMS_BY_NAME(N'dbo.SchemaVersions', N'OBJECT', N'SELECT') AS CanReadJournal, " +
                 "HAS_PERMS_BY_NAME(N'dbo.SchemaVersions', N'OBJECT', N'UPDATE') AS CanUpdateJournal, " +
@@ -172,6 +173,7 @@ public sealed class SqlPrincipalProvisioningTests
             Assert.Equal(1, permissions.CanUpdateBalances);
             Assert.Equal(1, permissions.CanUseReceiptSequence);
             Assert.Equal(1, permissions.CanInspectManifestFunction);
+            Assert.Equal(1, permissions.CanInspectEmployeeIndexDefinition);
             Assert.Equal(0, permissions.CanAlterSchema);
             Assert.Equal(1, permissions.CanReadJournal);
             Assert.Equal(0, permissions.CanUpdateJournal);
@@ -311,6 +313,8 @@ public sealed class SqlPrincipalProvisioningTests
         public int CanUseReceiptSequence { get; set; }
 
         public int CanInspectManifestFunction { get; set; }
+
+        public int CanInspectEmployeeIndexDefinition { get; set; }
 
         public int CanAlterSchema { get; set; }
 

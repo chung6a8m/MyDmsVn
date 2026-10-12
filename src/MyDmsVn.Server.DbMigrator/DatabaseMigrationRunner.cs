@@ -1,6 +1,7 @@
 using System;
 using DbUp;
 using DbUp.Engine;
+using DbUp.SqlServer;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Infrastructure.Operations;
 
@@ -28,11 +29,13 @@ public sealed class DatabaseMigrationRunner
         ValidateTargetDatabase(connectionString);
 
         using var migrationLock = DatabaseMigrationLock.Acquire(connectionString);
-        ValidateSchemaStateBeforeMigration(connectionString);
+        ValidateSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
+        var connectionManager = new SqlConnectionManager(
+            migrationLock.TransferConnectionOwnership);
 
         var assembly = typeof(DatabaseMigrationRunner).Assembly;
         var engine = DeployChanges.To
-            .SqlDatabase(connectionString)
+            .SqlDatabase(connectionManager)
             .WithScriptsEmbeddedInAssembly(
                 assembly,
                 resourceName => resourceName.Contains(".Scripts."))
@@ -44,10 +47,12 @@ public sealed class DatabaseMigrationRunner
         return engine.PerformUpgrade();
     }
 
-    private static void ValidateSchemaStateBeforeMigration(string connectionString)
+    private static void ValidateSchemaStateBeforeMigration(
+        string connectionString,
+        SqlConnection connection)
     {
         var compatibility = new SqlSchemaCompatibilityChecker(connectionString)
-            .CheckAsync(System.Threading.CancellationToken.None)
+            .CheckConnectionAsync(connection, System.Threading.CancellationToken.None)
             .GetAwaiter()
             .GetResult();
         switch (compatibility.Status)
@@ -156,11 +161,14 @@ internal sealed class DatabaseMigrationLock : IDisposable
 {
     private readonly SqlConnection _connection;
     private bool _disposed;
+    private bool _connectionOwnershipTransferred;
 
     private DatabaseMigrationLock(SqlConnection connection)
     {
         _connection = connection;
     }
+
+    public SqlConnection Connection => _connection;
 
     public static DatabaseMigrationLock Acquire(string connectionString)
     {
@@ -192,10 +200,33 @@ internal sealed class DatabaseMigrationLock : IDisposable
         }
     }
 
+    public SqlConnection TransferConnectionOwnership()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(DatabaseMigrationLock));
+        }
+
+        if (_connectionOwnershipTransferred)
+        {
+            throw new InvalidOperationException(
+                "The migration SQL connection has already been transferred to DbUp.");
+        }
+
+        _connectionOwnershipTransferred = true;
+        return _connection;
+    }
+
     public void Dispose()
     {
         if (_disposed)
         {
+            return;
+        }
+
+        if (_connectionOwnershipTransferred)
+        {
+            _disposed = true;
             return;
         }
 

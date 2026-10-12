@@ -14,7 +14,7 @@ Client v1 hiện tại hỗ trợ đúng journal prefix sau, theo thứ tự b�
 6. `006_GoodsReceipt_Number_Sequence.sql`
 7. `007_Inventory_Stock.sql`
 
-Journal giữ nguyên `dbo.SchemaVersions` từ P1. Script đã phát hành là immutable; sửa nội dung hoặc đổi tên script cũ tạo fork không được hỗ trợ. Manifest kiểm tra cả history, table/function/sequence, toàn bộ nhóm CHECK constraints của 002/003/004/005/007 ở trạng thái enabled/trusted, các unique index bắt buộc, toàn bộ foreign key bắt buộc ở trạng thái enabled/trusted và trigger append-only đang enabled, vì chỉ thấy entry `007` không chứng minh schema hoàn chỉnh. Migrator có quyền quản trị còn kiểm kê đầy đủ user-defined schema-scoped object cấp cao nhất và DML trigger trên mọi schema, gồm cả synonym; object ngoài manifest khiến database bị coi là unmanaged thay vì “empty”. Constraint/index con được kiểm tra bằng các invariant riêng thay vì coi là object độc lập trong inventory.
+Journal giữ nguyên `dbo.SchemaVersions` từ P1. Script đã phát hành là immutable; sửa nội dung hoặc đổi tên script cũ tạo fork không được hỗ trợ. Manifest kiểm tra cả history, table/function/sequence, toàn bộ nhóm CHECK constraints của 002/003/004/005/007 ở trạng thái enabled/trusted, primary key theo đúng bảng/tên/thứ tự cột, unique index theo đúng key/filter, foreign key theo đúng bảng/cột/action ở trạng thái enabled/trusted và trigger append-only đang enabled, vì chỉ thấy entry `007` không chứng minh schema hoàn chỉnh. Migrator có quyền quản trị còn kiểm kê đầy đủ user-defined schema-scoped object cấp cao nhất và DML trigger trên mọi schema, gồm cả synonym; allowlist khớp đồng thời schema, tên, object type và parent của trigger. Object ngoài manifest hoặc object trùng tên nhưng sai type khiến database bị coi là unmanaged thay vì “empty”. Constraint/index con được kiểm tra bằng các invariant riêng thay vì coi là object độc lập trong inventory.
 
 Đây là release schema baseline đầu tiên; chưa có prior production release baseline nào được hỗ trợ cho mixed-client rollout. Database ở prefix `001`–`006` chỉ là pre-release/interrupted state và bị desktop chặn.
 
@@ -46,7 +46,7 @@ Trước migration, operator phải ghi nhận:
 7. client đã dừng/drain, không còn transaction Post đang chạy;
 8. target release/commit/artifact hash đã duyệt.
 
-Chỉ sau đó đặt một maintenance owner và chạy migrator với migration configuration. Migrator xác nhận principal có `CONTROL` trên đúng database trước khi lấy lock hoặc gọi DbUp; runtime principal bị từ chối bằng `Migration.InsufficientPrivileges`, kể cả khi database hiện tại khiến migration là no-op. `DatabaseMigrationRunner` lấy SQL application lock exclusive `MyDmsVn.SchemaMigration` trên một connection sống suốt operation. Lần gọi cạnh tranh nhận `Migration.AlreadyRunning`; không retry mù hoặc chạy migrator thứ hai.
+Chỉ sau đó đặt một maintenance owner và chạy migrator với migration configuration. Migrator xác nhận principal có `CONTROL` trên đúng database trước khi lấy lock hoặc gọi DbUp; runtime principal bị từ chối bằng `Migration.InsufficientPrivileges`, kể cả khi database hiện tại khiến migration là no-op. `DatabaseMigrationRunner` lấy SQL application lock exclusive `MyDmsVn.SchemaMigration`, chạy preflight và toàn bộ DbUp transaction-per-script trên cùng một SQL session. Mất session đồng thời giải phóng lock và dừng/rollback script đang chạy, nên không còn một DbUp session mồ côi tiếp tục sau khi lock biến mất. Lần gọi cạnh tranh nhận `Migration.AlreadyRunning`; không retry mù hoặc chạy migrator thứ hai.
 
 ## 4. Thực thi
 

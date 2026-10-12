@@ -62,6 +62,7 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Table:RolePermissions", 2),
         new SchemaArtifact("Table:UserPermissions", 2),
         new SchemaArtifact("Invariant:IdentityChecks", 2),
+        new SchemaArtifact("Invariant:IdentityPrimaryKeys", 2),
         new SchemaArtifact("Invariant:IdentityUniqueIndexes", 2),
         new SchemaArtifact("Invariant:IdentityForeignKeys", 2),
         new SchemaArtifact("Table:Products", 3),
@@ -69,6 +70,7 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Table:Employees", 3),
         new SchemaArtifact("Table:Customers", 3),
         new SchemaArtifact("Invariant:CatalogChecks", 3),
+        new SchemaArtifact("Invariant:CatalogPrimaryKeys", 3),
         new SchemaArtifact("Invariant:CatalogUniqueIndexes", 3),
         new SchemaArtifact("Invariant:CatalogForeignKeys", 3),
         new SchemaArtifact("Function:CatalogTextContainsNul", 4),
@@ -76,12 +78,14 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Table:GoodsReceipts", 5),
         new SchemaArtifact("Table:GoodsReceiptLines", 5),
         new SchemaArtifact("Invariant:GoodsReceiptChecks", 5),
+        new SchemaArtifact("Invariant:GoodsReceiptPrimaryKeys", 5),
         new SchemaArtifact("Invariant:GoodsReceiptUniqueIndexes", 5),
         new SchemaArtifact("Invariant:GoodsReceiptForeignKeys", 5),
         new SchemaArtifact("Sequence:GoodsReceiptNumberSequence", 6),
         new SchemaArtifact("Table:StockLedger", 7),
         new SchemaArtifact("Table:StockBalances", 7),
         new SchemaArtifact("Invariant:InventoryChecks", 7),
+        new SchemaArtifact("Invariant:InventoryPrimaryKeys", 7),
         new SchemaArtifact("Invariant:InventoryUniqueIndexes", 7),
         new SchemaArtifact("Invariant:InventoryForeignKeys", 7),
         new SchemaArtifact("Trigger:TR_StockLedger_AppendOnly", 7),
@@ -102,13 +106,13 @@ public static class SchemaCompatibilityPolicy
             throw new ArgumentNullException(nameof(existingArtifacts));
         }
 
-        if (ContainsUnknownArtifact(existingArtifacts))
-        {
-            return UnknownHistory();
-        }
-
         if (!journalExists)
         {
+            if (ContainsUnknownArtifact(existingArtifacts))
+            {
+                return UnknownHistory();
+            }
+
             return ContainsAnyKnownArtifact(existingArtifacts)
                 ? Partial()
                 : Empty();
@@ -142,6 +146,11 @@ public static class SchemaCompatibilityPolicy
         if (normalizedScripts.Count > CurrentScripts.Count)
         {
             return TooNew();
+        }
+
+        if (ContainsUnknownArtifact(existingArtifacts))
+        {
+            return UnknownHistory();
         }
 
         if (!ArtifactsMatchAppliedPrefix(normalizedScripts.Count, existingArtifacts))

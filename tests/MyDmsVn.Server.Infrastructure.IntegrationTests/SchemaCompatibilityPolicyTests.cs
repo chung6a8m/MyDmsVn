@@ -25,6 +25,7 @@ public sealed class SchemaCompatibilityPolicyTests
         "Table:RolePermissions",
         "Table:UserPermissions",
         "Invariant:IdentityChecks",
+        "Invariant:IdentityPrimaryKeys",
         "Invariant:IdentityUniqueIndexes",
         "Invariant:IdentityForeignKeys",
         "Table:Products",
@@ -32,6 +33,7 @@ public sealed class SchemaCompatibilityPolicyTests
         "Table:Employees",
         "Table:Customers",
         "Invariant:CatalogChecks",
+        "Invariant:CatalogPrimaryKeys",
         "Invariant:CatalogUniqueIndexes",
         "Invariant:CatalogForeignKeys",
         "Function:CatalogTextContainsNul",
@@ -39,12 +41,14 @@ public sealed class SchemaCompatibilityPolicyTests
         "Table:GoodsReceipts",
         "Table:GoodsReceiptLines",
         "Invariant:GoodsReceiptChecks",
+        "Invariant:GoodsReceiptPrimaryKeys",
         "Invariant:GoodsReceiptUniqueIndexes",
         "Invariant:GoodsReceiptForeignKeys",
         "Sequence:GoodsReceiptNumberSequence",
         "Table:StockLedger",
         "Table:StockBalances",
         "Invariant:InventoryChecks",
+        "Invariant:InventoryPrimaryKeys",
         "Invariant:InventoryUniqueIndexes",
         "Invariant:InventoryForeignKeys",
         "Trigger:TR_StockLedger_AppendOnly",
@@ -99,15 +103,18 @@ public sealed class SchemaCompatibilityPolicyTests
                 "Table:Customers",
                 "Function:CatalogTextContainsNul",
                 "Invariant:IdentityChecks",
+                "Invariant:IdentityPrimaryKeys",
                 "Invariant:IdentityUniqueIndexes",
                 "Invariant:IdentityForeignKeys",
                 "Invariant:CatalogChecks",
+                "Invariant:CatalogPrimaryKeys",
                 "Invariant:CatalogUniqueIndexes",
                 "Invariant:CatalogForeignKeys",
                 "Invariant:CatalogNulChecks",
                 "Table:GoodsReceipts",
                 "Table:GoodsReceiptLines",
                 "Invariant:GoodsReceiptChecks",
+                "Invariant:GoodsReceiptPrimaryKeys",
                 "Invariant:GoodsReceiptUniqueIndexes",
                 "Invariant:GoodsReceiptForeignKeys",
                 "Sequence:GoodsReceiptNumberSequence",
@@ -162,6 +169,24 @@ public sealed class SchemaCompatibilityPolicyTests
         };
 
         var result = Evaluate(scripts, CurrentArtifacts);
+
+        Assert.Equal(SchemaCompatibilityStatus.TooNew, result.Status);
+        Assert.Equal("Schema.TooNew", result.Code);
+    }
+
+    [Fact]
+    public void Appended_script_with_future_artifact_is_too_new()
+    {
+        var scripts = new List<string>(CurrentScripts)
+        {
+            "008_Future.sql",
+        };
+        var artifacts = new List<string>(CurrentArtifacts)
+        {
+            "Unknown:UserObject",
+        };
+
+        var result = Evaluate(scripts, artifacts);
 
         Assert.Equal(SchemaCompatibilityStatus.TooNew, result.Status);
         Assert.Equal("Schema.TooNew", result.Code);

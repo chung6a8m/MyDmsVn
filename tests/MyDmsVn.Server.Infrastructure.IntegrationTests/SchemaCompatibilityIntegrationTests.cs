@@ -173,6 +173,78 @@ public sealed class SchemaCompatibilityIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Required_unique_index_with_wrong_key_definition_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DROP INDEX UX_StockLedger_DocumentType_DocumentLineId ON dbo.StockLedger; " +
+                    "CREATE UNIQUE INDEX UX_StockLedger_DocumentType_DocumentLineId " +
+                    "ON dbo.StockLedger (LedgerId);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Required_filtered_index_without_filter_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DROP INDEX UX_Employees_UserId ON dbo.Employees; " +
+                    "CREATE UNIQUE INDEX UX_Employees_UserId ON dbo.Employees (UserId);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Missing_required_primary_key_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.StockBalances DROP CONSTRAINT PK_StockBalances;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Disabled_or_untrusted_foreign_key_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -182,6 +254,56 @@ public sealed class SchemaCompatibilityIntegrationTests
             {
                 await connection.ExecuteAsync(
                     "ALTER TABLE dbo.StockLedger NOCHECK CONSTRAINT FK_StockLedger_Products;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Required_foreign_key_with_wrong_column_mapping_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.StockLedger DROP CONSTRAINT FK_StockLedger_Products; " +
+                    "ALTER TABLE dbo.StockLedger WITH CHECK ADD CONSTRAINT FK_StockLedger_Products " +
+                    "FOREIGN KEY (WarehouseId) REFERENCES dbo.Products (ProductId);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Required_foreign_key_with_cascade_action_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.StockBalances DROP CONSTRAINT FK_StockBalances_Products; " +
+                    "ALTER TABLE dbo.StockBalances WITH CHECK ADD CONSTRAINT FK_StockBalances_Products " +
+                    "FOREIGN KEY (ProductId) REFERENCES dbo.Products (ProductId) ON DELETE CASCADE;");
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
@@ -253,7 +375,8 @@ public sealed class SchemaCompatibilityIntegrationTests
             {
                 await connection.ExecuteAsync(
                     "INSERT dbo.SchemaVersions (ScriptName, Applied) " +
-                    "VALUES (N'MyDmsVn.Server.DbMigrator.Scripts.008_Future.sql', SYSUTCDATETIME());");
+                    "VALUES (N'MyDmsVn.Server.DbMigrator.Scripts.008_Future.sql', SYSUTCDATETIME()); " +
+                    "CREATE TABLE dbo.FutureFeature (FutureFeatureId int NOT NULL PRIMARY KEY);");
             }
 
             var future = await new SqlSchemaCompatibilityChecker(futureDatabase.ConnectionString)

@@ -86,6 +86,7 @@ GRANT SELECT ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Warehouses TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Employees TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.Employees TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Customers TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.CatalogTextContainsNul TO [MyDmsVnRuntimeRole];
 
