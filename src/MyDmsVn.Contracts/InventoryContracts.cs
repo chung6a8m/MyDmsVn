@@ -241,33 +241,59 @@ namespace MyDmsVn.Contracts
 
     public sealed class StockBalanceQuery
     {
-        public StockBalanceQuery(int? warehouseId, int pageNumber, int pageSize)
+        public StockBalanceQuery(
+            int? warehouseId,
+            int? productId,
+            string? search,
+            int pageNumber,
+            int pageSize)
         {
             WarehouseId = warehouseId;
+            ProductId = productId;
+            Search = search;
             PageNumber = pageNumber;
             PageSize = pageSize;
         }
 
         public int? WarehouseId { get; }
+        public int? ProductId { get; }
+        public string? Search { get; }
         public int PageNumber { get; }
         public int PageSize { get; }
     }
 
     public sealed class StockBalanceRow
     {
-        public StockBalanceRow(int warehouseId, int productId, string productCode, string productName, decimal quantity)
+        public StockBalanceRow(
+            int warehouseId,
+            string warehouseCode,
+            string warehouseName,
+            bool warehouseIsActive,
+            int productId,
+            string productCode,
+            string productName,
+            bool productIsActive,
+            decimal quantity)
         {
             WarehouseId = warehouseId;
+            WarehouseCode = warehouseCode;
+            WarehouseName = warehouseName;
+            WarehouseIsActive = warehouseIsActive;
             ProductId = productId;
             ProductCode = productCode;
             ProductName = productName;
+            ProductIsActive = productIsActive;
             Quantity = quantity;
         }
 
         public int WarehouseId { get; }
+        public string WarehouseCode { get; }
+        public string WarehouseName { get; }
+        public bool WarehouseIsActive { get; }
         public int ProductId { get; }
         public string ProductCode { get; }
         public string ProductName { get; }
+        public bool ProductIsActive { get; }
         public decimal Quantity { get; }
     }
 
@@ -293,18 +319,50 @@ namespace MyDmsVn.Contracts
 
     public sealed class StockCardRow
     {
-        public StockCardRow(long ledgerId, DateTime postedAtUtc, string documentType, string documentNumber, decimal quantityChange)
+        public StockCardRow(
+            long ledgerId,
+            int warehouseId,
+            string warehouseCode,
+            string warehouseName,
+            bool warehouseIsActive,
+            int productId,
+            string productCode,
+            string productName,
+            bool productIsActive,
+            DateTime postedAtUtc,
+            string documentType,
+            long documentId,
+            string documentNumber,
+            decimal quantityChange)
         {
             LedgerId = ledgerId;
+            WarehouseId = warehouseId;
+            WarehouseCode = warehouseCode;
+            WarehouseName = warehouseName;
+            WarehouseIsActive = warehouseIsActive;
+            ProductId = productId;
+            ProductCode = productCode;
+            ProductName = productName;
+            ProductIsActive = productIsActive;
             PostedAtUtc = postedAtUtc;
             DocumentType = documentType;
+            DocumentId = documentId;
             DocumentNumber = documentNumber;
             QuantityChange = quantityChange;
         }
 
         public long LedgerId { get; }
+        public int WarehouseId { get; }
+        public string WarehouseCode { get; }
+        public string WarehouseName { get; }
+        public bool WarehouseIsActive { get; }
+        public int ProductId { get; }
+        public string ProductCode { get; }
+        public string ProductName { get; }
+        public bool ProductIsActive { get; }
         public DateTime PostedAtUtc { get; }
         public string DocumentType { get; }
+        public long DocumentId { get; }
         public string DocumentNumber { get; }
         public decimal QuantityChange { get; }
     }

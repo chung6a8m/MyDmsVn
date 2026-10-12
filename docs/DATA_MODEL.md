@@ -67,10 +67,10 @@ Goods Receipt numbers are allocated only by the server from the non-cycling SQL 
 
 - Product / warehouse lookup: Id, Code, Name, IsActive.
 - Receipt detail: header, line collection, Status, PostedAtUtc.
-- StockBalanceRow: ProductId, WarehouseId, Code/Name projections, Quantity.
-- StockCardRow: LedgerId, date/time, document number/type, QuantityChange, running balance (optional read-side projection).
+- StockBalanceRow: ProductId, WarehouseId, warehouse/product Code/Name projections, both active flags, Quantity.
+- StockCardRow: LedgerId, WarehouseId, ProductId, warehouse/product Code/Name and active flags, posting timestamp, document ID/number/type, QuantityChange. Running balance remains an optional future read-side projection.
 
-Dapper queries have filters by warehouse/product/date, paging where appropriate, and authorization. User input is parameterized; do not concatenate SQL order-by expressions from arbitrary client strings.
+Dapper queries have filters by warehouse/product/date, paging where appropriate, and authorization. Balance rows sort by warehouse code, product code and stable IDs; stock-card rows sort by `PostedAtUtc, LedgerId`. Historical rows retain inactive entity names/flags and receipt document identity. User input is parameterized; do not concatenate SQL order-by expressions from arbitrary client strings.
 
 ## 6. Future extensibility boundaries
 

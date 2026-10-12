@@ -30,6 +30,7 @@ namespace MyDmsVn.Desktop.WinForms
             services.AddTransient<FoundationViewModel>();
             services.AddTransient<ICatalogControlFactory, CatalogControlFactory>();
             services.AddTransient<IGoodsReceiptControlFactory, GoodsReceiptControlFactory>();
+            services.AddTransient<IInventoryControlFactory, InventoryControlFactory>();
             services.AddTransient<FoundationShellForm>();
             return services;
         }

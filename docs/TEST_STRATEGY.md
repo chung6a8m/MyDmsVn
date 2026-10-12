@@ -34,6 +34,9 @@
 10. Stock reconciliation query: computed ledger sum equals materialized balance.
 11. Unique catalog codes and FKs enforced by SQL.
 12. Unauthorized Post leaves all business tables unchanged.
+13. Stock Balance filters/page order are deterministic and preserve readable inactive warehouse/product history.
+14. Stock Card filters by warehouse/product and UTC range, orders by `PostedAtUtc, LedgerId`, and returns stable document identity.
+15. Full P5 slice: create/post a receipt, read the resulting balance/card, reject duplicate Post, and allow a pre-deactivation Draft to post exactly once after all references are reactivated.
 
 **Required:** use isolated test database provisioned by test infrastructure with a test-only connection string, not an arbitrary existing database. Do not silently drop an unknown database. If SQL Server unavailable, report SQL tests as **not run**.
 
@@ -52,6 +55,7 @@
 - Legacy migration verifier tested only with approved real/synthetic algorithm fixtures; no plaintext/hashes in logs.
 - ApiResponse JSON casing/nullable behavior, input invalid/mixed errors; for P7 cover HTTP 400/401/403/404/409/500.
 - Local/HTTP parity tests reuse same command/read data and semantic assertions.
+- Inventory Local adapter tests cover both read permissions, validation mapping and the absence of balance/ledger mutation APIs.
 
 ## 6. CI / acceptance gate
 

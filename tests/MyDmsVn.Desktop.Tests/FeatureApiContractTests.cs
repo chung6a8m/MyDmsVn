@@ -55,5 +55,18 @@ namespace MyDmsVn.Desktop.Tests
                 "MyDmsVn.Contracts.PostGoodsReceiptRequest",
                 postParameter.ParameterType.FullName);
         }
+
+        [Fact]
+        public void Inventory_client_is_query_only_with_no_balance_or_ledger_mutation_api()
+        {
+            var methods = typeof(IInventoryApiClient).GetMethods();
+
+            Assert.Equal(
+                new[] { "GetStockBalancesAsync", "GetStockCardAsync" },
+                methods.Select(method => method.Name).OrderBy(name => name).ToArray());
+            Assert.All(
+                methods,
+                method => Assert.StartsWith("Get", method.Name, StringComparison.Ordinal));
+        }
     }
 }

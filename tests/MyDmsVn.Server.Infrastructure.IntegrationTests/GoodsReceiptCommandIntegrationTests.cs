@@ -499,6 +499,51 @@ public sealed class GoodsReceiptCommandIntegrationTests
             Assert.Equal(2.5m, balances.Single(row => row.ProductId == seed.Product1Id).Quantity);
             Assert.Equal(1m, balances.Single(row => row.ProductId == seed.Product2Id).Quantity);
 
+            using (var balanceProvider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: false,
+                onlyPermission: PermissionKeys.InventoryBalancesRead))
+            using (var scope = balanceProvider.CreateScope())
+            {
+                var balanceRead = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new GetStockBalancesQuery(
+                        new StockBalanceQuery(
+                            seed.WarehouseId,
+                            seed.Product1Id,
+                            "P-CMD-1",
+                            1,
+                            25)),
+                    CancellationToken.None);
+                Assert.False(balanceRead.IsError);
+                var balance = Assert.Single(balanceRead.Value.Items);
+                Assert.Equal(2.5m, balance.Quantity);
+            }
+
+            using (var cardProvider = CreateProvider(
+                database.ConnectionString,
+                seed.UserId,
+                allow: false,
+                onlyPermission: PermissionKeys.InventoryStockCardRead))
+            using (var scope = cardProvider.CreateScope())
+            {
+                var cardRead = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+                    new GetStockCardQuery(
+                        new StockCardQuery(
+                            seed.WarehouseId,
+                            seed.Product1Id,
+                            null,
+                            null,
+                            1,
+                            25)),
+                    CancellationToken.None);
+                Assert.False(cardRead.IsError);
+                var movement = Assert.Single(cardRead.Value.Items);
+                Assert.Equal(created.Id, movement.DocumentId);
+                Assert.Equal(created.ReceiptNumber, movement.DocumentNumber);
+                Assert.Equal(2.5m, movement.QuantityChange);
+            }
+
             using (var scope = postProvider.CreateScope())
             {
                 var second = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
@@ -942,6 +987,54 @@ public sealed class GoodsReceiptCommandIntegrationTests
 
                 await SetReferenceActiveAsync(database.ConnectionString, item, isActive: true);
             }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Reactivated_reference_allows_the_original_draft_to_post_once()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var created = await CreateReceiptAsync(
+                provider,
+                seed,
+                "reactivation",
+                seed.Product1Id,
+                4m);
+            var product = new InactiveReferenceCase(
+                "Products",
+                "ProductId",
+                seed.Product1Id,
+                "GoodsReceipt.ProductInactive");
+
+            await SetReferenceActiveAsync(database.ConnectionString, product, isActive: false);
+            var blocked = await PostInOwnScopeAsync(provider, created);
+            Assert.True(blocked.IsError);
+            Assert.Equal("GoodsReceipt.ProductInactive", blocked.FirstError.Code);
+            await AssertDraftHasNoInventoryAsync(database.ConnectionString, created.Id);
+
+            await SetReferenceActiveAsync(database.ConnectionString, product, isActive: true);
+            var posted = await PostInOwnScopeAsync(provider, created);
+            var duplicate = await PostInOwnScopeAsync(provider, created);
+
+            Assert.False(posted.IsError);
+            Assert.True(duplicate.IsError);
+            Assert.Equal("GoodsReceipt.AlreadyPosted", duplicate.FirstError.Code);
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentId = @receiptId;",
+                new { receiptId = created.Id }));
+            Assert.Equal(4m, await connection.QuerySingleAsync<decimal>(
+                "SELECT Quantity FROM dbo.StockBalances " +
+                "WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
+                new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
         }
         finally
         {
