@@ -350,7 +350,17 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "AND candidate.delete_referential_action = 0 AND candidate.update_referential_action = 0 " +
         "AND candidate.is_not_for_replication = 0 " +
         "AND actual.ColumnMappings = expected.ColumnMappings) = 9 THEN 1 END UNION ALL " +
-        "SELECT N'Sequence:GoodsReceiptNumberSequence', OBJECT_ID(N'dbo.GoodsReceiptNumberSequence', N'SO') UNION ALL " +
+        "SELECT N'Sequence:GoodsReceiptNumberSequence', (SELECT candidate.object_id " +
+        "FROM sys.sequences AS candidate " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = candidate.schema_id " +
+        "WHERE ownerSchema.name = N'dbo' AND candidate.name = N'GoodsReceiptNumberSequence' " +
+        "AND candidate.system_type_id = TYPE_ID(N'bigint') " +
+        "AND candidate.user_type_id = TYPE_ID(N'bigint') " +
+        "AND CONVERT(bigint, candidate.start_value) = 1 " +
+        "AND CONVERT(bigint, candidate.increment) = 1 " +
+        "AND CONVERT(bigint, candidate.minimum_value) = 1 " +
+        "AND CONVERT(bigint, candidate.maximum_value) = 9999999999 " +
+        "AND candidate.is_cycling = 0) UNION ALL " +
         "SELECT N'Table:StockLedger', OBJECT_ID(N'dbo.StockLedger', N'U') UNION ALL " +
         "SELECT N'Table:StockBalances', OBJECT_ID(N'dbo.StockBalances', N'U') UNION ALL " +
         "SELECT N'Invariant:InventoryChecks', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
