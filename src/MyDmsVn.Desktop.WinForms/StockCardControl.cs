@@ -115,7 +115,7 @@ namespace MyDmsVn.Desktop.WinForms
                 decimal.ToInt32(WarehouseFilter.Value),
                 decimal.ToInt32(ProductFilter.Value),
                 ToUtc(FromUtcFilter),
-                ToUtc(ToUtcFilter),
+                ToUtc(ToUtcFilter, includeDisplayedSecond: true),
                 CancellationToken.None);
         }
 
@@ -128,7 +128,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             LastOperation = _viewModel.SetDateRangeAsync(
                 ToUtc(FromUtcFilter),
-                ToUtc(ToUtcFilter),
+                ToUtc(ToUtcFilter, includeDisplayedSecond: true),
                 CancellationToken.None);
         }
 
@@ -225,10 +225,28 @@ namespace MyDmsVn.Desktop.WinForms
                 Width = 150,
             };
 
-        private static DateTime? ToUtc(DateTimePicker picker) =>
-            picker.Checked
-                ? DateTime.SpecifyKind(picker.Value, DateTimeKind.Utc)
-                : (DateTime?)null;
+        private static DateTime? ToUtc(
+            DateTimePicker picker,
+            bool includeDisplayedSecond = false)
+        {
+            if (!picker.Checked)
+            {
+                return null;
+            }
+
+            var value = picker.Value;
+            var displayedSecond = new DateTime(
+                value.Year,
+                value.Month,
+                value.Day,
+                value.Hour,
+                value.Minute,
+                value.Second,
+                DateTimeKind.Utc);
+            return includeDisplayedSecond
+                ? displayedSecond.AddSeconds(1).AddTicks(-1)
+                : displayedSecond;
+        }
 
         private static string FormatCatalog(string code, string name, bool isActive) =>
             code + " - " + name + (isActive ? string.Empty : " (inactive)");

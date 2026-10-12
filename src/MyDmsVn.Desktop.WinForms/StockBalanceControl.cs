@@ -160,7 +160,9 @@ namespace MyDmsVn.Desktop.WinForms
                 1L,
                 (_viewModel.TotalCount + _viewModel.PageSize - 1) / _viewModel.PageSize);
             PageLabel.Text = "Page " + _viewModel.PageNumber + " of " + totalPages;
-            TotalLabel.Text = _viewModel.VisibleQuantityTotal.ToString("0.0000");
+            TotalLabel.Text = _viewModel.CanShowVisibleQuantityTotal
+                ? _viewModel.VisibleQuantityTotal.ToString("0.0000")
+                : "—";
             BusyIndicator.Visible = _viewModel.IsLoading;
             BalanceGrid.Enabled = !_viewModel.IsLoading;
             RefreshButton.Enabled = !_viewModel.IsLoading;

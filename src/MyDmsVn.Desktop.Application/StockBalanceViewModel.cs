@@ -22,6 +22,7 @@ namespace MyDmsVn.Desktop.Application
         private int _pageSize = 25;
         private long _totalCount;
         private decimal _visibleQuantityTotal;
+        private bool _canShowVisibleQuantityTotal;
         private long _generation;
         private bool _isLoading;
         private bool _isAccessDenied;
@@ -50,7 +51,10 @@ namespace MyDmsVn.Desktop.Application
                 if (SetProperty(ref _items, value))
                 {
                     IsEmpty = value.Count == 0;
-                    VisibleQuantityTotal = value.Sum(row => row.Quantity);
+                    CanShowVisibleQuantityTotal = _productId.HasValue;
+                    VisibleQuantityTotal = CanShowVisibleQuantityTotal
+                        ? value.Sum(row => row.Quantity)
+                        : 0m;
                 }
             }
         }
@@ -77,6 +81,12 @@ namespace MyDmsVn.Desktop.Application
         {
             get => _visibleQuantityTotal;
             private set => SetProperty(ref _visibleQuantityTotal, value);
+        }
+
+        public bool CanShowVisibleQuantityTotal
+        {
+            get => _canShowVisibleQuantityTotal;
+            private set => SetProperty(ref _canShowVisibleQuantityTotal, value);
         }
 
         public bool IsLoading
@@ -135,6 +145,12 @@ namespace MyDmsVn.Desktop.Application
                 ThrowIfDisposed();
                 _searchDebouncer.Cancel();
                 _productId = productId;
+                CanShowVisibleQuantityTotal = productId.HasValue;
+                if (!CanShowVisibleQuantityTotal)
+                {
+                    VisibleQuantityTotal = 0m;
+                }
+
                 PageNumber = 1;
                 return LoadAsync(cancellationToken);
             }

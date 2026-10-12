@@ -43,7 +43,7 @@ public sealed class InventoryQueryIntegrationTests
                     seed.ArchivedWarehouseId,
                     seed.ArchivedProductId,
                     seed.FirstPostedAtUtc,
-                    seed.SecondPostedAtUtc,
+                    seed.SecondPostedAtUtc.AddMilliseconds(-500).AddSeconds(1).AddTicks(-1),
                     1,
                     1),
                 CancellationToken.None);
@@ -52,7 +52,7 @@ public sealed class InventoryQueryIntegrationTests
                     seed.ArchivedWarehouseId,
                     seed.ArchivedProductId,
                     seed.FirstPostedAtUtc,
-                    seed.SecondPostedAtUtc,
+                    seed.SecondPostedAtUtc.AddMilliseconds(-500).AddSeconds(1).AddTicks(-1),
                     2,
                     1),
                 CancellationToken.None);
@@ -121,7 +121,8 @@ public sealed class InventoryQueryIntegrationTests
             "INSERT dbo.Products (Code, Name, Unit) OUTPUT INSERTED.ProductId " +
             "VALUES (N'P-Z', N'Other product', N'EA');");
         var firstPosted = new DateTime(2026, 10, 10, 1, 0, 0, DateTimeKind.Utc);
-        var secondPosted = new DateTime(2026, 10, 10, 2, 0, 0, DateTimeKind.Utc);
+        var secondPosted = new DateTime(2026, 10, 10, 2, 0, 0, DateTimeKind.Utc)
+            .AddMilliseconds(500);
         var firstReceiptId = await InsertPostedReceiptAsync(
             connection, "GR0000000201", warehouseId, employeeId, userId, firstPosted);
         var secondReceiptId = await InsertPostedReceiptAsync(

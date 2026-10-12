@@ -60,7 +60,7 @@ public sealed class InventoryViewModelTests
         await oldLoad;
 
         Assert.Equal(8, Assert.Single(viewModel.Items).ProductId);
-        Assert.Equal(9m, viewModel.VisibleQuantityTotal);
+        Assert.Equal(0m, viewModel.VisibleQuantityTotal);
 
         api.NextBalanceResponse = ApiResponse<PagedResult<StockBalanceRow>>.Failure(
             new ApiError(ApiStatusCode.BadRequest, "ValidationError", "Invalid filter."));
@@ -84,6 +84,27 @@ public sealed class InventoryViewModelTests
         api.CompleteLatestBalance(Balance(3, 9, 12m));
         await pending;
         Assert.Empty(viewModel.Items);
+    }
+
+    [Fact]
+    public async Task Balance_does_not_total_quantities_without_a_single_product_filter()
+    {
+        var api = new ControlledInventoryApiClient();
+        using var viewModel = new StockBalanceViewModel(
+            api,
+            new IgnoringCancellationDispatcher(),
+            new DesktopNotificationCenter(),
+            new ImmediateDelay());
+
+        var load = viewModel.RefreshAsync(CancellationToken.None);
+        api.CompleteBalance(
+            0,
+            Balance(2, 7, 5m),
+            Balance(2, 8, 3m));
+        await load;
+
+        Assert.Equal(2, viewModel.Items.Count);
+        Assert.Equal(0m, viewModel.VisibleQuantityTotal);
     }
 
     [Fact]
@@ -269,9 +290,9 @@ public sealed class InventoryViewModelTests
             return completion.Task;
         }
 
-        public void CompleteBalance(int index, StockBalanceRow row) =>
+        public void CompleteBalance(int index, params StockBalanceRow[] rows) =>
             _balances[index].TrySetResult(ApiResponse<PagedResult<StockBalanceRow>>.Success(
-                new PagedResult<StockBalanceRow>(new[] { row }, 1, 25, 1)));
+                new PagedResult<StockBalanceRow>(rows, 1, 25, rows.Length)));
 
         public void CompleteLatestBalance(StockBalanceRow row) =>
             CompleteBalance(_balances.Count - 1, row);

@@ -34,12 +34,13 @@ public sealed class InventoryControlTests
                     control.BalanceGrid.Rows[0].Cells[0].Value);
                 Assert.Equal("P-007 - Archived product (inactive)",
                     control.BalanceGrid.Rows[0].Cells[1].Value);
-                Assert.Equal("12.5000", control.TotalLabel.Text);
+                Assert.Equal("—", control.TotalLabel.Text);
 
                 control.WarehouseFilter.Value = 2;
                 control.LastOperation.GetAwaiter().GetResult();
                 control.ProductFilter.Value = 7;
                 control.LastOperation.GetAwaiter().GetResult();
+                Assert.Equal("12.5000", control.TotalLabel.Text);
                 control.RefreshButton.PerformClick();
                 control.LastOperation.GetAwaiter().GetResult();
 
@@ -123,7 +124,7 @@ public sealed class InventoryControlTests
 
                 var request = Assert.Single(api.CardRequests);
                 Assert.Equal(fromUtc, request.FromUtc);
-                Assert.Equal(toUtc, request.ToUtc);
+                Assert.Equal(toUtc.AddSeconds(1).AddTicks(-1), request.ToUtc);
                 Assert.Empty(guard.Exceptions);
             },
             TimeSpan.FromSeconds(10));
