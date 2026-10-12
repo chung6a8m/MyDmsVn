@@ -13,7 +13,7 @@ Không dùng chung credential giữa desktop và migrator.
 
 Runtime principal không được là `sa`, thành viên `db_owner`, `db_ddladmin`, `sysadmin`, hoặc nhận quyền tương đương qua role khác. Migration credential không được đóng gói cùng desktop, ghi vào source control, shortcut, command line hoặc installer property có thể log ra ngoài.
 
-Hai user phải khác nhau. Script provisioning từ chối cùng một identity và từ chối runtime user đã có fixed-role, database/schema administration hoặc database-wide permission ngoài tập mặc định an toàn. Khi khởi động, cả hai desktop host kiểm tra lại effective server/database/schema permissions và fail closed bằng `Security.RuntimePrincipalOverprivileged`; vì vậy cấu hình nhầm migration credential không thể mở shell nghiệp vụ.
+Hai user phải khác nhau. Script provisioning từ chối cùng một identity và từ chối runtime user đã có fixed-role, database/schema/object administration hoặc database-wide permission ngoài tập mặc định an toàn. Khi khởi động, cả hai desktop host kiểm tra lại effective server/database/schema/object permissions và fail closed bằng `Security.RuntimePrincipalOverprivileged`; vì vậy cấu hình nhầm migration credential hoặc một `GRANT ALTER/CONTROL/TAKE OWNERSHIP` trực tiếp trên object không thể mở shell nghiệp vụ.
 
 DBA tạo login/user theo chính sách của môi trường, sau đó chạy script idempotent:
 
@@ -24,6 +24,8 @@ sqlcmd -S <server> -d <application-database> -E `
 ```
 
 Không đưa password vào lệnh trên. Với SQL Authentication, DBA tạo/đổi password qua kênh quản trị riêng trước khi tạo database user.
+
+Khi nâng cấp từ bản provisioning cũ, chạy lại script hiện tại bằng principal quản trị. Script chủ động `REVOKE` quyền `INSERT` và `UPDATE` toàn bảng `dbo.Users` trước khi cấp lại đúng năm cột password/audit; không chỉ dựa vào `GRANT` mới để thu hẹp quyền cũ.
 
 ## 2. Ma trận quyền runtime
 

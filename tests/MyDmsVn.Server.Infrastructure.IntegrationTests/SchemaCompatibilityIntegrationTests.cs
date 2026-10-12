@@ -150,6 +150,52 @@ public sealed class SchemaCompatibilityIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Missing_required_unique_index_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DROP INDEX UX_StockLedger_DocumentType_DocumentLineId ON dbo.StockLedger;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Disabled_or_untrusted_foreign_key_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.StockLedger NOCHECK CONSTRAINT FK_StockLedger_Products;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Disabled_append_only_trigger_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();

@@ -37,6 +37,12 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
         "ISNULL(HAS_PERMS_BY_NAME(DB_NAME(), N'DATABASE', N'ALTER'), 0) = 1 OR " +
         "ISNULL(HAS_PERMS_BY_NAME(N'dbo', N'SCHEMA', N'CONTROL'), 0) = 1 OR " +
         "ISNULL(HAS_PERMS_BY_NAME(N'dbo', N'SCHEMA', N'ALTER'), 0) = 1 OR " +
+        "EXISTS (SELECT 1 FROM sys.objects AS candidate " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = candidate.schema_id " +
+        "CROSS APPLY sys.fn_my_permissions(" +
+        "QUOTENAME(ownerSchema.name) + N'.' + QUOTENAME(candidate.name), N'OBJECT') AS objectPermission " +
+        "WHERE candidate.is_ms_shipped = 0 " +
+        "AND objectPermission.permission_name IN (N'ALTER', N'CONTROL', N'TAKE OWNERSHIP')) OR " +
         "EXISTS (SELECT 1 FROM sys.fn_my_permissions(NULL, N'DATABASE') " +
         "WHERE permission_name NOT IN (N'CONNECT', " +
         "N'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION', " +

@@ -76,6 +76,55 @@ public sealed class SqlPrincipalProvisioningTests
     }
 
     [SqlServerFact]
+    public async Task Provisioning_and_startup_reject_direct_object_alter_permission()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6ObjectAlterProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6ObjectAlterMigrationProbe] WITHOUT LOGIN; " +
+                "GRANT ALTER ON OBJECT::dbo.Products TO [P6ObjectAlterProbe];");
+
+            await connection.ExecuteAsync("EXECUTE AS USER = N'P6ObjectAlterProbe';");
+            try
+            {
+                var startupException = await Assert.ThrowsAsync<DesktopStartupException>(
+                    () => new SqlRuntimePrincipalValidator()
+                        .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None));
+                Assert.Equal("Security.RuntimePrincipalOverprivileged", startupException.Code);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+
+            var provisioningException = await Assert.ThrowsAsync<SqlException>(
+                () => connection.ExecuteAsync(
+                    ReadProvisioningScript(
+                        "P6ObjectAlterProbe",
+                        "P6ObjectAlterMigrationProbe")));
+
+            Assert.Contains("elevated", provisioningException.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.database_role_members AS membership " +
+                "INNER JOIN sys.database_principals AS rolePrincipal " +
+                "ON rolePrincipal.principal_id = membership.role_principal_id " +
+                "WHERE membership.member_principal_id = USER_ID(N'P6ObjectAlterProbe') " +
+                "AND rolePrincipal.name = N'MyDmsVnRuntimeRole';"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -93,6 +142,9 @@ public sealed class SqlPrincipalProvisioningTests
                 "CREATE TABLE dbo.P6UnlistedSecret (SecretId int NOT NULL); ");
 
             var script = ReadProvisioningScript("P6RuntimeProbe", "P6MigrationProbe");
+            await connection.ExecuteAsync(script);
+            await connection.ExecuteAsync(
+                "GRANT INSERT, UPDATE ON OBJECT::dbo.Users TO [MyDmsVnRuntimeRole];");
             await connection.ExecuteAsync(script);
 
             var permissions = await connection.QuerySingleAsync<PermissionProbe>(

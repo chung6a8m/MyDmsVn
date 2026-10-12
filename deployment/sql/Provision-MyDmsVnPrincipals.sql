@@ -32,6 +32,20 @@ SELECT @RuntimeHasElevatedPermissions = CASE WHEN
     EXISTS
     (
         SELECT 1
+        FROM sys.objects AS candidate
+        INNER JOIN sys.schemas AS ownerSchema
+            ON ownerSchema.schema_id = candidate.schema_id
+        CROSS APPLY sys.fn_my_permissions
+        (
+            QUOTENAME(ownerSchema.name) + N'.' + QUOTENAME(candidate.name),
+            N'OBJECT'
+        ) AS objectPermission
+        WHERE candidate.is_ms_shipped = 0
+          AND objectPermission.permission_name IN (N'ALTER', N'CONTROL', N'TAKE OWNERSHIP')
+    ) OR
+    EXISTS
+    (
+        SELECT 1
         FROM sys.fn_my_permissions(NULL, N'DATABASE')
         WHERE permission_name NOT IN
         (
@@ -58,6 +72,8 @@ IF IS_ROLEMEMBER(N'MyDmsVnRuntimeRole', N'$(RuntimeUser)') <> 1
 IF IS_ROLEMEMBER(N'MyDmsVnMigrationRole', N'$(MigrationUser)') <> 1
     ALTER ROLE [MyDmsVnMigrationRole] ADD MEMBER [$(MigrationUser)];
 
+REVOKE INSERT ON OBJECT::dbo.Users FROM [MyDmsVnRuntimeRole];
+REVOKE UPDATE ON OBJECT::dbo.Users FROM [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.Users TO [MyDmsVnRuntimeRole];
 GRANT UPDATE
     (PasswordHash, PasswordSalt, PasswordAlgorithm, UpdatedAtUtc, UpdatedByUserId)
