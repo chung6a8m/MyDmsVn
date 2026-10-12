@@ -13,6 +13,7 @@
 - The Stock Card WinForms upper-bound picker includes the full displayed second; application/API date filters retain their exact inclusive UTC semantics.
 - Stock Card SQL date parameters are bound explicitly as `datetime2`, preserving 100 ns boundary precision through Dapper and SqlClient.
 - Shared ViewModels provide loading, empty, validation/authorization/error states, totals, cancellation and request-generation stale-result protection. Only free-text search is debounced; selection changes and Refresh execute immediately.
+- Inventory empty-state flags are synchronized after every response, including an initial zero-row result represented by the shared `Array.Empty<T>()` instance.
 - Both WinForms hosts reuse the same controls and shell navigation for “Tồn kho” and “Thẻ kho”.
 
 ## Automated evidence
@@ -32,8 +33,8 @@ Final sequential verification results:
 
 - `dotnet restore MyDmsVn.sln --locked-mode`: succeeded; all projects up to date.
 - `dotnet build MyDmsVn.sln -c Release --no-restore -p:BuildInParallel=false`: succeeded with 0 warnings and 0 errors.
-- `net48`: Application 120/120, SQL integration 98/98, Desktop 178/178.
-- `net8.0` / `net8.0-windows`: Application 120/120, SQL integration 98/98, Desktop 178/178, Architecture 5/5.
+- `net48`: Application 120/120, SQL integration 98/98, Desktop 182/182.
+- `net8.0` / `net8.0-windows`: Application 120/120, SQL integration 98/98, Desktop 182/182, Architecture 5/5.
 - Both desktop hosts returned success from their Release `--smoke-test` entry point.
 
 The two TFM groups were tested serially; no `net48` and `net8.0` test runs overlapped.

@@ -11,6 +11,35 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class InventoryViewModelTests
 {
     [Fact]
+    public async Task Balance_reports_empty_state_after_first_successful_zero_row_query()
+    {
+        using var viewModel = new StockBalanceViewModel(
+            new ScriptedInventoryApiClient(),
+            new ImmediateUiDispatcher(),
+            new DesktopNotificationCenter(),
+            new ImmediateDelay());
+
+        await viewModel.ActivateAsync(CancellationToken.None);
+
+        Assert.True(viewModel.IsEmpty);
+        Assert.Empty(viewModel.Items);
+    }
+
+    [Fact]
+    public async Task Stock_card_reports_empty_state_after_first_successful_zero_row_query()
+    {
+        using var viewModel = new StockCardViewModel(
+            new ScriptedInventoryApiClient(),
+            new ImmediateUiDispatcher(),
+            new DesktopNotificationCenter());
+
+        await viewModel.SetSelectionAsync(2, 7, CancellationToken.None);
+
+        Assert.True(viewModel.IsEmpty);
+        Assert.Empty(viewModel.Items);
+    }
+
+    [Fact]
     public async Task Balance_search_is_debounced_while_filters_and_refresh_are_immediate()
     {
         var api = new ScriptedInventoryApiClient();
@@ -241,7 +270,8 @@ public sealed class InventoryViewModelTests
         public Task<ApiResponse<PagedResult<StockCardRow>>> GetStockCardAsync(
             StockCardQuery request,
             CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult(ApiResponse<PagedResult<StockCardRow>>.Success(
+                new PagedResult<StockCardRow>(Array.Empty<StockCardRow>(), request.PageNumber, request.PageSize, 0)));
     }
 
     private sealed class ControlledInventoryApiClient : IInventoryApiClient

@@ -13,6 +13,55 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class InventoryControlTests
 {
     [Fact]
+    public void Balance_control_shows_empty_state_after_first_successful_zero_row_query()
+    {
+        StaTest.Run(
+            cancellationToken =>
+            {
+                var api = new InventoryApiClient { ReturnEmptyBalances = true };
+                using var guard = new WinFormsTestGuard();
+                using var viewModel = new StockBalanceViewModel(
+                    api,
+                    new ImmediateUiDispatcher(),
+                    new DesktopNotificationCenter(),
+                    new ImmediateDelay());
+                using var control = new StockBalanceControl(viewModel);
+
+                control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+
+                Assert.Equal("No stock balances.", control.OperationStatusLabel.Text);
+                Assert.Empty(control.BalanceGrid.Rows.Cast<System.Windows.Forms.DataGridViewRow>());
+                Assert.Empty(guard.Exceptions);
+            },
+            TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public void Stock_card_control_shows_empty_state_after_first_successful_zero_row_query()
+    {
+        StaTest.Run(
+            _ =>
+            {
+                var api = new InventoryApiClient { ReturnEmptyCards = true };
+                using var guard = new WinFormsTestGuard();
+                using var viewModel = new StockCardViewModel(
+                    api,
+                    new ImmediateUiDispatcher(),
+                    new DesktopNotificationCenter());
+                using var control = new StockCardControl(viewModel);
+
+                control.WarehouseFilter.Value = 2;
+                control.ProductFilter.Value = 7;
+                control.LastOperation.GetAwaiter().GetResult();
+
+                Assert.Equal("No stock movements.", control.OperationStatusLabel.Text);
+                Assert.Empty(control.StockCardGrid.Rows.Cast<System.Windows.Forms.DataGridViewRow>());
+                Assert.Empty(guard.Exceptions);
+            },
+            TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
     public void Balance_control_renders_history_totals_and_runs_explicit_filters_immediately()
     {
         StaTest.Run(
@@ -141,12 +190,24 @@ public sealed class InventoryControlTests
         public IList<StockBalanceQuery> BalanceRequests { get; } = new List<StockBalanceQuery>();
         public IList<StockCardQuery> CardRequests { get; } = new List<StockCardQuery>();
         public ApiError? CardError { get; set; }
+        public bool ReturnEmptyBalances { get; set; }
+        public bool ReturnEmptyCards { get; set; }
 
         public Task<ApiResponse<PagedResult<StockBalanceRow>>> GetStockBalancesAsync(
             StockBalanceQuery request,
             CancellationToken cancellationToken)
         {
             BalanceRequests.Add(request);
+            if (ReturnEmptyBalances)
+            {
+                return Task.FromResult(ApiResponse<PagedResult<StockBalanceRow>>.Success(
+                    new PagedResult<StockBalanceRow>(
+                        Array.Empty<StockBalanceRow>(),
+                        request.PageNumber,
+                        request.PageSize,
+                        0)));
+            }
+
             var row = new StockBalanceRow(
                 2,
                 "WH-02",
@@ -169,6 +230,16 @@ public sealed class InventoryControlTests
             if (CardError != null)
             {
                 return Task.FromResult(ApiResponse<PagedResult<StockCardRow>>.Failure(CardError));
+            }
+
+            if (ReturnEmptyCards)
+            {
+                return Task.FromResult(ApiResponse<PagedResult<StockCardRow>>.Success(
+                    new PagedResult<StockCardRow>(
+                        Array.Empty<StockCardRow>(),
+                        request.PageNumber,
+                        request.PageSize,
+                        0)));
             }
 
             var row = new StockCardRow(

@@ -42,11 +42,9 @@ namespace MyDmsVn.Desktop.Application
             get => _items;
             private set
             {
-                if (SetProperty(ref _items, value))
-                {
-                    IsEmpty = value.Count == 0;
-                    VisibleQuantityChangeTotal = value.Sum(row => row.QuantityChange);
-                }
+                SetProperty(ref _items, value);
+                IsEmpty = value.Count == 0;
+                VisibleQuantityChangeTotal = value.Sum(row => row.QuantityChange);
             }
         }
 
