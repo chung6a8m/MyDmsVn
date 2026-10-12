@@ -200,6 +200,153 @@ public sealed class SqlPrincipalProvisioningTests
     }
 
     [SqlServerFact]
+    public async Task Provisioning_and_startup_reject_direct_users_insert_permission()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6DirectDmlRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6DirectDmlMigrationProbe] WITHOUT LOGIN;");
+            var script = ReadProvisioningScript(
+                "P6DirectDmlRuntimeProbe",
+                "P6DirectDmlMigrationProbe");
+            await connection.ExecuteAsync(script);
+            await connection.ExecuteAsync(
+                "GRANT INSERT ON OBJECT::dbo.Users TO [P6DirectDmlRuntimeProbe]; " +
+                "EXECUTE AS USER = N'P6DirectDmlRuntimeProbe';");
+            try
+            {
+                Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                    "SELECT HAS_PERMS_BY_NAME(N'dbo.Users', N'OBJECT', N'INSERT');"));
+                var startupException = await Assert.ThrowsAsync<DesktopStartupException>(
+                    () => new SqlRuntimePrincipalValidator()
+                        .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None));
+                Assert.Equal("Security.RuntimePrincipalOverprivileged", startupException.Code);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+
+            var provisioningException = await Assert.ThrowsAsync<SqlException>(
+                () => connection.ExecuteAsync(script));
+
+            Assert.Contains("elevated", provisioningException.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                "EXECUTE AS USER = N'P6DirectDmlRuntimeProbe'; " +
+                "SELECT HAS_PERMS_BY_NAME(" +
+                "N'dbo.Users', N'OBJECT', N'UPDATE', N'PasswordHash', N'COLUMN'); " +
+                "REVERT;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Provisioning_and_startup_reject_disallowed_users_column_update()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6ColumnDmlRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6ColumnDmlMigrationProbe] WITHOUT LOGIN;");
+            var script = ReadProvisioningScript(
+                "P6ColumnDmlRuntimeProbe",
+                "P6ColumnDmlMigrationProbe");
+            await connection.ExecuteAsync(script);
+            await connection.ExecuteAsync(
+                "GRANT UPDATE (IsActive) ON OBJECT::dbo.Users TO [P6ColumnDmlRuntimeProbe]; " +
+                "EXECUTE AS USER = N'P6ColumnDmlRuntimeProbe';");
+            try
+            {
+                Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                    "SELECT HAS_PERMS_BY_NAME(" +
+                    "N'dbo.Users', N'OBJECT', N'UPDATE', N'IsActive', N'COLUMN');"));
+                var startupException = await Assert.ThrowsAsync<DesktopStartupException>(
+                    () => new SqlRuntimePrincipalValidator()
+                        .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None));
+                Assert.Equal("Security.RuntimePrincipalOverprivileged", startupException.Code);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+
+            var provisioningException = await Assert.ThrowsAsync<SqlException>(
+                () => connection.ExecuteAsync(script));
+
+            Assert.Contains("elevated", provisioningException.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Provisioning_and_startup_reject_schema_dml_permission()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6SchemaDmlRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6SchemaDmlMigrationProbe] WITHOUT LOGIN;");
+            var script = ReadProvisioningScript(
+                "P6SchemaDmlRuntimeProbe",
+                "P6SchemaDmlMigrationProbe");
+            await connection.ExecuteAsync(script);
+            await connection.ExecuteAsync(
+                "GRANT SELECT, UPDATE ON SCHEMA::dbo TO [P6SchemaDmlRuntimeProbe]; " +
+                "EXECUTE AS USER = N'P6SchemaDmlRuntimeProbe';");
+            try
+            {
+                Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                    "SELECT HAS_PERMS_BY_NAME(N'dbo', N'SCHEMA', N'UPDATE');"));
+                Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                    "SELECT HAS_PERMS_BY_NAME(" +
+                    "N'dbo.Users', N'OBJECT', N'UPDATE', N'IsActive', N'COLUMN');"));
+                var startupException = await Assert.ThrowsAsync<DesktopStartupException>(
+                    () => new SqlRuntimePrincipalValidator()
+                        .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None));
+                Assert.Equal("Security.RuntimePrincipalOverprivileged", startupException.Code);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+
+            var provisioningException = await Assert.ThrowsAsync<SqlException>(
+                () => connection.ExecuteAsync(script));
+
+            Assert.Contains("elevated", provisioningException.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation()
     {
         var database = await SqlTestDatabase.CreateAsync(

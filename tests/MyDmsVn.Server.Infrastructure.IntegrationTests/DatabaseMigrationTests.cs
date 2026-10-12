@@ -12,6 +12,39 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class DatabaseMigrationTests
 {
     [SqlServerFact]
+    public async Task Unmanaged_alias_type_is_rejected_without_creating_the_journal()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.OpenAsync();
+                await connection.ExecuteAsync(
+                    "CREATE TYPE dbo.P6LegacyCode FROM nvarchar(32) NOT NULL;");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.types AS candidate " +
+                "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = candidate.schema_id " +
+                "WHERE ownerSchema.name = N'dbo' AND candidate.name = N'P6LegacyCode' " +
+                "AND candidate.is_user_defined = 1;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Unmanaged_database_ddl_trigger_is_rejected_without_creating_the_journal()
     {
         var database = await SqlTestDatabase.CreateAsync(

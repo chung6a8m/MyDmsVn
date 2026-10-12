@@ -37,6 +37,45 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
         "ISNULL(HAS_PERMS_BY_NAME(DB_NAME(), N'DATABASE', N'ALTER'), 0) = 1 OR " +
         "ISNULL(HAS_PERMS_BY_NAME(N'dbo', N'SCHEMA', N'CONTROL'), 0) = 1 OR " +
         "ISNULL(HAS_PERMS_BY_NAME(N'dbo', N'SCHEMA', N'ALTER'), 0) = 1 OR " +
+        "EXISTS (SELECT 1 FROM sys.schemas AS candidate " +
+        "CROSS APPLY sys.fn_my_permissions(QUOTENAME(candidate.name), N'SCHEMA') AS schemaPermission " +
+        "WHERE schemaPermission.permission_name IN (N'SELECT', N'INSERT', N'UPDATE', N'DELETE')) OR " +
+        "EXISTS (SELECT 1 FROM sys.objects AS candidate " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = candidate.schema_id " +
+        "CROSS APPLY sys.fn_my_permissions(" +
+        "QUOTENAME(ownerSchema.name) + N'.' + QUOTENAME(candidate.name), N'OBJECT') AS objectPermission " +
+        "WHERE candidate.is_ms_shipped = 0 " +
+        "AND candidate.parent_object_id = 0 " +
+        "AND objectPermission.permission_name IN (N'SELECT', N'INSERT', N'UPDATE', N'DELETE') " +
+        "AND NOT (ownerSchema.name = N'dbo' AND (" +
+        "(objectPermission.permission_name = N'SELECT' AND candidate.name IN (" +
+        "N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
+        "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
+        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions')) OR " +
+        "(objectPermission.permission_name = N'INSERT' AND candidate.name IN (" +
+        "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
+        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances')) OR " +
+        "(objectPermission.permission_name = N'UPDATE' AND candidate.name IN (" +
+        "N'Users', N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
+        "N'GoodsReceiptLines', N'GoodsReceiptNumberSequence', N'StockBalances')) OR " +
+        "(objectPermission.permission_name = N'DELETE' AND candidate.name = N'GoodsReceiptLines')))) OR " +
+        "EXISTS (SELECT 1 FROM sys.tables AS ownerTable " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = ownerTable.schema_id " +
+        "INNER JOIN sys.columns AS candidate ON candidate.object_id = ownerTable.object_id " +
+        "CROSS APPLY (VALUES (N'SELECT'), (N'UPDATE')) AS checkedPermission(permission_name) " +
+        "WHERE ownerTable.is_ms_shipped = 0 " +
+        "AND ISNULL(HAS_PERMS_BY_NAME(" +
+        "QUOTENAME(ownerSchema.name) + N'.' + QUOTENAME(ownerTable.name), N'OBJECT', " +
+        "checkedPermission.permission_name, candidate.name, N'COLUMN'), 0) = 1 " +
+        "AND NOT (ownerSchema.name = N'dbo' AND (" +
+        "(checkedPermission.permission_name = N'SELECT' AND ownerTable.name IN (" +
+        "N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
+        "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
+        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions')) OR " +
+        "(checkedPermission.permission_name = N'UPDATE' AND (ownerTable.name IN (" +
+        "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
+        "N'GoodsReceiptLines', N'StockBalances') OR (ownerTable.name = N'Users' AND candidate.name IN (" +
+        "N'PasswordHash', N'PasswordSalt', N'PasswordAlgorithm', N'UpdatedAtUtc', N'UpdatedByUserId'))))))) OR " +
         "EXISTS (SELECT 1 FROM sys.objects AS candidate " +
         "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = candidate.schema_id " +
         "CROSS APPLY sys.fn_my_permissions(" +
