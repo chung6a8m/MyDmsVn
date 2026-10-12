@@ -29,8 +29,8 @@ Final sequential verification results:
 
 - `dotnet restore MyDmsVn.sln --locked-mode`: succeeded; all projects up to date.
 - `dotnet build MyDmsVn.sln -c Release --no-restore -p:BuildInParallel=false`: succeeded with 0 warnings and 0 errors.
-- `net48`: Application 120/120, SQL integration 97/97, Desktop 175/175.
-- `net8.0` / `net8.0-windows`: Application 120/120, SQL integration 97/97, Desktop 175/175, Architecture 5/5.
+- `net48`: Application 120/120, SQL integration 97/97, Desktop 177/177.
+- `net8.0` / `net8.0-windows`: Application 120/120, SQL integration 97/97, Desktop 177/177, Architecture 5/5.
 - Both desktop hosts returned success from their Release `--smoke-test` entry point.
 
 The two TFM groups were tested serially; no `net48` and `net8.0` test runs overlapped.

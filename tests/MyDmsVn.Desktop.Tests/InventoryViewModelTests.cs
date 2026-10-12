@@ -111,6 +111,30 @@ public sealed class InventoryViewModelTests
         Assert.Equal(4m, viewModel.VisibleQuantityChangeTotal);
     }
 
+    [Fact]
+    public async Task Stock_card_clearing_selection_cancels_pending_read_and_clears_loading()
+    {
+        var api = new ControlledInventoryApiClient();
+        using var viewModel = new StockCardViewModel(
+            api,
+            new IgnoringCancellationDispatcher(),
+            new DesktopNotificationCenter());
+
+        var pending = viewModel.SetSelectionAsync(2, 7, CancellationToken.None);
+        Assert.True(viewModel.IsLoading);
+
+        await viewModel.SetSelectionAsync(2, 0, CancellationToken.None);
+
+        Assert.False(viewModel.IsLoading);
+        Assert.Empty(viewModel.Items);
+        Assert.Equal(0, viewModel.TotalCount);
+        Assert.Single(api.CardRequests);
+
+        api.CompleteCard(0, Movement(1, 2, 7, 5m));
+        await pending;
+        Assert.Empty(viewModel.Items);
+    }
+
     private static StockBalanceRow Balance(int warehouseId, int productId, decimal quantity) =>
         new StockBalanceRow(
             warehouseId,

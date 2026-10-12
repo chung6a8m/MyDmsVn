@@ -95,6 +95,40 @@ public sealed class InventoryControlTests
             TimeSpan.FromSeconds(10));
     }
 
+    [Fact]
+    public void Stock_card_control_applies_dates_chosen_before_ids_in_first_query()
+    {
+        StaTest.Run(
+            _ =>
+            {
+                var api = new InventoryApiClient();
+                using var guard = new WinFormsTestGuard();
+                using var viewModel = new StockCardViewModel(
+                    api,
+                    new ImmediateUiDispatcher(),
+                    new DesktopNotificationCenter());
+                using var control = new StockCardControl(viewModel);
+                var fromUtc = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+                var toUtc = new DateTime(2026, 10, 31, 23, 59, 0, DateTimeKind.Utc);
+
+                control.FromUtcFilter.Value = fromUtc;
+                control.FromUtcFilter.Checked = true;
+                control.ToUtcFilter.Value = toUtc;
+                control.ToUtcFilter.Checked = true;
+                Assert.Empty(api.CardRequests);
+
+                control.WarehouseFilter.Value = 2;
+                control.ProductFilter.Value = 7;
+                control.LastOperation.GetAwaiter().GetResult();
+
+                var request = Assert.Single(api.CardRequests);
+                Assert.Equal(fromUtc, request.FromUtc);
+                Assert.Equal(toUtc, request.ToUtc);
+                Assert.Empty(guard.Exceptions);
+            },
+            TimeSpan.FromSeconds(10));
+    }
+
     private sealed class ImmediateDelay : IAsyncDelay
     {
         public Task DelayAsync(TimeSpan interval, CancellationToken cancellationToken) =>

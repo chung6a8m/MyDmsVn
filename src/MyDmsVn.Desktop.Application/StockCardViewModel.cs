@@ -121,20 +121,31 @@ namespace MyDmsVn.Desktop.Application
             lock (_sync)
             {
                 ThrowIfDisposed();
-                WarehouseId = warehouseId;
-                ProductId = productId;
-                PageNumber = 1;
-                if (warehouseId <= 0 || productId <= 0)
-                {
-                    CancelActiveLoadLocked();
-                    ResetValidation();
-                    IsAccessDenied = false;
-                    Items = Array.Empty<StockCardRow>();
-                    TotalCount = 0;
-                    return Task.CompletedTask;
-                }
+                return SetFiltersLocked(
+                    warehouseId,
+                    productId,
+                    FromUtc,
+                    ToUtc,
+                    cancellationToken);
+            }
+        }
 
-                return LoadAsync(cancellationToken);
+        public Task SetFiltersAsync(
+            int warehouseId,
+            int productId,
+            DateTime? fromUtc,
+            DateTime? toUtc,
+            CancellationToken cancellationToken)
+        {
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+                return SetFiltersLocked(
+                    warehouseId,
+                    productId,
+                    fromUtc,
+                    toUtc,
+                    cancellationToken);
             }
         }
 
@@ -146,10 +157,12 @@ namespace MyDmsVn.Desktop.Application
             lock (_sync)
             {
                 ThrowIfDisposed();
-                FromUtc = fromUtc;
-                ToUtc = toUtc;
-                PageNumber = 1;
-                return LoadAsync(cancellationToken);
+                return SetFiltersLocked(
+                    WarehouseId,
+                    ProductId,
+                    fromUtc,
+                    toUtc,
+                    cancellationToken);
             }
         }
 
@@ -160,10 +173,7 @@ namespace MyDmsVn.Desktop.Application
                 ThrowIfDisposed();
                 if (WarehouseId <= 0 || ProductId <= 0)
                 {
-                    CancelActiveLoadLocked();
-                    Items = Array.Empty<StockCardRow>();
-                    TotalCount = 0;
-                    return Task.CompletedTask;
+                    return ClearWithoutQueryLocked();
                 }
 
                 return LoadAsync(cancellationToken);
@@ -242,6 +252,35 @@ namespace MyDmsVn.Desktop.Application
             {
                 await EndLoadAsync(operation).ConfigureAwait(false);
             }
+        }
+
+        private Task SetFiltersLocked(
+            int warehouseId,
+            int productId,
+            DateTime? fromUtc,
+            DateTime? toUtc,
+            CancellationToken cancellationToken)
+        {
+            WarehouseId = warehouseId;
+            ProductId = productId;
+            FromUtc = fromUtc;
+            ToUtc = toUtc;
+            PageNumber = 1;
+            return warehouseId <= 0 || productId <= 0
+                ? ClearWithoutQueryLocked()
+                : LoadAsync(cancellationToken);
+        }
+
+        private Task ClearWithoutQueryLocked()
+        {
+            CancelActiveLoadLocked();
+            ResetValidation();
+            IsAccessDenied = false;
+            Items = Array.Empty<StockCardRow>();
+            TotalCount = 0;
+            return _dispatcher.InvokeAsync(
+                () => IsLoading = false,
+                CancellationToken.None);
         }
 
         private void ApplyResponse(

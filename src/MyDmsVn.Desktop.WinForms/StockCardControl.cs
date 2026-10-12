@@ -111,9 +111,11 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnSelectionChanged(object? sender, EventArgs eventArgs)
         {
-            LastOperation = _viewModel.SetSelectionAsync(
+            LastOperation = _viewModel.SetFiltersAsync(
                 decimal.ToInt32(WarehouseFilter.Value),
                 decimal.ToInt32(ProductFilter.Value),
+                ToUtc(FromUtcFilter),
+                ToUtc(ToUtcFilter),
                 CancellationToken.None);
         }
 
