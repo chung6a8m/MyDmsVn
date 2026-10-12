@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -136,6 +136,31 @@ public sealed class SchemaCompatibilityIntegrationTests
             {
                 await connection.ExecuteAsync(
                     "ALTER TABLE dbo.Products NOCHECK CONSTRAINT CK_Products_Code_NoNul;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Required_check_constraint_with_wrong_predicate_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.StockLedger DROP CONSTRAINT CK_StockLedger_QuantityChange_NonZero; " +
+                    "ALTER TABLE dbo.StockLedger WITH CHECK ADD CONSTRAINT CK_StockLedger_QuantityChange_NonZero " +
+                    "CHECK (QuantityChange >= -1000);");
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
@@ -341,6 +366,30 @@ public sealed class SchemaCompatibilityIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Required_append_only_trigger_with_no_op_body_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger " +
+                    "AFTER UPDATE, DELETE AS BEGIN SET NOCOUNT ON; END;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Clean_known_prefix_is_too_old()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -416,4 +465,5 @@ public sealed class SchemaCompatibilityIntegrationTests
         Assert.True(migration.Successful, migration.Error?.ToString());
         return database;
     }
+
 }

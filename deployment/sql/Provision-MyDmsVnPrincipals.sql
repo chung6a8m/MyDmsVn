@@ -1,4 +1,4 @@
-SET NOCOUNT ON;
+﻿SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
 IF DB_NAME() IN (N'master', N'model', N'msdb', N'tempdb')
@@ -75,25 +75,35 @@ IF IS_ROLEMEMBER(N'MyDmsVnMigrationRole', N'$(MigrationUser)') <> 1
 REVOKE INSERT ON OBJECT::dbo.Users FROM [MyDmsVnRuntimeRole];
 REVOKE UPDATE ON OBJECT::dbo.Users FROM [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.Users TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.Users TO [MyDmsVnRuntimeRole];
 GRANT UPDATE
     (PasswordHash, PasswordSalt, PasswordAlgorithm, UpdatedAtUtc, UpdatedByUserId)
     ON OBJECT::dbo.Users TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.Roles TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.Roles TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.UserRoles TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.RolePermissions TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.RolePermissions TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
 
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Warehouses TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.Warehouses TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Employees TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.Employees TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Customers TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.Customers TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.CatalogTextContainsNul TO [MyDmsVnRuntimeRole];
 
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.GoodsReceipts TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.GoodsReceipts TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.GoodsReceiptLines TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.GoodsReceiptLines TO [MyDmsVnRuntimeRole];
 GRANT UPDATE ON OBJECT::dbo.GoodsReceiptNumberSequence TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT ON OBJECT::dbo.StockLedger TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.StockLedger TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.StockBalances TO [MyDmsVnRuntimeRole];
 
 GRANT SELECT ON OBJECT::dbo.SchemaVersions TO [MyDmsVnRuntimeRole];

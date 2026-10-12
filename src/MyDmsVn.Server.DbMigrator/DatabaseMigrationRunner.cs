@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using DbUp;
 using DbUp.Engine;
 using DbUp.SqlServer;
@@ -172,7 +172,11 @@ internal sealed class DatabaseMigrationLock : IDisposable
 
     public static DatabaseMigrationLock Acquire(string connectionString)
     {
-        var connection = new SqlConnection(connectionString);
+        var dedicatedConnectionString = new SqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = false,
+        }.ConnectionString;
+        var connection = new SqlConnection(dedicatedConnectionString);
         try
         {
             connection.Open();

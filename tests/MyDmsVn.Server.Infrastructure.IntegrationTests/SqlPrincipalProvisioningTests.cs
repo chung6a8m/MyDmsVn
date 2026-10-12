@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Threading.Tasks;
 using Dapper;
@@ -159,6 +159,7 @@ public sealed class SqlPrincipalProvisioningTests
                 "HAS_PERMS_BY_NAME(N'dbo.GoodsReceiptNumberSequence', N'OBJECT', N'UPDATE') AS CanUseReceiptSequence, " +
                 "HAS_PERMS_BY_NAME(N'dbo.CatalogTextContainsNul', N'OBJECT', N'VIEW DEFINITION') AS CanInspectManifestFunction, " +
                 "HAS_PERMS_BY_NAME(N'dbo.Employees', N'OBJECT', N'VIEW DEFINITION') AS CanInspectEmployeeIndexDefinition, " +
+                "HAS_PERMS_BY_NAME(N'dbo.StockLedger', N'OBJECT', N'VIEW DEFINITION') AS CanInspectAppendOnlyTriggerDefinition, " +
                 "HAS_PERMS_BY_NAME(N'dbo', N'SCHEMA', N'ALTER') AS CanAlterSchema, " +
                 "HAS_PERMS_BY_NAME(N'dbo.SchemaVersions', N'OBJECT', N'SELECT') AS CanReadJournal, " +
                 "HAS_PERMS_BY_NAME(N'dbo.SchemaVersions', N'OBJECT', N'UPDATE') AS CanUpdateJournal, " +
@@ -174,6 +175,7 @@ public sealed class SqlPrincipalProvisioningTests
             Assert.Equal(1, permissions.CanUseReceiptSequence);
             Assert.Equal(1, permissions.CanInspectManifestFunction);
             Assert.Equal(1, permissions.CanInspectEmployeeIndexDefinition);
+            Assert.Equal(1, permissions.CanInspectAppendOnlyTriggerDefinition);
             Assert.Equal(0, permissions.CanAlterSchema);
             Assert.Equal(1, permissions.CanReadJournal);
             Assert.Equal(0, permissions.CanUpdateJournal);
@@ -268,6 +270,47 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Runtime_preflight_rejects_unexpected_filtered_unique_index()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6FilteredIndexRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6FilteredIndexMigrationProbe] WITHOUT LOGIN;");
+            await connection.ExecuteAsync(
+                ReadProvisioningScript(
+                    "P6FilteredIndexRuntimeProbe",
+                    "P6FilteredIndexMigrationProbe"));
+            await connection.ExecuteAsync(
+                "DROP INDEX UX_Products_Code ON dbo.Products; " +
+                "CREATE UNIQUE INDEX UX_Products_Code ON dbo.Products (Code) WHERE IsActive = 1; " +
+                "EXECUTE AS USER = N'P6FilteredIndexRuntimeProbe';");
+            try
+            {
+                var compatibility = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                    .CheckConnectionAsync(connection, System.Threading.CancellationToken.None);
+
+                Assert.Equal(SchemaCompatibilityStatus.Partial, compatibility.Status);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     private static string FindProvisioningScript()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -315,6 +358,8 @@ public sealed class SqlPrincipalProvisioningTests
         public int CanInspectManifestFunction { get; set; }
 
         public int CanInspectEmployeeIndexDefinition { get; set; }
+
+        public int CanInspectAppendOnlyTriggerDefinition { get; set; }
 
         public int CanAlterSchema { get; set; }
 

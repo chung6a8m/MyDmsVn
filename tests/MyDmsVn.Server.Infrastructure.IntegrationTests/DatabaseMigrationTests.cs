@@ -233,6 +233,44 @@ public sealed class DatabaseMigrationTests
     }
 
     [SqlServerFact]
+    public async Task Successful_migration_releases_session_lock_before_connection_is_pooled()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        var pooledConnectionString = new SqlConnectionStringBuilder(database.ConnectionString)
+        {
+            Pooling = true,
+            ApplicationName = "P6-Pooled-Migration-Lock-Probe",
+        }.ConnectionString;
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(pooledConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+
+            var independentConnectionString = new SqlConnectionStringBuilder(database.ConnectionString)
+            {
+                Pooling = false,
+                ApplicationName = "P6-Independent-Migration-Lock-Probe",
+            }.ConnectionString;
+            using var observer = new SqlConnection(independentConnectionString);
+            await observer.OpenAsync();
+            var lockResult = await observer.QuerySingleAsync<int>(
+                "DECLARE @Result int; " +
+                "EXEC @Result = sys.sp_getapplock " +
+                "@Resource = N'MyDmsVn.SchemaMigration', " +
+                "@LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0; " +
+                "SELECT @Result;");
+
+            Assert.True(lockResult >= 0, $"Migration lock remained held by a pooled session: {lockResult}.");
+        }
+        finally
+        {
+            SqlConnection.ClearPool(new SqlConnection(pooledConnectionString));
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Losing_the_migration_lock_session_stops_the_active_DbUp_script()
     {
         var database = await SqlTestDatabase.CreateAsync(
