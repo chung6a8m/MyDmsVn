@@ -233,12 +233,8 @@ namespace MyDmsVn.Desktop.Application
             }
 
             IsAccessDenied = IsAuthorizationFailure(response.Error!);
-            if (IsAccessDenied)
-            {
-                Items = Array.Empty<StockBalanceRow>();
-                TotalCount = 0;
-            }
-
+            Items = Array.Empty<StockBalanceRow>();
+            TotalCount = 0;
             ApplyApiError(response.Error!);
         }
 

@@ -302,12 +302,8 @@ namespace MyDmsVn.Desktop.Application
             }
 
             IsAccessDenied = IsAuthorizationFailure(response.Error!);
-            if (IsAccessDenied)
-            {
-                Items = Array.Empty<StockCardRow>();
-                TotalCount = 0;
-            }
-
+            Items = Array.Empty<StockCardRow>();
+            TotalCount = 0;
             ApplyApiError(response.Error!);
         }
 

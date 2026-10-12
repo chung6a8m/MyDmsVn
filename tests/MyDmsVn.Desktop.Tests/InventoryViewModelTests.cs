@@ -63,6 +63,15 @@ public sealed class InventoryViewModelTests
         Assert.Equal(9m, viewModel.VisibleQuantityTotal);
 
         api.NextBalanceResponse = ApiResponse<PagedResult<StockBalanceRow>>.Failure(
+            new ApiError(ApiStatusCode.BadRequest, "ValidationError", "Invalid filter."));
+        await viewModel.SetWarehouseFilterAsync(9, CancellationToken.None);
+        Assert.Empty(viewModel.Items);
+        Assert.Equal(0m, viewModel.VisibleQuantityTotal);
+        Assert.Equal(0, viewModel.TotalCount);
+        Assert.False(viewModel.IsAccessDenied);
+        Assert.Equal("Invalid filter.", viewModel.ErrorMessage);
+
+        api.NextBalanceResponse = ApiResponse<PagedResult<StockBalanceRow>>.Failure(
             new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Denied."));
         await viewModel.RefreshAsync(CancellationToken.None);
         Assert.Empty(viewModel.Items);
@@ -109,6 +118,15 @@ public sealed class InventoryViewModelTests
         api.CompleteCard(3, Movement(4, 3, 8, 4m));
         await refresh;
         Assert.Equal(4m, viewModel.VisibleQuantityChangeTotal);
+
+        api.NextCardResponse = ApiResponse<PagedResult<StockCardRow>>.Failure(
+            new ApiError(ApiStatusCode.BadRequest, "ValidationError", "Invalid date range."));
+        await viewModel.SetDateRangeAsync(toUtc, fromUtc, CancellationToken.None);
+        Assert.Empty(viewModel.Items);
+        Assert.Equal(0m, viewModel.VisibleQuantityChangeTotal);
+        Assert.Equal(0, viewModel.TotalCount);
+        Assert.False(viewModel.IsAccessDenied);
+        Assert.Equal("Invalid date range.", viewModel.ErrorMessage);
     }
 
     [Fact]
@@ -214,6 +232,7 @@ public sealed class InventoryViewModelTests
 
         public IList<StockCardQuery> CardRequests { get; } = new List<StockCardQuery>();
         public ApiResponse<PagedResult<StockBalanceRow>>? NextBalanceResponse { get; set; }
+        public ApiResponse<PagedResult<StockCardRow>>? NextCardResponse { get; set; }
 
         public Task<ApiResponse<PagedResult<StockBalanceRow>>> GetStockBalancesAsync(
             StockBalanceQuery request,
@@ -237,6 +256,13 @@ public sealed class InventoryViewModelTests
             CancellationToken cancellationToken)
         {
             CardRequests.Add(request);
+            if (NextCardResponse != null)
+            {
+                var response = NextCardResponse;
+                NextCardResponse = null;
+                return Task.FromResult(response);
+            }
+
             var completion = new TaskCompletionSource<ApiResponse<PagedResult<StockCardRow>>>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             _cards.Add(completion);
