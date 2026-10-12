@@ -46,6 +46,33 @@ SELECT @RuntimeHasElevatedPermissions = CASE WHEN
     EXISTS
     (
         SELECT 1
+        FROM sys.database_principals AS candidate
+        WHERE candidate.name <> USER_NAME()
+          AND candidate.type <> N'R'
+          AND
+          (
+              ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'USER', N'IMPERSONATE'), 0) = 1 OR
+              ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'USER', N'CONTROL'), 0) = 1 OR
+              ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'USER', N'ALTER'), 0) = 1 OR
+              ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'USER', N'TAKE OWNERSHIP'), 0) = 1
+          )
+    ) OR
+    EXISTS
+    (
+        SELECT 1
+        FROM sys.database_principals AS candidate
+        WHERE candidate.name <> USER_NAME()
+          AND candidate.type = N'R'
+          AND
+          (
+              ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'ROLE', N'CONTROL'), 0) = 1 OR
+              ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'ROLE', N'ALTER'), 0) = 1 OR
+              ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'ROLE', N'TAKE OWNERSHIP'), 0) = 1
+          )
+    ) OR
+    EXISTS
+    (
+        SELECT 1
         FROM sys.fn_my_permissions(NULL, N'DATABASE')
         WHERE permission_name NOT IN
         (

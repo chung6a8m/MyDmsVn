@@ -104,6 +104,30 @@ public sealed class SchemaCompatibilityIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Current_database_with_unmanaged_database_ddl_trigger_is_unknown()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "CREATE TRIGGER P6CurrentUnmanagedDatabaseDdl ON DATABASE " +
+                    "FOR CREATE_TABLE AS BEGIN SET NOCOUNT ON; END;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.UnknownHistory, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Applied_artifacts_without_matching_journal_entry_are_partial()
     {
         var database = await CreateMigratedDatabaseAsync();

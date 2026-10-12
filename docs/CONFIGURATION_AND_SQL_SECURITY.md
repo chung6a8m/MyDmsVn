@@ -11,7 +11,7 @@ Không dùng chung credential giữa desktop và migrator.
 | Runtime principal | Hai desktop host | DML tối thiểu cho P3/P5; đọc journal để schema preflight; không DDL và không sửa journal |
 | Migration principal | Chỉ gói triển khai/quản trị | `CONTROL` trong đúng application database để DbUp tạo/thay đổi schema |
 
-Runtime principal không được là `sa`, thành viên `db_owner`, `db_ddladmin`, `sysadmin`, hoặc nhận quyền tương đương qua role khác. Migration credential không được đóng gói cùng desktop, ghi vào source control, shortcut, command line hoặc installer property có thể log ra ngoài.
+Runtime principal không được là `sa`, thành viên `db_owner`, `db_ddladmin`, `sysadmin`, nhận quyền tương đương qua role khác, hoặc có quyền `IMPERSONATE`/kiểm soát principal khác để chuyển sang migration user/login. Provisioning kiểm tra effective quyền trên database principals; desktop startup còn kiểm tra login và server roles khi chạy bằng login thật. Migration credential không được đóng gói cùng desktop, ghi vào source control, shortcut, command line hoặc installer property có thể log ra ngoài.
 
 Hai user phải khác nhau. Script provisioning từ chối cùng một identity và từ chối runtime user đã có fixed-role, database/schema/object administration hoặc database-wide permission ngoài tập mặc định an toàn. Khi khởi động, cả hai desktop host kiểm tra lại effective server/database/schema/object permissions và fail closed bằng `Security.RuntimePrincipalOverprivileged`; vì vậy cấu hình nhầm migration credential hoặc một `GRANT ALTER/CONTROL/TAKE OWNERSHIP` trực tiếp trên object không thể mở shell nghiệp vụ.
 

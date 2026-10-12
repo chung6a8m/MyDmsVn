@@ -12,6 +12,37 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class DatabaseMigrationTests
 {
     [SqlServerFact]
+    public async Task Unmanaged_database_ddl_trigger_is_rejected_without_creating_the_journal()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "CREATE TRIGGER P6UnmanagedDatabaseDdl ON DATABASE " +
+                    "FOR CREATE_TABLE AS BEGIN SET NOCOUNT ON; END;");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.triggers " +
+                "WHERE name = N'P6UnmanagedDatabaseDdl' AND parent_class = 0;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Managed_name_with_wrong_object_type_is_rejected_without_creating_the_journal()
     {
         var database = await SqlTestDatabase.CreateAsync(

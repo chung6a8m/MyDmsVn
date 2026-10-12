@@ -445,7 +445,9 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "(candidate.type = N'FN' AND candidate.name = N'CatalogTextContainsNul') OR " +
         "(candidate.type = N'SO' AND candidate.name = N'GoodsReceiptNumberSequence') OR " +
         "(candidate.type = N'TR' AND candidate.name = N'TR_StockLedger_AppendOnly' " +
-        "AND candidate.parent_object_id = OBJECT_ID(N'dbo.StockLedger', N'U')))));";
+        "AND candidate.parent_object_id = OBJECT_ID(N'dbo.StockLedger', N'U'))))) " +
+        "OR EXISTS (SELECT 1 FROM sys.triggers AS candidate " +
+        "WHERE candidate.parent_class = 0 AND candidate.is_ms_shipped = 0);";
 
     private readonly string _connectionString;
 

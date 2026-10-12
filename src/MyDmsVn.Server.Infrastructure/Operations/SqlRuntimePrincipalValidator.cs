@@ -43,6 +43,28 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
         "QUOTENAME(ownerSchema.name) + N'.' + QUOTENAME(candidate.name), N'OBJECT') AS objectPermission " +
         "WHERE candidate.is_ms_shipped = 0 " +
         "AND objectPermission.permission_name IN (N'ALTER', N'CONTROL', N'TAKE OWNERSHIP')) OR " +
+        "EXISTS (SELECT 1 FROM sys.database_principals AS candidate " +
+        "WHERE candidate.name <> USER_NAME() AND candidate.type <> N'R' " +
+        "AND (ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'USER', N'IMPERSONATE'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'USER', N'CONTROL'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'USER', N'ALTER'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'USER', N'TAKE OWNERSHIP'), 0) = 1)) OR " +
+        "EXISTS (SELECT 1 FROM sys.database_principals AS candidate " +
+        "WHERE candidate.name <> USER_NAME() AND candidate.type = N'R' " +
+        "AND (ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'ROLE', N'CONTROL'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'ROLE', N'ALTER'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'ROLE', N'TAKE OWNERSHIP'), 0) = 1)) OR " +
+        "EXISTS (SELECT 1 FROM sys.server_principals AS candidate " +
+        "WHERE candidate.name <> ORIGINAL_LOGIN() AND candidate.type <> N'R' " +
+        "AND (ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'LOGIN', N'IMPERSONATE'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'LOGIN', N'CONTROL'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'LOGIN', N'ALTER'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'LOGIN', N'TAKE OWNERSHIP'), 0) = 1)) OR " +
+        "EXISTS (SELECT 1 FROM sys.server_principals AS candidate " +
+        "WHERE candidate.name <> ORIGINAL_LOGIN() AND candidate.type = N'R' " +
+        "AND (ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'SERVER ROLE', N'CONTROL'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'SERVER ROLE', N'ALTER'), 0) = 1 " +
+        "OR ISNULL(HAS_PERMS_BY_NAME(candidate.name, N'SERVER ROLE', N'TAKE OWNERSHIP'), 0) = 1)) OR " +
         "EXISTS (SELECT 1 FROM sys.fn_my_permissions(NULL, N'DATABASE') " +
         "WHERE permission_name NOT IN (N'CONNECT', " +
         "N'VIEW DEFINITION', " +

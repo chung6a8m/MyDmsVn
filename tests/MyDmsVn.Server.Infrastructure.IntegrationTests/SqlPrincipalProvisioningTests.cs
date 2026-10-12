@@ -125,6 +125,81 @@ public sealed class SqlPrincipalProvisioningTests
     }
 
     [SqlServerFact]
+    public async Task Provisioning_rejects_direct_user_impersonation_permission()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6ImpersonatingRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6ImpersonatedMigrationProbe] WITHOUT LOGIN;");
+
+            var script = ReadProvisioningScript(
+                "P6ImpersonatingRuntimeProbe",
+                "P6ImpersonatedMigrationProbe");
+            await connection.ExecuteAsync(script);
+            await connection.ExecuteAsync(
+                "GRANT IMPERSONATE ON USER::[P6ImpersonatedMigrationProbe] " +
+                "TO [P6ImpersonatingRuntimeProbe];");
+
+            var exception = await Assert.ThrowsAsync<SqlException>(
+                () => connection.ExecuteAsync(script));
+
+            Assert.Contains("elevated", exception.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Startup_rejects_direct_user_impersonation_permission()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6StartupImpersonatingRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6StartupImpersonatedMigrationProbe] WITHOUT LOGIN;");
+            await connection.ExecuteAsync(
+                ReadProvisioningScript(
+                    "P6StartupImpersonatingRuntimeProbe",
+                    "P6StartupImpersonatedMigrationProbe"));
+            await connection.ExecuteAsync(
+                "GRANT IMPERSONATE ON USER::[P6StartupImpersonatedMigrationProbe] " +
+                "TO [P6StartupImpersonatingRuntimeProbe]; " +
+                "EXECUTE AS USER = N'P6StartupImpersonatingRuntimeProbe';");
+            try
+            {
+                var exception = await Assert.ThrowsAsync<DesktopStartupException>(
+                    () => new SqlRuntimePrincipalValidator()
+                        .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None));
+
+                Assert.Equal("Security.RuntimePrincipalOverprivileged", exception.Code);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation()
     {
         var database = await SqlTestDatabase.CreateAsync(
