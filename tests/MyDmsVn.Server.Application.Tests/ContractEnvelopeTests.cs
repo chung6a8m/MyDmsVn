@@ -131,7 +131,16 @@ namespace MyDmsVn.Server.Application.Tests
             var page = new PagedResult<StockBalanceRow>(
                 new[]
                 {
-                    new StockBalanceRow(2, 7, "P-007", "Product 7", 12.3400m),
+                    new StockBalanceRow(
+                        2,
+                        "WH-02",
+                        "Warehouse 2",
+                        false,
+                        7,
+                        "P-007",
+                        "Product 7",
+                        false,
+                        12.3400m),
                 },
                 1,
                 25,
@@ -141,8 +150,56 @@ namespace MyDmsVn.Server.Application.Tests
             var json = JsonConvert.SerializeObject(response, ApiJson.CreateSerializerSettings());
 
             Assert.Equal(
-                "{\"data\":{\"items\":[{\"warehouseId\":2,\"productId\":7,\"productCode\":\"P-007\",\"productName\":\"Product 7\",\"quantity\":12.3400}],\"pageNumber\":1,\"pageSize\":25,\"totalCount\":1}}",
+                "{\"data\":{\"items\":[{\"warehouseId\":2,\"warehouseCode\":\"WH-02\",\"warehouseName\":\"Warehouse 2\",\"warehouseIsActive\":false,\"productId\":7,\"productCode\":\"P-007\",\"productName\":\"Product 7\",\"productIsActive\":false,\"quantity\":12.3400}],\"pageNumber\":1,\"pageSize\":25,\"totalCount\":1}}",
                 json);
+        }
+
+        [Fact]
+        public void Inventory_read_contracts_round_trip_filters_and_historical_display_state()
+        {
+            var settings = ApiJson.CreateSerializerSettings();
+            var balanceQuery = new StockBalanceQuery(2, 7, "archived", 3, 25);
+            var cardQuery = new StockCardQuery(
+                2,
+                7,
+                new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 10, 31, 23, 59, 59, DateTimeKind.Utc),
+                2,
+                50);
+            var cardRow = new StockCardRow(
+                91,
+                2,
+                "WH-02",
+                "Archived warehouse",
+                false,
+                7,
+                "P-007",
+                "Archived product",
+                false,
+                new DateTime(2026, 10, 12, 1, 2, 3, DateTimeKind.Utc),
+                "GoodsReceipt",
+                41,
+                "GR0000000041",
+                12.5000m);
+
+            var balanceRoundTrip = JsonConvert.DeserializeObject<StockBalanceQuery>(
+                JsonConvert.SerializeObject(balanceQuery, settings),
+                settings)!;
+            var cardRoundTrip = JsonConvert.DeserializeObject<StockCardRow>(
+                JsonConvert.SerializeObject(cardRow, settings),
+                settings)!;
+
+            Assert.Equal(2, balanceRoundTrip.WarehouseId);
+            Assert.Equal(7, balanceRoundTrip.ProductId);
+            Assert.Equal("archived", balanceRoundTrip.Search);
+            Assert.Equal(3, balanceRoundTrip.PageNumber);
+            Assert.Equal(25, balanceRoundTrip.PageSize);
+            Assert.Equal(2, cardQuery.PageNumber);
+            Assert.Equal(50, cardQuery.PageSize);
+            Assert.Equal(41, cardRoundTrip.DocumentId);
+            Assert.Equal("GR0000000041", cardRoundTrip.DocumentNumber);
+            Assert.False(cardRoundTrip.WarehouseIsActive);
+            Assert.False(cardRoundTrip.ProductIsActive);
         }
 
         [Fact]

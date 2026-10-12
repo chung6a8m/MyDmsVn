@@ -217,6 +217,31 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void WinForms_composition_resolves_inventory_factory_and_controls()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var services = new ServiceCollection();
+                    services.AddServerApplication();
+                    services.AddLocalDesktopAdapter();
+                    services.AddMyDmsVnDesktopWinForms(new SynchronizationContext());
+
+                    using (var provider = services.BuildServiceProvider())
+                    {
+                        var factory = provider.GetRequiredService<IInventoryControlFactory>();
+                        using (var balances = factory.CreateStockBalances())
+                        using (var card = factory.CreateStockCard())
+                        {
+                            Assert.IsType<StockBalanceControl>(balances);
+                            Assert.IsType<StockCardControl>(card);
+                        }
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public async Task In_flight_catalog_mutation_keeps_authorized_actor_after_local_sign_out()
         {
             var unitOfWorkFactory = new PausingUnitOfWorkFactory();

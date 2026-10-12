@@ -1,6 +1,6 @@
 ﻿# P5 — Sales & Inventory Foundation (detailed implementation plan)
 
-Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03, the P5.2 gate, P5.3-T01, P5.3-T02, P5.3-T03 and the P5.3 gate completed on 2026-10-11. Interactive P5.1 manual smoke and P5.4 onward remain open. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
+Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03, the P5.2 gate, P5.3-T01, P5.3-T02, P5.3-T03 and the P5.3 gate completed on 2026-10-11. P5.4 implementation and automated coverage completed on 2026-10-12. Interactive P5.1/P5.4 walkthroughs remain open because the current hosts have no authenticated-session bootstrap. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
 ## Goal / explicitly excluded
 
@@ -38,7 +38,7 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [x] Integration tests: uniqueness/collation, FK, deactivated historical reference, permissions.
 - [x] Deterministic ViewModel tests (with fake API and controllable delay/scheduler): rapid typing issues one final debounced query; page resets on filter change; a canceled but late old response cannot overwrite new results; Refresh executes immediately; close/dispose prevents delayed UI work.
 - [x] Messenger tests: each successful Create/Update/SetActive publishes exactly one correctly typed change, failures publish none; two open recipients refresh only affected catalogs, handle bursts, and stop reacting after disposal; reopening fetches fresh data. A deactivated selected item remains visible but is unavailable for new selection.
-- [ ] Manual smoke and safe STA UI smoke for each catalog and open Goods Receipt lookups across `net48` and `net8.0-windows`: rapid filtering, successful edit/activation/deactivation propagation, thread-safe binding updates, and no modal hangs.
+- [ ] Manual smoke and safe STA UI smoke for each catalog and open Goods Receipt lookups across `net48` and `net8.0-windows`: rapid filtering, successful edit/activation/deactivation propagation, thread-safe binding updates, and no modal hangs. (Safe STA automation is green on both targets and both native shells render the navigation without modal failure; the authenticated interactive walkthrough remains blocked until a host session/login bootstrap exists.)
 
 ## P5.2 — Goods Receipt Draft
 
@@ -101,14 +101,14 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 
 ## P5.4 — Inventory read/UI + full slice testing
 
-- [ ] Implement StockBalance query (warehouse/product filters, readable names, deterministic sort).
-- [ ] Implement StockCard query (warehouse+product, posting timestamp, document identity, quantity delta).
-- [ ] Permissions `Inventory.Balances.Read` and `Inventory.StockCard.Read`.
-- [ ] WinForms "Tồn kho" and "Thẻ kho", filters, totals, loading/empty/error states. Reuse P5.1-T04 debounced free-text filtering, cancel/ignore obsolete reads and refresh the latest request on explicit user action; do not debounce selection changes or a manual Refresh unnecessarily.
-- [ ] LocalApiClient contract tests for all P5 operations.
-- [ ] GUI/manual walkthrough: create catalog items → Draft → Post → balance increases → stock card shows movement → double Post rejected.
-- [ ] Test inactive Products, Warehouses and Employees remain visible historically but cannot be used for new receipt posting; a Draft created before deactivation must fail Post until references become valid again.
-- [ ] No direct Create/Update/Delete client API for balances/ledger.
+- [x] Implement StockBalance query (warehouse/product filters, readable names, deterministic sort).
+- [x] Implement StockCard query (warehouse+product, posting timestamp, document identity, quantity delta).
+- [x] Permissions `Inventory.Balances.Read` and `Inventory.StockCard.Read`.
+- [x] WinForms "Tồn kho" and "Thẻ kho", filters, totals, loading/empty/error states. Reuse P5.1-T04 debounced free-text filtering, cancel/ignore obsolete reads and refresh the latest request on explicit user action; do not debounce selection changes or a manual Refresh unnecessarily.
+- [x] LocalApiClient contract tests for all P5 operations.
+- [ ] GUI/manual walkthrough: create catalog items → Draft → Post → balance increases → stock card shows movement → double Post rejected. (The full business slice is covered through Application/SQL/Local/UI automation and both native shells render the new navigation; an authenticated interactive walkthrough is still pending because the current hosts start without a session/login bootstrap.)
+- [x] Test inactive Products, Warehouses and Employees remain visible historically but cannot be used for new receipt posting; a Draft created before deactivation must fail Post until references become valid again.
+- [x] No direct Create/Update/Delete client API for balances/ledger.
 
 ## Reusable acceptance walkthrough
 

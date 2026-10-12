@@ -22,12 +22,13 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly IDesktopNotificationService? _notifications;
         private readonly ICatalogControlFactory? _catalogControlFactory;
         private readonly IGoodsReceiptControlFactory? _goodsReceiptControlFactory;
+        private readonly IInventoryControlFactory? _inventoryControlFactory;
         private readonly int _uiThreadId;
         private long? _workspaceSessionVersion;
         private bool _openingWorkspace;
 
         public FoundationShellForm(FoundationViewModel viewModel)
-            : this(viewModel, null, null, null, null, true)
+            : this(viewModel, null, null, null, null, null, true)
         {
         }
 
@@ -39,6 +40,7 @@ namespace MyDmsVn.Desktop.WinForms
                 viewModel,
                 session ?? throw new ArgumentNullException(nameof(session)),
                 notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                null,
                 null,
                 null,
                 true)
@@ -56,6 +58,7 @@ namespace MyDmsVn.Desktop.WinForms
                 notifications ?? throw new ArgumentNullException(nameof(notifications)),
                 catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
                 null,
+                null,
                 true)
         {
         }
@@ -72,6 +75,25 @@ namespace MyDmsVn.Desktop.WinForms
                 notifications ?? throw new ArgumentNullException(nameof(notifications)),
                 catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
                 goodsReceiptControlFactory ?? throw new ArgumentNullException(nameof(goodsReceiptControlFactory)),
+                null,
+                true)
+        {
+        }
+
+        public FoundationShellForm(
+            FoundationViewModel viewModel,
+            IDesktopSession session,
+            IDesktopNotificationService notifications,
+            ICatalogControlFactory catalogControlFactory,
+            IGoodsReceiptControlFactory goodsReceiptControlFactory,
+            IInventoryControlFactory inventoryControlFactory)
+            : this(
+                viewModel,
+                session ?? throw new ArgumentNullException(nameof(session)),
+                notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
+                goodsReceiptControlFactory ?? throw new ArgumentNullException(nameof(goodsReceiptControlFactory)),
+                inventoryControlFactory ?? throw new ArgumentNullException(nameof(inventoryControlFactory)),
                 true)
         {
         }
@@ -82,6 +104,7 @@ namespace MyDmsVn.Desktop.WinForms
             IDesktopNotificationService? notifications,
             ICatalogControlFactory? catalogControlFactory,
             IGoodsReceiptControlFactory? goodsReceiptControlFactory,
+            IInventoryControlFactory? inventoryControlFactory,
             bool initialize)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
@@ -89,6 +112,7 @@ namespace MyDmsVn.Desktop.WinForms
             _notifications = notifications;
             _catalogControlFactory = catalogControlFactory;
             _goodsReceiptControlFactory = goodsReceiptControlFactory;
+            _inventoryControlFactory = inventoryControlFactory;
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
 
             Text = "MyDmsVn";
@@ -225,6 +249,18 @@ namespace MyDmsVn.Desktop.WinForms
                 _openingWorkspace = false;
             }
         }
+
+        public TabPage? OpenStockBalances() =>
+            OpenInventoryWorkspace(
+                "stock-balances",
+                "Tồn kho",
+                () => _inventoryControlFactory!.CreateStockBalances());
+
+        public TabPage? OpenStockCard() =>
+            OpenInventoryWorkspace(
+                "stock-card",
+                "Thẻ kho",
+                () => _inventoryControlFactory!.CreateStockCard());
 
         public TabPage? OpenWorkspace(
             string key,
@@ -374,6 +410,20 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 OpenGoodsReceipts();
             }
+            else if (string.Equals(
+                Navigation.SelectedItem?.Tag as string,
+                "stock-balances",
+                StringComparison.Ordinal))
+            {
+                OpenStockBalances();
+            }
+            else if (string.Equals(
+                Navigation.SelectedItem?.Tag as string,
+                "stock-card",
+                StringComparison.Ordinal))
+            {
+                OpenStockCard();
+            }
         }
 
         private void OnWorkspaceSelectedIndexChanged(object? sender, EventArgs eventArgs)
@@ -390,6 +440,16 @@ namespace MyDmsVn.Desktop.WinForms
             if (page?.Controls.Count > 0 && page.Controls[0] is GoodsReceiptControl goodsReceipts)
             {
                 _ = goodsReceipts.ActivateAsync(CancellationToken.None);
+            }
+
+            if (page?.Controls.Count > 0 && page.Controls[0] is StockBalanceControl balances)
+            {
+                _ = balances.ActivateAsync(CancellationToken.None);
+            }
+
+            if (page?.Controls.Count > 0 && page.Controls[0] is StockCardControl card)
+            {
+                _ = card.ActivateAsync(CancellationToken.None);
             }
         }
 
@@ -530,7 +590,53 @@ namespace MyDmsVn.Desktop.WinForms
                     Text = "Goods Receipts",
                     Tag = "goods-receipts",
                 });
+            navigation.Items.Add(
+                new BootstrapSidebarItem
+                {
+                    Text = "Tồn kho",
+                    Tag = "stock-balances",
+                });
+            navigation.Items.Add(
+                new BootstrapSidebarItem
+                {
+                    Text = "Thẻ kho",
+                    Tag = "stock-card",
+                });
             return navigation;
+        }
+
+        private TabPage? OpenInventoryWorkspace(
+            string key,
+            string title,
+            Func<Control> createControl)
+        {
+            if (_inventoryControlFactory == null)
+            {
+                return null;
+            }
+
+            _openingWorkspace = true;
+            try
+            {
+                if (_documents.TryGetValue(key, out var existing))
+                {
+                    Workspace.SelectedTab = existing;
+                    ActivateWorkspace(existing);
+                    return existing;
+                }
+
+                var page = OpenWorkspace(
+                    key,
+                    title,
+                    createControl(),
+                    WorkspaceSessionVersion);
+                ActivateWorkspace(page);
+                return page;
+            }
+            finally
+            {
+                _openingWorkspace = false;
+            }
         }
 
         private static string GetCatalogTitle(CatalogKind kind)

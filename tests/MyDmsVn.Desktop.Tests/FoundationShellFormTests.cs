@@ -62,6 +62,50 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Inventory_navigation_opens_and_reuses_balance_and_stock_card_workspaces()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                    var notifications = new DesktopNotificationCenter();
+                    var inventory = new RecordingInventoryControlFactory();
+                    using (var shell = new FoundationShellForm(
+                        new FoundationViewModel(new ReadyApiClient(), notifications),
+                        session,
+                        notifications,
+                        new EmptyCatalogControlFactory(),
+                        new RecordingGoodsReceiptControlFactory(),
+                        inventory))
+                    {
+                        var balances = shell.OpenStockBalances();
+                        var balancesAgain = shell.OpenStockBalances();
+                        var stockCard = shell.OpenStockCard();
+                        var stockCardAgain = shell.OpenStockCard();
+
+                        Assert.Same(balances, balancesAgain);
+                        Assert.Same(stockCard, stockCardAgain);
+                        Assert.Equal("stock-balances", balances!.Name);
+                        Assert.Equal("Tồn kho", balances.Text);
+                        Assert.Equal("stock-card", stockCard!.Name);
+                        Assert.Equal("Thẻ kho", stockCard.Text);
+                        Assert.Equal(1, inventory.BalanceCreateCount);
+                        Assert.Equal(1, inventory.CardCreateCount);
+                        Assert.Contains(
+                            shell.Navigation.Items.Cast<object>(),
+                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                                string.Equals(sidebarItem.Tag as string, "stock-balances", StringComparison.Ordinal));
+                        Assert.Contains(
+                            shell.Navigation.Items.Cast<object>(),
+                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                                string.Equals(sidebarItem.Tag as string, "stock-card", StringComparison.Ordinal));
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void ToggleTheme_switches_between_light_and_dark()
         {
             StaTest.Run(
@@ -567,6 +611,24 @@ namespace MyDmsVn.Desktop.Tests
                 CreateCount++;
                 CreatedControl = new Panel();
                 return CreatedControl;
+            }
+        }
+
+        private sealed class RecordingInventoryControlFactory : IInventoryControlFactory
+        {
+            public int BalanceCreateCount { get; private set; }
+            public int CardCreateCount { get; private set; }
+
+            public Control CreateStockBalances()
+            {
+                BalanceCreateCount++;
+                return new Panel();
+            }
+
+            public Control CreateStockCard()
+            {
+                CardCreateCount++;
+                return new Panel();
             }
         }
 

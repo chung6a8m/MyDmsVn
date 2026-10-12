@@ -28,6 +28,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             services.AddTransient<IEmployeeApiClient, LocalEmployeeApiClient>();
             services.AddTransient<ICustomerApiClient, LocalCustomerApiClient>();
             services.AddTransient<IGoodsReceiptApiClient, LocalGoodsReceiptApiClient>();
+            services.AddTransient<IInventoryApiClient, LocalInventoryApiClient>();
             services.AddTransient<ProductCatalogLookupSource>();
             services.AddTransient<WarehouseCatalogLookupSource>();
             services.AddTransient<EmployeeCatalogLookupSource>();
