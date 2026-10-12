@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -84,15 +85,13 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
         using var connection = await _connectionFactory
             .OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
-        var parameters = new
-        {
-            request.WarehouseId,
-            request.ProductId,
-            request.FromUtc,
-            request.ToUtc,
-            Offset = (long)(request.PageNumber - 1) * request.PageSize,
-            request.PageSize,
-        };
+        var parameters = new DynamicParameters();
+        parameters.Add("WarehouseId", request.WarehouseId);
+        parameters.Add("ProductId", request.ProductId);
+        parameters.Add("FromUtc", request.FromUtc, DbType.DateTime2);
+        parameters.Add("ToUtc", request.ToUtc, DbType.DateTime2);
+        parameters.Add("Offset", (long)(request.PageNumber - 1) * request.PageSize);
+        parameters.Add("PageSize", request.PageSize);
         var command = new CommandDefinition(
             "SELECT COUNT_BIG(*)" + CardFromAndFilter + "; " +
             "SELECT ledger.LedgerId, ledger.WarehouseId, warehouse.Code AS WarehouseCode, " +

@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,54 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class InventoryQueryIntegrationTests
 {
+    [SqlServerFact]
+    public async Task Stock_card_query_preserves_datetime2_boundaries()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            var lastTickOfSecond = new DateTime(
+                2026,
+                10,
+                10,
+                3,
+                0,
+                0,
+                DateTimeKind.Utc).AddSeconds(1).AddTicks(-1);
+            await InsertBoundaryMovementsAsync(
+                database.ConnectionString,
+                seed.ArchivedWarehouseId,
+                seed.ArchivedProductId,
+                seed.UserId,
+                lastTickOfSecond);
+
+            var services = new ServiceCollection();
+            services.AddSqlPersistence(database.ConnectionString);
+            using var provider = services.BuildServiceProvider();
+            using var scope = provider.CreateScope();
+            var queries = scope.ServiceProvider.GetRequiredService<IInventoryQueryService>();
+
+            var result = await queries.GetStockCardAsync(
+                new StockCardQuery(
+                    seed.ArchivedWarehouseId,
+                    seed.ArchivedProductId,
+                    lastTickOfSecond,
+                    lastTickOfSecond,
+                    1,
+                    25),
+                CancellationToken.None);
+
+            var movement = Assert.Single(result.Items);
+            Assert.Equal(lastTickOfSecond, movement.PostedAtUtc);
+            Assert.Equal(1.0000m, movement.QuantityChange);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     [SqlServerFact]
     public async Task Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history()
     {
@@ -158,6 +207,7 @@ public sealed class InventoryQueryIntegrationTests
         return new SeedData(
             warehouseId,
             productId,
+            userId,
             firstReceiptId,
             secondReceiptId,
             firstPosted,
@@ -190,11 +240,34 @@ public sealed class InventoryQueryIntegrationTests
             "OUTPUT INSERTED.ReceiptLineId VALUES (@receiptId, 1, @productId, @quantity, 1.0000, @userId);",
             new { receiptId, productId, quantity, userId });
 
+    private static async Task InsertBoundaryMovementsAsync(
+        string connectionString,
+        int warehouseId,
+        int productId,
+        int userId,
+        DateTime lastTickOfSecond)
+    {
+        using var connection = new SqlConnection(connectionString);
+        var parameters = new DynamicParameters();
+        parameters.Add("warehouseId", warehouseId);
+        parameters.Add("productId", productId);
+        parameters.Add("lastTickOfSecond", lastTickOfSecond, DbType.DateTime2);
+        parameters.Add("nextSecond", lastTickOfSecond.AddTicks(1), DbType.DateTime2);
+        parameters.Add("userId", userId);
+        await connection.ExecuteAsync(
+            "INSERT dbo.StockLedger " +
+            "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) VALUES " +
+            "(@warehouseId, @productId, 'Boundary', 1, 9001, 1.0000, @lastTickOfSecond, @userId), " +
+            "(@warehouseId, @productId, 'Boundary', 2, 9002, 2.0000, @nextSecond, @userId);",
+            parameters);
+    }
+
     private sealed class SeedData
     {
         public SeedData(
             int archivedWarehouseId,
             int archivedProductId,
+            int userId,
             long firstReceiptId,
             long secondReceiptId,
             DateTime firstPostedAtUtc,
@@ -202,6 +275,7 @@ public sealed class InventoryQueryIntegrationTests
         {
             ArchivedWarehouseId = archivedWarehouseId;
             ArchivedProductId = archivedProductId;
+            UserId = userId;
             FirstReceiptId = firstReceiptId;
             SecondReceiptId = secondReceiptId;
             FirstPostedAtUtc = firstPostedAtUtc;
@@ -210,6 +284,7 @@ public sealed class InventoryQueryIntegrationTests
 
         public int ArchivedWarehouseId { get; }
         public int ArchivedProductId { get; }
+        public int UserId { get; }
         public long FirstReceiptId { get; }
         public long SecondReceiptId { get; }
         public DateTime FirstPostedAtUtc { get; }
