@@ -7,8 +7,8 @@ Scope: detailed P6-T01 and P6-T02 in `docs/plans/20261008-007-phase-6-local-hard
 
 - Purpose-specific SQL configuration loader for desktop runtime and the separate migrator. Direct environment value overrides an environment-selected file, then `%ProgramData%\MyDmsVn\runtime.connection` or `migration.connection`. There is no runtime/admin fallback.
 - Safe Vietnamese startup/configuration diagnostics that never echo the connection string. Both desktop hosts run the same read-only schema preflight before registering SQL persistence or opening the shell. Headless `--smoke-test` configuration failures return exit code 2 without a modal dialog.
-- Idempotent SQL role/grant script and permission matrix. Runtime can perform required P3/P5 DML, read `SchemaVersions` for preflight and inspect the manifest function, but cannot mutate the journal, alter schema or read unlisted data. Migration role is separate and has database `CONTROL` for the controlled deployment step.
-- Exact schema manifest for immutable scripts 001–007 plus artifact checks. Empty/old/current/new/forked/partial histories receive distinct safe statuses; current is the only desktop-compatible state.
+- Idempotent SQL role/grant script and permission matrix. Runtime can perform required P3/P5 DML, read `SchemaVersions` for preflight and inspect manifest metadata, but cannot create users, deactivate accounts, mutate the journal, alter schema or read unlisted data. Password replacement is limited to five named columns. Provisioning and desktop startup reject identical/elevated runtime identities; migration role is separate and has database `CONTROL` for the controlled deployment step.
+- Exact schema manifest for immutable scripts 001–007 plus cross-schema object inventory, complete enabled/trusted CHECK groups and enabled append-only trigger checks. Empty/old/current/new/forked/partial histories receive distinct safe statuses; current is the only desktop-compatible state.
 - Migrator-side principal validation and schema preflight under an exclusive session-owned SQL application lock. Database-level `CONTROL` is mandatory even for a no-op; unmanaged, future, forked and partial targets are rejected before DbUp mutation. Valid empty/old/current targets are allowed; DbUp remains `WithTransactionPerScript()`.
 - Administrator configuration/security guide and migration/recovery/rollout runbook. Baseline policy requires downtime because no prior production client combination has been approved for mixed-version operation.
 
@@ -17,9 +17,9 @@ Scope: detailed P6-T01 and P6-T02 in `docs/plans/20261008-007-phase-6-local-hard
 Focused tests were first observed failing for missing production APIs/artifacts, then passing on both applicable TFMs:
 
 - configuration precedence, purpose isolation, invalid/system target redaction and unreadable-file security failures;
-- SQL runtime/migration role grants, journal read-only access, denied DDL and unlisted-object access, plus migrator rejection of the runtime role even for a no-op;
+- SQL runtime/migration role grants, distinct/elevated identity rejection, column-scoped password update, denied user creation/deactivation, journal read-only access, denied DDL and unlisted-object access, plus migrator rejection of the runtime role even for a no-op;
 - schema policy for empty, exact, old, future, reordered/forked and partial states;
-- SQL preflight for current/no-op, known prefix, interrupted prefix, future, forked and journal/artifact mismatch;
+- SQL preflight for current/no-op, known prefix, interrupted prefix, future, forked, cross-schema unmanaged objects, disabled/untrusted constraints, disabled append-only trigger and journal/artifact mismatch;
 - migration application lock and competing owner rejection;
 - unmanaged database, future history and partial schema rejected without changing existing data/history;
 - an injected SQL failure after committed scripts 001–006 rolls back its own artifact and leaves the journal at 6; that state blocks clients, while an explicit forward migration applies production script 007 and preserves existing business data;
@@ -53,19 +53,19 @@ dotnet test tests/MyDmsVn.Server.Application.Tests/... -c Release -f net8.0 --no
 Result: 120 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Desktop.Tests/... -c Release -f net48 --no-build --no-restore
-Result: 185 passed, 0 failed, 0 skipped.
+Result: 186 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Desktop.Tests/... -c Release -f net8.0-windows --no-build --no-restore
-Result: 185 passed, 0 failed, 0 skipped.
+Result: 186 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Infrastructure.IntegrationTests/... -c Release -f net48 --no-build --no-restore
-Result: 124 passed, 0 failed, 0 skipped.
+Result: 129 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Infrastructure.IntegrationTests/... -c Release -f net8.0 --no-build --no-restore
-Result: 124 passed, 0 failed, 0 skipped.
+Result: 129 passed, 0 failed, 0 skipped.
 ```
 
-Total target-specific executions: 863 passed, 0 failed, 0 skipped.
+Total target-specific executions: 875 passed, 0 failed, 0 skipped.
 
 Additional bounded host check after Release build:
 
@@ -77,7 +77,7 @@ MyDmsVn.Desktop.AppCore.exe --smoke-test with an explicitly selected missing run
 Result: exit 2 within 10 seconds; no modal/hang.
 ```
 
-The initial pre-change baseline had one `net48` catalog messenger test fail once with 181 passes; the focused test passed 3/3 immediately afterward. The final unchanged full desktop behavior suite passed 185/185 on each desktop target, so no unrelated flaky-test fix was included.
+The initial pre-change baseline had one `net48` catalog messenger test fail once with 181 passes; the focused test passed 3/3 immediately afterward. The final desktop suite passed 186/186 on each target, including the new overprivileged-runtime startup guard, so no unrelated flaky-test fix was included.
 
 ## Evidence files
 

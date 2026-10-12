@@ -23,21 +23,33 @@ public sealed class DesktopDatabaseStartupCoordinator
 {
     private readonly SqlConnectionConfigurationLoader _configurationLoader;
     private readonly Func<string, ISchemaCompatibilityChecker> _createChecker;
+    private readonly IRuntimeSqlPrincipalValidator _runtimePrincipalValidator;
 
     public DesktopDatabaseStartupCoordinator()
         : this(
             new SqlConnectionConfigurationLoader(),
-            connectionString => new SqlSchemaCompatibilityChecker(connectionString))
+            connectionString => new SqlSchemaCompatibilityChecker(connectionString),
+            new SqlRuntimePrincipalValidator())
     {
     }
 
     public DesktopDatabaseStartupCoordinator(
         SqlConnectionConfigurationLoader configurationLoader,
         Func<string, ISchemaCompatibilityChecker> createChecker)
+        : this(configurationLoader, createChecker, new SqlRuntimePrincipalValidator())
+    {
+    }
+
+    public DesktopDatabaseStartupCoordinator(
+        SqlConnectionConfigurationLoader configurationLoader,
+        Func<string, ISchemaCompatibilityChecker> createChecker,
+        IRuntimeSqlPrincipalValidator runtimePrincipalValidator)
     {
         _configurationLoader = configurationLoader ??
             throw new ArgumentNullException(nameof(configurationLoader));
         _createChecker = createChecker ?? throw new ArgumentNullException(nameof(createChecker));
+        _runtimePrincipalValidator = runtimePrincipalValidator ??
+            throw new ArgumentNullException(nameof(runtimePrincipalValidator));
     }
 
     public async Task<SqlConnectionConfiguration> PrepareAsync(
@@ -49,6 +61,9 @@ public sealed class DesktopDatabaseStartupCoordinator
         SchemaCompatibilityResult compatibility;
         try
         {
+            await _runtimePrincipalValidator
+                .ValidateAsync(configuration.ConnectionString, cancellationToken)
+                .ConfigureAwait(false);
             compatibility = await _createChecker(configuration.ConnectionString)
                 .CheckAsync(cancellationToken)
                 .ConfigureAwait(false);

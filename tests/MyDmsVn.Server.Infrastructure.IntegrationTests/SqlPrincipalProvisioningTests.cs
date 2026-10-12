@@ -4,12 +4,77 @@ using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
+using MyDmsVn.Server.Infrastructure.Operations;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class SqlPrincipalProvisioningTests
 {
+    [SqlServerFact]
+    public async Task Provisioning_rejects_the_same_runtime_and_migration_identity()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync("CREATE USER [P6SameProbe] WITHOUT LOGIN;");
+
+            var exception = await Assert.ThrowsAsync<SqlException>(
+                () => connection.ExecuteAsync(
+                    ReadProvisioningScript("P6SameProbe", "P6SameProbe")));
+
+            Assert.Contains("distinct", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.database_role_members AS membership " +
+                "WHERE membership.member_principal_id = USER_ID(N'P6SameProbe');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Provisioning_rejects_an_existing_elevated_runtime_identity()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6ElevatedRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6SeparateMigrationProbe] WITHOUT LOGIN; " +
+                "ALTER ROLE [db_ddladmin] ADD MEMBER [P6ElevatedRuntimeProbe];");
+
+            var exception = await Assert.ThrowsAsync<SqlException>(
+                () => connection.ExecuteAsync(
+                    ReadProvisioningScript(
+                        "P6ElevatedRuntimeProbe",
+                        "P6SeparateMigrationProbe")));
+
+            Assert.Contains("elevated", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.database_role_members AS membership " +
+                "INNER JOIN sys.database_principals AS rolePrincipal " +
+                "ON rolePrincipal.principal_id = membership.role_principal_id " +
+                "WHERE membership.member_principal_id = USER_ID(N'P6ElevatedRuntimeProbe') " +
+                "AND rolePrincipal.name = N'MyDmsVnRuntimeRole';"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     [SqlServerFact]
     public async Task Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation()
     {
@@ -27,10 +92,7 @@ public sealed class SqlPrincipalProvisioningTests
                 "CREATE USER [P6MigrationProbe] WITHOUT LOGIN; " +
                 "CREATE TABLE dbo.P6UnlistedSecret (SecretId int NOT NULL); ");
 
-            var script = File.ReadAllText(FindProvisioningScript());
-            script = script
-                .Replace("$(RuntimeUser)", "P6RuntimeProbe")
-                .Replace("$(MigrationUser)", "P6MigrationProbe");
+            var script = ReadProvisioningScript("P6RuntimeProbe", "P6MigrationProbe");
             await connection.ExecuteAsync(script);
 
             var permissions = await connection.QuerySingleAsync<PermissionProbe>(
@@ -63,6 +125,42 @@ public sealed class SqlPrincipalProvisioningTests
             Assert.Equal(0, permissions.CanUpdateJournal);
             Assert.Equal(0, permissions.CanReadUnlistedObject);
 
+            var protectedUserId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Users " +
+                "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm, IsActive) " +
+                "OUTPUT INSERTED.UserId VALUES " +
+                "(N'P6 Protected', N'P6 PROTECTED', N'P6 Protected', N'Local', N'old-hash', N'old-salt', N'Legacy', 1);");
+            await connection.ExecuteAsync("EXECUTE AS USER = N'P6RuntimeProbe';");
+            try
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE dbo.Users SET PasswordHash = N'new-hash', PasswordSalt = N'new-salt', " +
+                    "PasswordAlgorithm = N'BCrypt', UpdatedAtUtc = SYSUTCDATETIME(), " +
+                    "UpdatedByUserId = @userId WHERE UserId = @userId;",
+                    new { userId = protectedUserId });
+                await Assert.ThrowsAsync<SqlException>(
+                    () => connection.ExecuteAsync(
+                        "INSERT dbo.Users " +
+                        "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm, IsActive) " +
+                        "VALUES (N'P6 Rogue', N'P6 ROGUE', N'P6 Rogue', N'Local', N'x', N'x', N'Legacy', 1);"));
+                await Assert.ThrowsAsync<SqlException>(
+                    () => connection.ExecuteAsync(
+                        "UPDATE dbo.Users SET IsActive = 0 WHERE UserId = @userId;",
+                        new { userId = protectedUserId }));
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+
+            var protectedUser = await connection.QuerySingleAsync<ProtectedUserProbe>(
+                "SELECT PasswordHash, IsActive FROM dbo.Users WHERE UserId = @userId;",
+                new { userId = protectedUserId });
+            Assert.Equal("new-hash", protectedUser.PasswordHash);
+            Assert.True(protectedUser.IsActive);
+            Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.Users WHERE NormalizedUsername = N'P6 ROGUE';"));
+
             var migrationControl = await connection.QuerySingleAsync<int>(
                 "EXECUTE AS USER = N'P6MigrationProbe'; " +
                 "SELECT HAS_PERMS_BY_NAME(DB_NAME(), N'DATABASE', N'CONTROL'); " +
@@ -72,6 +170,11 @@ public sealed class SqlPrincipalProvisioningTests
             await connection.ExecuteAsync("EXECUTE AS USER = N'P6RuntimeProbe';");
             try
             {
+                await new SqlRuntimePrincipalValidator()
+                    .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None);
+                var compatibility = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                    .CheckConnectionAsync(connection, System.Threading.CancellationToken.None);
+                Assert.True(compatibility.IsCompatible, compatibility.SafeMessage);
                 var exception = Assert.Throws<DatabaseMigrationAuthorizationException>(
                     () => DatabaseMigrationPrincipalValidator.Validate(connection));
                 Assert.Equal("Migration.InsufficientPrivileges", exception.Code);
@@ -84,6 +187,10 @@ public sealed class SqlPrincipalProvisioningTests
             await connection.ExecuteAsync("EXECUTE AS USER = N'P6MigrationProbe';");
             try
             {
+                var runtimeException = await Assert.ThrowsAsync<DesktopStartupException>(
+                    () => new SqlRuntimePrincipalValidator()
+                        .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None));
+                Assert.Equal("Security.RuntimePrincipalOverprivileged", runtimeException.Code);
                 DatabaseMigrationPrincipalValidator.Validate(connection);
             }
             finally
@@ -128,6 +235,13 @@ public sealed class SqlPrincipalProvisioningTests
         throw new FileNotFoundException("The SQL principal provisioning script was not found.");
     }
 
+    private static string ReadProvisioningScript(string runtimeUser, string migrationUser)
+    {
+        return File.ReadAllText(FindProvisioningScript())
+            .Replace("$(RuntimeUser)", runtimeUser)
+            .Replace("$(MigrationUser)", migrationUser);
+    }
+
     private sealed class PermissionProbe
     {
         public int CanReadProducts { get; set; }
@@ -153,5 +267,12 @@ public sealed class SqlPrincipalProvisioningTests
         public int CanUpdateJournal { get; set; }
 
         public int CanReadUnlistedObject { get; set; }
+    }
+
+    private sealed class ProtectedUserProbe
+    {
+        public string PasswordHash { get; set; } = string.Empty;
+
+        public bool IsActive { get; set; }
     }
 }

@@ -127,6 +127,52 @@ public sealed class SchemaCompatibilityIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Disabled_or_untrusted_check_constraint_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.Products NOCHECK CONSTRAINT CK_Products_Code_NoNul;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Disabled_append_only_trigger_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DISABLE TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Clean_known_prefix_is_too_old()
     {
         var database = await CreateMigratedDatabaseAsync();

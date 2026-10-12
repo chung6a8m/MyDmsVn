@@ -11,6 +11,37 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class DatabaseMigrationTests
 {
     [SqlServerFact]
+    public async Task Nonempty_unmanaged_database_outside_dbo_is_rejected_without_touching_existing_data()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync("CREATE SCHEMA [external];");
+                await connection.ExecuteAsync(
+                    "CREATE TABLE [external].ExistingData (Id int NOT NULL PRIMARY KEY, Value nvarchar(50) NOT NULL); " +
+                    "INSERT [external].ExistingData (Id, Value) VALUES (1, N'preserve-me');");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal("preserve-me", await verification.QuerySingleAsync<string>(
+                "SELECT Value FROM [external].ExistingData WHERE Id = 1;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Nonempty_unmanaged_database_is_rejected_without_touching_existing_data()
     {
         var database = await SqlTestDatabase.CreateAsync(

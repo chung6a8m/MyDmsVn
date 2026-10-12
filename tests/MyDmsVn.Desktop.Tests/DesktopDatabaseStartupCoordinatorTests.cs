@@ -27,7 +27,8 @@ namespace MyDmsVn.Desktop.Tests
                 {
                     Assert.Equal(RuntimeConnection, connectionString);
                     return checker;
-                });
+                },
+                new AllowingRuntimePrincipalValidator());
 
             var result = await coordinator.PrepareAsync(CancellationToken.None);
 
@@ -44,7 +45,8 @@ namespace MyDmsVn.Desktop.Tests
                     new SchemaCompatibilityResult(
                         SchemaCompatibilityStatus.Partial,
                         "Schema.PartialMigration",
-                        "Cần quản trị viên xử lý phục hồi.")));
+                        "Cần quản trị viên xử lý phục hồi.")),
+                new AllowingRuntimePrincipalValidator());
 
             var exception = await Assert.ThrowsAsync<DesktopStartupException>(
                 () => coordinator.PrepareAsync(CancellationToken.None));
@@ -59,12 +61,28 @@ namespace MyDmsVn.Desktop.Tests
         {
             var coordinator = new DesktopDatabaseStartupCoordinator(
                 CreateLoader(SqlConnectionConfigurationPurpose.Migration, RuntimeConnection),
-                _ => throw new InvalidOperationException("Schema checker must not be created."));
+                _ => throw new InvalidOperationException("Schema checker must not be created."),
+                new AllowingRuntimePrincipalValidator());
 
             var exception = await Assert.ThrowsAsync<OperationalConfigurationException>(
                 () => coordinator.PrepareAsync(CancellationToken.None));
 
             Assert.Equal("Startup.DatabaseConfigurationMissing", exception.Code);
+        }
+
+        [Fact]
+        public async Task Overprivileged_runtime_is_rejected_before_schema_preflight()
+        {
+            var coordinator = new DesktopDatabaseStartupCoordinator(
+                CreateLoader(SqlConnectionConfigurationPurpose.Runtime, RuntimeConnection),
+                _ => throw new InvalidOperationException("Schema checker must not be created."),
+                new RejectingRuntimePrincipalValidator());
+
+            var exception = await Assert.ThrowsAsync<DesktopStartupException>(
+                () => coordinator.PrepareAsync(CancellationToken.None));
+
+            Assert.Equal("Security.RuntimePrincipalOverprivileged", exception.Code);
+            Assert.DoesNotContain(RuntimeConnection, exception.SafeMessage, StringComparison.Ordinal);
         }
 
         private static SqlConnectionConfigurationLoader CreateLoader(
@@ -99,6 +117,28 @@ namespace MyDmsVn.Desktop.Tests
             {
                 CallCount++;
                 return Task.FromResult(_result);
+            }
+        }
+
+        private sealed class RejectingRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
+        {
+            public Task ValidateAsync(
+                string connectionString,
+                CancellationToken cancellationToken)
+            {
+                throw new DesktopStartupException(
+                    "Security.RuntimePrincipalOverprivileged",
+                    "Tài khoản runtime có quyền quản trị không được phép.");
+            }
+        }
+
+        private sealed class AllowingRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
+        {
+            public Task ValidateAsync(
+                string connectionString,
+                CancellationToken cancellationToken)
+            {
+                return Task.CompletedTask;
             }
         }
     }

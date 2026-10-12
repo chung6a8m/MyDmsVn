@@ -14,7 +14,7 @@ Client v1 hiện tại hỗ trợ đúng journal prefix sau, theo thứ tự b�
 6. `006_GoodsReceipt_Number_Sequence.sql`
 7. `007_Inventory_Stock.sql`
 
-Journal giữ nguyên `dbo.SchemaVersions` từ P1. Script đã phát hành là immutable; sửa nội dung hoặc đổi tên script cũ tạo fork không được hỗ trợ. Manifest kiểm tra cả history và các table/function/constraint/sequence trọng yếu, vì chỉ thấy entry `007` không chứng minh schema hoàn chỉnh.
+Journal giữ nguyên `dbo.SchemaVersions` từ P1. Script đã phát hành là immutable; sửa nội dung hoặc đổi tên script cũ tạo fork không được hỗ trợ. Manifest kiểm tra cả history, table/function/sequence, toàn bộ nhóm CHECK constraints của 002/003/004/005/007 ở trạng thái enabled/trusted và trigger append-only đang enabled, vì chỉ thấy entry `007` không chứng minh schema hoàn chỉnh. Migrator có quyền quản trị còn kiểm kê user table/view/procedure/function/sequence/trigger trên mọi schema; object ngoài manifest khiến database bị coi là unmanaged thay vì “empty”.
 
 Đây là release schema baseline đầu tiên; chưa có prior production release baseline nào được hỗ trợ cho mixed-client rollout. Database ở prefix `001`–`006` chỉ là pre-release/interrupted state và bị desktop chặn.
 

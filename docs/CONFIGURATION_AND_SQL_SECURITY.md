@@ -13,6 +13,8 @@ Không dùng chung credential giữa desktop và migrator.
 
 Runtime principal không được là `sa`, thành viên `db_owner`, `db_ddladmin`, `sysadmin`, hoặc nhận quyền tương đương qua role khác. Migration credential không được đóng gói cùng desktop, ghi vào source control, shortcut, command line hoặc installer property có thể log ra ngoài.
 
+Hai user phải khác nhau. Script provisioning từ chối cùng một identity và từ chối runtime user đã có fixed-role, database/schema administration hoặc database-wide permission ngoài tập mặc định an toàn. Khi khởi động, cả hai desktop host kiểm tra lại effective server/database/schema permissions và fail closed bằng `Security.RuntimePrincipalOverprivileged`; vì vậy cấu hình nhầm migration credential không thể mở shell nghiệp vụ.
+
 DBA tạo login/user theo chính sách của môi trường, sau đó chạy script idempotent:
 
 ```powershell
@@ -27,7 +29,7 @@ Không đưa password vào lệnh trên. Với SQL Authentication, DBA tạo/đ�
 
 | Object | SELECT | INSERT | UPDATE | DELETE |
 |---|---:|---:|---:|---:|
-| `Users` | Có | Có | Có | Không |
+| `Users` | Có | Không | Chỉ `PasswordHash`, `PasswordSalt`, `PasswordAlgorithm`, `UpdatedAtUtc`, `UpdatedByUserId` | Không |
 | `Roles`, `UserRoles`, `RolePermissions`, `UserPermissions` | Có | Không | Không | Không |
 | `Products`, `Warehouses`, `Employees`, `Customers` | Có | Có | Có | Không |
 | `GoodsReceipts` | Có | Có | Có | Không |
@@ -96,6 +98,7 @@ Mã startup hiện có:
 - `Startup.DatabaseConfigurationUnreadable`
 - `Startup.DatabaseConfigurationInvalid`
 - `Startup.DatabaseUnavailable`
+- `Security.RuntimePrincipalOverprivileged`
 - các mã `Schema.*` trong runbook migration
 
 ## 7. Giới hạn trust còn lại
