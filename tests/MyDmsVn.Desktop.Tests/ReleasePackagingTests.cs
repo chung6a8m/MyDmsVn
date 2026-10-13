@@ -25,8 +25,8 @@ namespace MyDmsVn.Desktop.Tests
                 var manifest = JObject.Parse(
                     File.ReadAllText(Path.Combine(fixture.Root, "release-manifest.json")));
                 Assert.Equal("1.2.3", manifest.Value<string>("productVersion"));
-                Assert.Equal(7, manifest["schemaSupport"]!.Value<int>("minimum"));
-                Assert.Equal(7, manifest["schemaSupport"]!.Value<int>("maximum"));
+                Assert.Equal(8, manifest["schemaSupport"]!.Value<int>("minimum"));
+                Assert.Equal(8, manifest["schemaSupport"]!.Value<int>("maximum"));
                 Assert.IsType<bool>(manifest["sourceTreeDirty"]!.Value<bool>());
                 Assert.Equal(3, manifest["packages"]!.Count());
                 Assert.All(

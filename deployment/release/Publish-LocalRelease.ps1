@@ -176,9 +176,9 @@ $manifest = [ordered]@{
     sourceTreeDirty = $sourceTreeDirty
     generatedAtUtc = [DateTime]::UtcNow.ToString('o')
     schemaSupport = [ordered]@{
-        minimum = 7
-        maximum = 7
-        compatibilityPolicy = 'Exact schema 7 for the first release baseline'
+        minimum = 8
+        maximum = 8
+        compatibilityPolicy = 'Exact schema 8 for the P3.1 release baseline'
     }
     sqlCompatibility = [ordered]@{
         validatedVersions = @()
