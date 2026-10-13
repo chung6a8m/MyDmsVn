@@ -1,29 +1,31 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using MyDmsVn.Server.Application.Catalog;
+using MyDmsVn.Server.Application.Inventory;
 
 namespace MyDmsVn.Server.Application.Security
 {
     public static class PermissionKeys
     {
-        public const string CatalogProductsRead = "Catalog.Products.Read";
-        public const string CatalogProductsWrite = "Catalog.Products.Write";
-        public const string CatalogWarehousesRead = "Catalog.Warehouses.Read";
-        public const string CatalogWarehousesWrite = "Catalog.Warehouses.Write";
-        public const string CatalogEmployeesRead = "Catalog.Employees.Read";
-        public const string CatalogEmployeesWrite = "Catalog.Employees.Write";
-        public const string CatalogCustomersRead = "Catalog.Customers.Read";
-        public const string CatalogCustomersWrite = "Catalog.Customers.Write";
-        public const string InventoryGoodsReceiptsRead = "Inventory.GoodsReceipts.Read";
-        public const string InventoryGoodsReceiptsWrite = "Inventory.GoodsReceipts.Write";
-        public const string InventoryGoodsReceiptsPost = "Inventory.GoodsReceipts.Post";
-        public const string InventoryBalancesRead = "Inventory.Balances.Read";
-        public const string InventoryStockCardRead = "Inventory.StockCard.Read";
-        public const string SecurityUsersManage = "Security.Users.Manage";
-        public const string SecurityRolesManage = "Security.Roles.Manage";
+        public const string CatalogProductsRead = CatalogPermissionKeys.ProductsRead;
+        public const string CatalogProductsWrite = CatalogPermissionKeys.ProductsWrite;
+        public const string CatalogWarehousesRead = CatalogPermissionKeys.WarehousesRead;
+        public const string CatalogWarehousesWrite = CatalogPermissionKeys.WarehousesWrite;
+        public const string CatalogEmployeesRead = CatalogPermissionKeys.EmployeesRead;
+        public const string CatalogEmployeesWrite = CatalogPermissionKeys.EmployeesWrite;
+        public const string CatalogCustomersRead = CatalogPermissionKeys.CustomersRead;
+        public const string CatalogCustomersWrite = CatalogPermissionKeys.CustomersWrite;
+        public const string InventoryGoodsReceiptsRead = InventoryPermissionKeys.GoodsReceiptsRead;
+        public const string InventoryGoodsReceiptsWrite = InventoryPermissionKeys.GoodsReceiptsWrite;
+        public const string InventoryGoodsReceiptsPost = InventoryPermissionKeys.GoodsReceiptsPost;
+        public const string InventoryBalancesRead = InventoryPermissionKeys.BalancesRead;
+        public const string InventoryStockCardRead = InventoryPermissionKeys.StockCardRead;
+        public const string SecurityUsersManage = SecurityPermissionKeys.UsersManage;
+        public const string SecurityRolesManage = SecurityPermissionKeys.RolesManage;
 
-        private static readonly HashSet<string> Declared = new HashSet<string>(
-            new[]
-            {
+        private static readonly string[] DeclaredKeys =
+        {
                 CatalogProductsRead,
                 CatalogProductsWrite,
                 CatalogWarehousesRead,
@@ -39,8 +41,14 @@ namespace MyDmsVn.Server.Application.Security
                 InventoryStockCardRead,
                 SecurityUsersManage,
                 SecurityRolesManage,
-            },
+        };
+
+        private static readonly HashSet<string> Declared = new HashSet<string>(
+            DeclaredKeys,
             StringComparer.Ordinal);
+
+        public static IReadOnlyList<string> All { get; } =
+            new ReadOnlyCollection<string>(DeclaredKeys);
 
         public static bool IsDeclared(string permissionKey)
         {
