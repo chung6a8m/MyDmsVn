@@ -917,12 +917,12 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                         transaction,
                         cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-                    if (existing!.CatalogStatus == "Unregistered" && desiredStatus == "Active")
+                    if (desiredStatus == "Active")
                     {
                         await connection.ExecuteAsync(new CommandDefinition(
                             "UPDATE dbo.PermissionLegacyAssignmentDrift " +
                             "SET ReviewStatus = 'Adopted', ReviewedAtUtc = @UtcNow, ReviewedBy = @Actor " +
-                            "WHERE PermissionKey = @PermissionKey;",
+                            "WHERE PermissionKey = @PermissionKey AND ReviewStatus = 'Unreviewed';",
                             new
                             {
                                 PermissionKey = definition.Key,

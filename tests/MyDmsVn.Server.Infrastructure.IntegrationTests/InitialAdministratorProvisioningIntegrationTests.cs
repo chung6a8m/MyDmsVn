@@ -1,12 +1,18 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
+using MyDmsVn.Server.Application;
+using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.DbMigrator.SecurityProvisioning;
+using MyDmsVn.Server.Infrastructure;
 using MyDmsVn.Server.Infrastructure.Identity;
 using Xunit;
 
@@ -88,8 +94,29 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
                 UtcNow,
                 CancellationToken.None);
 
+            string originalHash;
             using (var connection = new SqlConnection(database.ConnectionString))
             {
+                originalHash = await connection.QuerySingleAsync<string>(
+                    "SELECT PasswordHash FROM dbo.Users WHERE NormalizedUsername = N'FIRST.ADMIN';");
+            }
+
+            var noReset = await engine.ProvisionAsync(
+                database.ConnectionString,
+                new InitialAdministratorProvisioningRequest(
+                    inspection.DatabaseIdentity,
+                    "first.admin",
+                    "First Administrator",
+                    "DifferentStrong!456",
+                    "deployment-operator",
+                    request.ReleaseId),
+                UtcNow.AddSeconds(30),
+                CancellationToken.None);
+            Assert.Equal(InitialAdministratorProvisioningOutcome.AlreadyCompleted, noReset.Outcome);
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                Assert.Equal(originalHash, await connection.QuerySingleAsync<string>(
+                    "SELECT PasswordHash FROM dbo.Users WHERE NormalizedUsername = N'FIRST.ADMIN';"));
                 await connection.ExecuteAsync("DELETE dbo.UserRoles; DELETE dbo.Users;");
             }
 
@@ -255,6 +282,143 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Fresh_install_admin_logs_in_and_receives_only_active_assignments_with_direct_deny_precedence()
+    {
+        var database = await CreateSynchronizedDatabaseAsync();
+        try
+        {
+            var engine = new InitialAdministratorProvisioningEngine(new BcryptPasswordHasher(10));
+            var inspection = await engine.InspectAsync(database.ConnectionString, CancellationToken.None);
+            await engine.ProvisionAsync(
+                database.ConnectionString,
+                new InitialAdministratorProvisioningRequest(
+                    inspection.DatabaseIdentity,
+                    "first.admin",
+                    "First Administrator",
+                    StrongPassword,
+                    "deployment-operator",
+                    PermissionRegistryComposition.CreateDefault().ReleaseId),
+                UtcNow,
+                CancellationToken.None);
+
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddSqlPersistence(database.ConnectionString);
+            using var provider = services.BuildServiceProvider();
+            var login = await provider.GetRequiredService<MediatR.ISender>().Send(
+                new LoginCommand("first.admin", StrongPassword),
+                CancellationToken.None);
+            Assert.False(login.IsError);
+
+            var registry = PermissionRegistryComposition.CreateDefault();
+            var store = provider.GetRequiredService<IPermissionStore>();
+            var authenticated = CurrentUser.Authenticated(
+                login.Value.UserId,
+                login.Value.Username,
+                login.Value.DisplayName,
+                isActive: true);
+            var authorization = new PermissionAuthorizationService(
+                new FixedCurrentUserAccessor(authenticated),
+                store,
+                registry);
+            foreach (var definition in registry.Definitions)
+            {
+                Assert.True(await authorization.IsAllowedAsync(
+                    definition.Key,
+                    CancellationToken.None));
+            }
+
+            var deniedKey = registry.Definitions[0].Key;
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "INSERT dbo.UserPermissions (UserId, PermissionKey, Granted) " +
+                    "VALUES (@UserId, @PermissionKey, 0);",
+                    new { UserId = login.Value.UserId, PermissionKey = deniedKey });
+            }
+
+            Assert.False(await authorization.IsAllowedAsync(deniedKey, CancellationToken.None));
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE dbo.Users SET IsActive = 0 WHERE UserId = @UserId;",
+                    new { UserId = login.Value.UserId });
+            }
+
+            var inactiveLogin = await provider.GetRequiredService<MediatR.ISender>().Send(
+                new LoginCommand("first.admin", StrongPassword),
+                CancellationToken.None);
+            Assert.True(inactiveLogin.IsError);
+            var anonymousAuthorization = new PermissionAuthorizationService(
+                new FixedCurrentUserAccessor(CurrentUser.Anonymous),
+                store,
+                registry);
+            Assert.False(await anonymousAuthorization.IsAllowedAsync(
+                registry.Definitions[1].Key,
+                CancellationToken.None));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Redirected_bootstrap_apply_exits_promptly_without_reading_or_echoing_secret()
+    {
+        var database = await CreateSynchronizedDatabaseAsync();
+        try
+        {
+            var inspection = await new InitialAdministratorProvisioningEngine(
+                    new BcryptPasswordHasher(10))
+                .InspectAsync(database.ConnectionString, CancellationToken.None);
+            var executable = Path.Combine(
+                AppContext.BaseDirectory,
+                "MyDmsVn.Server.DbMigrator.exe");
+            Assert.True(File.Exists(executable), "DbMigrator executable was not copied to test output.");
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments =
+                    "security bootstrap-admin --apply " +
+                    "--confirm-database " + inspection.DatabaseIdentity.ToString("D") + " " +
+                    "--username first.admin --display-name FirstAdministrator " +
+                    "--actor deployment-operator --release-id " +
+                    PermissionRegistryComposition.CreateDefault().ReleaseId,
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+            startInfo.EnvironmentVariables[
+                "MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING"] = database.ConnectionString;
+            using var process = Process.Start(startInfo);
+            Assert.NotNull(process);
+            process!.StandardInput.WriteLine("SentinelSecret!456");
+            process.StandardInput.Close();
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(15000))
+            {
+                process.Kill();
+                Assert.Fail("Bootstrap subprocess did not exit within 15 seconds.");
+            }
+
+            var output = await standardOutput;
+            var error = await standardError;
+            Assert.Equal(3, process.ExitCode);
+            Assert.Contains("SecurityBootstrap.InteractiveInputRequired", error, StringComparison.Ordinal);
+            Assert.DoesNotContain("SentinelSecret", output, StringComparison.Ordinal);
+            Assert.DoesNotContain("SentinelSecret", error, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     private const string StrongPassword = "Bootstrap!Pass456";
     private static readonly DateTime UtcNow =
         new DateTime(2026, 10, 14, 3, 0, 0, DateTimeKind.Utc);
@@ -302,5 +466,15 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
         public string PasswordSalt { get; set; } = string.Empty;
         public string PasswordAlgorithm { get; set; } = string.Empty;
         public bool IsActive { get; set; }
+    }
+
+    private sealed class FixedCurrentUserAccessor : ICurrentUserAccessor
+    {
+        public FixedCurrentUserAccessor(CurrentUser current)
+        {
+            Current = current;
+        }
+
+        public CurrentUser Current { get; }
     }
 }

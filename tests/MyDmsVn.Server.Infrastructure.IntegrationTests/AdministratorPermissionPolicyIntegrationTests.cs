@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Security;
@@ -229,6 +230,125 @@ public sealed class AdministratorPermissionPolicyIntegrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Later_release_grants_only_independently_approved_new_and_late_permissions()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            var engine = new PermissionSynchronizationEngine();
+            var baseline = PermissionRegistryComposition.CreateDefault();
+            var baselineApprovals = new PermissionSyncApprovalSet(
+                baseline.ReleaseId,
+                "release-operator",
+                UtcNow.AddHours(4),
+                baseline.Definitions.Select(definition => new PermissionSyncApproval(
+                    definition.Key,
+                    PermissionCatalogDecision.Approved,
+                    AdministratorGrantDecision.Approved)));
+            var baselinePlan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                baseline,
+                baselineApprovals,
+                UtcNow,
+                CancellationToken.None);
+            await engine.ApplyAsync(
+                database.ConnectionString,
+                baseline,
+                baselineApprovals,
+                baselinePlan,
+                UtcNow,
+                CancellationToken.None);
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DECLARE @RoleId int; " +
+                    "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
+                    "VALUES (N'Normal role', N'NORMAL ROLE'); SET @RoleId = SCOPE_IDENTITY(); " +
+                    "INSERT dbo.RolePermissions (RoleId, PermissionKey) VALUES (@RoleId, @BaselineKey);",
+                    new { BaselineKey = baseline.Definitions[0].Key });
+            }
+
+            var version2 = CreateSalesRegistry("release-v2");
+            var version2Approvals = CreateSalesApprovals(
+                version2,
+                approveSensitiveAdministratorGrant: false);
+            var version2Plan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                version2,
+                version2Approvals,
+                UtcNow.AddMinutes(1),
+                CancellationToken.None);
+            Assert.Equal(3, version2Plan.Changes.Count(change =>
+                change.Kind == PermissionSyncChangeKind.AddDefinition &&
+                change.PermissionKey.StartsWith("Sales.Orders.", StringComparison.Ordinal)));
+            await engine.ApplyAsync(
+                database.ConnectionString,
+                version2,
+                version2Approvals,
+                version2Plan,
+                UtcNow.AddMinutes(1),
+                CancellationToken.None);
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                Assert.Equal("Active", await connection.QuerySingleAsync<string>(
+                    "SELECT CatalogStatus FROM dbo.Permissions WHERE PermissionKey = 'Sales.Orders.Read';"));
+                Assert.Equal("PendingActivation", await connection.QuerySingleAsync<string>(
+                    "SELECT CatalogStatus FROM dbo.Permissions WHERE PermissionKey = 'Sales.Orders.Write';"));
+                Assert.Equal("Active", await connection.QuerySingleAsync<string>(
+                    "SELECT CatalogStatus FROM dbo.Permissions WHERE PermissionKey = 'Sales.Orders.Approve';"));
+                Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                    "SELECT COUNT(*) FROM dbo.ManagedRolePermissionGrants " +
+                    "WHERE PermissionKey = 'Sales.Orders.Read' AND GrantState = 'Granted';"));
+                Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                    "SELECT COUNT(*) FROM dbo.ManagedRolePermissionGrants " +
+                    "WHERE PermissionKey IN ('Sales.Orders.Write', 'Sales.Orders.Approve') " +
+                    "AND GrantState = 'Granted';"));
+                Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                    "SELECT COUNT(*) FROM dbo.RolePermissions AS assignment " +
+                    "JOIN dbo.Roles AS role ON role.RoleId = assignment.RoleId " +
+                    "WHERE role.NormalizedRoleName = N'NORMAL ROLE' " +
+                    "AND assignment.PermissionKey LIKE N'Sales.Orders.%';"));
+            }
+
+            var version3 = CreateSalesRegistry("release-v3");
+            var version3Approvals = CreateSalesApprovals(
+                version3,
+                approveSensitiveAdministratorGrant: true);
+            var version3Plan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                version3,
+                version3Approvals,
+                UtcNow.AddMinutes(2),
+                CancellationToken.None);
+            Assert.Contains(version3Plan.Changes, change =>
+                change.Kind == PermissionSyncChangeKind.GrantAdministratorPermission &&
+                change.PermissionKey == "Sales.Orders.Approve");
+            await engine.ApplyAsync(
+                database.ConnectionString,
+                version3,
+                version3Approvals,
+                version3Plan,
+                UtcNow.AddMinutes(2),
+                CancellationToken.None);
+            var repeat = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                version3,
+                version3Approvals,
+                UtcNow.AddMinutes(3),
+                CancellationToken.None);
+            Assert.DoesNotContain(repeat.Changes, change =>
+                change.Kind == PermissionSyncChangeKind.GrantAdministratorPermission &&
+                change.PermissionKey == "Sales.Orders.Approve");
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     private static readonly DateTime UtcNow =
         new DateTime(2026, 10, 14, 2, 0, 0, DateTimeKind.Utc);
 
@@ -245,6 +365,68 @@ public sealed class AdministratorPermissionPolicyIntegrationTests
                 definition.AdministratorGrantPolicy == AdministratorGrantPolicy.Eligible
                     ? AdministratorGrantDecision.Approved
                     : AdministratorGrantDecision.Pending)));
+    }
+
+    private static PermissionRegistry CreateSalesRegistry(string releaseId)
+    {
+        var definitions = new List<PermissionDefinition>(
+            PermissionRegistryComposition.CreateDefault().Definitions)
+        {
+            new PermissionDefinition(
+                "Sales.Orders.Read",
+                "Sales",
+                "Read sales orders.",
+                PermissionLifecycleStatus.Active,
+                AdministratorGrantPolicy.Eligible),
+            new PermissionDefinition(
+                "Sales.Orders.Write",
+                "Sales",
+                "Create and update sales orders.",
+                PermissionLifecycleStatus.Active,
+                AdministratorGrantPolicy.Eligible),
+            new PermissionDefinition(
+                "Sales.Orders.Approve",
+                "Sales",
+                "Approve sales orders.",
+                PermissionLifecycleStatus.Active,
+                AdministratorGrantPolicy.Sensitive),
+        };
+        return PermissionRegistry.Create(releaseId, definitions);
+    }
+
+    private static PermissionSyncApprovalSet CreateSalesApprovals(
+        IPermissionRegistry registry,
+        bool approveSensitiveAdministratorGrant)
+    {
+        return new PermissionSyncApprovalSet(
+            registry.ReleaseId,
+            "release-operator",
+            UtcNow.AddHours(4),
+            registry.Definitions.Select(definition =>
+            {
+                if (definition.Key == "Sales.Orders.Write")
+                {
+                    return new PermissionSyncApproval(
+                        definition.Key,
+                        PermissionCatalogDecision.Pending,
+                        AdministratorGrantDecision.Approved);
+                }
+
+                if (definition.Key == "Sales.Orders.Approve")
+                {
+                    return new PermissionSyncApproval(
+                        definition.Key,
+                        PermissionCatalogDecision.Approved,
+                        approveSensitiveAdministratorGrant
+                            ? AdministratorGrantDecision.Approved
+                            : AdministratorGrantDecision.Pending);
+                }
+
+                return new PermissionSyncApproval(
+                    definition.Key,
+                    PermissionCatalogDecision.Approved,
+                    AdministratorGrantDecision.Approved);
+            }));
     }
 
     private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()

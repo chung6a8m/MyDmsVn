@@ -4,9 +4,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
+using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.DbMigrator.SecurityProvisioning;
+using MyDmsVn.Server.Infrastructure;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -209,6 +212,166 @@ public sealed class PermissionSynchronizationIntegrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Historical_assignment_stays_denied_until_declared_key_is_independently_activated()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            const string key = "Legacy.Future.Read";
+            int userId;
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.OpenAsync();
+                userId = await connection.QuerySingleAsync<int>(
+                    "INSERT dbo.Users " +
+                    "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm) " +
+                    "OUTPUT INSERTED.UserId VALUES " +
+                    "(N'legacy-user', N'LEGACY-USER', N'Legacy User', N'Local', N'hash', N'', N'BCrypt');");
+                var roleId = await connection.QuerySingleAsync<int>(
+                    "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
+                    "OUTPUT INSERTED.RoleId VALUES (N'Legacy role', N'LEGACY ROLE');");
+                await connection.ExecuteAsync(
+                    "INSERT dbo.UserRoles (UserId, RoleId) VALUES (@UserId, @RoleId); " +
+                    "INSERT dbo.RolePermissions (RoleId, PermissionKey) VALUES (@RoleId, @Key); " +
+                    "INSERT dbo.Permissions " +
+                    "(PermissionKey, Module, Description, CatalogStatus, AdministratorGrantPolicy) " +
+                    "VALUES (@Key, N'Legacy', N'Historical assignment.', 'Unregistered', 'NotEligible'); " +
+                    "INSERT dbo.PermissionLegacyAssignmentDrift " +
+                    "(PermissionKey, RoleGrantCount, UserGrantCount, ReviewStatus) " +
+                    "VALUES (@Key, 1, 0, 'Unreviewed');",
+                    new { UserId = userId, RoleId = roleId, Key = key });
+            }
+
+            var definitions = PermissionRegistryComposition.CreateDefault().Definitions
+                .Concat(new[]
+                {
+                    new PermissionDefinition(
+                        key,
+                        "Legacy",
+                        "Adopted future permission.",
+                        PermissionLifecycleStatus.Active,
+                        AdministratorGrantPolicy.NotEligible),
+                });
+            var pendingRegistry = PermissionRegistry.Create("legacy-adoption-v1", definitions);
+            var pendingApprovals = ApprovalForRegistry(
+                pendingRegistry,
+                key,
+                PermissionCatalogDecision.Pending);
+            var engine = new PermissionSynchronizationEngine();
+            var pendingPlan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                pendingRegistry,
+                pendingApprovals,
+                UtcNow,
+                CancellationToken.None);
+            await engine.ApplyAsync(
+                database.ConnectionString,
+                pendingRegistry,
+                pendingApprovals,
+                pendingPlan,
+                UtcNow,
+                CancellationToken.None);
+
+            var services = new ServiceCollection();
+            services.AddSqlPersistence(database.ConnectionString);
+            using var provider = services.BuildServiceProvider();
+            var authorization = new PermissionAuthorizationService(
+                new AnonymousCurrentUserAccessor(),
+                provider.GetRequiredService<IPermissionStore>(),
+                pendingRegistry);
+            Assert.False(await authorization.IsAllowedAsync(userId, key, CancellationToken.None));
+
+            var activeRegistry = PermissionRegistry.Create("legacy-adoption-v2", definitions);
+            var activeApprovals = ApprovalForRegistry(
+                activeRegistry,
+                key,
+                PermissionCatalogDecision.Approved);
+            var activePlan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                activeRegistry,
+                activeApprovals,
+                UtcNow.AddMinutes(1),
+                CancellationToken.None);
+            await engine.ApplyAsync(
+                database.ConnectionString,
+                activeRegistry,
+                activeApprovals,
+                activePlan,
+                UtcNow.AddMinutes(1),
+                CancellationToken.None);
+
+            var activeAuthorization = new PermissionAuthorizationService(
+                new AnonymousCurrentUserAccessor(),
+                provider.GetRequiredService<IPermissionStore>(),
+                activeRegistry);
+            Assert.True(await activeAuthorization.IsAllowedAsync(userId, key, CancellationToken.None));
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal("Adopted", await verification.QuerySingleAsync<string>(
+                "SELECT ReviewStatus FROM dbo.PermissionLegacyAssignmentDrift WHERE PermissionKey = @Key;",
+                new { Key = key }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Competing_apply_attempts_commit_once_without_duplicate_catalog_or_role_rows()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            var registry = PermissionRegistryComposition.CreateDefault();
+            var approvals = ApproveCatalog(registry);
+            var engine = new PermissionSynchronizationEngine();
+            var plan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                registry,
+                approvals,
+                UtcNow,
+                CancellationToken.None);
+
+            async Task<string> ApplyAsync()
+            {
+                try
+                {
+                    await engine.ApplyAsync(
+                        database.ConnectionString,
+                        registry,
+                        approvals,
+                        plan,
+                        UtcNow,
+                        CancellationToken.None);
+                    return "Succeeded";
+                }
+                catch (PermissionSynchronizationException exception)
+                {
+                    return exception.Code;
+                }
+            }
+
+            var outcomes = await Task.WhenAll(ApplyAsync(), ApplyAsync());
+            Assert.Equal(1, outcomes.Count(outcome => outcome == "Succeeded"));
+            Assert.Contains(outcomes, outcome =>
+                outcome == "PermissionSync.Busy" || outcome == "PermissionSync.StalePlan");
+
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(registry.Definitions.Count, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.Permissions WHERE Module <> N'Legacy';"));
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SystemManagedRoles WHERE SystemRoleKey = 'Administrator';"));
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.PermissionSecurityAudit " +
+                "WHERE Operation = 'PermissionSync.Apply' AND Outcome = 'Succeeded';"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     private static readonly DateTime UtcNow =
         new DateTime(2026, 10, 14, 1, 0, 0, DateTimeKind.Utc);
 
@@ -225,6 +388,23 @@ public sealed class PermissionSynchronizationIntegrationTests
                     AdministratorGrantDecision.Pending)));
     }
 
+    private static PermissionSyncApprovalSet ApprovalForRegistry(
+        IPermissionRegistry registry,
+        string specialKey,
+        PermissionCatalogDecision specialDecision)
+    {
+        return new PermissionSyncApprovalSet(
+            registry.ReleaseId,
+            "release-operator",
+            UtcNow.AddHours(4),
+            registry.Definitions.Select(definition => new PermissionSyncApproval(
+                definition.Key,
+                definition.Key == specialKey
+                    ? specialDecision
+                    : PermissionCatalogDecision.Approved,
+                AdministratorGrantDecision.Pending)));
+    }
+
     private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -232,5 +412,10 @@ public sealed class PermissionSynchronizationIntegrationTests
         var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
         Assert.True(result.Successful, result.Error?.ToString());
         return database;
+    }
+
+    private sealed class AnonymousCurrentUserAccessor : ICurrentUserAccessor
+    {
+        public CurrentUser Current => CurrentUser.Anonymous;
     }
 }

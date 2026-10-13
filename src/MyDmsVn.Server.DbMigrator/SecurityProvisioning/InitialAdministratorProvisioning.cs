@@ -155,6 +155,15 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                         var inspection = CreateInspection(state);
                         if (inspection.Status == InitialAdministratorProvisioningStatus.AlreadyCompleted)
                         {
+                            await WriteAuditAsync(
+                                connection,
+                                transaction,
+                                databaseIdentity,
+                                request,
+                                "Succeeded",
+                                "SecurityBootstrap.AlreadyCompleted",
+                                utcNow,
+                                cancellationToken).ConfigureAwait(false);
                             transaction.Commit();
                             return new InitialAdministratorProvisioningResult(
                                 InitialAdministratorProvisioningOutcome.AlreadyCompleted,
