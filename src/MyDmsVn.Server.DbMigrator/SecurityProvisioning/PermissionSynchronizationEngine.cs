@@ -90,6 +90,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                             transaction,
                             registry,
                             approvals,
+                            currentPlan,
                             state,
                             utcNow,
                             cancellationToken).ConfigureAwait(false);
@@ -98,6 +99,16 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                             transaction,
                             registry,
                             approvals,
+                            currentPlan,
+                            utcNow,
+                            cancellationToken).ConfigureAwait(false);
+                        await ApplyAdministratorPolicyAsync(
+                            connection,
+                            transaction,
+                            currentPlan,
+                            registry,
+                            approvals,
+                            state,
                             utcNow,
                             cancellationToken).ConfigureAwait(false);
                         await UpdateSynchronizationStateAsync(
@@ -152,6 +163,303 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                     }
                 }
             }
+        }
+
+        public Task RevokeAdministratorGrantAsync(
+            string connectionString,
+            string permissionKey,
+            string releaseId,
+            string actor,
+            string reason,
+            DateTime utcNow,
+            CancellationToken cancellationToken)
+        {
+            return ChangeAdministratorGrantStateAsync(
+                connectionString,
+                permissionKey,
+                releaseId,
+                actor,
+                reason,
+                utcNow,
+                restore: false,
+                cancellationToken);
+        }
+
+        public Task RestoreAdministratorGrantAsync(
+            string connectionString,
+            string permissionKey,
+            string releaseId,
+            string actor,
+            string reason,
+            DateTime utcNow,
+            CancellationToken cancellationToken)
+        {
+            return ChangeAdministratorGrantStateAsync(
+                connectionString,
+                permissionKey,
+                releaseId,
+                actor,
+                reason,
+                utcNow,
+                restore: true,
+                cancellationToken);
+        }
+
+        private static async Task ChangeAdministratorGrantStateAsync(
+            string connectionString,
+            string permissionKey,
+            string releaseId,
+            string actor,
+            string reason,
+            DateTime utcNow,
+            bool restore,
+            CancellationToken cancellationToken)
+        {
+            ValidateGrantChangeInputs(
+                connectionString,
+                permissionKey,
+                releaseId,
+                actor,
+                reason,
+                utcNow);
+            using (var connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                DatabaseMigrationPrincipalValidator.Validate(connection);
+                Guid databaseIdentity = Guid.Empty;
+                using (var transaction = connection.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    try
+                    {
+                        await AcquireLockAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+                        databaseIdentity = await connection.QuerySingleAsync<Guid>(new CommandDefinition(
+                            "SELECT DatabaseIdentity FROM dbo.PermissionSynchronizationState WHERE StateId = 1;",
+                            transaction: transaction,
+                            cancellationToken: cancellationToken)).ConfigureAwait(false);
+                        var grant = await connection.QuerySingleOrDefaultAsync<AdministratorGrantRow>(
+                            new CommandDefinition(
+                                "SELECT managed.ManagedRoleId, managed.RoleId, managedGrant.GrantState, " +
+                                "permission.CatalogStatus, permission.AdministratorGrantPolicy, " +
+                                "approval.AdministratorGrantDecision, approval.DecisionReleaseId, " +
+                                "approval.ExpiresAtUtc " +
+                                "FROM dbo.SystemManagedRoles AS managed " +
+                                "JOIN dbo.ManagedRolePermissionGrants AS managedGrant " +
+                                "ON managedGrant.ManagedRoleId = managed.ManagedRoleId " +
+                                "JOIN dbo.Permissions AS permission " +
+                                "ON permission.PermissionKey = managedGrant.PermissionKey " +
+                                "LEFT JOIN dbo.PermissionGrantApprovals AS approval " +
+                                "ON approval.PermissionKey = managedGrant.PermissionKey " +
+                                "WHERE managed.SystemRoleKey = 'Administrator' " +
+                                "AND managedGrant.PermissionKey = @PermissionKey;",
+                                new { PermissionKey = permissionKey },
+                                transaction,
+                                cancellationToken: cancellationToken)).ConfigureAwait(false);
+                        if (grant == null)
+                        {
+                            throw new PermissionSynchronizationException(
+                                "PermissionSync.ManagedGrantMissing",
+                                "The requested managed Administrator grant does not exist.");
+                        }
+
+                        if (restore)
+                        {
+                            ValidateRestore(grant, releaseId, utcNow);
+                            await connection.ExecuteAsync(new CommandDefinition(
+                                "IF NOT EXISTS (SELECT 1 FROM dbo.RolePermissions " +
+                                "WHERE RoleId = @RoleId AND PermissionKey = @PermissionKey) " +
+                                "INSERT dbo.RolePermissions (RoleId, PermissionKey) " +
+                                "VALUES (@RoleId, @PermissionKey);",
+                                new { grant.RoleId, PermissionKey = permissionKey },
+                                transaction,
+                                cancellationToken: cancellationToken)).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            if (!string.Equals(grant.GrantState, "Granted", StringComparison.Ordinal))
+                            {
+                                throw new PermissionSynchronizationException(
+                                    "PermissionSync.ManagedGrantNotGranted",
+                                    "Only a currently granted managed permission can be revoked.");
+                            }
+
+                            await connection.ExecuteAsync(new CommandDefinition(
+                                "DELETE dbo.RolePermissions " +
+                                "WHERE RoleId = @RoleId AND PermissionKey = @PermissionKey;",
+                                new { grant.RoleId, PermissionKey = permissionKey },
+                                transaction,
+                                cancellationToken: cancellationToken)).ConfigureAwait(false);
+                        }
+
+                        var expectedState = restore ? "Revoked" : "Granted";
+                        var targetState = restore ? "Granted" : "Revoked";
+                        var affected = await connection.ExecuteAsync(new CommandDefinition(
+                            "UPDATE dbo.ManagedRolePermissionGrants SET GrantState = @TargetState, " +
+                            "StateReleaseId = @ReleaseId, StateChangedAtUtc = @UtcNow, " +
+                            "StateChangedBy = @Actor, Reason = @Reason " +
+                            "WHERE ManagedRoleId = @ManagedRoleId AND PermissionKey = @PermissionKey " +
+                            "AND GrantState = @ExpectedState;",
+                            new
+                            {
+                                TargetState = targetState,
+                                ReleaseId = releaseId,
+                                UtcNow = utcNow,
+                                Actor = actor,
+                                Reason = reason,
+                                grant.ManagedRoleId,
+                                PermissionKey = permissionKey,
+                                ExpectedState = expectedState,
+                            },
+                            transaction,
+                            cancellationToken: cancellationToken)).ConfigureAwait(false);
+                        if (affected != 1)
+                        {
+                            throw new PermissionSynchronizationException(
+                                "PermissionSync.ManagedGrantStateChanged",
+                                "The managed grant state no longer matches the reviewed operation.");
+                        }
+
+                        await WriteGrantChangeAuditAsync(
+                            connection,
+                            transaction,
+                            databaseIdentity,
+                            releaseId,
+                            actor,
+                            restore,
+                            "Succeeded",
+                            restore ? "PermissionSync.GrantRestored" : "PermissionSync.GrantRevoked",
+                            permissionKey,
+                            utcNow,
+                            cancellationToken).ConfigureAwait(false);
+                        transaction.Commit();
+                    }
+                    catch (Exception exception)
+                    {
+                        transaction.Rollback();
+                        var known = exception as PermissionSynchronizationException;
+                        await WriteGrantChangeAuditAsync(
+                            connection,
+                            null,
+                            databaseIdentity,
+                            releaseId,
+                            actor,
+                            restore,
+                            known == null ? "Failed" : "Rejected",
+                            known?.Code ?? "PermissionSync.GrantChangeFailed",
+                            permissionKey,
+                            utcNow,
+                            CancellationToken.None).ConfigureAwait(false);
+                        if (known != null)
+                        {
+                            throw;
+                        }
+
+                        throw new PermissionSynchronizationException(
+                            "PermissionSync.GrantChangeFailed",
+                            "The managed Administrator grant change failed without committing.");
+                    }
+                }
+            }
+        }
+
+        private static void ValidateGrantChangeInputs(
+            string connectionString,
+            string permissionKey,
+            string releaseId,
+            string actor,
+            string reason,
+            DateTime utcNow)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new ArgumentException("A database connection string is required.", nameof(connectionString));
+            }
+
+            if (string.IsNullOrWhiteSpace(permissionKey) || permissionKey.Length > 100)
+            {
+                throw new ArgumentException("A valid permission key is required.", nameof(permissionKey));
+            }
+
+            if (string.IsNullOrWhiteSpace(releaseId) || releaseId.Length > 64)
+            {
+                throw new ArgumentException("A valid release identifier is required.", nameof(releaseId));
+            }
+
+            if (string.IsNullOrWhiteSpace(actor) || actor.Length > 128)
+            {
+                throw new ArgumentException("A valid operator identity is required.", nameof(actor));
+            }
+
+            if (string.IsNullOrWhiteSpace(reason) || reason.Length > 500)
+            {
+                throw new ArgumentException("A review reason of at most 500 characters is required.", nameof(reason));
+            }
+
+            if (utcNow.Kind != DateTimeKind.Utc)
+            {
+                throw new ArgumentException("The grant change time must be UTC.", nameof(utcNow));
+            }
+        }
+
+        private static void ValidateRestore(
+            AdministratorGrantRow grant,
+            string releaseId,
+            DateTime utcNow)
+        {
+            if (!string.Equals(grant.GrantState, "Revoked", StringComparison.Ordinal))
+            {
+                throw new PermissionSynchronizationException(
+                    "PermissionSync.ManagedGrantNotRevoked",
+                    "Only a revoked managed permission can be restored.");
+            }
+
+            if (!string.Equals(grant.CatalogStatus, "Active", StringComparison.Ordinal) ||
+                string.Equals(grant.AdministratorGrantPolicy, "NotEligible", StringComparison.Ordinal) ||
+                !string.Equals(grant.AdministratorGrantDecision, "Approved", StringComparison.Ordinal) ||
+                !string.Equals(grant.DecisionReleaseId, releaseId, StringComparison.Ordinal) ||
+                !grant.ExpiresAtUtc.HasValue ||
+                grant.ExpiresAtUtc.Value <= utcNow)
+            {
+                throw new PermissionSynchronizationException(
+                    "PermissionSync.RestoreNotApproved",
+                    "Restore requires a current, unexpired Administrator grant approval for an active key.");
+            }
+        }
+
+        private static Task<int> WriteGrantChangeAuditAsync(
+            SqlConnection connection,
+            SqlTransaction? transaction,
+            Guid databaseIdentity,
+            string releaseId,
+            string actor,
+            bool restore,
+            string outcome,
+            string reasonCode,
+            string permissionKey,
+            DateTime utcNow,
+            CancellationToken cancellationToken)
+        {
+            const string sql =
+                "INSERT dbo.PermissionSecurityAudit " +
+                "(AttemptId, Operation, ReleaseId, DatabaseIdentity, Actor, Outcome, " +
+                "ReasonCode, ChangeSummary, OccurredAtUtc) VALUES " +
+                "(@AttemptId, @Operation, @ReleaseId, @DatabaseIdentity, @Actor, @Outcome, " +
+                "@ReasonCode, @ChangeSummary, @UtcNow);";
+            return connection.ExecuteAsync(new CommandDefinition(
+                sql,
+                new
+                {
+                    AttemptId = Guid.NewGuid(),
+                    Operation = restore ? "PermissionSync.Restore" : "PermissionSync.Revoke",
+                    ReleaseId = releaseId,
+                    DatabaseIdentity = databaseIdentity,
+                    Actor = actor,
+                    Outcome = outcome,
+                    ReasonCode = reasonCode,
+                    ChangeSummary = "PermissionKey=" + permissionKey,
+                    UtcNow = utcNow,
+                },
+                transaction,
+                cancellationToken: cancellationToken));
         }
 
         private static void ValidateInputs(
@@ -346,6 +654,13 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 }
             }
 
+            AddAdministratorPolicyChanges(
+                registry,
+                approvals,
+                state,
+                changes,
+                conflicts);
+
             var stateFingerprint = FingerprintState(state);
             var manifestFingerprint = FingerprintManifest(registry);
             var approvalFingerprint = FingerprintApprovals(approvals);
@@ -371,6 +686,126 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 conflicts.OrderBy(conflict => conflict.PermissionKey, StringComparer.Ordinal));
         }
 
+        private static void AddAdministratorPolicyChanges(
+            IPermissionRegistry registry,
+            PermissionSyncApprovalSet approvals,
+            DatabaseState state,
+            ICollection<PermissionSyncChange> changes,
+            ICollection<PermissionSyncConflict> conflicts)
+        {
+            var managedRole = state.ManagedRoles.FirstOrDefault(role =>
+                string.Equals(role.SystemRoleKey, "Administrator", StringComparison.Ordinal));
+            if (managedRole == null)
+            {
+                var collision = state.Roles.FirstOrDefault(role =>
+                    string.Equals(
+                        role.NormalizedRoleName,
+                        "ADMINISTRATOR",
+                        StringComparison.OrdinalIgnoreCase));
+                if (collision != null)
+                {
+                    conflicts.Add(new PermissionSyncConflict(
+                        "PermissionSync.AdministratorRoleOwnershipCollision",
+                        "Administrator"));
+                    return;
+                }
+
+                changes.Add(new PermissionSyncChange(
+                    PermissionSyncChangeKind.CreateAdministratorRole,
+                    "Administrator"));
+                foreach (var definition in registry.Definitions)
+                {
+                    if (ShouldGrantToAdministrator(definition, GetApproval(approvals, definition.Key)))
+                    {
+                        changes.Add(new PermissionSyncChange(
+                            PermissionSyncChangeKind.GrantAdministratorPermission,
+                            definition.Key));
+                    }
+                }
+
+                return;
+            }
+
+            var roleRow = state.Roles.FirstOrDefault(role => role.RoleId == managedRole.RoleId);
+            if (roleRow == null ||
+                !roleRow.IsActive ||
+                !string.Equals(roleRow.NormalizedRoleName, "ADMINISTRATOR", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(
+                    managedRole.ExpectedNormalizedRoleName,
+                    "ADMINISTRATOR",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                conflicts.Add(new PermissionSyncConflict(
+                    "PermissionSync.AdministratorRoleOwnershipInvalid",
+                    "Administrator"));
+                return;
+            }
+
+            foreach (var definition in registry.Definitions)
+            {
+                var assignmentExists = state.RoleAssignments.Any(assignment =>
+                    assignment.RoleId == managedRole.RoleId &&
+                    string.Equals(assignment.PermissionKey, definition.Key, StringComparison.Ordinal));
+                var managedGrant = state.ManagedGrants.FirstOrDefault(grant =>
+                    grant.ManagedRoleId == managedRole.ManagedRoleId &&
+                    string.Equals(grant.PermissionKey, definition.Key, StringComparison.Ordinal));
+                if (managedGrant == null)
+                {
+                    if (assignmentExists)
+                    {
+                        changes.Add(new PermissionSyncChange(
+                            PermissionSyncChangeKind.ReportManualAdministratorGrant,
+                            definition.Key));
+                    }
+                    else if (ShouldGrantToAdministrator(
+                        definition,
+                        GetApproval(approvals, definition.Key)))
+                    {
+                        changes.Add(new PermissionSyncChange(
+                            PermissionSyncChangeKind.GrantAdministratorPermission,
+                            definition.Key));
+                    }
+
+                    continue;
+                }
+
+                if (string.Equals(managedGrant.GrantState, "Granted", StringComparison.Ordinal) &&
+                    !assignmentExists)
+                {
+                    changes.Add(new PermissionSyncChange(
+                        PermissionSyncChangeKind.RecordAdministratorRevocation,
+                        definition.Key));
+                }
+                else if (!string.Equals(managedGrant.GrantState, "Granted", StringComparison.Ordinal) &&
+                         assignmentExists)
+                {
+                    conflicts.Add(new PermissionSyncConflict(
+                        "PermissionSync.ManagedGrantAssignmentConflict",
+                        definition.Key));
+                }
+                else if (string.Equals(managedGrant.GrantState, "NotGranted", StringComparison.Ordinal) &&
+                         !assignmentExists &&
+                         ShouldGrantToAdministrator(
+                             definition,
+                             GetApproval(approvals, definition.Key)))
+                {
+                    changes.Add(new PermissionSyncChange(
+                        PermissionSyncChangeKind.GrantAdministratorPermission,
+                        definition.Key));
+                }
+            }
+        }
+
+        private static bool ShouldGrantToAdministrator(
+            PermissionDefinition definition,
+            PermissionSyncApproval approval)
+        {
+            return definition.LifecycleStatus == PermissionLifecycleStatus.Active &&
+                   definition.AdministratorGrantPolicy != AdministratorGrantPolicy.NotEligible &&
+                   approval.CatalogDecision == PermissionCatalogDecision.Approved &&
+                   approval.AdministratorGrantDecision == AdministratorGrantDecision.Approved;
+        }
+
         private static void EnsurePlanIsCurrent(
             PermissionSynchronizationPlan supplied,
             PermissionSynchronizationPlan current)
@@ -393,6 +828,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
             SqlTransaction transaction,
             IPermissionRegistry registry,
             PermissionSyncApprovalSet approvals,
+            PermissionSynchronizationPlan plan,
             DatabaseState state,
             DateTime utcNow,
             CancellationToken cancellationToken)
@@ -402,6 +838,17 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 StringComparer.Ordinal);
             foreach (var definition in registry.Definitions)
             {
+                if (!plan.Changes.Any(change =>
+                    string.Equals(change.PermissionKey, definition.Key, StringComparison.Ordinal) &&
+                    (change.Kind == PermissionSyncChangeKind.AddDefinition ||
+                     change.Kind == PermissionSyncChangeKind.UpdateDefinition ||
+                     change.Kind == PermissionSyncChangeKind.ActivateDefinition ||
+                     change.Kind == PermissionSyncChangeKind.DeprecateDefinition ||
+                     change.Kind == PermissionSyncChangeKind.StageDefinition)))
+                {
+                    continue;
+                }
+
                 var approval = GetApproval(approvals, definition.Key);
                 var existing = state.Permissions.FirstOrDefault(
                     row => string.Equals(row.PermissionKey, definition.Key, StringComparison.Ordinal));
@@ -494,6 +941,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
             SqlTransaction transaction,
             IPermissionRegistry registry,
             PermissionSyncApprovalSet approvals,
+            PermissionSynchronizationPlan plan,
             DateTime utcNow,
             CancellationToken cancellationToken)
         {
@@ -510,6 +958,13 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 "@Actor, @UtcNow, @ExpiresAtUtc);";
             foreach (var definition in registry.Definitions)
             {
+                if (!plan.Changes.Any(change =>
+                    change.Kind == PermissionSyncChangeKind.UpdateApproval &&
+                    string.Equals(change.PermissionKey, definition.Key, StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
                 var approval = GetApproval(approvals, definition.Key);
                 await connection.ExecuteAsync(new CommandDefinition(
                     sql,
@@ -522,6 +977,115 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                         Actor = approvals.ApprovedBy,
                         UtcNow = utcNow,
                         approvals.ExpiresAtUtc,
+                    },
+                    transaction,
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            }
+        }
+
+        private static async Task ApplyAdministratorPolicyAsync(
+            SqlConnection connection,
+            SqlTransaction transaction,
+            PermissionSynchronizationPlan plan,
+            IPermissionRegistry registry,
+            PermissionSyncApprovalSet approvals,
+            DatabaseState state,
+            DateTime utcNow,
+            CancellationToken cancellationToken)
+        {
+            var managedRole = state.ManagedRoles.FirstOrDefault(role =>
+                string.Equals(role.SystemRoleKey, "Administrator", StringComparison.Ordinal));
+            int managedRoleId;
+            int roleId;
+            if (plan.Changes.Any(change =>
+                change.Kind == PermissionSyncChangeKind.CreateAdministratorRole))
+            {
+                const string createRoleSql =
+                    "INSERT dbo.Roles (RoleName, NormalizedRoleName, IsActive, CreatedAtUtc) " +
+                    "OUTPUT INSERTED.RoleId VALUES (N'Administrator', N'ADMINISTRATOR', 1, @UtcNow);";
+                roleId = await connection.QuerySingleAsync<int>(new CommandDefinition(
+                    createRoleSql,
+                    new { UtcNow = utcNow },
+                    transaction,
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+                const string ownRoleSql =
+                    "INSERT dbo.SystemManagedRoles " +
+                    "(SystemRoleKey, RoleId, ExpectedNormalizedRoleName, CreatedAtUtc, CreatedBy) " +
+                    "OUTPUT INSERTED.ManagedRoleId " +
+                    "VALUES ('Administrator', @RoleId, N'ADMINISTRATOR', @UtcNow, @Actor);";
+                managedRoleId = await connection.QuerySingleAsync<int>(new CommandDefinition(
+                    ownRoleSql,
+                    new { RoleId = roleId, UtcNow = utcNow, Actor = approvals.ApprovedBy },
+                    transaction,
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            }
+            else
+            {
+                if (managedRole == null)
+                {
+                    throw new PermissionSynchronizationException(
+                        "PermissionSync.AdministratorRoleMissing",
+                        "The managed Administrator role is missing from the reviewed plan state.");
+                }
+
+                managedRoleId = managedRole.ManagedRoleId;
+                roleId = managedRole.RoleId;
+            }
+
+            foreach (var change in plan.Changes.Where(item =>
+                item.Kind == PermissionSyncChangeKind.RecordAdministratorRevocation))
+            {
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "UPDATE dbo.ManagedRolePermissionGrants SET GrantState = 'Revoked', " +
+                    "StateReleaseId = @ReleaseId, StateChangedAtUtc = @UtcNow, " +
+                    "StateChangedBy = @Actor, Reason = N'Assignment missing during reviewed sync.' " +
+                    "WHERE ManagedRoleId = @ManagedRoleId AND PermissionKey = @PermissionKey " +
+                    "AND GrantState = 'Granted';",
+                    new
+                    {
+                        ManagedRoleId = managedRoleId,
+                        change.PermissionKey,
+                        ReleaseId = registry.ReleaseId,
+                        UtcNow = utcNow,
+                        Actor = approvals.ApprovedBy,
+                    },
+                    transaction,
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            }
+
+            foreach (var change in plan.Changes.Where(item =>
+                item.Kind == PermissionSyncChangeKind.GrantAdministratorPermission))
+            {
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "IF NOT EXISTS (SELECT 1 FROM dbo.RolePermissions " +
+                    "WHERE RoleId = @RoleId AND PermissionKey = @PermissionKey) " +
+                    "INSERT dbo.RolePermissions (RoleId, PermissionKey) " +
+                    "VALUES (@RoleId, @PermissionKey);",
+                    new { RoleId = roleId, change.PermissionKey },
+                    transaction,
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "UPDATE dbo.ManagedRolePermissionGrants SET GrantState = 'Granted', " +
+                    "StateReleaseId = @ReleaseId, StateChangedAtUtc = @UtcNow, " +
+                    "StateChangedBy = @Actor, Reason = N'Reviewed release grant.' " +
+                    "WHERE ManagedRoleId = @ManagedRoleId AND PermissionKey = @PermissionKey " +
+                    "AND GrantState = 'NotGranted'; " +
+                    "IF @@ROWCOUNT = 0 AND NOT EXISTS " +
+                    "(SELECT 1 FROM dbo.ManagedRolePermissionGrants " +
+                    "WHERE ManagedRoleId = @ManagedRoleId AND PermissionKey = @PermissionKey) " +
+                    "INSERT dbo.ManagedRolePermissionGrants " +
+                    "(ManagedRoleId, PermissionKey, GrantState, StateReleaseId, " +
+                    "StateChangedAtUtc, StateChangedBy, Reason) VALUES " +
+                    "(@ManagedRoleId, @PermissionKey, 'Granted', @ReleaseId, @UtcNow, @Actor, " +
+                    "N'Reviewed release grant.');",
+                    new
+                    {
+                        ManagedRoleId = managedRoleId,
+                        change.PermissionKey,
+                        ReleaseId = registry.ReleaseId,
+                        UtcNow = utcNow,
+                        Actor = approvals.ApprovedBy,
                     },
                     transaction,
                     cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -967,6 +1531,18 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
             public DateTime FirstObservedAtUtc { get; set; }
             public DateTime? ReviewedAtUtc { get; set; }
             public string? ReviewedBy { get; set; }
+        }
+
+        private sealed class AdministratorGrantRow
+        {
+            public int ManagedRoleId { get; set; }
+            public int RoleId { get; set; }
+            public string GrantState { get; set; } = string.Empty;
+            public string CatalogStatus { get; set; } = string.Empty;
+            public string AdministratorGrantPolicy { get; set; } = string.Empty;
+            public string? AdministratorGrantDecision { get; set; }
+            public string? DecisionReleaseId { get; set; }
+            public DateTime? ExpiresAtUtc { get; set; }
         }
     }
 }

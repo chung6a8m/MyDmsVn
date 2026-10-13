@@ -28,6 +28,10 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
         UpdateApproval = 4,
         StageDefinition = 5,
         ReportUnregisteredDefinition = 6,
+        CreateAdministratorRole = 7,
+        GrantAdministratorPermission = 8,
+        RecordAdministratorRevocation = 9,
+        ReportManualAdministratorGrant = 10,
     }
 
     public sealed class PermissionSyncApproval
