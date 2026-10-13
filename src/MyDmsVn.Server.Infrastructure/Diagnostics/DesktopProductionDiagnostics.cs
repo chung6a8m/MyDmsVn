@@ -136,6 +136,15 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
                     TryEnforceAuditRetention();
                 }
             }
+            catch (IOException exception) when (IsTransientFileContention(exception))
+            {
+                Trace.TraceWarning(
+                    "{0}: {1}",
+                    "Diagnostics.AuditFileTemporarilyUnavailable",
+                    SensitiveDataRedactor.ToSafeDiagnostic(exception));
+                TraceAuditFallback(entry);
+                throw;
+            }
             catch (Exception exception) when (
                 exception is IOException ||
                 exception is UnauthorizedAccessException ||
@@ -151,6 +160,15 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
                 TraceAuditFallback(entry);
                 throw;
             }
+        }
+
+        private static bool IsTransientFileContention(IOException exception)
+        {
+            const int ErrorSharingViolation = 32;
+            const int ErrorLockViolation = 33;
+            var nativeErrorCode = exception.HResult & 0xFFFF;
+            return nativeErrorCode == ErrorSharingViolation ||
+                nativeErrorCode == ErrorLockViolation;
         }
 
         private string FormatAudit(SecurityAuditEntry entry)

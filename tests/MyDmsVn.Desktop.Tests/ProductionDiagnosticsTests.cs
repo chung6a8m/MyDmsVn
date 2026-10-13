@@ -208,6 +208,60 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Sharing_violation_reports_failure_and_recovers_on_the_next_audit_write()
+        {
+            var directory = NewTemporaryDirectory();
+            try
+            {
+                var reporter = new CapturingAuditFailureReporter();
+                var services = new ServiceCollection();
+                services.AddServerApplication();
+                services.AddLocalDesktopAdapter();
+                services.AddDesktopProductionDiagnostics(
+                    new DesktopDiagnosticsOptions("MyDmsVn.Net8", directory, 7));
+                services.RemoveAll<ISecurityAuditFailureReporter>();
+                services.AddSingleton<ISecurityAuditFailureReporter>(reporter);
+
+                using (var provider = services.BuildServiceProvider())
+                {
+                    var writer = provider.GetRequiredService<ISecurityAuditWriter>();
+                    var occurredAtUtc = new DateTime(2026, 10, 13, 1, 2, 3, DateTimeKind.Utc);
+                    await writer.WriteAsync(
+                        AuditEntry(occurredAtUtc, "first"),
+                        businessOperationCommitted: true,
+                        CancellationToken.None);
+                    var auditFile = Assert.Single(Directory.GetFiles(directory, "audit-*.json"));
+                    using (File.Open(auditFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    {
+                        await writer.WriteAsync(
+                            AuditEntry(occurredAtUtc, "blocked"),
+                            businessOperationCommitted: true,
+                            CancellationToken.None);
+                    }
+
+                    await writer.WriteAsync(
+                        AuditEntry(occurredAtUtc, "recovered"),
+                        businessOperationCommitted: true,
+                        CancellationToken.None);
+
+                    var status = provider.GetRequiredService<IDiagnosticsStartupStatus>();
+                    Assert.True(status.FileLoggingEnabled);
+                    Assert.Null(status.SafeErrorCode);
+                    Assert.Equal(1, reporter.Failures);
+                    Assert.True(reporter.BusinessOperationCommitted);
+                    var payload = File.ReadAllText(auditFile);
+                    Assert.Contains("\"DocumentId\":\"first\"", payload);
+                    Assert.DoesNotContain("\"DocumentId\":\"blocked\"", payload);
+                    Assert.Contains("\"DocumentId\":\"recovered\"", payload);
+                }
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
         public void Desktop_exception_reporter_writes_redacted_diagnostic_with_support_id()
         {
             var directory = NewTemporaryDirectory();
