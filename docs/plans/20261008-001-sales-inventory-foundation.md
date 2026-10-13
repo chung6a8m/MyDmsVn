@@ -2,6 +2,10 @@
 
 Status: **In progress**. P5.1-T01 and P5.1-T02 completed on 2026-10-09; P5.1-T03, P5.1-T04, the automatable P5.1 gate, P5.2-T01 and P5.2-T02 completed on 2026-10-10; P5.2-T03, the P5.2 gate, P5.3-T01, P5.3-T02, P5.3-T03 and the P5.3 gate completed on 2026-10-11. P5.4 implementation and automated coverage completed on 2026-10-12. Interactive P5.1/P5.4 walkthroughs remain open because the current hosts have no authenticated-session bootstrap. Requires P0–P4 exit gates and SQL Server integration-test infrastructure. Product requirements: `docs/PRD.md`; data model: `docs/DATA_MODEL.md`; contract and security rules in linked documents.
 
+## Integration prerequisite added 2026-10-13
+
+The interactive P5.1/P5.4 GUI gates depend on verified **[P3.1 first Administrator/permission provisioning](20261013-001-initial-security-provisioning-permission-sync.md)** followed by **[P4.1 Login/session bootstrap](20261013-002-desktop-login-session.md)**. These tasks are not covered by completed P3/P4 foundation tests; do not mark the pending P5 walkthrough checkboxes complete until both production hosts execute the actual authenticated flow. Keep synthetic headless UI tests separate from user-session evidence.
+
 ## Goal / explicitly excluded
 
 Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Ledger, Stock Balances and Stock Card** in WinForms. This is the **foundation** for future Sales; **no Sales Order, sales invoice, outbound stock, pricing, debt, COGS or accounting in P5**.
