@@ -5,6 +5,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyDmsVn.Contracts;
+using MyDmsVn.Desktop.Application;
 using MyDmsVn.Server.Application;
 
 namespace MyDmsVn.Desktop.Infrastructure.Local
@@ -131,6 +132,36 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
         }
     }
 
+    internal sealed class LocalDesktopExceptionReporter : IDesktopExceptionReporter
+    {
+        private readonly IRequestDiagnosticsScopeFactory _scopeFactory;
+        private readonly IApplicationExceptionReporter _exceptionReporter;
+
+        public LocalDesktopExceptionReporter(
+            IRequestDiagnosticsScopeFactory scopeFactory,
+            IApplicationExceptionReporter exceptionReporter)
+        {
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+            _exceptionReporter = exceptionReporter ??
+                throw new ArgumentNullException(nameof(exceptionReporter));
+        }
+
+        public string Report(string operationName, Exception exception)
+        {
+            if (exception == null)
+            {
+                throw new ArgumentNullException(nameof(exception));
+            }
+
+            using (var scope = _scopeFactory.Begin(operationName))
+            {
+                scope.RecordError("Desktop.UnexpectedError");
+                _exceptionReporter.Report(typeof(LocalDesktopExceptionReporter), exception);
+                return scope.CorrelationId;
+            }
+        }
+    }
+
     internal static class LocalRequestDiagnosticsRegistration
     {
         public static IServiceCollection AddLocalRequestDiagnostics(
@@ -144,6 +175,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             services.AddSingleton<IRequestCorrelationAccessor>(
                 provider => provider.GetRequiredService<LocalRequestDiagnosticsContext>());
             services.TryAddTransient<LocalRequestDispatcher>();
+            services.TryAddSingleton<IDesktopExceptionReporter, LocalDesktopExceptionReporter>();
             return services;
         }
     }

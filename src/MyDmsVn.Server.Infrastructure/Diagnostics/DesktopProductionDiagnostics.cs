@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +16,7 @@ using Serilog.Context;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Formatting.Json;
+using Serilog.Parsing;
 
 namespace MyDmsVn.Server.Infrastructure.Diagnostics
 {
@@ -56,18 +59,25 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
 
     internal sealed class DesktopDiagnosticLoggers : IDiagnosticsStartupStatus, IDisposable
     {
+        private static readonly MessageTemplate AuditMessageTemplate =
+            new MessageTemplateParser().Parse(
+                "Security audit {Action} {Outcome} actor {ActorUserId} document {DocumentType}/{DocumentId} at {OccurredAtUtc} correlation {CorrelationId}");
+        private readonly object _auditSync = new object();
+        private readonly DesktopDiagnosticsOptions _options;
+        private readonly JsonFormatter _auditFormatter = new JsonFormatter(renderMessage: true);
+        private bool _fileLoggingEnabled;
+        private string? _safeErrorCode;
+
         public DesktopDiagnosticLoggers(DesktopDiagnosticsOptions options)
         {
+            _options = options;
             try
             {
                 Directory.CreateDirectory(options.LogDirectory);
                 Operational = CreateLogger(
                     options,
                     Path.Combine(options.LogDirectory, "application-.json"));
-                Audit = CreateLogger(
-                    options,
-                    Path.Combine(options.LogDirectory, "audit-.json"));
-                FileLoggingEnabled = true;
+                _fileLoggingEnabled = true;
             }
             catch (Exception exception) when (
                 exception is IOException ||
@@ -75,12 +85,11 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
                 exception is ArgumentException ||
                 exception is NotSupportedException)
             {
-                SafeErrorCode = "Diagnostics.FileSinkUnavailable";
+                _safeErrorCode = "Diagnostics.FileSinkUnavailable";
                 Operational = CreateFallbackLogger(options);
-                Audit = CreateFallbackLogger(options);
                 Trace.TraceError(
                     "{0}: {1}",
-                    SafeErrorCode,
+                    _safeErrorCode,
                     SensitiveDataRedactor.ToSafeDiagnostic(exception));
             }
 
@@ -89,17 +98,111 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
         }
 
         public ILogger Operational { get; }
-        public ILogger Audit { get; }
-        public bool FileLoggingEnabled { get; }
-        public string? SafeErrorCode { get; }
+        public bool FileLoggingEnabled => _fileLoggingEnabled;
+        public string? SafeErrorCode => _safeErrorCode;
 
         public void Dispose()
         {
             (Operational as IDisposable)?.Dispose();
-            if (!ReferenceEquals(Operational, Audit))
+        }
+
+        public void WriteAudit(SecurityAuditEntry entry)
+        {
+            if (!_fileLoggingEnabled)
             {
-                (Audit as IDisposable)?.Dispose();
+                TraceAuditFallback(entry);
+                throw new IOException("The security audit file sink is unavailable.");
             }
+
+            try
+            {
+                var auditPath = Path.Combine(
+                    _options.LogDirectory,
+                    "audit-" + entry.OccurredAtUtc.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".json");
+                var payload = FormatAudit(entry);
+                var bytes = new UTF8Encoding(false).GetBytes(payload);
+                lock (_auditSync)
+                {
+                    using (var stream = new FileStream(
+                        auditPath,
+                        FileMode.Append,
+                        FileAccess.Write,
+                        FileShare.Read))
+                    {
+                        stream.Write(bytes, 0, bytes.Length);
+                        stream.Flush(flushToDisk: true);
+                    }
+
+                    EnforceAuditRetention();
+                }
+            }
+            catch (Exception exception) when (
+                exception is IOException ||
+                exception is UnauthorizedAccessException ||
+                exception is ArgumentException ||
+                exception is NotSupportedException)
+            {
+                _safeErrorCode = "Diagnostics.AuditFileSinkUnavailable";
+                _fileLoggingEnabled = false;
+                Trace.TraceError(
+                    "{0}: {1}",
+                    _safeErrorCode,
+                    SensitiveDataRedactor.ToSafeDiagnostic(exception));
+                TraceAuditFallback(entry);
+                throw;
+            }
+        }
+
+        private string FormatAudit(SecurityAuditEntry entry)
+        {
+            var properties = new List<LogEventProperty>
+            {
+                new LogEventProperty("Action", new ScalarValue(entry.Action.ToString())),
+                new LogEventProperty("Outcome", new ScalarValue(entry.Outcome.ToString())),
+                new LogEventProperty("ActorUserId", new ScalarValue(entry.UserId)),
+                new LogEventProperty("DocumentType", new ScalarValue(entry.DocumentType)),
+                new LogEventProperty("DocumentId", new ScalarValue(entry.DocumentId)),
+                new LogEventProperty("OccurredAtUtc", new ScalarValue(entry.OccurredAtUtc)),
+                new LogEventProperty("CorrelationId", new ScalarValue(entry.CorrelationId)),
+                new LogEventProperty("ApplicationVersion", new ScalarValue(GetApplicationVersion())),
+                new LogEventProperty("Host", new ScalarValue(_options.HostName)),
+                new LogEventProperty("Runtime", new ScalarValue(Environment.Version.ToString())),
+            };
+            var logEvent = new LogEvent(
+                new DateTimeOffset(entry.OccurredAtUtc),
+                LogEventLevel.Information,
+                null,
+                AuditMessageTemplate,
+                properties);
+            using (var writer = new StringWriter(CultureInfo.InvariantCulture))
+            {
+                _auditFormatter.Format(logEvent, writer);
+                return writer.ToString();
+            }
+        }
+
+        private void EnforceAuditRetention()
+        {
+            var files = Directory.GetFiles(_options.LogDirectory, "audit-*.json");
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+            var removeCount = files.Length - _options.RetainedFileCountLimit;
+            for (var index = 0; index < removeCount; index++)
+            {
+                File.Delete(files[index]);
+            }
+        }
+
+        private static void TraceAuditFallback(SecurityAuditEntry entry)
+        {
+            Trace.TraceError(
+                "Security audit fallback Action={0}; Outcome={1}; ActorUserId={2}; DocumentType={3}; DocumentId={4}; OccurredAtUtc={5:o}; CorrelationId={6}",
+                entry.Action,
+                entry.Outcome,
+                entry.UserId,
+                entry.DocumentType,
+                entry.DocumentId,
+                entry.OccurredAtUtc,
+                entry.CorrelationId);
         }
 
         private static ILogger CreateLogger(
@@ -126,15 +229,19 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
 
         private static LoggerConfiguration ConfigureBase(DesktopDiagnosticsOptions options)
         {
-            var assembly = typeof(DesktopDiagnosticLoggers).Assembly;
-            var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion ?? assembly.GetName().Version?.ToString() ?? "unknown";
             return new LoggerConfiguration()
                 .MinimumLevel.Information()
                 .Enrich.FromLogContext()
-                .Enrich.WithProperty("ApplicationVersion", version)
+                .Enrich.WithProperty("ApplicationVersion", GetApplicationVersion())
                 .Enrich.WithProperty("Host", options.HostName)
                 .Enrich.WithProperty("Runtime", Environment.Version.ToString());
+        }
+
+        private static string GetApplicationVersion()
+        {
+            var assembly = typeof(DesktopDiagnosticLoggers).Assembly;
+            return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? assembly.GetName().Version?.ToString() ?? "unknown";
         }
     }
 
@@ -230,23 +337,15 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
 
     internal sealed class SerilogSecurityAuditSink : ISecurityAuditSink
     {
-        private readonly ILogger _logger;
+        private readonly DesktopDiagnosticLoggers _loggers;
 
         public SerilogSecurityAuditSink(DesktopDiagnosticLoggers loggers) =>
-            _logger = loggers.Audit;
+            _loggers = loggers;
 
         public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _logger.Information(
-                "Security audit {Action} {Outcome} actor {ActorUserId} document {DocumentType}/{DocumentId} at {OccurredAtUtc} correlation {CorrelationId}",
-                entry.Action,
-                entry.Outcome,
-                entry.UserId,
-                entry.DocumentType,
-                entry.DocumentId,
-                entry.OccurredAtUtc,
-                entry.CorrelationId);
+            _loggers.WriteAudit(entry);
             return Task.CompletedTask;
         }
     }

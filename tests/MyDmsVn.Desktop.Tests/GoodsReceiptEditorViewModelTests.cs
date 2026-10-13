@@ -183,7 +183,9 @@ namespace MyDmsVn.Desktop.Tests
                 var saved = await fixture.Editor.SaveAsync(CancellationToken.None);
 
                 Assert.False(saved);
-                Assert.Equal("An unexpected error occurred.", fixture.Editor.ErrorMessage);
+                Assert.Matches(
+                    "^An unexpected error occurred\\. Support ID: [a-f0-9]{32}$",
+                    fixture.Editor.ErrorMessage!);
                 Assert.Null(fixture.Editor.Id);
             }
         }
@@ -203,7 +205,9 @@ namespace MyDmsVn.Desktop.Tests
                 var saved = await fixture.Editor.SaveAsync(CancellationToken.None);
 
                 Assert.False(saved);
-                Assert.Equal("An unexpected error occurred.", fixture.Editor.ErrorMessage);
+                Assert.Matches(
+                    "^An unexpected error occurred\\. Support ID: [a-f0-9]{32}$",
+                    fixture.Editor.ErrorMessage!);
                 Assert.Equal("changed", fixture.Editor.Note);
             }
         }
@@ -225,7 +229,9 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.Equal(41, fixture.Editor.Id);
                 Assert.Equal("AQEBAQEBAQE=", fixture.Editor.Version);
                 Assert.False(fixture.Editor.IsDirty);
-                Assert.Equal("An unexpected error occurred.", fixture.Editor.ErrorMessage);
+                Assert.Matches(
+                    "^An unexpected error occurred\\. Support ID: [a-f0-9]{32}$",
+                    fixture.Editor.ErrorMessage!);
             }
         }
 
@@ -243,7 +249,9 @@ namespace MyDmsVn.Desktop.Tests
                 var refreshed = await fixture.Editor.RefreshAsync(CancellationToken.None);
 
                 Assert.False(refreshed);
-                Assert.Equal("An unexpected error occurred.", fixture.Editor.ErrorMessage);
+                Assert.Matches(
+                    "^An unexpected error occurred\\. Support ID: [a-f0-9]{32}$",
+                    fixture.Editor.ErrorMessage!);
                 Assert.Equal("original", fixture.Editor.Note);
             }
         }

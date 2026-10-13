@@ -30,8 +30,9 @@ namespace MyDmsVn.Desktop.Application
         public StockCardViewModel(
             IInventoryApiClient apiClient,
             IUiDispatcher dispatcher,
-            IDesktopNotificationService notifications)
-            : base(notifications)
+            IDesktopNotificationService notifications,
+            IDesktopExceptionReporter? exceptionReporter = null)
+            : base(notifications, exceptionReporter)
         {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));

@@ -15,10 +15,11 @@ Date: 2026-10-13 (Asia/Bangkok). Scope: detailed P6-T03 structured diagnostics/s
 
 - Baseline Release build: `dotnet build MyDmsVn.sln -c Release -m:1 --nologo` — Pass, 0 warnings/errors.
 - Baseline tests ran sequentially. Architecture 5/5; Application 120/120 on each TFM; Desktop 186/186 on each TFM after one pre-existing net48 flaky test passed both isolated and full-suite rerun; SQL integration 161/161 on each TFM.
-- TDD focused tests: correlation contract 1/1; Local correlation 1/1; Post audit ordering/deny/post-commit failure 3/3; production diagnostics/redaction/fallback 3/3; release manifest/rejection 3/3; UI support ID/redaction 2/2.
+- TDD focused tests: correlation contract 1/1; Local correlation 1/1; Post audit ordering/deny/post-commit failure 3/3; production diagnostics/redaction/runtime failure/desktop reporting 5/5; release manifest/rejection 3/3; UI support ID/redaction 2/2.
 - Final Release rebuild: `dotnet build MyDmsVn.sln -c Release --no-restore -m:1 -t:Rebuild --nologo` — Pass, 0 warnings/errors.
-- Final tests ran sequentially, never with both TFMs active. Architecture 5/5; Application 125/125 on each TFM; Desktop `net8.0-windows` 195/195; SQL integration 161/161 on each TFM.
-- Desktop `net48` covered all 195 tests as 193 passing in the complementary suite plus two isolated passing tests. The combined process twice stalled on `Cancellation_after_create_response_reports_saved_without_refreshing_details`; a later run instead exposed the pre-existing order-dependent catalog-message failure. Both affected tests pass independently. This is recorded as a test-order/harness stability risk rather than reported as an unqualified full-suite pass.
+- Final review-fix verification ran sequentially, never with both TFMs active. Release rebuild passed with 0 warnings/errors; Architecture 5/5; Application 125/125 on each TFM; Desktop 197/197 on both `net48` and `net8.0-windows`; SQL integration 161/161 on each TFM.
+- Earlier `net48` verification exposed order-dependent instability in two pre-existing async UI tests, as recorded in this PR history. The final review-fix run completed the full `net48` suite without splitting or retrying.
+- Review regression fixtures verify complete Authorization/JWT and quoted-secret redaction, runtime audit file failure after successful initialization, degraded health/failure reporting without changing a committed result, and redacted desktop exception diagnostics with a UI support correlation ID.
 - An actual pre-review `Publish-LocalRelease.ps1 -Version 0.6.0-p6t04` run passed and produced net48 x86, net8 x64 FDD and separate admin migrator directories. The final script additionally refuses dirty source trees and non-empty output directories; the generated `release-manifest.json` is the authoritative per-file SHA-256 evidence for each clean candidate run.
 
 ## Environment and blocked gates

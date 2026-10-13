@@ -10,8 +10,12 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
             @"(?i)\b(?:server|data\s+source)\s*=.*?(?=$|[\r\n])",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+        private static readonly Regex AuthorizationHeaderPattern = new Regex(
+            @"(?im)\bauthorization\s*[:=]\s*[^\r\n]*",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
         private static readonly Regex NamedSecretPattern = new Regex(
-            @"(?i)\b(passwordhash|passwordsalt|password|pwd|user\s+id|uid|auth(?:entication)?token|access\s+token|authorization)\s*[:=]\s*([^;\s,]+)",
+            "(?i)\\b(passwordhash|passwordsalt|password|pwd|user\\s+id|uid|auth(?:entication)?token|access\\s+token)\\s*[:=]\\s*(?:\"[^\"\\r\\n]*\"|'[^'\\r\\n]*'|[^;,\\r\\n]*)",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly Regex BearerPattern = new Regex(
@@ -25,9 +29,10 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
                 return string.Empty;
             }
 
-            var safe = ConnectionStringPattern.Replace(value, "[REDACTED-CONNECTION-STRING]");
-            safe = NamedSecretPattern.Replace(safe, "$1=[REDACTED]");
+            var safe = AuthorizationHeaderPattern.Replace(value, "Authorization=[REDACTED]");
             safe = BearerPattern.Replace(safe, "Bearer [REDACTED]");
+            safe = ConnectionStringPattern.Replace(safe, "[REDACTED-CONNECTION-STRING]");
+            safe = NamedSecretPattern.Replace(safe, "$1=[REDACTED]");
             return safe.Length <= 4096 ? safe : safe.Substring(0, 4096) + " [TRUNCATED]";
         }
 

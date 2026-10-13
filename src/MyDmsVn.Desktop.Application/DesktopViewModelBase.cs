@@ -10,19 +10,28 @@ using MyDmsVn.Contracts;
 
 namespace MyDmsVn.Desktop.Application
 {
+    public interface IDesktopExceptionReporter
+    {
+        string Report(string operationName, Exception exception);
+    }
+
     public abstract class DesktopViewModelBase : ObservableObject, INotifyDataErrorInfo
     {
         private readonly Dictionary<string, IReadOnlyList<string>> _fieldErrors =
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         private readonly IDesktopNotificationService _notifications;
+        private readonly IDesktopExceptionReporter? _exceptionReporter;
         private CancellationTokenSource? _activeOperation;
         private string? _errorMessage;
         private bool _isBusy;
         private bool _isEmpty;
 
-        protected DesktopViewModelBase(IDesktopNotificationService notifications)
+        protected DesktopViewModelBase(
+            IDesktopNotificationService notifications,
+            IDesktopExceptionReporter? exceptionReporter = null)
         {
             _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
+            _exceptionReporter = exceptionReporter;
         }
 
         public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
@@ -150,11 +159,25 @@ namespace MyDmsVn.Desktop.Application
                 throw new ArgumentNullException(nameof(exception));
             }
 
+            var correlationId = Guid.NewGuid().ToString("N");
+            if (_exceptionReporter != null)
+            {
+                try
+                {
+                    correlationId = _exceptionReporter.Report(GetType().Name, exception);
+                }
+                catch (Exception)
+                {
+                    // Reporting must not replace the original safe UI failure path.
+                }
+            }
+
             ApplyApiError(
                 new ApiError(
                     ApiStatusCode.InternalServerError,
                     "Desktop.UnexpectedError",
-                    "An unexpected error occurred."));
+                    "An unexpected error occurred.",
+                    correlationId: correlationId));
         }
 
         protected void PublishNotification(DesktopNotificationKind kind, string message)

@@ -12,7 +12,7 @@ Mỗi host ghi JSON Lines bằng Serilog vào `%LocalAppData%\MyDmsVn\Logs\<host
 
 Thư mục nằm trong profile người dùng nên desktop không cần quyền Administrator. Không nới ACL cho `Everyone`, không chuyển log vào thư mục cài đặt chỉ đọc. File log workstation chỉ phục vụ support; nó không phải audit tập trung, chống sửa/xóa hoặc bằng chứng bất biến.
 
-Nếu không tạo/ghi được file sink khi khởi tạo, composition vẫn dùng non-modal Trace fallback và công bố `Diagnostics.FileSinkUnavailable`. Lỗi ghi audit được báo vào operational diagnostics. Nếu nghiệp vụ đã commit, UI vẫn nhận kết quả nghiệp vụ thành công; không được mô tả là transaction rollback. Operator phải thu thập fallback diagnostics, khắc phục ACL/dung lượng và xác nhận audit tiếp tục ghi. Thiết kế outbox/audit transactionally durable nằm ngoài P6-T03 và cần thay đổi được phê duyệt riêng.
+Nếu không tạo/ghi được file sink khi khởi tạo, composition vẫn dùng non-modal Trace fallback và công bố `Diagnostics.FileSinkUnavailable`. Security audit dùng định dạng JSON có cấu trúc của Serilog với ranh giới append và flush-to-disk đồng bộ để audit writer nhận được lỗi I/O trong runtime. Lỗi runtime chuyển diagnostics health sang `Diagnostics.AuditFileSinkUnavailable`, ghi safe Trace fallback và gọi audit failure reporter. Nếu nghiệp vụ đã commit, UI vẫn nhận kết quả nghiệp vụ thành công; không được mô tả là transaction rollback. Operator phải khắc phục ACL/dung lượng và restart trước khi coi file audit là healthy trở lại. Thiết kế outbox/audit transactionally durable nằm ngoài P6-T03 và cần thay đổi được phê duyệt riêng.
 
 ## Trường cấu trúc
 
@@ -47,7 +47,7 @@ Khi gửi log cho support:
 | Authorization denied | Audit `Denied`, actor/action/document | Xem role/direct deny; không sửa DB trực tiếp để bypass |
 | Slow query | Operation/correlation/timestamp, không SQL parameter | Đối chiếu SQL health và query plan bằng DBA tooling |
 | Post failed | Error code, document ID, ledger/balance reconciliation | Reload receipt; không retry khi commit outcome chưa rõ |
-| Logging failure | `Diagnostics.FileSinkUnavailable`, ACL/disk quota | Khôi phục quyền/dung lượng, restart, xác nhận file mới |
+| Logging failure | `Diagnostics.FileSinkUnavailable` hoặc `Diagnostics.AuditFileSinkUnavailable`, ACL/disk quota | Khôi phục quyền/dung lượng, restart, xác nhận file mới |
 | Crash recovery | Trace fallback và log cuối cùng | Ghi correlation/time, restart; kiểm tra schema và trạng thái Post trước retry |
 
 Không mở modal từ logging/audit failure. Modal startup hiện hữu chỉ chứa safe code/message; automated smoke dùng `--smoke-test` để ghi stderr và thoát hữu hạn.

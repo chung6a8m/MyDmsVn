@@ -142,7 +142,9 @@ namespace MyDmsVn.Desktop.Tests
                     CatalogChangeOperation.Updated));
 
                 await WaitUntilAsync(() => viewModel.ErrorMessage != null);
-                Assert.Equal("An unexpected error occurred.", viewModel.ErrorMessage);
+                Assert.Matches(
+                    "^An unexpected error occurred\\. Support ID: [a-f0-9]{32}$",
+                    viewModel.ErrorMessage!);
             }
         }
 

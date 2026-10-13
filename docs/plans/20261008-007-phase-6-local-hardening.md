@@ -82,7 +82,7 @@ At phase completion, update both the detailed checklist and the roadmap with mat
 
 - [x] Tests assert both hosts resolve a non-NoOp audit implementation in production DI, login/security events reach the configured sink, privileged Post success is emitted after commit and denied/failed/canceled work creates no false success event.
 - [x] Automated redaction fixtures cover password/hash/salt, auth tokens, connection strings, SQL errors and nested exceptions; correlation IDs remain consistent through Local adapter and pipeline on errors and cancellation.
-- [ ] Exercise sink permission denial/full disk and startup logging failures without uncontrolled modal dialogs or misleading business commit status; record supported fallback/fail policy.
+- [ ] Exercise sink permission denial/full disk and startup logging failures without uncontrolled modal dialogs or misleading business commit status; record supported fallback/fail policy. (Automated startup-denial and post-initialization runtime I/O failure paths pass; physical full-disk evidence remains pending.)
 - [x] Evidence: logging/audit schema and retention guide, redaction results, DI/test evidence and troubleshooting examples.
 
 ## P6-T04 — Reproducible packaging for both Windows hosts
