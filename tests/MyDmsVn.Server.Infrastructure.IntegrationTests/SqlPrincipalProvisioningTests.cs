@@ -377,6 +377,10 @@ public sealed class SqlPrincipalProvisioningTests
                 "HAS_PERMS_BY_NAME(N'dbo.GoodsReceiptLines', N'OBJECT', N'DELETE') AS CanDeleteReceiptLines, " +
                 "HAS_PERMS_BY_NAME(N'dbo.StockLedger', N'OBJECT', N'INSERT') AS CanInsertLedger, " +
                 "HAS_PERMS_BY_NAME(N'dbo.StockBalances', N'OBJECT', N'UPDATE') AS CanUpdateBalances, " +
+                "HAS_PERMS_BY_NAME(N'dbo.Permissions', N'OBJECT', N'SELECT') AS CanReadPermissions, " +
+                "HAS_PERMS_BY_NAME(N'dbo.Permissions', N'OBJECT', N'UPDATE') AS CanUpdatePermissions, " +
+                "HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', N'OBJECT', N'SELECT') AS CanReadSyncState, " +
+                "HAS_PERMS_BY_NAME(N'dbo.SecurityBootstrapState', N'OBJECT', N'INSERT') AS CanInsertBootstrapState, " +
                 "HAS_PERMS_BY_NAME(N'dbo.GoodsReceiptNumberSequence', N'OBJECT', N'UPDATE') AS CanUseReceiptSequence, " +
                 "HAS_PERMS_BY_NAME(N'dbo.CatalogTextContainsNul', N'OBJECT', N'VIEW DEFINITION') AS CanInspectManifestFunction, " +
                 "HAS_PERMS_BY_NAME(N'dbo.Employees', N'OBJECT', N'VIEW DEFINITION') AS CanInspectEmployeeIndexDefinition, " +
@@ -392,6 +396,10 @@ public sealed class SqlPrincipalProvisioningTests
             Assert.Equal(1, permissions.CanDeleteReceiptLines);
             Assert.Equal(1, permissions.CanInsertLedger);
             Assert.Equal(1, permissions.CanUpdateBalances);
+            Assert.Equal(1, permissions.CanReadPermissions);
+            Assert.Equal(0, permissions.CanUpdatePermissions);
+            Assert.Equal(0, permissions.CanReadSyncState);
+            Assert.Equal(0, permissions.CanInsertBootstrapState);
             Assert.Equal(1, permissions.CanUseReceiptSequence);
             Assert.Equal(1, permissions.CanInspectManifestFunction);
             Assert.Equal(1, permissions.CanInspectEmployeeIndexDefinition);
@@ -622,6 +630,14 @@ public sealed class SqlPrincipalProvisioningTests
         public int CanUpdateBalances { get; set; }
 
         public int CanUseReceiptSequence { get; set; }
+
+        public int CanReadPermissions { get; set; }
+
+        public int CanUpdatePermissions { get; set; }
+
+        public int CanReadSyncState { get; set; }
+
+        public int CanInsertBootstrapState { get; set; }
 
         public int CanInspectManifestFunction { get; set; }
 

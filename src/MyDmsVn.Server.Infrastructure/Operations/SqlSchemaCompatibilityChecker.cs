@@ -13,6 +13,102 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
     private const string CheckDefinitionHashSql =
         "CONVERT(varchar(64), HASHBYTES('SHA2_256', candidate.definition), 2)";
 
+    private const string PermissionProvisioningArtifactSql =
+        "SELECT ArtifactKey FROM (" +
+        "SELECT N'Table:Permissions' AS ArtifactKey, OBJECT_ID(N'dbo.Permissions', N'U') AS ObjectId UNION ALL " +
+        "SELECT N'Table:PermissionLegacyAssignmentDrift', OBJECT_ID(N'dbo.PermissionLegacyAssignmentDrift', N'U') UNION ALL " +
+        "SELECT N'Table:PermissionSynchronizationState', OBJECT_ID(N'dbo.PermissionSynchronizationState', N'U') UNION ALL " +
+        "SELECT N'Table:SystemManagedRoles', OBJECT_ID(N'dbo.SystemManagedRoles', N'U') UNION ALL " +
+        "SELECT N'Table:PermissionGrantApprovals', OBJECT_ID(N'dbo.PermissionGrantApprovals', N'U') UNION ALL " +
+        "SELECT N'Table:ManagedRolePermissionGrants', OBJECT_ID(N'dbo.ManagedRolePermissionGrants', N'U') UNION ALL " +
+        "SELECT N'Table:SecurityBootstrapState', OBJECT_ID(N'dbo.SecurityBootstrapState', N'U') UNION ALL " +
+        "SELECT N'Table:PermissionSecurityAudit', OBJECT_ID(N'dbo.PermissionSecurityAudit', N'U') UNION ALL " +
+        "SELECT N'Invariant:PermissionProvisioningColumns', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
+        "(N'Permissions', 13), (N'PermissionLegacyAssignmentDrift', 7), " +
+        "(N'PermissionSynchronizationState', 7), (N'SystemManagedRoles', 6), " +
+        "(N'PermissionGrantApprovals', 8), (N'ManagedRolePermissionGrants', 9), " +
+        "(N'SecurityBootstrapState', 5), (N'PermissionSecurityAudit', 11)) " +
+        "AS expected(TableName, ColumnCount) INNER JOIN sys.tables AS ownerTable ON ownerTable.name = expected.TableName " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = ownerTable.schema_id " +
+        "CROSS APPLY (SELECT COUNT(*) AS ColumnCount FROM sys.columns AS candidate " +
+        "WHERE candidate.object_id = ownerTable.object_id) AS actual " +
+        "WHERE ownerSchema.name = N'dbo' AND actual.ColumnCount = expected.ColumnCount) = 8 " +
+        "AND NOT EXISTS (SELECT 1 FROM (VALUES " +
+        "(N'Permissions', N'PermissionKey,Module,Description,CatalogStatus,AdministratorGrantPolicy,IntroducedReleaseId,DeprecatedReleaseId,ActivatedAtUtc,ActivatedBy,CreatedAtUtc,UpdatedAtUtc,UpdatedBy,RowVersion'), " +
+        "(N'PermissionLegacyAssignmentDrift', N'PermissionKey,RoleGrantCount,UserGrantCount,ReviewStatus,FirstObservedAtUtc,ReviewedAtUtc,ReviewedBy'), " +
+        "(N'PermissionSynchronizationState', N'StateId,DatabaseIdentity,LastAppliedPlanId,LastAppliedReleaseId,LastAppliedAtUtc,LastAppliedBy,RowVersion'), " +
+        "(N'SystemManagedRoles', N'ManagedRoleId,SystemRoleKey,RoleId,ExpectedNormalizedRoleName,CreatedAtUtc,CreatedBy'), " +
+        "(N'PermissionGrantApprovals', N'PermissionKey,CatalogDecision,AdministratorGrantDecision,DecisionReleaseId,DecisionBy,DecisionAtUtc,ExpiresAtUtc,RowVersion'), " +
+        "(N'ManagedRolePermissionGrants', N'ManagedRolePermissionGrantId,ManagedRoleId,PermissionKey,GrantState,StateReleaseId,StateChangedAtUtc,StateChangedBy,Reason,RowVersion'), " +
+        "(N'SecurityBootstrapState', N'BootstrapKey,CompletedAtUtc,CompletedBy,AdministratorUserId,ReleaseId'), " +
+        "(N'PermissionSecurityAudit', N'PermissionSecurityAuditId,AttemptId,Operation,PlanId,ReleaseId,DatabaseIdentity,Actor,Outcome,ReasonCode,ChangeSummary,OccurredAtUtc')) " +
+        "AS expected(TableName, ColumnNames) INNER JOIN sys.tables AS ownerTable ON ownerTable.name = expected.TableName " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = ownerTable.schema_id " +
+        "CROSS APPLY (SELECT STRING_AGG(candidate.name, N',') WITHIN GROUP (ORDER BY candidate.column_id) AS ColumnNames " +
+        "FROM sys.columns AS candidate WHERE candidate.object_id = ownerTable.object_id) AS actual " +
+        "WHERE ownerSchema.name <> N'dbo' OR actual.ColumnNames <> expected.ColumnNames) " +
+        "AND COL_LENGTH(N'dbo.Permissions', N'PermissionKey') = 200 " +
+        "AND COL_LENGTH(N'dbo.Permissions', N'CatalogStatus') = 32 " +
+        "AND COL_LENGTH(N'dbo.PermissionSynchronizationState', N'DatabaseIdentity') = 16 " +
+        "AND COL_LENGTH(N'dbo.ManagedRolePermissionGrants', N'RowVersion') = 8 " +
+        "THEN 1 END UNION ALL " +
+        "SELECT N'Invariant:PermissionProvisioningChecks', CASE WHEN (SELECT COUNT(*) FROM sys.check_constraints AS candidate " +
+        "WHERE candidate.parent_object_id IN (OBJECT_ID(N'dbo.Permissions'), OBJECT_ID(N'dbo.PermissionLegacyAssignmentDrift'), " +
+        "OBJECT_ID(N'dbo.PermissionSynchronizationState'), OBJECT_ID(N'dbo.SystemManagedRoles'), " +
+        "OBJECT_ID(N'dbo.PermissionGrantApprovals'), OBJECT_ID(N'dbo.ManagedRolePermissionGrants'), " +
+        "OBJECT_ID(N'dbo.SecurityBootstrapState'), OBJECT_ID(N'dbo.PermissionSecurityAudit')) " +
+        "AND candidate.is_disabled = 0 AND candidate.is_not_trusted = 0 " +
+        "AND candidate.name IN (N'CK_Permissions_PermissionKey_NotBlank', N'CK_Permissions_Module_NotBlank', " +
+        "N'CK_Permissions_Description_NotBlank', N'CK_Permissions_CatalogStatus', " +
+        "N'CK_Permissions_AdministratorGrantPolicy', N'CK_Permissions_ActivationAudit', " +
+        "N'CK_PermissionLegacyAssignmentDrift_Counts', N'CK_PermissionLegacyAssignmentDrift_ReviewStatus', " +
+        "N'CK_PermissionSynchronizationState_Singleton', N'CK_SystemManagedRoles_SystemRoleKey_NotBlank', " +
+        "N'CK_SystemManagedRoles_Name_NotBlank', N'CK_PermissionGrantApprovals_CatalogDecision', " +
+        "N'CK_PermissionGrantApprovals_AdministratorDecision', N'CK_PermissionGrantApprovals_Audit_NotBlank', " +
+        "N'CK_ManagedRolePermissionGrants_GrantState', N'CK_ManagedRolePermissionGrants_Audit_NotBlank', " +
+        "N'CK_SecurityBootstrapState_Key_NotBlank', N'CK_SecurityBootstrapState_Audit_NotBlank', " +
+        "N'CK_PermissionSecurityAudit_Operation_NotBlank', N'CK_PermissionSecurityAudit_Actor_NotBlank', " +
+        "N'CK_PermissionSecurityAudit_Outcome', N'CK_PermissionSecurityAudit_ReasonCode_NotBlank')) = 22 " +
+        "AND EXISTS (SELECT 1 FROM sys.check_constraints AS candidate WHERE candidate.name = N'CK_Permissions_CatalogStatus' " +
+        "AND CHARINDEX(N'UNREGISTERED', UPPER(candidate.definition)) > 0 " +
+        "AND CHARINDEX(N'PENDINGACTIVATION', REPLACE(UPPER(candidate.definition), N' ', N'')) > 0 " +
+        "AND CHARINDEX(N'ACTIVE', UPPER(candidate.definition)) > 0 " +
+        "AND CHARINDEX(N'DEPRECATED', UPPER(candidate.definition)) > 0) " +
+        "AND EXISTS (SELECT 1 FROM sys.check_constraints AS candidate WHERE candidate.name = N'CK_Permissions_AdministratorGrantPolicy' " +
+        "AND CHARINDEX(N'NOTELIGIBLE', REPLACE(UPPER(candidate.definition), N' ', N'')) > 0 " +
+        "AND CHARINDEX(N'ELIGIBLE', UPPER(candidate.definition)) > 0 " +
+        "AND CHARINDEX(N'SENSITIVE', UPPER(candidate.definition)) > 0) " +
+        "AND NOT EXISTS (SELECT 1 FROM sys.check_constraints AS candidate WHERE candidate.name IN " +
+        "(N'CK_PermissionGrantApprovals_CatalogDecision', N'CK_PermissionGrantApprovals_AdministratorDecision') " +
+        "AND (CHARINDEX(N'PENDING', UPPER(candidate.definition)) = 0 OR " +
+        "CHARINDEX(N'APPROVED', UPPER(candidate.definition)) = 0 OR " +
+        "CHARINDEX(N'REJECTED', UPPER(candidate.definition)) = 0)) " +
+        "AND EXISTS (SELECT 1 FROM sys.check_constraints AS candidate WHERE candidate.name = N'CK_ManagedRolePermissionGrants_GrantState' " +
+        "AND CHARINDEX(N'NOTGRANTED', REPLACE(UPPER(candidate.definition), N' ', N'')) > 0 " +
+        "AND CHARINDEX(N'GRANTED', UPPER(candidate.definition)) > 0 " +
+        "AND CHARINDEX(N'REVOKED', UPPER(candidate.definition)) > 0) " +
+        "AND EXISTS (SELECT 1 FROM sys.check_constraints AS candidate WHERE candidate.name = N'CK_PermissionSecurityAudit_Outcome' " +
+        "AND CHARINDEX(N'SUCCEEDED', UPPER(candidate.definition)) > 0 " +
+        "AND CHARINDEX(N'REJECTED', UPPER(candidate.definition)) > 0 " +
+        "AND CHARINDEX(N'FAILED', UPPER(candidate.definition)) > 0) THEN 1 END UNION ALL " +
+        "SELECT N'Invariant:PermissionProvisioningPrimaryKeys', CASE WHEN (SELECT COUNT(*) FROM sys.key_constraints AS candidate " +
+        "WHERE candidate.type = N'PK' AND candidate.parent_object_id IN (OBJECT_ID(N'dbo.Permissions'), " +
+        "OBJECT_ID(N'dbo.PermissionLegacyAssignmentDrift'), OBJECT_ID(N'dbo.PermissionSynchronizationState'), " +
+        "OBJECT_ID(N'dbo.SystemManagedRoles'), OBJECT_ID(N'dbo.PermissionGrantApprovals'), " +
+        "OBJECT_ID(N'dbo.ManagedRolePermissionGrants'), OBJECT_ID(N'dbo.SecurityBootstrapState'), " +
+        "OBJECT_ID(N'dbo.PermissionSecurityAudit'))) = 8 THEN 1 END UNION ALL " +
+        "SELECT N'Invariant:PermissionProvisioningUniqueIndexes', CASE WHEN (SELECT COUNT(*) FROM sys.indexes AS candidate " +
+        "WHERE candidate.is_unique = 1 AND candidate.is_disabled = 0 AND candidate.name IN " +
+        "(N'UX_PermissionSynchronizationState_DatabaseIdentity', N'UX_SystemManagedRoles_SystemRoleKey', " +
+        "N'UX_SystemManagedRoles_RoleId', N'UX_ManagedRolePermissionGrants_Role_Key', " +
+        "N'UX_PermissionSecurityAudit_AttemptId')) = 5 THEN 1 END UNION ALL " +
+        "SELECT N'Invariant:PermissionProvisioningForeignKeys', CASE WHEN (SELECT COUNT(*) FROM sys.foreign_keys AS candidate " +
+        "WHERE candidate.is_disabled = 0 AND candidate.is_not_trusted = 0 AND candidate.name IN " +
+        "(N'FK_PermissionLegacyAssignmentDrift_Permissions', N'FK_SystemManagedRoles_Roles', " +
+        "N'FK_PermissionGrantApprovals_Permissions', N'FK_ManagedRolePermissionGrants_SystemManagedRoles', " +
+        "N'FK_ManagedRolePermissionGrants_Permissions')) = 5 THEN 1 END" +
+        ") AS Artifacts WHERE ObjectId IS NOT NULL;";
+
     private const string ColumnArtifactSql =
         "WITH ManagedColumnSignatures AS (SELECT CASE " +
         "WHEN ownerTable.name = N'SchemaVersions' THEN N'Persistence' " +
@@ -451,7 +547,10 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "(candidate.type = N'U' AND candidate.name IN (" +
         "N'SchemaVersions', N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
         "N'Products', N'Warehouses', N'Employees', N'Customers', " +
-        "N'GoodsReceipts', N'GoodsReceiptLines', N'StockLedger', N'StockBalances')) OR " +
+        "N'GoodsReceipts', N'GoodsReceiptLines', N'StockLedger', N'StockBalances', " +
+        "N'Permissions', N'PermissionLegacyAssignmentDrift', N'PermissionSynchronizationState', " +
+        "N'SystemManagedRoles', N'PermissionGrantApprovals', N'ManagedRolePermissionGrants', " +
+        "N'SecurityBootstrapState', N'PermissionSecurityAudit')) OR " +
         "(candidate.type = N'FN' AND candidate.name = N'CatalogTextContainsNul') OR " +
         "(candidate.type = N'SO' AND candidate.name = N'GoodsReceiptNumberSequence') OR " +
         "(candidate.type = N'TR' AND candidate.name = N'TR_StockLedger_AppendOnly' " +
@@ -528,6 +627,12 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
                     ColumnArtifactSql,
                     cancellationToken: cancellationToken)).ConfigureAwait(false);
             artifacts.UnionWith(columnArtifactRows);
+
+            var permissionArtifactRows = await connection.QueryAsync<string>(
+                new CommandDefinition(
+                    PermissionProvisioningArtifactSql,
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            artifacts.UnionWith(permissionArtifactRows);
         }
 
         return SchemaCompatibilityPolicy.Evaluate(

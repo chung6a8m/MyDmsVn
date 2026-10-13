@@ -15,6 +15,7 @@ public sealed class SchemaCompatibilityPolicyTests
         "005_GoodsReceipt.sql",
         "006_GoodsReceipt_Number_Sequence.sql",
         "007_Inventory_Stock.sql",
+        "008_Permission_Provisioning.sql",
     };
 
     private static readonly string[] CurrentArtifacts =
@@ -57,6 +58,19 @@ public sealed class SchemaCompatibilityPolicyTests
         "Invariant:InventoryUniqueIndexes",
         "Invariant:InventoryForeignKeys",
         "Trigger:TR_StockLedger_AppendOnly",
+        "Table:Permissions",
+        "Table:PermissionLegacyAssignmentDrift",
+        "Table:PermissionSynchronizationState",
+        "Table:SystemManagedRoles",
+        "Table:PermissionGrantApprovals",
+        "Table:ManagedRolePermissionGrants",
+        "Table:SecurityBootstrapState",
+        "Table:PermissionSecurityAudit",
+        "Invariant:PermissionProvisioningColumns",
+        "Invariant:PermissionProvisioningChecks",
+        "Invariant:PermissionProvisioningPrimaryKeys",
+        "Invariant:PermissionProvisioningUniqueIndexes",
+        "Invariant:PermissionProvisioningForeignKeys",
     };
 
     [Fact]

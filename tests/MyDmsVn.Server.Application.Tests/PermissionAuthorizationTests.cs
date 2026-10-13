@@ -42,6 +42,22 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
+        public async Task Inactive_catalog_key_denies_even_when_a_direct_or_role_grant_exists()
+        {
+            var store = new FakePermissionStore
+            {
+                CatalogActive = false,
+                DirectDecision = true,
+                RoleGrant = true,
+            };
+            var service = CreateService(ActiveUser(), store);
+
+            Assert.False(await service.IsAllowedAsync(
+                PermissionKeys.CatalogProductsRead,
+                CancellationToken.None));
+        }
+
+        [Fact]
         public async Task Unknown_permission_and_inactive_or_anonymous_user_fail_closed()
         {
             var store = new FakePermissionStore { DirectDecision = true, RoleGrant = true };
@@ -113,7 +129,8 @@ namespace MyDmsVn.Server.Application.Tests
         {
             return new PermissionAuthorizationService(
                 new StubCurrentUserAccessor(currentUser),
-                store);
+                store,
+                PermissionRegistryComposition.CreateDefault());
         }
 
         private static CurrentUser ActiveUser()
@@ -135,6 +152,7 @@ namespace MyDmsVn.Server.Application.Tests
         {
             public bool? DirectDecision { get; set; }
             public bool RoleGrant { get; set; }
+            public bool CatalogActive { get; set; } = true;
             public int QueryCount { get; private set; }
 
             public Task<PermissionSnapshot> GetSnapshotAsync(
@@ -143,7 +161,8 @@ namespace MyDmsVn.Server.Application.Tests
                 CancellationToken cancellationToken)
             {
                 QueryCount++;
-                return Task.FromResult(new PermissionSnapshot(DirectDecision, RoleGrant));
+                return Task.FromResult(
+                    new PermissionSnapshot(DirectDecision, RoleGrant, CatalogActive));
             }
         }
 

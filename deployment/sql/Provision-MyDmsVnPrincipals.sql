@@ -17,6 +17,14 @@ IF DATABASE_PRINCIPAL_ID(N'MyDmsVnRuntimeRole') IS NOT NULL
 BEGIN
     REVOKE INSERT ON OBJECT::dbo.Users FROM [MyDmsVnRuntimeRole];
     REVOKE UPDATE ON OBJECT::dbo.Users FROM [MyDmsVnRuntimeRole];
+    REVOKE INSERT, UPDATE, DELETE ON OBJECT::dbo.Permissions FROM [MyDmsVnRuntimeRole];
+    REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.PermissionLegacyAssignmentDrift FROM [MyDmsVnRuntimeRole];
+    REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.PermissionSynchronizationState FROM [MyDmsVnRuntimeRole];
+    REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.SystemManagedRoles FROM [MyDmsVnRuntimeRole];
+    REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.PermissionGrantApprovals FROM [MyDmsVnRuntimeRole];
+    REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.ManagedRolePermissionGrants FROM [MyDmsVnRuntimeRole];
+    REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.SecurityBootstrapState FROM [MyDmsVnRuntimeRole];
+    REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.PermissionSecurityAudit FROM [MyDmsVnRuntimeRole];
 END;
 
 DECLARE @RuntimeHasElevatedPermissions bit = 0;
@@ -68,7 +76,7 @@ SELECT @RuntimeHasElevatedPermissions = CASE WHEN
                   (objectPermission.permission_name = N'SELECT' AND candidate.name IN
                       (N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions',
                        N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
-                       N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions')) OR
+                       N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions', N'Permissions')) OR
                   (objectPermission.permission_name = N'INSERT' AND candidate.name IN
                       (N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
                        N'GoodsReceiptLines', N'StockLedger', N'StockBalances')) OR
@@ -109,7 +117,7 @@ SELECT @RuntimeHasElevatedPermissions = CASE WHEN
                   (checkedPermission.permission_name = N'SELECT' AND ownerTable.name IN
                       (N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions',
                        N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
-                       N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions')) OR
+                       N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions', N'Permissions')) OR
                   (checkedPermission.permission_name = N'UPDATE' AND
                       (ownerTable.name IN
                           (N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
@@ -213,6 +221,8 @@ GRANT SELECT ON OBJECT::dbo.RolePermissions TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.RolePermissions TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
+GRANT SELECT ON OBJECT::dbo.Permissions TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.Permissions TO [MyDmsVnRuntimeRole];
 
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];

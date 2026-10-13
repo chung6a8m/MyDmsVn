@@ -8,13 +8,16 @@ namespace MyDmsVn.Server.Application.Security
     {
         private readonly ICurrentUserAccessor _currentUserAccessor;
         private readonly IPermissionStore _permissionStore;
+        private readonly IPermissionRegistry _permissionRegistry;
 
         public PermissionAuthorizationService(
             ICurrentUserAccessor currentUserAccessor,
-            IPermissionStore permissionStore)
+            IPermissionStore permissionStore,
+            IPermissionRegistry permissionRegistry)
         {
             _currentUserAccessor = currentUserAccessor;
             _permissionStore = permissionStore;
+            _permissionRegistry = permissionRegistry;
         }
 
         public async Task<bool> IsAllowedAsync(
@@ -26,7 +29,7 @@ namespace MyDmsVn.Server.Application.Security
             if (!currentUser.IsAuthenticated ||
                 !currentUser.IsActive ||
                 !currentUser.UserId.HasValue ||
-                !PermissionKeys.IsDeclared(permissionKey))
+                !_permissionRegistry.TryGet(permissionKey, out _))
             {
                 return false;
             }
@@ -44,7 +47,7 @@ namespace MyDmsVn.Server.Application.Security
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (userId <= 0 || !PermissionKeys.IsDeclared(permissionKey))
+            if (userId <= 0 || !_permissionRegistry.TryGet(permissionKey, out _))
             {
                 return false;
             }
@@ -55,6 +58,11 @@ namespace MyDmsVn.Server.Application.Security
                     permissionKey,
                     cancellationToken)
                 .ConfigureAwait(false);
+            if (!snapshot.IsCatalogActive)
+            {
+                return false;
+            }
+
             if (snapshot.DirectDecision.HasValue)
             {
                 return snapshot.DirectDecision.Value;

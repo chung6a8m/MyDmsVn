@@ -27,19 +27,19 @@ public sealed class SchemaCompatibilityIntegrationTests
                     assembly,
                     resourceName =>
                         resourceName.Contains(".Scripts.") &&
-                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal))
+                        !resourceName.EndsWith("008_Permission_Provisioning.sql", StringComparison.Ordinal))
                 .JournalToSqlTable("dbo", "SchemaVersions")
                 .WithTransactionPerScript()
                 .LogToNowhere()
                 .Build()
                 .PerformUpgrade();
             Assert.True(interrupted.Successful, interrupted.Error?.ToString());
-            Assert.Equal(6, interrupted.Scripts.Count());
+            Assert.Equal(7, interrupted.Scripts.Count());
 
             var injectedFailure = DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScript(
-                    "007_FaultInjection.sql",
+                    "008_FaultInjection.sql",
                     "CREATE TABLE dbo.P6FaultArtifact (Id int NOT NULL); " +
                     "THROW 51000, 'Injected migration failure.', 1;")
                 .JournalToSqlTable("dbo", "SchemaVersions")
@@ -53,7 +53,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             {
                 Assert.Null(await connection.ExecuteScalarAsync<int?>(
                     "SELECT OBJECT_ID(N'dbo.P6FaultArtifact', N'U');"));
-                Assert.Equal(6, await connection.QuerySingleAsync<int>(
+                Assert.Equal(7, await connection.QuerySingleAsync<int>(
                     "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
                 await connection.ExecuteAsync(
                     "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P6-SAFE', N'Preserved', N'EA');");
@@ -94,8 +94,58 @@ public sealed class SchemaCompatibilityIntegrationTests
             Assert.True(first.IsCompatible);
             Assert.True(second.IsCompatible);
             using var connection = new SqlConnection(database.ConnectionString);
-            Assert.Equal(7, await connection.QuerySingleAsync<int>(
+            Assert.Equal(8, await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Permission_catalog_constraint_tampering_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.Permissions DROP CONSTRAINT CK_Permissions_CatalogStatus; " +
+                    "ALTER TABLE dbo.Permissions WITH CHECK ADD CONSTRAINT CK_Permissions_CatalogStatus " +
+                    "CHECK (LEN(CatalogStatus) > 0); " +
+                    "ALTER TABLE dbo.Permissions CHECK CONSTRAINT CK_Permissions_CatalogStatus;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Permission_schema_column_rename_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "EXEC sys.sp_rename " +
+                    "N'dbo.PermissionSecurityAudit.ChangeSummary', N'ChangedSummary', N'COLUMN';");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
         }
         finally
         {
@@ -206,7 +256,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             using (var connection = new SqlConnection(database.ConnectionString))
             {
                 await connection.ExecuteAsync(
-                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%007_Inventory_Stock.sql';");
+                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%008_Permission_Provisioning.sql';");
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
@@ -618,9 +668,15 @@ public sealed class SchemaCompatibilityIntegrationTests
             using (var connection = new SqlConnection(database.ConnectionString))
             {
                 await connection.ExecuteAsync(
-                    "DROP TABLE dbo.StockBalances; " +
-                    "DROP TABLE dbo.StockLedger; " +
-                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%007_Inventory_Stock.sql';");
+                    "DROP TABLE dbo.SecurityBootstrapState; " +
+                    "DROP TABLE dbo.ManagedRolePermissionGrants; " +
+                    "DROP TABLE dbo.PermissionGrantApprovals; " +
+                    "DROP TABLE dbo.SystemManagedRoles; " +
+                    "DROP TABLE dbo.PermissionLegacyAssignmentDrift; " +
+                    "DROP TABLE dbo.PermissionSecurityAudit; " +
+                    "DROP TABLE dbo.PermissionSynchronizationState; " +
+                    "DROP TABLE dbo.Permissions; " +
+                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%008_Permission_Provisioning.sql';");
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
