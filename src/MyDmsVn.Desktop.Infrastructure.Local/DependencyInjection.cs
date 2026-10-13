@@ -10,6 +10,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
     {
         public static IServiceCollection AddLocalDesktopAdapter(this IServiceCollection services)
         {
+            services.AddLocalRequestDiagnostics();
             services.TryAddSingleton<IDesktopNotificationService, DesktopNotificationCenter>();
             services.TryAddSingleton<IMessenger>(_ => new WeakReferenceMessenger());
             services.TryAddSingleton<IAsyncDelay, SystemAsyncDelay>();

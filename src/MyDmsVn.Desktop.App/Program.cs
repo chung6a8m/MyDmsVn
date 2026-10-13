@@ -7,6 +7,7 @@ using MyDmsVn.Desktop.WinForms;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Infrastructure;
 using MyDmsVn.Server.Infrastructure.Operations;
+using MyDmsVn.Server.Infrastructure.Diagnostics;
 
 namespace MyDmsVn.Desktop.App
 {
@@ -64,6 +65,8 @@ namespace MyDmsVn.Desktop.App
             services.AddServerInfrastructure();
             services.AddSqlPersistence(connectionString);
             services.AddLocalDesktopAdapter();
+            services.AddDesktopProductionDiagnostics(
+                DesktopDiagnosticsOptions.CreateDefault("MyDmsVn.Desktop.App"));
             services.AddMyDmsVnDesktopWinForms(uiContext);
             return services.BuildServiceProvider();
         }

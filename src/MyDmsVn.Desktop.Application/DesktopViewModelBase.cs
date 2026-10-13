@@ -135,9 +135,12 @@ namespace MyDmsVn.Desktop.Application
             }
 
             OnPropertyChanged(nameof(HasErrors));
-            ErrorMessage = error.Message;
+            var userMessage = string.IsNullOrWhiteSpace(error.CorrelationId)
+                ? error.Message
+                : error.Message + " Support ID: " + error.CorrelationId;
+            ErrorMessage = userMessage;
             _notifications.Publish(
-                new DesktopNotification(DesktopNotificationKind.Error, error.Message));
+                new DesktopNotification(DesktopNotificationKind.Error, userMessage));
         }
 
         protected void ApplyUnexpectedError(Exception exception)
@@ -151,7 +154,7 @@ namespace MyDmsVn.Desktop.Application
                 new ApiError(
                     ApiStatusCode.InternalServerError,
                     "Desktop.UnexpectedError",
-                    exception.Message));
+                    "An unexpected error occurred."));
         }
 
         protected void PublishNotification(DesktopNotificationKind kind, string message)

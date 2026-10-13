@@ -59,6 +59,38 @@ namespace MyDmsVn.Desktop.Tests
             Assert.Equal(DesktopNotificationKind.Error, notifications.LastNotification!.Kind);
         }
 
+        [Fact]
+        public void ApplyApiError_appends_safe_support_correlation_id()
+        {
+            var notifications = new DesktopNotificationCenter();
+            var viewModel = new TestViewModel(notifications);
+
+            viewModel.Apply(
+                new ApiError(
+                    ApiStatusCode.InternalServerError,
+                    "InternalError",
+                    "An unexpected error occurred.",
+                    correlationId: "9a76a76b8fb34dd689d7145ea5d84504"));
+
+            Assert.Equal(
+                "An unexpected error occurred. Support ID: 9a76a76b8fb34dd689d7145ea5d84504",
+                viewModel.ErrorMessage);
+            Assert.Equal(viewModel.ErrorMessage, notifications.LastNotification!.Message);
+        }
+
+        [Fact]
+        public void Unexpected_exception_message_is_not_exposed_to_the_user()
+        {
+            var notifications = new DesktopNotificationCenter();
+            var viewModel = new TestViewModel(notifications);
+
+            viewModel.ApplyUnexpected(
+                new InvalidOperationException("Server=db;Password=secret"));
+
+            Assert.Equal("An unexpected error occurred.", viewModel.ErrorMessage);
+            Assert.DoesNotContain("secret", notifications.LastNotification!.Message);
+        }
+
         private sealed class TestViewModel : DesktopViewModelBase
         {
             public TestViewModel(IDesktopNotificationService notifications)
@@ -76,6 +108,11 @@ namespace MyDmsVn.Desktop.Tests
             public void Apply(ApiError error)
             {
                 ApplyApiError(error);
+            }
+
+            public void ApplyUnexpected(Exception exception)
+            {
+                ApplyUnexpectedError(exception);
             }
         }
     }

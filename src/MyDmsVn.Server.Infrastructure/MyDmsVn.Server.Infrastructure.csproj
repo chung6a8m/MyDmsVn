@@ -9,6 +9,8 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="RepoDb" />
     <PackageReference Include="RepoDb.SqlServer" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MyDmsVn.Server.Application\MyDmsVn.Server.Application.csproj" />

@@ -164,14 +164,14 @@ namespace MyDmsVn.Desktop.Tests
             using (var viewModel = Create(api, new ImmediateDelay()))
             {
                 await viewModel.ActivateAsync(CancellationToken.None);
-                Assert.Equal("List connection failed.", viewModel.ErrorMessage);
+                Assert.Equal("An unexpected error occurred.", viewModel.ErrorMessage);
 
                 api.ListException = null;
                 api.GetException = new InvalidOperationException("Detail connection failed.");
                 var selected = await viewModel.SelectAsync(41, CancellationToken.None);
 
                 Assert.Null(selected);
-                Assert.Equal("Detail connection failed.", viewModel.ErrorMessage);
+                Assert.Equal("An unexpected error occurred.", viewModel.ErrorMessage);
             }
         }
 

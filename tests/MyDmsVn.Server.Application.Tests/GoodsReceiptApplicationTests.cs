@@ -517,6 +517,32 @@ public sealed class GoodsReceiptApplicationTests
         Assert.Equal(GoodsReceiptStatuses.Posted, result.Value.Status);
     }
 
+    [Fact]
+    public async Task Successful_post_audit_is_emitted_only_after_the_business_commit()
+    {
+        var repository = new FakeGoodsReceiptWriteRepository();
+        var unitOfWork = new FakeUnitOfWork(repository);
+        var audit = new CommitObservingAuditSink(unitOfWork);
+        using var provider = CreateProvider(
+            unitOfWork,
+            permissionStore: new PostOnlyPermissionStore(),
+            auditSink: audit);
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        var entry = Assert.Single(audit.Entries);
+        Assert.True(audit.CommitStates[0]);
+        Assert.Equal(SecurityAuditAction.GoodsReceiptPost, entry.Action);
+        Assert.Equal(SecurityAuditOutcome.Succeeded, entry.Outcome);
+        Assert.Equal(42, entry.UserId);
+        Assert.Equal("GoodsReceipt", entry.DocumentType);
+        Assert.Equal("41", entry.DocumentId);
+    }
+
     [Theory]
     [InlineData(GoodsReceiptStatuses.Posted, 1, "GoodsReceipt.AlreadyPosted")]
     [InlineData(GoodsReceiptStatuses.Draft, 2, "GoodsReceipt.ConcurrencyConflict")]
@@ -637,6 +663,68 @@ public sealed class GoodsReceiptApplicationTests
         Assert.False(unitOfWork.BeganTransaction);
     }
 
+    [Fact]
+    public async Task Explicit_post_deny_records_denied_audit_without_false_success()
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        var audit = new CommitObservingAuditSink(unitOfWork);
+        using var provider = CreateProvider(unitOfWork, allow: false, auditSink: audit);
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        var entry = Assert.Single(audit.Entries);
+        Assert.Equal(SecurityAuditOutcome.Denied, entry.Outcome);
+        Assert.DoesNotContain(
+            audit.Entries,
+            item => item.Outcome == SecurityAuditOutcome.Succeeded);
+        Assert.False(unitOfWork.BeganTransaction);
+    }
+
+    [Fact]
+    public async Task Post_commit_audit_failure_is_reported_without_claiming_business_rollback()
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        var reporter = new CapturingAuditFailureReporter();
+        using var provider = CreateProvider(
+            unitOfWork,
+            permissionStore: new PostOnlyPermissionStore(),
+            auditSink: new ThrowingAuditSink(),
+            auditFailureReporter: reporter);
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.True(unitOfWork.Committed);
+        Assert.Equal(SecurityAuditAction.GoodsReceiptPost, reporter.Action);
+        Assert.True(reporter.BusinessOperationCommitted);
+    }
+
+    [Fact]
+    public async Task Post_commit_result_survives_audit_sink_and_failure_reporter_failure()
+    {
+        var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
+        using var provider = CreateProvider(
+            unitOfWork,
+            permissionStore: new PostOnlyPermissionStore(),
+            auditSink: new ThrowingAuditSink(),
+            auditFailureReporter: new ThrowingAuditFailureReporter());
+
+        var result = await provider.GetRequiredService<ISender>().Send(
+            new PostGoodsReceiptCommand(
+                new PostGoodsReceiptRequest(41, VersionToken(1))),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.True(unitOfWork.Committed);
+    }
+
     private static SaveGoodsReceiptRequest ValidSaveRequest() =>
         new SaveGoodsReceiptRequest(
             new DateTime(2026, 10, 10),
@@ -696,7 +784,9 @@ public sealed class GoodsReceiptApplicationTests
         FakeUnitOfWork unitOfWork,
         bool allow = true,
         IGoodsReceiptQueryService? queryService = null,
-        IPermissionStore? permissionStore = null)
+        IPermissionStore? permissionStore = null,
+        ISecurityAuditSink? auditSink = null,
+        ISecurityAuditFailureReporter? auditFailureReporter = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IUnitOfWorkFactory>(new FakeUnitOfWorkFactory(unitOfWork));
@@ -706,6 +796,16 @@ public sealed class GoodsReceiptApplicationTests
                 CurrentUser.Authenticated(42, "operator", "Operator", isActive: true)));
         services.AddSingleton(permissionStore ?? new PermissionStore(allow));
         services.AddSingleton<IUtcClock>(new FixedUtcClock());
+        if (auditSink != null)
+        {
+            services.AddSingleton(auditSink);
+        }
+
+        if (auditFailureReporter != null)
+        {
+            services.AddSingleton(auditFailureReporter);
+        }
+
         services.AddServerApplication();
         return services.BuildServiceProvider();
     }
@@ -918,5 +1018,53 @@ public sealed class GoodsReceiptApplicationTests
             LastLines = lines;
             return Task.FromResult(Receipt(header.Id, "GR0000000041", 3));
         }
+    }
+
+    private sealed class CommitObservingAuditSink : ISecurityAuditSink
+    {
+        private readonly FakeUnitOfWork _unitOfWork;
+
+        public CommitObservingAuditSink(FakeUnitOfWork unitOfWork) =>
+            _unitOfWork = unitOfWork;
+
+        public List<SecurityAuditEntry> Entries { get; } = new List<SecurityAuditEntry>();
+        public List<bool> CommitStates { get; } = new List<bool>();
+
+        public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken)
+        {
+            Entries.Add(entry);
+            CommitStates.Add(_unitOfWork.Committed);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingAuditSink : ISecurityAuditSink
+    {
+        public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("audit storage unavailable");
+    }
+
+    private sealed class CapturingAuditFailureReporter : ISecurityAuditFailureReporter
+    {
+        public SecurityAuditAction Action { get; private set; }
+        public bool BusinessOperationCommitted { get; private set; }
+
+        public void Report(
+            SecurityAuditEntry entry,
+            Exception exception,
+            bool businessOperationCommitted)
+        {
+            Action = entry.Action;
+            BusinessOperationCommitted = businessOperationCommitted;
+        }
+    }
+
+    private sealed class ThrowingAuditFailureReporter : ISecurityAuditFailureReporter
+    {
+        public void Report(
+            SecurityAuditEntry entry,
+            Exception exception,
+            bool businessOperationCommitted) =>
+            throw new InvalidOperationException("audit failure reporter unavailable");
     }
 }

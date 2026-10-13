@@ -142,7 +142,7 @@ namespace MyDmsVn.Desktop.Tests
                     CatalogChangeOperation.Updated));
 
                 await WaitUntilAsync(() => viewModel.ErrorMessage != null);
-                Assert.Equal("Product lookup failed.", viewModel.ErrorMessage);
+                Assert.Equal("An unexpected error occurred.", viewModel.ErrorMessage);
             }
         }
 

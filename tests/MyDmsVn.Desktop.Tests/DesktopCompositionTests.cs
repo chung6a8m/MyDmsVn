@@ -80,6 +80,10 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.False(response.IsSuccess);
                 Assert.Equal("ValidationError", response.Error!.Code);
                 Assert.Equal("clientName", response.Error.Details[0].Field);
+                Assert.Matches("^[a-f0-9]{32}$", response.Error.CorrelationId!);
+                Assert.Null(
+                    provider.GetRequiredService<IRequestCorrelationAccessor>()
+                        .CorrelationId);
             }
         }
 
@@ -101,6 +105,9 @@ namespace MyDmsVn.Desktop.Tests
                     () => client.GetStatusAsync(
                         new FoundationStatusRequest("Desktop"),
                         cancellation.Token));
+                Assert.Null(
+                    provider.GetRequiredService<IRequestCorrelationAccessor>()
+                        .CorrelationId);
             }
         }
 
@@ -285,6 +292,38 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Fact]
+        public async Task Stale_login_error_keeps_request_correlation_and_cleans_up_scope()
+        {
+            var handler = new PausingLoginHandler();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton(handler);
+            services.AddTransient<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
+                PausingLoginHandler>(provider => provider.GetRequiredService<PausingLoginHandler>());
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var identity = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                var login = identity.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None);
+                await handler.Started;
+                session.SignOut();
+                handler.Resume();
+
+                var response = await login;
+
+                Assert.False(response.IsSuccess);
+                Assert.Equal("Auth.SessionChanged", response.Error!.Code);
+                Assert.False(string.IsNullOrWhiteSpace(response.Error.CorrelationId));
+                Assert.Null(provider.GetRequiredService<IRequestCorrelationAccessor>().CorrelationId);
+            }
+        }
+
         private sealed class ThrowingFoundationHandler
             : IRequestHandler<GetFoundationStatusQuery, ErrorOr<FoundationStatus>>
         {
@@ -356,6 +395,28 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken cancellationToken) =>
                 Task.FromResult<ErrorOr<CurrentUserDto>>(
                     new CurrentUserDto(42, request.Username, "Operator"));
+        }
+
+        private sealed class PausingLoginHandler
+            : IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>
+        {
+            private readonly TaskCompletionSource<bool> _started =
+                new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource<bool> _resume =
+                new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public Task Started => _started.Task;
+
+            public async Task<ErrorOr<CurrentUserDto>> Handle(
+                LoginCommand request,
+                CancellationToken cancellationToken)
+            {
+                _started.TrySetResult(true);
+                await _resume.Task.ConfigureAwait(false);
+                return new CurrentUserDto(42, request.Username, "Operator");
+            }
+
+            public void Resume() => _resume.TrySetResult(true);
         }
 
         private sealed class PausingUnitOfWorkFactory : IUnitOfWorkFactory

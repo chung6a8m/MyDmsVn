@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,7 +36,8 @@ public sealed class UpdateGoodsReceiptDraftCommand : AuthorizedActorApplicationR
     public override string PermissionKey => PermissionKeys.InventoryGoodsReceiptsWrite;
 }
 
-public sealed class PostGoodsReceiptCommand : AuthorizedActorApplicationRequest<PostGoodsReceiptResponse>
+public sealed class PostGoodsReceiptCommand
+    : AuthorizedActorApplicationRequest<PostGoodsReceiptResponse>, ISecurityAuditedRequest
 {
     public PostGoodsReceiptCommand(PostGoodsReceiptRequest request) =>
         Request = request ?? throw new ArgumentNullException(nameof(request));
@@ -43,6 +45,10 @@ public sealed class PostGoodsReceiptCommand : AuthorizedActorApplicationRequest<
     public PostGoodsReceiptRequest Request { get; }
 
     public override string PermissionKey => PermissionKeys.InventoryGoodsReceiptsPost;
+
+    public SecurityAuditAction AuditAction => SecurityAuditAction.GoodsReceiptPost;
+    public string AuditDocumentType => "GoodsReceipt";
+    public string AuditDocumentId => Request.ReceiptId.ToString(CultureInfo.InvariantCulture);
 }
 
 internal sealed class SaveGoodsReceiptRequestValidator : AbstractValidator<SaveGoodsReceiptRequest>
@@ -407,13 +413,16 @@ internal sealed class PostGoodsReceiptCommandHandler
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
     private readonly IUtcClock _clock;
+    private readonly ISecurityAuditWriter _auditWriter;
 
     public PostGoodsReceiptCommandHandler(
         IUnitOfWorkFactory unitOfWorkFactory,
-        IUtcClock clock)
+        IUtcClock clock,
+        ISecurityAuditWriter auditWriter)
     {
         _unitOfWorkFactory = unitOfWorkFactory;
         _clock = clock;
+        _auditWriter = auditWriter;
     }
 
     public async Task<ErrorOr<PostGoodsReceiptResponse>> Handle(
@@ -482,6 +491,16 @@ internal sealed class PostGoodsReceiptCommandHandler
             cancellationToken).ConfigureAwait(false);
 
         unitOfWork.Commit();
+        await _auditWriter.WriteAsync(
+            new SecurityAuditEntry(
+                SecurityAuditAction.GoodsReceiptPost,
+                SecurityAuditOutcome.Succeeded,
+                command.AuthorizedUserId,
+                postedAtUtc,
+                "GoodsReceipt",
+                header.Id.ToString(CultureInfo.InvariantCulture)),
+            businessOperationCommitted: true,
+            CancellationToken.None).ConfigureAwait(false);
         return new PostGoodsReceiptResponse(header.Id, GoodsReceiptStatuses.Posted, postedAtUtc);
     }
 

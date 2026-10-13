@@ -1,6 +1,5 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
-using MediatR;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Server.Application;
@@ -9,21 +8,21 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 {
     internal sealed class LocalFoundationApiClient : IFoundationApiClient
     {
-        private readonly ISender _sender;
+        private readonly LocalRequestDispatcher _dispatcher;
 
-        public LocalFoundationApiClient(ISender sender)
+        public LocalFoundationApiClient(LocalRequestDispatcher dispatcher)
         {
-            _sender = sender;
+            _dispatcher = dispatcher;
         }
 
         public async Task<ApiResponse<FoundationStatus>> GetStatusAsync(
             FoundationStatusRequest request,
             CancellationToken cancellationToken)
         {
-            var result = await _sender
-                .Send(new GetFoundationStatusQuery(request.ClientName), cancellationToken)
-                .ConfigureAwait(false);
-            return ApiResponseMapper.Map(result);
+            return await _dispatcher.SendAsync(
+                new GetFoundationStatusQuery(request.ClientName),
+                null,
+                cancellationToken).ConfigureAwait(false);
         }
     }
 }
