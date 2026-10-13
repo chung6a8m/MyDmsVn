@@ -26,3 +26,7 @@ Evidence: `docs/P3_VERIFICATION.md`.
 ## Open prerequisite
 
 Legacy import verifier requires algorithm description or sanitized sample fixture from the legacy system. Do not equate missing fixture with permission to guess. Document migration path as pending if needed.
+
+## Post-foundation integration dependency (new 2026-10-13)
+
+P3's completed schema, Login abstractions, BCrypt and authorization tests **do not include production seed/provisioning of an initial Administrator** or a repeatable lifecycle for newly introduced permission keys. Track this separately in **[P3.1 — Initial security provisioning and continuous permission synchronization](20261013-001-initial-security-provisioning-permission-sync.md)**. It owns the permission registry, additive schema, controlled dry-run/apply sync, Administrator policy, guarded first-user enrollment and SQL verification. This is **not started** and is a prerequisite for real-user desktop Login acceptance; do not relabel existing checked P3 tasks.
