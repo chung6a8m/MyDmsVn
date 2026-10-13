@@ -76,7 +76,7 @@ Recommended initial interfaces:
 - `IProductApiClient`, `IWarehouseApiClient`, `IEmployeeApiClient`, `ICustomerApiClient`.
 - `IGoodsReceiptApiClient`: `CreateDraftAsync`, `UpdateDraftAsync`, `PostAsync`, `GetAsync`, `ListAsync`.
 - `IInventoryApiClient`: `GetStockBalancesAsync`, `GetStockCardAsync`.
-- `IIdentityApiClient`: `LoginAsync` / `GetCurrentUserAsync`, after auth contract is defined.
+- `IIdentityApiClient`: `LoginAsync` / `GetCurrentUserAsync` for authenticated identity flow; P4.1 defines production UI/session bootstrap around these existing contracts, not a new direct-SQL login path.
 
 Each call is async and accepts `CancellationToken`. Commands have DTO request and typed response; queries return paginated DTOs with total count and deterministic sort where appropriate.
 
@@ -90,6 +90,10 @@ Example command-level behavior:
 - CreateDraft and UpdateDraft accept 1–200 non-null lines. Each line must have a unique positive Product ID, Quantity fitting SQL `decimal(18,4)` and greater than zero, and UnitCost fitting SQL `decimal(19,4)` and greater than or equal to zero. Values with more than four effective fractional digits or precision outside those SQL types return field validation errors before database access.
 - `PostGoodsReceiptResponse` returns receipt identifier, status, posting timestamp; retry of an already posted receipt returns a documented conflict (or a stable idempotent success if an idempotency contract is added later). In either case, **no second stock posting** occurs.
 - Identifiers and date/time formats are consistent in Local/HTTP tests; transport changes cannot alter business semantics.
+
+## Local desktop session (P4.1)
+
+Production WinForms hosts must gate shell/business access on successful `IIdentityApiClient.LoginAsync` and establish a host-scoped session-backed `ICurrentUserAccessor`. Missing/expired user denies privileged Application operations. Logout clears current-user UI state and forces reauthentication; cancellation and session generation prevent late responses from a previous user populating the next user's workspace. An authorization result already captured by an in-flight server use case cannot be retroactively reassigned by logout. No automatic re-execution of mutating commands on expiry or SQL timeout. First Administrator provisioning and registry sync are separate privileged deployment commands (P3.1), **not client API operations**.
 
 ## Auth and HTTP-specific behavior (P7)
 
