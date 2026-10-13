@@ -4,7 +4,7 @@ Applies to the entire repository. This file is authoritative for AI-assisted cha
 
 ## Mission and status
 
-Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **P0 foundation code and tests exist; no business features or SQL schema are implemented yet.** Implement in small, reviewable phase-scoped changes and do not claim later-phase capabilities exist.
+Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **P0–P4 foundations and P5 implementation/automated gates exist; P5 authenticated interactive acceptance and P6 release gates remain open.** Consult `docs/DEVELOPMENT_PLAN.md` for the current evidence-based status. **P3.1 initial Administrator/continuous permission sync and P4.1 real Login/session are newly planned, not implemented**, despite historical P3/P4 completion. Implement in small, reviewable phase-scoped changes and do not claim later-phase capabilities exist.
 
 ## Read-order and precedence
 
@@ -28,6 +28,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 - v1 Local uses in-process Application dispatch; v2 HTTP uses the **same DTO/API result semantics**.
 - Preserve legacy `PasswordHash` and `PasswordSalt` columns for migration; no new plaintext or reversible password storage.
 - Authorization is checked on server-side application use cases; UI gating alone is insufficient. UserPermission explicit deny/grant overrides roles; default deny.
+- New features must declare/register permission keys centrally and validate new-key lifecycle in tests. Provision/synchronize permissions under reviewed deployment/administrator privilege only; never seed users/roles or run synchronization from desktop Login/startup. See `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md`.
 - Do not add sales order, issue, returns, pricing, accounting or multi-warehouse receipt to P5 unless separately approved.
 
 ## Coding conventions
@@ -64,5 +65,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 - "Implement P0 from `docs/plans/20261008-002-phase-0-foundation.md`; create solution skeleton, DI and build verification only."
 - "Implement P1 from `docs/DEVELOPMENT_PLAN.md` and `docs/PERSISTENCE.md`, including SQL integration tests."
 - "Implement P5.1 master data after P0–P4 quality gates; follow `docs/plans/20261008-001-sales-inventory-foundation.md`."
+- "Implement P3.1 administrator provisioning and continuous permission sync in `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md` before interactive Login tests."
+- "Implement P4.1 shared WinForms Login/session in `docs/plans/20261013-002-desktop-login-session.md` after P3.1, then complete authenticated P5/P6 release gates."
 
 Do not automatically implement all phases in a single unreviewable change.
