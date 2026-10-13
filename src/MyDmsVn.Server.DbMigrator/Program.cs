@@ -21,6 +21,19 @@ internal static class Program
                 DateTime.UtcNow);
         }
 
+        if (args.Length >= 2 &&
+            string.Equals(args[0], "security", StringComparison.Ordinal) &&
+            string.Equals(args[1], "bootstrap-admin", StringComparison.Ordinal))
+        {
+            return InitialAdministratorProvisioningCommand.Run(
+                args.Skip(2).ToArray(),
+                new SqlConnectionConfigurationLoader(),
+                new ConsoleProvisioningSecretReader(),
+                Console.Out,
+                Console.Error,
+                DateTime.UtcNow);
+        }
+
         return DatabaseMigratorCommand.Run(
             new SqlConnectionConfigurationLoader(),
             Console.Out,

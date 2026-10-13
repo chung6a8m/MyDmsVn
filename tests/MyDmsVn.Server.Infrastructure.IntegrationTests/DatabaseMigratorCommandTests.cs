@@ -34,6 +34,30 @@ public sealed class DatabaseMigratorCommandTests
     }
 
     [Fact]
+    public void Bootstrap_rejects_password_command_line_argument_without_echoing_it()
+    {
+        var loader = new SqlConnectionConfigurationLoader(
+            _ => throw new InvalidOperationException("configuration must not be loaded"),
+            _ => throw new InvalidOperationException(),
+            _ => "unused");
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exitCode = InitialAdministratorProvisioningCommand.Run(
+            new[] { "--apply", "--password", "DoNotEcho!456" },
+            loader,
+            new NonInteractiveSecretReader(),
+            output,
+            error,
+            new DateTime(2026, 10, 14, 3, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(2, exitCode);
+        Assert.Contains("SecurityBootstrap.InvalidArguments", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("DoNotEcho", error.ToString(), StringComparison.Ordinal);
+        Assert.Equal(string.Empty, output.ToString());
+    }
+
+    [Fact]
     public void Missing_migration_configuration_returns_safe_actionable_error()
     {
         var loader = new SqlConnectionConfigurationLoader(
@@ -72,5 +96,15 @@ public sealed class DatabaseMigratorCommandTests
         Assert.Equal(2, exitCode);
         Assert.Contains("Startup.DatabaseConfigurationMissing", error.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("runtime-secret", error.ToString(), StringComparison.Ordinal);
+    }
+
+    private sealed class NonInteractiveSecretReader : IProvisioningSecretReader
+    {
+        public bool IsInteractive => false;
+
+        public string ReadSecret(string prompt, TextWriter output)
+        {
+            throw new InvalidOperationException("Secret input must not be requested.");
+        }
     }
 }
