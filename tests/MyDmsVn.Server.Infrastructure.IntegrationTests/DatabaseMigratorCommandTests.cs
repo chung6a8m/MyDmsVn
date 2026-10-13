@@ -58,6 +58,28 @@ public sealed class DatabaseMigratorCommandTests
     }
 
     [Fact]
+    public void Administrator_grant_change_requires_exact_operation_and_target_before_configuration()
+    {
+        var loader = new SqlConnectionConfigurationLoader(
+            _ => throw new InvalidOperationException("configuration must not be loaded"),
+            _ => throw new InvalidOperationException(),
+            _ => "unused");
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exitCode = AdministratorGrantCommand.Run(
+            new[] { "--revoke", "--restore" },
+            loader,
+            output,
+            error,
+            new DateTime(2026, 10, 14, 3, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(2, exitCode);
+        Assert.Contains("PermissionSync.InvalidArguments", error.ToString(), StringComparison.Ordinal);
+        Assert.Equal(string.Empty, output.ToString());
+    }
+
+    [Fact]
     public void Missing_migration_configuration_returns_safe_actionable_error()
     {
         var loader = new SqlConnectionConfigurationLoader(

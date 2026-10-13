@@ -40,10 +40,14 @@ Khi nâng cấp từ bản provisioning cũ, chạy lại script hiện tại b�
 | `StockLedger` | Có | Có | Không | Không |
 | `StockBalances` | Có | Có | Có | Không |
 | `SchemaVersions` | Có | Không | Không | Không |
+| `Permissions` | Có | Không | Không | Không |
+| `PermissionLegacyAssignmentDrift`, `PermissionSynchronizationState`, `SystemManagedRoles`, `PermissionGrantApprovals`, `ManagedRolePermissionGrants`, `SecurityBootstrapState`, `PermissionSecurityAudit` | Không | Không | Không | Không |
 
 Runtime role còn có `VIEW DEFINITION` ở database scope để schema preflight kiểm kê nhất quán mọi user object, kể cả object unmanaged chưa được cấp quyền dữ liệu, đồng thời xác nhận function, constraint, index và trigger trong manifest. Đây là quyền chỉ đọc metadata/định nghĩa; nó không cấp `SELECT`, `EXECUTE`, DML hay DDL trên các object đó. Runtime validator chỉ allowlist quyền database read-only này và vẫn từ chối các quyền quản trị, bảo mật hoặc thay đổi schema.
 
 Mọi object mới phải được xem xét và thêm rõ ràng vào script; không cấp `SELECT/EXECUTE` toàn schema. Runtime không được đọc object chưa liệt kê, `ALTER/DROP`, tự cấp quyền, hoặc thay đổi migration history.
+
+Permission sync, managed Administrator grant revoke/restore và first-admin bootstrap chỉ dùng migration principal qua admin package. Chúng dùng cùng secure migration configuration, xác nhận `DatabaseIdentity`/plan ID trước mutation và không tồn tại trong desktop/Login/background process. Xem [security provisioning runbook](SECURITY_PROVISIONING_RUNBOOK.md).
 
 ## 3. Nguồn cấu hình và precedence
 

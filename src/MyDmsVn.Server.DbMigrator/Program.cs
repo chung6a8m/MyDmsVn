@@ -34,6 +34,18 @@ internal static class Program
                 DateTime.UtcNow);
         }
 
+        if (args.Length >= 2 &&
+            string.Equals(args[0], "permissions", StringComparison.Ordinal) &&
+            string.Equals(args[1], "administrator-grant", StringComparison.Ordinal))
+        {
+            return AdministratorGrantCommand.Run(
+                args.Skip(2).ToArray(),
+                new SqlConnectionConfigurationLoader(),
+                Console.Out,
+                Console.Error,
+                DateTime.UtcNow);
+        }
+
         return DatabaseMigratorCommand.Run(
             new SqlConnectionConfigurationLoader(),
             Console.Out,
