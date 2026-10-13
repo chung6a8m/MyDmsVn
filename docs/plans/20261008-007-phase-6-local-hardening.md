@@ -4,6 +4,10 @@ Status: **In progress**. P6-T01/P6-T02 implementation requirements and automatab
 
 Read first: `AGENTS.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`, `docs/SECURITY.md`, `docs/PERSISTENCE.md`, `docs/TEST_STRATEGY.md`, `docs/CONTRACTS.md`, `docs/P3_VERIFICATION.md`, and `docs/plans/20261008-001-sales-inventory-foundation.md`. Existing migrator entry point: `src/MyDmsVn.Server.DbMigrator`.
 
+## New mandatory identity dependencies (2026-10-13)
+
+Before packaged P5 Login/logout walkthroughs or P6 sign-off, complete **[P3.1 provisioning + continuous permission synchronization](20261013-001-initial-security-provisioning-permission-sync.md)** and **[P4.1 desktop Login/session](20261013-002-desktop-login-session.md)**. A fresh install must separately migrate schema, approve/apply permission sync, enroll the first Administrator with operator-provided credentials and then log in via the production desktop host. Upgrades sync new feature permission keys under reviewed Administrator policy **without** recreating users or resetting passwords. Keep these privileged commands outside normal desktop startup and the ordinary installer; do not weaken the P6-T01 SQL runtime principal allowlist.
+
 ## Objective and boundaries
 
 Make the P5 Local Mode vertical slice installable, diagnosable, maintainable and recoverable on supported Windows/SQL Server deployments, through **verified artifacts** for both `net48` and `net8.0-windows`.
@@ -107,7 +111,7 @@ At phase completion, update both the detailed checklist and the roadmap with mat
 
 ### Implementation requirements
 
-- [ ] Execute the P5 acceptance walkthrough **from packaged binaries** for both hosts: login, permissions, all four catalog CRUD/active-state workflows, Goods Receipt Draft create/edit/reload, Post, StockBalances, StockCard, duplicate Post rejection, logout/relogin and restart.
+- [ ] Execute the P5 acceptance walkthrough **from packaged binaries** for both hosts: independently provision first Administrator with P3.1 CLI, perform a **real Login** (not test-only session injection), permissions, all four catalog CRUD/active-state workflows, Goods Receipt Draft create/edit/reload, Post, StockBalances, StockCard, duplicate Post rejection, logout/relogin and restart. Include another restricted user and a direct-deny test; record P3.1/P4.1 evidence.
 - [ ] Validate Catalog UI free-text filtering debounce, cancellation and request-generation stale-response discard; explicit Refresh remains immediate and paging resets correctly. Keep large-grid tests in T07.
 - [ ] With Goods Receipt open, update/deactivate/reactivate Product/Warehouse/Employee in catalog screens: `CatalogChangedMessage` causes same-process lookup invalidation/reload, maintains historical selection and respects active-only new selections. Reopening screens fetches current data; **do not claim cross-process messenger delivery**.
 - [ ] Smoke stale receipt concurrency tokens and Post-only versus Write/Read permissions; unauthorized operations and failed Post must not change ledger or balances.
@@ -179,7 +183,7 @@ At phase completion, update both the detailed checklist and the roadmap with mat
 | **G2 — SQL/data safety** | Least-privilege runtime vs admin principals; no privileged embedded secrets; verified backup restore; Post concurrency, rollback and ledger reconciliation | Yes |
 | **G3 — Security/diagnostics** | Non-NoOp audit sink wired in both production hosts; correct post-commit semantics; logs redact secrets and correlate errors | Yes |
 | **G4 — Desktop/regression** | P5 acceptance and WinForms/STA smoke on **both** installed release artifacts; debounce/messenger/lookup, cancel/offline/timeout cases; no modal hangs | Yes |
-| **G5 — Identity/release decision** | Approved real legacy verifier tests **or** approved exclusion/reset strategy; .NET 8 lifecycle risk disposition; complete release matrix and owner sign-off | Yes |
+| **G5 — Identity/release decision** | P3.1 fresh-admin bootstrap + repeatable reviewed permission sync, P4.1 real Login/logout/expiry on both hosts; approved real legacy verifier tests **or** approved exclusion/reset strategy; .NET 8 lifecycle risk disposition; complete release matrix and owner sign-off | Yes |
 
 **Evidence discipline:** Every task must record changed files, actual Release build/test commands and results, Windows/SQL environment, manual vs automated evidence, outstanding findings and next task. A skipped SQL/Windows test is not equivalent to a passed gate; environmental inability to execute mandatory verification leaves P6 blocked. Use `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` only with the guarded disposable test database harness. Production data must never be reset to make tests pass.
 
