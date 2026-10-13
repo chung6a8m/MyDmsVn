@@ -1,6 +1,6 @@
 # P7 — ASP.NET Core 8 HTTP API and adapter parity
 
-Status: Not started. Depends on P6. Read ADR 0001, `docs/CONTRACTS.md`, `docs/SECURITY.md`.
+Status: Not started. Depends on P6 (including P3.1 provisioning/registry and P4.1 reusable Login UX). Read ADR 0001, `docs/CONTRACTS.md`, `docs/SECURITY.md`.
 
 ## Objective
 
@@ -23,4 +23,4 @@ P5 user scenario passes with both LocalApiClient and HttpApiClient; authorizatio
 
 ## Avoid
 
-Rewriting UI, duplicating use-case logic in controllers, moving direct SQL to HttpApiClient, transmitting Domain entities, relying on UI-only permission guards.
+Rewriting UI, duplicating use-case logic in controllers, moving direct SQL to HttpApiClient, transmitting Domain entities, relying on UI-only permission guards. Reuse P3.1 registry and deployment sync for future remote modules; keep P4.1 Login presentation, but implement bearer token lifecycle only in P7 HTTP infrastructure.
