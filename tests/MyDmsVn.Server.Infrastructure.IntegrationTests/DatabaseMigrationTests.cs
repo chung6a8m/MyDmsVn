@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
+using DbUp;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
 using Xunit;
@@ -10,6 +11,411 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class DatabaseMigrationTests
 {
+    [SqlServerFact]
+    public async Task Unmanaged_alias_type_is_rejected_without_creating_the_journal()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.OpenAsync();
+                await connection.ExecuteAsync(
+                    "CREATE TYPE dbo.P6LegacyCode FROM nvarchar(32) NOT NULL;");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.types AS candidate " +
+                "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = candidate.schema_id " +
+                "WHERE ownerSchema.name = N'dbo' AND candidate.name = N'P6LegacyCode' " +
+                "AND candidate.is_user_defined = 1;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Unmanaged_database_ddl_trigger_is_rejected_without_creating_the_journal()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "CREATE TRIGGER P6UnmanagedDatabaseDdl ON DATABASE " +
+                    "FOR CREATE_TABLE AS BEGIN SET NOCOUNT ON; END;");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.triggers " +
+                "WHERE name = N'P6UnmanagedDatabaseDdl' AND parent_class = 0;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Managed_name_with_wrong_object_type_is_rejected_without_creating_the_journal()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "CREATE SYNONYM dbo.Users FOR LegacyDatabase.dbo.Users;");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.synonyms " +
+                "WHERE object_id = OBJECT_ID(N'dbo.Users', N'SN');"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Unmanaged_synonym_is_rejected_without_creating_the_journal()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "CREATE SYNONYM dbo.LegacyProducts FOR LegacyDatabase.dbo.Products;");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.synonyms " +
+                "WHERE object_id = OBJECT_ID(N'dbo.LegacyProducts', N'SN');"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Nonempty_unmanaged_database_outside_dbo_is_rejected_without_touching_existing_data()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync("CREATE SCHEMA [external];");
+                await connection.ExecuteAsync(
+                    "CREATE TABLE [external].ExistingData (Id int NOT NULL PRIMARY KEY, Value nvarchar(50) NOT NULL); " +
+                    "INSERT [external].ExistingData (Id, Value) VALUES (1, N'preserve-me');");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal("preserve-me", await verification.QuerySingleAsync<string>(
+                "SELECT Value FROM [external].ExistingData WHERE Id = 1;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Nonempty_unmanaged_database_is_rejected_without_touching_existing_data()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "CREATE TABLE dbo.UnrelatedData (Id int NOT NULL PRIMARY KEY, Value nvarchar(50) NOT NULL); " +
+                    "INSERT dbo.UnrelatedData (Id, Value) VALUES (1, N'preserve-me');");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.UnknownHistory", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal("preserve-me", await verification.QuerySingleAsync<string>(
+                "SELECT Value FROM dbo.UnrelatedData WHERE Id = 1;"));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID(N'dbo.SchemaVersions');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Migrator_rejects_future_history_without_mutating_existing_data()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var initial = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(initial.Successful, initial.Error?.ToString());
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "INSERT dbo.Products (Code, Name, Unit) VALUES (N'P6-FUTURE', N'Preserved', N'EA'); " +
+                    "INSERT dbo.SchemaVersions (ScriptName, Applied) " +
+                    "VALUES (N'MyDmsVn.Server.DbMigrator.Scripts.008_Future.sql', SYSUTCDATETIME());");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.SchemaTooNew", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.Products WHERE Code = N'P6-FUTURE' AND Name = N'Preserved';"));
+            Assert.Equal(8, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Migrator_rejects_partial_schema_without_rewriting_journal()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var initial = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(initial.Successful, initial.Error?.ToString());
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%007_Inventory_Stock.sql';");
+            }
+
+            var exception = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+
+            Assert.Equal("Migration.PartialSchema", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(6, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
+            Assert.Equal(2, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.tables WHERE name IN (N'StockLedger', N'StockBalances');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Competing_migrator_is_rejected_until_the_deployment_lock_is_released()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            using var lockConnection = new SqlConnection(database.ConnectionString);
+            await lockConnection.OpenAsync();
+            var lockResult = await lockConnection.QuerySingleAsync<int>(
+                "DECLARE @Result int; " +
+                "EXEC @Result = sys.sp_getapplock " +
+                "@Resource = N'MyDmsVn.SchemaMigration', " +
+                "@LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0; " +
+                "SELECT @Result;");
+            Assert.True(lockResult >= 0, $"Unable to establish the test migration lock: {lockResult}.");
+
+            var exception = Assert.Throws<DatabaseMigrationConcurrencyException>(
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
+            Assert.Equal("Migration.AlreadyRunning", exception.Code);
+            Assert.DoesNotContain(database.ConnectionString, exception.Message, StringComparison.Ordinal);
+
+            await lockConnection.ExecuteAsync(
+                "EXEC sys.sp_releaseapplock " +
+                "@Resource = N'MyDmsVn.SchemaMigration', @LockOwner = N'Session';");
+
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+            Assert.Equal(7, result.Scripts.Count());
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Successful_migration_releases_session_lock_before_connection_is_pooled()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        var pooledConnectionString = new SqlConnectionStringBuilder(database.ConnectionString)
+        {
+            Pooling = true,
+            ApplicationName = "P6-Pooled-Migration-Lock-Probe",
+        }.ConnectionString;
+        try
+        {
+            var result = new DatabaseMigrationRunner().Migrate(pooledConnectionString);
+            Assert.True(result.Successful, result.Error?.ToString());
+
+            var independentConnectionString = new SqlConnectionStringBuilder(database.ConnectionString)
+            {
+                Pooling = false,
+                ApplicationName = "P6-Independent-Migration-Lock-Probe",
+            }.ConnectionString;
+            using var observer = new SqlConnection(independentConnectionString);
+            await observer.OpenAsync();
+            var lockResult = await observer.QuerySingleAsync<int>(
+                "DECLARE @Result int; " +
+                "EXEC @Result = sys.sp_getapplock " +
+                "@Resource = N'MyDmsVn.SchemaMigration', " +
+                "@LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0; " +
+                "SELECT @Result;");
+
+            Assert.True(lockResult >= 0, $"Migration lock remained held by a pooled session: {lockResult}.");
+        }
+        finally
+        {
+            SqlConnection.ClearPool(new SqlConnection(pooledConnectionString));
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Losing_the_migration_lock_session_stops_the_active_DbUp_script()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var assembly = typeof(DatabaseMigrationRunner).Assembly;
+            var prefix = DeployChanges.To
+                .SqlDatabase(database.ConnectionString)
+                .WithScriptsEmbeddedInAssembly(
+                    assembly,
+                    resourceName =>
+                        resourceName.Contains(".Scripts.") &&
+                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal))
+                .JournalToSqlTable("dbo", "SchemaVersions")
+                .WithTransactionPerScript()
+                .LogToNowhere()
+                .Build()
+                .PerformUpgrade();
+            Assert.True(prefix.Successful, prefix.Error?.ToString());
+
+            var runnerConnectionString = new SqlConnectionStringBuilder(database.ConnectionString)
+            {
+                ApplicationName = "P6-Lock-Session-Probe",
+            }.ConnectionString;
+            using var blocker = new SqlConnection(database.ConnectionString);
+            await blocker.OpenAsync();
+            var blockerSessionId = await blocker.QuerySingleAsync<int>("SELECT @@SPID;");
+            using var blockerTransaction = blocker.BeginTransaction();
+            await blocker.ExecuteAsync(
+                "SELECT COUNT(*) FROM dbo.Products WITH (TABLOCKX, HOLDLOCK);",
+                transaction: blockerTransaction);
+
+            var migrationTask = Task.Run(() =>
+            {
+                try
+                {
+                    return new DatabaseMigrationRunner().Migrate(runnerConnectionString).Successful;
+                }
+                catch (SqlException)
+                {
+                    return false;
+                }
+            });
+
+            using var observer = new SqlConnection(database.ConnectionString);
+            await observer.OpenAsync();
+            var blockedSessionId = await WaitForSessionAsync(
+                observer,
+                "SELECT TOP (1) session_id FROM sys.dm_exec_requests " +
+                "WHERE blocking_session_id = @blockerSessionId;",
+                new { blockerSessionId });
+            var lockSessionId = await WaitForSessionAsync(
+                observer,
+                "SELECT TOP (1) request_session_id FROM sys.dm_tran_locks " +
+                "WHERE resource_type = N'APPLICATION' AND resource_database_id = DB_ID() " +
+                "AND request_status = N'GRANT';",
+                new { });
+
+            Assert.NotEqual(blockerSessionId, blockedSessionId);
+            await observer.ExecuteAsync("KILL " + lockSessionId + ";");
+            blockerTransaction.Rollback();
+
+            var migrationSucceeded = await migrationTask;
+            Assert.False(migrationSucceeded);
+            Assert.Equal(0, await observer.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SchemaVersions " +
+                "WHERE ScriptName LIKE N'%007_Inventory_Stock.sql';"));
+            Assert.Null(await observer.ExecuteScalarAsync<int?>(
+                "SELECT OBJECT_ID(N'dbo.StockLedger', N'U');"));
+
+            var recovery = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(recovery.Successful, recovery.Error?.ToString());
+            Assert.Single(recovery.Scripts);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     [Theory]
     [InlineData("Server=invalid.invalid;Database=master;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
     [InlineData("Server=invalid.invalid;Database=model;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
@@ -19,6 +425,26 @@ public sealed class DatabaseMigrationTests
     public void System_or_unspecified_database_is_rejected_before_connecting(string connectionString)
     {
         Assert.Throws<ArgumentException>(() => new DatabaseMigrationRunner().Migrate(connectionString));
+    }
+
+    private static async Task<int> WaitForSessionAsync(
+        SqlConnection connection,
+        string sql,
+        object parameters)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var sessionId = await connection.QuerySingleOrDefaultAsync<int?>(sql, parameters);
+            if (sessionId.HasValue)
+            {
+                return sessionId.Value;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("The expected SQL migration session was not observed.");
     }
 
     [SqlServerFact]

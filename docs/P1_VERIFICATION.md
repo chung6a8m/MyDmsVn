@@ -22,7 +22,7 @@ P1 adds SQL Server connection ownership, an explicit UnitOfWork, explicit reposi
 - DbUp embeds numbered immutable production scripts and journals them in `dbo.SchemaVersions`; test fixture scripts are embedded separately in the test assembly and use `dbo.TestSchemaVersions`.
 - Applying `001_PersistenceFoundation.sql` to a clean database creates one production history row without creating `dbo.P1TestProbe`; applying it again executes zero scripts and preserves one history row.
 - The migrator requires an explicit application database and rejects `master`, `model`, `msdb`, and `tempdb` before opening a connection.
-- The migrator is a separate command using `MYDMSVN_SQLSERVER_CONNECTION_STRING`; desktop composition does not invoke it.
+- The migrator remains a separate command. P6 superseded the original shared environment variable with migration-only configuration described in `docs/CONFIGURATION_AND_SQL_SECURITY.md`; desktop composition does not invoke it.
 
 ## Covered SQL behaviors
 

@@ -19,7 +19,7 @@
 | **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Complete (2026-10-09) |
 | **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Complete (2026-10-09) |
 | **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | In progress (P5.4 implementation/automated gate complete 2026-10-12; authenticated interactive smoke pending) |
-| **P6** | Local v1 hardening | Deployment/migration instructions, logging, secure configuration, two desktop host smoke, release checklist | Not started |
+| **P6** | Local v1 hardening | Deployment/migration instructions, logging, secure configuration, two desktop host smoke, release checklist | In progress (detailed P6-T01/T02 implementation and automated gates complete 2026-10-12; operational/package gates pending) |
 | **P7** | HTTP API v2 & parity | ASP.NET Core 8 API + HTTP adapter, auth and contract parity; no shared DB credentials on remote desktop | Not started |
 
 ## P0 — Detailed tasks
@@ -79,8 +79,8 @@ See dedicated [P5 detailed plan](plans/20261008-001-sales-inventory-foundation.m
 
 ## P6 — v1 hardening
 
-- [ ] P6-T01 documented migration and client/schema version compatibility.
-- [ ] P6-T02 installer/deployment paths, configuration and safe updater decision.
+- [ ] P6-T01 documented migration and client/schema version compatibility. (Detailed P6-T02 compatibility implementation/automated gate complete 2026-10-12; P6-T06 recovery evidence pending.)
+- [ ] P6-T02 installer/deployment paths, configuration and safe updater decision. (Detailed P6-T01 secure configuration/principal implementation complete 2026-10-12; P6-T04 packaging/updater evidence pending.)
 - [ ] P6-T03 structured logs, correlation IDs, authentication/audit log redaction.
 - [ ] P6-T04 dual-target smoke/install/upgrade, backup/recovery exercise.
 - [ ] P6-T05 release checklist and known limitations (including 2-tier SQL security).

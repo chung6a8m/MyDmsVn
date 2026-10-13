@@ -6,6 +6,7 @@ using MyDmsVn.Desktop.Infrastructure.Local;
 using MyDmsVn.Desktop.WinForms;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Infrastructure;
+using MyDmsVn.Server.Infrastructure.Operations;
 
 namespace MyDmsVn.Desktop.AppCore
 {
@@ -16,14 +17,34 @@ namespace MyDmsVn.Desktop.AppCore
         {
             System.Windows.Forms.Application.EnableVisualStyles();
             System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
+            var smokeTest = IsSmokeTest(args);
+            SqlConnectionConfiguration databaseConfiguration;
+            try
+            {
+                databaseConfiguration = new DesktopDatabaseStartupCoordinator()
+                    .PrepareAsync(CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (OperationalConfigurationException exception)
+            {
+                return ReportStartupFailure(exception.Code, exception.SafeMessage, smokeTest);
+            }
+            catch (DesktopStartupException exception)
+            {
+                return ReportStartupFailure(exception.Code, exception.SafeMessage, smokeTest);
+            }
+
             var uiContext = SynchronizationContext.Current ??
                 new System.Windows.Forms.WindowsFormsSynchronizationContext();
             SynchronizationContext.SetSynchronizationContext(uiContext);
-            using (var provider = CreateServiceProvider(uiContext))
+            using (var provider = CreateServiceProvider(
+                uiContext,
+                databaseConfiguration.ConnectionString))
             {
                 return DesktopHostRunner.Run(
                     provider.GetRequiredService<FoundationShellForm>(),
-                    IsSmokeTest(args));
+                    smokeTest);
             }
         }
 
@@ -34,14 +55,39 @@ namespace MyDmsVn.Desktop.AppCore
                 argument => string.Equals(argument, "--smoke-test", StringComparison.Ordinal));
         }
 
-        private static ServiceProvider CreateServiceProvider(SynchronizationContext uiContext)
+        private static ServiceProvider CreateServiceProvider(
+            SynchronizationContext uiContext,
+            string connectionString)
         {
             var services = new ServiceCollection();
             services.AddServerApplication();
             services.AddServerInfrastructure();
+            services.AddSqlPersistence(connectionString);
             services.AddLocalDesktopAdapter();
             services.AddMyDmsVnDesktopWinForms(uiContext);
             return services.BuildServiceProvider();
+        }
+
+        private static int ReportStartupFailure(
+            string code,
+            string safeMessage,
+            bool smokeTest)
+        {
+            var message = code + Environment.NewLine + safeMessage;
+            if (smokeTest)
+            {
+                Console.Error.WriteLine(message);
+            }
+            else
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    message,
+                    "MyDmsVn",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Error);
+            }
+
+            return 2;
         }
     }
 }
