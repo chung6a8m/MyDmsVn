@@ -1,8 +1,8 @@
 # P3.1 — Initial security provisioning and continuous permission synchronization
 
-Status: **In progress — P3.1-T01 through T06 implemented; T07 final evidence pending** (2026-10-14). Follow-up to completed P3, **not** retroactive completion evidence for P3. Depends on P1–P3 identity, password, schema and authorization foundations. Must be verified **before P4.1 authenticated desktop login walkthroughs, P5 interactive acceptance or P6 release**.
+Status: **Complete — P3.1-T01 through T07 implemented and verified** (2026-10-14). Follow-up to completed P3, **not** retroactive completion evidence for P3. Depends on P1–P3 identity, password, schema and authorization foundations. P4.1 authenticated desktop login walkthroughs, P5 interactive acceptance and remaining P6 operational gates remain separate follow-up work.
 
-Read: `AGENTS.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/CONFIGURATION_AND_SQL_SECURITY.md`, `docs/P3_VERIFICATION.md`, `docs/TEST_STRATEGY.md`, `docs/plans/20261008-007-phase-6-local-hardening.md`.
+Read: `AGENTS.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/CONFIGURATION_AND_SQL_SECURITY.md`, `docs/P3_VERIFICATION.md`, `docs/P3_1_VERIFICATION.md`, `docs/TEST_STRATEGY.md`, `docs/plans/20261008-007-phase-6-local-hardening.md`.
 
 ## Objective
 
@@ -70,22 +70,22 @@ P3 created `Users`, `Roles`, `UserRoles`, `RolePermissions` and `UserPermissions
 
 ### P3.1-T07 — Verification and acceptance gates
 
-- [ ] Fresh SQL database: migrate -> sync -> enroll first Administrator -> Login with provided credentials -> all **approved** baseline permissions succeed; inactive/unauthenticated accounts fail. No business Catalog seed required.
-- [ ] Re-run provisioning/sync against populated DB: no duplicate role/user/key/membership/grant, no password reset, and no changed custom/direct permissions. Concurrent invocations serialize; injected failure rolls back.
-- [ ] Release v2 adds `Sales.Orders.Read`, `Sales.Orders.Write` and a sensitive `Sales.Orders.Approve`: dry-run accurately reports additions; after reviewed activation/grant approval and apply, Administrator gets only eligible/approved grants; normal roles get no new grants; sensitive key stays denied if catalog activation is pending, and stays ungranted to Administrator if only its role grant approval is pending. Approve it in release v3 and verify a **late** approved managed grant is applied once without resurrecting revoked grants. Repeat is a no-op.
-- [ ] Test a historical SQL `RolePermissions`/`UserPermissions` grant for a key absent from v1 code that later appears in v2 code: it **remains denied** until independently reviewed registry adoption/activation; an unknown, unregistered, pending or deprecated key cannot be activated by a preexisting SQL row or direct grant. Test direct deny overrides activated role grant and catalog state is checked consistently with permission assignment snapshot.
-- [ ] Test manual grant remains manual, revoked managed Administrator grant retains durable tombstone (including out-of-band deletion), later routine sync never regrants it, and separate approved restore does. Verify new/late approvals, Administrator role ownership collision and permission drift.
-- [ ] Test a preexisting P3 database with permission assignments, malformed manifests, mismatched schema, failed/competing syncs and unsupported/older clients. Verify dry-run/apply fingerprint match and stale-plan rejection after DB/approval/manifest changes, including concurrent change between review and apply; no partial write. Preserve historical assignments/data and log sanitized outcomes.
-- [ ] Test bootstrap marker persistence across admin disable/deletion and application restart, concurrency racing two initial enrollments, preexisting users without marker, transaction failure before marker commit and the separately authorized recovery path. Verify neither a partially initialized identity nor a second Administrator is created.
-- [ ] Integration tests use `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` guarded disposable DB, not production; test command and actual pass/fail/blocked evidence required. Add CLI subprocess tests that assert no echo/no secrets/no modal prompts/no hangs.
+- [x] Fresh SQL database: migrate -> sync -> enroll first Administrator -> Login with provided credentials -> all **approved** baseline permissions succeed; inactive/unauthenticated accounts fail. No business Catalog seed required.
+- [x] Re-run provisioning/sync against populated DB: no duplicate role/user/key/membership/grant, no password reset, and no changed custom/direct permissions. Concurrent invocations serialize; injected failure rolls back.
+- [x] Release v2 adds `Sales.Orders.Read`, `Sales.Orders.Write` and a sensitive `Sales.Orders.Approve`: dry-run accurately reports additions; after reviewed activation/grant approval and apply, Administrator gets only eligible/approved grants; normal roles get no new grants; sensitive key stays denied if catalog activation is pending, and stays ungranted to Administrator if only its role grant approval is pending. Approve it in release v3 and verify a **late** approved managed grant is applied once without resurrecting revoked grants. Repeat is a no-op.
+- [x] Test a historical SQL `RolePermissions`/`UserPermissions` grant for a key absent from v1 code that later appears in v2 code: it **remains denied** until independently reviewed registry adoption/activation; an unknown, unregistered, pending or deprecated key cannot be activated by a preexisting SQL row or direct grant. Test direct deny overrides activated role grant and catalog state is checked consistently with permission assignment snapshot.
+- [x] Test manual grant remains manual, revoked managed Administrator grant retains durable tombstone (including out-of-band deletion), later routine sync never regrants it, and separate approved restore does. Verify new/late approvals, Administrator role ownership collision and permission drift.
+- [x] Test a preexisting P3 database with permission assignments, malformed manifests, mismatched schema, failed/competing syncs and unsupported/older clients. Verify dry-run/apply fingerprint match and stale-plan rejection after DB/approval/manifest changes, including concurrent change between review and apply; no partial write. Preserve historical assignments/data and log sanitized outcomes.
+- [x] Test bootstrap marker persistence across admin disable/deletion and application restart, concurrency racing two initial enrollments, preexisting users without marker, transaction failure before marker commit and the separately authorized recovery path. Verify neither a partially initialized identity nor a second Administrator is created.
+- [x] Integration tests use `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` guarded disposable DB, not production; test command and actual pass/fail/blocked evidence required. Add CLI subprocess tests that assert no echo/no secrets/no modal prompts/no hangs.
 
 ## Acceptance / exit gate
 
-- [ ] Document exact CLI syntax, preconditions, principal privilege split, dry-run/apply outputs, recoverability and administrator emergency recovery in a runbook.
-- [ ] Permission registry and new SQL schema are additive and versioned, with proved non-authorizing backfill, **runtime activation enforcement**, deterministic plan-ID-bound sync, persisted Administrator grant approval/revocation policy and durable one-time bootstrap state.
-- [ ] Fresh DB first admin can sign in through existing Application Login; no default password is present anywhere; repeated provisioning never changes that account.
-- [ ] The **new feature permission lifecycle** (declaration -> registration -> catalog adoption/activation review -> migration/sync dry-run/approved apply -> managed-grant policy -> runtime authorization -> tests) is automated as far as safe and part of the development/release checklist; stale approval cannot apply and historical grants cannot bypass the gate.
-- [ ] Evidence recorded; update `docs/SECURITY.md`, deployment docs/permission allowlists, `docs/DEVELOPMENT_PLAN.md` and this plan status only after verification.
+- [x] Document exact CLI syntax, preconditions, principal privilege split, dry-run/apply outputs, recoverability and administrator emergency recovery in a runbook.
+- [x] Permission registry and new SQL schema are additive and versioned, with proved non-authorizing backfill, **runtime activation enforcement**, deterministic plan-ID-bound sync, persisted Administrator grant approval/revocation policy and durable one-time bootstrap state.
+- [x] Fresh DB first admin can sign in through existing Application Login; no default password is present anywhere; repeated provisioning never changes that account.
+- [x] The **new feature permission lifecycle** (declaration -> registration -> catalog adoption/activation review -> migration/sync dry-run/approved apply -> managed-grant policy -> runtime authorization -> tests) is automated as far as safe and part of the development/release checklist; stale approval cannot apply and historical grants cannot bypass the gate.
+- [x] Evidence recorded; update `docs/SECURITY.md`, deployment docs/permission allowlists, `docs/DEVELOPMENT_PLAN.md` and this plan status only after verification.
 
 ## Avoid
 

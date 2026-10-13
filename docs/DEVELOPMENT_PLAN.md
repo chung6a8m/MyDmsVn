@@ -17,7 +17,7 @@
 | **P1** | Persistence foundation | SQL connection, RepoDb maps, Dapper, DbUp migrator, explicit UoW; SQL commit/rollback tests | Complete (2026-10-08) |
 | **P2** | Application pipeline/contracts | MediatR, validation, ErrorOr, transport-neutral ApiResponse mapping, client APIs; error tests | Complete (2026-10-09) |
 | **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Complete (2026-10-09) |
-| **P3.1** | **First Administrator + continuous permission sync** | Permission registry, additive catalog migration, controlled deployment sync, first-admin CLI, tests | **In progress** (T01–T06 implemented 2026-10-14; final T07 evidence pending) |
+| **P3.1** | **First Administrator + continuous permission sync** | Permission registry, additive catalog migration, controlled deployment sync, first-admin CLI, tests | **Complete** (T01–T07 verified 2026-10-14) |
 | **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Complete (2026-10-09) |
 | **P4.1** | **Interactive Login and session** | Shared dual-host LoginForm/ViewModel, current-user session, logout/expiry/relogin and STA tests | **Not started** (new 2026-10-13) |
 | **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | In progress (P5.4 implementation/automated gate complete 2026-10-12; authenticated interactive smoke pending) |
@@ -63,11 +63,11 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 
 ## P3.1 — Initial security provisioning and continuous permission synchronization (new)
 
-See [P3.1 detailed plan](plans/20261013-001-initial-security-provisioning-permission-sync.md). Implementation T01–T06 exists; final T07 acceptance evidence remains open.
+See [P3.1 detailed plan](plans/20261013-001-initial-security-provisioning-permission-sync.md) and [P3.1 verification evidence](P3_1_VERIFICATION.md). T01–T07 are implemented and verified; P4.1 interactive desktop Login/session remains the next prerequisite.
 - [x] P3.1-T01/T02 version-controlled per-module registry and additive `dbo.Permissions` migration with preservation of historical assignments.
 - [x] P3.1-T03/T04 deterministic dry-run/apply sync for every new module release; reviewed Administrator auto-grant policy; existing roles and direct denies unchanged.
 - [x] P3.1-T05/T06 guarded first-admin creation via separate privileged CLI with operator-supplied password, secure input and operational runbook; no desktop/installer seed.
-- [ ] P3.1-T07 SQL integration/CLI tests for first install, upgrade, idempotency, concurrency, revocation and new-key lifecycle.
+- [x] P3.1-T07 SQL integration/CLI tests for first install, upgrade, idempotency, concurrency, revocation and new-key lifecycle.
 **Exit:** application Administrator can be safely enrolled on clean SQL and future permissions are continuously synchronized through reviewed deployment, not one-time seed.
 
 ## P4 — WinForms desktop foundation
