@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using MediatR;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Server.Application;
@@ -11,10 +10,10 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 {
     internal sealed class LocalInventoryApiClient : IInventoryApiClient
     {
-        private readonly ISender _sender;
+        private readonly LocalRequestDispatcher _dispatcher;
 
-        public LocalInventoryApiClient(ISender sender) =>
-            _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+        public LocalInventoryApiClient(LocalRequestDispatcher dispatcher) =>
+            _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
         public Task<ApiResponse<PagedResult<StockBalanceRow>>> GetStockBalancesAsync(
             StockBalanceQuery request,
@@ -30,8 +29,8 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             ApplicationRequest<T> request,
             CancellationToken cancellationToken)
         {
-            var result = await _sender.Send(request, cancellationToken).ConfigureAwait(false);
-            return ApiResponseMapper.Map(result, "Request");
+            return await _dispatcher.SendAsync(request, "Request", cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 }

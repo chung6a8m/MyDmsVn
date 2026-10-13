@@ -89,6 +89,7 @@ namespace MyDmsVn.Contracts
         {
             var code = token.Value<string>("code");
             var message = token.Value<string>("message");
+            var correlationId = token.Value<string>("correlationId");
             var detailsToken = token["details"];
             var details = detailsToken == null || detailsToken.Type == JTokenType.Null
                 ? Array.Empty<ApiErrorDetail>()
@@ -101,7 +102,8 @@ namespace MyDmsVn.Contracts
                     _responseStatus,
                     code!,
                     message!,
-                    details);
+                    details,
+                    correlationId);
             }
             catch (ArgumentException exception)
             {

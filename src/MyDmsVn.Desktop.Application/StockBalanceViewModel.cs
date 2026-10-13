@@ -33,8 +33,9 @@ namespace MyDmsVn.Desktop.Application
             IUiDispatcher dispatcher,
             IDesktopNotificationService notifications,
             IAsyncDelay delay,
-            TimeSpan? debounceInterval = null)
-            : base(notifications)
+            TimeSpan? debounceInterval = null,
+            IDesktopExceptionReporter? exceptionReporter = null)
+            : base(notifications, exceptionReporter)
         {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));

@@ -33,8 +33,9 @@ namespace MyDmsVn.Desktop.Application
             IUiDispatcher dispatcher,
             IDesktopNotificationService notifications,
             IAsyncDelay delay,
-            TimeSpan? debounceInterval = null)
-            : base(notifications)
+            TimeSpan? debounceInterval = null,
+            IDesktopExceptionReporter? exceptionReporter = null)
+            : base(notifications, exceptionReporter)
         {
             _source = source ?? throw new ArgumentNullException(nameof(source));
             if (_source.Kind != CatalogKind.Product)

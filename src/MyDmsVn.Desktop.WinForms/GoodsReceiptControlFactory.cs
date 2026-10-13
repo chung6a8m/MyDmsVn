@@ -14,6 +14,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly IMessenger _messenger;
         private readonly IUiDispatcher _dispatcher;
         private readonly IDesktopNotificationService _notifications;
+        private readonly IDesktopExceptionReporter _exceptionReporter;
         private readonly IAsyncDelay _delay;
 
         public GoodsReceiptControlFactory(
@@ -24,6 +25,7 @@ namespace MyDmsVn.Desktop.WinForms
             IMessenger messenger,
             IUiDispatcher dispatcher,
             IDesktopNotificationService notifications,
+            IDesktopExceptionReporter exceptionReporter,
             IAsyncDelay delay)
         {
             _receipts = receipts ?? throw new ArgumentNullException(nameof(receipts));
@@ -33,6 +35,8 @@ namespace MyDmsVn.Desktop.WinForms
             _messenger = messenger ?? throw new ArgumentNullException(nameof(messenger));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
             _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
+            _exceptionReporter = exceptionReporter ??
+                throw new ArgumentNullException(nameof(exceptionReporter));
             _delay = delay ?? throw new ArgumentNullException(nameof(delay));
         }
 
@@ -42,7 +46,8 @@ namespace MyDmsVn.Desktop.WinForms
                 _receipts,
                 _dispatcher,
                 _notifications,
-                _delay);
+                _delay,
+                exceptionReporter: _exceptionReporter);
             var editor = new GoodsReceiptEditorViewModel(
                 _receipts,
                 new CatalogLookupViewModel(
@@ -50,21 +55,25 @@ namespace MyDmsVn.Desktop.WinForms
                     _messenger,
                     _dispatcher,
                     _notifications,
-                    _delay),
+                    _delay,
+                    exceptionReporter: _exceptionReporter),
                 new CatalogLookupViewModel(
                     new EmployeeCatalogLookupSource(_employees),
                     _messenger,
                     _dispatcher,
                     _notifications,
-                    _delay),
+                    _delay,
+                    exceptionReporter: _exceptionReporter),
                 new GoodsReceiptProductOptionsViewModel(
                     new ProductCatalogLookupSource(_products),
                     _messenger,
                     _dispatcher,
                     _notifications,
-                    _delay),
+                    _delay,
+                    exceptionReporter: _exceptionReporter),
                 _dispatcher,
-                _notifications);
+                _notifications,
+                _exceptionReporter);
             return new GoodsReceiptControl(list, editor);
         }
     }

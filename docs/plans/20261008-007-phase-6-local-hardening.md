@@ -1,6 +1,6 @@
 # P6 — Local v1 production hardening (detailed implementation plan)
 
-Status: **In progress**. P6-T01/P6-T02 implementation requirements and automatable SQL gates completed on 2026-10-12; clean-machine runtime-principal/rotation, packaged-secret scan and actual two-client-version evidence remain open. Depends on verified P5 acceptance; do not release P6 while mandatory P5 SQL/concurrency/authorization/Windows GUI gates are blocked. Scope is **Local Mode v1**, not the P7 HTTP service.
+Status: **In progress**. P6-T01/P6-T02 implementation requirements and automatable SQL gates completed on 2026-10-12; P6-T03/P6-T04 implementation and developer-workstation automated/package gates completed on 2026-10-13. Clean-machine runtime-principal/rotation, VM install/upgrade, full-disk, packaged GUI smoke and actual two-client-version evidence remain open. Depends on verified P5 acceptance; do not release P6 while mandatory P5 SQL/concurrency/authorization/Windows GUI gates are blocked. Scope is **Local Mode v1**, not the P7 HTTP service.
 
 Read first: `AGENTS.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`, `docs/SECURITY.md`, `docs/PERSISTENCE.md`, `docs/TEST_STRATEGY.md`, `docs/CONTRACTS.md`, `docs/P3_VERIFICATION.md`, and `docs/plans/20261008-001-sales-inventory-foundation.md`. Existing migrator entry point: `src/MyDmsVn.Server.DbMigrator`.
 
@@ -75,37 +75,37 @@ At phase completion, update both the detailed checklist and the roadmap with mat
 
 ### Implementation requirements
 
-- [ ] Configure production **Serilog sinks**, enrichment, levels and retention for both desktop hosts; include application version, host/runtime, operation name, correlation ID and safe error code. Each LocalApiClient request/command must carry a correlation context across Application pipeline, handler and persistence diagnostics without relying on leaked cross-request state.
-- [ ] Replace the P3 production **NoOp security audit sink** with an actual registered sink in **both** desktop composition roots; keep typed security audit contract/redaction boundary. Cover login success/failure/disabled/rehash errors and privileged P5 actions (especially successful/denied Post); define minimum action/outcome/actor/timestamp/document identifier fields without sensitive request bodies.
-- [ ] Emit audit **success only after durable business commit**; failed validation/authorization/conflict/cancellation must not be mislabeled successful. Explicitly decide how to surface and retry/report audit-write failures after a committed operation; do not tell users the transaction rolled back if only the post-commit sink failed. If stronger durability is required, specify a transactionally persisted/outbox design as a separate approved change.
-- [ ] Define log folder and writable ACLs without requiring ordinary users to be administrators; rotation, retention, disk-full behavior, support export, access and cleanup. Local workstation file logs are **not** inherently tamper-proof centralized audit evidence.
-- [ ] Use stable, localized user-facing errors mapped from `ApiError.Code`; attach correlation ID for support. Logs may contain controlled technical detail, but UI/exports must not expose SQL command text with parameters, connection strings, stack traces or credentials.
-- [ ] Provide a troubleshooting/runbook path for config failure, SQL offline, migration incompatibility, authorization failure, slow queries, failed posting, logging failure and crash recovery.
+- [x] Configure production **Serilog sinks**, enrichment, levels and retention for both desktop hosts; include application version, host/runtime, operation name, correlation ID and safe error code. Each LocalApiClient request/command must carry a correlation context across Application pipeline, handler and persistence diagnostics without relying on leaked cross-request state.
+- [x] Replace the P3 production **NoOp security audit sink** with an actual registered sink in **both** desktop composition roots; keep typed security audit contract/redaction boundary. Cover login success/failure/disabled/rehash errors and privileged P5 actions (especially successful/denied Post); define minimum action/outcome/actor/timestamp/document identifier fields without sensitive request bodies.
+- [x] Emit audit **success only after durable business commit**; failed validation/authorization/conflict/cancellation must not be mislabeled successful. Explicitly decide how to surface and retry/report audit-write failures after a committed operation; do not tell users the transaction rolled back if only the post-commit sink failed. If stronger durability is required, specify a transactionally persisted/outbox design as a separate approved change.
+- [x] Define log folder and writable ACLs without requiring ordinary users to be administrators; rotation, retention, disk-full behavior, support export, access and cleanup. Local workstation file logs are **not** inherently tamper-proof centralized audit evidence.
+- [x] Use stable, localized user-facing errors mapped from `ApiError.Code`; attach correlation ID for support. Logs may contain controlled technical detail, but UI/exports must not expose SQL command text with parameters, connection strings, stack traces or credentials.
+- [x] Provide a troubleshooting/runbook path for config failure, SQL offline, migration incompatibility, authorization failure, slow queries, failed posting, logging failure and crash recovery.
 
 ### Verification and acceptance
 
-- [ ] Tests assert both hosts resolve a non-NoOp audit implementation in production DI, login/security events reach the configured sink, privileged Post success is emitted after commit and denied/failed/canceled work creates no false success event.
-- [ ] Automated redaction fixtures cover password/hash/salt, auth tokens, connection strings, SQL errors and nested exceptions; correlation IDs remain consistent through Local adapter and pipeline on errors and cancellation.
-- [ ] Exercise sink permission denial/full disk and startup logging failures without uncontrolled modal dialogs or misleading business commit status; record supported fallback/fail policy.
-- [ ] Evidence: logging/audit schema and retention guide, redaction results, DI/test evidence and troubleshooting examples.
+- [x] Tests assert both hosts resolve a non-NoOp audit implementation in production DI, login/security events reach the configured sink, privileged Post success is emitted after commit and denied/failed/canceled work creates no false success event.
+- [x] Automated redaction fixtures cover password/hash/salt, auth tokens, connection strings, SQL errors and nested exceptions; correlation IDs remain consistent through Local adapter and pipeline on errors and cancellation.
+- [ ] Exercise sink permission denial/full disk and startup logging failures without uncontrolled modal dialogs or misleading business commit status; record supported fallback/fail policy. (Automated startup-denial and post-initialization runtime I/O failure paths pass; physical full-disk evidence remains pending.)
+- [x] Evidence: logging/audit schema and retention guide, redaction results, DI/test evidence and troubleshooting examples.
 
 ## P6-T04 — Reproducible packaging for both Windows hosts
 
 ### Implementation requirements
 
-- [ ] Choose and document **actual release artifacts** for `net48` and `net8.0-windows` (installer and/or documented publish-directory deployment). Specify per-host version, build/publish commands, prerequisites, supported Windows editions, architecture `x86`/`x64` and native/transitive dependencies. Do not mistake successful `dotnet build` for deployment verification.
-- [ ] For `net48`, document installed .NET Framework 4.8/runtime requirements; for `net8.0-windows`, decide framework-dependent vs self-contained, bitness and .NET Desktop Runtime handling. Test the **built artifacts**, not only the development environment.
-- [ ] Define installation and upgrade paths, user vs machine installation permissions, config preservation, shortcuts, writable log/data folders, clean uninstall behavior and whether uninstall leaves shared SQL data intact (default: **never remove DB**).
-- [ ] Keep migrations in a separate admin package/step with separate credentials. An ordinary user installer/update must not silently invoke DbUp, alter SQL principal grants or embed privileged secrets.
-- [ ] Do not adopt Onova or auto-update without approval; document manual/safe updater decision and version skew/maintenance policy. If signed binaries are required by deployment policy, verify signature/trust chain; otherwise record explicit release acceptance.
-- [ ] Build a release manifest with product/runtime version, schema support range, package dependencies, artifact hashes (e.g. SHA-256), SQL compatibility and optional signing information.
+- [x] Choose and document **actual release artifacts** for `net48` and `net8.0-windows` (installer and/or documented publish-directory deployment). Specify per-host version, build/publish commands, prerequisites, supported Windows editions, architecture `x86`/`x64` and native/transitive dependencies. Do not mistake successful `dotnet build` for deployment verification.
+- [x] For `net48`, document installed .NET Framework 4.8/runtime requirements; for `net8.0-windows`, decide framework-dependent vs self-contained, bitness and .NET Desktop Runtime handling. Test the **built artifacts**, not only the development environment.
+- [x] Define installation and upgrade paths, user vs machine installation permissions, config preservation, shortcuts, writable log/data folders, clean uninstall behavior and whether uninstall leaves shared SQL data intact (default: **never remove DB**).
+- [x] Keep migrations in a separate admin package/step with separate credentials. An ordinary user installer/update must not silently invoke DbUp, alter SQL principal grants or embed privileged secrets.
+- [x] Do not adopt Onova or auto-update without approval; document manual/safe updater decision and version skew/maintenance policy. If signed binaries are required by deployment policy, verify signature/trust chain; otherwise record explicit release acceptance.
+- [x] Build a release manifest with product/runtime version, schema support range, package dependencies, artifact hashes (e.g. SHA-256), SQL compatibility and optional signing information.
 
 ### Verification and acceptance
 
 - [ ] Clean-install each host from its release artifact on appropriate Windows VM(s) without Visual Studio, developer SDK or undeclared dependencies; test correct architecture and supported runtime installation.
 - [ ] Upgrade over a prior installed version preserves configuration and shared SQL data; restart, repair/uninstall and limited-user execution behave as documented.
-- [ ] Verify release artifact contents contain no admin/migrator connection strings, migration automation or unexpected elevated privileges; verify hashes/signature where applicable.
-- [ ] Evidence: deterministic package/build scripts, installation guide, artifact manifest/hashes and VM install/upgrade test records.
+- [x] Verify release artifact contents contain no admin/migrator connection strings, migration automation or unexpected elevated privileges; verify hashes/signature where applicable.
+- [ ] Evidence: deterministic package/build scripts, installation guide, artifact manifest/hashes and VM install/upgrade test records. (Script/guide/manifest/hash evidence complete 2026-10-13; VM install/upgrade records pending.)
 
 ## P6-T05 — End-to-end functional and Windows GUI smoke
 

@@ -16,8 +16,8 @@ namespace MyDmsVn.Desktop.Application
         private string _userIdText = string.Empty;
         private bool _userIdInputInvalid;
 
-        public EmployeeCatalogViewModel(IEmployeeApiClient client, IMessenger messenger, IUiDispatcher dispatcher, IDesktopNotificationService notifications, IAsyncDelay delay, TimeSpan? debounceInterval = null)
-            : base(CatalogKind.Employee, messenger, dispatcher, notifications, delay, debounceInterval) => _client = client ?? throw new ArgumentNullException(nameof(client));
+        public EmployeeCatalogViewModel(IEmployeeApiClient client, IMessenger messenger, IUiDispatcher dispatcher, IDesktopNotificationService notifications, IAsyncDelay delay, TimeSpan? debounceInterval = null, IDesktopExceptionReporter? exceptionReporter = null)
+            : base(CatalogKind.Employee, messenger, dispatcher, notifications, delay, debounceInterval, exceptionReporter) => _client = client ?? throw new ArgumentNullException(nameof(client));
         public string Code { get => _code; set => SetProperty(ref _code, value ?? string.Empty); }
         public string Name { get => _name; set => SetProperty(ref _name, value ?? string.Empty); }
         public string? Phone { get => _phone; set => SetProperty(ref _phone, value); }

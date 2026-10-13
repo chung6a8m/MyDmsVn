@@ -291,18 +291,49 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Fact]
+        public async Task Lookup_exception_is_reported_without_exposing_secret_in_notification()
+        {
+            const string secret = "Server=db;Password=secret";
+            var exception = new InvalidOperationException(secret);
+            var source = new ScriptedSource(
+                CatalogKind.Product,
+                (_, __) => Task.FromException<ApiResponse<IReadOnlyList<CatalogLookupDto>>>(
+                    exception));
+            var notifications = new DesktopNotificationCenter();
+            var reporter = new CapturingDesktopExceptionReporter("lookup-support-id");
+            using (var viewModel = Create(
+                source,
+                new WeakReferenceMessenger(),
+                new ControllableDelay(),
+                notifications: notifications,
+                exceptionReporter: reporter))
+            {
+                await viewModel.RefreshAsync(CancellationToken.None);
+
+                Assert.Equal(DesktopNotificationKind.Error, notifications.LastNotification!.Kind);
+                Assert.DoesNotContain(secret, notifications.LastNotification.Message);
+                Assert.Contains("lookup-support-id", notifications.LastNotification.Message);
+                Assert.Same(exception, reporter.Exception);
+                Assert.Equal(nameof(CatalogLookupViewModel), reporter.OperationName);
+            }
+        }
+
         private static CatalogLookupViewModel Create(
             ICatalogLookupSource source,
             IMessenger messenger,
             IAsyncDelay delay,
-            IUiDispatcher? dispatcher = null)
+            IUiDispatcher? dispatcher = null,
+            IDesktopNotificationService? notifications = null,
+            IDesktopExceptionReporter? exceptionReporter = null)
         {
             return new CatalogLookupViewModel(
                 source,
                 messenger,
                 dispatcher ?? new ImmediateUiDispatcher(),
-                new DesktopNotificationCenter(),
-                delay);
+                notifications ?? new DesktopNotificationCenter(),
+                delay,
+                exceptionReporter: exceptionReporter);
         }
 
         private static async Task WaitUntilAsync(Func<bool> condition)
@@ -349,6 +380,26 @@ namespace MyDmsVn.Desktop.Tests
                 {
                     completion.TrySetResult(true);
                 }
+            }
+        }
+
+        private sealed class CapturingDesktopExceptionReporter : IDesktopExceptionReporter
+        {
+            private readonly string _correlationId;
+
+            public CapturingDesktopExceptionReporter(string correlationId)
+            {
+                _correlationId = correlationId;
+            }
+
+            public string? OperationName { get; private set; }
+            public Exception? Exception { get; private set; }
+
+            public string Report(string operationName, Exception exception)
+            {
+                OperationName = operationName;
+                Exception = exception;
+                return _correlationId;
             }
         }
 

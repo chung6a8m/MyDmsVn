@@ -34,8 +34,9 @@ namespace MyDmsVn.Desktop.Application
             CatalogLookupViewModel employeeLookup,
             GoodsReceiptProductOptionsViewModel productOptions,
             IUiDispatcher dispatcher,
-            IDesktopNotificationService notifications)
-            : base(notifications)
+            IDesktopNotificationService notifications,
+            IDesktopExceptionReporter? exceptionReporter = null)
+            : base(notifications, exceptionReporter)
         {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             WarehouseLookup = warehouseLookup ?? throw new ArgumentNullException(nameof(warehouseLookup));

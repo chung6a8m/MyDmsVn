@@ -12,13 +12,19 @@ namespace MyDmsVn.Server.Application.Security
     {
         private readonly ICurrentUserAccessor _currentUserAccessor;
         private readonly IPermissionAuthorizationService _authorizationService;
+        private readonly ISecurityAuditWriter _auditWriter;
+        private readonly IUtcClock _clock;
 
         public AuthorizationBehavior(
             ICurrentUserAccessor currentUserAccessor,
-            IPermissionAuthorizationService authorizationService)
+            IPermissionAuthorizationService authorizationService,
+            ISecurityAuditWriter auditWriter,
+            IUtcClock clock)
         {
             _currentUserAccessor = currentUserAccessor;
             _authorizationService = authorizationService;
+            _auditWriter = auditWriter;
+            _clock = clock;
         }
 
         public async Task<TResponse> Handle(
@@ -34,6 +40,7 @@ namespace MyDmsVn.Server.Application.Security
             var currentUser = _currentUserAccessor.Current;
             if (!currentUser.IsAuthenticated || !currentUser.IsActive)
             {
+                await AuditDeniedAsync(request, null, cancellationToken).ConfigureAwait(false);
                 return request.FromErrors(
                     new[]
                     {
@@ -45,6 +52,7 @@ namespace MyDmsVn.Server.Application.Security
 
             if (!currentUser.UserId.HasValue)
             {
+                await AuditDeniedAsync(request, null, cancellationToken).ConfigureAwait(false);
                 return request.FromErrors(
                     new[]
                     {
@@ -61,6 +69,10 @@ namespace MyDmsVn.Server.Application.Security
                         cancellationToken)
                     .ConfigureAwait(false))
             {
+                await AuditDeniedAsync(
+                    request,
+                    currentUser.UserId.Value,
+                    cancellationToken).ConfigureAwait(false);
                 return request.FromErrors(
                     new[]
                     {
@@ -76,6 +88,28 @@ namespace MyDmsVn.Server.Application.Security
             }
 
             return await next().ConfigureAwait(false);
+        }
+
+        private Task AuditDeniedAsync(
+            TRequest request,
+            int? userId,
+            CancellationToken cancellationToken)
+        {
+            if (request is not ISecurityAuditedRequest auditedRequest)
+            {
+                return Task.CompletedTask;
+            }
+
+            return _auditWriter.WriteAsync(
+                new SecurityAuditEntry(
+                    auditedRequest.AuditAction,
+                    SecurityAuditOutcome.Denied,
+                    userId,
+                    _clock.UtcNow,
+                    auditedRequest.AuditDocumentType,
+                    auditedRequest.AuditDocumentId),
+                businessOperationCommitted: false,
+                cancellationToken);
         }
     }
 }

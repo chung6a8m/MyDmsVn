@@ -13,20 +13,20 @@ namespace MyDmsVn.Server.Application.Identity
         private readonly IUserStore _userStore;
         private readonly IPasswordHasher _passwordHasher;
         private readonly ILegacyPasswordVerifier _legacyPasswordVerifier;
-        private readonly ISecurityAuditSink _auditSink;
+        private readonly ISecurityAuditWriter _auditWriter;
         private readonly IUtcClock _clock;
 
         public LoginCommandHandler(
             IUserStore userStore,
             IPasswordHasher passwordHasher,
             ILegacyPasswordVerifier legacyPasswordVerifier,
-            ISecurityAuditSink auditSink,
+            ISecurityAuditWriter auditWriter,
             IUtcClock clock)
         {
             _userStore = userStore;
             _passwordHasher = passwordHasher;
             _legacyPasswordVerifier = legacyPasswordVerifier;
-            _auditSink = auditSink;
+            _auditWriter = auditWriter;
             _clock = clock;
         }
 
@@ -134,12 +134,13 @@ namespace MyDmsVn.Server.Application.Identity
             SecurityAuditOutcome outcome,
             CancellationToken cancellationToken)
         {
-            return _auditSink.WriteAsync(
+            return _auditWriter.WriteAsync(
                 new SecurityAuditEntry(
                     SecurityAuditAction.Authentication,
                     outcome,
                     userId,
                     _clock.UtcNow),
+                businessOperationCommitted: false,
                 cancellationToken);
         }
 

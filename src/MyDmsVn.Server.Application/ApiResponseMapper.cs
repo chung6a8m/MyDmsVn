@@ -19,6 +19,14 @@ namespace MyDmsVn.Server.Application
             ErrorOr<TValue> result,
             string? requestFieldRoot)
         {
+            return Map(result, requestFieldRoot, null);
+        }
+
+        public static ApiResponse<TValue> Map<TValue>(
+            ErrorOr<TValue> result,
+            string? requestFieldRoot,
+            string? correlationId)
+        {
             if (!result.IsError)
             {
                 return ApiResponse<TValue>.Success(result.Value);
@@ -31,7 +39,8 @@ namespace MyDmsVn.Server.Application
                     new ApiError(
                         ApiStatusCode.InternalServerError,
                         "InternalError",
-                        "An unexpected error occurred."));
+                        "An unexpected error occurred.",
+                        correlationId: correlationId));
             }
 
             var dominantType = GetDominantType(errors);
@@ -48,7 +57,8 @@ namespace MyDmsVn.Server.Application
                     ToStatus(dominantType),
                     ToAggregateCode(dominantType, dominantError.Code),
                     ToAggregateMessage(dominantType, dominantError.Description),
-                    details));
+                    details,
+                    correlationId));
         }
 
         private static bool IsPublicErrorType(ErrorType type)

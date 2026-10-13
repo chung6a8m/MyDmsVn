@@ -59,10 +59,49 @@ namespace MyDmsVn.Desktop.Tests
             Assert.Equal(DesktopNotificationKind.Error, notifications.LastNotification!.Kind);
         }
 
+        [Fact]
+        public void ApplyApiError_appends_safe_support_correlation_id()
+        {
+            var notifications = new DesktopNotificationCenter();
+            var viewModel = new TestViewModel(notifications);
+
+            viewModel.Apply(
+                new ApiError(
+                    ApiStatusCode.InternalServerError,
+                    "InternalError",
+                    "An unexpected error occurred.",
+                    correlationId: "9a76a76b8fb34dd689d7145ea5d84504"));
+
+            Assert.Equal(
+                "An unexpected error occurred. Support ID: 9a76a76b8fb34dd689d7145ea5d84504",
+                viewModel.ErrorMessage);
+            Assert.Equal(viewModel.ErrorMessage, notifications.LastNotification!.Message);
+        }
+
+        [Fact]
+        public void Unexpected_exception_message_is_not_exposed_to_the_user()
+        {
+            var notifications = new DesktopNotificationCenter();
+            var reporter = new CapturingDesktopExceptionReporter();
+            var viewModel = new TestViewModel(notifications, reporter);
+            var exception = new InvalidOperationException("Server=db;Password=secret");
+
+            viewModel.ApplyUnexpected(exception);
+
+            Assert.Equal(
+                "An unexpected error occurred. Support ID: 9a76a76b8fb34dd689d7145ea5d84504",
+                viewModel.ErrorMessage);
+            Assert.DoesNotContain("secret", notifications.LastNotification!.Message);
+            Assert.Same(exception, reporter.Exception);
+            Assert.Equal(nameof(TestViewModel), reporter.OperationName);
+        }
+
         private sealed class TestViewModel : DesktopViewModelBase
         {
-            public TestViewModel(IDesktopNotificationService notifications)
-                : base(notifications)
+            public TestViewModel(
+                IDesktopNotificationService notifications,
+                IDesktopExceptionReporter? exceptionReporter = null)
+                : base(notifications, exceptionReporter)
             {
             }
 
@@ -76,6 +115,24 @@ namespace MyDmsVn.Desktop.Tests
             public void Apply(ApiError error)
             {
                 ApplyApiError(error);
+            }
+
+            public void ApplyUnexpected(Exception exception)
+            {
+                ApplyUnexpectedError(exception);
+            }
+        }
+
+        private sealed class CapturingDesktopExceptionReporter : IDesktopExceptionReporter
+        {
+            public string? OperationName { get; private set; }
+            public Exception? Exception { get; private set; }
+
+            public string Report(string operationName, Exception exception)
+            {
+                OperationName = operationName;
+                Exception = exception;
+                return "9a76a76b8fb34dd689d7145ea5d84504";
             }
         }
     }

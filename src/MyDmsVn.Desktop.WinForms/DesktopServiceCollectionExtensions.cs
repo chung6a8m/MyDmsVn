@@ -45,6 +45,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly IMessenger _messenger;
         private readonly IUiDispatcher _dispatcher;
         private readonly IDesktopNotificationService _notifications;
+        private readonly IDesktopExceptionReporter _exceptionReporter;
         private readonly IAsyncDelay _delay;
 
         public CatalogControlFactory(
@@ -55,6 +56,7 @@ namespace MyDmsVn.Desktop.WinForms
             IMessenger messenger,
             IUiDispatcher dispatcher,
             IDesktopNotificationService notifications,
+            IDesktopExceptionReporter exceptionReporter,
             IAsyncDelay delay)
         {
             _products = products;
@@ -64,6 +66,7 @@ namespace MyDmsVn.Desktop.WinForms
             _messenger = messenger;
             _dispatcher = dispatcher;
             _notifications = notifications;
+            _exceptionReporter = exceptionReporter;
             _delay = delay;
         }
 
@@ -78,7 +81,8 @@ namespace MyDmsVn.Desktop.WinForms
                             _messenger,
                             _dispatcher,
                             _notifications,
-                            _delay));
+                            _delay,
+                            exceptionReporter: _exceptionReporter));
                 case CatalogKind.Warehouse:
                     return new CatalogControl(
                         new WarehouseCatalogViewModel(
@@ -86,7 +90,8 @@ namespace MyDmsVn.Desktop.WinForms
                             _messenger,
                             _dispatcher,
                             _notifications,
-                            _delay));
+                            _delay,
+                            exceptionReporter: _exceptionReporter));
                 case CatalogKind.Employee:
                     return new CatalogControl(
                         new EmployeeCatalogViewModel(
@@ -94,7 +99,8 @@ namespace MyDmsVn.Desktop.WinForms
                             _messenger,
                             _dispatcher,
                             _notifications,
-                            _delay));
+                            _delay,
+                            exceptionReporter: _exceptionReporter));
                 case CatalogKind.Customer:
                     return new CatalogControl(
                         new CustomerCatalogViewModel(
@@ -102,7 +108,8 @@ namespace MyDmsVn.Desktop.WinForms
                             _messenger,
                             _dispatcher,
                             _notifications,
-                            _delay));
+                            _delay,
+                            exceptionReporter: _exceptionReporter));
                 default:
                     throw new ArgumentOutOfRangeException(nameof(kind));
             }

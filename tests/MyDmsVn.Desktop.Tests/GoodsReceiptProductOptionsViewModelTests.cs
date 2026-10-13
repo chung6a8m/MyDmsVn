@@ -142,7 +142,9 @@ namespace MyDmsVn.Desktop.Tests
                     CatalogChangeOperation.Updated));
 
                 await WaitUntilAsync(() => viewModel.ErrorMessage != null);
-                Assert.Equal("Product lookup failed.", viewModel.ErrorMessage);
+                Assert.Matches(
+                    "^An unexpected error occurred\\. Support ID: [a-f0-9]{32}$",
+                    viewModel.ErrorMessage!);
             }
         }
 

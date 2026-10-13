@@ -13,9 +13,9 @@ namespace MyDmsVn.Server.Application
         public void Report(Type requestType, Exception exception)
         {
             Trace.TraceError(
-                "Unhandled application request {0}: {1}",
+                "Unhandled application request {0}; exception={1}",
                 requestType.FullName,
-                exception);
+                exception.GetType().FullName);
         }
     }
 }

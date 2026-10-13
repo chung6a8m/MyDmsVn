@@ -68,6 +68,25 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
+        public void Failure_contract_round_trips_a_support_correlation_id()
+        {
+            const string correlationId = "9a76a76b8fb34dd689d7145ea5d84504";
+            var response = ApiResponse<string>.Failure(
+                new ApiError(
+                    ApiStatusCode.InternalServerError,
+                    "InternalError",
+                    "An unexpected error occurred.",
+                    correlationId: correlationId));
+            var settings = ApiJson.CreateSerializerSettings();
+
+            var json = JsonConvert.SerializeObject(response, settings);
+            var roundTrip = JsonConvert.DeserializeObject<ApiResponse<string>>(json, settings)!;
+
+            Assert.Contains("\"correlationId\":\"" + correlationId + "\"", json);
+            Assert.Equal(correlationId, roundTrip.Error!.CorrelationId);
+        }
+
+        [Fact]
         public void Serializer_round_trips_success_failure_and_value_type_envelopes()
         {
             var settings = ApiJson.CreateSerializerSettings();
