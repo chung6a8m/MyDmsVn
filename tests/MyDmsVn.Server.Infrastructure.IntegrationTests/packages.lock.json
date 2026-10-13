@@ -515,8 +515,10 @@
       "mydmsvn.server.dbmigrator": {
         "type": "Project",
         "dependencies": {
+          "Dapper": "[2.1.79, )",
           "Microsoft.Data.SqlClient": "[7.0.2, )",
           "MyDmsVn.Server.Infrastructure": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )",
           "dbup-sqlserver": "[7.2.0, )"
         }
       },
@@ -1005,8 +1007,10 @@
       "mydmsvn.server.dbmigrator": {
         "type": "Project",
         "dependencies": {
+          "Dapper": "[2.1.79, )",
           "Microsoft.Data.SqlClient": "[7.0.2, )",
           "MyDmsVn.Server.Infrastructure": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )",
           "dbup-sqlserver": "[7.2.0, )"
         }
       },
