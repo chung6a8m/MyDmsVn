@@ -165,6 +165,49 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Retention_cleanup_failure_does_not_disable_subsequent_audit_writes()
+        {
+            var directory = NewTemporaryDirectory();
+            try
+            {
+                var services = new ServiceCollection();
+                services.AddServerApplication();
+                services.AddLocalDesktopAdapter();
+                services.AddDesktopProductionDiagnostics(
+                    new DesktopDiagnosticsOptions("MyDmsVn.Net8", directory, 1));
+
+                using (var provider = services.BuildServiceProvider())
+                {
+                    var sink = provider.GetRequiredService<ISecurityAuditSink>();
+                    await sink.WriteAsync(
+                        AuditEntry(new DateTime(2026, 10, 11, 1, 2, 3, DateTimeKind.Utc), "old"),
+                        CancellationToken.None);
+                    var oldAuditFile = Assert.Single(Directory.GetFiles(directory, "audit-20261011.json"));
+                    using (File.Open(oldAuditFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    {
+                        await sink.WriteAsync(
+                            AuditEntry(new DateTime(2026, 10, 12, 1, 2, 3, DateTimeKind.Utc), "first"),
+                            CancellationToken.None);
+                        await sink.WriteAsync(
+                            AuditEntry(new DateTime(2026, 10, 13, 1, 2, 3, DateTimeKind.Utc), "second"),
+                            CancellationToken.None);
+
+                        var status = provider.GetRequiredService<IDiagnosticsStartupStatus>();
+                        Assert.True(status.FileLoggingEnabled);
+                        Assert.Null(status.SafeErrorCode);
+                        var latestPayload = File.ReadAllText(
+                            Path.Combine(directory, "audit-20261013.json"));
+                        Assert.Contains("\"DocumentId\":\"second\"", latestPayload);
+                    }
+                }
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Fact]
         public void Desktop_exception_reporter_writes_redacted_diagnostic_with_support_id()
         {
             var directory = NewTemporaryDirectory();
@@ -205,6 +248,15 @@ namespace MyDmsVn.Desktop.Tests
             Directory.CreateDirectory(path);
             return path;
         }
+
+        private static SecurityAuditEntry AuditEntry(DateTime occurredAtUtc, string documentId) =>
+            new SecurityAuditEntry(
+                SecurityAuditAction.GoodsReceiptPost,
+                SecurityAuditOutcome.Succeeded,
+                42,
+                occurredAtUtc,
+                "GoodsReceipt",
+                documentId);
 
         private sealed class CapturingAuditFailureReporter : ISecurityAuditFailureReporter
         {

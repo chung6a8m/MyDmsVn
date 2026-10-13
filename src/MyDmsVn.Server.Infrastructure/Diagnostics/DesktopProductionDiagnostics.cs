@@ -133,7 +133,7 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
                         stream.Flush(flushToDisk: true);
                     }
 
-                    EnforceAuditRetention();
+                    TryEnforceAuditRetention();
                 }
             }
             catch (Exception exception) when (
@@ -189,6 +189,25 @@ namespace MyDmsVn.Server.Infrastructure.Diagnostics
             for (var index = 0; index < removeCount; index++)
             {
                 File.Delete(files[index]);
+            }
+        }
+
+        private void TryEnforceAuditRetention()
+        {
+            try
+            {
+                EnforceAuditRetention();
+            }
+            catch (Exception exception) when (
+                exception is IOException ||
+                exception is UnauthorizedAccessException ||
+                exception is ArgumentException ||
+                exception is NotSupportedException)
+            {
+                Trace.TraceWarning(
+                    "{0}: {1}",
+                    "Diagnostics.AuditRetentionCleanupFailed",
+                    SensitiveDataRedactor.ToSafeDiagnostic(exception));
             }
         }
 

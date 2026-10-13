@@ -55,13 +55,15 @@ namespace MyDmsVn.Desktop.WinForms
                     _messenger,
                     _dispatcher,
                     _notifications,
-                    _delay),
+                    _delay,
+                    exceptionReporter: _exceptionReporter),
                 new CatalogLookupViewModel(
                     new EmployeeCatalogLookupSource(_employees),
                     _messenger,
                     _dispatcher,
                     _notifications,
-                    _delay),
+                    _delay,
+                    exceptionReporter: _exceptionReporter),
                 new GoodsReceiptProductOptionsViewModel(
                     new ProductCatalogLookupSource(_products),
                     _messenger,

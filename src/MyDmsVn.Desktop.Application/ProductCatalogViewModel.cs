@@ -13,8 +13,8 @@ namespace MyDmsVn.Desktop.Application
         private string _name = string.Empty;
         private string _unit = string.Empty;
 
-        public ProductCatalogViewModel(IProductApiClient client, IMessenger messenger, IUiDispatcher dispatcher, IDesktopNotificationService notifications, IAsyncDelay delay, TimeSpan? debounceInterval = null)
-            : base(CatalogKind.Product, messenger, dispatcher, notifications, delay, debounceInterval) =>
+        public ProductCatalogViewModel(IProductApiClient client, IMessenger messenger, IUiDispatcher dispatcher, IDesktopNotificationService notifications, IAsyncDelay delay, TimeSpan? debounceInterval = null, IDesktopExceptionReporter? exceptionReporter = null)
+            : base(CatalogKind.Product, messenger, dispatcher, notifications, delay, debounceInterval, exceptionReporter) =>
             _client = client ?? throw new ArgumentNullException(nameof(client));
 
         public string Code { get => _code; set => SetProperty(ref _code, value ?? string.Empty); }

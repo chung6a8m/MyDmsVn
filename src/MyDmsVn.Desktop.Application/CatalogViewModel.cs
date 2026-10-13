@@ -39,8 +39,9 @@ namespace MyDmsVn.Desktop.Application
             IUiDispatcher dispatcher,
             IDesktopNotificationService notifications,
             IAsyncDelay delay,
-            TimeSpan? debounceInterval = null)
-            : base(notifications)
+            TimeSpan? debounceInterval = null,
+            IDesktopExceptionReporter? exceptionReporter = null)
+            : base(notifications, exceptionReporter)
         {
             Kind = kind;
             Messenger = messenger ?? throw new ArgumentNullException(nameof(messenger));
@@ -265,9 +266,7 @@ namespace MyDmsVn.Desktop.Application
                             if (!editorCancellation.IsCancellationRequested &&
                                 IsEditorCurrent(editorGeneration))
                             {
-                                PublishNotification(
-                                    DesktopNotificationKind.Error,
-                                    exception.Message);
+                                ApplyUnexpectedError(exception);
                             }
                         },
                         CancellationToken.None).ConfigureAwait(false);
@@ -425,7 +424,7 @@ namespace MyDmsVn.Desktop.Application
                     {
                         if (!IsDisposed())
                         {
-                            PublishNotification(DesktopNotificationKind.Error, exception.Message);
+                            ApplyUnexpectedError(exception);
                         }
                     },
                     CancellationToken.None).ConfigureAwait(false);
@@ -475,7 +474,7 @@ namespace MyDmsVn.Desktop.Application
                     {
                         if (!IsDisposed())
                         {
-                            PublishNotification(DesktopNotificationKind.Error, exception.Message);
+                            ApplyUnexpectedError(exception);
                         }
                     },
                     CancellationToken.None).ConfigureAwait(false);
@@ -528,7 +527,7 @@ namespace MyDmsVn.Desktop.Application
                         {
                             if (IsCurrent(generation))
                             {
-                                PublishNotification(DesktopNotificationKind.Error, exception.Message);
+                                ApplyUnexpectedError(exception);
                             }
                         },
                         CancellationToken.None).ConfigureAwait(false);

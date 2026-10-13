@@ -484,22 +484,28 @@ namespace MyDmsVn.Desktop.Tests
         [Fact]
         public async Task Detail_load_exception_is_reported_without_faulting_the_selection_task()
         {
+            const string secret = "Server=db;Password=secret";
             var client = new FakeProductClient
             {
-                GetException = new InvalidOperationException("detail unavailable"),
+                GetException = new InvalidOperationException(secret),
             };
             var notifications = new DesktopNotificationCenter();
+            var reporter = new CapturingDesktopExceptionReporter("catalog-support-id");
             using (var viewModel = new ProductCatalogViewModel(
                 client,
                 new WeakReferenceMessenger(),
                 new ImmediateUiDispatcher(),
                 notifications,
-                new ControllableDelay()))
+                new ControllableDelay(),
+                exceptionReporter: reporter))
             {
                 await viewModel.SelectAsync(1, CancellationToken.None);
 
                 Assert.Equal(DesktopNotificationKind.Error, notifications.LastNotification!.Kind);
-                Assert.Equal("detail unavailable", notifications.LastNotification.Message);
+                Assert.DoesNotContain(secret, notifications.LastNotification.Message);
+                Assert.Contains("catalog-support-id", notifications.LastNotification.Message);
+                Assert.Same(client.GetException, reporter.Exception);
+                Assert.Equal(nameof(ProductCatalogViewModel), reporter.OperationName);
             }
         }
 
@@ -746,6 +752,26 @@ namespace MyDmsVn.Desktop.Tests
                 }
 
                 await Task.Delay(10);
+            }
+        }
+
+        private sealed class CapturingDesktopExceptionReporter : IDesktopExceptionReporter
+        {
+            private readonly string _correlationId;
+
+            public CapturingDesktopExceptionReporter(string correlationId)
+            {
+                _correlationId = correlationId;
+            }
+
+            public string? OperationName { get; private set; }
+            public Exception? Exception { get; private set; }
+
+            public string Report(string operationName, Exception exception)
+            {
+                OperationName = operationName;
+                Exception = exception;
+                return _correlationId;
             }
         }
 
