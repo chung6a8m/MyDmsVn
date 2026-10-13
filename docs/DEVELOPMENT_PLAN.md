@@ -4,7 +4,7 @@
 
 ## Operating rules
 
-- Execute P0 → P7 sequentially; P0–P6 produce Local Mode MVP; P7 enables Remote Mode.
+- Execute P0 → P7 sequentially; P0–P6 produce Local Mode MVP; P7 enables Remote Mode. **Integration addenda P3.1 then P4.1 must pass before outstanding authenticated P5 GUI gates and P6 release**, despite historical P3/P4 foundation completion.
 - For each task, implement a small vertical change with tests, record results, and update checklist truthfully.
 - Exact targets/packages/user decisions: `docs/TECH_STACK.md`. Architecture and boundaries: `docs/ARCHITECTURE.md`.
 - Each phase exits only with measurable acceptance evidence. For user-visible scope changes, update PRD and record an ADR.
@@ -17,7 +17,9 @@
 | **P1** | Persistence foundation | SQL connection, RepoDb maps, Dapper, DbUp migrator, explicit UoW; SQL commit/rollback tests | Complete (2026-10-08) |
 | **P2** | Application pipeline/contracts | MediatR, validation, ErrorOr, transport-neutral ApiResponse mapping, client APIs; error tests | Complete (2026-10-09) |
 | **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Complete (2026-10-09) |
+| **P3.1** | **First Administrator + continuous permission sync** | Permission registry, additive catalog migration, controlled deployment sync, first-admin CLI, tests | **Not started** (new 2026-10-13) |
 | **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Complete (2026-10-09) |
+| **P4.1** | **Interactive Login and session** | Shared dual-host LoginForm/ViewModel, current-user session, logout/expiry/relogin and STA tests | **Not started** (new 2026-10-13) |
 | **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | In progress (P5.4 implementation/automated gate complete 2026-10-12; authenticated interactive smoke pending) |
 | **P6** | Local v1 hardening | Deployment/migration instructions, logging, secure configuration, two desktop host smoke, release checklist | In progress (detailed P6-T01/T02 implementation and automated gates complete 2026-10-12; operational/package gates pending) |
 | **P7** | HTTP API v2 & parity | ASP.NET Core 8 API + HTTP adapter, auth and contract parity; no shared DB credentials on remote desktop | Not started |
@@ -59,6 +61,15 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 - [x] P3-T05 tests for deactivation, overrides, privilege denial, password migration fixtures. (Legacy algorithm fixture remains an explicit external prerequisite; unknown algorithms deny.)
 **Exit:** unauthorized commands cannot write; compatibility preserved for PasswordSalt.
 
+## P3.1 — Initial security provisioning and continuous permission synchronization (new)
+
+See [P3.1 detailed plan](plans/20261013-001-initial-security-provisioning-permission-sync.md). **Not started**; completed P3 does not cover initial Administrator enrollment or future permission key synchronization.
+- [ ] P3.1-T01/T02 version-controlled per-module registry and additive `dbo.Permissions` migration with preservation of historical assignments.
+- [ ] P3.1-T03/T04 deterministic dry-run/apply sync for every new module release; reviewed Administrator auto-grant policy; existing roles and direct denies unchanged.
+- [ ] P3.1-T05/T06 guarded first-admin creation via separate privileged CLI with operator-supplied password, secure input and operational runbook; no desktop/installer seed.
+- [ ] P3.1-T07 SQL integration/CLI tests for first install, upgrade, idempotency, concurrency, revocation and new-key lifecycle.
+**Exit:** application Administrator can be safely enrolled on clean SQL and future permissions are continuously synchronized through reviewed deployment, not one-time seed.
+
 ## P4 — WinForms desktop foundation
 
 - [x] P4-T01 create shell, bootstrap theme/grid integration validation for both runtimes.
@@ -68,6 +79,15 @@ See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md)
 - [x] P4-T05 deterministic STA UI test harness without modal dialogs.
 **Exit:** two WinForms hosts open same shell and use same desktop abstractions; no direct server infrastructure references from views.
 
+## P4.1 — Interactive desktop Login and session (new)
+
+See [P4.1 detailed plan](plans/20261013-002-desktop-login-session.md). **Not started**, depends on verified P3.1 and existing P3/P4.
+- [ ] P4.1-T01 shared fail-closed session state/current-user accessor and auth contract integration.
+- [ ] P4.1-T02/T03 shared LoginForm/LoginViewModel and production Login-first bootstrap in both desktop hosts; no fake authenticated startup.
+- [ ] P4.1-T04 explicit logout, expiration/relogin, cross-user cache teardown and stale-result cancellation.
+- [ ] P4.1-T05 dual-runtime STA, application/SQL and packaged interactive smoke tests.
+**Exit:** both hosts block business access until a real login and can run authenticated P5 walkthroughs.
+
 ## P5 — Sales & Inventory Foundation
 
 See dedicated [P5 detailed plan](plans/20261008-001-sales-inventory-foundation.md).
@@ -75,7 +95,7 @@ See dedicated [P5 detailed plan](plans/20261008-001-sales-inventory-foundation.m
 - [x] P5.2 GoodsReceipt Draft header/lines with validation and permissions.
 - [x] P5.3 Post command with atomic ledger/balance updates, idempotency and reconciliation.
 - [ ] P5.4 Stock Balance/Card Dapper queries, desktop UI, concurrency/GUI regression suite. (Implementation and automated coverage complete 2026-10-12; authenticated interactive walkthrough pending.)
-**Exit:** all P5 acceptance cases and SQL integration tests pass.
+**Exit:** all P5 acceptance cases and SQL integration tests pass; pending authenticated interactive checks require **P3.1 + P4.1**, not only P3/P4 foundation checks.
 
 ## P6 — v1 hardening
 
@@ -84,7 +104,7 @@ See dedicated [P5 detailed plan](plans/20261008-001-sales-inventory-foundation.m
 - [ ] P6-T03 structured logs, correlation IDs, authentication/audit log redaction.
 - [ ] P6-T04 dual-target smoke/install/upgrade, backup/recovery exercise.
 - [ ] P6-T05 release checklist and known limitations (including 2-tier SQL security).
-**Exit:** repeatable deployment, support diagnostics, no untested hidden modal-dialog blocker.
+**Exit:** repeatable deployment (including reviewed permission sync and safe first-user provisioning), real Login/logout/expiry on both hosts, support diagnostics, no untested hidden modal-dialog blocker.
 
 ## P7 — HTTP v2
 
