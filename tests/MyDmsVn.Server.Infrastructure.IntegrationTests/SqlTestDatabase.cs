@@ -322,7 +322,6 @@ internal sealed class SqlTestDatabase : IDisposable
         {
             SqlTestDatabaseName.EnsureDisposable(DatabaseName);
             var approval = SqlInstanceApprovalLoader.Load(_approvalFilePath);
-            SqlConnection.ClearAllPools();
             using var session = _sessionFactory(_adminConnectionString);
             var preflight = await new SqlPreflightValidator()
                 .ValidateOpenSessionAsync(

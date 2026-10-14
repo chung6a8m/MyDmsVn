@@ -18,6 +18,8 @@ P1 SQL tests require a reachable SQL Server instance and a test administrator lo
 
 The P5.3 SQL-concurrency gates also observe blocked requests and their lock resources through `sys.dm_exec_requests` and `sys.dm_tran_locks` from a separate SQL session. Their test login therefore requires the server-level `VIEW SERVER STATE` permission on SQL Server 2019 (15.x) and earlier, or `VIEW SERVER PERFORMANCE STATE` on SQL Server 2022 (16.x) and later. The tests preflight the version-specific permission and fail immediately with the required `GRANT` when it is absent. Grant this monitoring permission only on the disposable-test SQL Server instance.
 
+SQLPERF-T02 concurrency tests use a unique test-only `sp_getapplock` release gate instead of a fixed SQL delay. A controller session acquires the session-owned gate before the holder starts; the trigger waits transaction-owned while retaining its business locks. A separate observer must identify the holder's APP wait and expected granted business-table lock, then the contender's wait on the expected business resource, before releasing the controller. Cancellation or failure releases the gate and drains every started task before database disposal. Do not replace this sequence with `WAITFOR`, `Task.Delay` or an uncommitted signal-table read.
+
 SQL test database mutation now also requires a separately maintained approval file. The file is local/operator-managed and must never be committed. It binds an explicit non-production attestation to the exact live SQL instance fingerprint and expiration/configuration metadata. Both variables are required; missing or mismatched approval fails closed before `CREATE DATABASE`, including direct IDE/VSTest runs.
 
 For an approved local Windows-authenticated development instance:
@@ -51,7 +53,7 @@ tests\tools\Invoke-SqlIntegrationBenchmark.ps1 `
 
 Raw TRX, journals and timing JSONL stay ignored/local. Timing is off by default; the runner sets `MYDMSVN_SQL_TEST_TIMINGS=1`, a unique run ID and a local output path. A timeout, missing/corrupt TRX, nonzero exit, failed/skipped mandatory case, inventory mismatch, ownership ambiguity or approval failure makes the run incomplete.
 
-The harness creates a unique database named `MyDmsVn_Test_<32 hex digits>`, disables pooling for its database connection, and only drops the exact generated name it owns. Name validation rejects production-like names and incomplete test prefixes. Never point the variable at production or grant the test principal access to production data.
+The harness creates a unique database named `MyDmsVn_Test_<32 hex digits>`, disables pooling for its database connection, and only drops the exact generated name it owns. Name validation rejects production-like names and incomplete test prefixes. Teardown does not call global `SqlConnection.ClearAllPools()`: owned database and production migrator connections are non-pooled, and the one test that deliberately enables a migration pool clears that exact pool itself. `SINGLE_USER WITH ROLLBACK IMMEDIATE` remains the guarded cleanup boundary for positively owned databases; unrelated pools must remain intact. Never point the variable at production or grant the test principal access to production data.
 
 When either required variable is absent, SQL-dependent tests are reported as skipped with the missing-variable reason; guardrail tests still run. Skips are convenient for local non-SQL work but are invalid for SQL acceptance. The repository acceptance gate sets both variables and runs both `net48` and `net8.0` targets sequentially.
 
