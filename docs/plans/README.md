@@ -14,7 +14,7 @@ These are execution instructions, not implementation evidence. Statuses belong t
 | P5 | [Sales & Inventory Foundation](20261008-001-sales-inventory-foundation.md) |
 | P6 | [Local v1 hardening](20261008-007-phase-6-local-hardening.md) |
 | P7 | [ASP.NET Core v2 / HTTP parity](20261008-008-phase-7-remote-api.md) |
-| **SQLPERF** (cross-phase) | **[SQL integration test performance optimization](20261014-001-sql-integration-test-performance-optimization.md)** — planned (2026-10-14); can proceed separately from P4.1; do not weaken full SQL gates |
+| **SQLPERF** (cross-phase) | **[SQL integration test performance optimization](20261014-001-sql-integration-test-performance-optimization.md)** — T01 complete (2026-10-15); T02 is next; can proceed separately from P4.1; do not weaken full SQL gates |
 
 A phase begins only after preceding phase exit checks have evidence. **P3.1 is verified; P4.1 remains a prerequisite for authenticated P5 GUI acceptance and P6 release sign-off.** SQLPERF is an independent test-infrastructure workstream with serial full-suite gates. This is a targeted integration follow-up to completed P3/P4, not a rewrite of their historical evidence. `docs/DEVELOPMENT_PLAN.md` is the summary/source of phase status; task-specific detail is here. `AGENTS.md` is the required AI instructions entry point.
 
@@ -28,6 +28,6 @@ When Codex finishes a task, demand:
 3. Any deviation, compatibility issue or accepted ADR.
 4. Next task ID and blockers.
 
-P3.1 registry/sync/first-admin CLI is complete. Implement **P4.1 shared Login/session UI** as the next authenticated feature prerequisite. Execute **SQLPERF-T01** before modifying SQL test synchronization or database fixtures; separate performance PRs from P4.1 feature PRs. The permission lifecycle must continue on every later feature release (new keys -> registration -> approval -> sync -> authorization tests); neither task may add production defaults or run DbUp/provisioning during desktop Login.
+P3.1 registry/sync/first-admin CLI is complete. Implement **P4.1 shared Login/session UI** as the next authenticated feature prerequisite. For the independent performance workstream, execute **SQLPERF-T02** from the accepted T01 baseline; separate performance PRs from P4.1 feature PRs. The permission lifecycle must continue on every later feature release (new keys -> registration -> approval -> sync -> authorization tests); neither task may add production defaults or run DbUp/provisioning during desktop Login.
 
 Do not combine multiple phases into an unreviewable implementation change.

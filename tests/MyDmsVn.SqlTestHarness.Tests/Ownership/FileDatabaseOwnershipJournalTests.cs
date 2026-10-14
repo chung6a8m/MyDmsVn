@@ -158,6 +158,62 @@ public sealed class FileDatabaseOwnershipJournalTests
         });
     }
 
+    [Fact]
+    public async Task Exhausted_replace_retries_preserve_the_prior_durable_record()
+    {
+        await WithDirectoryAsync(async directory =>
+        {
+            var replaceAttempts = 0;
+            var journal = new FileDatabaseOwnershipJournal(
+                directory,
+                stream => stream.Flush(flushToDisk: true),
+                (_, _, _) =>
+                {
+                    replaceAttempts++;
+                    throw new ReplaceFileIOException();
+                },
+                _ => { });
+            var record = CreateIntent();
+            await journal.WriteCreateIntentAsync(record);
+
+            await Assert.ThrowsAsync<ReplaceFileIOException>(
+                () => journal.TransitionAsync(record, DatabaseOwnershipState.Created));
+
+            Assert.Equal(21, replaceAttempts);
+            Assert.Equal(
+                DatabaseOwnershipState.CreateIntent,
+                Assert.Single(await journal.ReadAllAsync()).State);
+        });
+    }
+
+    [Fact]
+    public async Task Non_transient_replace_failure_is_not_retried_and_preserves_the_prior_record()
+    {
+        await WithDirectoryAsync(async directory =>
+        {
+            var replaceAttempts = 0;
+            var journal = new FileDatabaseOwnershipJournal(
+                directory,
+                stream => stream.Flush(flushToDisk: true),
+                (_, _, _) =>
+                {
+                    replaceAttempts++;
+                    throw new IOException("expected non-transient replacement failure");
+                },
+                _ => throw new InvalidOperationException("retry delay must not run"));
+            var record = CreateIntent();
+            await journal.WriteCreateIntentAsync(record);
+
+            await Assert.ThrowsAsync<IOException>(
+                () => journal.TransitionAsync(record, DatabaseOwnershipState.Created));
+
+            Assert.Equal(1, replaceAttempts);
+            Assert.Equal(
+                DatabaseOwnershipState.CreateIntent,
+                Assert.Single(await journal.ReadAllAsync()).State);
+        });
+    }
+
     private static DatabaseOwnershipRecord CreateIntent(int index = 0) =>
         new DatabaseOwnershipRecord(
             runId: "run-001",
