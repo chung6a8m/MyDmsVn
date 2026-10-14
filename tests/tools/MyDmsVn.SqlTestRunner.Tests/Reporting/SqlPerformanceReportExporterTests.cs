@@ -29,27 +29,27 @@ public sealed class SqlPerformanceReportExporterTests
             {
                 WriteRun(root, "warmup-secret", "net8.0", BenchmarkPassKind.Warmup, 1, 999,
                     ("Example.WarmupTests.Leak(secret-warmup)", 999),
-                    Timing("warmup-secret", "net8.0", "warmup-secret", null, "warmup", 0, 999)),
+                    Timing("warmup-secret", "net8.0", "Example.WarmupTests.Leak", "warmup-secret", null, "warmup", 0, 999)),
                 WriteRun(root, "net8-one", "net8.0", BenchmarkPassKind.Measured, 1, 100,
                     ("Example.AlphaTests.Slow(secret-one)", 60),
                     ("Example.ZetaTests.Tie(server-one)", 40),
-                    Timing("net8-one", "net8.0", "body", null, "test-body", 0, 100),
-                    Timing("net8-one", "net8.0", "migration", "body", "migration", 20, 80)),
+                    Timing("net8-one", "net8.0", "Example.AlphaTests.Slow", "body", null, "test-body", 0, 100),
+                    Timing("net8-one", "net8.0", "Example.AlphaTests.Slow", "migration", "body", "migration", 20, 80)),
                 WriteRun(root, "net8-two", "net8.0", BenchmarkPassKind.Measured, 2, 200,
                     ("Example.AlphaTests.Slow(secret-two)", 70),
                     ("Example.BetaTests.Tie(C:\\private\\customer-42)", 40),
-                    Timing("net8-two", "net8.0", "database", null, "database", 0, 50),
-                    Timing("net8-two", "net8.0", "migration", null, "migration", 40, 100)),
+                    Timing("net8-two", "net8.0", "Example.AlphaTests.Slow", "database", null, "database", 0, 50),
+                    Timing("net8-two", "net8.0", "Example.AlphaTests.Slow", "migration", null, "migration", 40, 100)),
                 WriteRun(root, "invalid-secret", "net8.0", BenchmarkPassKind.Measured, 3, 777,
                     ("Example.InvalidTests.Leak(password=secret-invalid)", 777),
-                    Timing("invalid-secret", "net8.0", "invalid", null, "invalid", 0, 777),
+                    Timing("invalid-secret", "net8.0", "Example.InvalidTests.Leak", "invalid", null, "invalid", 0, 777),
                     new ExitCode(1)),
                 WriteRun(root, "net48-one", "net48", BenchmarkPassKind.Measured, 1, 50,
                     ("Example.LegacyTests.First(secret-legacy)", 50),
-                    Timing("net48-one", "net48", "legacy", null, "migration", 0, 50)),
+                    Timing("net48-one", "net48", "Example.LegacyTests.First", "legacy", null, "migration", 0, 50)),
                 WriteRun(root, "net48-two", "net48", BenchmarkPassKind.Measured, 2, 70,
                     ("Example.LegacyTests.Second(server-legacy)", 70),
-                    Timing("net48-two", "net48", "legacy", null,
+                    Timing("net48-two", "net48", "Example.LegacyTests.Second", "legacy", null,
                         "Server=review-host;Password=stage-secret", 0, 70)),
             };
             var exporter = new SqlPerformanceReportExporter();
@@ -100,6 +100,54 @@ public sealed class SqlPerformanceReportExporterTests
     }
 
     [Fact]
+    public async Task Exporter_reports_three_pass_test_and_class_statistics_with_stage_reconciliation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ReportStatistics", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            const string test = "Example.InventoryTests.Creates_receipt";
+            var runs = new[]
+            {
+                StatisticalRun(root, "pass-1", 1, 100, 150, test),
+                StatisticalRun(root, "pass-2", 2, 200, 250, test),
+                StatisticalRun(root, "pass-3", 3, 300, 350, test),
+            };
+
+            var result = await new SqlPerformanceReportExporter().ExportAsync(
+                new BenchmarkReportEvidence(root, new[] { "net8.0" }, 3, runs),
+                CancellationToken.None);
+
+            Assert.True(result.IsComplete);
+            var report = JObject.Parse(File.ReadAllText(Path.Combine(root, "sqlperf-baseline-net8.0.json")));
+            var testRow = Assert.Single(report["rankedTests"]!);
+            Assert.Equal(3, (int?)testRow["count"]);
+            Assert.Equal(600m, (decimal?)testRow["totalDurationMs"]);
+            Assert.Equal(200m, (decimal?)testRow["p50DurationMs"]);
+            Assert.Equal(300m, (decimal?)testRow["p95DurationMs"]);
+            Assert.Equal(90m, (decimal?)testRow["setupDurationMs"]);
+            Assert.Equal(30m, (decimal?)testRow["teardownDurationMs"]);
+            Assert.Equal(480m, (decimal?)testRow["exclusiveStageMs"]?["test-body"]);
+            Assert.Equal(600m, (decimal?)testRow["measuredExclusiveDurationMs"]);
+            Assert.Equal(0m, (decimal?)testRow["residualDurationMs"]);
+            Assert.Equal(80m, (decimal?)testRow["wallClockContributionPercent"]);
+
+            var classRow = Assert.Single(report["rankedClasses"]!);
+            Assert.Equal("Example.InventoryTests", (string?)classRow["identity"]);
+            Assert.Equal(3, (int?)classRow["count"]);
+            Assert.Equal(600m, (decimal?)classRow["totalDurationMs"]);
+            Assert.Equal(200m, (decimal?)classRow["p50DurationMs"]);
+            Assert.Equal(300m, (decimal?)classRow["p95DurationMs"]);
+            Assert.Equal(90m, (decimal?)classRow["setupDurationMs"]);
+            Assert.Equal(30m, (decimal?)classRow["teardownDurationMs"]);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public async Task Exporter_rejects_malformed_timing_event_instead_of_omitting_it()
     {
         var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ReportMalformed", Guid.NewGuid().ToString("N"));
@@ -114,8 +162,8 @@ public sealed class SqlPerformanceReportExporterTests
             {
                 "{\"runId\":\"malformed\",\"tfm\":\"net8.0\",\"stage\":\"migration\"," +
                 "\"operationId\":\"missing-end\",\"startTimestamp\":1}",
-                Timing("malformed", "net8.0", "reversed", null, "migration", 10, 0),
-                Timing("malformed", "net8.0", "mismatch", null, "migration", 0, 10)
+                Timing("malformed", "net8.0", "Example.Tests.One", "reversed", null, "migration", 10, 0),
+                Timing("malformed", "net8.0", "Example.Tests.One", "mismatch", null, "migration", 0, 10)
                     .Replace("\"durationMs\":10", "\"durationMs\":9", StringComparison.Ordinal),
             };
 
@@ -145,7 +193,7 @@ public sealed class SqlPerformanceReportExporterTests
         {
             var run = WriteRun(root, "only-one", "net8.0", BenchmarkPassKind.Measured, 1, 10,
                 ("Example.Tests.One", 10),
-                Timing("only-one", "net8.0", "one", null, "migration", 0, 10));
+                Timing("only-one", "net8.0", "Example.Tests.One", "one", null, "migration", 0, 10));
 
             var result = await new SqlPerformanceReportExporter().ExportAsync(
                 new BenchmarkReportEvidence(root, new[] { "net8.0" }, 2, new[] { run }),
@@ -196,6 +244,7 @@ public sealed class SqlPerformanceReportExporterTests
     private static string Timing(
         string runId,
         string tfm,
+        string testCaseId,
         string operationId,
         string? parentOperationId,
         string stage,
@@ -203,13 +252,35 @@ public sealed class SqlPerformanceReportExporterTests
         long endMs)
     {
         var parent = parentOperationId is null ? "null" : "\"" + parentOperationId + "\"";
-        return "{\"runId\":\"" + runId + "\",\"testCaseId\":\"sensitive(row-value)\"," +
+        return "{\"runId\":\"" + runId + "\",\"testCaseId\":\"" + testCaseId + "\"," +
                "\"operationId\":\"" + operationId + "\",\"parentOperationId\":" + parent + "," +
                "\"stage\":\"" + stage + "\",\"startTimestamp\":" +
                (startMs * Stopwatch.Frequency / 1000) + ",\"endTimestamp\":" +
                (endMs * Stopwatch.Frequency / 1000) + ",\"durationMs\":" + (endMs - startMs) +
                ",\"outcome\":\"Succeeded\",\"tfm\":\"" + tfm +
                "\",\"anonymizedDatabaseId\":\"db\"}";
+    }
+
+    private static BenchmarkFrameworkRun StatisticalRun(
+        string root,
+        string runId,
+        int pass,
+        int trxDurationMs,
+        decimal wallClockMs,
+        string test)
+    {
+        return WriteRun(
+            root,
+            runId,
+            "net8.0",
+            BenchmarkPassKind.Measured,
+            pass,
+            wallClockMs,
+            (test, trxDurationMs),
+            Timing(runId, "net8.0", test, "create", null, "create", 0, 10),
+            Timing(runId, "net8.0", test, "migration", null, "migration", 10, 30),
+            Timing(runId, "net8.0", test, "body", null, "test-body", 30, trxDurationMs - 10),
+            Timing(runId, "net8.0", test, "drop", null, "drop", trxDurationMs - 10, trxDurationMs));
     }
 
     private readonly record struct ExitCode(int Value);

@@ -1,5 +1,29 @@
 [
   {
+    "invocationId": "DatabaseMigrationTests.Clean_migration_applies_once_and_repeat_is_a_no_op.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Clean_migration_applies_once_and_repeat_is_a_no_op",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 488,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Clean_migration_applies_once_and_repeat_is_a_no_op.migration-02",
+    "class": "DatabaseMigrationTests",
+    "method": "Clean_migration_applies_once_and_repeat_is_a_no_op",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 492,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
     "invocationId": "SqlPrincipalProvisioningTests.Provisioning_rejects_the_same_runtime_and_migration_identity.migration-01",
     "class": "SqlPrincipalProvisioningTests",
     "method": "Provisioning_rejects_the_same_runtime_and_migration_identity",

@@ -47,7 +47,19 @@ public sealed class SqlPerformanceReport
     public IReadOnlyList<SqlPerformanceCost> RankedClasses { get; }
 }
 
-public sealed record SqlPerformanceCost(string Identity, decimal TotalDurationMs);
+public sealed record SqlPerformanceCost(
+    string Identity,
+    int Count,
+    decimal TotalDurationMs,
+    decimal P50DurationMs,
+    decimal P95DurationMs,
+    decimal SetupDurationMs,
+    decimal TeardownDurationMs,
+    decimal MeasuredExclusiveDurationMs,
+    decimal OverlapDurationMs,
+    decimal ResidualDurationMs,
+    decimal WallClockContributionPercent,
+    IReadOnlyDictionary<string, decimal> ExclusiveStageMs);
 
 public sealed record SqlDmvSnapshot(
     decimal? CpuMs,

@@ -48,6 +48,40 @@ public sealed class MigrationInvocationManifestAuditorTests
     }
 
     [Fact]
+    public void Audit_rejects_an_uninstrumented_migrator_call_through_a_local_variable()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ManifestMigrator", Guid.NewGuid().ToString("N"));
+        var sourcePath = Path.Combine(root, "tests", "ExampleTests.cs");
+        var manifestPath = Path.Combine(root, "manifest.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(sourcePath)!);
+        try
+        {
+            File.WriteAllText(
+                manifestPath,
+                "[{\"invocationId\":\"ExampleTests.Case.migration-01\",\"class\":\"ExampleTests\"," +
+                "\"method\":\"Case\",\"sourceFile\":\"tests/ExampleTests.cs\"," +
+                "\"tfms\":[\"net8.0\"],\"expectedInvocationRule\":\"once-per-test-execution\"}]");
+            File.WriteAllText(
+                sourcePath,
+                "class ExampleTests { void Case() { " +
+                "MeasuredDatabaseMigrationRunner.Migrate(context, " +
+                "\"ExampleTests.Case.migration-01\", connection); } }");
+
+            Assert.True(MigrationInvocationManifestAuditor.IsValid(root, manifestPath, "net8.0"));
+
+            File.AppendAllText(
+                sourcePath,
+                "// deliberately uninstrumented through a local receiver\n" +
+                "var r = new DatabaseMigrationRunner(); r.Migrate(connection);");
+            Assert.False(MigrationInvocationManifestAuditor.IsValid(root, manifestPath, "net8.0"));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void Caller_rule_counts_each_helper_call_per_test_method()
     {
         var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ManifestCallers", Guid.NewGuid().ToString("N"));

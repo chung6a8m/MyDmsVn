@@ -49,6 +49,31 @@ public sealed class BenchmarkOwnershipGateTests
     }
 
     [Fact]
+    public async Task Unexpected_run_id_in_isolated_journal_is_incomplete_and_sanitized()
+    {
+        using var fixture = new Fixture();
+        await fixture.WriteRecordAsync(DatabaseOwnershipState.Disposed);
+        var foreign = await fixture.WriteRecordAsync(
+            DatabaseOwnershipState.Created,
+            "foreign-execution-sensitive",
+            "foreign-operation-sensitive",
+            "MyDmsVn_Test_fedcba9876543210fedcba9876543210");
+
+        var result = await fixture.ValidateAsync();
+
+        Assert.False(result.IsComplete);
+        Assert.Equal(fixture.RecoveryPath, result.RecoveryArtifactPath);
+        var artifact = File.ReadAllText(fixture.RecoveryPath);
+        Assert.Contains("UnexpectedRunId", artifact, StringComparison.Ordinal);
+        Assert.DoesNotContain(foreign.RunId, artifact, StringComparison.Ordinal);
+        Assert.DoesNotContain(foreign.OperationId, artifact, StringComparison.Ordinal);
+        Assert.DoesNotContain(foreign.DatabaseName, artifact, StringComparison.Ordinal);
+        Assert.DoesNotContain(foreign.OwnershipToken, artifact, StringComparison.Ordinal);
+        Assert.DoesNotContain(foreign.InstanceFingerprintSha256, artifact, StringComparison.Ordinal);
+        Assert.DoesNotContain(foreign.DatabaseName, fixture.Reader.ReadDatabaseNames);
+    }
+
+    [Fact]
     public async Task Disposed_record_on_a_different_live_instance_is_incomplete()
     {
         using var fixture = new Fixture();
@@ -133,12 +158,16 @@ public sealed class BenchmarkOwnershipGateTests
 
         public FakeLiveOwnershipReader Reader { get; } = new FakeLiveOwnershipReader();
 
-        public async Task<DatabaseOwnershipRecord> WriteRecordAsync(DatabaseOwnershipState target)
+        public async Task<DatabaseOwnershipRecord> WriteRecordAsync(
+            DatabaseOwnershipState target,
+            string runId = "execution-1",
+            string operationId = "operation-sensitive",
+            string databaseName = "MyDmsVn_Test_0123456789abcdef0123456789abcdef")
         {
             var record = new DatabaseOwnershipRecord(
-                "execution-1",
-                "operation-sensitive",
-                "MyDmsVn_Test_0123456789abcdef0123456789abcdef",
+                runId,
+                operationId,
+                databaseName,
                 "ownership-secret",
                 _approval.FingerprintSha256,
                 _approval.ApprovalId,
@@ -195,6 +224,8 @@ public sealed class BenchmarkOwnershipGateTests
         public Dictionary<string, LiveDatabaseOwnership?> Results { get; } =
             new Dictionary<string, LiveDatabaseOwnership?>(StringComparer.Ordinal);
 
+        public List<string> ReadDatabaseNames { get; } = new List<string>();
+
         public Task OpenAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task<SqlInstanceIdentity?> ReadIdentityAsync(CancellationToken cancellationToken) =>
@@ -204,6 +235,7 @@ public sealed class BenchmarkOwnershipGateTests
             string databaseName,
             CancellationToken cancellationToken)
         {
+            ReadDatabaseNames.Add(databaseName);
             Results.TryGetValue(databaseName, out var result);
             return Task.FromResult(result);
         }

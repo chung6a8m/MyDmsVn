@@ -68,9 +68,11 @@ public static class MigrationInvocationManifestAuditor
                 var directCalls = Regex.Matches(source, "\\.PerformUpgrade\\s*\\(").Count;
                 var directEntries = group.Count(entry =>
                     entry.InvocationId.IndexOf(".direct-", StringComparison.Ordinal) >= 0);
-                if (directCalls != directEntries ||
-                    source.IndexOf("new DatabaseMigrationRunner().Migrate(", StringComparison.Ordinal) >= 0 ||
-                    source.IndexOf("TestDatabaseMigrationRunner.Migrate(", StringComparison.Ordinal) >= 0)
+                var migrationCalls = Regex.Matches(source, "\\.\\s*Migrate\\s*\\(").Count;
+                var measuredMigrationCalls = Regex.Matches(
+                    source,
+                    "\\bMeasuredDatabaseMigrationRunner\\s*\\.\\s*Migrate\\s*\\(").Count;
+                if (directCalls != directEntries || migrationCalls != measuredMigrationCalls)
                 {
                     return false;
                 }

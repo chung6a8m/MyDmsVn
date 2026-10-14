@@ -64,17 +64,30 @@ public sealed class BenchmarkOwnershipGate : IBenchmarkOwnershipGate
         {
             var approval = SqlInstanceApprovalLoader.Load(evidence.ApprovalFile);
             var journal = new FileDatabaseOwnershipJournal(evidence.JournalDirectory);
-            var records = (await journal.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            var allRecords = (await journal.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                .ToArray();
+            var unexpectedRecords = allRecords
+                .Where(record => !string.Equals(
+                    record.RunId,
+                    evidence.ExecutionId,
+                    StringComparison.Ordinal))
+                .ToArray();
+            foreach (var record in unexpectedRecords)
+            {
+                issues.Add(RecoveryEntry.UnexpectedRunId(record.OperationId, record.State));
+            }
+
+            var records = allRecords
                 .Where(record => string.Equals(
                     record.RunId,
                     evidence.ExecutionId,
                     StringComparison.Ordinal))
                 .ToArray();
-            if (records.Length == 0)
+            if (allRecords.Length == 0)
             {
                 issues.Add(RecoveryEntry.EmptyJournal());
             }
-            else
+            else if (records.Length > 0)
             {
                 using var reader = _readerFactory();
                 await reader.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -230,6 +243,16 @@ public sealed class BenchmarkOwnershipGate : IBenchmarkOwnershipGate
             State = "Unknown",
             Classification = "InspectionFailed",
             Reason = "Ownership inspection could not be completed.",
+        };
+
+        public static RecoveryEntry UnexpectedRunId(
+            string operationId,
+            DatabaseOwnershipState state) => new RecoveryEntry
+        {
+            OperationId = Anonymize(operationId),
+            State = state.ToString(),
+            Classification = "UnexpectedRunId",
+            Reason = "The isolated ownership journal contains a record for another execution.",
         };
     }
 }

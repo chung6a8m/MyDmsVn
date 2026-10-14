@@ -85,7 +85,7 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
                     true,
                     (decimal)run.Command.Duration.TotalMilliseconds)).ToArray();
                 var timings = new List<SqlTestTimingEvent>();
-                var testCosts = new Dictionary<string, decimal>(StringComparer.Ordinal);
+                var testCosts = new Dictionary<string, CostAccumulator>(StringComparer.Ordinal);
                 foreach (var run in accepted)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -94,7 +94,8 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
                         return Task.FromResult(BenchmarkReportExportResult.Incomplete());
                     }
 
-                    timings.AddRange(ReadTimings(run.TimingPath, run.RunId, tfm));
+                    var runTimings = ReadTimings(run.TimingPath, run.RunId, tfm);
+                    timings.AddRange(runTimings);
                     var trx = TrxResultParser.TryParse(run.TrxPath, tfm);
                     if (!trx.IsComplete || trx.Results.Count == 0 ||
                         trx.Results.Any(row => row.Outcome != TestOutcome.Passed))
@@ -102,23 +103,57 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
                         return Task.FromResult(BenchmarkReportExportResult.Incomplete());
                     }
 
-                    foreach (var row in trx.Results)
+                    var methodGroups = trx.Results
+                        .GroupBy(row => row.MethodName, StringComparer.Ordinal)
+                        .ToArray();
+                    foreach (var timing in runTimings)
                     {
-                        var identity = SqlPerformanceReportBuilder.RedactShareable(row.MethodName);
-                        testCosts.TryGetValue(identity, out var current);
-                        testCosts[identity] = current + (decimal)row.Duration.TotalMilliseconds;
+                        if (methodGroups.Count(group => TestCaseMatches(
+                                timing.TestCaseId,
+                                group.Key)) != 1)
+                        {
+                            throw new InvalidDataException(
+                                "A timing event cannot be attributed to exactly one TRX test.");
+                        }
+                    }
+
+                    foreach (var group in methodGroups)
+                    {
+                        var identity = SqlPerformanceReportBuilder.RedactShareable(group.Key);
+                        if (!testCosts.TryGetValue(identity, out var accumulator))
+                        {
+                            accumulator = new CostAccumulator(identity);
+                            testCosts.Add(identity, accumulator);
+                        }
+
+                        var groupEvents = runTimings
+                            .Where(timing => TestCaseMatches(timing.TestCaseId, group.Key))
+                            .ToArray();
+                        var duration = group.Sum(row => row.Duration.TotalMilliseconds);
+                        var reconciliation = TimingIntervalReconciler.Reconcile(
+                            TimeSpan.FromMilliseconds(duration),
+                            groupEvents);
+                        accumulator.Add(
+                            group.Select(row => (decimal)row.Duration.TotalMilliseconds),
+                            reconciliation);
                     }
                 }
 
-                var rankedTests = Rank(testCosts);
-                var classCosts = new Dictionary<string, decimal>(StringComparer.Ordinal);
-                foreach (var row in rankedTests)
+                var totalWallClockMs = samples.Sum(sample => sample.WallClockMs);
+                var rankedTests = Rank(testCosts, totalWallClockMs);
+                var classCosts = new Dictionary<string, CostAccumulator>(StringComparer.Ordinal);
+                foreach (var pair in testCosts)
                 {
-                    var separator = row.Identity.LastIndexOf('.');
-                    var identity = separator > 0 ? row.Identity.Substring(0, separator) : row.Identity;
+                    var separator = pair.Key.LastIndexOf('.');
+                    var identity = separator > 0 ? pair.Key.Substring(0, separator) : pair.Key;
                     identity = SqlPerformanceReportBuilder.RedactShareable(identity);
-                    classCosts.TryGetValue(identity, out var current);
-                    classCosts[identity] = current + row.TotalDurationMs;
+                    if (!classCosts.TryGetValue(identity, out var accumulator))
+                    {
+                        accumulator = new CostAccumulator(identity);
+                        classCosts.Add(identity, accumulator);
+                    }
+
+                    accumulator.Merge(pair.Value);
                 }
 
                 var baseReport = SqlPerformanceReportBuilder.Build(samples, timings, null);
@@ -137,7 +172,7 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
                         StringComparer.Ordinal),
                     baseReport.DmvStatus,
                     rankedTests,
-                    Rank(classCosts))));
+                    Rank(classCosts, totalWallClockMs))));
             }
 
             Directory.CreateDirectory(evidence.ArtifactRoot);
@@ -228,9 +263,14 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
     private static string RequiredString(JObject value, string name) =>
         (string?)value[name] ?? throw new InvalidDataException("Timing field is missing: " + name);
 
+    private static bool TestCaseMatches(string testCaseId, string methodName) =>
+        string.Equals(testCaseId, methodName, StringComparison.Ordinal) ||
+        methodName.EndsWith("." + testCaseId, StringComparison.Ordinal);
+
     private static IReadOnlyList<SqlPerformanceCost> Rank(
-        IReadOnlyDictionary<string, decimal> costs) =>
-        costs.Select(pair => new SqlPerformanceCost(pair.Key, pair.Value))
+        IReadOnlyDictionary<string, CostAccumulator> costs,
+        decimal totalWallClockMs) =>
+        costs.Select(pair => pair.Value.Build(totalWallClockMs))
             .OrderByDescending(row => row.TotalDurationMs)
             .ThenBy(row => row.Identity, StringComparer.Ordinal)
             .ToArray();
@@ -254,7 +294,18 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
         foreach (var row in report.RankedTests)
         {
             builder.AppendLine("- " + SqlPerformanceReportBuilder.RedactShareable(row.Identity) +
-                               ": " + Format(row.TotalDurationMs) + " ms");
+                               ": count=" + row.Count +
+                               ", total=" + Format(row.TotalDurationMs) +
+                               " ms, p50=" + Format(row.P50DurationMs) +
+                               " ms, p95=" + Format(row.P95DurationMs) +
+                               " ms, setup=" + Format(row.SetupDurationMs) +
+                               " ms, teardown=" + Format(row.TeardownDurationMs) +
+                               " ms, exclusive=" + Format(row.MeasuredExclusiveDurationMs) +
+                               " ms, overlap=" + Format(row.OverlapDurationMs) +
+                               " ms, residual=" + Format(row.ResidualDurationMs) +
+                               " ms, stages=" + FormatStages(row.ExclusiveStageMs) +
+                               ", wall-clock contribution=" +
+                               Format(row.WallClockContributionPercent) + "%");
         }
 
         builder.AppendLine();
@@ -263,7 +314,18 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
         foreach (var row in report.RankedClasses)
         {
             builder.AppendLine("- " + SqlPerformanceReportBuilder.RedactShareable(row.Identity) +
-                               ": " + Format(row.TotalDurationMs) + " ms");
+                               ": count=" + row.Count +
+                               ", total=" + Format(row.TotalDurationMs) +
+                               " ms, p50=" + Format(row.P50DurationMs) +
+                               " ms, p95=" + Format(row.P95DurationMs) +
+                               " ms, setup=" + Format(row.SetupDurationMs) +
+                               " ms, teardown=" + Format(row.TeardownDurationMs) +
+                               " ms, exclusive=" + Format(row.MeasuredExclusiveDurationMs) +
+                               " ms, overlap=" + Format(row.OverlapDurationMs) +
+                               " ms, residual=" + Format(row.ResidualDurationMs) +
+                               " ms, stages=" + FormatStages(row.ExclusiveStageMs) +
+                               ", wall-clock contribution=" +
+                               Format(row.WallClockContributionPercent) + "%");
         }
 
         return builder.ToString();
@@ -271,6 +333,13 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
 
     private static string Format(decimal value) =>
         value.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string FormatStages(IReadOnlyDictionary<string, decimal> stages) =>
+        "[" + string.Join(
+            ", ",
+            stages.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => SqlPerformanceReportBuilder.RedactShareable(pair.Key) +
+                                "=" + Format(pair.Value))) + "]";
 
     private static string SafeFileComponent(string value) =>
         new string(value.Where(character =>
@@ -281,5 +350,92 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
         var temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
         File.WriteAllText(temporary, content, new UTF8Encoding(false));
         File.Move(temporary, path, true);
+    }
+
+    private sealed class CostAccumulator
+    {
+        private static readonly HashSet<string> SetupStages = new HashSet<string>(
+            new[] { "create", "migration", "seed", "permission-sync" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> TeardownStages = new HashSet<string>(
+            new[] { "pool-cleanup", "drop" },
+            StringComparer.Ordinal);
+        private readonly List<decimal> _durations = new List<decimal>();
+        private readonly Dictionary<string, decimal> _exclusiveStages =
+            new Dictionary<string, decimal>(StringComparer.Ordinal);
+
+        public CostAccumulator(string identity) => Identity = identity;
+
+        public string Identity { get; }
+
+        public decimal OverlapDurationMs { get; private set; }
+
+        public decimal ResidualDurationMs { get; private set; }
+
+        public void Add(
+            IEnumerable<decimal> durations,
+            TimingIntervalReconciliation reconciliation)
+        {
+            _durations.AddRange(durations);
+            OverlapDurationMs += reconciliation.OverlapMs;
+            ResidualDurationMs += reconciliation.ResidualMs;
+            foreach (var stage in reconciliation.ExclusiveDurationByStage)
+            {
+                AddStage(stage.Key, stage.Value);
+            }
+        }
+
+        public void Merge(CostAccumulator other)
+        {
+            _durations.AddRange(other._durations);
+            OverlapDurationMs += other.OverlapDurationMs;
+            ResidualDurationMs += other.ResidualDurationMs;
+            foreach (var stage in other._exclusiveStages)
+            {
+                AddStage(stage.Key, stage.Value);
+            }
+        }
+
+        public SqlPerformanceCost Build(decimal totalWallClockMs)
+        {
+            var ordered = _durations.OrderBy(value => value).ToArray();
+            var total = ordered.Sum();
+            var setup = _exclusiveStages
+                .Where(pair => SetupStages.Contains(pair.Key))
+                .Sum(pair => pair.Value);
+            var teardown = _exclusiveStages
+                .Where(pair => TeardownStages.Contains(pair.Key))
+                .Sum(pair => pair.Value);
+            return new SqlPerformanceCost(
+                Identity,
+                ordered.Length,
+                total,
+                Percentile(ordered, 0.50m),
+                Percentile(ordered, 0.95m),
+                setup,
+                teardown,
+                _exclusiveStages.Values.Sum(),
+                OverlapDurationMs,
+                ResidualDurationMs,
+                totalWallClockMs == 0m ? 0m : total * 100m / totalWallClockMs,
+                new SortedDictionary<string, decimal>(_exclusiveStages, StringComparer.Ordinal));
+        }
+
+        private void AddStage(string stage, decimal duration)
+        {
+            _exclusiveStages.TryGetValue(stage, out var current);
+            _exclusiveStages[stage] = current + duration;
+        }
+
+        private static decimal Percentile(IReadOnlyList<decimal> ordered, decimal percentile)
+        {
+            if (ordered.Count == 0)
+            {
+                return 0m;
+            }
+
+            var rank = (int)Math.Ceiling(ordered.Count * percentile);
+            return ordered[Math.Max(0, rank - 1)];
+        }
     }
 }

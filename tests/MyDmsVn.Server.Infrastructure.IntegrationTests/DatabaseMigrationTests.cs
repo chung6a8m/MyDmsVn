@@ -483,10 +483,14 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migrator = new DatabaseMigrationRunner();
-
-            var first = migrator.Migrate(database.ConnectionString);
-            var second = migrator.Migrate(database.ConnectionString);
+            var first = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "DatabaseMigrationTests.Clean_migration_applies_once_and_repeat_is_a_no_op.migration-01",
+                database.ConnectionString);
+            var second = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "DatabaseMigrationTests.Clean_migration_applies_once_and_repeat_is_a_no_op.migration-02",
+                database.ConnectionString);
 
             Assert.True(first.Successful, first.Error?.ToString());
             Assert.Equal(8, first.Scripts.Count());
