@@ -245,7 +245,7 @@ Run locked restore and Release solution build, then:
 
 Expected: zero failures/skips for these selected gates and zero build warnings/errors.
 
-- [ ] **Step 3: Request independent whole-branch review**
+- [x] **Step 3: Request independent whole-branch review**
 
 Review all round-3 changes against the spec and the five Review Focus cases. Fix every Critical/Important finding through a fresh red-green test, then rerun the affected suite.
 
