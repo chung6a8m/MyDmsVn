@@ -208,6 +208,62 @@ public sealed class SqlPerformanceReportExporterTests
         }
     }
 
+    [Fact]
+    public async Task Exporter_rejects_create_and_drop_timing_from_a_different_run()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ReportWrongRun", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var run = WriteRun(root, "expected-run", "net8.0", BenchmarkPassKind.Measured, 1, 20,
+                ("Example.Tests.One", 20),
+                Timing("other-run", "net8.0", "Example.Tests.One", "create", null, "create", 0, 10),
+                Timing("other-run", "net8.0", "Example.Tests.One", "drop", null, "drop", 10, 20));
+
+            var result = await new SqlPerformanceReportExporter().ExportAsync(
+                new BenchmarkReportEvidence(root, new[] { "net8.0" }, 1, new[] { run }),
+                CancellationToken.None);
+
+            Assert.False(result.IsComplete);
+            Assert.Empty(result.ReportPaths);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Exporter_accepts_helper_timings_attributed_to_the_public_test()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ReportHelper", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            const string test = "Example.RepositoryTests.Public_test";
+            var run = WriteRun(root, "run-1", "net8.0", BenchmarkPassKind.Measured, 1, 20,
+                (test, 20),
+                Timing("run-1", "net8.0", test, "helper-create", null, "create", 0, 10),
+                Timing("run-1", "net8.0", test, "helper-drop", null, "drop", 10, 20));
+
+            var result = await new SqlPerformanceReportExporter().ExportAsync(
+                new BenchmarkReportEvidence(root, new[] { "net8.0" }, 1, new[] { run }),
+                CancellationToken.None);
+
+            Assert.True(result.IsComplete);
+            var report = JObject.Parse(File.ReadAllText(Path.Combine(root, "sqlperf-baseline-net8.0.json")));
+            var row = Assert.Single(report["rankedTests"]!);
+            Assert.Equal(test, (string?)row["identity"]);
+            Assert.Equal(10m, (decimal?)row["setupDurationMs"]);
+            Assert.Equal(10m, (decimal?)row["teardownDurationMs"]);
+            Assert.Equal(0m, (decimal?)row["residualDurationMs"]);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private static BenchmarkFrameworkRun WriteRun(
         string root,
         string runId,

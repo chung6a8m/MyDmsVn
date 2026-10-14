@@ -77,6 +77,20 @@ public sealed class MigrationTimingArtifactReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_rejects_complete_pairs_from_a_different_run()
+    {
+        using var fixture = new Fixture(Entry("ExampleTests.Case.migrate", "Case"));
+        fixture.WriteArtifact(
+            Invocation("Case", "net8.0", "ExampleTests.Case.migrate", "other-run"),
+            Timing("Case", "net8.0", "ExampleTests.Case.migrate", "other-run"));
+
+        var result = fixture.Reconcile("net8.0", Executed("Namespace.ExampleTests.Case", "net8.0"));
+
+        Assert.False(result.IsComplete);
+        Assert.NotEmpty(result.UnexpectedKeys);
+    }
+
+    [Fact]
     public void Multiline_helper_caller_missing_both_records_fails_closed()
     {
         using var fixture = new Fixture(HelperEntry("ExampleTests.CreateDatabase.migrate"));
@@ -148,12 +162,22 @@ public sealed class MigrationTimingArtifactReconcilerTests
     private static TrxTestResult[] Executed(string method, string tfm) =>
         new[] { TrxTestResult.Passed("case", method, tfm, TimeSpan.Zero) };
 
-    private static string Invocation(string testCaseId, string tfm, string invocationId) =>
-        "{\"recordType\":\"migration-invocation\",\"testCaseId\":\"" + testCaseId +
+    private static string Invocation(
+        string testCaseId,
+        string tfm,
+        string invocationId,
+        string runId = "run-1") =>
+        "{\"recordType\":\"migration-invocation\",\"runId\":\"" + runId +
+        "\",\"testCaseId\":\"" + testCaseId +
         "\",\"tfm\":\"" + tfm + "\",\"invocationId\":\"" + invocationId + "\"}";
 
-    private static string Timing(string testCaseId, string tfm, string operationId) =>
-        "{\"stage\":\"migration\",\"testCaseId\":\"" + testCaseId +
+    private static string Timing(
+        string testCaseId,
+        string tfm,
+        string operationId,
+        string runId = "run-1") =>
+        "{\"stage\":\"migration\",\"runId\":\"" + runId +
+        "\",\"testCaseId\":\"" + testCaseId +
         "\",\"tfm\":\"" + tfm + "\",\"operationId\":\"" + operationId + "\"}";
 
     private sealed class Fixture : IDisposable
@@ -187,7 +211,13 @@ public sealed class MigrationTimingArtifactReconcilerTests
         public MigrationTimingArtifactReconciliation Reconcile(
             string tfm,
             TrxTestResult[] executed) =>
-            MigrationTimingArtifactReconciler.Reconcile(ArtifactPath, ManifestPath, _root, tfm, executed);
+            MigrationTimingArtifactReconciler.Reconcile(
+                ArtifactPath,
+                ManifestPath,
+                _root,
+                "run-1",
+                tfm,
+                executed);
 
         public void Dispose() => Directory.Delete(_root, true);
     }

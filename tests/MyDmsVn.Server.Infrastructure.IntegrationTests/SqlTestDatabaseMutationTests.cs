@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestHarness.Approval;
@@ -122,6 +123,43 @@ public sealed class SqlTestDatabaseMutationTests
                 Assert.Single(await journal.ReadAllAsync()).State);
         });
     }
+
+    [Fact]
+    public async Task Database_helper_forwards_the_public_test_identity_to_measurement_context()
+    {
+        await WithJournalAsync(async (directory, journal) =>
+        {
+            var approvalPath = Path.Combine(directory, "approval.json");
+            File.WriteAllText(approvalPath, ValidApprovalJson());
+            var database = await CreateThroughHelperAsync(
+                approvalPath,
+                journal,
+                new RecordingSession());
+            try
+            {
+                Assert.Equal(
+                    nameof(Database_helper_forwards_the_public_test_identity_to_measurement_context),
+                    database.MeasurementContext.TestCaseId);
+            }
+            finally
+            {
+                await database.DisposeAsync();
+            }
+        });
+    }
+
+    private static Task<SqlTestDatabase> CreateThroughHelperAsync(
+        string approvalPath,
+        IDatabaseOwnershipJournal journal,
+        ISqlAdministrativeSession session,
+        [CallerMemberName] string testCaseId = "") =>
+        SqlTestDatabase.CreateAsync(
+            MasterConnectionString,
+            approvalPath,
+            journal,
+            _ => session,
+            CancellationToken.None,
+            testCaseId);
 
     private static async Task WithJournalAsync(
         Func<string, FileDatabaseOwnershipJournal, Task> assertion)

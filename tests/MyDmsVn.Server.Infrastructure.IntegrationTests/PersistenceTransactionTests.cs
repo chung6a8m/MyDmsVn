@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -172,10 +173,13 @@ public sealed class PersistenceTransactionTests
         return services.BuildServiceProvider();
     }
 
-    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
+    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
+        [CallerMemberName] string testCaseId = "")
     {
+        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
+            measurement);
         try
         {
             TestDatabaseMigrationRunner.Migrate(

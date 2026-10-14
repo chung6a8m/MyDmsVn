@@ -212,6 +212,12 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
             var value = JObject.Parse(line);
             var hasStart = value["startTimestamp"] is not null;
             var hasEnd = value["endTimestamp"] is not null;
+            if (!string.Equals(RequiredString(value, "runId"), runId, StringComparison.Ordinal) ||
+                !string.Equals(RequiredString(value, "tfm"), tfm, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("A timing record has unexpected run provenance.");
+            }
+
             if (!hasStart && !hasEnd &&
                 string.Equals(
                     (string?)value["recordType"],
@@ -250,11 +256,7 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
                 Enum.Parse<SqlTestTimingOutcome>(RequiredString(value, "outcome"), ignoreCase: false),
                 RequiredString(value, "tfm"),
                 RequiredString(value, "anonymizedDatabaseId"));
-            if (string.Equals(timing.RunId, runId, StringComparison.Ordinal) &&
-                string.Equals(timing.Tfm, tfm, StringComparison.Ordinal))
-            {
-                result.Add(timing);
-            }
+            result.Add(timing);
         }
 
         return result;

@@ -190,6 +190,7 @@ public sealed class BenchmarkRunCoordinator
                             discovery.StandardOutput,
                             trxPath,
                             timingPath,
+                            executionId,
                             tfm,
                             result.ExitCode,
                             options.RepositoryRoot,
@@ -318,6 +319,7 @@ public sealed class TrxBenchmarkResultGate : IBenchmarkResultGate
                 evidence.TimingPath,
                 evidence.MigrationManifestPath,
                 evidence.RepositoryRoot,
+                evidence.RunId,
                 evidence.Tfm,
                 trx.Results)
             .IsComplete;
@@ -351,6 +353,7 @@ public sealed record BenchmarkResultEvidence(
     string DiscoveryOutput,
     string TrxPath,
     string TimingPath,
+    string RunId,
     string Tfm,
     int RunnerExitCode,
     string RepositoryRoot = "",

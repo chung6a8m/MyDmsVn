@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Data;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -239,10 +240,13 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             }
         }
 
-        private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
+        private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
+            [CallerMemberName] string testCaseId = "")
         {
+            var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
             var database = await SqlTestDatabase.CreateAsync(
-                Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+                Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
+                measurement);
             var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
             return database;

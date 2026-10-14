@@ -247,7 +247,7 @@ public sealed class BenchmarkRunCoordinatorTests
                 new StubMigrationManifestGate());
 
             var valid = gate.IsValid(
-                new BenchmarkResultEvidence("assembly.dll", discovery, trxPath, "timing.jsonl", "net8.0", 0));
+                new BenchmarkResultEvidence("assembly.dll", discovery, trxPath, "timing.jsonl", "run-1", "net8.0", 0));
 
             Assert.False(valid);
         }
@@ -276,8 +276,8 @@ public sealed class BenchmarkRunCoordinatorTests
                 timingPath,
                 new[]
                 {
-                    "{\"recordType\":\"migration-invocation\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"invocationId\":\"Example.Tests.First.migrate\"}",
-                    "{\"stage\":\"migration\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"operationId\":\"Example.Tests.First.migrate\"}",
+                    "{\"recordType\":\"migration-invocation\",\"runId\":\"run-1\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"invocationId\":\"Example.Tests.First.migrate\"}",
+                    "{\"stage\":\"migration\",\"runId\":\"run-1\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"operationId\":\"Example.Tests.First.migrate\"}",
                 });
             File.WriteAllText(
                 manifestPath,
@@ -293,6 +293,7 @@ public sealed class BenchmarkRunCoordinatorTests
                 "The following Tests are available:\n    Example.Tests.First\n",
                 trxPath,
                 timingPath,
+                "run-1",
                 "net8.0",
                 0,
                 directory,
@@ -301,7 +302,7 @@ public sealed class BenchmarkRunCoordinatorTests
             Assert.True(gate.IsValid(evidence));
             File.AppendAllText(
                 timingPath,
-                "{\"stage\":\"migration\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"operationId\":\"Example.Tests.First.migrate\"}" + Environment.NewLine);
+                "{\"stage\":\"migration\",\"runId\":\"run-1\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"operationId\":\"Example.Tests.First.migrate\"}" + Environment.NewLine);
             Assert.False(gate.IsValid(evidence));
         }
         finally
@@ -334,6 +335,7 @@ public sealed class BenchmarkRunCoordinatorTests
                     "The following Tests are available:\n    Example.Tests.First\n    Example.Tests.First\n",
                     trxPath,
                     "missing-timing.jsonl",
+                    "run-1",
                     "net8.0",
                     0));
 

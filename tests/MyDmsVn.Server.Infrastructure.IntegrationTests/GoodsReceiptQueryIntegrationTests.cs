@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -153,10 +154,13 @@ public sealed class GoodsReceiptQueryIntegrationTests
         return services.BuildServiceProvider();
     }
 
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
+    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
+        [CallerMemberName] string testCaseId = "")
     {
+        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
+            measurement);
         try
         {
             var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);

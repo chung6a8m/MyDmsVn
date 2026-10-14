@@ -76,7 +76,8 @@ internal sealed class SqlTestDatabase : IDisposable
     public static Task<SqlTestDatabase> CreateAsync(
         string adminConnectionString,
         SqlTestMeasurementContext? measurementContext,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        [CallerMemberName] string testCaseId = "")
     {
         ValidateAdminConnectionString(adminConnectionString);
         var approvalFilePath = Environment.GetEnvironmentVariable(ApprovalFileEnvironmentVariable);
@@ -92,7 +93,7 @@ internal sealed class SqlTestDatabase : IDisposable
             CreateDefaultJournal(),
             connectionString => new SqlClientAdministrativeSession(connectionString),
             cancellationToken,
-            measurementContext ?? CreateMeasurementContextForTest("SqlTestDatabase"),
+            measurementContext ?? CreateMeasurementContextForTest(testCaseId),
             _ => { });
     }
 
@@ -101,21 +102,23 @@ internal sealed class SqlTestDatabase : IDisposable
         string approvalFilePath,
         IDatabaseOwnershipJournal journal,
         Func<string, ISqlAdministrativeSession> sessionFactory,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        [CallerMemberName] string testCaseId = "") =>
         CreateAsync(
             adminConnectionString,
             approvalFilePath,
             journal,
             sessionFactory,
             cancellationToken,
-            CreateMeasurementContextForTest("SqlTestDatabase"),
+            CreateMeasurementContextForTest(testCaseId),
             _ => { });
 
     internal static Task<SqlTestDatabase> CreateAsync(
         string adminConnectionString,
         CancellationToken cancellationToken,
         Func<string, ISqlAdministrativeSession> sessionFactory,
-        Action<string> afterCreate)
+        Action<string> afterCreate,
+        [CallerMemberName] string testCaseId = "")
     {
         ValidateAdminConnectionString(adminConnectionString);
         var approvalFilePath = Environment.GetEnvironmentVariable(ApprovalFileEnvironmentVariable);
@@ -131,7 +134,7 @@ internal sealed class SqlTestDatabase : IDisposable
             CreateDefaultJournal(),
             sessionFactory,
             cancellationToken,
-            CreateMeasurementContextForTest("SqlTestDatabase"),
+            CreateMeasurementContextForTest(testCaseId),
             afterCreate);
     }
 

@@ -13,6 +13,7 @@ public static class MigrationTimingArtifactReconciler
         string artifactPath,
         string manifestPath,
         string repositoryRoot,
+        string runId,
         string tfm,
         IReadOnlyCollection<TrxTestResult> executed)
     {
@@ -42,6 +43,7 @@ public static class MigrationTimingArtifactReconciler
             try
             {
                 var record = JObject.Parse(line);
+                var recordRunId = (string?)record["runId"];
                 var recordTfm = (string?)record["tfm"];
                 var testCaseId = (string?)record["testCaseId"];
                 var recordType = (string?)record["recordType"];
@@ -50,9 +52,11 @@ public static class MigrationTimingArtifactReconciler
                 {
                     AddRecord(
                         recordedInvocations,
+                        recordRunId,
                         recordTfm,
                         testCaseId,
                         (string?)record["invocationId"],
+                        runId,
                         tfm,
                         invalid,
                         lineNumber);
@@ -61,9 +65,11 @@ public static class MigrationTimingArtifactReconciler
                 {
                     AddRecord(
                         timingEvents,
+                        recordRunId,
                         recordTfm,
                         testCaseId,
                         (string?)record["operationId"],
+                        runId,
                         tfm,
                         invalid,
                         lineNumber);
@@ -149,14 +155,17 @@ public static class MigrationTimingArtifactReconciler
 
     private static void AddRecord(
         ICollection<string> destination,
+        string? recordRunId,
         string? recordTfm,
         string? testCaseId,
         string? invocationId,
+        string expectedRunId,
         string expectedTfm,
         ICollection<string> invalid,
         int lineNumber)
     {
-        if (!string.Equals(recordTfm, expectedTfm, StringComparison.Ordinal) ||
+        if (!string.Equals(recordRunId, expectedRunId, StringComparison.Ordinal) ||
+            !string.Equals(recordTfm, expectedTfm, StringComparison.Ordinal) ||
             string.IsNullOrWhiteSpace(testCaseId) ||
             string.IsNullOrWhiteSpace(invocationId))
         {
