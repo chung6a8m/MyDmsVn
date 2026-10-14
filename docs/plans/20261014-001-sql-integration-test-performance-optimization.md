@@ -1,6 +1,6 @@
 ﻿# SQLPERF — SQL integration test performance optimization (post PR #18)
 
-**Status:** Planned / not started (2026-10-14). **Type:** cross-phase test-infrastructure hardening, not a new business feature or a change to completed P3.1. **Base:** `main` after merged PR #18 (code baseline `130ab55787a2718cb590754662715393e094dade`; merge commit `810136c7aca65c2970194d8a6de87cf68353d53f`). **Target:** Windows, SQL Server 2017+, `net48` and `net8.0`. May proceed independently of P4.1, but must not delay or weaken P4.1/P5/P6 correctness gates.
+**Status:** SQLPERF-T01 implementation complete / live acceptance blocked (2026-10-14). The mutation guard, durable ownership journal, opt-in timing, audited migration manifest, independent inventory/TRX parser, Job Object watchdog, runner and sanitized report primitives are implemented and pass non-SQL automated gates. The operator approval file is absent in this environment, so no live SQL DDL, warm baseline, instrumentation-overhead measurement or unfiltered dual-TFM SQL acceptance was run; Gate T01 remains open. **Type:** cross-phase test-infrastructure hardening, not a new business feature or a change to completed P3.1. **Base:** `main` after merged PR #18 (code baseline `130ab55787a2718cb590754662715393e094dade`; merge commit `810136c7aca65c2970194d8a6de87cf68353d53f`). **Target:** Windows, SQL Server 2017+, `net48` and `net8.0`. May proceed independently of P4.1, but must not delay or weaken P4.1/P5/P6 correctness gates.
 
 Read before implementation: `AGENTS.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/TEST_STRATEGY.md`, `docs/P3_1_VERIFICATION.md`, `docs/PERSISTENCE.md`, `docs/SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md`, this plan and relevant test source. Treat the 2026-10-14 operator diagnostics as an **observed local baseline**, not a guaranteed CI/runtime benchmark; its shareable ZIP and TRX were reviewed outside the repository.
 
@@ -9,6 +9,8 @@ Read before implementation: `AGENTS.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/TEST_
 **Follow-up review remediation (2026-10-14):** Four additional design safeguards are now mandatory: an independent SQL-test inventory (not inferred from traits being verified), a non-blocking observable synchronization signal for gate-based concurrency tests, operator-approved non-production SQL instance validation before DDL, and equivalent repeated warm-run baselines for A/B comparisons. These are planned implementation requirements, not completed evidence.
 
 **Round-2 review closure (2026-10-14):** This specification additionally requires an in-harness SQL mutation guard, durable crash-recoverable test DB ownership and complete reconciliation of migration timing invocation paths. Requirements are not evidence of implementation.
+
+**T01 implementation evidence (2026-10-14):** See `docs/SQLPERF_T01_VERIFICATION.md`. Source/discovery lists 210 cases for each TFM and the audited migration manifest contains 41 call sites. These discovery and synthetic results do not substitute for the blocked approved-instance baseline; no T01 checkbox or Gate is considered complete until the live criteria pass.
 
 ## 1. Objective and scope
 

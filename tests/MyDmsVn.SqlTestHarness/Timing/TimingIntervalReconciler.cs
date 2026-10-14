@@ -63,7 +63,8 @@ public static class TimingIntervalReconciler
             .ToArray();
         var measuredUnionTicks = UnionLength(roots.Select(ToInterval));
         var exclusive = new Dictionary<string, decimal>(StringComparer.Ordinal);
-        decimal overlapTicks = 0m;
+        decimal overlapTicks = roots.Sum(root =>
+            (decimal)Math.Max(0, root.EndTimestamp - root.StartTimestamp)) - measuredUnionTicks;
 
         foreach (var timingEvent in events)
         {

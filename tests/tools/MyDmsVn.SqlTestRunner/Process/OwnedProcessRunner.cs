@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,30 +18,12 @@ public sealed class OwnedProcessRunner : IProcessRunner, IDisposable
         CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var startInfo = new ProcessStartInfo(command.FileName, command.Arguments)
-        {
-            WorkingDirectory = command.WorkingDirectory,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        foreach (var pair in command.Environment)
-        {
-            startInfo.Environment[pair.Key] = pair.Value;
-        }
-
         using var job = new WindowsJobObject();
-        using var process = new System.Diagnostics.Process { StartInfo = startInfo };
-        if (!process.Start())
-        {
-            throw new InvalidOperationException("The owned process did not start.");
-        }
-
+        using var owned = SuspendedOwnedProcess.Start(command, job);
+        var process = owned.Process;
         var rootPid = process.Id;
-        job.Assign(process.Handle);
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
+        var stdout = owned.StandardOutput.ReadToEndAsync();
+        var stderr = owned.StandardError.ReadToEndAsync();
         using var deadline = new CancellationTokenSource(command.Timeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
