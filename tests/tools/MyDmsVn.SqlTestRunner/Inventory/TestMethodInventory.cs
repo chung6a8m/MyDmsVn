@@ -14,6 +14,12 @@ public static class TestMethodInventory
     {
         var fullPath = Path.GetFullPath(assemblyPath);
         var context = new AssemblyLoadContext("sql-inventory-" + Guid.NewGuid().ToString("N"), isCollectible: true);
+        var resolver = new AssemblyDependencyResolver(fullPath);
+        context.Resolving += (_, assemblyName) =>
+        {
+            var dependencyPath = resolver.ResolveAssemblyToPath(assemblyName);
+            return dependencyPath is null ? null : context.LoadFromAssemblyPath(dependencyPath);
+        };
         try
         {
             var assembly = context.LoadFromAssemblyPath(fullPath);
@@ -21,11 +27,12 @@ public static class TestMethodInventory
                 .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
                 .Select(method => new { Method = method, Attributes = CustomAttributeData.GetCustomAttributes(method) })
                 .Where(item => item.Attributes.Any(attribute =>
-                    attribute.AttributeType.FullName == "Xunit.FactAttribute" ||
-                    attribute.AttributeType.FullName == "Xunit.TheoryAttribute"))
+                    IsAttributeOrDerived(attribute.AttributeType, "Xunit.FactAttribute") ||
+                    IsAttributeOrDerived(attribute.AttributeType, "Xunit.TheoryAttribute")))
                 .Select(item => new TestMethodDescriptor(
                     item.Method.DeclaringType!.FullName + "." + item.Method.Name,
-                    item.Attributes.Any(attribute => attribute.AttributeType.FullName == "Xunit.TheoryAttribute"),
+                    item.Attributes.Any(attribute =>
+                        IsAttributeOrDerived(attribute.AttributeType, "Xunit.TheoryAttribute")),
                     Fingerprint(item.Method)))
                 .OrderBy(item => item.FullyQualifiedName, StringComparer.Ordinal)
                 .ToArray();
@@ -34,6 +41,19 @@ public static class TestMethodInventory
         {
             context.Unload();
         }
+    }
+
+    private static bool IsAttributeOrDerived(Type attributeType, string expectedFullName)
+    {
+        for (var current = attributeType; current is not null; current = current.BaseType)
+        {
+            if (string.Equals(current.FullName, expectedFullName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string Fingerprint(MethodInfo method)

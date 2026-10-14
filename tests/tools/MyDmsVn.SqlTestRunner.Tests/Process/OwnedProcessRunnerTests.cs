@@ -10,6 +10,28 @@ namespace MyDmsVn.SqlTestRunner.Tests.Processes;
 public sealed class OwnedProcessRunnerTests
 {
     [Fact]
+    public void Assignment_failure_terminates_the_suspended_process()
+    {
+        var processId = 0;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            SuspendedOwnedProcess.Start(
+                new CommandSpec(
+                    "powershell.exe",
+                    "-NoProfile -Command Start-Sleep -Seconds 30",
+                    Environment.CurrentDirectory,
+                    TimeSpan.FromSeconds(10)),
+                (createdProcessId, _) =>
+                {
+                    processId = createdProcessId;
+                    throw new InvalidOperationException("Injected assignment failure.");
+                }));
+
+        Assert.NotEqual(0, processId);
+        Assert.Throws<ArgumentException>(() => System.Diagnostics.Process.GetProcessById(processId));
+    }
+
+    [Fact]
     public async Task Normal_command_drains_stdout_and_stderr()
     {
         using var runner = new OwnedProcessRunner();

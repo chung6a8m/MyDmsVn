@@ -9,4 +9,10 @@ public sealed record BenchmarkRunOptions(
     string ArtifactRoot,
     string ApprovalFile,
     IReadOnlyList<string> TargetFrameworks,
-    TimeSpan CommandTimeout);
+    TimeSpan CommandTimeout,
+    int WarmupPasses = 1,
+    int MeasuredPasses = 3,
+    TimeSpan? OverallRunTimeout = null)
+{
+    public TimeSpan OverallTimeout { get; init; } = OverallRunTimeout ?? TimeSpan.FromHours(4);
+}

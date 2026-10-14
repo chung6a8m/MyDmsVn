@@ -15,4 +15,10 @@
   <ItemGroup>
     <ProjectReference Include="..\MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj" />
   </ItemGroup>
+  <Target Name="BuildIntegrationInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net8.0" />
+  </Target>
 </Project>

@@ -56,7 +56,8 @@ internal static class Program
                     Path.GetFullPath(artifacts),
                     Path.GetFullPath(approval),
                     new[] { "net48", "net8.0" },
-                    TimeSpan.FromMinutes(30)),
+                    TimeSpan.FromMinutes(30),
+                    OverallRunTimeout: TimeSpan.FromHours(4)),
                 CancellationToken.None)
             .ConfigureAwait(false);
         return result.IsComplete ? 0 : 3;

@@ -12,8 +12,9 @@ Gate T01 therefore remains open. SQLPERF-T02 must not use these changes as an ac
 - Durable, process-safe ownership transitions cover create intent, created, drop intent, disposed, cleanup failure and quarantine. Cleanup needs approval, marker and live metadata corroboration.
 - Timing is explicit and opt-in; it uses monotonic timestamps, thread-safe JSONL, outcomes and parent linkage. Interval reconciliation reports union, overlap and residual without adding nested timings to TRX.
 - The four high-cost classes have a reviewed 41-entry migration invocation manifest. Source coverage is bidirectional and includes direct DbUp, reruns and failure paths.
-- Independent discovery/TRX primitives default cases to SQL-required. The method-scoped non-SQL exemption manifest is intentionally empty, which is fail-closed.
-- The runner uses a Windows Job Object with kill-on-close, bounded commands, concurrent stdout/stderr drainage, sequential TFMs, mandatory preflight before each child and mandatory complete TRX.
+- Independent source/discovery/TRX primitives default cases to SQL-required, recognize derived xUnit attributes, and reconcile the current assembly, discovery and execution one-to-one. The method-scoped non-SQL exemption manifest is intentionally empty, which is fail-closed.
+- Migration coverage is a multiset keyed by test case, TFM and invocation; expected invocation records are emitted separately from completed timing events, and missing, unexpected or duplicate events invalidate a pass. The runner also re-audits the reviewed source manifest, including direct DbUp call counts, before accepting each pass.
+- The runner uses a Windows Job Object with kill-on-close, explicitly terminates a suspended child when ownership assignment fails, and provides bounded commands with concurrent stdout/stderr drainage plus a four-hour hard overall baseline deadline. `baseline` runs one labeled warm-up plus three measured passes per TFM, alternates TFM order, gives every run unique TRX/timing artifacts, and applies mandatory preflight and result gates to every child.
 - Reporting excludes warmups/invalid runs, computes literal p50/p95, labels unavailable DMV data and redacts secrets, hosts, paths and theory values.
 
 ## Commands and actual results
@@ -21,11 +22,11 @@ Gate T01 therefore remains open. SQLPERF-T02 must not use these changes as an ac
 | Command/gate | Result |
 |---|---|
 | Fresh locked restore and Release solution build | Passed, 0 warnings / 0 errors |
-| Harness tests, `net48` | 47 passed, 0 failed, 0 skipped |
-| Harness tests, `net8.0` | 47 passed, 0 failed, 0 skipped |
-| Migration coverage, `net48` | 7 passed, 0 failed, 0 skipped |
-| Migration coverage, `net8.0` | 7 passed, 0 failed, 0 skipped |
-| Runner synthetic/unit tests | 20 passed, 0 failed, 0 skipped |
+| Harness tests, `net48` | 48 passed, 0 failed, 0 skipped |
+| Harness tests, `net8.0` | 48 passed, 0 failed, 0 skipped |
+| Migration coverage, `net48` | 9 passed, 0 failed, 0 skipped |
+| Migration coverage, `net8.0` | 9 passed, 0 failed, 0 skipped |
+| Runner synthetic/unit tests | 31 passed, 0 failed, 0 skipped |
 | Server.Application, `net48` / `net8.0` | 133 / 133 passed, no failures/skips |
 | Architecture | 5 passed, no failures/skips |
 | Desktop, `net48` / `net8.0-windows` | 200 / 200 passed, no failures/skips |

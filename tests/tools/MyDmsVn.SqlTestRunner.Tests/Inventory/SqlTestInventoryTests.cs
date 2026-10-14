@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using MyDmsVn.SqlTestRunner.Inventory;
 using Xunit;
 
@@ -56,5 +58,43 @@ public sealed class SqlTestInventoryTests
                 StringComparison.Ordinal));
         Assert.False(current.IsTheory);
         Assert.Equal(64, current.BodyFingerprint.Length);
+    }
+
+    [Fact]
+    public void Integration_inventory_includes_every_derived_sql_server_fact()
+    {
+        var assemblyPath = Path.Combine(
+            FindRepositoryRoot(),
+            "tests",
+            "MyDmsVn.Server.Infrastructure.IntegrationTests",
+            "bin",
+            "Release",
+            "net8.0",
+            "MyDmsVn.Server.Infrastructure.IntegrationTests.dll");
+        var actual = TestMethodInventory.Read(assemblyPath)
+            .Select(method => method.FullyQualifiedName)
+            .ToHashSet(StringComparer.Ordinal);
+        var assembly = Assembly.LoadFrom(assemblyPath);
+        var expected = assembly.GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
+            .Where(method => method.CustomAttributes.Any(attribute =>
+                attribute.AttributeType.Name == "SqlServerFactAttribute"))
+            .Select(method => method.DeclaringType!.FullName + "." + method.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(expected);
+        Assert.DoesNotContain(expected, method => !actual.Contains(method));
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "MyDmsVn.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Repository root was not found.");
     }
 }

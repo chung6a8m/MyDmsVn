@@ -60,6 +60,21 @@ public sealed class SqlTestMeasurementContext
             Require(operationId, nameof(operationId)),
             parentOperationId);
 
+    public void RecordMigrationInvocation(string invocationId)
+    {
+        var requiredInvocationId = Require(invocationId, nameof(invocationId));
+        if (Enabled && Sink is ISqlTestInvocationSink invocationSink)
+        {
+            invocationSink.WriteInvocation(
+                new SqlTestMigrationInvocation(
+                    RunId,
+                    TestCaseId,
+                    requiredInvocationId,
+                    Tfm,
+                    AnonymizedDatabaseId));
+        }
+    }
+
     private static string Require(string value, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value))

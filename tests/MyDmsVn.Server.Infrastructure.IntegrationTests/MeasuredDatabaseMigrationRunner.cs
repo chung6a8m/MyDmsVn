@@ -33,6 +33,7 @@ internal static class MeasuredDatabaseMigrationRunner
             throw new ArgumentNullException(nameof(migration));
         }
 
+        context.RecordMigrationInvocation(invocationId);
         using var timing = context.StartOperation("migration", invocationId);
         try
         {
@@ -71,6 +72,7 @@ internal static class MeasuredDatabaseMigrationRunner
             throw new ArgumentNullException(nameof(migration));
         }
 
+        context.RecordMigrationInvocation(invocationId);
         using var timing = context.StartOperation("migration", invocationId);
         try
         {
@@ -96,12 +98,35 @@ internal static class MigrationTimingCoverage
         IEnumerable<SqlTestTimingEvent> events)
     {
         var expected = expectedInvocationIds.ToList();
-        var covered = new HashSet<string>(
-            events.Where(item => string.Equals(item.Stage, "migration", StringComparison.Ordinal))
-                .Select(item => item.OperationId),
-            StringComparer.Ordinal);
-        var missing = expected.Where(item => !covered.Contains(item)).Distinct().ToArray();
-        return new MigrationTimingCoverageResult(expected.Count, expected.Count - missing.Length, missing);
+        var actual = events
+            .Where(item => string.Equals(item.Stage, "migration", StringComparison.Ordinal))
+            .Select(item => item.OperationId)
+            .ToList();
+        var expectedCounts = expected.GroupBy(item => item, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var actualCounts = actual.GroupBy(item => item, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var allIds = expectedCounts.Keys.Concat(actualCounts.Keys)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(item => item, StringComparer.Ordinal)
+            .ToArray();
+        var missing = new List<string>();
+        var unexpected = new List<string>();
+        var coveredCount = 0;
+        foreach (var invocationId in allIds)
+        {
+            expectedCounts.TryGetValue(invocationId, out var expectedCount);
+            actualCounts.TryGetValue(invocationId, out var actualCount);
+            coveredCount += Math.Min(expectedCount, actualCount);
+            missing.AddRange(Enumerable.Repeat(invocationId, Math.Max(0, expectedCount - actualCount)));
+            unexpected.AddRange(Enumerable.Repeat(invocationId, Math.Max(0, actualCount - expectedCount)));
+        }
+
+        return new MigrationTimingCoverageResult(
+            expected.Count,
+            coveredCount,
+            missing,
+            unexpected);
     }
 }
 
@@ -110,11 +135,13 @@ internal sealed class MigrationTimingCoverageResult
     public MigrationTimingCoverageResult(
         int expectedCount,
         int coveredCount,
-        IReadOnlyList<string> missingInvocationIds)
+        IReadOnlyList<string> missingInvocationIds,
+        IReadOnlyList<string> unexpectedInvocationIds)
     {
         ExpectedCount = expectedCount;
         CoveredCount = coveredCount;
         MissingInvocationIds = missingInvocationIds;
+        UnexpectedInvocationIds = unexpectedInvocationIds;
     }
 
     public int ExpectedCount { get; }
@@ -123,5 +150,10 @@ internal sealed class MigrationTimingCoverageResult
 
     public IReadOnlyList<string> MissingInvocationIds { get; }
 
-    public bool IsComplete => ExpectedCount == CoveredCount && MissingInvocationIds.Count == 0;
+    public IReadOnlyList<string> UnexpectedInvocationIds { get; }
+
+    public bool IsComplete =>
+        ExpectedCount == CoveredCount &&
+        MissingInvocationIds.Count == 0 &&
+        UnexpectedInvocationIds.Count == 0;
 }

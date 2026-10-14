@@ -61,6 +61,36 @@ public sealed class MigrationTimingCoverageTests
         Assert.Equal(1, result.CoveredCount);
     }
 
+    [Fact]
+    public void Reconciliation_preserves_expected_multiplicity()
+    {
+        var result = MigrationTimingCoverage.Reconcile(
+            new[] { "repeated", "repeated" },
+            new[] { MigrationEvent("repeated", SqlTestTimingOutcome.Succeeded) });
+
+        Assert.False(result.IsComplete);
+        Assert.Equal(new[] { "repeated" }, result.MissingInvocationIds);
+        Assert.Equal(2, result.ExpectedCount);
+        Assert.Equal(1, result.CoveredCount);
+    }
+
+    [Fact]
+    public void Reconciliation_rejects_unexpected_and_duplicate_events()
+    {
+        var result = MigrationTimingCoverage.Reconcile(
+            new[] { "expected" },
+            new[]
+            {
+                MigrationEvent("expected", SqlTestTimingOutcome.Succeeded),
+                MigrationEvent("expected", SqlTestTimingOutcome.Succeeded),
+                MigrationEvent("unexpected", SqlTestTimingOutcome.Succeeded),
+            });
+
+        Assert.False(result.IsComplete);
+        Assert.Equal(new[] { "expected", "unexpected" }, result.UnexpectedInvocationIds);
+        Assert.Equal(1, result.CoveredCount);
+    }
+
     [Theory]
     [InlineData(SqlTestTimingOutcome.Succeeded)]
     [InlineData(SqlTestTimingOutcome.Failed)]

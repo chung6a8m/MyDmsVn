@@ -16,6 +16,7 @@ internal sealed class SuspendedOwnedProcess : IDisposable
     private const uint CreateNoWindow = 0x08000000;
     private const uint CreateUnicodeEnvironment = 0x00000400;
     private const uint StartfUseStdHandles = 0x00000100;
+    private const uint WaitTimeoutMilliseconds = 5000;
     private const int StdInputHandle = -10;
 
     private SuspendedOwnedProcess(
@@ -41,7 +42,12 @@ internal sealed class SuspendedOwnedProcess : IDisposable
 
     public StreamReader StandardError { get; }
 
-    public static SuspendedOwnedProcess Start(CommandSpec command, WindowsJobObject job)
+    public static SuspendedOwnedProcess Start(CommandSpec command, WindowsJobObject job) =>
+        Start(command, (_, processHandle) => job.Assign(processHandle));
+
+    internal static SuspendedOwnedProcess Start(
+        CommandSpec command,
+        Action<int, IntPtr> assignToOwner)
     {
         var stdout = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.Inheritable);
         var stderr = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.Inheritable);
@@ -77,7 +83,7 @@ internal sealed class SuspendedOwnedProcess : IDisposable
 
             stdout.DisposeLocalCopyOfClientHandle();
             stderr.DisposeLocalCopyOfClientHandle();
-            job.Assign(information.ProcessHandle);
+            assignToOwner((int)information.ProcessId, information.ProcessHandle);
             if (ResumeThread(information.ThreadHandle) == uint.MaxValue)
             {
                 throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
@@ -93,6 +99,12 @@ internal sealed class SuspendedOwnedProcess : IDisposable
         }
         catch
         {
+            if (information.ProcessHandle != IntPtr.Zero)
+            {
+                TerminateProcess(information.ProcessHandle, 1);
+                WaitForSingleObject(information.ProcessHandle, WaitTimeoutMilliseconds);
+            }
+
             stdout.Dispose();
             stderr.Dispose();
             throw;
@@ -153,6 +165,12 @@ internal sealed class SuspendedOwnedProcess : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint ResumeThread(IntPtr threadHandle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr processHandle, uint exitCode);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetStdHandle(int standardHandle);

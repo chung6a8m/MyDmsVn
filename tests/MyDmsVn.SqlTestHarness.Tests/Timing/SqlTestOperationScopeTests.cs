@@ -69,6 +69,21 @@ public sealed class SqlTestOperationScopeTests
     }
 
     [Fact]
+    public void Enabled_context_records_expected_migration_invocation_separately()
+    {
+        var sink = new RecordingSink();
+        var context = Context(sink, enabled: true);
+
+        context.RecordMigrationInvocation("migration-expected");
+
+        var invocation = Assert.Single(sink.Invocations);
+        Assert.Equal("run-1", invocation.RunId);
+        Assert.Equal("Tests.Class.Method#row-a", invocation.TestCaseId);
+        Assert.Equal("migration-expected", invocation.InvocationId);
+        Assert.Equal("net8.0", invocation.Tfm);
+    }
+
+    [Fact]
     public async Task Concurrent_json_lines_are_complete_and_exclude_sensitive_values()
     {
         var directory = Path.Combine(Path.GetTempPath(), "MyDmsVn.TimingTests", Guid.NewGuid().ToString("N"));
@@ -110,11 +125,17 @@ public sealed class SqlTestOperationScopeTests
             sink,
             enabled);
 
-    private sealed class RecordingSink : ISqlTestTimingSink
+    private sealed class RecordingSink : ISqlTestTimingSink, ISqlTestInvocationSink
     {
         public ConcurrentQueue<SqlTestTimingEvent> Events { get; } =
             new ConcurrentQueue<SqlTestTimingEvent>();
 
         public void Write(SqlTestTimingEvent timingEvent) => Events.Enqueue(timingEvent);
+
+        public ConcurrentQueue<SqlTestMigrationInvocation> Invocations { get; } =
+            new ConcurrentQueue<SqlTestMigrationInvocation>();
+
+        public void WriteInvocation(SqlTestMigrationInvocation invocation) =>
+            Invocations.Enqueue(invocation);
     }
 }

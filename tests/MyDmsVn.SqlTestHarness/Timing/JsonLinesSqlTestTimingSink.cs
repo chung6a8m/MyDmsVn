@@ -8,7 +8,7 @@ using Newtonsoft.Json.Serialization;
 
 namespace MyDmsVn.SqlTestHarness.Timing;
 
-public sealed class JsonLinesSqlTestTimingSink : ISqlTestTimingSink
+public sealed class JsonLinesSqlTestTimingSink : ISqlTestTimingSink, ISqlTestInvocationSink
 {
     private static readonly ConcurrentDictionary<string, object> PathLocks =
         new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -41,13 +41,27 @@ public sealed class JsonLinesSqlTestTimingSink : ISqlTestTimingSink
             throw new ArgumentNullException(nameof(timingEvent));
         }
 
+        WriteLine(JsonConvert.SerializeObject(timingEvent, Settings));
+    }
+
+    public void WriteInvocation(SqlTestMigrationInvocation invocation)
+    {
+        if (invocation is null)
+        {
+            throw new ArgumentNullException(nameof(invocation));
+        }
+
+        WriteLine(JsonConvert.SerializeObject(invocation, Settings));
+    }
+
+    private void WriteLine(string line)
+    {
         var directory = Path.GetDirectoryName(_path);
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
-        var line = JsonConvert.SerializeObject(timingEvent, Settings);
         lock (_sync)
         {
             using var stream = new FileStream(

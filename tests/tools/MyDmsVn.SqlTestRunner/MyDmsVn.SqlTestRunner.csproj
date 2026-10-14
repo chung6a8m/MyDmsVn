@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\MyDmsVn.SqlTestHarness\MyDmsVn.SqlTestHarness.csproj" />
+    <InternalsVisibleTo Include="MyDmsVn.SqlTestRunner.Tests" />
   </ItemGroup>
 </Project>
