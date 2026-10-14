@@ -22,15 +22,18 @@ public sealed class BenchmarkRunCoordinator
     private readonly IBenchmarkPreflightGate _preflight;
     private readonly IProcessRunner _processRunner;
     private readonly IBenchmarkResultGate _resultGate;
+    private readonly IBenchmarkOwnershipGate _ownershipGate;
 
     public BenchmarkRunCoordinator(
         IBenchmarkPreflightGate preflight,
         IProcessRunner processRunner,
-        IBenchmarkResultGate? resultGate = null)
+        IBenchmarkResultGate? resultGate = null,
+        IBenchmarkOwnershipGate? ownershipGate = null)
     {
         _preflight = preflight;
         _processRunner = processRunner;
         _resultGate = resultGate ?? new TrxBenchmarkResultGate();
+        _ownershipGate = ownershipGate ?? new BenchmarkOwnershipGate();
     }
 
     public async Task<BenchmarkRunResult> RunAsync(
@@ -97,6 +100,14 @@ public sealed class BenchmarkRunCoordinator
                 var trxName = "sqlperf-" + executionId + ".trx";
                 var timingName = "timings-" + executionId + ".jsonl";
                 var timingPath = Path.Combine(options.ArtifactRoot, timingName);
+                var journalDirectory = Path.Combine(
+                    options.ArtifactRoot,
+                    "ownership",
+                    executionId);
+                var recoveryPath = Path.Combine(
+                    options.ArtifactRoot,
+                    "ownership-recovery-" + executionId + ".json");
+                Directory.CreateDirectory(journalDirectory);
                 var arguments =
                     "test \"" + options.TestProject + "\" -c Release -f " + tfm +
                     " --no-build --no-restore --logger \"trx;LogFileName=" + trxName +
@@ -105,18 +116,50 @@ public sealed class BenchmarkRunCoordinator
                 {
                     [SqlTestHarnessEnvironment.ApprovalFileVariable] = options.ApprovalFile,
                     [SqlTestHarnessEnvironment.RunIdVariable] = executionId,
+                    [SqlTestHarnessEnvironment.JournalDirectoryVariable] = journalDirectory,
                     [SqlTestHarnessEnvironment.TimingEnabledVariable] = "1",
                     [SqlTestHarnessEnvironment.TimingOutputVariable] = timingPath,
                 };
-                var result = await _processRunner.RunAsync(
-                        new CommandSpec(
-                            "dotnet",
-                            arguments,
-                            options.RepositoryRoot,
-                            options.CommandTimeout,
-                            environment),
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                CommandResult? result = null;
+                BenchmarkOwnershipResult ownershipResult =
+                    new BenchmarkOwnershipResult(false, recoveryPath);
+                var processLaunched = false;
+                try
+                {
+                    processLaunched = true;
+                    result = await _processRunner.RunAsync(
+                            new CommandSpec(
+                                "dotnet",
+                                arguments,
+                                options.RepositoryRoot,
+                                options.CommandTimeout,
+                                environment),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                finally
+                {
+                    if (processLaunched)
+                    {
+                        using var ownershipDeadline =
+                            new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        ownershipResult = await _ownershipGate.ValidateAsync(
+                                new BenchmarkOwnershipEvidence(
+                                    executionId,
+                                    journalDirectory,
+                                    recoveryPath,
+                                    options.ApprovalFile,
+                                    result is not null && result.ExitCode == 0 && !result.TimedOut),
+                                ownershipDeadline.Token)
+                            .ConfigureAwait(false);
+                    }
+                }
+
+                if (result is null)
+                {
+                    return new BenchmarkRunResult(false, runs);
+                }
+
                 runs.Add(new BenchmarkFrameworkRun(tfm, trxName, timingName, pass.Kind, pass.Number, result));
                 var trxPath = Path.Combine(options.ArtifactRoot, trxName);
                 var projectPath = Path.IsPathRooted(options.TestProject)
@@ -129,7 +172,7 @@ public sealed class BenchmarkRunCoordinator
                     "Release",
                     tfm,
                     assemblyName);
-                if (result.ExitCode != 0 || result.TimedOut ||
+                if (!ownershipResult.IsComplete || result.ExitCode != 0 || result.TimedOut ||
                     !_resultGate.IsValid(
                         new BenchmarkResultEvidence(
                             assemblyPath,

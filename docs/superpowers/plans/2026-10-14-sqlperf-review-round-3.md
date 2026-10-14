@@ -90,7 +90,7 @@ Expected: all selected tests pass with zero skips/failures.
 - `BenchmarkOwnershipEvidence` carries `ExecutionId`, `JournalDirectory`, `RecoveryArtifactPath`, `ApprovalFile`, and process outcome; connection details are read only from the existing harness environment and never serialized.
 - `BenchmarkOwnershipResult` carries `IsComplete` and the optional sanitized recovery artifact path.
 
-- [ ] **Step 1: Add ownership gate regressions**
+- [x] **Step 1: Add ownership gate regressions**
 
 Add real file-journal tests for:
 
@@ -102,7 +102,7 @@ Add real file-journal tests for:
 
 Use a narrow fake live-ownership reader; keep the real `FileDatabaseOwnershipJournal` and `DatabaseOwnershipReconciler` behavior.
 
-- [ ] **Step 2: Run ownership gate tests and verify RED**
+- [x] **Step 2: Run ownership gate tests and verify RED**
 
 Run:
 
@@ -112,11 +112,11 @@ dotnet test tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.
 
 Expected: FAIL because the gate and typed evidence do not exist.
 
-- [ ] **Step 3: Implement the read-only ownership gate**
+- [x] **Step 3: Implement the read-only ownership gate**
 
 Implement `BenchmarkOwnershipGate` with a production live-reader adapter around `SqlClientAdministrativeSession`. Load the approval document, verify each selected journal record belongs to the approved fingerprint/approval ID, inspect live metadata, and accept only `Disposed` plus absent. Write recovery JSON atomically with anonymized operation IDs, durable state, live-presence, classification, and reason. Perform no SQL mutation.
 
-- [ ] **Step 4: Add coordinator failure-injection tests**
+- [x] **Step 4: Add coordinator failure-injection tests**
 
 Add:
 
@@ -127,11 +127,11 @@ Add:
 
 Assert observable result and recovery calls rather than only mock invocation counts.
 
-- [ ] **Step 5: Integrate the ownership gate after every launched child**
+- [x] **Step 5: Integrate the ownership gate after every launched child**
 
 Create one journal root under the baseline artifact directory, pass it through `MYDMSVN_SQL_TEST_JOURNAL_DIRECTORY`, and run reconciliation from a `finally` path using a short independent timeout. If process, result, or ownership validation fails, retain all artifacts and return incomplete.
 
-- [ ] **Step 6: Run ownership/coordinator and harness tests GREEN**
+- [x] **Step 6: Run ownership/coordinator and harness tests GREEN**
 
 Run:
 

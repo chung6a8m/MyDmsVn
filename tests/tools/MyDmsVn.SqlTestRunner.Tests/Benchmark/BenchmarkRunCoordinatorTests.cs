@@ -20,7 +20,8 @@ public sealed class BenchmarkRunCoordinatorTests
         var coordinator = new BenchmarkRunCoordinator(
             new StubPreflightGate(false),
             process,
-            new StubResultGate());
+            new StubResultGate(),
+            new StubOwnershipGate());
 
         var result = await coordinator.RunAsync(Options(), CancellationToken.None);
 
@@ -35,7 +36,8 @@ public sealed class BenchmarkRunCoordinatorTests
         var coordinator = new BenchmarkRunCoordinator(
             new BlockingPreflightGate(),
             process,
-            new StubResultGate());
+            new StubResultGate(),
+            new StubOwnershipGate());
         var options = Options() with { OverallTimeout = TimeSpan.FromMilliseconds(50) };
 
         var result = await coordinator.RunAsync(options, CancellationToken.None);
@@ -51,7 +53,8 @@ public sealed class BenchmarkRunCoordinatorTests
         var coordinator = new BenchmarkRunCoordinator(
             new StubPreflightGate(true),
             process,
-            new StubResultGate());
+            new StubResultGate(),
+            new StubOwnershipGate());
 
         var result = await coordinator.RunAsync(Options(), CancellationToken.None);
 
@@ -81,6 +84,93 @@ public sealed class BenchmarkRunCoordinatorTests
             Assert.True(command.Environment.ContainsKey("MYDMSVN_SQL_TEST_APPROVAL_FILE"));
             Assert.True(command.Environment.ContainsKey("MYDMSVN_SQL_TEST_RUN_ID"));
         });
+    }
+
+    [Fact]
+    public async Task Passed_process_with_unresolved_ownership_is_incomplete()
+    {
+        using var fixture = new CoordinatorFixture();
+        var process = new RecordingProcessRunner();
+        var ownership = new StubOwnershipGate(isComplete: false, writeRecoveryArtifact: true);
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            process,
+            new StubResultGate(),
+            ownership);
+
+        var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        var evidence = Assert.Single(ownership.Evidence);
+        Assert.True(evidence.ProcessSucceeded);
+        Assert.True(File.Exists(evidence.RecoveryArtifactPath));
+    }
+
+    [Fact]
+    public async Task Timed_out_process_still_reconciles_ownership()
+    {
+        using var fixture = new CoordinatorFixture();
+        var process = new RecordingProcessRunner(command =>
+            command.Arguments.Contains("--list-tests")
+                ? Success(command)
+                : new CommandResult(-1, true, 1, string.Empty, "timed out", Array.Empty<int>()));
+        var ownership = new StubOwnershipGate(isComplete: false, writeRecoveryArtifact: true);
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            process,
+            new StubResultGate(),
+            ownership);
+
+        var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        var evidence = Assert.Single(ownership.Evidence);
+        Assert.False(evidence.ProcessSucceeded);
+        Assert.True(File.Exists(evidence.RecoveryArtifactPath));
+    }
+
+    [Fact]
+    public async Task Overall_deadline_after_child_launch_uses_bounded_ownership_reconciliation()
+    {
+        using var fixture = new CoordinatorFixture();
+        var process = new DeadlineProcessRunner();
+        var ownership = new StubOwnershipGate(isComplete: false, writeRecoveryArtifact: true);
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            process,
+            new StubResultGate(),
+            ownership);
+
+        var result = await coordinator.RunAsync(
+            fixture.Options with { OverallTimeout = TimeSpan.FromMilliseconds(50) },
+            CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        var evidence = Assert.Single(ownership.Evidence);
+        Assert.False(ownership.ReceivedCancelledToken);
+        Assert.True(File.Exists(evidence.RecoveryArtifactPath));
+    }
+
+    [Fact]
+    public async Task Every_execution_receives_the_isolated_journal_directory()
+    {
+        using var fixture = new CoordinatorFixture();
+        var process = new RecordingProcessRunner();
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            process,
+            new StubResultGate(),
+            new StubOwnershipGate());
+
+        var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
+
+        Assert.True(result.IsComplete);
+        var executions = process.Commands.FindAll(command => !command.Arguments.Contains("--list-tests"));
+        var journalDirectories = executions.ConvertAll(command =>
+            command.Environment["MYDMSVN_SQL_TEST_JOURNAL_DIRECTORY"]);
+        Assert.Equal(8, journalDirectories.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.All(journalDirectories, path =>
+            Assert.StartsWith(fixture.ArtifactRoot, path, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -230,18 +320,105 @@ public sealed class BenchmarkRunCoordinatorTests
         }
     }
 
+    private static CommandResult Success(CommandSpec command)
+    {
+        var output = command.Arguments.Contains("--list-tests")
+            ? "The following Tests are available:\n    Example.Tests.First\n"
+            : string.Empty;
+        return new CommandResult(0, false, 1, output, string.Empty, Array.Empty<int>());
+    }
+
     private sealed class RecordingProcessRunner : IProcessRunner
     {
+        private readonly Func<CommandSpec, CommandResult> _result;
+
+        public RecordingProcessRunner(Func<CommandSpec, CommandResult>? result = null) =>
+            _result = result ?? Success;
+
         public List<CommandSpec> Commands { get; } = new List<CommandSpec>();
 
         public Task<CommandResult> RunAsync(CommandSpec command, CancellationToken cancellationToken)
         {
             Commands.Add(command);
-            var output = command.Arguments.Contains("--list-tests")
-                ? "The following Tests are available:\n    Example.Tests.First\n"
-                : string.Empty;
-            return Task.FromResult(new CommandResult(0, false, 1, output, string.Empty, Array.Empty<int>()));
+            return Task.FromResult(_result(command));
         }
+    }
+
+    private sealed class DeadlineProcessRunner : IProcessRunner
+    {
+        private int _callCount;
+
+        public async Task<CommandResult> RunAsync(CommandSpec command, CancellationToken cancellationToken)
+        {
+            _callCount++;
+            if (_callCount == 1)
+            {
+                return Success(command);
+            }
+
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable.");
+        }
+    }
+
+    private sealed class StubOwnershipGate : IBenchmarkOwnershipGate
+    {
+        private readonly bool _isComplete;
+        private readonly bool _writeRecoveryArtifact;
+
+        public StubOwnershipGate(bool isComplete = true, bool writeRecoveryArtifact = false)
+        {
+            _isComplete = isComplete;
+            _writeRecoveryArtifact = writeRecoveryArtifact;
+        }
+
+        public List<BenchmarkOwnershipEvidence> Evidence { get; } =
+            new List<BenchmarkOwnershipEvidence>();
+
+        public bool ReceivedCancelledToken { get; private set; }
+
+        public Task<BenchmarkOwnershipResult> ValidateAsync(
+            BenchmarkOwnershipEvidence evidence,
+            CancellationToken cancellationToken)
+        {
+            Evidence.Add(evidence);
+            ReceivedCancelledToken |= cancellationToken.IsCancellationRequested;
+            if (_writeRecoveryArtifact)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(evidence.RecoveryArtifactPath)!);
+                File.WriteAllText(evidence.RecoveryArtifactPath, "{}");
+            }
+
+            return Task.FromResult(new BenchmarkOwnershipResult(
+                _isComplete,
+                _writeRecoveryArtifact ? evidence.RecoveryArtifactPath : null));
+        }
+    }
+
+    private sealed class CoordinatorFixture : IDisposable
+    {
+        private readonly string _root = Path.Combine(
+            Path.GetTempPath(),
+            "MyDmsVn.BenchmarkCoordinator",
+            Guid.NewGuid().ToString("N"));
+
+        public CoordinatorFixture()
+        {
+            ArtifactRoot = Path.Combine(_root, "artifacts");
+            Directory.CreateDirectory(ArtifactRoot);
+            Options = BenchmarkRunCoordinatorTests.Options() with
+            {
+                RepositoryRoot = _root,
+                ArtifactRoot = ArtifactRoot,
+                ApprovalFile = Path.Combine(_root, "approval.json"),
+            };
+        }
+
+        public string ArtifactRoot { get; }
+
+        public BenchmarkRunOptions Options { get; }
+
+        public void Dispose() => Directory.Delete(_root, true);
     }
 
     private sealed class StubResultGate : IBenchmarkResultGate
