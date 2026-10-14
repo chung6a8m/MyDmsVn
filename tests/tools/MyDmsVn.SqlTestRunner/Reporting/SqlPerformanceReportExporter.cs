@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -190,15 +191,27 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
                 throw new InvalidDataException("A timing record is missing interval timestamps.");
             }
 
+            var startTimestamp = (long)value["startTimestamp"]!;
+            var endTimestamp = (long)value["endTimestamp"]!;
+            var durationMs = (decimal)value["durationMs"]!;
+            var expectedDurationMs =
+                (decimal)(endTimestamp - startTimestamp) * 1000m / Stopwatch.Frequency;
+            if (endTimestamp < startTimestamp ||
+                durationMs < 0m ||
+                durationMs != expectedDurationMs)
+            {
+                throw new InvalidDataException("A timing record contains an invalid interval.");
+            }
+
             var timing = new SqlTestTimingEvent(
                 RequiredString(value, "runId"),
                 RequiredString(value, "testCaseId"),
                 RequiredString(value, "operationId"),
                 (string?)value["parentOperationId"],
                 SqlPerformanceReportBuilder.RedactShareable(RequiredString(value, "stage")),
-                (long)value["startTimestamp"]!,
-                (long)value["endTimestamp"]!,
-                (decimal)value["durationMs"]!,
+                startTimestamp,
+                endTimestamp,
+                durationMs,
                 Enum.Parse<SqlTestTimingOutcome>(RequiredString(value, "outcome"), ignoreCase: false),
                 RequiredString(value, "tfm"),
                 RequiredString(value, "anonymizedDatabaseId"));

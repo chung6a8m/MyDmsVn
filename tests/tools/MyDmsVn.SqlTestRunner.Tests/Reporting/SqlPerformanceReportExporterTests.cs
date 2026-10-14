@@ -110,13 +110,25 @@ public sealed class SqlPerformanceReportExporterTests
                 ("Example.Tests.One", 10),
                 "{\"runId\":\"malformed\",\"tfm\":\"net8.0\",\"stage\":\"migration\"," +
                 "\"operationId\":\"broken\",\"startTimestamp\":1}");
+            var malformedLines = new[]
+            {
+                "{\"runId\":\"malformed\",\"tfm\":\"net8.0\",\"stage\":\"migration\"," +
+                "\"operationId\":\"missing-end\",\"startTimestamp\":1}",
+                Timing("malformed", "net8.0", "reversed", null, "migration", 10, 0),
+                Timing("malformed", "net8.0", "mismatch", null, "migration", 0, 10)
+                    .Replace("\"durationMs\":10", "\"durationMs\":9", StringComparison.Ordinal),
+            };
 
-            var result = await new SqlPerformanceReportExporter().ExportAsync(
-                new BenchmarkReportEvidence(root, new[] { "net8.0" }, 1, new[] { run }),
-                CancellationToken.None);
+            foreach (var malformed in malformedLines)
+            {
+                File.WriteAllText(run.TimingPath, malformed);
+                var result = await new SqlPerformanceReportExporter().ExportAsync(
+                    new BenchmarkReportEvidence(root, new[] { "net8.0" }, 1, new[] { run }),
+                    CancellationToken.None);
 
-            Assert.False(result.IsComplete);
-            Assert.Empty(result.ReportPaths);
+                Assert.False(result.IsComplete);
+                Assert.Empty(result.ReportPaths);
+            }
         }
         finally
         {
