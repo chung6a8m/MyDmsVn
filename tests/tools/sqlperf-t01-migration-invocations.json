@@ -1,0 +1,518 @@
+[
+  {
+    "invocationId": "DatabaseMigrationTests.Clean_migration_applies_once_and_repeat_is_a_no_op.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Clean_migration_applies_once_and_repeat_is_a_no_op",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 488,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Clean_migration_applies_once_and_repeat_is_a_no_op.migration-02",
+    "class": "DatabaseMigrationTests",
+    "method": "Clean_migration_applies_once_and_repeat_is_a_no_op",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 492,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_rejects_the_same_runtime_and_migration_identity.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_rejects_the_same_runtime_and_migration_identity",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 22,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_rejects_an_existing_elevated_runtime_identity.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_rejects_an_existing_elevated_runtime_identity",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 50,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_direct_object_alter_permission.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_and_startup_reject_direct_object_alter_permission",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 86,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_rejects_direct_user_impersonation_permission.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_rejects_direct_user_impersonation_permission",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 135,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Startup_rejects_direct_user_impersonation_permission.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Startup_rejects_direct_user_impersonation_permission",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 169,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_direct_users_insert_permission.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_and_startup_reject_direct_users_insert_permission",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 210,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_disallowed_users_column_update.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_and_startup_reject_disallowed_users_column_update",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 261,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_schema_dml_permission.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_and_startup_reject_schema_dml_permission",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 308,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_full_permission_sync_state_read.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_and_startup_reject_full_permission_sync_state_read",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 357,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 404,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Runtime_preflight_rejects_unexpected_filtered_unique_index.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Runtime_preflight_rejects_unexpected_filtered_unique_index",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 565,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SqlPrincipalProvisioningTests.Runtime_preflight_detects_unlisted_object_without_data_grants.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Runtime_preflight_detects_unlisted_object_without_data_grants",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 606,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Unmanaged_alias_type_is_rejected_without_creating_the_journal.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Unmanaged_alias_type_is_rejected_without_creating_the_journal",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 29,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Unmanaged_database_ddl_trigger_is_rejected_without_creating_the_journal.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Unmanaged_database_ddl_trigger_is_rejected_without_creating_the_journal",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 62,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Managed_name_with_wrong_object_type_is_rejected_without_creating_the_journal.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Managed_name_with_wrong_object_type_is_rejected_without_creating_the_journal",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 92,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Unmanaged_synonym_is_rejected_without_creating_the_journal.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Unmanaged_synonym_is_rejected_without_creating_the_journal",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 122,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Nonempty_unmanaged_database_outside_dbo_is_rejected_without_touching_existing_data.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Nonempty_unmanaged_database_outside_dbo_is_rejected_without_touching_existing_data",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 154,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Nonempty_unmanaged_database_is_rejected_without_touching_existing_data.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Nonempty_unmanaged_database_is_rejected_without_touching_existing_data",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 184,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Migrator_rejects_future_history_without_mutating_existing_data.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Migrator_rejects_future_history_without_mutating_existing_data",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 206,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Migrator_rejects_future_history_without_mutating_existing_data.migration-02",
+    "class": "DatabaseMigrationTests",
+    "method": "Migrator_rejects_future_history_without_mutating_existing_data",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 217,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Migrator_rejects_partial_schema_without_rewriting_journal.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Migrator_rejects_partial_schema_without_rewriting_journal",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 239,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Migrator_rejects_partial_schema_without_rewriting_journal.migration-02",
+    "class": "DatabaseMigrationTests",
+    "method": "Migrator_rejects_partial_schema_without_rewriting_journal",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 248,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Competing_migrator_is_rejected_until_the_deployment_lock_is_released.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Competing_migrator_is_rejected_until_the_deployment_lock_is_released",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 284,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Competing_migrator_is_rejected_until_the_deployment_lock_is_released.migration-02",
+    "class": "DatabaseMigrationTests",
+    "method": "Competing_migrator_is_rejected_until_the_deployment_lock_is_released",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 292,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Successful_migration_releases_session_lock_before_connection_is_pooled.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Successful_migration_releases_session_lock_before_connection_is_pooled",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 314,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.direct-prefix",
+    "class": "DatabaseMigrationTests",
+    "method": "Losing_the_migration_lock_session_stops_the_active_DbUp_script",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 350,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Losing_the_migration_lock_session_stops_the_active_DbUp_script",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 381,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.migration-02",
+    "class": "DatabaseMigrationTests",
+    "method": "Losing_the_migration_lock_session_stops_the_active_DbUp_script",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 415,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.System_or_unspecified_database_is_rejected_before_connecting.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "AssertSystemDatabaseRejected",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 435,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-caller-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Goods_receipt_migration_enforces_aggregate_keys_checks_and_rowversion.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Goods_receipt_migration_enforces_aggregate_keys_checks_and_rowversion",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 512,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Identity_migration_creates_required_tables_and_enforces_unique_normalized_names.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Identity_migration_creates_required_tables_and_enforces_unique_normalized_names",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 668,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Catalog_migration_creates_empty_tables_and_enforces_code_uniqueness_and_employee_user_fk.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Catalog_migration_creates_empty_tables_and_enforces_code_uniqueness_and_employee_user_fk",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 716,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Catalog_required_text_rejects_display_whitespace_only_values.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Catalog_required_text_rejects_display_whitespace_only_values",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 808,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Catalog_searchable_text_rejects_nul_values_at_database_boundary.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Catalog_searchable_text_rejects_nul_values_at_database_boundary",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 844,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Every_catalog_code_is_unique_case_and_accent_insensitively.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Every_catalog_code_is_unique_case_and_accent_insensitively",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 880,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "DatabaseMigrationTests.Employee_user_link_allows_many_nulls_but_only_one_employee_per_user.migration-01",
+    "class": "DatabaseMigrationTests",
+    "method": "Employee_user_link_allows_many_nulls_but_only_one_employee_per_user",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
+    "sourceLine": 922,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "GoodsReceiptCommandIntegrationTests.CreateDatabaseAsync.migration-01",
+    "class": "GoodsReceiptCommandIntegrationTests",
+    "method": "CreateDatabaseAsync",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/GoodsReceiptCommandIntegrationTests.cs",
+    "sourceLine": 1696,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-caller-execution"
+  },
+  {
+    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.direct-prefix",
+    "class": "SchemaCompatibilityIntegrationTests",
+    "method": "Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SchemaCompatibilityIntegrationTests.cs",
+    "sourceLine": 29,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.direct-failure",
+    "class": "SchemaCompatibilityIntegrationTests",
+    "method": "Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SchemaCompatibilityIntegrationTests.cs",
+    "sourceLine": 47,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.migration-01",
+    "class": "SchemaCompatibilityIntegrationTests",
+    "method": "Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SchemaCompatibilityIntegrationTests.cs",
+    "sourceLine": 75,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "SchemaCompatibilityIntegrationTests.CreateMigratedDatabaseAsync.migration-01",
+    "class": "SchemaCompatibilityIntegrationTests",
+    "method": "CreateMigratedDatabaseAsync",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SchemaCompatibilityIntegrationTests.cs",
+    "sourceLine": 1005,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-caller-execution"
+  }
+]

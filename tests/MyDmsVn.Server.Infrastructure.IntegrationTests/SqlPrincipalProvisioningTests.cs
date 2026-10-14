@@ -19,7 +19,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_rejects_the_same_runtime_and_migration_identity.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -47,7 +47,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_rejects_an_existing_elevated_runtime_identity.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -83,7 +83,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_direct_object_alter_permission.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -132,7 +132,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_rejects_direct_user_impersonation_permission.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -166,7 +166,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Startup_rejects_direct_user_impersonation_permission.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -207,7 +207,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_direct_users_insert_permission.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -258,7 +258,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_disallowed_users_column_update.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -305,7 +305,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_schema_dml_permission.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -354,7 +354,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_full_permission_sync_state_read.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -401,7 +401,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             using var connection = new SqlConnection(database.ConnectionString);
@@ -562,7 +562,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Runtime_preflight_rejects_unexpected_filtered_unique_index.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             using var connection = new SqlConnection(database.ConnectionString);
@@ -603,7 +603,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Runtime_preflight_detects_unlisted_object_without_data_grants.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             using var connection = new SqlConnection(database.ConnectionString);

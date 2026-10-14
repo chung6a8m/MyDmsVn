@@ -2,6 +2,7 @@
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -159,10 +160,13 @@ public sealed class InventoryStorageIntegrationTests
         }
     }
 
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
+    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
+        [CallerMemberName] string testCaseId = "")
     {
+        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
+            measurement);
         var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
         Assert.True(migration.Successful, migration.Error?.ToString());
         return database;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -20,7 +21,10 @@ public sealed class RepositoryAndQueryIntegrationTests
         var database = await CreateDatabaseAsync();
         try
         {
-            TestDatabaseMigrationRunner.Migrate(database.ConnectionString);
+            TestDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "RepositoryAndQueryIntegrationTests.Repository_and_query_share_committed_data.test-migration",
+                database.ConnectionString);
             var services = new ServiceCollection();
             services
                 .AddSqlPersistence(database.ConnectionString)
@@ -87,10 +91,13 @@ public sealed class RepositoryAndQueryIntegrationTests
         Assert.Equal(2, mapping.Attempts);
     }
 
-    private static Task<SqlTestDatabase> CreateDatabaseAsync()
+    private static Task<SqlTestDatabase> CreateDatabaseAsync(
+        [CallerMemberName] string testCaseId = "")
     {
+        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         return SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
+            measurement);
     }
 
     private interface ITestProbeRepository

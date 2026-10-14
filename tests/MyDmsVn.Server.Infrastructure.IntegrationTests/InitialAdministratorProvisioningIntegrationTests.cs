@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -423,10 +424,13 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
     private static readonly DateTime UtcNow =
         new DateTime(2026, 10, 14, 3, 0, 0, DateTimeKind.Utc);
 
-    private static async Task<SqlTestDatabase> CreateSynchronizedDatabaseAsync()
+    private static async Task<SqlTestDatabase> CreateSynchronizedDatabaseAsync(
+        [CallerMemberName] string testCaseId = "")
     {
+        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
+            measurement);
         var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
         Assert.True(migration.Successful, migration.Error?.ToString());
         var registry = PermissionRegistryComposition.CreateDefault();

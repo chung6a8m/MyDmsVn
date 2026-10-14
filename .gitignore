@@ -59,6 +59,8 @@ appsettings.*.local.json
 **/local.settings.json
 **/auth.json
 secrets/
+.sqlperf/
+sql-test-approval*.json
 
 # ------------------------------
 # Local database / storage

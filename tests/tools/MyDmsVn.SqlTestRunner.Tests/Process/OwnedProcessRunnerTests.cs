@@ -1,0 +1,88 @@
+using System;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using MyDmsVn.SqlTestRunner.Processes;
+using Xunit;
+
+namespace MyDmsVn.SqlTestRunner.Tests.Processes;
+
+public sealed class OwnedProcessRunnerTests
+{
+    [Fact]
+    public void Assignment_failure_terminates_the_suspended_process()
+    {
+        var processId = 0;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            SuspendedOwnedProcess.Start(
+                new CommandSpec(
+                    "powershell.exe",
+                    "-NoProfile -Command Start-Sleep -Seconds 30",
+                    Environment.CurrentDirectory,
+                    TimeSpan.FromSeconds(10)),
+                (createdProcessId, _) =>
+                {
+                    processId = createdProcessId;
+                    throw new InvalidOperationException("Injected assignment failure.");
+                }));
+
+        Assert.NotEqual(0, processId);
+        Assert.Throws<ArgumentException>(() => System.Diagnostics.Process.GetProcessById(processId));
+    }
+
+    [Fact]
+    public async Task Normal_command_drains_stdout_and_stderr()
+    {
+        using var runner = new OwnedProcessRunner();
+        var result = await runner.RunAsync(
+            new CommandSpec(
+                "cmd.exe",
+                "/d /s /c \"echo stdout-line & echo stderr-line 1>&2\"",
+                Environment.CurrentDirectory,
+                TimeSpan.FromSeconds(10)),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(result.TimedOut);
+        Assert.True(result.Duration > TimeSpan.Zero);
+        Assert.Contains("stdout-line", result.StandardOutput);
+        Assert.Contains("stderr-line", result.StandardError);
+    }
+
+    [Fact]
+    public async Task Deadline_terminates_only_the_owned_process_tree()
+    {
+        using var unrelated = System.Diagnostics.Process.Start(new ProcessStartInfo(
+            "powershell.exe",
+            "-NoProfile -Command Start-Sleep -Seconds 20") { CreateNoWindow = true });
+        Assert.NotNull(unrelated);
+        try
+        {
+            using var runner = new OwnedProcessRunner();
+            var result = await runner.RunAsync(
+                new CommandSpec(
+                    "powershell.exe",
+                    "-NoProfile -Command \"$startInfo=[System.Diagnostics.ProcessStartInfo]::new('powershell.exe','-NoProfile -Command Start-Sleep -Seconds 20'); $startInfo.UseShellExecute=$false; $startInfo.CreateNoWindow=$true; $child=[System.Diagnostics.Process]::Start($startInfo); Write-Output $child.Id; Start-Sleep -Seconds 20\"",
+                    Environment.CurrentDirectory,
+                    TimeSpan.FromMilliseconds(750)),
+                CancellationToken.None);
+
+            Assert.True(result.TimedOut);
+            Assert.Contains(result.RootProcessId, result.TerminatedProcessIds);
+            var childProcessId = int.Parse(result.StandardOutput.Trim());
+            Assert.Throws<ArgumentException>(() =>
+                System.Diagnostics.Process.GetProcessById(childProcessId));
+            Assert.False(unrelated!.HasExited);
+        }
+        finally
+        {
+            if (unrelated is { HasExited: false })
+            {
+                unrelated.Kill(entireProcessTree: true);
+            }
+
+            unrelated?.Dispose();
+        }
+    }
+}

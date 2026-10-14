@@ -546,6 +546,13 @@
       "mydmsvn.sharedkernel": {
         "type": "Project"
       },
+      "mydmsvn.sqltestharness": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.SqlClient": "[7.0.2, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
       "BCrypt.Net-Next": {
         "type": "CentralTransitive",
         "requested": "[4.2.0, )",
@@ -1037,6 +1044,13 @@
       },
       "mydmsvn.sharedkernel": {
         "type": "Project"
+      },
+      "mydmsvn.sqltestharness": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.SqlClient": "[7.0.2, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
       },
       "BCrypt.Net-Next": {
         "type": "CentralTransitive",
