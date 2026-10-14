@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -223,6 +223,136 @@ public sealed class AdministratorPermissionPolicyIntegrationTests
             Assert.Contains(resurrectedPlan.Conflicts, conflict =>
                 conflict.Code == "PermissionSync.ManagedGrantAssignmentConflict" &&
                 conflict.PermissionKey == key);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Restore_rejects_managed_administrator_role_renamed_out_of_band()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            var registry = PermissionRegistryComposition.CreateDefault();
+            var approvals = ApproveEligibleAdministratorGrants(registry);
+            var engine = new PermissionSynchronizationEngine();
+            var plan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                registry,
+                approvals,
+                UtcNow,
+                CancellationToken.None);
+            await engine.ApplyAsync(
+                database.ConnectionString,
+                registry,
+                approvals,
+                plan,
+                UtcNow,
+                CancellationToken.None);
+            var key = registry.Definitions.First(definition =>
+                definition.AdministratorGrantPolicy == AdministratorGrantPolicy.Eligible).Key;
+            await engine.RevokeAdministratorGrantAsync(
+                database.ConnectionString,
+                key,
+                approvals.ReleaseId,
+                "security-operator",
+                "Prepare reviewed restore regression.",
+                UtcNow.AddMinutes(1),
+                CancellationToken.None);
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE role SET RoleName = N'Repurposed role', NormalizedRoleName = N'REPURPOSED ROLE' " +
+                    "FROM dbo.Roles AS role " +
+                    "JOIN dbo.SystemManagedRoles AS managed ON managed.RoleId = role.RoleId " +
+                    "WHERE managed.SystemRoleKey = N'Administrator';");
+            }
+
+            var exception = await Assert.ThrowsAsync<PermissionSynchronizationException>(
+                () => engine.RestoreAdministratorGrantAsync(
+                    database.ConnectionString,
+                    key,
+                    approvals.ReleaseId,
+                    "security-operator",
+                    "Attempt restore after ownership drift.",
+                    UtcNow.AddMinutes(2),
+                    CancellationToken.None));
+
+            Assert.Equal("PermissionSync.ManagedRoleOwnershipConflict", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal("Revoked", await verification.QuerySingleAsync<string>(
+                "SELECT GrantState FROM dbo.ManagedRolePermissionGrants WHERE PermissionKey = @Key;",
+                new { Key = key }));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.RolePermissions AS assignment " +
+                "JOIN dbo.SystemManagedRoles AS managed ON managed.RoleId = assignment.RoleId " +
+                "WHERE managed.SystemRoleKey = N'Administrator' AND assignment.PermissionKey = @Key;",
+                new { Key = key }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Revoke_rejects_inactive_managed_administrator_role()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            var registry = PermissionRegistryComposition.CreateDefault();
+            var approvals = ApproveEligibleAdministratorGrants(registry);
+            var engine = new PermissionSynchronizationEngine();
+            var plan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                registry,
+                approvals,
+                UtcNow,
+                CancellationToken.None);
+            await engine.ApplyAsync(
+                database.ConnectionString,
+                registry,
+                approvals,
+                plan,
+                UtcNow,
+                CancellationToken.None);
+            var key = registry.Definitions.First(definition =>
+                definition.AdministratorGrantPolicy == AdministratorGrantPolicy.Eligible).Key;
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE role SET IsActive = 0 " +
+                    "FROM dbo.Roles AS role " +
+                    "JOIN dbo.SystemManagedRoles AS managed ON managed.RoleId = role.RoleId " +
+                    "WHERE managed.SystemRoleKey = N'Administrator';");
+            }
+
+            var exception = await Assert.ThrowsAsync<PermissionSynchronizationException>(
+                () => engine.RevokeAdministratorGrantAsync(
+                    database.ConnectionString,
+                    key,
+                    approvals.ReleaseId,
+                    "security-operator",
+                    "Attempt revoke after ownership drift.",
+                    UtcNow.AddMinutes(1),
+                    CancellationToken.None));
+
+            Assert.Equal("PermissionSync.ManagedRoleOwnershipConflict", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal("Granted", await verification.QuerySingleAsync<string>(
+                "SELECT GrantState FROM dbo.ManagedRolePermissionGrants WHERE PermissionKey = @Key;",
+                new { Key = key }));
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.RolePermissions AS assignment " +
+                "JOIN dbo.SystemManagedRoles AS managed ON managed.RoleId = assignment.RoleId " +
+                "WHERE managed.SystemRoleKey = N'Administrator' AND assignment.PermissionKey = @Key;",
+                new { Key = key }));
         }
         finally
         {

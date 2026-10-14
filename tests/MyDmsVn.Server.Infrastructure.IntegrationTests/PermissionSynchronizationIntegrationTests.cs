@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -166,6 +166,81 @@ public sealed class PermissionSynchronizationIntegrationTests
                     CancellationToken.None));
 
             Assert.Equal("PermissionSync.StalePlan", exception.Code);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Apply_rejects_administrator_membership_added_after_grant_plan_review()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            var registry = PermissionRegistryComposition.CreateDefault();
+            var baselineApprovals = ApproveCatalog(registry);
+            var engine = new PermissionSynchronizationEngine();
+            var baselinePlan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                registry,
+                baselineApprovals,
+                UtcNow,
+                CancellationToken.None);
+            await engine.ApplyAsync(
+                database.ConnectionString,
+                registry,
+                baselineApprovals,
+                baselinePlan,
+                UtcNow,
+                CancellationToken.None);
+
+            var grantApprovals = new PermissionSyncApprovalSet(
+                registry.ReleaseId,
+                "release-operator",
+                UtcNow.AddHours(4),
+                registry.Definitions.Select(definition => new PermissionSyncApproval(
+                    definition.Key,
+                    PermissionCatalogDecision.Approved,
+                    definition.AdministratorGrantPolicy == AdministratorGrantPolicy.Eligible
+                        ? AdministratorGrantDecision.Approved
+                        : AdministratorGrantDecision.Pending)));
+            var reviewedPlan = await engine.CreatePlanAsync(
+                database.ConnectionString,
+                registry,
+                grantApprovals,
+                UtcNow.AddMinutes(1),
+                CancellationToken.None);
+            Assert.Contains(reviewedPlan.Changes, change =>
+                change.Kind == PermissionSyncChangeKind.GrantAdministratorPermission);
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DECLARE @UserId int; " +
+                    "INSERT dbo.Users " +
+                    "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm) " +
+                    "VALUES (N'late-admin', N'LATE-ADMIN', N'Late Administrator', N'Local', N'hash', N'', N'BCrypt'); " +
+                    "SET @UserId = SCOPE_IDENTITY(); " +
+                    "INSERT dbo.UserRoles (UserId, RoleId) " +
+                    "SELECT @UserId, RoleId FROM dbo.SystemManagedRoles " +
+                    "WHERE SystemRoleKey = N'Administrator';");
+            }
+
+            var exception = await Assert.ThrowsAsync<PermissionSynchronizationException>(
+                () => engine.ApplyAsync(
+                    database.ConnectionString,
+                    registry,
+                    grantApprovals,
+                    reviewedPlan,
+                    UtcNow.AddMinutes(1),
+                    CancellationToken.None));
+
+            Assert.Equal("PermissionSync.StalePlan", exception.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.ManagedRolePermissionGrants WHERE GrantState = N'Granted';"));
         }
         finally
         {

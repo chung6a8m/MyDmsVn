@@ -25,10 +25,10 @@ dotnet build MyDmsVn.sln -c Release --no-restore
 Result: succeeded; 0 warnings, 0 errors.
 
 dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net48 --no-build --no-restore
-Result: 130 passed, 0 failed, 0 skipped.
+Result: 132 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net48 --no-build --no-restore
-Result: 184 passed, 0 failed, 0 skipped; 7m51s.
+Result: 187 passed, 0 failed, 0 skipped; 7m48s.
 
 dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-build --no-restore
 Result: 200 passed, 0 failed, 0 skipped.
@@ -37,10 +37,10 @@ dotnet test tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj -
 Result: 5 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net8.0 --no-build --no-restore
-Result: 130 passed, 0 failed, 0 skipped.
+Result: 132 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net8.0 --no-build --no-restore
-Result: 184 passed, 0 failed, 0 skipped; 6m49s.
+Result: 187 passed, 0 failed, 0 skipped; 7m39s.
 
 dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net8.0-windows --no-build --no-restore
 Result: 200 passed, 0 failed, 0 skipped.
@@ -60,6 +60,9 @@ The final full suites ran sequentially by TFM. SQL integration test collections 
 - Added bootstrap fault injection, concurrent enrollment and subprocess no-echo/no-hang coverage.
 - Corrected release-package compatibility metadata from schema 7 to schema 8.
 - Serialized SQL integration collections after full-suite review exposed local SQL overload under parallel database migration.
+- Enforced the code-side `Active` lifecycle gate independently from SQL catalog state in both authorization overloads.
+- Added every `UserRoles` membership to the reviewed plan fingerprint so membership drift invalidates a pending apply.
+- Revalidated active, normalized system-managed Administrator role ownership inside revoke/restore transactions.
 
 ## Remaining roadmap work
 

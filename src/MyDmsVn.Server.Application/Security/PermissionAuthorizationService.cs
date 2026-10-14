@@ -29,7 +29,8 @@ namespace MyDmsVn.Server.Application.Security
             if (!currentUser.IsAuthenticated ||
                 !currentUser.IsActive ||
                 !currentUser.UserId.HasValue ||
-                !_permissionRegistry.TryGet(permissionKey, out _))
+                !_permissionRegistry.TryGet(permissionKey, out var definition) ||
+                definition.LifecycleStatus != PermissionLifecycleStatus.Active)
             {
                 return false;
             }
@@ -47,7 +48,9 @@ namespace MyDmsVn.Server.Application.Security
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (userId <= 0 || !_permissionRegistry.TryGet(permissionKey, out _))
+            if (userId <= 0 ||
+                !_permissionRegistry.TryGet(permissionKey, out var definition) ||
+                definition.LifecycleStatus != PermissionLifecycleStatus.Active)
             {
                 return false;
             }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
@@ -238,11 +238,14 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                             cancellationToken: cancellationToken)).ConfigureAwait(false);
                         var grant = await connection.QuerySingleOrDefaultAsync<AdministratorGrantRow>(
                             new CommandDefinition(
-                                "SELECT managed.ManagedRoleId, managed.RoleId, managedGrant.GrantState, " +
+                                "SELECT managed.ManagedRoleId, managed.RoleId, " +
+                                "managed.ExpectedNormalizedRoleName, role.NormalizedRoleName, role.IsActive, " +
+                                "managedGrant.GrantState, " +
                                 "permission.CatalogStatus, permission.AdministratorGrantPolicy, " +
                                 "approval.AdministratorGrantDecision, approval.DecisionReleaseId, " +
                                 "approval.ExpiresAtUtc " +
                                 "FROM dbo.SystemManagedRoles AS managed " +
+                                "JOIN dbo.Roles AS role ON role.RoleId = managed.RoleId " +
                                 "JOIN dbo.ManagedRolePermissionGrants AS managedGrant " +
                                 "ON managedGrant.ManagedRoleId = managed.ManagedRoleId " +
                                 "JOIN dbo.Permissions AS permission " +
@@ -260,6 +263,8 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                                 "PermissionSync.ManagedGrantMissing",
                                 "The requested managed Administrator grant does not exist.");
                         }
+
+                        ValidateAdministratorRoleOwnership(grant);
 
                         if (restore)
                         {
@@ -425,6 +430,24 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
             }
         }
 
+        private static void ValidateAdministratorRoleOwnership(AdministratorGrantRow grant)
+        {
+            if (!grant.IsActive ||
+                !string.Equals(
+                    grant.ExpectedNormalizedRoleName,
+                    "ADMINISTRATOR",
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    grant.NormalizedRoleName,
+                    grant.ExpectedNormalizedRoleName,
+                    StringComparison.Ordinal))
+            {
+                throw new PermissionSynchronizationException(
+                    "PermissionSync.ManagedRoleOwnershipConflict",
+                    "The managed Administrator role ownership or active state has changed.");
+            }
+        }
+
         private static Task<int> WriteGrantChangeAuditAsync(
             SqlConnection connection,
             SqlTransaction? transaction,
@@ -554,6 +577,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 "CreatedAtUtc, CreatedBy FROM dbo.SystemManagedRoles ORDER BY ManagedRoleId; " +
                 "SELECT RoleId, RoleName, NormalizedRoleName, IsActive, RowVersion " +
                 "FROM dbo.Roles ORDER BY RoleId; " +
+                "SELECT UserId, RoleId FROM dbo.UserRoles ORDER BY RoleId, UserId; " +
                 "SELECT ManagedRolePermissionGrantId, ManagedRoleId, PermissionKey, GrantState, " +
                 "StateReleaseId, StateChangedAtUtc, StateChangedBy, Reason, RowVersion " +
                 "FROM dbo.ManagedRolePermissionGrants " +
@@ -577,6 +601,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 var approvalRows = (await grid.ReadAsync<ApprovalRow>().ConfigureAwait(false)).ToArray();
                 var managedRoles = (await grid.ReadAsync<ManagedRoleRow>().ConfigureAwait(false)).ToArray();
                 var roles = (await grid.ReadAsync<RoleRow>().ConfigureAwait(false)).ToArray();
+                var roleMemberships = (await grid.ReadAsync<RoleMembershipRow>().ConfigureAwait(false)).ToArray();
                 var managedGrants = (await grid.ReadAsync<ManagedGrantRow>().ConfigureAwait(false)).ToArray();
                 var roleAssignments = (await grid.ReadAsync<RoleAssignmentRow>().ConfigureAwait(false)).ToArray();
                 var userAssignments = (await grid.ReadAsync<UserAssignmentRow>().ConfigureAwait(false)).ToArray();
@@ -587,6 +612,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                     approvalRows,
                     managedRoles,
                     roles,
+                    roleMemberships,
                     managedGrants,
                     roleAssignments,
                     userAssignments,
@@ -1320,6 +1346,13 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 values.Add(Convert.ToBase64String(row.RowVersion));
             }
 
+            foreach (var row in state.RoleMemberships)
+            {
+                values.Add("RoleMembership");
+                values.Add(row.RoleId.ToString(CultureInfo.InvariantCulture));
+                values.Add(row.UserId.ToString(CultureInfo.InvariantCulture));
+            }
+
             foreach (var row in state.ManagedGrants)
             {
                 values.Add("ManagedGrant");
@@ -1408,6 +1441,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 ApprovalRow[] approvals,
                 ManagedRoleRow[] managedRoles,
                 RoleRow[] roles,
+                RoleMembershipRow[] roleMemberships,
                 ManagedGrantRow[] managedGrants,
                 RoleAssignmentRow[] roleAssignments,
                 UserAssignmentRow[] userAssignments,
@@ -1418,6 +1452,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
                 Approvals = approvals;
                 ManagedRoles = managedRoles;
                 Roles = roles;
+                RoleMemberships = roleMemberships;
                 ManagedGrants = managedGrants;
                 RoleAssignments = roleAssignments;
                 UserAssignments = userAssignments;
@@ -1429,6 +1464,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
             public ApprovalRow[] Approvals { get; }
             public ManagedRoleRow[] ManagedRoles { get; }
             public RoleRow[] Roles { get; }
+            public RoleMembershipRow[] RoleMemberships { get; }
             public ManagedGrantRow[] ManagedGrants { get; }
             public RoleAssignmentRow[] RoleAssignments { get; }
             public UserAssignmentRow[] UserAssignments { get; }
@@ -1495,6 +1531,12 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
             public byte[] RowVersion { get; set; } = Array.Empty<byte>();
         }
 
+        private sealed class RoleMembershipRow
+        {
+            public int UserId { get; set; }
+            public int RoleId { get; set; }
+        }
+
         private sealed class ManagedGrantRow
         {
             public long ManagedRolePermissionGrantId { get; set; }
@@ -1537,6 +1579,9 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
         {
             public int ManagedRoleId { get; set; }
             public int RoleId { get; set; }
+            public string ExpectedNormalizedRoleName { get; set; } = string.Empty;
+            public string NormalizedRoleName { get; set; } = string.Empty;
+            public bool IsActive { get; set; }
             public string GrantState { get; set; } = string.Empty;
             public string CatalogStatus { get; set; } = string.Empty;
             public string AdministratorGrantPolicy { get; set; } = string.Empty;
