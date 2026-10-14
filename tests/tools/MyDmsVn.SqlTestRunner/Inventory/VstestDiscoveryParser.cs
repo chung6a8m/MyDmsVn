@@ -27,7 +27,7 @@ public static class VstestDiscoveryParser
 
             var method = TheoryRowIdentity.MethodName(line);
             rows.TryGetValue(method, out var ordinal);
-            cases.Add(CreateCase(method, tfm, ordinal));
+            cases.Add(CreateCase(method, tfm, ordinal, line));
             rows[method] = ordinal + 1;
         }
 
@@ -35,11 +35,18 @@ public static class VstestDiscoveryParser
     }
 
     public static DiscoveredTestCase CreateCase(string methodName, string tfm, int rowOrdinal) =>
+        CreateCase(methodName, tfm, rowOrdinal, methodName + "#synthetic-row:" + rowOrdinal);
+
+    private static DiscoveredTestCase CreateCase(
+        string methodName,
+        string tfm,
+        int rowOrdinal,
+        string displayName) =>
         new DiscoveredTestCase(
             methodName,
             tfm,
             rowOrdinal,
-            TheoryRowIdentity.Create(methodName, tfm, rowOrdinal));
+            TheoryRowIdentity.Create(methodName, tfm, displayName));
 }
 
 public sealed record DiscoveredTestCase(

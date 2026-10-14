@@ -441,7 +441,7 @@
       "net48",
       "net8.0"
     ],
-    "expectedInvocationRule": "once-per-test-execution"
+    "expectedInvocationRule": "once-per-caller-execution"
   },
   {
     "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.direct-prefix",
@@ -489,6 +489,6 @@
       "net48",
       "net8.0"
     ],
-    "expectedInvocationRule": "once-per-test-execution"
+    "expectedInvocationRule": "once-per-caller-execution"
   }
 ]

@@ -13,17 +13,27 @@ public static class MigrationInvocationManifestAuditor
     {
         try
         {
-            var entries = JsonConvert.DeserializeObject<List<MigrationInvocationManifestEntry>>(
-                File.ReadAllText(manifestPath));
-            if (entries is null || entries.Count == 0 ||
+            var entries = MigrationInvocationManifest.Read(manifestPath);
+            if (entries.Count == 0 ||
                 entries.Any(entry =>
                     string.IsNullOrWhiteSpace(entry.InvocationId) ||
                     string.IsNullOrWhiteSpace(entry.Class) ||
                     string.IsNullOrWhiteSpace(entry.Method) ||
                     string.IsNullOrWhiteSpace(entry.SourceFile) ||
                     !entry.Tfms.Contains(tfm, StringComparer.Ordinal) ||
-                    !string.Equals(entry.ExpectedInvocationRule, "once-per-test-execution", StringComparison.Ordinal)) ||
+                    (!string.Equals(entry.ExpectedInvocationRule, "once-per-test-execution", StringComparison.Ordinal) &&
+                     !string.Equals(entry.ExpectedInvocationRule, "once-per-caller-execution", StringComparison.Ordinal))) ||
                 entries.GroupBy(entry => entry.InvocationId, StringComparer.Ordinal).Any(group => group.Count() != 1))
+            {
+                return false;
+            }
+
+            if (entries.Any(entry =>
+            {
+                var expectations = MigrationInvocationManifest.ResolveExpectations(entry, repositoryRoot);
+                return expectations.Count == 0 || expectations.Any(expectation =>
+                    string.IsNullOrWhiteSpace(expectation.TestMethod) || expectation.Count <= 0);
+            }))
             {
                 return false;
             }
@@ -76,20 +86,5 @@ public static class MigrationInvocationManifestAuditor
         {
             return false;
         }
-    }
-
-    private sealed class MigrationInvocationManifestEntry
-    {
-        public string InvocationId { get; set; } = string.Empty;
-
-        public string Class { get; set; } = string.Empty;
-
-        public string Method { get; set; } = string.Empty;
-
-        public string SourceFile { get; set; } = string.Empty;
-
-        public string[] Tfms { get; set; } = Array.Empty<string>();
-
-        public string ExpectedInvocationRule { get; set; } = string.Empty;
     }
 }

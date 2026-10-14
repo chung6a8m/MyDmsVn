@@ -7,6 +7,24 @@ namespace MyDmsVn.SqlTestHarness.Tests.Timing;
 public sealed class TimingIntervalReconcilerTests
 {
     [Fact]
+    public void Repeated_logical_operation_ids_in_different_tests_remain_distinct_instances()
+    {
+        var events = new[]
+        {
+            Event("migration", parent: null, start: 0, end: 40, testCaseId: "Tests.First"),
+            Event("migration", parent: null, start: 50, end: 80, testCaseId: "Tests.Second"),
+        };
+
+        var result = TimingIntervalReconciler.Reconcile(
+            TimeSpan.FromMilliseconds(100),
+            events,
+            timestampFrequency: 1000);
+
+        Assert.Equal(70m, result.MeasuredUnionMs);
+        Assert.Equal(70m, result.GetExclusiveDurationMs("migration"));
+    }
+
+    [Fact]
     public void Nested_intervals_are_subtracted_once_and_residual_uses_union_time()
     {
         var events = new[]
@@ -64,13 +82,15 @@ public sealed class TimingIntervalReconcilerTests
         string operation,
         string? parent,
         long start,
-        long end) =>
+        long end,
+        string testCaseId = "Tests.Class.Method",
+        string stage = "migration") =>
         new SqlTestTimingEvent(
             "run-1",
-            "Tests.Class.Method",
+            testCaseId,
             operation,
             parent,
-            "migration",
+            stage,
             start,
             end,
             end - start,

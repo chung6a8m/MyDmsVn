@@ -26,22 +26,39 @@ public static class SqlPerformanceReportBuilder
     {
         var accepted = runs.Where(run => !run.IsWarmup && run.IsValid).ToArray();
         var durations = accepted.Select(run => run.WallClockMs).OrderBy(value => value).ToArray();
-        var trxDuration = TimeSpan.FromMilliseconds(
-            accepted.Length == 0 ? 0d : (double)accepted[0].WallClockMs);
-        var timing = TimingIntervalReconciler.Reconcile(trxDuration, timingEvents);
-        var exclusiveByStage = timingEvents
-            .GroupBy(item => item.Stage, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => TimingIntervalReconciler.Reconcile(trxDuration, group.ToArray()).MeasuredUnionMs,
-                StringComparer.Ordinal);
+        decimal measuredUnionMs = 0m;
+        decimal overlapMs = 0m;
+        decimal residualMs = 0m;
+        var exclusiveByStage = new Dictionary<string, decimal>(StringComparer.Ordinal);
+
+        foreach (var run in accepted)
+        {
+            var matchingEvents = timingEvents
+                .Where(item =>
+                    string.Equals(item.RunId, run.RunId, StringComparison.Ordinal) &&
+                    string.Equals(item.Tfm, run.Tfm, StringComparison.Ordinal))
+                .ToArray();
+            var timing = TimingIntervalReconciler.Reconcile(
+                TimeSpan.FromMilliseconds((double)run.WallClockMs),
+                matchingEvents);
+
+            measuredUnionMs += timing.MeasuredUnionMs;
+            overlapMs += timing.OverlapMs;
+            residualMs += timing.ResidualMs;
+            foreach (var stage in timing.ExclusiveDurationByStage)
+            {
+                exclusiveByStage.TryGetValue(stage.Key, out var current);
+                exclusiveByStage[stage.Key] = current + stage.Value;
+            }
+        }
+
         return new SqlPerformanceReport(
             accepted.Length,
             Percentile(durations, 0.50m),
             Percentile(durations, 0.95m),
-            timing.MeasuredUnionMs,
-            timing.OverlapMs,
-            timing.ResidualMs,
+            measuredUnionMs,
+            overlapMs,
+            residualMs,
             exclusiveByStage,
             dmv is null ? "unavailable" : "available");
     }

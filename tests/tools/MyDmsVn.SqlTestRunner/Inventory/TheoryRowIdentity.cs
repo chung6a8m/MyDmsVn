@@ -12,9 +12,10 @@ public static class TheoryRowIdentity
     public static string MethodName(string displayName) =>
         Parameters.Replace(displayName.Trim(), string.Empty);
 
-    public static string Create(string methodName, string tfm, int rowOrdinal)
+    public static string Create(string methodName, string tfm, string displayName)
     {
-        var value = methodName + "|" + tfm + "|row:" + rowOrdinal;
+        var normalizedDisplay = displayName.Trim();
+        var value = methodName + "|" + tfm + "|display:" + normalizedDisplay;
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
         return methodName + "#" + Convert.ToHexString(hash).ToLowerInvariant();
     }

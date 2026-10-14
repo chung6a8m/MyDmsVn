@@ -125,6 +125,7 @@ public sealed class BenchmarkRunCoordinatorTests
         {
             var trxPath = Path.Combine(directory, "complete.trx");
             var timingPath = Path.Combine(directory, "timing.jsonl");
+            var manifestPath = Path.Combine(directory, "migration-manifest.json");
             File.WriteAllText(
                 trxPath,
                 "<TestRun xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\"><Results>" +
@@ -134,9 +135,15 @@ public sealed class BenchmarkRunCoordinatorTests
                 timingPath,
                 new[]
                 {
-                    "{\"recordType\":\"migration-invocation\",\"testCaseId\":\"case-a\",\"tfm\":\"net8.0\",\"invocationId\":\"migrate\"}",
-                    "{\"stage\":\"migration\",\"testCaseId\":\"case-a\",\"tfm\":\"net8.0\",\"operationId\":\"migrate\"}",
+                    "{\"recordType\":\"migration-invocation\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"invocationId\":\"Example.Tests.First.migrate\"}",
+                    "{\"stage\":\"migration\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"operationId\":\"Example.Tests.First.migrate\"}",
                 });
+            File.WriteAllText(
+                manifestPath,
+                "[{\"invocationId\":\"Example.Tests.First.migrate\",\"class\":\"Tests\"," +
+                "\"method\":\"First\",\"sourceFile\":\"ExampleTests.cs\",\"tfms\":[\"net8.0\"]," +
+                "\"expectedInvocationRule\":\"once-per-test-execution\"," +
+                "\"expectedInvocations\":[{\"testMethod\":\"First\",\"count\":1}]}]");
             var gate = new TrxBenchmarkResultGate(
                 new StaticSourceInventory(new TestMethodDescriptor("Example.Tests.First", false, "a")),
                 new StubMigrationManifestGate());
@@ -146,12 +153,14 @@ public sealed class BenchmarkRunCoordinatorTests
                 trxPath,
                 timingPath,
                 "net8.0",
-                0);
+                0,
+                directory,
+                manifestPath);
 
             Assert.True(gate.IsValid(evidence));
             File.AppendAllText(
                 timingPath,
-                "{\"stage\":\"migration\",\"testCaseId\":\"case-a\",\"tfm\":\"net8.0\",\"operationId\":\"migrate\"}" + Environment.NewLine);
+                "{\"stage\":\"migration\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"operationId\":\"Example.Tests.First.migrate\"}" + Environment.NewLine);
             Assert.False(gate.IsValid(evidence));
         }
         finally

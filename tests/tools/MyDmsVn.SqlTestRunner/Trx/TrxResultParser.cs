@@ -31,15 +31,12 @@ public static class TrxResultParser
         try
         {
             var document = XDocument.Load(path);
-            var ordinals = new Dictionary<string, int>(StringComparer.Ordinal);
             var results = document.Descendants()
                 .Where(element => element.Name.LocalName == "UnitTestResult")
                 .Select(element =>
                 {
                     var display = (string?)element.Attribute("testName") ?? string.Empty;
                     var method = TheoryRowIdentity.MethodName(display);
-                    ordinals.TryGetValue(method, out var ordinal);
-                    ordinals[method] = ordinal + 1;
                     var outcome = ParseOutcome((string?)element.Attribute("outcome"));
                     var duration = TimeSpan.TryParse(
                         (string?)element.Attribute("duration"),
@@ -48,7 +45,7 @@ public static class TrxResultParser
                         ? parsed
                         : TimeSpan.Zero;
                     return new TrxTestResult(
-                        TheoryRowIdentity.Create(method, tfm, ordinal),
+                        TheoryRowIdentity.Create(method, tfm, display),
                         method,
                         tfm,
                         outcome,

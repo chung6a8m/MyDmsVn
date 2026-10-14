@@ -34,6 +34,11 @@ public static class SqlTestInventoryReconciler
             reasons.Add(InventoryIncompleteReason.DuplicateResult);
         }
 
+        if (discovered.GroupBy(item => item.StableCaseId).Any(group => group.Count() != 1))
+        {
+            reasons.Add(InventoryIncompleteReason.DuplicateDiscovery);
+        }
+
         var discoveredIds = new HashSet<string>(discovered.Select(item => item.StableCaseId), StringComparer.Ordinal);
         var executedIds = new HashSet<string>(executed.Select(item => item.StableCaseId), StringComparer.Ordinal);
         if (discoveredIds.Except(executedIds).Any())
@@ -62,6 +67,7 @@ public enum InventoryIncompleteReason
     FailedTest,
     SkippedMandatorySql,
     DuplicateResult,
+    DuplicateDiscovery,
     DiscoveredNotExecuted,
     ExecutedNotDiscovered,
     TfmMismatch,

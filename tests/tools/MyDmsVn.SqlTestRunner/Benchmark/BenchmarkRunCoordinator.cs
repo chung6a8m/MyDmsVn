@@ -231,7 +231,13 @@ public sealed class TrxBenchmarkResultGate : IBenchmarkResultGate
             return false;
         }
 
-        return MigrationTimingArtifactReconciler.Reconcile(evidence.TimingPath, evidence.Tfm).IsComplete;
+        return MigrationTimingArtifactReconciler.Reconcile(
+                evidence.TimingPath,
+                evidence.MigrationManifestPath,
+                evidence.RepositoryRoot,
+                evidence.Tfm,
+                trx.Results)
+            .IsComplete;
     }
 }
 
