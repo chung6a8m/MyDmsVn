@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MyDmsVn.Server.DbMigrator\MyDmsVn.Server.DbMigrator.csproj" />
     <ProjectReference Include="..\..\src\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
+    <ProjectReference Include="..\MyDmsVn.SqlTestHarness\MyDmsVn.SqlTestHarness.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="TestScripts\*.sql" />

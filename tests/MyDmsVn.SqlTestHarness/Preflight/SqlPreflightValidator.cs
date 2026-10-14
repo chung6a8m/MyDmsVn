@@ -49,6 +49,45 @@ public sealed class SqlPreflightValidator
                 "The SQL test connection string must be valid and explicitly target master.");
         }
 
+        using var session = _sessionFactory(normalizedConnectionString!);
+        return await ValidateOpenSessionAsync(
+                normalizedConnectionString,
+                approval,
+                requirements,
+                session,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<SqlPreflightResult> ValidateOpenSessionAsync(
+        string? connectionString,
+        SqlInstanceApproval approval,
+        SqlPreflightRequirements requirements,
+        ISqlAdministrativeSession session,
+        CancellationToken cancellationToken)
+    {
+        if (approval is null)
+        {
+            throw new ArgumentNullException(nameof(approval));
+        }
+
+        if (requirements is null)
+        {
+            throw new ArgumentNullException(nameof(requirements));
+        }
+
+        if (session is null)
+        {
+            throw new ArgumentNullException(nameof(session));
+        }
+
+        if (!TryValidateConnectionString(connectionString, out var normalizedConnectionString))
+        {
+            return Failed(
+                SqlPreflightFailureKind.InvalidConfiguration,
+                "The SQL test connection string must be valid and explicitly target master.");
+        }
+
         var now = _utcNow();
         if (approval.ValidUntilUtc is not null && approval.ValidUntilUtc <= now)
         {
@@ -57,7 +96,6 @@ public sealed class SqlPreflightValidator
                 "The SQL instance approval has expired.");
         }
 
-        using var session = _sessionFactory(normalizedConnectionString!);
         try
         {
             await session.OpenAsync(cancellationToken).ConfigureAwait(false);

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestHarness.Approval;
 using MyDmsVn.SqlTestHarness.Preflight;
+using MyDmsVn.SqlTestHarness.Ownership;
 using Xunit;
 
 namespace MyDmsVn.SqlTestHarness.Tests.Preflight;
@@ -291,6 +292,11 @@ public sealed class SqlPreflightValidatorTests
             RequestedPermissions.Add(permissionName);
             return Task.FromResult(HasPermission);
         }
+
+        public Task<LiveDatabaseOwnership?> ReadDatabaseOwnershipAsync(
+            string databaseName,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LiveDatabaseOwnership?>(null);
 
         public Task ExecuteAsync(
             string sql,

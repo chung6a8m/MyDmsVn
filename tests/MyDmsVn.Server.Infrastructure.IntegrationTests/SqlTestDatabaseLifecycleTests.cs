@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using MyDmsVn.SqlTestHarness.Preflight;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -62,7 +63,7 @@ public sealed class SqlTestDatabaseLifecycleTests
             () => SqlTestDatabase.CreateAsync(
                 adminConnectionString,
                 default,
-                connectionString => new SqlConnection(connectionString),
+                connectionString => new SqlClientAdministrativeSession(connectionString),
                 databaseName =>
                 {
                     attemptedDatabaseName = databaseName;
@@ -94,7 +95,7 @@ public sealed class SqlTestDatabaseLifecycleTests
                     throw new InvalidOperationException("Expected transient teardown failure.");
                 }
 
-                return new SqlConnection(connectionString);
+                return new SqlClientAdministrativeSession(connectionString);
             },
             _ => { });
 

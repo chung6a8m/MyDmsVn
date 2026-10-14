@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.SqlTestHarness.Approval;
+using MyDmsVn.SqlTestHarness.Ownership;
 
 namespace MyDmsVn.SqlTestHarness.Preflight;
 
@@ -84,6 +85,42 @@ SELECT
             : Convert.ToInt32(value, CultureInfo.InvariantCulture) == 1;
     }
 
+    public async Task<LiveDatabaseOwnership?> ReadDatabaseOwnershipAsync(
+        string databaseName,
+        CancellationToken cancellationToken)
+    {
+        EnsureDisposableDatabaseName(databaseName);
+        using var metadataCommand = CreateCommand(
+            "SELECT database_id, " +
+            "TODATETIMEOFFSET(create_date, DATEPART(TZOFFSET, SYSDATETIMEOFFSET())) " +
+            "FROM sys.databases WHERE name = @databaseName;");
+        metadataCommand.Parameters.Add(new SqlParameter("@databaseName", SqlDbType.NVarChar, 128)
+        {
+            Value = databaseName,
+        });
+        using var reader = await metadataCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        var databaseId = reader.GetInt32(0);
+        var createDateUtc = reader.GetFieldValue<DateTimeOffset>(1).ToUniversalTime();
+        reader.Close();
+
+        using var markerCommand = CreateCommand(
+            $"SELECT CONVERT(nvarchar(4000), value) " +
+            $"FROM [{databaseName}].sys.extended_properties " +
+            "WHERE class = 0 AND name = N'MyDmsVn.TestOwnership';");
+        var markerValue = Convert.ToString(
+            await markerCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false),
+            CultureInfo.InvariantCulture);
+        return new LiveDatabaseOwnership(
+            databaseId,
+            createDateUtc,
+            DatabaseOwnershipMarker.TryParse(markerValue));
+    }
+
     public async Task ExecuteAsync(
         string sql,
         IReadOnlyDictionary<string, object?> parameters,
@@ -110,4 +147,24 @@ SELECT
         {
             CommandType = CommandType.Text,
         };
+
+    private static void EnsureDisposableDatabaseName(string databaseName)
+    {
+        const string prefix = "MyDmsVn_Test_";
+        if (databaseName is null ||
+            databaseName.Length != prefix.Length + 32 ||
+            !databaseName.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The database name is not disposable.");
+        }
+
+        for (var index = prefix.Length; index < databaseName.Length; index++)
+        {
+            var value = databaseName[index];
+            if (!((value >= '0' && value <= '9') || (value >= 'a' && value <= 'f')))
+            {
+                throw new InvalidOperationException("The database name is not disposable.");
+            }
+        }
+    }
 }

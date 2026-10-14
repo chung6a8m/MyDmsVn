@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestHarness.Approval;
+using MyDmsVn.SqlTestHarness.Ownership;
 
 namespace MyDmsVn.SqlTestHarness.Preflight;
 
@@ -17,6 +18,10 @@ public interface ISqlAdministrativeSession : IDisposable
     Task<int?> ReadMajorVersionAsync(CancellationToken cancellationToken);
 
     Task<bool?> HasServerPermissionAsync(string permissionName, CancellationToken cancellationToken);
+
+    Task<LiveDatabaseOwnership?> ReadDatabaseOwnershipAsync(
+        string databaseName,
+        CancellationToken cancellationToken);
 
     Task ExecuteAsync(
         string sql,
