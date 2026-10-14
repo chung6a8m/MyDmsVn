@@ -9,6 +9,14 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length == 0)
+        {
+            return DatabaseMigratorCommand.Run(
+                new SqlConnectionConfigurationLoader(),
+                Console.Out,
+                Console.Error);
+        }
+
         if (args.Length >= 2 &&
             string.Equals(args[0], "permissions", StringComparison.Ordinal) &&
             string.Equals(args[1], "sync", StringComparison.Ordinal))
@@ -46,9 +54,9 @@ internal static class Program
                 DateTime.UtcNow);
         }
 
-        return DatabaseMigratorCommand.Run(
-            new SqlConnectionConfigurationLoader(),
-            Console.Out,
-            Console.Error);
+        Console.Error.WriteLine(
+            "DbMigrator.InvalidArguments: Unknown command. " +
+            "Use no arguments to migrate, or use a documented permissions/security command.");
+        return 2;
     }
 }

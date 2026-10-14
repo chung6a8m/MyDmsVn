@@ -77,6 +77,7 @@ Checklist PR có permission mới:
 
 - thêm constant và `PermissionDefinition` tại module owner, rồi đăng ký qua composition deterministic;
 - chọn lifecycle và `AdministratorGrantPolicy` theo key, không chỉ theo module;
+- bump `PermissionReleaseManifest.CurrentReleaseId` và cập nhật fingerprint bất biến đi kèm; build/test phải fail nếu manifest đổi dưới cùng release ID;
 - dùng key trong server-side Application authorization; registry validation phải thấy mọi key được tham chiếu;
 - cập nhật fixtures/snapshot/schema/package docs nếu cần;
 - test undeclared/pending/unknown deny, activation độc lập với Administrator approval, direct deny vẫn thắng;

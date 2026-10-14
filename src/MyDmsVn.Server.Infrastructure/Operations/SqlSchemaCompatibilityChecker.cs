@@ -617,6 +617,7 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
 
     private readonly string _connectionString;
     private readonly bool _requireCurrentPermissionRelease;
+    private readonly IPermissionRegistry _permissionRegistry;
 
     public SqlSchemaCompatibilityChecker(string connectionString)
         : this(connectionString, requireCurrentPermissionRelease: true)
@@ -626,6 +627,17 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
     public SqlSchemaCompatibilityChecker(
         string connectionString,
         bool requireCurrentPermissionRelease)
+        : this(
+            connectionString,
+            requireCurrentPermissionRelease,
+            PermissionRegistryComposition.CreateDefault())
+    {
+    }
+
+    public SqlSchemaCompatibilityChecker(
+        string connectionString,
+        bool requireCurrentPermissionRelease,
+        IPermissionRegistry permissionRegistry)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -636,6 +648,7 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
 
         _connectionString = connectionString;
         _requireCurrentPermissionRelease = requireCurrentPermissionRelease;
+        _permissionRegistry = permissionRegistry ?? throw new ArgumentNullException(nameof(permissionRegistry));
     }
 
     public async Task<SchemaCompatibilityResult> CheckAsync(
@@ -709,6 +722,11 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
             return compatibility;
         }
 
+        if (!PermissionReleaseManifest.MatchesCurrent(_permissionRegistry))
+        {
+            return PermissionSynchronizationRequired();
+        }
+
         var lastAppliedReleaseId = await connection.QuerySingleOrDefaultAsync<string>(
             new CommandDefinition(
                 "SELECT LastAppliedReleaseId FROM dbo.PermissionSynchronizationState;",
@@ -721,6 +739,11 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
             return compatibility;
         }
 
+        return PermissionSynchronizationRequired();
+    }
+
+    private static SchemaCompatibilityResult PermissionSynchronizationRequired()
+    {
         return new SchemaCompatibilityResult(
             SchemaCompatibilityStatus.PermissionSynchronizationRequired,
             "Security.PermissionSynchronizationRequired",

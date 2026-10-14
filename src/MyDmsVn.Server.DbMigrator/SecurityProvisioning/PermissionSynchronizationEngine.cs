@@ -1255,17 +1255,7 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
 
         private static string FingerprintManifest(IPermissionRegistry registry)
         {
-            var values = new List<string> { registry.ReleaseId };
-            foreach (var definition in registry.Definitions)
-            {
-                values.Add(definition.Key);
-                values.Add(definition.Module);
-                values.Add(definition.Description);
-                values.Add(definition.LifecycleStatus.ToString());
-                values.Add(definition.AdministratorGrantPolicy.ToString());
-            }
-
-            return Hash(values.ToArray());
+            return PermissionManifestFingerprint.Compute(registry);
         }
 
         private static string FingerprintApprovals(PermissionSyncApprovalSet approvals)

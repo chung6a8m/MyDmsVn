@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -137,6 +138,41 @@ public sealed class SchemaCompatibilityIntegrationTests
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.False(result.IsCompatible);
+            Assert.Equal("Security.PermissionSynchronizationRequired", result.Code);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Changed_manifest_under_current_release_fails_runtime_preflight()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            var current = PermissionRegistryComposition.CreateDefault();
+            var changedDefinitions = new List<PermissionDefinition>(current.Definitions)
+            {
+                new PermissionDefinition(
+                    "Security.Unreleased.Test",
+                    "Security",
+                    "Unreleased permission used to verify immutable release binding.",
+                    PermissionLifecycleStatus.PendingActivation,
+                    AdministratorGrantPolicy.NotEligible),
+            };
+            var changedRegistry = PermissionRegistry.Create(
+                PermissionReleaseManifest.CurrentReleaseId,
+                changedDefinitions);
+
+            var result = await new SqlSchemaCompatibilityChecker(
+                    database.ConnectionString,
+                    requireCurrentPermissionRelease: true,
+                    changedRegistry)
                 .CheckAsync(CancellationToken.None);
 
             Assert.False(result.IsCompatible);

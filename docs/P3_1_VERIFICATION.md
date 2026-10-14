@@ -25,10 +25,10 @@ dotnet build MyDmsVn.sln -c Release --no-restore
 Result: succeeded; 0 warnings, 0 errors.
 
 dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net48 --no-build --no-restore
-Result: 132 passed, 0 failed, 0 skipped.
+Result: 133 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net48 --no-build --no-restore
-Result: 197 passed, 0 failed, 0 skipped; 9m54s.
+Result: 199 passed, 0 failed, 0 skipped; 9m14s.
 
 dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-build --no-restore
 Result: 200 passed, 0 failed, 0 skipped.
@@ -37,10 +37,10 @@ dotnet test tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj -
 Result: 5 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net8.0 --no-build --no-restore
-Result: 132 passed, 0 failed, 0 skipped.
+Result: 133 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net8.0 --no-build --no-restore
-Result: 197 passed, 0 failed, 0 skipped; 9m43s.
+Result: 199 passed, 0 failed, 0 skipped; 8m45s.
 
 dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net8.0-windows --no-build --no-restore
 Result: 200 passed, 0 failed, 0 skipped.
@@ -68,6 +68,8 @@ The final full suites ran sequentially by TFM. SQL integration test collections 
 - Included unique-index `INCLUDE` mappings in the exact 008 fingerprint so covering-column drift also fails closed.
 - Included PK sort direction and `IGNORE_DUP_KEY` options for both PK and unique indexes in the exact 008 fingerprint.
 - Canonicalized SQL `datetime2` synchronization timestamps as persisted UTC values so plan fingerprints do not depend on the operator machine time zone.
+- Rejected every unrecognized DbMigrator command before configuration loading so a typo cannot fall through to privileged migration.
+- Bound the current release ID to an immutable manifest fingerprint shared by sync planning and runtime preflight; a changed registry without a release bump now fails closed.
 
 ## Remaining roadmap work
 

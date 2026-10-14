@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
+using Dapper;
+using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Operations;
 using MyDmsVn.Server.DbMigrator.SecurityProvisioning;
@@ -10,6 +14,56 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class DatabaseMigratorCommandTests
 {
+    [SqlServerFact]
+    public async Task Unknown_command_exits_without_modifying_the_database()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var executable = Path.Combine(
+                AppContext.BaseDirectory,
+                "MyDmsVn.Server.DbMigrator.exe");
+            Assert.True(File.Exists(executable), "DbMigrator executable was not copied to test output.");
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments = "permissions sycn --dry-run",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+            startInfo.EnvironmentVariables[
+                SqlConnectionConfigurationLoader.MigrationConnectionStringEnvironmentVariable] =
+                database.ConnectionString;
+
+            using var process = Process.Start(startInfo);
+            Assert.NotNull(process);
+            var standardOutput = process!.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(15000))
+            {
+                process.Kill();
+                Assert.Fail("Unknown-command subprocess did not exit within 15 seconds.");
+            }
+
+            var output = await standardOutput;
+            var error = await standardError;
+            Assert.Equal(2, process.ExitCode);
+            Assert.Equal(string.Empty, output);
+            Assert.Contains("DbMigrator.InvalidArguments", error, StringComparison.Ordinal);
+
+            using var connection = new SqlConnection(database.ConnectionString);
+            Assert.Null(await connection.ExecuteScalarAsync<int?>(
+                "SELECT OBJECT_ID(N'dbo.SchemaVersions', N'U');"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     [Fact]
     public void Permission_sync_apply_requires_exact_plan_id_before_loading_configuration()
     {

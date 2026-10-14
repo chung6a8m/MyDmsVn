@@ -26,6 +26,17 @@ public sealed class PermissionRegistryTests
     }
 
     [Fact]
+    public void Current_release_is_bound_to_the_exact_manifest_fingerprint()
+    {
+        var registry = PermissionRegistryComposition.CreateDefault();
+
+        Assert.Equal(
+            PermissionReleaseManifest.CurrentManifestFingerprint,
+            PermissionManifestFingerprint.Compute(registry));
+        Assert.True(PermissionReleaseManifest.MatchesCurrent(registry));
+    }
+
+    [Fact]
     public void Registry_rejects_case_collisions_and_invalid_metadata()
     {
         var first = Definition("Catalog.Products.Read");
