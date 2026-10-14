@@ -23,15 +23,21 @@ namespace MyDmsVn.Server.Application.Security
 
     public sealed class PermissionSnapshot
     {
-        public PermissionSnapshot(bool? directDecision, bool hasRoleGrant)
+        public PermissionSnapshot(
+            bool? directDecision,
+            bool hasRoleGrant,
+            bool isCatalogActive = true)
         {
             DirectDecision = directDecision;
             HasRoleGrant = hasRoleGrant;
+            IsCatalogActive = isCatalogActive;
         }
 
         public bool? DirectDecision { get; }
 
         public bool HasRoleGrant { get; }
+
+        public bool IsCatalogActive { get; }
     }
 
     public interface IPermissionAuthorizationService

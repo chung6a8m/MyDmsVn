@@ -25,6 +25,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             {
                 using var connection = new SqlConnection(database.ConnectionString);
                 var userId = await InsertUserAsync(connection, "operator", "OPERATOR");
+                await ActivatePermissionAsync(connection, PermissionKeys.CatalogProductsWrite);
                 var roleId = await connection.QuerySingleAsync<int>(
                     "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
                     "OUTPUT INSERTED.RoleId VALUES (N'Warehouse', N'WAREHOUSE');");
@@ -190,6 +191,9 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                 using (var setupConnection = new SqlConnection(database.ConnectionString))
                 {
                     userId = await InsertUserAsync(setupConnection, "operator", "OPERATOR");
+                    await ActivatePermissionAsync(
+                        setupConnection,
+                        PermissionKeys.CatalogProductsWrite);
                     roleId = await setupConnection.QuerySingleAsync<int>(
                         "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
                         "OUTPUT INSERTED.RoleId VALUES (N'Warehouse', N'WAREHOUSE');");
@@ -255,6 +259,19 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                 "OUTPUT INSERTED.UserId " +
                 "VALUES (@username, @normalizedUsername, N'Operator', N'Local', N'old-hash', N'', N'BCrypt');",
                 new { username, normalizedUsername });
+        }
+
+        private static Task ActivatePermissionAsync(
+            SqlConnection connection,
+            string permissionKey)
+        {
+            return connection.ExecuteAsync(
+                "INSERT dbo.Permissions " +
+                "(PermissionKey, Module, Description, CatalogStatus, AdministratorGrantPolicy, " +
+                "IntroducedReleaseId, ActivatedAtUtc, ActivatedBy) VALUES " +
+                "(@permissionKey, N'Catalog', N'Integration-test permission.', N'Active', " +
+                "N'Eligible', N'test', SYSUTCDATETIME(), N'test');",
+                new { permissionKey });
         }
 
         private static async Task AssertDuplicateAsync(Task operation)

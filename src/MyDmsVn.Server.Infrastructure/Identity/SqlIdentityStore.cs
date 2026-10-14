@@ -88,6 +88,10 @@ namespace MyDmsVn.Server.Infrastructure.Identity
                 var row = await connection.QuerySingleOrDefaultAsync<PermissionSnapshotRow>(
                     new CommandDefinition(
                         "SELECT " +
+                        "CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.Permissions AS permission " +
+                        "WHERE permission.PermissionKey = @permissionKey " +
+                        "AND permission.CatalogStatus = N'Active') THEN 1 ELSE 0 END AS bit) " +
+                        "AS IsCatalogActive, " +
                         "CASE WHEN u.IsActive = 1 THEN (" +
                         "SELECT TOP (1) up.Granted FROM dbo.UserPermissions AS up " +
                         "WHERE up.UserId = u.UserId AND up.PermissionKey = @permissionKey" +
@@ -104,8 +108,11 @@ namespace MyDmsVn.Server.Infrastructure.Identity
                         cancellationToken: cancellationToken)).ConfigureAwait(false);
                 transaction.Commit();
                 return row == null
-                    ? new PermissionSnapshot(null, false)
-                    : new PermissionSnapshot(row.DirectDecision, row.HasRoleGrant);
+                    ? new PermissionSnapshot(null, false, false)
+                    : new PermissionSnapshot(
+                        row.DirectDecision,
+                        row.HasRoleGrant,
+                        row.IsCatalogActive);
             }
             catch
             {
@@ -128,6 +135,8 @@ namespace MyDmsVn.Server.Infrastructure.Identity
 
         private sealed class PermissionSnapshotRow
         {
+            public bool IsCatalogActive { get; set; }
+
             public bool? DirectDecision { get; set; }
 
             public bool HasRoleGrant { get; set; }

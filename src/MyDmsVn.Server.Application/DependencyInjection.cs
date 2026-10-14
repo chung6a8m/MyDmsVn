@@ -30,6 +30,8 @@ namespace MyDmsVn.Server.Application
             services.TryAddSingleton<IRequestCorrelationAccessor, EmptyRequestCorrelationAccessor>();
             services.TryAddSingleton<ISecurityAuditWriter, SecurityAuditWriter>();
             services.TryAddScoped<IPermissionStore, DenyAllPermissionStore>();
+            services.TryAddSingleton<IPermissionRegistry>(
+                PermissionRegistryComposition.CreateDefault());
             services.TryAddScoped<IPermissionAuthorizationService, PermissionAuthorizationService>();
             return services;
         }

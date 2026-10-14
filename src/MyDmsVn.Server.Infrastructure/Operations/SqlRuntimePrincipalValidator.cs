@@ -51,7 +51,8 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
         "(objectPermission.permission_name = N'SELECT' AND candidate.name IN (" +
         "N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
-        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions')) OR " +
+        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions', N'Permissions', " +
+        "N'PermissionSynchronizationState')) OR " +
         "(objectPermission.permission_name = N'INSERT' AND candidate.name IN (" +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
         "N'GoodsReceiptLines', N'StockLedger', N'StockBalances')) OR " +
@@ -71,7 +72,10 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
         "(checkedPermission.permission_name = N'SELECT' AND ownerTable.name IN (" +
         "N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
-        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions')) OR " +
+        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions', N'Permissions')) OR " +
+        "(checkedPermission.permission_name = N'SELECT' " +
+        "AND ownerTable.name = N'PermissionSynchronizationState' " +
+        "AND candidate.name = N'LastAppliedReleaseId') OR " +
         "(checkedPermission.permission_name = N'UPDATE' AND (ownerTable.name IN (" +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
         "N'GoodsReceiptLines', N'StockBalances') OR (ownerTable.name = N'Users' AND candidate.name IN (" +
