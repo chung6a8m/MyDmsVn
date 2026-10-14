@@ -1,10 +1,10 @@
-# Codex instructions — MyDmsVn
+﻿# Codex instructions — MyDmsVn
 
 Applies to the entire repository. This file is authoritative for AI-assisted changes.
 
 ## Mission and status
 
-Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **P0–P4 foundations and P5 implementation/automated gates exist; P5 authenticated interactive acceptance and P6 release gates remain open.** Consult `docs/DEVELOPMENT_PLAN.md` for the current evidence-based status. **P3.1 initial Administrator/continuous permission sync and P4.1 real Login/session are newly planned, not implemented**, despite historical P3/P4 completion. Implement in small, reviewable phase-scoped changes and do not claim later-phase capabilities exist.
+Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **P0–P4 foundations and P5 implementation/automated gates exist; P5 authenticated interactive acceptance and P6 release gates remain open.** Consult `docs/DEVELOPMENT_PLAN.md` for the current evidence-based status. **P3.1 initial Administrator/continuous permission sync is implemented and verified (PR #18 merged 2026-10-14); P4.1 real Login/session remains planned**, despite historical P3/P4 completion. Implement in small, reviewable phase-scoped changes and do not claim later-phase capabilities exist.
 
 ## Read-order and precedence
 
@@ -44,7 +44,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 
 ## Work protocol
 
-1. Inspect the repo and phase dependencies; choose the first unfinished phase/task. Do not invent completed code.
+1. Inspect the repo and phase dependencies; choose the first unfinished phase/task. Do not invent completed code. Cross-phase SQLPERF test-hardening tasks may proceed independently in separate PRs; preserve full dual-TFM SQL gates.
 2. State the scope and affected layers before implementation; avoid changing unrelated modules.
 3. Make a minimal vertical change with automated tests.
 4. Build both `net48` and `net8.0` / `net8.0-windows` configurations on an environment with the targeting packs.
@@ -65,7 +65,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 - "Implement P0 from `docs/plans/20261008-002-phase-0-foundation.md`; create solution skeleton, DI and build verification only."
 - "Implement P1 from `docs/DEVELOPMENT_PLAN.md` and `docs/PERSISTENCE.md`, including SQL integration tests."
 - "Implement P5.1 master data after P0–P4 quality gates; follow `docs/plans/20261008-001-sales-inventory-foundation.md`."
-- "Implement P3.1 administrator provisioning and continuous permission sync in `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md` before interactive Login tests."
+- "Optimize SQL integration test performance one task at a time from `docs/plans/20261014-001-sql-integration-test-performance-optimization.md`; start at SQLPERF-T01 instrumentation, preserve real SQL isolation and dual-target regression gates."
 - "Implement P4.1 shared WinForms Login/session in `docs/plans/20261013-002-desktop-login-session.md` after P3.1, then complete authenticated P5/P6 release gates."
 
 Do not automatically implement all phases in a single unreviewable change.
