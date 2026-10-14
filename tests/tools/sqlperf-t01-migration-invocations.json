@@ -338,14 +338,14 @@
   {
     "invocationId": "DatabaseMigrationTests.System_or_unspecified_database_is_rejected_before_connecting.migration-01",
     "class": "DatabaseMigrationTests",
-    "method": "System_or_unspecified_database_is_rejected_before_connecting",
+    "method": "AssertSystemDatabaseRejected",
     "sourceFile": "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/DatabaseMigrationTests.cs",
     "sourceLine": 435,
     "tfms": [
       "net48",
       "net8.0"
     ],
-    "expectedInvocationRule": "once-per-test-execution"
+    "expectedInvocationRule": "once-per-caller-execution"
   },
   {
     "invocationId": "DatabaseMigrationTests.Goods_receipt_migration_enforces_aggregate_keys_checks_and_rowversion.migration-01",

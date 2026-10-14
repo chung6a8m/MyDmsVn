@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Dapper;
 using DbUp;
@@ -422,16 +423,36 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [Theory]
-    [InlineData("Server=invalid.invalid;Database=master;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
-    [InlineData("Server=invalid.invalid;Database=model;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
-    [InlineData("Server=invalid.invalid;Database=msdb;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
-    [InlineData("Server=invalid.invalid;Database=tempdb;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
-    [InlineData("Server=invalid.invalid;User ID=test;Password=test;Connect Timeout=1;Encrypt=false")]
-    public void System_or_unspecified_database_is_rejected_before_connecting(string connectionString)
+    [Fact]
+    public void Master_database_is_rejected_before_connecting() =>
+        AssertSystemDatabaseRejected(
+            "Server=invalid.invalid;Database=master;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
+
+    [Fact]
+    public void Model_database_is_rejected_before_connecting() =>
+        AssertSystemDatabaseRejected(
+            "Server=invalid.invalid;Database=model;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
+
+    [Fact]
+    public void Msdb_database_is_rejected_before_connecting() =>
+        AssertSystemDatabaseRejected(
+            "Server=invalid.invalid;Database=msdb;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
+
+    [Fact]
+    public void Tempdb_database_is_rejected_before_connecting() =>
+        AssertSystemDatabaseRejected(
+            "Server=invalid.invalid;Database=tempdb;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
+
+    [Fact]
+    public void Unspecified_database_is_rejected_before_connecting() =>
+        AssertSystemDatabaseRejected(
+            "Server=invalid.invalid;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
+
+    private static void AssertSystemDatabaseRejected(
+        string connectionString,
+        [CallerMemberName] string testCaseId = "")
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(
-            nameof(System_or_unspecified_database_is_rejected_before_connecting));
+        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         Assert.Throws<ArgumentException>(() => MeasuredDatabaseMigrationRunner.Migrate(measurement, "DatabaseMigrationTests.System_or_unspecified_database_is_rejected_before_connecting.migration-01", connectionString));
     }
 

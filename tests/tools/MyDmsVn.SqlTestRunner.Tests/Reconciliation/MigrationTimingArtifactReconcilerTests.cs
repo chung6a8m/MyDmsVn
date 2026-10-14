@@ -100,6 +100,40 @@ public sealed class MigrationTimingArtifactReconcilerTests
         Assert.Contains(result.MissingKeys, key => key.StartsWith("First|", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Theory_rows_cannot_satisfy_each_others_migration_expectations()
+    {
+        using var fixture = new Fixture(Entry("ExampleTests.Case.migrate", "Case"));
+        var executed = new[]
+        {
+            TrxTestResult.Passed("row-a", "Namespace.ExampleTests.Case", "net8.0", TimeSpan.Zero),
+            TrxTestResult.Passed("row-b", "Namespace.ExampleTests.Case", "net8.0", TimeSpan.Zero),
+        };
+        fixture.WriteArtifact(
+            Invocation("Case", "net8.0", "ExampleTests.Case.migrate"),
+            Timing("Case", "net8.0", "ExampleTests.Case.migrate"),
+            Invocation("Case", "net8.0", "ExampleTests.Case.migrate"),
+            Timing("Case", "net8.0", "ExampleTests.Case.migrate"));
+
+        var collapsed = fixture.Reconcile("net8.0", executed);
+
+        Assert.False(collapsed.IsComplete);
+        Assert.Contains(collapsed.MissingKeys, key => key.StartsWith("row-a|", StringComparison.Ordinal));
+        Assert.Contains(collapsed.MissingKeys, key => key.StartsWith("row-b|", StringComparison.Ordinal));
+
+        fixture.WriteArtifact(
+            Invocation("row-a", "net8.0", "ExampleTests.Case.migrate"),
+            Timing("row-a", "net8.0", "ExampleTests.Case.migrate"),
+            Invocation("row-a", "net8.0", "ExampleTests.Case.migrate"),
+            Timing("row-a", "net8.0", "ExampleTests.Case.migrate"));
+
+        var swapped = fixture.Reconcile("net8.0", executed);
+
+        Assert.False(swapped.IsComplete);
+        Assert.Contains(swapped.MissingKeys, key => key.StartsWith("row-b|", StringComparison.Ordinal));
+        Assert.Contains(swapped.UnexpectedKeys, key => key.StartsWith("row-a|", StringComparison.Ordinal));
+    }
+
     private static string Entry(string invocationId, string method, int count = 1) =>
         "{\"invocationId\":\"" + invocationId + "\",\"class\":\"ExampleTests\"," +
         "\"method\":\"" + method + "\",\"sourceFile\":\"tests/ExampleTests.cs\"," +

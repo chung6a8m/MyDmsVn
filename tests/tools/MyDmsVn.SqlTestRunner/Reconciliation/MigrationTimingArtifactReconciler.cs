@@ -99,18 +99,30 @@ public static class MigrationTimingArtifactReconciler
             foreach (var expectation in MigrationInvocationManifest.ResolveExpectations(entry, repositoryRoot))
             {
                 var suffix = "." + entry.Class + "." + expectation.TestMethod;
-                var executions = executed.Count(result =>
-                    string.Equals(result.Tfm, tfm, StringComparison.Ordinal) &&
-                    result.MethodName.EndsWith(suffix, StringComparison.Ordinal));
-                if (executions == 0)
+                var executions = executed.Where(result =>
+                        string.Equals(result.Tfm, tfm, StringComparison.Ordinal) &&
+                        result.MethodName.EndsWith(suffix, StringComparison.Ordinal))
+                    .ToArray();
+                if (executions.Length == 0)
                 {
                     invalid.Add("manifest-target-not-executed:" + entry.Class + "." + expectation.TestMethod);
                     continue;
                 }
 
-                expected.AddRange(Enumerable.Repeat(
-                    Key(expectation.TestMethod, tfm, entry.InvocationId),
-                    executions * expectation.Count));
+                if (executions.Length == 1)
+                {
+                    expected.AddRange(Enumerable.Repeat(
+                        Key(expectation.TestMethod, tfm, entry.InvocationId),
+                        expectation.Count));
+                    continue;
+                }
+
+                foreach (var execution in executions)
+                {
+                    expected.AddRange(Enumerable.Repeat(
+                        Key(execution.StableCaseId, tfm, entry.InvocationId),
+                        expectation.Count));
+                }
             }
         }
 

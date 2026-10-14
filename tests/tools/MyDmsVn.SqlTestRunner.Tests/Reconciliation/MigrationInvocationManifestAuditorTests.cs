@@ -79,6 +79,30 @@ public sealed class MigrationInvocationManifestAuditorTests
         }
     }
 
+    [Fact]
+    public void System_database_guard_manifest_resolves_all_named_fact_callers()
+    {
+        var root = FindRepositoryRoot();
+        var manifestPath = Path.Combine(root, "tests", "tools", "sqlperf-t01-migration-invocations.json");
+        var entry = MigrationInvocationManifest.Read(manifestPath).Single(item =>
+            item.InvocationId ==
+            "DatabaseMigrationTests.System_or_unspecified_database_is_rejected_before_connecting.migration-01");
+
+        var expectations = MigrationInvocationManifest.ResolveExpectations(entry, root);
+
+        Assert.Equal(
+            new[]
+            {
+                "Master_database_is_rejected_before_connecting",
+                "Model_database_is_rejected_before_connecting",
+                "Msdb_database_is_rejected_before_connecting",
+                "Tempdb_database_is_rejected_before_connecting",
+                "Unspecified_database_is_rejected_before_connecting",
+            },
+            expectations.Select(item => item.TestMethod).OrderBy(name => name, StringComparer.Ordinal));
+        Assert.All(expectations, expectation => Assert.Equal(1, expectation.Count));
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
