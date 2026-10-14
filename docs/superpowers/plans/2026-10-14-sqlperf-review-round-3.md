@@ -249,6 +249,6 @@ Expected: zero failures/skips for these selected gates and zero build warnings/e
 
 Review all round-3 changes against the spec and the five Review Focus cases. Fix every Critical/Important finding through a fresh red-green test, then rerun the affected suite.
 
-- [ ] **Step 4: Commit, push, reply, and resolve**
+- [x] **Step 4: Commit, push, reply, and resolve**
 
 Push to `codex/sqlperf-t01`. Reply in each round-3 inline thread with exact regression evidence and resolve only after remote HEAD matches local HEAD.
