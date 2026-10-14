@@ -174,9 +174,20 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
             }
 
             var value = JObject.Parse(line);
-            if (value["startTimestamp"] is null || value["endTimestamp"] is null)
+            var hasStart = value["startTimestamp"] is not null;
+            var hasEnd = value["endTimestamp"] is not null;
+            if (!hasStart && !hasEnd &&
+                string.Equals(
+                    (string?)value["recordType"],
+                    "migration-invocation",
+                    StringComparison.Ordinal))
             {
                 continue;
+            }
+
+            if (!hasStart || !hasEnd)
+            {
+                throw new InvalidDataException("A timing record is missing interval timestamps.");
             }
 
             var timing = new SqlTestTimingEvent(
@@ -184,7 +195,7 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
                 RequiredString(value, "testCaseId"),
                 RequiredString(value, "operationId"),
                 (string?)value["parentOperationId"],
-                RequiredString(value, "stage"),
+                SqlPerformanceReportBuilder.RedactShareable(RequiredString(value, "stage")),
                 (long)value["startTimestamp"]!,
                 (long)value["endTimestamp"]!,
                 (decimal)value["durationMs"]!,

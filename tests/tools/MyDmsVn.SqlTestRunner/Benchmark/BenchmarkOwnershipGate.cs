@@ -25,6 +25,8 @@ public interface IBenchmarkLiveOwnershipReader : IDisposable
 {
     Task OpenAsync(CancellationToken cancellationToken);
 
+    Task<SqlInstanceIdentity?> ReadIdentityAsync(CancellationToken cancellationToken);
+
     Task<LiveDatabaseOwnership?> ReadAsync(
         string databaseName,
         CancellationToken cancellationToken);
@@ -76,6 +78,17 @@ public sealed class BenchmarkOwnershipGate : IBenchmarkOwnershipGate
             {
                 using var reader = _readerFactory();
                 await reader.OpenAsync(cancellationToken).ConfigureAwait(false);
+                var identity = await reader.ReadIdentityAsync(cancellationToken).ConfigureAwait(false);
+                if (identity is null ||
+                    !string.Equals(
+                        SqlInstanceFingerprint.Create(identity),
+                        approval.FingerprintSha256,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "The live SQL instance does not match the approval.");
+                }
+
                 foreach (var record in records)
                 {
                     var live = await reader.ReadAsync(record.DatabaseName, cancellationToken)
@@ -230,6 +243,9 @@ internal sealed class SqlBenchmarkLiveOwnershipReader : IBenchmarkLiveOwnershipR
 
     public Task OpenAsync(CancellationToken cancellationToken) =>
         _session.OpenAsync(cancellationToken);
+
+    public Task<SqlInstanceIdentity?> ReadIdentityAsync(CancellationToken cancellationToken) =>
+        _session.ReadIdentityAsync(cancellationToken);
 
     public Task<LiveDatabaseOwnership?> ReadAsync(
         string databaseName,

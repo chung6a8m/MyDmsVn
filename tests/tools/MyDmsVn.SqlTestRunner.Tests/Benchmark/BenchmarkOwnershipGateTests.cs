@@ -48,6 +48,25 @@ public sealed class BenchmarkOwnershipGateTests
         Assert.False(File.Exists(fixture.RecoveryPath));
     }
 
+    [Fact]
+    public async Task Disposed_record_on_a_different_live_instance_is_incomplete()
+    {
+        using var fixture = new Fixture();
+        await fixture.WriteRecordAsync(DatabaseOwnershipState.Disposed);
+        fixture.Reader.Identity = new SqlInstanceIdentity(
+            "other-server",
+            "other-machine",
+            "other-instance",
+            null);
+
+        var result = await fixture.ValidateAsync();
+
+        Assert.False(result.IsComplete);
+        Assert.True(File.Exists(fixture.RecoveryPath));
+        Assert.DoesNotContain("other-server", File.ReadAllText(fixture.RecoveryPath),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData(DatabaseOwnershipState.CreateIntent)]
     [InlineData(DatabaseOwnershipState.Created)]
@@ -102,6 +121,7 @@ public sealed class BenchmarkOwnershipGateTests
                 "\"instanceName\":\"review-instance\",\"endpoint\":null}," +
                 "\"fingerprintSha256\":\"" + fingerprint + "\"}");
             _approval = SqlInstanceApprovalLoader.Load(ApprovalPath);
+            Reader.Identity = identity;
             _journal = new FileDatabaseOwnershipJournal(JournalDirectory);
         }
 
@@ -170,10 +190,15 @@ public sealed class BenchmarkOwnershipGateTests
 
     private sealed class FakeLiveOwnershipReader : IBenchmarkLiveOwnershipReader
     {
+        public SqlInstanceIdentity? Identity { get; set; }
+
         public Dictionary<string, LiveDatabaseOwnership?> Results { get; } =
             new Dictionary<string, LiveDatabaseOwnership?>(StringComparer.Ordinal);
 
         public Task OpenAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<SqlInstanceIdentity?> ReadIdentityAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(Identity);
 
         public Task<LiveDatabaseOwnership?> ReadAsync(
             string databaseName,

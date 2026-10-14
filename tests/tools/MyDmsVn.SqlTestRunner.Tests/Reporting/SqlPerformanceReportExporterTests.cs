@@ -49,7 +49,8 @@ public sealed class SqlPerformanceReportExporterTests
                     Timing("net48-one", "net48", "legacy", null, "migration", 0, 50)),
                 WriteRun(root, "net48-two", "net48", BenchmarkPassKind.Measured, 2, 70,
                     ("Example.LegacyTests.Second(server-legacy)", 70),
-                    Timing("net48-two", "net48", "legacy", null, "migration", 0, 70)),
+                    Timing("net48-two", "net48", "legacy", null,
+                        "Server=review-host;Password=stage-secret", 0, 70)),
             };
             var exporter = new SqlPerformanceReportExporter();
 
@@ -85,11 +86,37 @@ public sealed class SqlPerformanceReportExporterTests
                      {
                          "secret-warmup", "secret-one", "server-one", "secret-two",
                          "customer-42", "secret-invalid", "secret-legacy", "server-legacy",
+                         "review-host", "stage-secret",
                          root,
                      })
             {
                 Assert.DoesNotContain(sensitive, shareable, StringComparison.OrdinalIgnoreCase);
             }
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Exporter_rejects_malformed_timing_event_instead_of_omitting_it()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ReportMalformed", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var run = WriteRun(root, "malformed", "net8.0", BenchmarkPassKind.Measured, 1, 10,
+                ("Example.Tests.One", 10),
+                "{\"runId\":\"malformed\",\"tfm\":\"net8.0\",\"stage\":\"migration\"," +
+                "\"operationId\":\"broken\",\"startTimestamp\":1}");
+
+            var result = await new SqlPerformanceReportExporter().ExportAsync(
+                new BenchmarkReportEvidence(root, new[] { "net8.0" }, 1, new[] { run }),
+                CancellationToken.None);
+
+            Assert.False(result.IsComplete);
+            Assert.Empty(result.ReportPaths);
         }
         finally
         {

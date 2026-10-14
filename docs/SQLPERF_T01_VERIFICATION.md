@@ -15,8 +15,10 @@ Gate T01 therefore remains open. SQLPERF-T02 must not use these changes as an ac
 - Independent source/discovery/TRX primitives default cases to SQL-required, recognize derived xUnit attributes, and reconcile the current assembly, discovery and execution one-to-one. The method-scoped non-SQL exemption manifest is intentionally empty, which is fail-closed.
 - Migration coverage is a multiset keyed by test case, TFM and invocation; expected invocation records are emitted separately from completed timing events, and missing, unexpected or duplicate events invalidate a pass. The runner also re-audits the reviewed source manifest, including direct DbUp call counts, before accepting each pass.
 - Theory rows use redacted content hashes instead of discovery ordinals, so reordered rows reconcile while substitutions and duplicate/deferred rows fail closed. Migration expectations now come independently from the reviewed manifest plus executed TRX rows, including repeated helper calls.
+- Migration expectations are row-scoped whenever a theory produces multiple executions. The five system-database rejection cases are named facts, and reconciliation rejects a row swap such as A=2/B=0 even when the method-level total still equals two.
 - The runner uses a Windows Job Object with kill-on-close, explicitly terminates a suspended child when ownership assignment fails, and provides bounded commands with concurrent stdout/stderr drainage plus a four-hour hard overall baseline deadline. `baseline` runs one labeled warm-up plus three measured passes per TFM, alternates TFM order, gives every run unique TRX/timing artifacts, and applies mandatory preflight and result gates to every child.
-- Reporting excludes warmups/invalid runs, computes literal p50/p95, labels unavailable DMV data and redacts secrets, hosts, paths and theory values.
+- Every launched SQL test child receives an isolated ownership journal. A read-only post-run gate executes from the coordinator's `finally` path under an independent 30-second bound, accepts only approved `Disposed` records with absent live databases, and writes a sanitized recovery artifact for empty, unresolved, mismatched or uninspectable ownership. It never drops a database.
+- Reporting is a required completion gate. It excludes warmups/invalid runs, computes literal p50/p95 plus interval and ranked test/class costs, labels unavailable DMV data, redacts secrets, hosts, paths and theory values, and atomically creates stable JSON/Markdown files for each TFM. Missing or failed report output makes `baseline` return exit code 3.
 - Timing reconciliation scopes repeated logical operation IDs to run/TFM/test instances. Reports reconcile each accepted run independently and derive per-stage exclusive interval unions, including cross-stage parent/child subtraction.
 
 ## Commands and actual results
@@ -28,7 +30,7 @@ Gate T01 therefore remains open. SQLPERF-T02 must not use these changes as an ac
 | Harness tests, `net8.0` | 49 passed, 0 failed, 0 skipped |
 | Migration coverage, `net48` | 9 passed, 0 failed, 0 skipped |
 | Migration coverage, `net8.0` | 9 passed, 0 failed, 0 skipped |
-| Runner synthetic/unit tests | 39 passed, 0 failed, 0 skipped |
+| Runner synthetic/unit tests | 60 passed, 0 failed, 0 skipped |
 | Server.Application, `net48` / `net8.0` | 133 / 133 passed, no failures/skips |
 | Architecture | 5 passed, no failures/skips |
 | Desktop, `net48` / `net8.0-windows` | 200 / 200 passed, no failures/skips |

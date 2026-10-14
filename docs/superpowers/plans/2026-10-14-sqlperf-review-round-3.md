@@ -228,11 +228,11 @@ Expected: all runner tests pass with zero skips/failures.
 - Consumes: verified test/build outputs and generated sanitized report fixtures.
 - Produces: evidence-based round-3 verification notes; T01 remains explicitly open pending approved live SQL evidence.
 
-- [ ] **Step 1: Update verification evidence**
+- [x] **Step 1: Update verification evidence**
 
 Document row-scoped migration fail-closed behavior, post-run ownership reconciliation, required report export, exact new test counts, and the unchanged live SQL blocker. Do not add baseline numbers without an approved run.
 
-- [ ] **Step 2: Run the full non-SQL verification matrix**
+- [x] **Step 2: Run the full non-SQL verification matrix**
 
 Run locked restore and Release solution build, then:
 
