@@ -18,6 +18,7 @@ public enum SchemaCompatibilityStatus
     TooNew,
     UnknownHistory,
     Partial,
+    PermissionSynchronizationRequired,
 }
 
 public sealed class SchemaCompatibilityResult

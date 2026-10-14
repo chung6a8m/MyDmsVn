@@ -27,7 +27,8 @@ Cả hai host chạy cùng `DesktopDatabaseStartupCoordinator` trước khi đă
 |---|---|---|---|
 | Không journal, không artifact | `Schema.Empty` | Chặn | Chạy clean install bằng migrator |
 | Prefix hợp lệ nhưng thiếu script hiện tại | `Schema.TooOld` | Chặn | Backup/maintenance window, chạy migrator, preflight lại |
-| Đúng 001–008 và đủ artifact | `Schema.Compatible` | Cho phép nếu registry đã sync | Tiếp tục startup |
+| Đúng 001–008, đủ artifact và đã sync đúng permission release hiện tại | `Schema.Compatible` | Cho phép | Tiếp tục startup |
+| Đúng 001–008 nhưng chưa sync hoặc sync permission release cũ | `Security.PermissionSynchronizationRequired` | Chặn | Chạy permission sync đã review bằng migration principal, rồi preflight lại |
 | Có script sau 008 | `Schema.TooNew` | Chặn | Cài client tương thích; không downgrade schema |
 | Sai/thừa/thiếu giữa chuỗi | `Schema.UnknownHistory` | Chặn | Dừng rollout, điều tra provenance; không sửa journal thủ công |
 | Journal và artifact không khớp | `Schema.PartialMigration` | Chặn | Giữ client đóng; chọn forward-fix hoặc restore đã kiểm chứng |

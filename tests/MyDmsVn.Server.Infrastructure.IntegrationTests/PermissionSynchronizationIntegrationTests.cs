@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -16,6 +17,26 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class PermissionSynchronizationIntegrationTests
 {
+    [Fact]
+    public void Sql_datetime2_timestamp_is_canonicalized_as_utc_without_local_time_conversion()
+    {
+        var sqlTimestamp = new DateTime(
+            2026,
+            10,
+            14,
+            1,
+            2,
+            3,
+            DateTimeKind.Unspecified);
+        var format = typeof(PermissionSynchronizationEngine).GetMethod(
+            "Format",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        var canonical = Assert.IsType<string>(format!.Invoke(null, new object?[] { sqlTimestamp }));
+
+        Assert.Equal("2026-10-14T01:02:03.0000000Z", canonical);
+    }
+
     [SqlServerFact]
     public async Task Approved_plan_activates_manifest_and_repeat_plan_is_idempotent()
     {

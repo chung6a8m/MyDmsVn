@@ -41,7 +41,8 @@ Khi nâng cấp từ bản provisioning cũ, chạy lại script hiện tại b�
 | `StockBalances` | Có | Có | Có | Không |
 | `SchemaVersions` | Có | Không | Không | Không |
 | `Permissions` | Có | Không | Không | Không |
-| `PermissionLegacyAssignmentDrift`, `PermissionSynchronizationState`, `SystemManagedRoles`, `PermissionGrantApprovals`, `ManagedRolePermissionGrants`, `SecurityBootstrapState`, `PermissionSecurityAudit` | Không | Không | Không | Không |
+| `PermissionSynchronizationState.LastAppliedReleaseId` | Chỉ cột này | Không | Không | Không |
+| `PermissionLegacyAssignmentDrift`, các cột khác của `PermissionSynchronizationState`, `SystemManagedRoles`, `PermissionGrantApprovals`, `ManagedRolePermissionGrants`, `SecurityBootstrapState`, `PermissionSecurityAudit` | Không | Không | Không | Không |
 
 Runtime role còn có `VIEW DEFINITION` ở database scope để schema preflight kiểm kê nhất quán mọi user object, kể cả object unmanaged chưa được cấp quyền dữ liệu, đồng thời xác nhận function, constraint, index và trigger trong manifest. Đây là quyền chỉ đọc metadata/định nghĩa; nó không cấp `SELECT`, `EXECUTE`, DML hay DDL trên các object đó. Runtime validator chỉ allowlist quyền database read-only này và vẫn từ chối các quyền quản trị, bảo mật hoặc thay đổi schema.
 

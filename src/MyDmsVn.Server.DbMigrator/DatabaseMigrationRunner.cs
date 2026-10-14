@@ -51,7 +51,9 @@ public sealed class DatabaseMigrationRunner
         string connectionString,
         SqlConnection connection)
     {
-        var compatibility = new SqlSchemaCompatibilityChecker(connectionString)
+        var compatibility = new SqlSchemaCompatibilityChecker(
+                connectionString,
+                requireCurrentPermissionRelease: false)
             .CheckConnectionAsync(connection, System.Threading.CancellationToken.None)
             .GetAwaiter()
             .GetResult();
@@ -72,6 +74,10 @@ public sealed class DatabaseMigrationRunner
             case SchemaCompatibilityStatus.Partial:
                 throw new DatabaseMigrationPreflightException(
                     "Migration.PartialSchema",
+                    compatibility.SafeMessage);
+            case SchemaCompatibilityStatus.PermissionSynchronizationRequired:
+                throw new DatabaseMigrationPreflightException(
+                    "Migration.PermissionSynchronizationRequired",
                     compatibility.SafeMessage);
             default:
                 throw new DatabaseMigrationPreflightException(

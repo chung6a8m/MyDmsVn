@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Operations;
 using Xunit;
@@ -347,6 +348,53 @@ public sealed class SqlPrincipalProvisioningTests
     }
 
     [SqlServerFact]
+    public async Task Provisioning_and_startup_reject_full_permission_sync_state_read()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6SyncStateRuntimeProbe] WITHOUT LOGIN; " +
+                "CREATE USER [P6SyncStateMigrationProbe] WITHOUT LOGIN;");
+            var script = ReadProvisioningScript(
+                "P6SyncStateRuntimeProbe",
+                "P6SyncStateMigrationProbe");
+            await connection.ExecuteAsync(script);
+            await connection.ExecuteAsync(
+                "GRANT SELECT ON OBJECT::dbo.PermissionSynchronizationState TO [P6SyncStateRuntimeProbe]; " +
+                "EXECUTE AS USER = N'P6SyncStateRuntimeProbe';");
+            try
+            {
+                Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                    "SELECT HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', " +
+                    "N'OBJECT', N'SELECT', N'DatabaseIdentity', N'COLUMN');"));
+                var startupException = await Assert.ThrowsAsync<DesktopStartupException>(
+                    () => new SqlRuntimePrincipalValidator()
+                        .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None));
+                Assert.Equal("Security.RuntimePrincipalOverprivileged", startupException.Code);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+
+            var provisioningException = await Assert.ThrowsAsync<SqlException>(
+                () => connection.ExecuteAsync(script));
+
+            Assert.Contains("elevated", provisioningException.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -367,6 +415,10 @@ public sealed class SqlPrincipalProvisioningTests
             await connection.ExecuteAsync(
                 "GRANT INSERT, UPDATE ON OBJECT::dbo.Users TO [MyDmsVnRuntimeRole];");
             await connection.ExecuteAsync(script);
+            await connection.ExecuteAsync(
+                "UPDATE dbo.PermissionSynchronizationState SET LastAppliedReleaseId = @releaseId " +
+                "WHERE StateId = 1;",
+                new { releaseId = PermissionReleaseManifest.CurrentReleaseId });
 
             var permissions = await connection.QuerySingleAsync<PermissionProbe>(
                 "EXECUTE AS USER = N'P6RuntimeProbe'; " +
@@ -380,6 +432,10 @@ public sealed class SqlPrincipalProvisioningTests
                 "HAS_PERMS_BY_NAME(N'dbo.Permissions', N'OBJECT', N'SELECT') AS CanReadPermissions, " +
                 "HAS_PERMS_BY_NAME(N'dbo.Permissions', N'OBJECT', N'UPDATE') AS CanUpdatePermissions, " +
                 "HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', N'OBJECT', N'SELECT') AS CanReadSyncState, " +
+                "HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', N'OBJECT', N'SELECT', " +
+                "N'LastAppliedReleaseId', N'COLUMN') AS CanReadSyncRelease, " +
+                "HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', N'OBJECT', N'SELECT', " +
+                "N'DatabaseIdentity', N'COLUMN') AS CanReadSyncDatabaseIdentity, " +
                 "HAS_PERMS_BY_NAME(N'dbo.SecurityBootstrapState', N'OBJECT', N'INSERT') AS CanInsertBootstrapState, " +
                 "HAS_PERMS_BY_NAME(N'dbo.GoodsReceiptNumberSequence', N'OBJECT', N'UPDATE') AS CanUseReceiptSequence, " +
                 "HAS_PERMS_BY_NAME(N'dbo.CatalogTextContainsNul', N'OBJECT', N'VIEW DEFINITION') AS CanInspectManifestFunction, " +
@@ -399,6 +455,8 @@ public sealed class SqlPrincipalProvisioningTests
             Assert.Equal(1, permissions.CanReadPermissions);
             Assert.Equal(0, permissions.CanUpdatePermissions);
             Assert.Equal(0, permissions.CanReadSyncState);
+            Assert.Equal(1, permissions.CanReadSyncRelease);
+            Assert.Equal(0, permissions.CanReadSyncDatabaseIdentity);
             Assert.Equal(0, permissions.CanInsertBootstrapState);
             Assert.Equal(1, permissions.CanUseReceiptSequence);
             Assert.Equal(1, permissions.CanInspectManifestFunction);
@@ -636,6 +694,10 @@ public sealed class SqlPrincipalProvisioningTests
         public int CanUpdatePermissions { get; set; }
 
         public int CanReadSyncState { get; set; }
+
+        public int CanReadSyncRelease { get; set; }
+
+        public int CanReadSyncDatabaseIdentity { get; set; }
 
         public int CanInsertBootstrapState { get; set; }
 

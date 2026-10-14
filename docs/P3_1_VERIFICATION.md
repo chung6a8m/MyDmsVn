@@ -28,7 +28,7 @@ dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Te
 Result: 132 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net48 --no-build --no-restore
-Result: 187 passed, 0 failed, 0 skipped; 7m48s.
+Result: 197 passed, 0 failed, 0 skipped; 9m54s.
 
 dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-build --no-restore
 Result: 200 passed, 0 failed, 0 skipped.
@@ -40,7 +40,7 @@ dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Te
 Result: 132 passed, 0 failed, 0 skipped.
 
 dotnet test tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net8.0 --no-build --no-restore
-Result: 187 passed, 0 failed, 0 skipped; 7m39s.
+Result: 197 passed, 0 failed, 0 skipped; 9m43s.
 
 dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net8.0-windows --no-build --no-restore
 Result: 200 passed, 0 failed, 0 skipped.
@@ -63,6 +63,11 @@ The final full suites ran sequentially by TFM. SQL integration test collections 
 - Enforced the code-side `Active` lifecycle gate independently from SQL catalog state in both authorization overloads.
 - Added every `UserRoles` membership to the reviewed plan fingerprint so membership drift invalidates a pending apply.
 - Revalidated active, normalized system-managed Administrator role ownership inside revoke/restore transactions.
+- Required runtime startup to match `PermissionSynchronizationState.LastAppliedReleaseId` to the compiled permission release while leaving DbMigrator schema preflight able to perform the prerequisite upgrade.
+- Replaced the broad 008 artifact checks with exact column/default/collation, CHECK-definition, primary-key, unique-index and foreign-key fingerprints.
+- Included unique-index `INCLUDE` mappings in the exact 008 fingerprint so covering-column drift also fails closed.
+- Included PK sort direction and `IGNORE_DUP_KEY` options for both PK and unique indexes in the exact 008 fingerprint.
+- Canonicalized SQL `datetime2` synchronization timestamps as persisted UTC values so plan fingerprints do not depend on the operator machine time zone.
 
 ## Remaining roadmap work
 

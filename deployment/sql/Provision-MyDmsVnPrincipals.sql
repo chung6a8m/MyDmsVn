@@ -20,6 +20,7 @@ BEGIN
     REVOKE INSERT, UPDATE, DELETE ON OBJECT::dbo.Permissions FROM [MyDmsVnRuntimeRole];
     REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.PermissionLegacyAssignmentDrift FROM [MyDmsVnRuntimeRole];
     REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.PermissionSynchronizationState FROM [MyDmsVnRuntimeRole];
+    REVOKE SELECT (LastAppliedReleaseId) ON OBJECT::dbo.PermissionSynchronizationState FROM [MyDmsVnRuntimeRole];
     REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.SystemManagedRoles FROM [MyDmsVnRuntimeRole];
     REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.PermissionGrantApprovals FROM [MyDmsVnRuntimeRole];
     REVOKE SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.ManagedRolePermissionGrants FROM [MyDmsVnRuntimeRole];
@@ -223,6 +224,9 @@ GRANT SELECT ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.Permissions TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.Permissions TO [MyDmsVnRuntimeRole];
+GRANT SELECT (LastAppliedReleaseId)
+    ON OBJECT::dbo.PermissionSynchronizationState TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.PermissionSynchronizationState TO [MyDmsVnRuntimeRole];
 
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];

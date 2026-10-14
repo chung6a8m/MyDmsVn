@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Dapper;
 using DbUp;
 using Microsoft.Data.SqlClient;
+using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Operations;
 using Xunit;
@@ -66,6 +67,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             var forwardFix = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(forwardFix.Successful, forwardFix.Error?.ToString());
             Assert.Single(forwardFix.Scripts);
+            await MarkPermissionReleaseCurrentAsync(database.ConnectionString);
 
             var compatible = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
                 .CheckAsync(CancellationToken.None);
@@ -104,6 +106,49 @@ public sealed class SchemaCompatibilityIntegrationTests
     }
 
     [SqlServerFact]
+    public async Task Migrated_database_without_permission_sync_fails_runtime_preflight()
+    {
+        var database = await CreateMigratedDatabaseAsync(markPermissionReleaseCurrent: false);
+        try
+        {
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.False(result.IsCompatible);
+            Assert.Equal("Security.PermissionSynchronizationRequired", result.Code);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Database_synced_to_old_permission_release_fails_runtime_preflight()
+    {
+        var database = await CreateMigratedDatabaseAsync(markPermissionReleaseCurrent: false);
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE dbo.PermissionSynchronizationState " +
+                    "SET LastAppliedReleaseId = N'2026.10.12-old' WHERE StateId = 1;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.False(result.IsCompatible);
+            Assert.Equal("Security.PermissionSynchronizationRequired", result.Code);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
     public async Task Permission_catalog_constraint_tampering_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -116,6 +161,179 @@ public sealed class SchemaCompatibilityIntegrationTests
                     "ALTER TABLE dbo.Permissions WITH CHECK ADD CONSTRAINT CK_Permissions_CatalogStatus " +
                     "CHECK (LEN(CatalogStatus) > 0); " +
                     "ALTER TABLE dbo.Permissions CHECK CONSTRAINT CK_Permissions_CatalogStatus;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Permission_activation_audit_constraint_tampering_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.Permissions DROP CONSTRAINT CK_Permissions_ActivationAudit; " +
+                    "ALTER TABLE dbo.Permissions WITH CHECK ADD CONSTRAINT CK_Permissions_ActivationAudit " +
+                    "CHECK (1 = 1); " +
+                    "ALTER TABLE dbo.Permissions CHECK CONSTRAINT CK_Permissions_ActivationAudit;");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Permission_key_collation_tampering_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.PermissionLegacyAssignmentDrift DROP CONSTRAINT FK_PermissionLegacyAssignmentDrift_Permissions; " +
+                    "ALTER TABLE dbo.PermissionGrantApprovals DROP CONSTRAINT FK_PermissionGrantApprovals_Permissions; " +
+                    "ALTER TABLE dbo.ManagedRolePermissionGrants DROP CONSTRAINT FK_ManagedRolePermissionGrants_Permissions; " +
+                    "DROP INDEX UX_ManagedRolePermissionGrants_Role_Key ON dbo.ManagedRolePermissionGrants; " +
+                    "ALTER TABLE dbo.Permissions DROP CONSTRAINT CK_Permissions_PermissionKey_NotBlank; " +
+                    "ALTER TABLE dbo.Permissions DROP CONSTRAINT PK_Permissions; " +
+                    "ALTER TABLE dbo.PermissionLegacyAssignmentDrift DROP CONSTRAINT PK_PermissionLegacyAssignmentDrift; " +
+                    "ALTER TABLE dbo.PermissionGrantApprovals DROP CONSTRAINT PK_PermissionGrantApprovals; " +
+                    "ALTER TABLE dbo.Permissions ALTER COLUMN PermissionKey nvarchar(100) COLLATE Latin1_General_100_CI_AI NOT NULL; " +
+                    "ALTER TABLE dbo.PermissionLegacyAssignmentDrift ALTER COLUMN PermissionKey nvarchar(100) COLLATE Latin1_General_100_CI_AI NOT NULL; " +
+                    "ALTER TABLE dbo.PermissionGrantApprovals ALTER COLUMN PermissionKey nvarchar(100) COLLATE Latin1_General_100_CI_AI NOT NULL; " +
+                    "ALTER TABLE dbo.ManagedRolePermissionGrants ALTER COLUMN PermissionKey nvarchar(100) COLLATE Latin1_General_100_CI_AI NOT NULL; " +
+                    "ALTER TABLE dbo.Permissions ADD CONSTRAINT PK_Permissions PRIMARY KEY (PermissionKey); " +
+                    "ALTER TABLE dbo.PermissionLegacyAssignmentDrift ADD CONSTRAINT PK_PermissionLegacyAssignmentDrift PRIMARY KEY (PermissionKey); " +
+                    "ALTER TABLE dbo.PermissionGrantApprovals ADD CONSTRAINT PK_PermissionGrantApprovals PRIMARY KEY (PermissionKey); " +
+                    "ALTER TABLE dbo.Permissions WITH CHECK ADD CONSTRAINT CK_Permissions_PermissionKey_NotBlank " +
+                    "CHECK (LEN(LTRIM(RTRIM(PermissionKey))) > 0); " +
+                    "ALTER TABLE dbo.PermissionLegacyAssignmentDrift WITH CHECK ADD CONSTRAINT FK_PermissionLegacyAssignmentDrift_Permissions " +
+                    "FOREIGN KEY (PermissionKey) REFERENCES dbo.Permissions (PermissionKey); " +
+                    "ALTER TABLE dbo.PermissionGrantApprovals WITH CHECK ADD CONSTRAINT FK_PermissionGrantApprovals_Permissions " +
+                    "FOREIGN KEY (PermissionKey) REFERENCES dbo.Permissions (PermissionKey); " +
+                    "ALTER TABLE dbo.ManagedRolePermissionGrants WITH CHECK ADD CONSTRAINT FK_ManagedRolePermissionGrants_Permissions " +
+                    "FOREIGN KEY (PermissionKey) REFERENCES dbo.Permissions (PermissionKey); " +
+                    "CREATE UNIQUE INDEX UX_ManagedRolePermissionGrants_Role_Key " +
+                    "ON dbo.ManagedRolePermissionGrants (ManagedRoleId, PermissionKey);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Permission_unique_index_with_unexpected_included_column_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DROP INDEX UX_PermissionSecurityAudit_AttemptId ON dbo.PermissionSecurityAudit; " +
+                    "CREATE UNIQUE INDEX UX_PermissionSecurityAudit_AttemptId " +
+                    "ON dbo.PermissionSecurityAudit (AttemptId) INCLUDE (Actor);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Permission_primary_key_with_descending_key_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.SecurityBootstrapState DROP CONSTRAINT PK_SecurityBootstrapState; " +
+                    "ALTER TABLE dbo.SecurityBootstrapState ADD CONSTRAINT PK_SecurityBootstrapState " +
+                    "PRIMARY KEY (BootstrapKey DESC);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Permission_primary_key_with_ignore_duplicate_key_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "ALTER TABLE dbo.SecurityBootstrapState DROP CONSTRAINT PK_SecurityBootstrapState; " +
+                    "ALTER TABLE dbo.SecurityBootstrapState ADD CONSTRAINT PK_SecurityBootstrapState " +
+                    "PRIMARY KEY (BootstrapKey) WITH (IGNORE_DUP_KEY = ON);");
+            }
+
+            var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
+                .CheckAsync(CancellationToken.None);
+
+            Assert.Equal(SchemaCompatibilityStatus.Partial, result.Status);
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact]
+    public async Task Permission_unique_index_with_ignore_duplicate_key_is_partial()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DROP INDEX UX_PermissionSecurityAudit_AttemptId ON dbo.PermissionSecurityAudit; " +
+                    "CREATE UNIQUE INDEX UX_PermissionSecurityAudit_AttemptId " +
+                    "ON dbo.PermissionSecurityAudit (AttemptId) WITH (IGNORE_DUP_KEY = ON);");
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
@@ -733,13 +951,28 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
+    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
+        bool markPermissionReleaseCurrent = true)
     {
         var database = await SqlTestDatabase.CreateAsync(
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
         Assert.True(migration.Successful, migration.Error?.ToString());
+        if (markPermissionReleaseCurrent)
+        {
+            await MarkPermissionReleaseCurrentAsync(database.ConnectionString);
+        }
+
         return database;
+    }
+
+    private static async Task MarkPermissionReleaseCurrentAsync(string connectionString)
+    {
+        using var connection = new SqlConnection(connectionString);
+        await connection.ExecuteAsync(
+            "UPDATE dbo.PermissionSynchronizationState SET LastAppliedReleaseId = @releaseId " +
+            "WHERE StateId = 1;",
+            new { releaseId = PermissionReleaseManifest.CurrentReleaseId });
     }
 
 }

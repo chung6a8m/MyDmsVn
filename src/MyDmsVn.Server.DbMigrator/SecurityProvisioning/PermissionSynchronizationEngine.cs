@@ -1420,7 +1420,8 @@ namespace MyDmsVn.Server.DbMigrator.SecurityProvisioning
         private static string Format(DateTime? value)
         {
             return value.HasValue
-                ? value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
+                ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+                    .ToString("O", CultureInfo.InvariantCulture)
                 : null!;
         }
 
