@@ -45,6 +45,7 @@ public sealed class OwnedProcessRunnerTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.False(result.TimedOut);
+        Assert.True(result.Duration > TimeSpan.Zero);
         Assert.Contains("stdout-line", result.StandardOutput);
         Assert.Contains("stderr-line", result.StandardError);
     }

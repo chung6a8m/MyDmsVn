@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace MyDmsVn.SqlTestRunner.Processes;
@@ -8,4 +9,5 @@ public sealed record CommandResult(
     int RootProcessId,
     string StandardOutput,
     string StandardError,
-    IReadOnlyList<int> TerminatedProcessIds);
+    IReadOnlyList<int> TerminatedProcessIds,
+    TimeSpan Duration);

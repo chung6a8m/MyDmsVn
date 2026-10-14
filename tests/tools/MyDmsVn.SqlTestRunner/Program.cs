@@ -11,7 +11,13 @@ namespace MyDmsVn.SqlTestRunner;
 
 internal static class Program
 {
-    public static async Task<int> Main(string[] args)
+    public static Task<int> Main(string[] args) =>
+        RunAsync(args, RunBaselineAsync, CancellationToken.None);
+
+    internal static async Task<int> RunAsync(
+        string[] args,
+        Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> baselineRunner,
+        CancellationToken cancellationToken)
     {
         if (args.Length == 0)
         {
@@ -21,7 +27,7 @@ internal static class Program
         if (string.Equals(args[0], "preflight", StringComparison.OrdinalIgnoreCase))
         {
             return await new EnvironmentPreflightGate()
-                .ValidateAsync(CancellationToken.None)
+                .ValidateAsync(cancellationToken)
                 .ConfigureAwait(false)
                 ? 0
                 : 2;
@@ -45,11 +51,7 @@ internal static class Program
             SqlTestHarnessEnvironment.ApprovalFileVariable,
             approval);
         Directory.CreateDirectory(artifacts);
-        using var runner = new OwnedProcessRunner();
-        var result = await new BenchmarkRunCoordinator(
-                new EnvironmentPreflightGate(),
-                runner)
-            .RunAsync(
+        var result = await baselineRunner(
                 new BenchmarkRunOptions(
                     Path.GetFullPath(repository),
                     Path.GetFullPath(project),
@@ -58,9 +60,21 @@ internal static class Program
                     new[] { "net48", "net8.0" },
                     TimeSpan.FromMinutes(30),
                     OverallRunTimeout: TimeSpan.FromHours(4)),
-                CancellationToken.None)
+                cancellationToken)
             .ConfigureAwait(false);
         return result.IsComplete ? 0 : 3;
+    }
+
+    private static async Task<BenchmarkRunResult> RunBaselineAsync(
+        BenchmarkRunOptions options,
+        CancellationToken cancellationToken)
+    {
+        using var runner = new OwnedProcessRunner();
+        return await new BenchmarkRunCoordinator(
+                new EnvironmentPreflightGate(),
+                runner)
+            .RunAsync(options, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static Dictionary<string, string> ParseOptions(string[] args)

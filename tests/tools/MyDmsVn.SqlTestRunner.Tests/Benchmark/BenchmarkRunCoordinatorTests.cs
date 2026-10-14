@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Benchmark;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Processes;
+using MyDmsVn.SqlTestRunner.Reporting;
 using Xunit;
 
 namespace MyDmsVn.SqlTestRunner.Tests.Benchmark;
@@ -21,7 +22,8 @@ public sealed class BenchmarkRunCoordinatorTests
             new StubPreflightGate(false),
             process,
             new StubResultGate(),
-            new StubOwnershipGate());
+            new StubOwnershipGate(),
+            new StubReportExporter());
 
         var result = await coordinator.RunAsync(Options(), CancellationToken.None);
 
@@ -37,7 +39,8 @@ public sealed class BenchmarkRunCoordinatorTests
             new BlockingPreflightGate(),
             process,
             new StubResultGate(),
-            new StubOwnershipGate());
+            new StubOwnershipGate(),
+            new StubReportExporter());
         var options = Options() with { OverallTimeout = TimeSpan.FromMilliseconds(50) };
 
         var result = await coordinator.RunAsync(options, CancellationToken.None);
@@ -49,14 +52,16 @@ public sealed class BenchmarkRunCoordinatorTests
     [Fact]
     public async Task Baseline_runs_one_warmup_and_three_measured_passes_in_alternating_tfm_order()
     {
+        using var fixture = new CoordinatorFixture();
         var process = new RecordingProcessRunner();
         var coordinator = new BenchmarkRunCoordinator(
             new StubPreflightGate(true),
             process,
             new StubResultGate(),
-            new StubOwnershipGate());
+            new StubOwnershipGate(),
+            new StubReportExporter());
 
-        var result = await coordinator.RunAsync(Options(), CancellationToken.None);
+        var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
         Assert.True(result.IsComplete);
         Assert.Equal(16, process.Commands.Count);
@@ -77,6 +82,12 @@ public sealed class BenchmarkRunCoordinatorTests
         Assert.Equal(8, executions.ConvertAll(command => command.Environment["MYDMSVN_SQL_TEST_TIMING_OUTPUT"]).Distinct().Count());
         Assert.Equal(2, result.Runs.Count(run => run.Kind == BenchmarkPassKind.Warmup));
         Assert.Equal(6, result.Runs.Count(run => run.Kind == BenchmarkPassKind.Measured));
+        Assert.Equal(8, result.Runs.Select(run => run.RunId).Distinct().Count());
+        Assert.All(result.Runs, run =>
+        {
+            Assert.True(Path.IsPathRooted(run.TrxPath));
+            Assert.True(Path.IsPathRooted(run.TimingPath));
+        });
         Assert.All(executions, command =>
         {
             Assert.Contains("--no-build", command.Arguments);
@@ -96,7 +107,8 @@ public sealed class BenchmarkRunCoordinatorTests
             new StubPreflightGate(true),
             process,
             new StubResultGate(),
-            ownership);
+            ownership,
+            new StubReportExporter());
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -113,13 +125,14 @@ public sealed class BenchmarkRunCoordinatorTests
         var process = new RecordingProcessRunner(command =>
             command.Arguments.Contains("--list-tests")
                 ? Success(command)
-                : new CommandResult(-1, true, 1, string.Empty, "timed out", Array.Empty<int>()));
+                : new CommandResult(-1, true, 1, string.Empty, "timed out", Array.Empty<int>(), TimeSpan.FromSeconds(1)));
         var ownership = new StubOwnershipGate(isComplete: false, writeRecoveryArtifact: true);
         var coordinator = new BenchmarkRunCoordinator(
             new StubPreflightGate(true),
             process,
             new StubResultGate(),
-            ownership);
+            ownership,
+            new StubReportExporter());
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -139,7 +152,8 @@ public sealed class BenchmarkRunCoordinatorTests
             new StubPreflightGate(true),
             process,
             new StubResultGate(),
-            ownership);
+            ownership,
+            new StubReportExporter());
 
         var result = await coordinator.RunAsync(
             fixture.Options with { OverallTimeout = TimeSpan.FromMilliseconds(50) },
@@ -160,7 +174,8 @@ public sealed class BenchmarkRunCoordinatorTests
             new StubPreflightGate(true),
             process,
             new StubResultGate(),
-            new StubOwnershipGate());
+            new StubOwnershipGate(),
+            new StubReportExporter());
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -171,6 +186,42 @@ public sealed class BenchmarkRunCoordinatorTests
         Assert.Equal(8, journalDirectories.Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.All(journalDirectories, path =>
             Assert.StartsWith(fixture.ArtifactRoot, path, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Required_report_export_failure_is_incomplete()
+    {
+        using var fixture = new CoordinatorFixture();
+        var exporter = new StubReportExporter(isComplete: false);
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            new RecordingProcessRunner(),
+            new StubResultGate(),
+            new StubOwnershipGate(),
+            exporter);
+
+        var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        var evidence = Assert.Single(exporter.Evidence);
+        Assert.Equal(2, evidence.Runs.Count(run => run.Kind == BenchmarkPassKind.Warmup));
+        Assert.Equal(6, evidence.Runs.Count(run => run.Kind == BenchmarkPassKind.Measured));
+    }
+
+    [Fact]
+    public async Task Missing_required_report_output_is_incomplete()
+    {
+        using var fixture = new CoordinatorFixture();
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            new RecordingProcessRunner(),
+            new StubResultGate(),
+            new StubOwnershipGate(),
+            new StubReportExporter(returnMissingPaths: true));
+
+        var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
+
+        Assert.False(result.IsComplete);
     }
 
     [Fact]
@@ -325,7 +376,7 @@ public sealed class BenchmarkRunCoordinatorTests
         var output = command.Arguments.Contains("--list-tests")
             ? "The following Tests are available:\n    Example.Tests.First\n"
             : string.Empty;
-        return new CommandResult(0, false, 1, output, string.Empty, Array.Empty<int>());
+        return new CommandResult(0, false, 1, output, string.Empty, Array.Empty<int>(), TimeSpan.FromSeconds(1));
     }
 
     private sealed class RecordingProcessRunner : IProcessRunner
@@ -392,6 +443,52 @@ public sealed class BenchmarkRunCoordinatorTests
             return Task.FromResult(new BenchmarkOwnershipResult(
                 _isComplete,
                 _writeRecoveryArtifact ? evidence.RecoveryArtifactPath : null));
+        }
+    }
+
+    private sealed class StubReportExporter : IBenchmarkReportExporter
+    {
+        private readonly bool _isComplete;
+        private readonly bool _returnMissingPaths;
+
+        public StubReportExporter(bool isComplete = true, bool returnMissingPaths = false)
+        {
+            _isComplete = isComplete;
+            _returnMissingPaths = returnMissingPaths;
+        }
+
+        public List<BenchmarkReportEvidence> Evidence { get; } =
+            new List<BenchmarkReportEvidence>();
+
+        public Task<BenchmarkReportExportResult> ExportAsync(
+            BenchmarkReportEvidence evidence,
+            CancellationToken cancellationToken)
+        {
+            Evidence.Add(evidence);
+            if (!_isComplete)
+            {
+                return Task.FromResult(BenchmarkReportExportResult.Incomplete());
+            }
+
+            var paths = evidence.TargetFrameworks.SelectMany(tfm => new[]
+            {
+                Path.Combine(evidence.ArtifactRoot, "sqlperf-baseline-" + tfm + ".json"),
+                Path.Combine(evidence.ArtifactRoot, "sqlperf-baseline-" + tfm + ".md"),
+            }).ToArray();
+            if (_returnMissingPaths)
+            {
+                return Task.FromResult(new BenchmarkReportExportResult(true, paths));
+            }
+
+            Directory.CreateDirectory(evidence.ArtifactRoot);
+            foreach (var path in paths)
+            {
+                File.WriteAllText(path, string.Empty);
+            }
+
+            return Task.FromResult(new BenchmarkReportExportResult(
+                true,
+                paths));
         }
     }
 

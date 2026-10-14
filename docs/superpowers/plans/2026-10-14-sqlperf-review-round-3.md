@@ -167,7 +167,7 @@ Expected: all tests pass with zero skips/failures.
 - `Program.RunAsync(string[] args, Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> baselineRunner, CancellationToken)` is the internal CLI seam; `Main` supplies the production coordinator.
 - Produces: stable files `sqlperf-baseline-net48.json/.md` and `sqlperf-baseline-net8.0.json/.md`.
 
-- [ ] **Step 1: Add real exporter regressions**
+- [x] **Step 1: Add real exporter regressions**
 
 Use synthetic TRX and timing files for warm-up, two measured runs, an invalid run, another TFM, nested stages, and theory displays containing sensitive values. Assert:
 
@@ -177,7 +177,7 @@ Use synthetic TRX and timing files for warm-up, two measured runs, an invalid ru
 - `dmvStatus` is `unavailable`;
 - JSON and Markdown files exist and contain none of the supplied secret, server, path, or theory values.
 
-- [ ] **Step 2: Run exporter tests and verify RED**
+- [x] **Step 2: Run exporter tests and verify RED**
 
 Run:
 
@@ -187,19 +187,19 @@ dotnet test tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.
 
 Expected: FAIL because exporter and enriched run evidence do not exist.
 
-- [ ] **Step 3: Measure process duration and enrich run evidence**
+- [x] **Step 3: Measure process duration and enrich run evidence**
 
 Start a `Stopwatch` immediately before child launch and store elapsed duration after stdout/stderr drainage. Add `Duration` to all real and synthetic `CommandResult` instances. Store execution ID and resolved artifact paths in `BenchmarkFrameworkRun`.
 
-- [ ] **Step 4: Implement sanitized report export**
+- [x] **Step 4: Implement sanitized report export**
 
 Parse timing JSONL and TRX through focused private readers. Build per-TFM measured samples, aggregate test/class duration rows from TRX, and serialize deterministic JSON plus Markdown using temporary files followed by atomic replace/move. Reuse `SqlPerformanceReportBuilder.RedactShareable` at every shareable-text boundary. Never copy raw display names into the document model.
 
-- [ ] **Step 5: Make report export a completion gate**
+- [x] **Step 5: Make report export a completion gate**
 
 Inject `IBenchmarkReportExporter` into the coordinator. Invoke it only after all pass and ownership gates succeed. Return incomplete when exporter validation/write fails or when either target TFM lacks the configured measured-pass count.
 
-- [ ] **Step 6: Add CLI/coordinator boundary regressions**
+- [x] **Step 6: Add CLI/coordinator boundary regressions**
 
 Add tests proving:
 
@@ -208,7 +208,7 @@ Add tests proving:
 - warm-up artifacts remain local but absent from report aggregates;
 - `Program.Main` maps required-report failure to exit code `3` through an internal injectable baseline entry point rather than launching real SQL.
 
-- [ ] **Step 7: Run reporting, process, coordinator, and full runner tests GREEN**
+- [x] **Step 7: Run reporting, process, coordinator, and full runner tests GREEN**
 
 Run:
 

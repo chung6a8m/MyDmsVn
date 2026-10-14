@@ -19,7 +19,9 @@ public sealed class SqlPerformanceReport
         decimal overlapMs,
         decimal residualMs,
         IReadOnlyDictionary<string, decimal> exclusiveStageMs,
-        string dmvStatus)
+        string dmvStatus,
+        IReadOnlyList<SqlPerformanceCost>? rankedTests = null,
+        IReadOnlyList<SqlPerformanceCost>? rankedClasses = null)
     {
         AcceptedRunCount = acceptedRunCount;
         WallClockP50Ms = wallClockP50Ms;
@@ -29,6 +31,8 @@ public sealed class SqlPerformanceReport
         ResidualMs = residualMs;
         ExclusiveStageMs = exclusiveStageMs;
         DmvStatus = dmvStatus;
+        RankedTests = rankedTests ?? new List<SqlPerformanceCost>();
+        RankedClasses = rankedClasses ?? new List<SqlPerformanceCost>();
     }
 
     public int AcceptedRunCount { get; }
@@ -39,7 +43,11 @@ public sealed class SqlPerformanceReport
     public decimal ResidualMs { get; }
     public IReadOnlyDictionary<string, decimal> ExclusiveStageMs { get; }
     public string DmvStatus { get; }
+    public IReadOnlyList<SqlPerformanceCost> RankedTests { get; }
+    public IReadOnlyList<SqlPerformanceCost> RankedClasses { get; }
 }
+
+public sealed record SqlPerformanceCost(string Identity, decimal TotalDurationMs);
 
 public sealed record SqlDmvSnapshot(
     decimal? CpuMs,

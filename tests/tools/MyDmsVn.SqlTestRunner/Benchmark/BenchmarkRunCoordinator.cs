@@ -8,6 +8,7 @@ using MyDmsVn.SqlTestHarness;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Processes;
 using MyDmsVn.SqlTestRunner.Reconciliation;
+using MyDmsVn.SqlTestRunner.Reporting;
 using MyDmsVn.SqlTestRunner.Trx;
 
 namespace MyDmsVn.SqlTestRunner.Benchmark;
@@ -23,17 +24,20 @@ public sealed class BenchmarkRunCoordinator
     private readonly IProcessRunner _processRunner;
     private readonly IBenchmarkResultGate _resultGate;
     private readonly IBenchmarkOwnershipGate _ownershipGate;
+    private readonly IBenchmarkReportExporter _reportExporter;
 
     public BenchmarkRunCoordinator(
         IBenchmarkPreflightGate preflight,
         IProcessRunner processRunner,
         IBenchmarkResultGate? resultGate = null,
-        IBenchmarkOwnershipGate? ownershipGate = null)
+        IBenchmarkOwnershipGate? ownershipGate = null,
+        IBenchmarkReportExporter? reportExporter = null)
     {
         _preflight = preflight;
         _processRunner = processRunner;
         _resultGate = resultGate ?? new TrxBenchmarkResultGate();
         _ownershipGate = ownershipGate ?? new BenchmarkOwnershipGate();
+        _reportExporter = reportExporter ?? new SqlPerformanceReportExporter();
     }
 
     public async Task<BenchmarkRunResult> RunAsync(
@@ -160,8 +164,15 @@ public sealed class BenchmarkRunCoordinator
                     return new BenchmarkRunResult(false, runs);
                 }
 
-                runs.Add(new BenchmarkFrameworkRun(tfm, trxName, timingName, pass.Kind, pass.Number, result));
                 var trxPath = Path.Combine(options.ArtifactRoot, trxName);
+                runs.Add(new BenchmarkFrameworkRun(
+                    executionId,
+                    tfm,
+                    Path.GetFullPath(trxPath),
+                    Path.GetFullPath(timingPath),
+                    pass.Kind,
+                    pass.Number,
+                    result));
                 var projectPath = Path.IsPathRooted(options.TestProject)
                     ? options.TestProject
                     : Path.Combine(options.RepositoryRoot, options.TestProject);
@@ -191,6 +202,35 @@ public sealed class BenchmarkRunCoordinator
                     return new BenchmarkRunResult(false, runs);
                 }
             }
+        }
+
+        var export = await _reportExporter.ExportAsync(
+                new BenchmarkReportEvidence(
+                    options.ArtifactRoot,
+                    options.TargetFrameworks,
+                    options.MeasuredPasses,
+                    runs),
+                cancellationToken)
+            .ConfigureAwait(false);
+        var expectedReportPaths = options.TargetFrameworks
+            .SelectMany(tfm => new[]
+            {
+                Path.GetFullPath(Path.Combine(
+                    options.ArtifactRoot,
+                    "sqlperf-baseline-" + tfm + ".json")),
+                Path.GetFullPath(Path.Combine(
+                    options.ArtifactRoot,
+                    "sqlperf-baseline-" + tfm + ".md")),
+            })
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var actualReportPaths = export.ReportPaths
+            .Select(Path.GetFullPath)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!export.IsComplete ||
+            !actualReportPaths.SetEquals(expectedReportPaths) ||
+            expectedReportPaths.Any(path => !File.Exists(path)))
+        {
+            return new BenchmarkRunResult(false, runs);
         }
 
         return new BenchmarkRunResult(true, runs);
@@ -323,9 +363,10 @@ public enum BenchmarkPassKind
 }
 
 public sealed record BenchmarkFrameworkRun(
+    string RunId,
     string Tfm,
-    string TrxName,
-    string TimingName,
+    string TrxPath,
+    string TimingPath,
     BenchmarkPassKind Kind,
     int PassNumber,
     CommandResult Command);

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,6 +20,7 @@ public sealed class OwnedProcessRunner : IProcessRunner, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         using var job = new WindowsJobObject();
+        var stopwatch = Stopwatch.StartNew();
         using var owned = SuspendedOwnedProcess.Start(command, job);
         var process = owned.Process;
         var rootPid = process.Id;
@@ -48,13 +50,15 @@ public sealed class OwnedProcessRunner : IProcessRunner, IDisposable
 
         var output = await stdout.ConfigureAwait(false);
         var error = await stderr.ConfigureAwait(false);
+        stopwatch.Stop();
         return new CommandResult(
             timedOut ? -1 : process.ExitCode,
             timedOut,
             rootPid,
             output,
             error,
-            timedOut ? new[] { rootPid } : Array.Empty<int>());
+            timedOut ? new[] { rootPid } : Array.Empty<int>(),
+            stopwatch.Elapsed);
     }
 
     public void Dispose() => _disposed = true;
