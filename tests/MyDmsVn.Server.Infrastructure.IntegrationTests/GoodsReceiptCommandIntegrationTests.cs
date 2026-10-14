@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -1683,13 +1684,16 @@ public sealed class GoodsReceiptCommandIntegrationTests
             note,
             new[] { new SaveGoodsReceiptLineRequest(productId, 1m, 2m) });
 
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
+    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
+        [CallerMemberName] string testCaseId = "")
     {
+        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
+            measurement);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "GoodsReceiptCommandIntegrationTests.CreateDatabaseAsync.migration-01", database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             return database;
         }

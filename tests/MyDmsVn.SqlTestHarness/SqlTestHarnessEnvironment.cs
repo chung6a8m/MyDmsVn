@@ -13,4 +13,10 @@ public static class SqlTestHarnessEnvironment
 
     public const string RunIdVariable =
         "MYDMSVN_SQL_TEST_RUN_ID";
+
+    public const string TimingEnabledVariable =
+        "MYDMSVN_SQL_TEST_TIMINGS";
+
+    public const string TimingOutputVariable =
+        "MYDMSVN_SQL_TEST_TIMING_OUTPUT";
 }

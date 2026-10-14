@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -9,6 +10,7 @@ using MyDmsVn.SqlTestHarness;
 using MyDmsVn.SqlTestHarness.Approval;
 using MyDmsVn.SqlTestHarness.Ownership;
 using MyDmsVn.SqlTestHarness.Preflight;
+using MyDmsVn.SqlTestHarness.Timing;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
@@ -35,13 +37,15 @@ internal sealed class SqlTestDatabase : IDisposable
         string approvalFilePath,
         IDatabaseOwnershipJournal journal,
         Func<string, ISqlAdministrativeSession> sessionFactory,
-        DatabaseOwnershipRecord record)
+        DatabaseOwnershipRecord record,
+        SqlTestMeasurementContext measurementContext)
     {
         _adminConnectionString = adminConnectionString;
         _approvalFilePath = approvalFilePath;
         _journal = journal;
         _sessionFactory = sessionFactory;
         _record = record;
+        MeasurementContext = measurementContext;
         DatabaseName = record.DatabaseName;
 
         var builder = new SqlConnectionStringBuilder(adminConnectionString)
@@ -56,8 +60,22 @@ internal sealed class SqlTestDatabase : IDisposable
 
     public string DatabaseName { get; }
 
+    public SqlTestMeasurementContext MeasurementContext { get; }
+
     public static Task<SqlTestDatabase> CreateAsync(
         string adminConnectionString,
+        CancellationToken cancellationToken = default,
+        [CallerMemberName] string testCaseId = "")
+    {
+        return CreateAsync(
+            adminConnectionString,
+            CreateMeasurementContextForTest(testCaseId),
+            cancellationToken);
+    }
+
+    public static Task<SqlTestDatabase> CreateAsync(
+        string adminConnectionString,
+        SqlTestMeasurementContext? measurementContext,
         CancellationToken cancellationToken = default)
     {
         ValidateAdminConnectionString(adminConnectionString);
@@ -74,6 +92,7 @@ internal sealed class SqlTestDatabase : IDisposable
             CreateDefaultJournal(),
             connectionString => new SqlClientAdministrativeSession(connectionString),
             cancellationToken,
+            measurementContext ?? CreateMeasurementContextForTest("SqlTestDatabase"),
             _ => { });
     }
 
@@ -89,6 +108,7 @@ internal sealed class SqlTestDatabase : IDisposable
             journal,
             sessionFactory,
             cancellationToken,
+            CreateMeasurementContextForTest("SqlTestDatabase"),
             _ => { });
 
     internal static Task<SqlTestDatabase> CreateAsync(
@@ -111,6 +131,7 @@ internal sealed class SqlTestDatabase : IDisposable
             CreateDefaultJournal(),
             sessionFactory,
             cancellationToken,
+            CreateMeasurementContextForTest("SqlTestDatabase"),
             afterCreate);
     }
 
@@ -120,6 +141,7 @@ internal sealed class SqlTestDatabase : IDisposable
         IDatabaseOwnershipJournal journal,
         Func<string, ISqlAdministrativeSession> sessionFactory,
         CancellationToken cancellationToken,
+        SqlTestMeasurementContext measurementContext,
         Action<string> afterCreate)
     {
         ValidateAdminConnectionString(adminConnectionString);
@@ -158,10 +180,14 @@ internal sealed class SqlTestDatabase : IDisposable
             approvalFilePath,
             journal,
             sessionFactory,
-            record);
+            record,
+            measurementContext);
 
         var createIssued = false;
         var ownershipConfirmed = false;
+        using var timing = measurementContext.StartOperation(
+            "create",
+            "database-create-" + record.OwnershipToken);
         try
         {
             using var session = sessionFactory(adminConnectionString);
@@ -224,6 +250,14 @@ internal sealed class SqlTestDatabase : IDisposable
         }
         catch (Exception provisioningError)
         {
+            if (provisioningError is OperationCanceledException)
+            {
+                timing.Cancel();
+            }
+            else
+            {
+                timing.Fail();
+            }
             if (createIssued && !ownershipConfirmed &&
                 database._record.State != DatabaseOwnershipState.Quarantined)
             {
@@ -278,6 +312,9 @@ internal sealed class SqlTestDatabase : IDisposable
             throw new InvalidOperationException("SQL test database cleanup is already in progress.");
         }
 
+        using var timing = MeasurementContext.StartOperation(
+            "drop",
+            "database-drop-" + _record.OwnershipToken);
         try
         {
             SqlTestDatabaseName.EnsureDisposable(DatabaseName);
@@ -334,8 +371,16 @@ internal sealed class SqlTestDatabase : IDisposable
                 .ConfigureAwait(false);
             Volatile.Write(ref _disposeState, 2);
         }
-        catch
+        catch (Exception cleanupError)
         {
+            if (cleanupError is OperationCanceledException)
+            {
+                timing.Cancel();
+            }
+            else
+            {
+                timing.Fail();
+            }
             if (_record.State == DatabaseOwnershipState.DropIntent)
             {
                 try
@@ -412,6 +457,45 @@ internal sealed class SqlTestDatabase : IDisposable
     {
         var configured = Environment.GetEnvironmentVariable(SqlTestHarnessEnvironment.RunIdVariable);
         return string.IsNullOrWhiteSpace(configured) ? DirectRunId : configured;
+    }
+
+    internal static SqlTestMeasurementContext CreateMeasurementContextForTest(string testCaseId)
+    {
+        var enabled = string.Equals(
+            Environment.GetEnvironmentVariable(SqlTestHarnessEnvironment.TimingEnabledVariable),
+            "1",
+            StringComparison.Ordinal);
+        var outputPath = Environment.GetEnvironmentVariable(
+            SqlTestHarnessEnvironment.TimingOutputVariable);
+        if (enabled && string.IsNullOrWhiteSpace(outputPath))
+        {
+            throw new InvalidOperationException(
+                $"Set {SqlTestHarnessEnvironment.TimingOutputVariable} when SQL timing is enabled.");
+        }
+
+        ISqlTestTimingSink sink = enabled
+            ? new JsonLinesSqlTestTimingSink(outputPath!)
+            : NullTimingSink.Instance;
+        return SqlTestMeasurementContext.Create(
+            GetRunId(),
+            string.IsNullOrWhiteSpace(testCaseId) ? "unknown-test" : testCaseId,
+#if NET48
+            "net48",
+#else
+            "net8.0",
+#endif
+            Guid.NewGuid().ToString("N"),
+            sink,
+            enabled);
+    }
+
+    private sealed class NullTimingSink : ISqlTestTimingSink
+    {
+        public static NullTimingSink Instance { get; } = new NullTimingSink();
+
+        public void Write(SqlTestTimingEvent timingEvent)
+        {
+        }
     }
 
     private static IReadOnlyDictionary<string, object?> EmptyParameters { get; } =

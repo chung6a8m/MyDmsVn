@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -23,7 +24,10 @@ public sealed class SchemaCompatibilityIntegrationTests
         try
         {
             var assembly = typeof(DatabaseMigrationRunner).Assembly;
-            var interrupted = DeployChanges.To
+            var interrupted = MeasuredDatabaseMigrationRunner.Execute(
+                database.MeasurementContext,
+                "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.direct-prefix",
+                () => DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScriptsEmbeddedInAssembly(
                     assembly,
@@ -34,11 +38,14 @@ public sealed class SchemaCompatibilityIntegrationTests
                 .WithTransactionPerScript()
                 .LogToNowhere()
                 .Build()
-                .PerformUpgrade();
+                .PerformUpgrade());
             Assert.True(interrupted.Successful, interrupted.Error?.ToString());
             Assert.Equal(7, interrupted.Scripts.Count());
 
-            var injectedFailure = DeployChanges.To
+            var injectedFailure = MeasuredDatabaseMigrationRunner.Execute(
+                database.MeasurementContext,
+                "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.direct-failure",
+                () => DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScript(
                     "008_FaultInjection.sql",
@@ -48,7 +55,7 @@ public sealed class SchemaCompatibilityIntegrationTests
                 .WithTransactionPerScript()
                 .LogToNowhere()
                 .Build()
-                .PerformUpgrade();
+                .PerformUpgrade());
             Assert.False(injectedFailure.Successful);
 
             using (var connection = new SqlConnection(database.ConnectionString))
@@ -65,7 +72,7 @@ public sealed class SchemaCompatibilityIntegrationTests
                 .CheckAsync(CancellationToken.None);
             Assert.Equal(SchemaCompatibilityStatus.TooOld, blocked.Status);
 
-            var forwardFix = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var forwardFix = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.migration-01", database.ConnectionString);
             Assert.True(forwardFix.Successful, forwardFix.Error?.ToString());
             Assert.Single(forwardFix.Scripts);
             await MarkPermissionReleaseCurrentAsync(database.ConnectionString);
@@ -988,11 +995,14 @@ public sealed class SchemaCompatibilityIntegrationTests
     }
 
     private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
-        bool markPermissionReleaseCurrent = true)
+        bool markPermissionReleaseCurrent = true,
+        [CallerMemberName] string testCaseId = "")
     {
+        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
+            measurement);
+        var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SchemaCompatibilityIntegrationTests.CreateMigratedDatabaseAsync.migration-01", database.ConnectionString);
         Assert.True(migration.Successful, migration.Error?.ToString());
         if (markPermissionReleaseCurrent)
         {

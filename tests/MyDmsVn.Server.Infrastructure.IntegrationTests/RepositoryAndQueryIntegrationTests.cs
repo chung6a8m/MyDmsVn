@@ -20,7 +20,10 @@ public sealed class RepositoryAndQueryIntegrationTests
         var database = await CreateDatabaseAsync();
         try
         {
-            TestDatabaseMigrationRunner.Migrate(database.ConnectionString);
+            TestDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "RepositoryAndQueryIntegrationTests.Repository_and_query_share_committed_data.test-migration",
+                database.ConnectionString);
             var services = new ServiceCollection();
             services
                 .AddSqlPersistence(database.ConnectionString)
