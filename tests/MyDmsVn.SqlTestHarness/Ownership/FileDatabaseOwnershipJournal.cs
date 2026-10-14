@@ -15,6 +15,9 @@ namespace MyDmsVn.SqlTestHarness.Ownership;
 
 public sealed class FileDatabaseOwnershipJournal : IDatabaseOwnershipJournal
 {
+    private const int UnableToRemoveReplacedError = 1175;
+    private const int ReplaceAttempts = 3;
+
     private static readonly Regex DisposableDatabaseName = new Regex(
         "^MyDmsVn_Test_[0-9a-f]{32}$",
         RegexOptions.CultureInvariant);
@@ -28,6 +31,8 @@ public sealed class FileDatabaseOwnershipJournal : IDatabaseOwnershipJournal
 
     private readonly string _rootDirectory;
     private readonly Action<FileStream> _durableFlush;
+    private readonly Action<string, string, string?> _replaceFile;
+    private readonly Action<TimeSpan> _replacementRetryDelay;
     private readonly string _mutexName;
 
     public FileDatabaseOwnershipJournal(string rootDirectory)
@@ -38,6 +43,19 @@ public sealed class FileDatabaseOwnershipJournal : IDatabaseOwnershipJournal
     internal FileDatabaseOwnershipJournal(
         string rootDirectory,
         Action<FileStream> durableFlush)
+        : this(
+            rootDirectory,
+            durableFlush,
+            (source, destination, backup) => File.Replace(source, destination, backup),
+            delay => System.Threading.Thread.Sleep(delay))
+    {
+    }
+
+    internal FileDatabaseOwnershipJournal(
+        string rootDirectory,
+        Action<FileStream> durableFlush,
+        Action<string, string, string?> replaceFile,
+        Action<TimeSpan> replacementRetryDelay)
     {
         if (string.IsNullOrWhiteSpace(rootDirectory))
         {
@@ -46,6 +64,9 @@ public sealed class FileDatabaseOwnershipJournal : IDatabaseOwnershipJournal
 
         _rootDirectory = Path.GetFullPath(rootDirectory);
         _durableFlush = durableFlush ?? throw new ArgumentNullException(nameof(durableFlush));
+        _replaceFile = replaceFile ?? throw new ArgumentNullException(nameof(replaceFile));
+        _replacementRetryDelay = replacementRetryDelay ??
+                                 throw new ArgumentNullException(nameof(replacementRetryDelay));
         _mutexName = "Local\\MyDmsVn.SqlTestJournal." + Hash(_rootDirectory).Substring(0, 24);
     }
 
@@ -212,7 +233,7 @@ public sealed class FileDatabaseOwnershipJournal : IDatabaseOwnershipJournal
 
             if (File.Exists(targetPath))
             {
-                File.Replace(temporaryPath, targetPath, null);
+                ReplaceWithRetry(temporaryPath, targetPath);
             }
             else
             {
@@ -227,6 +248,26 @@ public sealed class FileDatabaseOwnershipJournal : IDatabaseOwnershipJournal
             }
         }
     }
+
+    private void ReplaceWithRetry(string temporaryPath, string targetPath)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                _replaceFile(temporaryPath, targetPath, null);
+                return;
+            }
+            catch (IOException exception) when (
+                IsUnableToRemoveReplaced(exception) && attempt < ReplaceAttempts)
+            {
+                _replacementRetryDelay(TimeSpan.FromMilliseconds(25 * attempt));
+            }
+        }
+    }
+
+    private static bool IsUnableToRemoveReplaced(IOException exception) =>
+        (exception.HResult & 0xffff) == UnableToRemoveReplacedError;
 
     private static DatabaseOwnershipRecord ReadRecord(string path)
     {

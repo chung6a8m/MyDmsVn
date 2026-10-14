@@ -63,13 +63,16 @@ public sealed class OwnedProcessRunnerTests
             var result = await runner.RunAsync(
                 new CommandSpec(
                     "powershell.exe",
-                    "-NoProfile -Command \"$child=Start-Process powershell.exe -ArgumentList '-NoProfile -Command Start-Sleep -Seconds 20' -PassThru; Write-Output $child.Id; Start-Sleep -Seconds 20\"",
+                    "-NoProfile -Command \"$startInfo=[System.Diagnostics.ProcessStartInfo]::new('powershell.exe','-NoProfile -Command Start-Sleep -Seconds 20'); $startInfo.UseShellExecute=$false; $startInfo.CreateNoWindow=$true; $child=[System.Diagnostics.Process]::Start($startInfo); Write-Output $child.Id; Start-Sleep -Seconds 20\"",
                     Environment.CurrentDirectory,
                     TimeSpan.FromMilliseconds(750)),
                 CancellationToken.None);
 
             Assert.True(result.TimedOut);
             Assert.Contains(result.RootProcessId, result.TerminatedProcessIds);
+            var childProcessId = int.Parse(result.StandardOutput.Trim());
+            Assert.Throws<ArgumentException>(() =>
+                System.Diagnostics.Process.GetProcessById(childProcessId));
             Assert.False(unrelated!.HasExited);
         }
         finally

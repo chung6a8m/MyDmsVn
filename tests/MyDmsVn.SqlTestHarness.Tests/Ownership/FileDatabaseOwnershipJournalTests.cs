@@ -121,6 +121,43 @@ public sealed class FileDatabaseOwnershipJournalTests
         });
     }
 
+    [Fact]
+    public async Task Transient_replace_failure_is_retried_without_losing_the_record()
+    {
+        await WithDirectoryAsync(async directory =>
+        {
+            var replaceAttempts = 0;
+            var journal = new FileDatabaseOwnershipJournal(
+                directory,
+                stream => stream.Flush(flushToDisk: true),
+                (source, destination, backup) =>
+                {
+                    replaceAttempts++;
+                    if (replaceAttempts < 3)
+                    {
+                        throw new ReplaceFileIOException();
+                    }
+
+                    File.Replace(source, destination, backup);
+                },
+                _ => { });
+            var record = CreateIntent();
+            await journal.WriteCreateIntentAsync(record);
+
+            var updated = await journal.TransitionAsync(
+                record,
+                DatabaseOwnershipState.Created,
+                databaseId: 7,
+                databaseCreateDateUtc: DateTimeOffset.UtcNow);
+
+            Assert.Equal(3, replaceAttempts);
+            Assert.Equal(DatabaseOwnershipState.Created, updated.State);
+            Assert.Equal(
+                DatabaseOwnershipState.Created,
+                Assert.Single(await journal.ReadAllAsync()).State);
+        });
+    }
+
     private static DatabaseOwnershipRecord CreateIntent(int index = 0) =>
         new DatabaseOwnershipRecord(
             runId: "run-001",
@@ -160,6 +197,15 @@ public sealed class FileDatabaseOwnershipJournalTests
         finally
         {
             Directory.Delete(directory, true);
+        }
+    }
+
+    private sealed class ReplaceFileIOException : IOException
+    {
+        public ReplaceFileIOException()
+            : base("Unable to remove the file to be replaced.")
+        {
+            HResult = unchecked((int)0x80070497);
         }
     }
 }
