@@ -23,8 +23,14 @@ public static class MigrationTimingArtifactReconciler
         }
 
         var invalid = new List<string>();
+        var manifestEntries = MigrationInvocationManifest.Read(manifestPath)
+            .Where(entry => entry.Tfms.Contains(tfm, StringComparer.Ordinal))
+            .ToArray();
+        var auditedInvocationSuffixes = new HashSet<string>(
+            manifestEntries.Select(entry => "|" + entry.InvocationId),
+            StringComparer.Ordinal);
         var manifestExpected = BuildManifestExpectations(
-            manifestPath,
+            manifestEntries,
             repositoryRoot,
             tfm,
             executed,
@@ -83,7 +89,12 @@ public static class MigrationTimingArtifactReconciler
 
         var missing = new List<string>();
         var unexpected = new List<string>(invalid);
-        Compare(manifestExpected, recordedInvocations, missing, unexpected);
+        Compare(
+            manifestExpected,
+            recordedInvocations.Where(key => auditedInvocationSuffixes.Any(
+                suffix => key.EndsWith(suffix, StringComparison.Ordinal))),
+            missing,
+            unexpected);
         Compare(recordedInvocations, timingEvents, missing, unexpected);
         return new MigrationTimingArtifactReconciliation(
             manifestExpected.Count,
@@ -92,15 +103,14 @@ public static class MigrationTimingArtifactReconciler
     }
 
     private static List<string> BuildManifestExpectations(
-        string manifestPath,
+        IReadOnlyCollection<MigrationInvocationManifestEntry> manifestEntries,
         string repositoryRoot,
         string tfm,
         IReadOnlyCollection<TrxTestResult> executed,
         ICollection<string> invalid)
     {
         var expected = new List<string>();
-        foreach (var entry in MigrationInvocationManifest.Read(manifestPath)
-                     .Where(entry => entry.Tfms.Contains(tfm, StringComparer.Ordinal)))
+        foreach (var entry in manifestEntries)
         {
             foreach (var expectation in MigrationInvocationManifest.ResolveExpectations(entry, repositoryRoot))
             {

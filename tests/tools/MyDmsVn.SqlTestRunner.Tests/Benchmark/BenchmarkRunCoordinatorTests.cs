@@ -311,6 +311,81 @@ public sealed class BenchmarkRunCoordinatorTests
         }
     }
 
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void Trx_gate_reconciles_migration_pairs_outside_the_audited_manifest(
+        bool includeExternalTiming,
+        bool expected)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "MyDmsVn.MigrationScopeGate", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var trxPath = Path.Combine(directory, "complete.trx");
+            var timingPath = Path.Combine(directory, "timing.jsonl");
+            var manifestPath = Path.Combine(directory, "migration-manifest.json");
+            File.WriteAllText(
+                trxPath,
+                "<TestRun xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\"><Results>" +
+                "<UnitTestResult testId=\"a\" testName=\"Example.Tests.First\" outcome=\"Passed\" duration=\"00:00:00.0100000\" />" +
+                "<UnitTestResult testId=\"b\" testName=\"Example.Tests.RepositoryAndQueryIntegrationTests.Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write\" outcome=\"Passed\" duration=\"00:00:00.0100000\" />" +
+                "</Results></TestRun>");
+            var auditedInvocation =
+                "{\"recordType\":\"migration-invocation\",\"runId\":\"run-1\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"invocationId\":\"Example.Tests.First.migrate\"}";
+            var auditedTiming =
+                "{\"stage\":\"migration\",\"runId\":\"run-1\",\"testCaseId\":\"First\",\"tfm\":\"net8.0\",\"operationId\":\"Example.Tests.First.migrate\"}";
+            var externalInvocation =
+                "{\"recordType\":\"migration-invocation\",\"runId\":\"run-1\",\"testCaseId\":\"Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write\",\"tfm\":\"net8.0\",\"invocationId\":\"RepositoryAndQueryIntegrationTests.Repository_and_query_share_committed_data.test-migration\"}";
+            var externalTiming =
+                "{\"stage\":\"migration\",\"runId\":\"run-1\",\"testCaseId\":\"Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write\",\"tfm\":\"net8.0\",\"operationId\":\"RepositoryAndQueryIntegrationTests.Repository_and_query_share_committed_data.test-migration\"}";
+            var timingLines = new List<string>
+            {
+                auditedInvocation,
+                auditedTiming,
+                externalInvocation,
+            };
+            if (includeExternalTiming)
+            {
+                timingLines.Add(externalTiming);
+            }
+
+            File.WriteAllLines(timingPath, timingLines);
+            File.WriteAllText(
+                manifestPath,
+                "[{\"invocationId\":\"Example.Tests.First.migrate\",\"class\":\"Tests\"," +
+                "\"method\":\"First\",\"sourceFile\":\"ExampleTests.cs\",\"tfms\":[\"net8.0\"]," +
+                "\"expectedInvocationRule\":\"once-per-test-execution\"," +
+                "\"expectedInvocations\":[{\"testMethod\":\"First\",\"count\":1}]}]");
+            var gate = new TrxBenchmarkResultGate(
+                new StaticSourceInventory(
+                    new TestMethodDescriptor("Example.Tests.First", false, "a"),
+                    new TestMethodDescriptor(
+                        "Example.Tests.RepositoryAndQueryIntegrationTests.Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write",
+                        false,
+                        "b")),
+                new StubMigrationManifestGate());
+            var evidence = new BenchmarkResultEvidence(
+                "assembly.dll",
+                "The following Tests are available:\n" +
+                "    Example.Tests.First\n" +
+                "    Example.Tests.RepositoryAndQueryIntegrationTests.Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write\n",
+                trxPath,
+                timingPath,
+                "run-1",
+                "net8.0",
+                0,
+                directory,
+                manifestPath);
+
+            Assert.Equal(expected, gate.IsValid(evidence));
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     [Fact]
     public void Trx_gate_rejects_duplicate_discovery_for_a_fact()
     {

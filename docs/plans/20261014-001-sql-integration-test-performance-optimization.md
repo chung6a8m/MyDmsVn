@@ -10,7 +10,7 @@ Read before implementation: `AGENTS.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/TEST_
 
 **Round-2 review closure (2026-10-14):** This specification additionally requires an in-harness SQL mutation guard, durable crash-recoverable test DB ownership and complete reconciliation of migration timing invocation paths. Requirements are not evidence of implementation.
 
-**T01 implementation evidence (2026-10-14):** See `docs/SQLPERF_T01_VERIFICATION.md`. Source/discovery lists 210 cases for each TFM and the audited migration manifest contains 41 call sites. These discovery and synthetic results do not substitute for the blocked approved-instance baseline; no T01 checkbox or Gate is considered complete until the live criteria pass.
+**T01 implementation evidence (2026-10-14):** See `docs/SQLPERF_T01_VERIFICATION.md`. Source/discovery lists 210 cases for each TFM and the audited migration manifest contains 43 call sites. These discovery and synthetic results do not substitute for the blocked approved-instance baseline; no T01 checkbox or Gate is considered complete until the live criteria pass.
 
 ## 1. Objective and scope
 
