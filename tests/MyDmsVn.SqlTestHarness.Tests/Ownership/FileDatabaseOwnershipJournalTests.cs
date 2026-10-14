@@ -133,7 +133,7 @@ public sealed class FileDatabaseOwnershipJournalTests
                 (source, destination, backup) =>
                 {
                     replaceAttempts++;
-                    if (replaceAttempts < 3)
+                    if (replaceAttempts < 6)
                     {
                         throw new ReplaceFileIOException();
                     }
@@ -150,7 +150,7 @@ public sealed class FileDatabaseOwnershipJournalTests
                 databaseId: 7,
                 databaseCreateDateUtc: DateTimeOffset.UtcNow);
 
-            Assert.Equal(3, replaceAttempts);
+            Assert.Equal(6, replaceAttempts);
             Assert.Equal(DatabaseOwnershipState.Created, updated.State);
             Assert.Equal(
                 DatabaseOwnershipState.Created,

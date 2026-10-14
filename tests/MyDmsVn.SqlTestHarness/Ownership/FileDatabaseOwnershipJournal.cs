@@ -16,7 +16,8 @@ namespace MyDmsVn.SqlTestHarness.Ownership;
 public sealed class FileDatabaseOwnershipJournal : IDatabaseOwnershipJournal
 {
     private const int UnableToRemoveReplacedError = 1175;
-    private const int ReplaceAttempts = 3;
+    private const int ReplaceAttempts = 21;
+    private static readonly TimeSpan ReplaceRetryDelay = TimeSpan.FromMilliseconds(100);
 
     private static readonly Regex DisposableDatabaseName = new Regex(
         "^MyDmsVn_Test_[0-9a-f]{32}$",
@@ -261,7 +262,7 @@ public sealed class FileDatabaseOwnershipJournal : IDatabaseOwnershipJournal
             catch (IOException exception) when (
                 IsUnableToRemoveReplaced(exception) && attempt < ReplaceAttempts)
             {
-                _replacementRetryDelay(TimeSpan.FromMilliseconds(25 * attempt));
+                _replacementRetryDelay(ReplaceRetryDelay);
             }
         }
     }
