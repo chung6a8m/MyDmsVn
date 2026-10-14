@@ -98,5 +98,5 @@
 
 - [x] Run locked restore and Release solution build.
 - [x] Run harness and migration coverage on `net48`/`net8.0`, runner tests, and application/architecture/desktop regressions.
-- [ ] Request independent code review, fix any Critical/Important issues, commit, and push.
-- [ ] Reply to and resolve each round-2 inline thread with exact regression evidence.
+- [x] Request independent code review, fix any Critical/Important issues, commit, and push.
+- [x] Reply to and resolve each round-2 inline thread with exact regression evidence.
