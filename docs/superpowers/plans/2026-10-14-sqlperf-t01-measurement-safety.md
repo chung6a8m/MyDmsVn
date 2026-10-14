@@ -63,13 +63,13 @@
 - Produces: `SqlInstanceApprovalLoader.Load(string path)`, `SqlInstanceFingerprint.Create(SqlInstanceIdentity identity)`, `SqlPreflightValidator.ValidateAsync(string connectionString, SqlInstanceApproval approval, SqlPreflightRequirements requirements, CancellationToken cancellationToken)`, and `SqlMutationAuthorization` containing only the validated canonical identity/fingerprint and approval ID.
 - `ISqlAdministrativeSession` exposes explicit `OpenAsync`, identity/effective-database/permission reads, and parameterized administrative execution; fakes record attempted commands so tests can prove zero DDL.
 
-- [ ] **Step 1: Scaffold the two projects and write failing approval/redaction tests**
+- [x] **Step 1: Scaffold the two projects and write failing approval/redaction tests**
 
 Add the projects to `MyDmsVn.sln`. The harness targets `netstandard2.0`; its tests target `net48;net8.0`. Use the existing centrally pinned Newtonsoft.Json, Microsoft.Data.SqlClient, xUnit, and Microsoft.NET.Test.Sdk versions.
 
 Tests must assert literal outcomes for: missing file, malformed JSON, schema-version mismatch, false/missing attestation, expired approval, canonical identity mismatch, endpoint mismatch, and shortening/redaction that never emits supplied secrets or raw identity fields.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -79,7 +79,7 @@ dotnet test tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.cspr
 
 Expected: compilation/test failure because approval loading, fingerprinting, and redaction types do not exist.
 
-- [ ] **Step 3: Implement immutable approval parsing, canonical fingerprinting, and redaction**
+- [x] **Step 3: Implement immutable approval parsing, canonical fingerprinting, and redaction**
 
 The operator JSON schema is exact and rejects unknown/missing security fields:
 
@@ -101,15 +101,15 @@ The operator JSON schema is exact and rejects unknown/missing security fields:
 
 Do not add an approval-generation command. Reject a fingerprint not independently present in the file.
 
-- [ ] **Step 4: Run approval/redaction tests on both TFMs and verify GREEN**
+- [x] **Step 4: Run approval/redaction tests on both TFMs and verify GREEN**
 
 Run the Step 2 command for `net8.0`, then repeat with `-f net48`. Expected: all selected tests pass, zero skipped.
 
-- [ ] **Step 5: Write failing preflight and mutation-authorization tests**
+- [x] **Step 5: Write failing preflight and mutation-authorization tests**
 
 Use a recording fake session and name the break each test catches. Cover: connection string absent/unparseable, missing explicit `master`, effective `DB_NAME()` not `master`, unreadable identity, approval mismatch, alias/endpoint mismatch, missing version-aware DMV permission, revoked/expired approval, changed live identity between validations, and permission success. For every failure assert the fake received no command containing `CREATE DATABASE`, `ALTER DATABASE`, `DROP DATABASE`, or `KILL`.
 
-- [ ] **Step 6: Run preflight tests and verify RED**
+- [x] **Step 6: Run preflight tests and verify RED**
 
 Run:
 
@@ -119,11 +119,11 @@ dotnet test tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.cspr
 
 Expected: failure because live preflight and typed failure categories are not implemented.
 
-- [ ] **Step 7: Implement live preflight and short-lived mutation authorization**
+- [x] **Step 7: Implement live preflight and short-lived mutation authorization**
 
 Query effective database and canonical identity from the actual open connection. Check SQL major version and the applicable cross-session DMV permission, returning typed failures rather than granting anything. Authorization is valid only for the exact canonical identity, approval fingerprint/config digest, and validation instant; every mutation boundary must request fresh validation rather than trusting an environment flag.
 
-- [ ] **Step 8: Run Task 1 tests and solution build**
+- [x] **Step 8: Run Task 1 tests and solution build**
 
 Run:
 
@@ -136,7 +136,7 @@ dotnet build MyDmsVn.sln -c Release --no-restore
 
 Expected: zero failures, zero skipped harness tests, zero build warnings/errors.
 
-- [ ] **Step 9: Commit Task 1**
+- [x] **Step 9: Commit Task 1**
 
 ```powershell
 git add MyDmsVn.sln tests/MyDmsVn.SqlTestHarness tests/MyDmsVn.SqlTestHarness.Tests
@@ -169,11 +169,11 @@ git commit -m "test: guard SQL test mutations with approved preflight"
 - Produces: `IDatabaseOwnershipJournal.WriteCreateIntentAsync`, `TransitionAsync`, and `ReadAllAsync`; `DatabaseOwnershipReconciler.ClassifyAsync`; guarded `SqlTestDatabase.CreateAsync(string, CancellationToken)` and retryable `DisposeAsync()`.
 - Journal states are exactly `CreateIntent`, `Created`, `DropIntent`, `Disposed`, `CleanupFailed`, and `Quarantined`; transitions are monotonic except retry from `CleanupFailed` after fresh corroboration.
 
-- [ ] **Step 1: Write failing journal durability and concurrency tests**
+- [x] **Step 1: Write failing journal durability and concurrency tests**
 
 Assert: create-intent is readable after reopening; temp/partial state is detected rather than accepted; same operation replay is idempotent; invalid transition is rejected; two writers cannot corrupt a record; no record includes a connection string/raw host/credential; a failed flush reports failure and does not authorize creation.
 
-- [ ] **Step 2: Run journal tests and verify RED**
+- [x] **Step 2: Run journal tests and verify RED**
 
 Run:
 
@@ -183,19 +183,19 @@ dotnet test tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.cspr
 
 Expected: failure because journal types do not exist.
 
-- [ ] **Step 3: Implement one atomic state file per database**
+- [x] **Step 3: Implement one atomic state file per database**
 
 Use an ignored operator-local root, a lock scoped to the canonical journal path, same-volume temporary write, `FileOptions.WriteThrough`, explicit flush-to-disk, and atomic replace/move. Persist only fingerprint/approval IDs and opaque database/run/ownership IDs. Detect orphan temp files, invalid JSON, invalid transitions, and conflicting identities as ambiguous.
 
-- [ ] **Step 4: Write failing recovery and mutation tests**
+- [x] **Step 4: Write failing recovery and mutation tests**
 
 Use fake SQL metadata/command sessions. Cover absent, positively owned, ambiguous, unowned, and other-active-run databases; create-before-marker crash; marker-before-created-state crash; stale journal; wrong approved instance; live creation metadata mismatch; same-prefix unowned database; and disposal retry. Every non-positive class must assert zero `ALTER`, `DROP`, and `KILL`. A direct call to `SqlTestDatabase.CreateAsync` with missing/revoked approval must assert zero destructive SQL independent of runner state.
 
-- [ ] **Step 5: Run recovery/mutation tests and verify RED**
+- [x] **Step 5: Run recovery/mutation tests and verify RED**
 
 Run the harness tests filtered to `DatabaseOwnershipReconcilerTests`, then the integration project filtered to `SqlTestDatabaseMutationTests` on `net8.0`. Expected: missing marker/reconciliation and current unguarded DDL cause failures.
 
-- [ ] **Step 6: Implement marker, reconciliation, and guarded lifecycle**
+- [x] **Step 6: Implement marker, reconciliation, and guarded lifecycle**
 
 Before create: validate live approval, persist/flush `CreateIntent`, then issue parameter-safe guarded database creation. After create: write a database-level extended-property marker containing opaque run/ownership IDs, read back live database ID/create date/marker, and transition to `Created`. On any uncorroborated crash window, write `Quarantined` and issue no cleanup DDL.
 
@@ -203,11 +203,11 @@ Before alter/drop: open a fresh administrator connection, rerun Task 1 validatio
 
 Update `SqlServerFactAttribute` to skip when either connection input or approval-file input is missing, while retaining an explicit reason. Acceptance reconciliation later treats skipped mandatory SQL as failure.
 
-- [ ] **Step 7: Run Task 2 tests on both TFMs**
+- [x] **Step 7: Run Task 2 tests on both TFMs**
 
 Run harness unit tests and integration pure mutation/name/lifecycle validation tests on `net48` and `net8.0`. If an approved disposable SQL instance is configured, also run `SqlTestDatabaseLifecycleTests` sequentially on each TFM; otherwise record the live cases as blocked, not passed.
 
-- [ ] **Step 8: Commit Task 2**
+- [x] **Step 8: Commit Task 2**
 
 ```powershell
 git add .gitignore tests/MyDmsVn.SqlTestHarness tests/MyDmsVn.SqlTestHarness.Tests tests/MyDmsVn.Server.Infrastructure.IntegrationTests
@@ -242,35 +242,35 @@ git commit -m "test: journal SQL test database ownership"
 - Produces: `SqlTestMeasurementContext.Create(runId, testCaseId, tfm, anonymizedDatabaseId, sink)`, `context.StartOperation(stage, operationId, parentOperationId)`, `TimingIntervalReconciler.Reconcile(trxDuration, events)`, `SqlTestDatabase.CreateAsync(string, SqlTestMeasurementContext?, CancellationToken)`, and `MeasuredDatabaseMigrationRunner.Migrate(context, invocationId, connectionString)`.
 - The migration manifest keys each invocation by class, exact test method, stable call-site ID, TFM rule, and expected invocation rule; source line is recorded as review metadata but stable IDs do not depend on shifting line numbers.
 
-- [ ] **Step 1: Write failing timing event and interval tests**
+- [x] **Step 1: Write failing timing event and interval tests**
 
 Assert exact event fields and outcomes for success, expected exception, and cancellation; timing-disabled context writes no event; parent/child exclusive time subtracts nested intervals once; overlapping siblings are labeled overlap rather than summed; residual is `TRX - union(measured intervals)` with negative sampling residual explicitly labeled; concurrent sinks produce complete JSON lines without secrets.
 
-- [ ] **Step 2: Run timing tests and verify RED**
+- [x] **Step 2: Run timing tests and verify RED**
 
 Run the harness tests filtered to `SqlTestOperationScopeTests|TimingIntervalReconcilerTests` on `net8.0`. Expected: missing types.
 
-- [ ] **Step 3: Implement timing context, sink, scopes, and interval reconciliation**
+- [x] **Step 3: Implement timing context, sink, scopes, and interval reconciliation**
 
 Use `Stopwatch.GetTimestamp()` and `Stopwatch.Frequency` for monotonic calculations. Use immutable context values and explicit parameters only. Record create, migration, seed, permission-sync, pool-cleanup, and drop operations even on failure/cancellation. Do not instrument production `DatabaseMigrationRunner`.
 
-- [ ] **Step 4: Write failing migration coverage tests**
+- [x] **Step 4: Write failing migration coverage tests**
 
 Add tests that compare the four-class manifest against source/runtime invocation IDs. Cover a normal production migration, `TestDatabaseMigrationRunner`, direct DbUp `PerformUpgrade`, repeated migration, expected-throw migration, canceled/failing operation, and a deliberately omitted timing scope. The omitted case must return incomplete coverage rather than pass.
 
-- [ ] **Step 5: Run migration coverage tests and verify RED**
+- [x] **Step 5: Run migration coverage tests and verify RED**
 
 Run `MigrationTimingCoverageTests` on `net8.0`. Expected: failure listing the current uninstrumented call sites.
 
-- [ ] **Step 6: Inventory and instrument every migration path in the four audited classes**
+- [x] **Step 6: Inventory and instrument every migration path in the four audited classes**
 
 Replace only test call sites with timed delegation/scopes. Preserve exact DbUp builders, locks, transactions, scripts, exception behavior, rerun counts, and assertions. Introduce a caller-member helper for stable test method identity and explicit row/instance key where needed. Populate the manifest with every direct and helper-mediated invocation and its expected multiplicity.
 
-- [ ] **Step 7: Run Task 3 tests on both TFMs**
+- [x] **Step 7: Run Task 3 tests on both TFMs**
 
 Run harness timing tests and `MigrationTimingCoverageTests` on `net48` and `net8.0`. With approved SQL, run the four audited classes with timing enabled and assert 100% manifest-to-event reconciliation per TFM; without it, record the SQL portion blocked.
 
-- [ ] **Step 8: Commit Task 3**
+- [x] **Step 8: Commit Task 3**
 
 ```powershell
 git add tests/MyDmsVn.SqlTestHarness tests/MyDmsVn.SqlTestHarness.Tests tests/MyDmsVn.Server.Infrastructure.IntegrationTests tests/tools/sqlperf-t01-migration-invocations.json
@@ -306,11 +306,11 @@ git commit -m "test: instrument SQL test lifecycle stages"
 - Produces: `TestMethodInventory.Read(assemblyPath)`, `VstestDiscoveryParser.Parse`, `TrxResultParser.Parse`, `IlSqlCallGraphAuditor.Audit`, and `SqlTestInventoryReconciler.Reconcile` returning counts, mandatory stable case IDs, and typed completeness failures.
 - Stable case ID is fully qualified method + opaque SHA-256 of normalized discovery identity + row ordinal when needed; diagnostics never emit theory parameter values.
 
-- [ ] **Step 1: Write failing discovery/inventory tests with fixture assemblies and TRX**
+- [x] **Step 1: Write failing discovery/inventory tests with fixture assemblies and TRX**
 
 Fixtures must cover `[Fact]`, inline/member-data `[Theory]`, multiple rows, deferred discovery, duplicate display names, new unmarked SQL fact/theory, explicit exact-method exemption, stale method fingerprint, deleted method, wildcard exemption rejection, and an exemption whose IL call graph reaches `SqlConnection`, `SqlTestDatabase`, migration, provisioning, or SQL fixture code.
 
-- [ ] **Step 2: Run inventory tests and verify RED**
+- [x] **Step 2: Run inventory tests and verify RED**
 
 Run:
 
@@ -320,31 +320,31 @@ dotnet test tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.
 
 Expected: missing inventory types.
 
-- [ ] **Step 3: Implement independent method/discovery inventory and exemption audit**
+- [x] **Step 3: Implement independent method/discovery inventory and exemption audit**
 
 Read xUnit attributes from assembly metadata/reflection without consulting traits. Default every discovered method/case to SQL-required. Exempt only exact methods with rationale, evidence, and method-body fingerprint. Resolve direct/transitive IL calls within the test assembly and reject known SQL roots. Unknown/deferred rows fail unless method and executed row counts can be reconciled.
 
-- [ ] **Step 4: Write failing TRX and three-way reconciliation tests**
+- [x] **Step 4: Write failing TRX and three-way reconciliation tests**
 
 Cover: complete run, nonzero runner exit, missing/corrupt TRX, failed case, skipped mandatory SQL, skipped exempt non-SQL, discovered-not-executed, executed-not-discovered, missing theory row, duplicate result, TFM mismatch, and display-name variation that normalizes to the same opaque identity.
 
-- [ ] **Step 5: Run TRX/reconciliation tests and verify RED**
+- [x] **Step 5: Run TRX/reconciliation tests and verify RED**
 
 Run the runner tests filtered to `TrxResultParserTests|SqlTestInventoryReconcilerTests`. Expected: missing parser/reconciler.
 
-- [ ] **Step 6: Implement TRX parsing and fail-closed reconciliation**
+- [x] **Step 6: Implement TRX parsing and fail-closed reconciliation**
 
 Require real exit code zero, one complete TRX, zero failed, zero skipped mandatory SQL, and a one-to-one mandatory discovered/executed mapping. Derive all counts from current artifacts. Return typed incomplete reasons; never downgrade an unknown row/method to non-SQL.
 
-- [ ] **Step 7: Audit and populate the current exact-method exemption manifest**
+- [x] **Step 7: Audit and populate the current exact-method exemption manifest**
 
 Enumerate all current integration `[Fact]`/`[Theory]` methods. For each proposed non-SQL method, inspect direct/transitive calls and record exact rationale/evidence/fingerprint. Run reconciliation against both built TFM assemblies and `dotnet test --list-tests` output. Do not use `SqlServerFact` or future traits as evidence.
 
-- [ ] **Step 8: Run Task 4 tests and build**
+- [x] **Step 8: Run Task 4 tests and build**
 
 Run runner unit tests, both harness TFMs, and Release solution build. Expected: zero failures/warnings; inventory reconciliation succeeds for discovery on both TFMs even when execution artifacts are intentionally absent from the discovery-only command.
 
-- [ ] **Step 9: Commit Task 4**
+- [x] **Step 9: Commit Task 4**
 
 ```powershell
 git add MyDmsVn.sln tests/tools/MyDmsVn.SqlTestRunner tests/tools/MyDmsVn.SqlTestRunner.Tests tests/tools/sql-test-nonsql-exemptions.json
@@ -373,35 +373,35 @@ git commit -m "test: reconcile independent SQL test inventory"
 - Produces: CLI verbs `preflight`, `discover`, `run`, `reconcile`, and `baseline`; each returns nonzero for blocked/failed/incomplete and writes a machine-readable sanitized run manifest.
 - `OwnedProcessRunner.RunAsync(CommandSpec, CancellationToken)` assigns the root process to a Windows Job Object before work proceeds, drains both streams concurrently, returns the real exit code after exit, and terminates only that job on deadline.
 
-- [ ] **Step 1: Write failing process-tree tests**
+- [x] **Step 1: Write failing process-tree tests**
 
 The synthetic fixture launches a child and grandchild that block without interactive input. Assert normal command exit/output, stdout+stderr drainage under volume, per-command timeout, hard overall cancellation, root/descendant termination, partial-log preservation, and survival of a separately launched unrelated process.
 
-- [ ] **Step 2: Run watchdog tests and verify RED**
+- [x] **Step 2: Run watchdog tests and verify RED**
 
 Run `OwnedProcessRunnerTests`. Expected: missing Job Object/process runner.
 
-- [ ] **Step 3: Implement Windows Job Object process control**
+- [x] **Step 3: Implement Windows Job Object process control**
 
 Create the process suspended or otherwise guarantee assignment before it can spawn unowned descendants; set kill-on-job-close; resume only after assignment. On deadline terminate the job, drain streams, wait for exit, enumerate/report owned killed PIDs without broad `dotnet` lookup, and return timeout/incomplete even if a partial TRX exists.
 
-- [ ] **Step 4: Write failing coordinator tests**
+- [x] **Step 4: Write failing coordinator tests**
 
 Use fake process/preflight/journal components. Cover: child environment contains both required paths/IDs, preflight occurs before test launch, unique TRX names, build excluded from timed run, sequential TFMs, alternating order across passes, warm-up excluded from median, invalid run replacement, missing TRX, skipped mandatory SQL, watchdog timeout, journal quarantine after death, and no benchmark continuation after blocked preflight.
 
-- [ ] **Step 5: Run coordinator tests and verify RED**
+- [x] **Step 5: Run coordinator tests and verify RED**
 
 Run `BenchmarkRunCoordinatorTests`. Expected: missing coordinator behavior.
 
-- [ ] **Step 6: Implement CLI coordinator and thin PowerShell wrapper**
+- [x] **Step 6: Implement CLI coordinator and thin PowerShell wrapper**
 
 The PowerShell script only validates user-facing parameters and invokes the runner; it contains no alternate safety decisions. The runner preflights before every DDL-capable child, records child environment configuration without values, runs unfiltered `dotnet test` with unique TRX, invokes Task 4 reconciliation, and reopens Task 2 journal after abnormal exit. It never interprets timeout, missing output, or `dotnet test` exit zero alone as success.
 
-- [ ] **Step 7: Run Task 5 automated tests and a no-DDL negative CLI check**
+- [x] **Step 7: Run Task 5 automated tests and a no-DDL negative CLI check**
 
 Run all runner tests. Then invoke `preflight` and `baseline` with missing approval against a harmless fake/unreachable connection configuration and assert nonzero exit, no test launch, no journal create-intent, and no DDL command. Do not connect to any unapproved server for this negative check.
 
-- [ ] **Step 8: Commit Task 5**
+- [x] **Step 8: Commit Task 5**
 
 ```powershell
 git add tests/tools/MyDmsVn.SqlTestRunner tests/tools/MyDmsVn.SqlTestRunner.Tests tests/tools/Invoke-SqlIntegrationBenchmark.ps1
@@ -426,19 +426,19 @@ git commit -m "test: add watchdog SQL benchmark runner"
 - Consumes: valid run manifests, TRX, timing events, migration coverage, journal reconciliation, optional DMV snapshots, source commit/config/environment metadata.
 - Produces: sanitized JSON/Markdown reports with per-class/test count, total, p50/p95, wall-clock contribution, exclusive stage time, overlap, residual, inventory counts, migration coverage, cleanup/quarantine, DMV availability, and validity decision.
 
-- [ ] **Step 1: Write failing report tests**
+- [x] **Step 1: Write failing report tests**
 
 Use hand-checked fixtures. Assert literal p50/p95 and class totals; nested timing exclusion; overlap/residual labels; unavailable DMV values rendered as `unavailable`, not zero; warm-up excluded; invalid run excluded; no summing per-test durations as parallel wall-clock; and complete redaction of secrets, raw hosts, paths, and theory values.
 
-- [ ] **Step 2: Run report tests and verify RED**
+- [x] **Step 2: Run report tests and verify RED**
 
 Run `SqlPerformanceReportBuilderTests`. Expected: missing report builder.
 
-- [ ] **Step 3: Implement report builder and permission-aware DMV snapshots**
+- [x] **Step 3: Implement report builder and permission-aware DMV snapshots**
 
 Read waits, CPU, I/O, memory grants/compiler memory only after Task 1 permission validation. Missing fields/permissions remain unavailable. Keep raw artifacts ignored/local and generate only sanitized shareable output.
 
-- [ ] **Step 4: Run all non-SQL automated gates**
+- [x] **Step 4: Run all non-SQL automated gates**
 
 Run fresh Release restore/build and all harness/runner tests:
 
@@ -452,29 +452,29 @@ dotnet test tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.
 
 Expected: zero warnings/errors/failures/skips for these mandatory unit/synthetic gates.
 
-- [ ] **Step 5: Perform approved-instance preflight and direct-run negative proof**
+- [x] **Step 5: Perform approved-instance preflight and direct-run negative proof**
 
 If and only if the operator supplies the connection string, approval file, non-production attestation, and required permissions, run preflight and record only sanitized identity. Execute a deliberately unapproved direct `dotnet test` mutation test and prove it returns nonzero/blocked with zero database-level DDL. Execute wrong-database, wrong-identity, and wrong-server-disposal negative cases. If configuration is absent, record these live gates blocked and stop before DDL.
 
-- [ ] **Step 6: Measure instrumentation overhead**
+- [x] **Step 6: Measure instrumentation overhead**
 
 On the approved instance, build once and run matched timing-disabled and timing-enabled passes with identical inventory. Quantify wall-clock overhead; if it exceeds 5%, reduce/diagnose it or record an explicit accounting before baseline acceptance.
 
-- [ ] **Step 7: Run one warm-up plus three valid warm baseline passes per TFM**
+- [x] **Step 7: Run one warm-up plus three valid warm baseline passes per TFM**
 
 Use `Invoke-SqlIntegrationBenchmark.ps1` sequentially, alternating order across passes. Every accepted pass must have exit zero, complete unique TRX, zero failed, zero skipped mandatory SQL, complete source/discovery/execution reconciliation, complete migration invocation/event reconciliation, watchdog success, and clean/positively reconciled ownership. Repeat invalid passes; do not include them in medians.
 
 The T01 instrumentation revision is the unchanged performance baseline for SQLPERF-T02 onward. Record Git SHA, SDK, TFM, shortened approval fingerprint, SQL version/edition, memory limit, sanitized machine/load context, inventory, per-run wall clock, TRX duration, dispersion, and stage report.
 
-- [ ] **Step 8: Run full repository regression gates**
+- [x] **Step 8: Run full repository regression gates**
 
 After accepted SQL runs, execute the repository's complete Release test matrix, including application, architecture, desktop Windows tests, and both unfiltered SQL TFMs. Run SQL TFMs sequentially. Report every failure/skip by name; do not claim unavailable Windows GUI gates passed.
 
-- [ ] **Step 9: Update documentation and plan status from evidence only**
+- [x] **Step 9: Update documentation and plan status from evidence only**
 
 Document exact commands/results, counts, timing overhead, baseline table, invalid runs, timeout/cleanup outcomes, DMV availability, risks, and go/no-go for SQLPERF-T02 in `docs/SQLPERF_T01_VERIFICATION.md`. Update `tests/README.md` and `docs/TEST_STRATEGY.md` with operator configuration and runner usage. Check T01 boxes/Gate only if every required live and repeated-run criterion has evidence; otherwise leave them open and label precisely what remains blocked.
 
-- [ ] **Step 10: Commit Task 6**
+- [x] **Step 10: Commit Task 6**
 
 ```powershell
 git add tests/tools/MyDmsVn.SqlTestRunner tests/tools/MyDmsVn.SqlTestRunner.Tests tests/README.md docs/TEST_STRATEGY.md docs/SQLPERF_T01_VERIFICATION.md docs/plans/20261014-001-sql-integration-test-performance-optimization.md
@@ -485,11 +485,11 @@ git commit -m "test: verify SQLPERF-T01 measurement baseline"
 
 ## Final verification checklist
 
-- [ ] Re-read the T01 source plan and map every bullet/Gate clause to code, a named test, or recorded blocked evidence.
-- [ ] Confirm `git diff --check` is clean and the working tree contains no raw approval, journal, TRX, connection string, host identity, credential, or local benchmark artifact.
-- [ ] Confirm fresh Release restore/build has zero warnings/errors.
-- [ ] Confirm harness and runner automated suites pass with zero mandatory skips.
-- [ ] Confirm both unfiltered SQL TFMs have current-commit discovery/TRX reconciliation and zero skipped mandatory SQL cases.
-- [ ] Confirm synthetic hung process tree, direct-run bypass, interrupted journal, crash-window quarantine, wrong-server disposal, and missing migration-event negative gates all fail closed.
-- [ ] Confirm one warm-up plus at least three valid warm passes per TFM exist on the same approved non-production SQL instance, or report T01 incomplete/blocked without checking its Gate.
-- [ ] Confirm next roadmap work remains SQLPERF-T02 only after T01 evidence is complete; do not claim P4.1/P5/P6 completion.
+- [x] Re-read the T01 source plan and map every bullet/Gate clause to code, a named test, or recorded blocked evidence.
+- [x] Confirm `git diff --check` is clean and the working tree contains no raw approval, journal, TRX, connection string, host identity, credential, or local benchmark artifact.
+- [x] Confirm fresh Release restore/build has zero warnings/errors.
+- [x] Confirm harness and runner automated suites pass with zero mandatory skips.
+- [x] Confirm both unfiltered SQL TFMs have current-commit discovery/TRX reconciliation and zero skipped mandatory SQL cases.
+- [x] Confirm synthetic hung process tree, direct-run bypass, interrupted journal, crash-window quarantine, wrong-server disposal, and missing migration-event negative gates all fail closed.
+- [x] Confirm one warm-up plus at least three valid warm passes per TFM exist on the same approved non-production SQL instance, or report T01 incomplete/blocked without checking its Gate.
+- [x] Confirm next roadmap work remains SQLPERF-T02 only after T01 evidence is complete; do not claim P4.1/P5/P6 completion.

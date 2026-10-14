@@ -1,54 +1,83 @@
-# SQLPERF-T01 verification — 2026-10-14
+# SQLPERF-T01 verification — 2026-10-15
 
 ## Outcome
 
-The T01 safety and measurement tooling is implemented in an isolated worktree. Non-SQL automated gates pass. Live SQL acceptance is **blocked**, not passed: `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` exists locally, but `MYDMSVN_SQL_TEST_APPROVAL_FILE` was not supplied. No SQL test DDL or benchmark pass was attempted.
+Gate T01 **passed** on commit `cd3374ff295b86c2e38ea665c16cbbed5b356621`. The approved non-production SQL Server completed one labeled warm-up and three accepted measured passes for each target framework, with the same source inventory, no failed or skipped mandatory SQL cases, complete timing/migration reconciliation, and clean ownership reconciliation.
 
-Gate T01 therefore remains open. SQLPERF-T02 must not use these changes as an accepted performance baseline until the approved-instance steps below are completed on the unchanged revision.
+SQLPERF-T02 may use this revision as its unchanged baseline. This result does not complete P4.1, authenticated P5 acceptance, or P6 release gates.
 
-## Implemented evidence
+## Sanitized environment
 
-- Live-identity preflight and in-harness mutation authorization target `master`, verify the independently approved fingerprint, and check the SQL-version-specific cross-session DMV permission.
-- Durable, process-safe ownership transitions cover create intent, created, drop intent, disposed, cleanup failure and quarantine. Cleanup needs approval, marker and live metadata corroboration.
-- Timing is explicit and opt-in; it uses monotonic timestamps, thread-safe JSONL, outcomes and parent linkage. Interval reconciliation reports union, overlap and residual without adding nested timings to TRX.
-- The four high-cost classes have a reviewed 43-entry migration invocation manifest. Source coverage is bidirectional and includes direct DbUp, reruns and failure paths.
-- Independent source/discovery/TRX primitives default cases to SQL-required, recognize derived xUnit attributes, and reconcile the current assembly, discovery and execution one-to-one. The method-scoped non-SQL exemption manifest is intentionally empty, which is fail-closed.
-- Migration coverage is a multiset keyed by test case, TFM and invocation. Audited top-four invocation IDs must match the manifest exactly; every recorded migration across the full suite, including instrumentation outside that audited set, must still have a one-to-one invocation/timing pair. Missing, unexpected or duplicate pairs invalidate a pass. The runner also re-audits the reviewed source manifest, including direct DbUp call counts, before accepting each pass.
-- Theory rows use redacted content hashes instead of discovery ordinals, so reordered rows reconcile while substitutions and duplicate/deferred rows fail closed. Migration expectations now come independently from the reviewed manifest plus executed TRX rows, including repeated helper calls.
-- Migration expectations are row-scoped whenever a theory produces multiple executions. The five system-database rejection cases are named facts, and reconciliation rejects a row swap such as A=2/B=0 even when the method-level total still equals two.
-- The runner uses a Windows Job Object with kill-on-close, explicitly terminates a suspended child when ownership assignment fails, and provides bounded commands with concurrent stdout/stderr drainage plus a four-hour hard overall baseline deadline. `baseline` runs one labeled warm-up plus three measured passes per TFM, alternates TFM order, gives every run unique TRX/timing artifacts, and applies mandatory preflight and result gates to every child.
-- Every launched SQL test child receives an isolated ownership journal. A read-only post-run gate executes from the coordinator's `finally` path under an independent 30-second bound, accepts only approved `Disposed` records with absent live databases, and writes a sanitized recovery artifact for empty, unresolved, mismatched or uninspectable ownership. It never drops a database.
-- Reporting is a required completion gate. It excludes warmups/invalid runs, computes literal p50/p95 plus interval and ranked test/class costs, labels unavailable DMV data, redacts secrets, hosts, paths and theory values, and atomically creates stable JSON/Markdown files for each TFM. Missing or failed report output makes `baseline` return exit code 3.
-- Timing reconciliation scopes repeated logical operation IDs to run/TFM/test instances. Reports reconcile each accepted run independently and derive per-stage exclusive interval unions, including cross-stage parent/child subtraction.
+| Item | Recorded value |
+|---|---|
+| Git SHA | `cd3374ff295b86c2e38ea665c16cbbed5b356621` |
+| .NET SDK | `8.0.425` |
+| OS | Windows NT `10.0.26200.0` |
+| SQL Server | `14.0.2130.4`, Developer Edition (64-bit) |
+| SQL maximum server memory | 1536 MB |
+| Approval fingerprint | `2d160e60c982…` |
+| Source/discovery inventory | 210 method/cases per TFM |
+| Executed TRX cases | 213 per run, including expanded theory rows |
+
+The raw connection string, approval-file path, SQL host identity, database names, journals, TRX files, and timing JSONL remain ignored and local under `.sqlperf/`.
 
 ## Commands and actual results
 
-| Command/gate | Result |
+| Gate | Actual result |
 |---|---|
-| Fresh locked restore and Release solution build | Passed, 0 warnings / 0 errors |
-| Harness tests, `net48` | 49 passed, 0 failed, 0 skipped |
-| Harness tests, `net8.0` | 49 passed, 0 failed, 0 skipped |
-| Migration coverage, `net48` | 9 passed, 0 failed, 0 skipped |
-| Migration coverage, `net8.0` | 9 passed, 0 failed, 0 skipped |
-| Runner gate/reconciler tests | 21 passed, 0 failed, 0 skipped |
-| Runner synthetic/unit tests excluding `OwnedProcessRunnerTests` | 65 passed, 0 failed, 0 skipped; process-tree tests were not re-run because their known Windows Terminal side effect is under separate diagnosis |
-| Server.Application, `net48` / `net8.0` | 133 / 133 passed, no failures/skips |
-| Architecture | 5 passed, no failures/skips |
-| Desktop, `net48` / `net8.0-windows` | 200 / 200 passed, no failures/skips |
-| VSTest discovery, `net48` | exit 0, 210 cases |
-| VSTest discovery, `net8.0` | exit 0, 210 cases |
-| Runner preflight with approval removed | exit 2; stopped before connection/test launch/DDL |
-| Integration guardrail run with approval removed, each TFM | 68 passed, 142 skipped, 0 failed; explicitly invalid for SQL acceptance |
-| Approved live SQL runs | Blocked: approval file absent |
+| Runner preflight with the User-scope approval loaded into the process | Exit 0 before any benchmark DDL |
+| Release solution build | Passed, 0 warnings / 0 errors |
+| SQL test harness, `net48` / `net8.0` | 50 / 50 passed on each TFM |
+| Runner tests, including `OwnedProcessRunnerTests` | 68 / 68 passed |
+| Accepted baseline | 8 / 8 runs valid; every TRX 213 passed, 0 failed, 0 skipped/not-executed |
+| Ownership reconciliation | 143 records per accepted run; all `Disposed`; no recovery artifact |
+| Full Release regression after baseline | Application 133 / 133 per TFM; Desktop 200 / 200 per TFM; Architecture 5 / 5; Integration 213 / 213 per TFM; Harness 50 / 50 per TFM; Runner 68 / 68 |
 
-The 142 skips per TFM are expected in the deliberate missing-approval guardrail run and prove only that unapproved direct execution does not enter SQL-backed tests. They are not accepted benchmark evidence.
+The final regression command was:
 
-## Remaining approved-instance gates
+```powershell
+dotnet test MyDmsVn.sln -c Release --no-build --no-restore -m:1 --logger "console;verbosity=minimal"
+```
 
-1. Supply a separately maintained, unexpired non-production approval file matching the live instance and required permissions.
-2. Run preflight plus the direct-run missing/wrong approval, wrong effective database, wrong identity and wrong-server-disposal proofs with zero destructive SQL.
-3. Measure timing-disabled versus timing-enabled overhead; investigate or explicitly account for overhead above 5%.
-4. Run one warm-up plus three accepted warm passes per TFM, sequentially and with alternating order. Each pass needs exit 0, complete unique TRX, zero failed/skipped mandatory cases, complete discovery/execution and migration-event reconciliation, watchdog success and clean ownership reconciliation.
-5. Run the complete repository Release regression matrix after accepted SQL runs.
+Both SQL TFMs ran sequentially in the accepted benchmark. No accepted run contains a mandatory skip.
 
-Until all five steps have evidence, no baseline median, DMV delta, optimization percentage or T01 completion claim is valid.
+## Instrumentation overhead
+
+Matched full-suite runs used the same commit and inventory with timing disabled and enabled. All four runs passed 213 / 213 with positively reconciled ownership.
+
+| TFM | Timing off | Timing on | Delta |
+|---|---:|---:|---:|
+| `net48` | 555,013.198 ms | 546,949.497 ms | -1.45% |
+| `net8.0` | 534,405.665 ms | 536,900.892 ms | +0.47% |
+
+Both absolute deltas are below the 5% Gate T01 threshold. The negative `net48` delta is normal run-to-run variation, not a performance claim.
+
+## Accepted baseline
+
+| TFM | Warm-up TRX | Measured TRX elapsed | Runner wall-clock p50 / p95 |
+|---|---:|---:|---:|
+| `net48` | 545,006 ms | 547,012; 554,377; 554,749 ms | 554,981.459 / 555,336.485 ms |
+| `net8.0` | 544,075 ms | 542,117; 532,577; 540,124 ms | 540,718.071 / 542,674.892 ms |
+
+Sanitized measured-run stage totals and the highest class contributions were:
+
+| TFM | Database create | Migration | Database drop | Largest class contributions |
+|---|---:|---:|---:|---|
+| `net48` | 142,307.986 ms | 572,207.408 ms | 31,386.496 ms | Schema compatibility 31.221%; goods receipt 25.931%; migration 10.401%; principal provisioning 8.037% |
+| `net8.0` | 145,590.012 ms | 565,881.874 ms | 31,741.113 ms | Schema compatibility 30.580%; goods receipt 26.600%; migration 10.406%; principal provisioning 8.379% |
+
+The report labels DMV snapshots **unavailable** because no snapshot was captured. Preflight verified the SQL-version-specific permission, but this evidence makes no DMV wait, CPU, I/O, or memory delta claim and does not substitute zero values.
+
+## Invalid-run and cleanup evidence
+
+An initial baseline exposed Win32 error 1175 (`ERROR_UNABLE_TO_REMOVE_REPLACED`) while atomically replacing the ownership journal. A second matched-overhead attempt reproduced it after the initial short retry. These runs were rejected and never included in the baseline or overhead calculation.
+
+The journal writer now retries only error 1175 within a bounded two-second window; all other I/O failures still fail closed. A deterministic test fails the first five replace attempts before succeeding on both TFMs. The child-process fixture also launches its descendant without a visible shell and proves the descendant is terminated, eliminating the stray PowerShell/Windows Terminal side effect.
+
+The two invalid artifact roots contained five remaining live test databases: two quarantined crash-window records and three positively owned `Created` records. Before cleanup, each candidate was revalidated against the strict generated-name form, current approval ID/fingerprint, live database metadata, ownership marker run ID, and ownership token. A fresh preflight passed; exactly those five databases were dropped and a post-check found zero live test databases. Historical invalid journals remain unchanged as audit evidence.
+
+Negative guardrail tests for missing/expired approval, live-identity mismatch, wrong effective database, and changed-server disposal assert that zero destructive SQL is issued. They passed as part of every current full integration run on both TFMs.
+
+## Go / no-go
+
+**GO for SQLPERF-T02.** Use commit `cd3374ff295b86c2e38ea665c16cbbed5b356621` and the accepted medians above as the matched baseline. Preserve the dual-TFM, real-SQL, inventory, watchdog, negative-mutation, and ownership gates. Re-establish a baseline if the source inventory or measurement environment changes materially.

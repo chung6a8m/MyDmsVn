@@ -28,6 +28,16 @@ $env:MYDMSVN_SQL_TEST_APPROVAL_FILE = 'C:\local-secrets\sql-test-approval.json'
 dotnet test tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release
 ```
 
+Environment variables saved at Windows `User` scope are inherited only by processes started after the change. Restart the terminal/Codex host, or load the values into the current PowerShell process without printing them:
+
+```powershell
+$env:MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING = [Environment]::GetEnvironmentVariable('MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING', 'User')
+$env:MYDMSVN_SQL_TEST_APPROVAL_FILE = [Environment]::GetEnvironmentVariable('MYDMSVN_SQL_TEST_APPROVAL_FILE', 'User')
+dotnet run --project tests\tools\MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj -c Release --no-build -- preflight
+```
+
+Preflight exit code `0` confirms that the effective `master` connection, approval identity, expiration and version-specific monitoring permission are valid. Exit code `2` is blocked configuration and must stop the run before DDL. Do not echo either environment variable or commit the approval file.
+
 The repeatable SQLPERF runner builds separately, then runs TFMs sequentially under a Windows Job Object and requires complete TRX output:
 
 ```powershell
