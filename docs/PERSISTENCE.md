@@ -39,6 +39,31 @@ Rules:
 9. Sync methods are sufficient for initial ownership API, but async `CommitAsync/RollbackAsync/DisposeAsync` may be added where supported by target-specific implementations.
 10. Repositories are registered explicitly with DI; do not discover the first assignable type by arbitrary assembly scan.
 
+
+### 2.1. Repository resolution convention
+
+Application command handlers are permitted to obtain **repository interfaces** from their own explicit UoW:
+
+```csharp
+using var uow = await _unitOfWorkFactory.CreateAsync(cancellationToken);
+uow.BeginTransaction();
+
+var repository = uow.Repository<IGoodsReceiptWriteRepository>();
+// Execute command-side operations through this repository.
+
+uow.Commit();
+// Disposal rolls back an active uncommitted transaction.
+```
+
+- `TRepository` must be a business repository **interface** defined in `Server.Application` (or an appropriate inner layer), never a concrete SQL repository class. Application and Domain must not depend on `Server.Infrastructure`, `ISqlExecutionContext`, `IDbConnection`, `IDbTransaction`, RepoDb, Dapper, or SQL implementation details.
+- `Repository<TRepository>()` is **only** a UoW-scoped repository resolver, not a generic service locator. Register each interface-to-implementation mapping explicitly (for example via `SqlPersistenceBuilder.AddRepository<TRepository, TImplementation>()`); unregistered interfaces must fail clearly. Do not add arbitrary `GetService<T>()` or `Resolve<T>()` APIs to the UoW.
+- Resolution must bind each repository to the current UoW's connection and transaction. Multiple repositories resolved from the same UoW share that scope; no repository can silently open its own connection or transaction for participating work. Pass the active transaction explicitly to RepoDb operations, including async calls.
+- Repositories belong to their UoW's lifetime. Do not use or expose them after the UoW is disposed, or share the UoW/repositories concurrently. The UoW is responsible for disposing repository instances it creates, not injected caller-scoped dependencies.
+- Standalone CQRS queries use Application query-service interfaces returning DTOs; they do **not** need a UoW by default. When a query participates in an active command transaction, Infrastructure uses an explicit shared execution context with the same connection and transaction.
+- The tradeoff is that repository dependencies are looked up within the handler rather than listed in its constructor. Preserve strong interface typing, explicit registrations, startup/composition validation where feasible, and SQL integration tests for multi-repository atomicity. Switching to direct repository injection would require a separately proven transaction/lifetime design, not just a syntax change.
+
+This convention documents the existing `IUnitOfWork` contract and accepted [ADR 0002](adr/0002-explicit-unit-of-work.md); it is not a new Unit of Work strategy.
+
 ## 3. Example posting ownership
 
 ```text
