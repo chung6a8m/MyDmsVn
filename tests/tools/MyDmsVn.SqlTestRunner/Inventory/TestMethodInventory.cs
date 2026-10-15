@@ -33,7 +33,8 @@ public static class TestMethodInventory
                     item.Method.DeclaringType!.FullName + "." + item.Method.Name,
                     item.Attributes.Any(attribute =>
                         IsAttributeOrDerived(attribute.AttributeType, "Xunit.TheoryAttribute")),
-                    Fingerprint(item.Method)))
+                    Fingerprint(item.Method),
+                    ReadCategories(item.Method)))
                 .OrderBy(item => item.FullyQualifiedName, StringComparer.Ordinal)
                 .ToArray();
         }
@@ -61,9 +62,60 @@ public static class TestMethodInventory
         var body = method.GetMethodBody()?.GetILAsByteArray() ?? Array.Empty<byte>();
         return Convert.ToHexString(SHA256.HashData(body)).ToLowerInvariant();
     }
+
+    private static IReadOnlyList<string> ReadCategories(MethodInfo method) =>
+        CustomAttributeData.GetCustomAttributes(method.DeclaringType!)
+            .Concat(CustomAttributeData.GetCustomAttributes(method))
+            .SelectMany(ReadAttributeCategories)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+
+    private static IEnumerable<string> ReadAttributeCategories(CustomAttributeData attribute)
+    {
+        if (string.Equals(attribute.AttributeType.FullName, "Xunit.TraitAttribute", StringComparison.Ordinal) &&
+            attribute.ConstructorArguments.Count == 2 &&
+            string.Equals(attribute.ConstructorArguments[0].Value as string, "Category", StringComparison.Ordinal) &&
+            attribute.ConstructorArguments[1].Value is string traitCategory)
+        {
+            yield return traitCategory;
+        }
+
+        if (!string.Equals(attribute.AttributeType.Name, "SqlServerFactAttribute", StringComparison.Ordinal))
+        {
+            yield break;
+        }
+
+        if (attribute.ConstructorArguments.Count == 0 ||
+            attribute.ConstructorArguments[0].Value is not IReadOnlyCollection<CustomAttributeTypedArgument> arguments ||
+            arguments.Count == 0)
+        {
+            yield return SqlTestCategories.FastSql;
+            yield break;
+        }
+
+        foreach (var argument in arguments)
+        {
+            if (argument.Value is string category)
+            {
+                yield return category;
+            }
+        }
+    }
 }
 
 public sealed record TestMethodDescriptor(
     string FullyQualifiedName,
     bool IsTheory,
-    string BodyFingerprint);
+    string BodyFingerprint,
+    IReadOnlyList<string> Categories)
+{
+    public TestMethodDescriptor(
+        string FullyQualifiedName,
+        bool IsTheory,
+        string BodyFingerprint)
+        : this(FullyQualifiedName, IsTheory, BodyFingerprint, Array.Empty<string>())
+    {
+    }
+}

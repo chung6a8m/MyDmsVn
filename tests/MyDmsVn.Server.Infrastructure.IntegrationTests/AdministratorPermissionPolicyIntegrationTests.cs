@@ -15,7 +15,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class AdministratorPermissionPolicyIntegrationTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Approved_eligible_permissions_create_owned_Administrator_role_and_grants()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -68,7 +68,7 @@ public sealed class AdministratorPermissionPolicyIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Unowned_Administrator_name_collision_is_a_conflict_and_never_adopted()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -113,7 +113,7 @@ public sealed class AdministratorPermissionPolicyIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Missing_managed_grant_becomes_revoked_until_explicit_restore()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -231,7 +231,7 @@ public sealed class AdministratorPermissionPolicyIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Restore_rejects_managed_administrator_role_renamed_out_of_band()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -300,7 +300,7 @@ public sealed class AdministratorPermissionPolicyIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Revoke_rejects_inactive_managed_administrator_role()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -361,7 +361,7 @@ public sealed class AdministratorPermissionPolicyIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Later_release_grants_only_independently_approved_new_and_late_permissions()
     {
         var database = await CreateMigratedDatabaseAsync();

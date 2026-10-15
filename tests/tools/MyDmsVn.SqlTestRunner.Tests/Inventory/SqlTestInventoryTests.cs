@@ -48,6 +48,26 @@ public sealed class SqlTestInventoryTests
     }
 
     [Fact]
+    public void Either_reviewed_tfm_fingerprint_matches_the_same_method_exemption()
+    {
+        var exemption = new NonSqlExemption(
+            "Example.Tests.Method",
+            "net48-hash|net8-hash",
+            "pure assertion",
+            "reviewed on both TFMs");
+
+        var net48 = NonSqlExemptionManifest.Match(
+            exemption,
+            new TestMethodDescriptor("Example.Tests.Method", IsTheory: false, "net48-hash"));
+        var net8 = NonSqlExemptionManifest.Match(
+            exemption,
+            new TestMethodDescriptor("Example.Tests.Method", IsTheory: false, "net8-hash"));
+
+        Assert.True(net48.IsMatch);
+        Assert.True(net8.IsMatch);
+    }
+
+    [Fact]
     public void Assembly_inventory_finds_xunit_methods_and_hashes_their_bodies()
     {
         var methods = TestMethodInventory.Read(typeof(SqlTestInventoryTests).Assembly.Location);

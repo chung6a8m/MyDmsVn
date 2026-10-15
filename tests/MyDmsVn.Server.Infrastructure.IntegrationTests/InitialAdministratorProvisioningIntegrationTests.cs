@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -21,7 +21,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class InitialAdministratorProvisioningIntegrationTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provision_creates_active_local_admin_membership_and_durable_marker_atomically()
     {
         var database = await CreateSynchronizedDatabaseAsync();
@@ -74,7 +74,7 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Completed_marker_makes_repeat_a_no_op_even_after_admin_deletion()
     {
         var database = await CreateSynchronizedDatabaseAsync();
@@ -145,7 +145,7 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Existing_identity_without_marker_fails_closed()
     {
         var database = await CreateSynchronizedDatabaseAsync();
@@ -187,7 +187,7 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Failure_before_marker_rolls_back_user_and_membership_and_records_failed_attempt()
     {
         var database = await CreateSynchronizedDatabaseAsync();
@@ -232,7 +232,7 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning, SqlTestCategory.SqlConcurrency)]
     public async Task Concurrent_enrollment_attempts_create_exactly_one_administrator()
     {
         var database = await CreateSynchronizedDatabaseAsync();
@@ -283,7 +283,7 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Fresh_install_admin_logs_in_and_receives_only_active_assignments_with_direct_deny_precedence()
     {
         var database = await CreateSynchronizedDatabaseAsync();
@@ -365,7 +365,7 @@ public sealed class InitialAdministratorProvisioningIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Redirected_bootstrap_apply_exits_promptly_without_reading_or_echoing_secret()
     {
         var database = await CreateSynchronizedDatabaseAsync();

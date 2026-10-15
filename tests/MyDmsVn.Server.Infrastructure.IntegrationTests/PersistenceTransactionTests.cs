@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Data;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -69,7 +69,7 @@ public sealed class PersistenceTransactionTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Parallel_unit_of_works_have_distinct_connections_and_transactions()
     {
         var database = await CreateMigratedDatabaseAsync();

@@ -247,18 +247,31 @@ public sealed class TrxBenchmarkResultGate : IBenchmarkResultGate
 {
     private readonly IBenchmarkSourceInventory _sourceInventory;
     private readonly IBenchmarkMigrationManifestGate _migrationManifestGate;
+    private readonly IBenchmarkClassificationGate _classificationGate;
 
     public TrxBenchmarkResultGate()
-        : this(new ReflectionBenchmarkSourceInventory(), new SourceMigrationManifestGate())
+        : this(
+            new ReflectionBenchmarkSourceInventory(),
+            new SourceMigrationManifestGate(),
+            new SourceSqlTestClassificationGate())
     {
     }
 
     public TrxBenchmarkResultGate(
         IBenchmarkSourceInventory sourceInventory,
         IBenchmarkMigrationManifestGate migrationManifestGate)
+        : this(sourceInventory, migrationManifestGate, new AllowAllBenchmarkClassificationGate())
+    {
+    }
+
+    public TrxBenchmarkResultGate(
+        IBenchmarkSourceInventory sourceInventory,
+        IBenchmarkMigrationManifestGate migrationManifestGate,
+        IBenchmarkClassificationGate classificationGate)
     {
         _sourceInventory = sourceInventory ?? throw new ArgumentNullException(nameof(sourceInventory));
         _migrationManifestGate = migrationManifestGate ?? throw new ArgumentNullException(nameof(migrationManifestGate));
+        _classificationGate = classificationGate ?? throw new ArgumentNullException(nameof(classificationGate));
     }
 
     public bool IsValid(BenchmarkResultEvidence evidence)
@@ -272,6 +285,11 @@ public sealed class TrxBenchmarkResultGate : IBenchmarkResultGate
         }
 
         var sourceMethods = _sourceInventory.Read(evidence.AssemblyPath);
+        if (!_classificationGate.IsValid(evidence.AssemblyPath, evidence.RepositoryRoot))
+        {
+            return false;
+        }
+
         var discovered = VstestDiscoveryParser.Parse(evidence.DiscoveryOutput, evidence.Tfm);
         if (sourceMethods.Count == 0 || discovered.Count == 0)
         {
@@ -346,6 +364,47 @@ public sealed class SourceMigrationManifestGate : IBenchmarkMigrationManifestGat
 {
     public bool IsValid(string repositoryRoot, string manifestPath, string tfm) =>
         MigrationInvocationManifestAuditor.IsValid(repositoryRoot, manifestPath, tfm);
+}
+
+public interface IBenchmarkClassificationGate
+{
+    bool IsValid(string assemblyPath, string repositoryRoot);
+}
+
+public sealed class SourceSqlTestClassificationGate : IBenchmarkClassificationGate
+{
+    public bool IsValid(string assemblyPath, string repositoryRoot)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryRoot))
+        {
+            return false;
+        }
+
+        var manifestPath = Path.Combine(
+            repositoryRoot,
+            "tests",
+            "tools",
+            "sql-test-nonsql-exemptions.json");
+        try
+        {
+            return SqlTestClassificationVerifier.Verify(
+                    TestMethodInventory.Read(assemblyPath),
+                    NonSqlExemptionManifest.Read(manifestPath))
+                .IsComplete;
+        }
+        catch (Exception exception) when (
+            exception is IOException ||
+            exception is InvalidDataException ||
+            exception is InvalidOperationException)
+        {
+            return false;
+        }
+    }
+}
+
+internal sealed class AllowAllBenchmarkClassificationGate : IBenchmarkClassificationGate
+{
+    public bool IsValid(string assemblyPath, string repositoryRoot) => true;
 }
 
 public sealed record BenchmarkResultEvidence(

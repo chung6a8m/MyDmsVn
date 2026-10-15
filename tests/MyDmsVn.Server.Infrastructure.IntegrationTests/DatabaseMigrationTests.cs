@@ -12,7 +12,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class DatabaseMigrationTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Unmanaged_alias_type_is_rejected_without_creating_the_journal()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -45,7 +45,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Unmanaged_database_ddl_trigger_is_rejected_without_creating_the_journal()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -76,7 +76,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Managed_name_with_wrong_object_type_is_rejected_without_creating_the_journal()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -106,7 +106,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Unmanaged_synonym_is_rejected_without_creating_the_journal()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -136,7 +136,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Nonempty_unmanaged_database_outside_dbo_is_rejected_without_touching_existing_data()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -167,7 +167,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Nonempty_unmanaged_database_is_rejected_without_touching_existing_data()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -197,7 +197,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Migrator_rejects_future_history_without_mutating_existing_data()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -230,7 +230,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Migrator_rejects_partial_schema_without_rewriting_journal()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -264,7 +264,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Competing_migrator_is_rejected_until_the_deployment_lock_is_released()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -300,7 +300,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Successful_migration_releases_session_lock_before_connection_is_pooled()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -338,7 +338,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Losing_the_migration_lock_session_stops_the_active_DbUp_script()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -476,7 +476,7 @@ public sealed class DatabaseMigrationTests
         throw new TimeoutException("The expected SQL migration session was not observed.");
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Clean_migration_applies_once_and_repeat_is_a_no_op()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -527,7 +527,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Goods_receipt_migration_enforces_aggregate_keys_checks_and_rowversion()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -683,7 +683,7 @@ public sealed class DatabaseMigrationTests
             await database.DisposeAsync();
         }
     }
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Identity_migration_creates_required_tables_and_enforces_unique_normalized_names()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -731,7 +731,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Catalog_migration_creates_empty_tables_and_enforces_code_uniqueness_and_employee_user_fk()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -823,7 +823,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Catalog_required_text_rejects_display_whitespace_only_values()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -859,7 +859,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Catalog_searchable_text_rejects_nul_values_at_database_boundary()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -895,7 +895,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Every_catalog_code_is_unique_case_and_accent_insensitively()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -937,7 +937,7 @@ public sealed class DatabaseMigrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Employee_user_link_allows_many_nulls_but_only_one_employee_per_user()
     {
         var database = await SqlTestDatabase.CreateAsync(

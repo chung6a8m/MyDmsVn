@@ -53,6 +53,19 @@ tests\tools\Invoke-SqlIntegrationBenchmark.ps1 `
 
 Raw TRX, journals and timing JSONL stay ignored/local. Timing is off by default; the runner sets `MYDMSVN_SQL_TEST_TIMINGS=1`, a unique run ID and a local output path. A timeout, missing/corrupt TRX, nonzero exit, failed/skipped mandatory case, inventory mismatch, ownership ambiguity or approval failure makes the run incomplete.
 
+For bounded development iteration, run one explicit SQL responsibility category on both TFMs:
+
+```powershell
+tests\tools\Invoke-FocusedSqlIntegrationTests.ps1 `
+  -RepositoryRoot (Get-Location) `
+  -TestProject tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
+  -ArtifactRoot .sqlperf\focused-fastsql `
+  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
+  -Category FastSQL
+```
+
+Valid categories are `FastSQL`, `MigrationSchema`, `SecurityProvisioning` and `SqlConcurrency`. `FastSQL` contains only tests that access SQL Server; pure tests remain in the reviewed method-level non-SQL exemption manifest. The helper reports selected methods plus discovered/executed/skipped cases and category composition per TFM, reconciles theory rows and ownership, and fails closed on a mismatch. A focused green run never replaces the unfiltered benchmark/release gate.
+
 The harness creates a unique database named `MyDmsVn_Test_<32 hex digits>`, disables pooling for its database connection, and only drops the exact generated name it owns. Name validation rejects production-like names and incomplete test prefixes. Teardown does not call global `SqlConnection.ClearAllPools()`: owned database and production migrator connections are non-pooled, and the one test that deliberately enables a migration pool clears that exact pool itself. `SINGLE_USER WITH ROLLBACK IMMEDIATE` remains the guarded cleanup boundary for positively owned databases; unrelated pools must remain intact. Never point the variable at production or grant the test principal access to production data.
 
 When either required variable is absent, SQL-dependent tests are reported as skipped with the missing-variable reason; guardrail tests still run. Skips are convenient for local non-SQL work but are invalid for SQL acceptance. The repository acceptance gate sets both variables and runs both `net48` and `net8.0` targets sequentially.

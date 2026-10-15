@@ -258,6 +258,28 @@ public sealed class BenchmarkRunCoordinatorTests
     }
 
     [Fact]
+    public void Trx_gate_rejects_an_incomplete_independent_sql_classification()
+    {
+        var gate = new TrxBenchmarkResultGate(
+            new StaticSourceInventory(),
+            new StubMigrationManifestGate(),
+            new StubClassificationGate(false));
+
+        var valid = gate.IsValid(
+            new BenchmarkResultEvidence(
+                "assembly.dll",
+                "The following Tests are available:\n",
+                "missing.trx",
+                "missing-timing.jsonl",
+                "run-1",
+                "net8.0",
+                0,
+                "repo"));
+
+        Assert.False(valid);
+    }
+
+    [Fact]
     public void Trx_gate_requires_exact_migration_timing_coverage()
     {
         var directory = Path.Combine(Path.GetTempPath(), "MyDmsVn.MigrationGate", Guid.NewGuid().ToString("N"));
@@ -612,5 +634,14 @@ public sealed class BenchmarkRunCoordinatorTests
     private sealed class StubMigrationManifestGate : IBenchmarkMigrationManifestGate
     {
         public bool IsValid(string repositoryRoot, string manifestPath, string tfm) => true;
+    }
+
+    private sealed class StubClassificationGate : IBenchmarkClassificationGate
+    {
+        private readonly bool _valid;
+
+        public StubClassificationGate(bool valid) => _valid = valid;
+
+        public bool IsValid(string assemblyPath, string repositoryRoot) => _valid;
     }
 }
