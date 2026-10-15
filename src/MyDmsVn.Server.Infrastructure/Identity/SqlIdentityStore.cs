@@ -9,7 +9,7 @@ using MyDmsVn.Server.Infrastructure.Persistence;
 
 namespace MyDmsVn.Server.Infrastructure.Identity
 {
-    public sealed class SqlIdentityStore : IUserStore, IPermissionStore
+    public sealed class SqlIdentityStore : IUserStore, IPermissionStore, IUserAccountValidator
     {
         private readonly IDbConnectionFactory _connectionFactory;
 
@@ -72,6 +72,26 @@ namespace MyDmsVn.Server.Infrastructure.Identity
                     replacement,
                     cancellationToken: cancellationToken)).ConfigureAwait(false);
             return affected == 1;
+        }
+
+        public async Task<bool> IsActiveAsync(
+            int userId,
+            CancellationToken cancellationToken)
+        {
+            if (userId <= 0)
+            {
+                return false;
+            }
+
+            using var connection = await _connectionFactory
+                .OpenConnectionAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return await connection.ExecuteScalarAsync<bool>(
+                new CommandDefinition(
+                    "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.Users " +
+                    "WHERE UserId = @userId AND IsActive = 1) THEN 1 ELSE 0 END AS bit);",
+                    new { userId },
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
 
         public async Task<PermissionSnapshot> GetSnapshotAsync(

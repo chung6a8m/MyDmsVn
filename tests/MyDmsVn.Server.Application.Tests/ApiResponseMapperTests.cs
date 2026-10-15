@@ -136,6 +136,21 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.DoesNotContain("validation detail", json);
         }
 
+        [Fact]
+        public void Invalid_credentials_keep_the_safe_public_login_code_and_message()
+        {
+            ErrorOr<string> result = Error.Unauthorized(
+                "Auth.InvalidCredentials",
+                "The username or password is invalid.");
+
+            var response = ApiResponseMapper.Map(result);
+
+            Assert.Equal(ApiStatusCode.Unauthorized, response.Error!.Status);
+            Assert.Equal("Auth.InvalidCredentials", response.Error.Code);
+            Assert.Equal("The username or password is invalid.", response.Error.Message);
+            Assert.Empty(response.Error.Details);
+        }
+
         private static void AssertSafeInternalError(ApiResponse<string> response)
         {
             Assert.Equal(ApiStatusCode.InternalServerError, response.Error!.Status);

@@ -38,4 +38,18 @@ namespace MyDmsVn.Server.Application.Identity
             PasswordReplacement replacement,
             CancellationToken cancellationToken);
     }
+
+    public interface IUserAccountValidator
+    {
+        Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken);
+    }
+
+    internal sealed class RejectingUserAccountValidator : IUserAccountValidator
+    {
+        public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(false);
+        }
+    }
 }

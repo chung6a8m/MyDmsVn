@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Server.Application;
+using MyDmsVn.Server.Application.Identity;
+using MyDmsVn.Server.Application.Security;
 
 namespace MyDmsVn.Desktop.Infrastructure.Local
 {
@@ -73,15 +75,18 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
     internal sealed class LocalRequestDispatcher
     {
-        private readonly ISender _sender;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IRequestDiagnosticsScopeFactory _scopeFactory;
+        private readonly LocalDesktopSession _session;
 
         public LocalRequestDispatcher(
-            ISender sender,
-            IRequestDiagnosticsScopeFactory scopeFactory)
+            IServiceScopeFactory serviceScopeFactory,
+            IRequestDiagnosticsScopeFactory scopeFactory,
+            LocalDesktopSession session)
         {
-            _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+            _session = session ?? throw new ArgumentNullException(nameof(session));
         }
 
         public async Task<ApiResponse<T>> SendAsync<T>(
@@ -103,10 +108,81 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             CancellationToken cancellationToken)
         {
             using (var scope = _scopeFactory.Begin(request.GetType().Name))
+            using (var requestScope = _serviceScopeFactory.CreateScope())
             {
                 try
                 {
-                    var result = await _sender.Send(request, cancellationToken).ConfigureAwait(false);
+                    var hasActor = _session.TryCaptureActor(out var actor, out var generation);
+                    requestScope.ServiceProvider
+                        .GetRequiredService<LocalRequestCurrentUserAccessor>()
+                        .Initialize(actor);
+                    if (hasActor && !_session.IsCurrent(generation))
+                    {
+                        var stale = ApiResponse<T>.Failure(
+                            new ApiError(
+                                ApiStatusCode.Unauthorized,
+                                "Auth.SessionChanged",
+                                "The session changed before the request was admitted.",
+                                correlationId: scope.CorrelationId));
+                        scope.RecordError(stale.Error!.Code);
+                        return stale;
+                    }
+
+                    if (hasActor &&
+                        (request is IAuthorizedRequest || request is CheckPermissionQuery))
+                    {
+                        bool accountIsActive;
+                        try
+                        {
+                            accountIsActive = await requestScope.ServiceProvider
+                                .GetRequiredService<IUserAccountValidator>()
+                                .IsActiveAsync(actor.UserId!.Value, cancellationToken)
+                                .ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception)
+                        {
+                            var unavailable = ApiResponse<T>.Failure(
+                                new ApiError(
+                                    ApiStatusCode.InternalServerError,
+                                    "Database.Unavailable",
+                                    "Account validation is temporarily unavailable.",
+                                    correlationId: scope.CorrelationId));
+                            scope.RecordError(unavailable.Error!.Code);
+                            return unavailable;
+                        }
+
+                        if (!accountIsActive)
+                        {
+                            _session.RequireReauthentication(generation);
+                            var inactive = ApiResponse<T>.Failure(
+                                new ApiError(
+                                    ApiStatusCode.Unauthorized,
+                                    "Auth.Unauthorized",
+                                    "The account is no longer active.",
+                                    correlationId: scope.CorrelationId));
+                            scope.RecordError(inactive.Error!.Code);
+                            return inactive;
+                        }
+                    }
+
+                    if (hasActor && !_session.IsCurrent(generation))
+                    {
+                        var stale = ApiResponse<T>.Failure(
+                            new ApiError(
+                                ApiStatusCode.Unauthorized,
+                                "Auth.SessionChanged",
+                                "The session changed before the request was admitted.",
+                                correlationId: scope.CorrelationId));
+                        scope.RecordError(stale.Error!.Code);
+                        return stale;
+                    }
+
+                    var sender = requestScope.ServiceProvider.GetRequiredService<ISender>();
+                    var result = await sender.Send(request, cancellationToken).ConfigureAwait(false);
                     var response = ApiResponseMapper.Map(
                         result,
                         requestFieldRoot,
@@ -114,6 +190,13 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                     if (transformResponse != null)
                     {
                         response = transformResponse(response, scope.CorrelationId);
+                    }
+
+                    if (hasActor &&
+                        !response.IsSuccess &&
+                        response.Error!.Status == ApiStatusCode.Unauthorized)
+                    {
+                        _session.RequireReauthentication(generation);
                     }
 
                     if (!response.IsSuccess)

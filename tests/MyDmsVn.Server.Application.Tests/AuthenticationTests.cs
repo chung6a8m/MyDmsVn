@@ -186,6 +186,8 @@ namespace MyDmsVn.Server.Application.Tests
             services.AddSingleton<ICurrentUserAccessor>(
                 new StubCurrentUserAccessor(
                     CurrentUser.Authenticated(42, "operator", "Operator", true)));
+            services.AddSingleton<IUserAccountValidator>(
+                new StubUserAccountValidator(true));
             services.AddServerApplication();
             using var provider = services.BuildServiceProvider();
 
@@ -195,6 +197,26 @@ namespace MyDmsVn.Server.Application.Tests
 
             Assert.False(result.IsError);
             Assert.Equal(42, result.Value.UserId);
+        }
+
+        [Fact]
+        public async Task Current_user_query_rejects_a_cached_identity_when_the_account_is_disabled()
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<ICurrentUserAccessor>(
+                new StubCurrentUserAccessor(
+                    CurrentUser.Authenticated(42, "operator", "Operator", true)));
+            services.AddSingleton<IUserAccountValidator>(
+                new StubUserAccountValidator(false));
+            services.AddServerApplication();
+            using var provider = services.BuildServiceProvider();
+
+            var result = await provider.GetRequiredService<MediatR.ISender>().Send(
+                new GetCurrentUserQuery(),
+                CancellationToken.None);
+
+            Assert.True(result.IsError);
+            Assert.Equal("Auth.Unauthorized", result.FirstError.Code);
         }
 
         [Fact]
@@ -361,6 +383,21 @@ namespace MyDmsVn.Server.Application.Tests
             }
 
             public CurrentUser Current { get; }
+        }
+
+        private sealed class StubUserAccountValidator : IUserAccountValidator
+        {
+            private readonly bool _isActive;
+
+            public StubUserAccountValidator(bool isActive)
+            {
+                _isActive = isActive;
+            }
+
+            public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(_isActive);
+            }
         }
     }
 }

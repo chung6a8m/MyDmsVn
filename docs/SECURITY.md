@@ -23,12 +23,12 @@ Add:
 - Local Mode executes authentication in-process. Its SQL credentials are a security limitation; use least-privilege database principal and trusted installation controls.
 - Remote Mode adds HTTP auth (Bearer tokens), token expiry handling and transport security; cookies not required for desktop bearer scenario. Revocation/session model finalized in P7.
 
-## 2a. Safe first Administrator enrollment and Local desktop session (P3.1 complete; P4.1 planned)
+## 2a. Safe first Administrator enrollment and Local desktop session (P3.1 complete; P4.1 in progress)
 
 - The existing identity tables and Login/BCrypt handler do **not** imply that an initial application Administrator or a production WinForms Login UI already exists. A deployment-only operator command must provision a first Administrator after schema migration and approved permission synchronization, using an operator-provided secret and separate privileged SQL principal. No default password/hash, implicit startup seed or re-enrollment on subsequent invocations.
 - The Administrator is an ordinary **application role** with explicit `RolePermissions` assignments, **not SQL sysadmin**, not a wildcard permission and not a bypass of user direct-deny precedence. Recovering a lost administrator requires separately approved/audited maintenance, never an unguarded bootstrap replay.
 - Local desktop session belongs to the currently authenticated user in one host process. Login creates that state only after successful backend verification; logout/expiry clears it, cancels/invalidates old UI state and requires reauthentication. Local Mode does not issue or emulate P7 bearer tokens. Backend authorization must fail closed without an authenticated user and remains mandatory regardless of UI state.
-- P3.1 T01–T07 implementation and automated acceptance evidence are complete; see `docs/P3_1_VERIFICATION.md`. P4.1 interactive WinForms Login/session remains planned. Track scope in `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md` and `docs/plans/20261013-002-desktop-login-session.md`.
+- P3.1 T01–T07 implementation and automated acceptance evidence are complete; see `docs/P3_1_VERIFICATION.md`. P4.1 is in progress: Local dispatch captures one immutable actor/generation per request, production Login validates current SQL account state before publishing the session, and protected dispatch revalidates active-account status. The default Local idle timeout is 30 minutes, measured with a monotonic clock; keyboard/mouse input resets it, while API/background polling does not. Track incomplete acceptance in `docs/P4_1_VERIFICATION.md` and the detailed plan.
 
 ## 3. Authorization algorithm
 

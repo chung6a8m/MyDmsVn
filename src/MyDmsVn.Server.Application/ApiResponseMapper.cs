@@ -48,6 +48,13 @@ namespace MyDmsVn.Server.Application
                 .Where(error => error.Type == dominantType)
                 .OrderBy(error => error.Code, StringComparer.Ordinal)
                 .First();
+            var preserveInvalidCredentials =
+                errors.Count == 1 &&
+                dominantType == ErrorType.Unauthorized &&
+                string.Equals(
+                    dominantError.Code,
+                    "Auth.InvalidCredentials",
+                    StringComparison.Ordinal);
             var details = IsAuthorizationErrorType(dominantType)
                 ? Array.Empty<ApiErrorDetail>()
                 : errors.Select(error => ToDetail(error, requestFieldRoot)).ToArray();
@@ -55,8 +62,12 @@ namespace MyDmsVn.Server.Application
             return ApiResponse<TValue>.Failure(
                 new ApiError(
                     ToStatus(dominantType),
-                    ToAggregateCode(dominantType, dominantError.Code),
-                    ToAggregateMessage(dominantType, dominantError.Description),
+                    preserveInvalidCredentials
+                        ? dominantError.Code
+                        : ToAggregateCode(dominantType, dominantError.Code),
+                    preserveInvalidCredentials
+                        ? dominantError.Description
+                        : ToAggregateMessage(dominantType, dominantError.Description),
                     details,
                     correlationId));
         }

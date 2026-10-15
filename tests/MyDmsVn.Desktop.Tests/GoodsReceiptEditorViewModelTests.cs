@@ -45,6 +45,37 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Post_uses_persisted_identity_and_version_then_refreshes_the_posted_receipt()
+        {
+            var api = new EditorApiClient
+            {
+                GetResponse = ApiResponse<GoodsReceiptDto>.Success(
+                    Receipt("posted", "AgICAgICAgI=", "Posted")),
+            };
+            using (var fixture = Create(api))
+            {
+                fixture.Editor.Load(Receipt("draft", "AQIDBAUGBwg="));
+
+                var posted = await fixture.Editor.PostAsync(CancellationToken.None);
+
+                Assert.True(posted);
+                Assert.NotNull(api.LastPost);
+                Assert.Equal(41, api.LastPost!.ReceiptId);
+                Assert.Equal("AQIDBAUGBwg=", api.LastPost.ExpectedVersion);
+                Assert.Equal("Posted", fixture.Editor.Status);
+                Assert.True(fixture.Editor.IsReadOnly);
+                Assert.False(fixture.Editor.IsDirty);
+                Assert.NotNull(fixture.Notifications.LastNotification);
+                Assert.Equal(
+                    DesktopNotificationKind.Success,
+                    fixture.Notifications.LastNotification!.Kind);
+                Assert.Equal(
+                    "Goods receipt posted.",
+                    fixture.Notifications.LastNotification.Message);
+            }
+        }
+
+        [Fact]
         public async Task Update_reuses_opaque_version_and_conflict_preserves_user_input()
         {
             var api = new EditorApiClient
@@ -560,6 +591,7 @@ namespace MyDmsVn.Desktop.Tests
 
             public SaveGoodsReceiptRequest? LastCreate { get; private set; }
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
+            public PostGoodsReceiptRequest? LastPost { get; private set; }
             public IList<long> GetIds { get; } = new List<long>();
             public int CreateCalls { get; private set; }
             public bool ControlCreateResponse { get; set; }
@@ -623,7 +655,18 @@ namespace MyDmsVn.Desktop.Tests
             private TaskCompletionSource<ApiResponse<GoodsReceiptDto>>? _getCompletion;
             public void CompleteGet() => _getCompletion!.TrySetResult(GetResponse);
             public Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(GoodsReceiptListRequest request, CancellationToken token) => throw new NotSupportedException();
-            public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(PostGoodsReceiptRequest request, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(
+                PostGoodsReceiptRequest request,
+                CancellationToken token)
+            {
+                LastPost = request;
+                return Task.FromResult(
+                    ApiResponse<PostGoodsReceiptResponse>.Success(
+                        new PostGoodsReceiptResponse(
+                            request.ReceiptId,
+                            "Posted",
+                            new DateTime(2026, 10, 10, 1, 2, 3, DateTimeKind.Utc))));
+            }
         }
     }
 }

@@ -24,6 +24,7 @@ namespace MyDmsVn.Server.Application
             services.AddSingleton<IFoundationProbe, FoundationProbe>();
             services.TryAddSingleton<IApplicationExceptionReporter, TraceApplicationExceptionReporter>();
             services.TryAddScoped<ICurrentUserAccessor, AnonymousCurrentUserAccessor>();
+            services.TryAddScoped<IUserAccountValidator, RejectingUserAccountValidator>();
             services.TryAddSingleton<IUtcClock, SystemUtcClock>();
             services.TryAddSingleton<ISecurityAuditSink, NoOpSecurityAuditSink>();
             services.TryAddSingleton<ISecurityAuditFailureReporter, TraceSecurityAuditFailureReporter>();

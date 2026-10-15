@@ -15,12 +15,17 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             services.TryAddSingleton<IMessenger>(_ => new WeakReferenceMessenger());
             services.TryAddSingleton<IAsyncDelay, SystemAsyncDelay>();
             services.TryAddSingleton<IUiDispatcher, ImmediateUiDispatcher>();
+            services.TryAddSingleton<IMonotonicClock, SystemMonotonicClock>();
+            services.TryAddSingleton(DesktopSessionOptions.Default);
             services.TryAddSingleton<LocalDesktopSession>();
             services.TryAddSingleton<IDesktopSession>(
                 provider => provider.GetRequiredService<LocalDesktopSession>());
-            services.RemoveAll<ICurrentUserAccessor>();
-            services.AddSingleton<ICurrentUserAccessor>(
+            services.TryAddSingleton<IDesktopSessionActivity>(
                 provider => provider.GetRequiredService<LocalDesktopSession>());
+            services.RemoveAll<ICurrentUserAccessor>();
+            services.AddScoped<LocalRequestCurrentUserAccessor>();
+            services.AddScoped<ICurrentUserAccessor>(
+                provider => provider.GetRequiredService<LocalRequestCurrentUserAccessor>());
             services.AddTransient<IFoundationApiClient, LocalFoundationApiClient>();
             services.AddTransient<IIdentityApiClient, LocalIdentityApiClient>();
             services.AddTransient<IPermissionApiClient, LocalPermissionApiClient>();

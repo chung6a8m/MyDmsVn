@@ -10,13 +10,17 @@ namespace MyDmsVn.Server.Application.Identity
         : IRequestHandler<GetCurrentUserQuery, ErrorOr<CurrentUserDto>>
     {
         private readonly ICurrentUserAccessor _currentUserAccessor;
+        private readonly IUserAccountValidator _accountValidator;
 
-        public GetCurrentUserQueryHandler(ICurrentUserAccessor currentUserAccessor)
+        public GetCurrentUserQueryHandler(
+            ICurrentUserAccessor currentUserAccessor,
+            IUserAccountValidator accountValidator)
         {
             _currentUserAccessor = currentUserAccessor;
+            _accountValidator = accountValidator;
         }
 
-        public Task<ErrorOr<CurrentUserDto>> Handle(
+        public async Task<ErrorOr<CurrentUserDto>> Handle(
             GetCurrentUserQuery request,
             CancellationToken cancellationToken)
         {
@@ -28,17 +32,26 @@ namespace MyDmsVn.Server.Application.Identity
                 currentUser.Username == null ||
                 currentUser.DisplayName == null)
             {
-                return Task.FromResult<ErrorOr<CurrentUserDto>>(
+                return
                     Error.Unauthorized(
                         "Auth.Unauthorized",
-                        "Authentication is required."));
+                        "Authentication is required.");
             }
 
-            return Task.FromResult<ErrorOr<CurrentUserDto>>(
+            if (!await _accountValidator
+                    .IsActiveAsync(currentUser.UserId.Value, cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                return Error.Unauthorized(
+                    "Auth.Unauthorized",
+                    "Authentication is required.");
+            }
+
+            return
                 new CurrentUserDto(
                     currentUser.UserId.Value,
                     currentUser.Username,
-                    currentUser.DisplayName));
+                    currentUser.DisplayName);
         }
     }
 }

@@ -24,6 +24,7 @@ namespace MyDmsVn.Desktop.Application
         private string _status = "Draft";
         private string? _version;
         private int _saveInFlight;
+        private int _postInFlight;
         private bool _isApplyingReceipt;
         private bool _isDirty;
         private bool _disposed;
@@ -389,6 +390,146 @@ namespace MyDmsVn.Desktop.Application
                 }
             }
         }
+
+        public async Task<bool> PostAsync(CancellationToken cancellationToken)
+        {
+            ThrowIfDisposed();
+            if (Interlocked.CompareExchange(ref _postInFlight, 1, 0) != 0)
+            {
+                return false;
+            }
+
+            var lifetimeToken = _lifetimeCancellation.Token;
+            using (var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                lifetimeToken))
+            {
+                var posted = false;
+                try
+                {
+                    await ExecuteBusyAsync(
+                        async token => posted = await PostCoreAsync(token, lifetimeToken).ConfigureAwait(false),
+                        linkedCancellation.Token,
+                        () => !_disposed).ConfigureAwait(false);
+                    return posted;
+                }
+                finally
+                {
+                    Volatile.Write(ref _postInFlight, 0);
+                }
+            }
+        }
+
+        private async Task<bool> PostCoreAsync(
+            CancellationToken cancellationToken,
+            CancellationToken lifetimeToken)
+        {
+            if (!Id.HasValue ||
+                string.IsNullOrWhiteSpace(Version) ||
+                IsReadOnly ||
+                IsDirty)
+            {
+                return false;
+            }
+
+            var receiptId = Id.Value;
+            ApiResponse<PostGoodsReceiptResponse> response;
+            try
+            {
+                response = await _apiClient.PostAsync(
+                    new PostGoodsReceiptRequest(receiptId, Version!),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                await _dispatcher.InvokeAsync(
+                    () => ApplyUnexpectedError(exception),
+                    lifetimeToken).ConfigureAwait(false);
+                return false;
+            }
+
+            if (!response.IsSuccess)
+            {
+                await _dispatcher.InvokeAsync(
+                    () => ApplyApiError(response.Error!),
+                    cancellationToken).ConfigureAwait(false);
+                return false;
+            }
+
+            await _dispatcher.InvokeAsync(
+                () =>
+                {
+                    Status = response.Data!.Status;
+                    IsDirty = false;
+                },
+                lifetimeToken).ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await PublishPostedWithoutRefreshAsync(lifetimeToken).ConfigureAwait(false);
+                return true;
+            }
+
+            ApiResponse<GoodsReceiptDto> refresh;
+            try
+            {
+                refresh = await _apiClient
+                    .GetAsync(receiptId, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                await PublishPostedWithoutRefreshAsync(lifetimeToken).ConfigureAwait(false);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                await _dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        ApplyUnexpectedError(exception);
+                        PublishNotification(
+                            DesktopNotificationKind.Warning,
+                            "Goods receipt was posted, but its latest details could not be refreshed.");
+                    },
+                    lifetimeToken).ConfigureAwait(false);
+                return true;
+            }
+
+            if (!refresh.IsSuccess)
+            {
+                await _dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        ApplyApiError(refresh.Error!);
+                        PublishNotification(
+                            DesktopNotificationKind.Warning,
+                            "Goods receipt was posted, but its latest details could not be refreshed.");
+                    },
+                    lifetimeToken).ConfigureAwait(false);
+                return true;
+            }
+
+            await _dispatcher.InvokeAsync(
+                () =>
+                {
+                    Load(refresh.Data);
+                    PublishNotification(DesktopNotificationKind.Success, "Goods receipt posted.");
+                },
+                lifetimeToken).ConfigureAwait(false);
+            return true;
+        }
+
+        private Task PublishPostedWithoutRefreshAsync(CancellationToken cancellationToken) =>
+            _dispatcher.InvokeAsync(
+                () => PublishNotification(
+                    DesktopNotificationKind.Warning,
+                    "Goods receipt was posted, but its latest details were not refreshed because the operation was canceled."),
+                cancellationToken);
 
         private async Task<bool> SaveCoreAsync(
             CancellationToken cancellationToken,

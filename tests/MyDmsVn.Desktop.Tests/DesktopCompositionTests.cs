@@ -257,6 +257,7 @@ namespace MyDmsVn.Desktop.Tests
             services.AddSingleton<IPermissionStore>(new AllowPermissionStore());
             services.AddServerApplication();
             services.AddLocalDesktopAdapter();
+            services.AddScoped<IUserAccountValidator, ActiveAccountValidator>();
             services.AddTransient<
                 IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
                 SuccessfulLoginHandler>();
@@ -395,6 +396,14 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken cancellationToken) =>
                 Task.FromResult<ErrorOr<CurrentUserDto>>(
                     new CurrentUserDto(42, request.Username, "Operator"));
+        }
+
+        private sealed class ActiveAccountValidator : IUserAccountValidator
+        {
+            public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(true);
+            }
         }
 
         private sealed class PausingLoginHandler

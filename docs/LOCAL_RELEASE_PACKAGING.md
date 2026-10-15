@@ -27,7 +27,7 @@ Script restore locked và publish tuần tự, không chạy hai TFM song song:
 
 Candidate Windows scope là Windows 10/11 x64; host `net48` chạy x86 qua WoW64. Chỉ các OS/runtime được ghi Pass trong release matrix P6-T08 mới được công bố là supported. Native/transitive DLL được giữ cạnh executable trong publish directory; không yêu cầu Visual Studio hay developer SDK trên máy đích.
 
-`release-manifest.json` ghi product version, commit/trạng thái source tree, exact schema range `7..7`, kiến trúc/runtime, deployment mode và SHA-256/length của từng file. SQL version validation vẫn là P6-T06; manifest để danh sách verified SQL version rỗng thay vì suy diễn support. Binary hiện unsigned; release owner phải chấp nhận rõ hoặc cung cấp signing policy/trust-chain gate trước release.
+`release-manifest.json` ghi product version, commit/trạng thái source tree, exact schema range `8..8` cho baseline P3.1, kiến trúc/runtime, deployment mode và SHA-256/length của từng file. SQL version validation vẫn là P6-T06; manifest để danh sách verified SQL version rỗng thay vì suy diễn support. Binary hiện unsigned; release owner phải chấp nhận rõ hoặc cung cấp signing policy/trust-chain gate trước release.
 
 ## Cài đặt và upgrade
 
