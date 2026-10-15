@@ -25,19 +25,22 @@ public sealed class BenchmarkRunCoordinator
     private readonly IBenchmarkResultGate _resultGate;
     private readonly IBenchmarkOwnershipGate _ownershipGate;
     private readonly IBenchmarkReportExporter _reportExporter;
+    private readonly IBenchmarkClassificationGate _classificationGate;
 
     public BenchmarkRunCoordinator(
         IBenchmarkPreflightGate preflight,
         IProcessRunner processRunner,
         IBenchmarkResultGate? resultGate = null,
         IBenchmarkOwnershipGate? ownershipGate = null,
-        IBenchmarkReportExporter? reportExporter = null)
+        IBenchmarkReportExporter? reportExporter = null,
+        IBenchmarkClassificationGate? classificationGate = null)
     {
         _preflight = preflight;
         _processRunner = processRunner;
         _resultGate = resultGate ?? new TrxBenchmarkResultGate();
         _ownershipGate = ownershipGate ?? new BenchmarkOwnershipGate();
         _reportExporter = reportExporter ?? new SqlPerformanceReportExporter();
+        _classificationGate = classificationGate ?? new SourceSqlTestClassificationGate();
     }
 
     public async Task<BenchmarkRunResult> RunAsync(
@@ -65,6 +68,15 @@ public sealed class BenchmarkRunCoordinator
         List<BenchmarkFrameworkRun> runs,
         CancellationToken cancellationToken)
     {
+        foreach (var tfm in options.TargetFrameworks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_classificationGate.IsValid(AssemblyPath(options, tfm), options.RepositoryRoot))
+            {
+                return new BenchmarkRunResult(false, runs);
+            }
+        }
+
         var baselineId = Guid.NewGuid().ToString("N");
         var passes = Enumerable.Range(1, options.WarmupPasses)
             .Select(number => (Kind: BenchmarkPassKind.Warmup, Number: number))
@@ -173,16 +185,7 @@ public sealed class BenchmarkRunCoordinator
                     pass.Kind,
                     pass.Number,
                     result));
-                var projectPath = Path.IsPathRooted(options.TestProject)
-                    ? options.TestProject
-                    : Path.Combine(options.RepositoryRoot, options.TestProject);
-                var assemblyName = Path.GetFileNameWithoutExtension(projectPath) + ".dll";
-                var assemblyPath = Path.Combine(
-                    Path.GetDirectoryName(projectPath)!,
-                    "bin",
-                    "Release",
-                    tfm,
-                    assemblyName);
+                var assemblyPath = AssemblyPath(options, tfm);
                 if (!ownershipResult.IsComplete || result.ExitCode != 0 || result.TimedOut ||
                     !_resultGate.IsValid(
                         new BenchmarkResultEvidence(
@@ -235,6 +238,19 @@ public sealed class BenchmarkRunCoordinator
         }
 
         return new BenchmarkRunResult(true, runs);
+    }
+
+    private static string AssemblyPath(BenchmarkRunOptions options, string tfm)
+    {
+        var projectPath = Path.IsPathRooted(options.TestProject)
+            ? options.TestProject
+            : Path.Combine(options.RepositoryRoot, options.TestProject);
+        return Path.Combine(
+            Path.GetDirectoryName(projectPath)!,
+            "bin",
+            "Release",
+            tfm,
+            Path.GetFileNameWithoutExtension(projectPath) + ".dll");
     }
 }
 

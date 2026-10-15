@@ -50,6 +50,11 @@ public static class NonSqlExemptionManifest
             return new NonSqlExemptionMatch(false, NonSqlExemptionFailure.MethodMismatch);
         }
 
+        if (!method.IsBodyFingerprintComplete)
+        {
+            return new NonSqlExemptionMatch(false, NonSqlExemptionFailure.UnresolvedDependency);
+        }
+
         return exemption.MethodBodyFingerprint
             .Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
             .Contains(method.BodyFingerprint, StringComparer.Ordinal)
@@ -69,6 +74,7 @@ public enum NonSqlExemptionFailure
     None,
     MethodMismatch,
     StaleFingerprint,
+    UnresolvedDependency,
 }
 
 public sealed record NonSqlExemptionMatch(bool IsMatch, NonSqlExemptionFailure Failure);

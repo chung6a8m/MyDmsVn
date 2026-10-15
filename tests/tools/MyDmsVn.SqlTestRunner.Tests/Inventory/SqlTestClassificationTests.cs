@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using MyDmsVn.SqlTestRunner.Inventory;
 using Xunit;
 
@@ -76,11 +77,24 @@ public sealed class SqlTestClassificationTests
             "MyDmsVn.Server.Infrastructure.IntegrationTests.dll");
         var manifestPath = Path.Combine(root, "tests", "tools", "sql-test-nonsql-exemptions.json");
 
-        var result = SqlTestClassificationVerifier.Verify(
-            TestMethodInventory.Read(assemblyPath),
-            NonSqlExemptionManifest.Read(manifestPath));
+        var methods = TestMethodInventory.Read(assemblyPath);
+        var exemptions = NonSqlExemptionManifest.Read(manifestPath);
+        var result = SqlTestClassificationVerifier.Verify(methods, exemptions);
+        var invalidExemptions = exemptions
+            .Select(exemption => new
+            {
+                exemption.MethodName,
+                Match = methods
+                    .Where(method => method.FullyQualifiedName == exemption.MethodName)
+                    .Select(method => NonSqlExemptionManifest.Match(exemption, method))
+                    .SingleOrDefault(),
+            })
+            .Where(item => item.Match is not null && !item.Match.IsMatch)
+            .Select(item => item.MethodName + ":" + item.Match!.Failure);
 
-        Assert.True(result.IsComplete, string.Join(", ", result.Failures));
+        Assert.True(
+            result.IsComplete,
+            string.Join(", ", result.Failures) + Environment.NewLine + string.Join(Environment.NewLine, invalidExemptions));
         Assert.All(SqlTestCategories.All, category => Assert.True(result.CategoryCounts[category] > 0));
     }
 

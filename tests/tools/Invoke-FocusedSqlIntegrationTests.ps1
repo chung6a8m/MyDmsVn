@@ -44,8 +44,4 @@ try {
 }
 finally {
     $env:MYDMSVN_SQL_TEST_APPROVAL_FILE = $previousApproval
-    Remove-Item Env:MYDMSVN_SQL_TEST_RUN_ID -ErrorAction SilentlyContinue
-    Remove-Item Env:MYDMSVN_SQL_TEST_JOURNAL_DIRECTORY -ErrorAction SilentlyContinue
-    Remove-Item Env:MYDMSVN_SQL_TEST_TIMINGS -ErrorAction SilentlyContinue
-    Remove-Item Env:MYDMSVN_SQL_TEST_TIMING_OUTPUT -ErrorAction SilentlyContinue
 }
