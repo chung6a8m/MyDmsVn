@@ -8,6 +8,14 @@ dotnet build MyDmsVn.sln -c Release --no-restore
 dotnet test MyDmsVn.sln -c Release --no-build --no-restore
 ```
 
+## Codex test selection and PR acceptance
+
+Use [Codex Test Execution Policy](../docs/CODEX_TEST_EXECUTION_POLICY.md) to select tests in four stages: focused edit loop, affected-task check, final PR regression, and specialized release/performance verification. The generic `dotnet test MyDmsVn.sln` command above is a convenient local check **not an SQL acceptance certificate**: it does not itself prove SQL method/theory-row discovery-to-TRX reconciliation, zero required SQL skips, process-tree watchdog coverage or post-run database ownership reconciliation.
+
+For SQL development iteration, use the existing `Invoke-FocusedSqlIntegrationTests.ps1` category runner documented below; run the relevant unit/desktop test projects for other changes. After the last code change, a code-bearing PR needs full applicable Release and unfiltered SQL evidence on both SQL TFMs, not only category filters. The current strict SQL acceptance path is the multi-pass `Invoke-SqlIntegrationBenchmark.ps1` runner (one warm-up, three measured passes per TFM). No dedicated one-pass strict PR mode is implemented; do not invent one. For doc-only changes, report static checks and clearly label SQL/GUI suites not run.
+
+Write a Test Execution Report in the PR: changed surface, selected scope per stage, exact commands/TFMs, passed/failed/skipped counts, strict SQL inventory/ownership/watchdog outcome when applicable, and `passed` / `failed` / `blocked` / `not run` for remaining mandatory gates. Never disclose raw SQL connection strings, instance identifiers, credentials, journals or unsanitized test artifacts.
+
 WinForms tests create and dispose controls on an STA thread through `StaTest`. Each action receives a cancellation token; a timeout cancels the action and waits for cleanup before returning. Actions that cannot cooperate with cancellation, including fatal-process scenarios, must run in a bounded subprocess.
 
 `WinFormsTestGuard` captures `Application.ThreadException` and `DataGridView.DataError`, subscribes to `AppDomain.UnhandledException` as last-chance diagnostics, and enables the Windows thread error mode that suppresses critical-error and general-protection-fault dialogs. Unconsumed captured exceptions fail the test when the guard is disposed; a test that intentionally raises an expected exception must consume it with `DrainExceptions()` and assert it. An `AppDomain.UnhandledException` notification cannot prevent process termination, so tests must catch/await worker failures before they become unhandled and use subprocess isolation when intentionally testing fatal behavior.

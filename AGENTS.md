@@ -60,6 +60,14 @@ If documents contradict each other, flag the issue in the change summary; do not
 - Test transaction commit, rollback, parallel updates, duplicate posting, permissions and parity of Local/HTTP adapters as described in `docs/TEST_STRATEGY.md`.
 - If Windows GUI, SQL Server or targeting packs are unavailable, report the limitation honestly; do not mark their tests as passed.
 
+### Codex test execution policy
+
+- Before running tests for a change, choose the smallest relevant *non-SQL or SQL* test scope and record its rationale. Use progressive validation: focused inner-loop tests, affected-project/task tests, then final unfiltered PR acceptance. Do not rerun the entire SQL suite after each local fix.
+- The authoritative level-by-level decision matrix, existing command capabilities, exceptions and evidence template are in `docs/CODEX_TEST_EXECUTION_POLICY.md`. Follow it alongside the existing isolation policy below and every explicit plan acceptance gate; a narrow inner-loop run never replaces a required final gate.
+- For SQL-backed focused development runs, prefer the existing guarded `tests/tools/Invoke-FocusedSqlIntegrationTests.ps1` by a verified SQL responsibility category. Its category filter is **not** a full-suite acceptance result. Preserve fail-closed SQL instance approval, process watchdog, ownership reconciliation, theory-row inventory and zero mandatory SQL skips.
+- For a code-bearing PR, perform final applicable Release tests on both supported TFMs, including unfiltered dual-TFM SQL integration when required by the project acceptance rules, **after the last behavioral change**. A documentation-only PR may use documented static checks instead; never claim an unexecuted SQL/GUI gate passed. Missing Windows, SQL approval or test resources means `blocked/not run`, not `passed`.
+- The existing strict SQL runner currently exposes the multi-pass `baseline` protocol (one warm-up and three measured passes per TFM), **not** a one-pass PR acceptance switch. Do not invent such a switch or treat bare `dotnet test` as equivalent to the strict discovery/TRX/ownership gate. Performance A/B comparisons and specialized stress tests remain conditional on the relevant plan.
+
 ### Test parallelization and resource isolation
 
 - Decide parallel safety from **resource ownership and observable isolation**, not merely from the test-project name, SQL test trait, or test duration. Test classification (for example `FastSQL`, `MigrationSchema`, `SecurityProvisioning`, `SqlConcurrency`) is separate from execution/isolation policy.
