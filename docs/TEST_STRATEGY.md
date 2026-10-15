@@ -38,6 +38,9 @@ Before removing or narrowing a serial guard, document the isolation/ownership ma
 
 ## 2.2. Task gates and final full regression
 
+**TESTGATE rollout is local-only.** The required final full SQL acceptance is performed on an approved developer/Codex machine; do not introduce a new CI run of that full suite or CI gate enforcement as part of TESTGATE-T01–T05. Existing unrelated CI configuration is unchanged. Future CI participation requires explicit approval; local evidence must continue to satisfy all strict inventory, watchdog and cleanup gates.
+
+
 Every new implementation plan must specify an executable L2 task-gate matrix: changed module/dependencies, test project and TFM, actual reviewed selectors, mandatory real-SQL category/adversarial checks, approval/cleanup constraints and evidence. Codex runs smallest correct focused L1 and affected L2 gates; do **not** default to `dotnet test MyDmsVn.sln` or unfiltered SQL after each task. See [Test Gate Matrix](TEST_GATE_MATRIX.md) and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
 
 Plan one full L3 invocation only at the final gate-affecting revision after L2 is green. Required unfiltered dual-TFM SQL cases, approval, independent inventory/discovery/TRX, zero mandatory skips, watchdog and ownership checks remain intact. An L3 failure or relevant code/test/migration/harness/build/CI edit invalidates affected evidence; focused repair must precede rerunning the applicable full gate. A strict single-pass PR runner and module-scoped gate orchestration are **proposed, not implemented**; the current strict runner is multi-pass. Benchmark repetition is specialized L4, not the default feature gate. See [TESTGATE plan](plans/20261016-001-task-gates-and-modular-tests.md) and [proposed ADR 0006](adr/0006-task-scoped-test-execution-and-module-projects.md); ADR 0005 still governs isolation.
