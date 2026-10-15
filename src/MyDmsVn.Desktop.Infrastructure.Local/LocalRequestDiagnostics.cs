@@ -128,7 +128,8 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                         return stale;
                     }
 
-                    if (hasActor && request is IAuthorizedRequest)
+                    if (hasActor &&
+                        (request is IAuthorizedRequest || request is CheckPermissionQuery))
                     {
                         bool accountIsActive;
                         try

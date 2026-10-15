@@ -133,6 +133,27 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Sql_validation_failure_is_not_reported_as_bad_credentials()
+        {
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddScoped<IUserAccountValidator, ThrowingAccountValidator>();
+            services.AddTransient<IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>, SuccessfulLoginHandler>();
+            using (var provider = services.BuildServiceProvider())
+            {
+                var response = await provider.GetRequiredService<IIdentityApiClient>().LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None);
+
+                Assert.False(response.IsSuccess);
+                Assert.Equal("Database.Unavailable", response.Error!.Code);
+                Assert.Equal(ApiStatusCode.InternalServerError, response.Error.Status);
+                Assert.False(provider.GetRequiredService<IDesktopSession>().IsAuthenticated);
+            }
+        }
+
+        [Fact]
         public async Task Signing_out_invalidates_a_login_that_is_still_in_flight()
         {
             var delayedHandler = new DelayedLoginHandler();
@@ -296,6 +317,14 @@ namespace MyDmsVn.Desktop.Tests
 
             public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken) =>
                 Task.FromResult(IsActive);
+        }
+
+        private sealed class ThrowingAccountValidator : IUserAccountValidator
+        {
+            public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
+            {
+                throw new InvalidOperationException("SQL detail");
+            }
         }
 
         private sealed class SuccessfulLoginHandler

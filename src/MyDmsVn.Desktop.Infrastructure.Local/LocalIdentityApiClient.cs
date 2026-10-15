@@ -71,9 +71,28 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             {
                 var validator = validationScope.ServiceProvider
                     .GetRequiredService<IUserAccountValidator>();
-                if (!await validator
+                bool isActive;
+                try
+                {
+                    isActive = await validator
                         .IsActiveAsync(response.Data!.UserId, cancellationToken)
-                        .ConfigureAwait(false))
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    _session.SignOut();
+                    return ApiResponse<CurrentUserDto>.Failure(
+                        new ApiError(
+                            ApiStatusCode.InternalServerError,
+                            "Database.Unavailable",
+                            "Account validation is temporarily unavailable."));
+                }
+
+                if (!isActive)
                 {
                     _session.SignOut();
                     return ApiResponse<CurrentUserDto>.Failure(
@@ -103,6 +122,16 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 new GetCurrentUserQuery(),
                 null,
                 cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccess && response.Error!.Code == "InternalError")
+            {
+                return ApiResponse<CurrentUserDto>.Failure(
+                    new ApiError(
+                        ApiStatusCode.InternalServerError,
+                        "Database.Unavailable",
+                        "Account validation is temporarily unavailable.",
+                        correlationId: response.Error.CorrelationId));
+            }
+
             if (!response.IsSuccess &&
                 response.Error!.Status == ApiStatusCode.Unauthorized)
             {
