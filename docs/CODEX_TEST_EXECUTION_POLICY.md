@@ -8,6 +8,14 @@ Choose **the smallest correct set of tests during development**, then provide **
 
 Before executing a test command, identify the change surface, affected projects/TFMs, needed infrastructure, applicable plan gates and the next test stage. Prefer `--no-build` or `--no-restore` only after a successful corresponding build/restore **for that exact revision, configuration and target**. A failed test should lead to a focused fix/re-run. **L3 evidence must match the final gate-affecting revision**, not merely the last application-behavior edit. After changes to source code, tests/theory rows, SQL scripts/migrations, independent test inventory/classification manifests, harness/runner, or build/CI configuration that can affect scope, discovery, execution, or results, rerun the applicable complete L3 gates (including strict unfiltered dual-TFM SQL when required). Record the verified commit SHA and fresh discovery/TRX/ownership evidence; do not reuse results from before these changes. The static-only exception below applies to strictly documentation-only PRs; policy/acceptance changes in a code-bearing PR still require checking whether additional gates were introduced.
 
+## Mandatory task execution budget
+
+**Do not run whole-solution or unfiltered SQL suites automatically while editing or after individual tasks.** Declare affected modules and cross-module dependencies, exact test projects/TFMs, reviewed selectors, SQL category (only if needed), task-specific real SQL/race scenarios, SQL approvals, timeout/cleanup and pass/fail/skip/blocked evidence **before** each L2 task gate. Use the [current gate matrix](TEST_GATE_MATRIX.md) and include such a table in every new implementation plan.
+
+After all focused L2 gates are green and all gate-affecting edits are frozen, schedule **one planned final L3 invocation** with the complete mandatory regression and strict unfiltered SQL on both TFMs. If the gate fails or gate-affecting files later change, its evidence becomes stale and the relevant complete L3 checks MUST be rerun after focused repairs. An absolute single-execution cap must never weaken acceptance.
+
+**Implemented-tool boundary:** Today's strict SQL runner performs one warm-up and three measured passes **per TFM**; it is NOT a strict single-pass PR acceptance command. The proposed `Invoke-TestGate.ps1`, module-scoped project runner and strict `pr-acceptance` mode do NOT exist. Never fabricate those flags; use existing strict tooling or report L3 blocked. L4 benchmark repetition is not routine feature validation. See [TESTGATE plan](plans/20261016-001-task-gates-and-modular-tests.md) and [proposed ADR 0006](adr/0006-task-scoped-test-execution-and-module-projects.md), which do not replace ADR 0005 isolation policy.
+
 ## Four levels
 
 | Level / trigger | Minimum expectation | What does **not** suffice |
