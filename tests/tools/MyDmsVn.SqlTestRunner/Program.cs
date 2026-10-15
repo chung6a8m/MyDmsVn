@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestHarness;
 using MyDmsVn.SqlTestRunner.Benchmark;
+using MyDmsVn.SqlTestRunner.Focused;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Processes;
 using MyDmsVn.SqlTestRunner.Reconciliation;
@@ -36,9 +37,9 @@ internal static class Program
                 : 2;
         }
 
-        if (string.Equals(args[0], "focused-verify", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(args[0], "focused-run", StringComparison.OrdinalIgnoreCase))
         {
-            return await VerifyFocusedAsync(ParseOptions(args), cancellationToken).ConfigureAwait(false);
+            return await RunFocusedAsync(ParseOptions(args), cancellationToken).ConfigureAwait(false);
         }
 
         if (!string.Equals(args[0], "baseline", StringComparison.OrdinalIgnoreCase))
@@ -73,79 +74,36 @@ internal static class Program
         return result.IsComplete ? 0 : 3;
     }
 
-    private static async Task<int> VerifyFocusedAsync(
+    private static async Task<int> RunFocusedAsync(
         IReadOnlyDictionary<string, string> values,
         CancellationToken cancellationToken)
     {
         var required = new[]
         {
-            "assembly", "manifest", "category", "discovery", "trx", "tfm", "exit-code",
-            "run-id", "journal", "recovery", "approval",
+            "repo", "project", "artifacts", "approval", "category", "frameworks",
         };
-        if (required.Any(key => !values.ContainsKey(key)) ||
-            !int.TryParse(values["exit-code"], out var exitCode))
+        if (required.Any(key => !values.ContainsKey(key)))
         {
             return 64;
         }
 
-        IReadOnlyList<TestMethodDescriptor> methods;
-        try
-        {
-            methods = TestMethodInventory.Read(values["assembly"]);
-            if (!SqlTestClassificationVerifier.Verify(
-                    methods,
-                    NonSqlExemptionManifest.Read(values["manifest"]))
-                .IsComplete)
-            {
-                return 3;
-            }
-        }
-        catch (Exception exception) when (
-            exception is IOException ||
-            exception is InvalidDataException ||
-            exception is InvalidOperationException)
-        {
-            return 3;
-        }
-
-        var result = FocusedSqlTestResultGate.Verify(
-            methods,
-            values["category"],
-            File.ReadAllText(values["discovery"]),
-            values["trx"],
-            values["tfm"],
-            exitCode);
-        using var ownershipDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken,
-            ownershipDeadline.Token);
-        var ownership = await new BenchmarkOwnershipGate().ValidateAsync(
-                new BenchmarkOwnershipEvidence(
-                    values["run-id"],
-                    values["journal"],
-                    values["recovery"],
-                    values["approval"],
-                    exitCode == 0),
-                linked.Token)
+        Environment.SetEnvironmentVariable(SqlTestHarnessEnvironment.ApprovalFileVariable, values["approval"]);
+        Directory.CreateDirectory(values["artifacts"]);
+        using var runner = new OwnedProcessRunner();
+        var result = await new FocusedRunCoordinator(new EnvironmentPreflightGate(), runner)
+            .RunAsync(
+                new FocusedRunOptions(
+                    Path.GetFullPath(values["repo"]),
+                    Path.GetFullPath(values["project"]),
+                    Path.GetFullPath(values["artifacts"]),
+                    Path.GetFullPath(values["approval"]),
+                    values["category"],
+                    values["frameworks"].Split(',', StringSplitOptions.RemoveEmptyEntries),
+                    TimeSpan.FromMinutes(30),
+                    TimeSpan.FromHours(1)),
+                cancellationToken)
             .ConfigureAwait(false);
-
-        var composition = methods
-            .Where(method => method.Categories.Contains(values["category"], StringComparer.Ordinal))
-            .SelectMany(method => method.Categories)
-            .GroupBy(category => category, StringComparer.Ordinal)
-            .OrderBy(group => group.Key, StringComparer.Ordinal)
-            .Select(group => group.Key + ":" + group.Count());
-        Console.WriteLine(
-            "category={0} tfm={1} selectedMethods={2} discoveredCases={3} executedCases={4} skippedCases={5} composition={6} status={7}",
-            values["category"],
-            values["tfm"],
-            result.SelectedMethods,
-            result.DiscoveredCases,
-            result.ExecutedCases,
-            result.SkippedCases,
-            string.Join(",", composition),
-            result.IsComplete && ownership.IsComplete ? "complete" : "incomplete");
-        return result.IsComplete && ownership.IsComplete ? 0 : 3;
+        return result.IsComplete ? 0 : 3;
     }
 
     private static async Task<BenchmarkRunResult> RunBaselineAsync(

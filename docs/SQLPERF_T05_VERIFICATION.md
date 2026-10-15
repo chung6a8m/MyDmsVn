@@ -7,10 +7,10 @@
 ## Implemented
 
 - `SqlServerFact` now emits a real xUnit `Category` trait. Its default is `FastSQL`; methods with migration/schema, security/provisioning or concurrency responsibility declare those categories explicitly and may overlap.
-- The independent reflection inventory reads categories from the compiled assembly. A reviewed method-scoped non-SQL exemption manifest contains both TFM IL fingerprints, rationale and evidence for 60 pure or fail-closed tests. A changed method invalidates its exemption.
+- The independent reflection inventory reads categories from the compiled assembly. A reviewed method-scoped non-SQL exemption manifest contains reviewed-code fingerprints, rationale and evidence for 60 pure or fail-closed tests. Each fingerprint covers the integration-test, harness and application source boundary while excluding generated `bin`/`obj` output, so changes to async/generated bodies or reviewed local helper dependencies invalidate exemptions fail-closed without depending on commit metadata embedded in binaries.
 - The strict unfiltered benchmark gate now rejects missing, stale, duplicate or category-conflicting classification before accepting TRX results.
 - `FocusedSqlTestResultGate` compares selected source methods with filtered discovery and expanded TRX cases, rejects missing/extra methods, theory-row mismatch, failures and skips, and reports selected/discovered/executed/skipped counts.
-- `Invoke-FocusedSqlIntegrationTests.ps1` performs approval preflight, runs each requested TFM sequentially, uses unique TRX/timing/journal paths and reconciles database ownership. It warns that focused success is not a release gate.
+- `Invoke-FocusedSqlIntegrationTests.ps1` delegates discovery and execution to the runner's Windows Job Object watchdog, performs approval preflight, runs each requested TFM sequentially, uses unique TRX/timing/journal paths and reconciles database ownership in a bounded `finally` path after every launched execution. It warns that focused success is not a release gate.
 
 ## Classification inventory
 
@@ -47,7 +47,7 @@ tests/tools/Invoke-FocusedSqlIntegrationTests.ps1 `
 | `FastSQL` net48 | 37 selected, 37 discovered, 37 executed, 0 skipped; ownership complete; 1m46s |
 | `FastSQL` net8.0 | 37 selected, 37 discovered, 37 executed, 0 skipped; ownership complete; 1m34s |
 
-The first focused attempt correctly failed after the `net48` test execution because a single-TFM IL fingerprint was stale on the other TFM. The manifest format was tightened to retain both reviewed TFM fingerprints, a RED/GREEN test was added, and the complete dual-TFM rerun then passed. The invalid attempt was not accepted as evidence.
+The first focused attempt correctly failed after the `net48` test execution because the original single-TFM fingerprint was stale on the other TFM. The manifest format was tightened to retain both reviewed TFM fingerprints, a RED/GREEN test was added, and the complete dual-TFM rerun then passed. The invalid attempt was not accepted as evidence.
 
 ## Concurrency decision
 

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace MyDmsVn.SqlTestRunner.Inventory;
 
@@ -13,6 +14,7 @@ public static class TestMethodInventory
     public static IReadOnlyList<TestMethodDescriptor> Read(string assemblyPath)
     {
         var fullPath = Path.GetFullPath(assemblyPath);
+        var reviewedCode = ReadReviewedCode(fullPath);
         var context = new AssemblyLoadContext("sql-inventory-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         var resolver = new AssemblyDependencyResolver(fullPath);
         context.Resolving += (_, assemblyName) =>
@@ -33,7 +35,9 @@ public static class TestMethodInventory
                     item.Method.DeclaringType!.FullName + "." + item.Method.Name,
                     item.Attributes.Any(attribute =>
                         IsAttributeOrDerived(attribute.AttributeType, "Xunit.TheoryAttribute")),
-                    Fingerprint(item.Method),
+                    FingerprintReviewedCode(
+                        item.Method.DeclaringType!.FullName + "." + item.Method.Name,
+                        reviewedCode),
                     ReadCategories(item.Method)))
                 .OrderBy(item => item.FullyQualifiedName, StringComparer.Ordinal)
                 .ToArray();
@@ -57,10 +61,77 @@ public static class TestMethodInventory
         return false;
     }
 
-    private static string Fingerprint(MethodInfo method)
+    internal static string FingerprintReviewedCode(
+        string methodName,
+        IReadOnlyDictionary<string, byte[]> reviewedFiles)
     {
-        var body = method.GetMethodBody()?.GetILAsByteArray() ?? Array.Empty<byte>();
-        return Convert.ToHexString(SHA256.HashData(body)).ToLowerInvariant();
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData(Encoding.UTF8.GetBytes(methodName));
+        foreach (var file in reviewedFiles.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(file.Key.ToLowerInvariant()));
+            hash.AppendData(file.Value);
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+    }
+
+    private static IReadOnlyDictionary<string, byte[]> ReadReviewedCode(string assemblyPath)
+    {
+        var repositoryRoot = FindRepositoryRoot(Path.GetDirectoryName(assemblyPath)!);
+        if (repositoryRoot is null)
+        {
+            return new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                [Path.GetFileName(assemblyPath)] = File.ReadAllBytes(assemblyPath),
+            };
+        }
+
+        // Deliberately invalidate every exemption when reviewed source changes.
+        // The broad, source-stable boundary includes async/generated bodies and
+        // local helper call paths without depending on commit metadata embedded
+        // in deterministic build outputs.
+        var roots = new[]
+        {
+            Path.Combine(repositoryRoot, "src"),
+            Path.Combine(repositoryRoot, "tests", "MyDmsVn.Server.Infrastructure.IntegrationTests"),
+            Path.Combine(repositoryRoot, "tests", "MyDmsVn.SqlTestHarness"),
+        };
+        var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".cs", ".csproj", ".json", ".props", ".resx", ".sql", ".targets",
+        };
+        return roots
+            .Where(Directory.Exists)
+            .SelectMany(root => Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+            .Where(path => !HasBuildOutputSegment(repositoryRoot, path))
+            .Where(path => extensions.Contains(Path.GetExtension(path)))
+            .ToDictionary(
+                path => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
+                File.ReadAllBytes,
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string? FindRepositoryRoot(string startDirectory)
+    {
+        for (var directory = new DirectoryInfo(startDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "MyDmsVn.sln")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool HasBuildOutputSegment(string repositoryRoot, string path)
+    {
+        var relative = Path.GetRelativePath(repositoryRoot, path);
+        return relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Any(segment =>
+                string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<string> ReadCategories(MethodInfo method) =>

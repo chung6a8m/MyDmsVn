@@ -7,7 +7,7 @@ Date: 2026-10-15
 This closes SQLPERF-T06 only. It does not complete P4.1, authenticated P5 acceptance or P6 release gates.
 
 - Unchanged baseline: `2a139c258027f336cb1ded66a071a68c491ce08b`.
-- Candidate: `972674f` (the T04/T05 work plus the cross-TFM cancellation normalization found by the first candidate attempt).
+- Benchmark candidate: `972674f` (the T04/T05 work plus the cross-TFM cancellation normalization found by the first candidate attempt). The final reviewed head additionally contains the focused-run hardening described below; it does not change the timed SQL test execution path.
 - Both revisions were restored and built in separate Codex-managed worktrees. Submodules were initialized at their recorded revisions.
 - The same operator-approved non-production SQL instance, User-scope connection/approval configuration and runner protocol were used. Raw connection strings, instance identity, approval path, database names, TRX, timing JSONL and journals remain ignored local evidence under `.sqlperf/`.
 - Build/restore time was excluded. Each revision ran sequentially with one warm-up per TFM followed by three measured runs per TFM. Measured order was `net8.0 -> net48`, `net48 -> net8.0`, `net8.0 -> net48` after the `net48 -> net8.0` warm-ups.
@@ -91,7 +91,7 @@ No production migration, schema, authorization behavior, SQL permission or conne
 
 ## Final regression
 
-At candidate `972674f`:
+At the final reviewed head:
 
 ```powershell
 dotnet build MyDmsVn.sln -c Release --no-restore -m:1 -v:minimal
@@ -103,9 +103,9 @@ dotnet test MyDmsVn.sln -c Release --no-build --no-restore -m:1 `
 - Server Application: 133 / 133 on `net48`; 133 / 133 on `net8.0`.
 - Desktop automated tests: 200 / 200 on `net48`; 200 / 200 on `net8.0-windows`.
 - Architecture: 5 / 5.
-- Server Infrastructure integration: 222 / 222 on `net48` in 8m17s; 222 / 222 on `net8.0` in 8m16s; zero skipped.
+- Server Infrastructure integration: 222 / 222 on `net48` in 8m26s; 222 / 222 on `net8.0` in 8m15s; zero skipped.
 - SQL test harness: 52 / 52 on each TFM.
-- SQL test runner: 77 / 77.
+- SQL test runner: 81 / 81.
 
 These are automated WinForms/Desktop tests; no authenticated interactive P5 acceptance is claimed.
 
@@ -114,3 +114,9 @@ These are automated WinForms/Desktop tests; no authenticated interactive P5 acce
 The engineering target of 20–30% median improvement on each TFM was **not achieved**. The accepted gain is 8.56–11.23% for a larger full inventory, or 10.22–13.01% on the 199 common identities. Further speed would require fixture reuse or parallel SQL load. T04 found no safe reset boundary for fixture reuse, and T05 found no capacity evidence supporting parallel execution on this instance. Both remain rejected: the cost is a slower suite, while the benefit is preserving real migration, permission, locking, cleanup and per-test isolation evidence.
 
 SQLPERF-T01–T06 are complete under that explicit safety-based decision. Any future optimization should be a separately measured change with a new matched baseline; it must not reopen the rejected strategies without new isolation or capacity evidence.
+
+## Final review remediation
+
+The required fresh whole-branch review found three T05 infrastructure gaps. The fix pass made reviewed-code fingerprints cover async/generated test bodies plus reviewed harness/application source (excluding generated output so rebuild/commit metadata stays stable), routed focused discovery/execution through the existing owned-process-tree watchdog, and moved focused ownership validation into a bounded `finally` path that runs after every launched execution regardless of timeout or result-gate failure. Classification now runs before SQL test launch.
+
+Three targeted tests were added RED then GREEN for changed async/helper code, stale classification before launch, and timeout/result-gate ownership reconciliation. The runner suite increased from 77 to 81 tests. A real post-fix `FastSQL` run passed 37 / 37 with zero skipped and complete ownership reconciliation on each TFM. These changes strengthen developer-run failure handling; they do not alter the already accepted benchmark timings or production behavior.

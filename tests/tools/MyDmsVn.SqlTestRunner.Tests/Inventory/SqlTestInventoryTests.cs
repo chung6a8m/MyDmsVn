@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -78,6 +79,35 @@ public sealed class SqlTestInventoryTests
                 StringComparison.Ordinal));
         Assert.False(current.IsTheory);
         Assert.Equal(64, current.BodyFingerprint.Length);
+    }
+
+    [Fact]
+    public void Reviewed_code_fingerprint_changes_for_async_state_machine_or_helper_source_changes()
+    {
+        var original = TestMethodInventory.FingerprintReviewedCode(
+            "Example.Tests.AsyncMethod",
+            new Dictionary<string, byte[]>
+            {
+                ["tests/Example.Tests/AsyncTest.cs"] = new byte[] { 1, 2, 3 },
+                ["tests/MyDmsVn.SqlTestHarness/Helper.cs"] = new byte[] { 4, 5, 6 },
+            });
+        var asyncBodyChanged = TestMethodInventory.FingerprintReviewedCode(
+            "Example.Tests.AsyncMethod",
+            new Dictionary<string, byte[]>
+            {
+                ["tests/Example.Tests/AsyncTest.cs"] = new byte[] { 1, 2, 4 },
+                ["tests/MyDmsVn.SqlTestHarness/Helper.cs"] = new byte[] { 4, 5, 6 },
+            });
+        var helperChanged = TestMethodInventory.FingerprintReviewedCode(
+            "Example.Tests.AsyncMethod",
+            new Dictionary<string, byte[]>
+            {
+                ["tests/Example.Tests/AsyncTest.cs"] = new byte[] { 1, 2, 3 },
+                ["tests/MyDmsVn.SqlTestHarness/Helper.cs"] = new byte[] { 4, 5, 7 },
+            });
+
+        Assert.NotEqual(original, asyncBodyChanged);
+        Assert.NotEqual(original, helperChanged);
     }
 
     [Fact]
