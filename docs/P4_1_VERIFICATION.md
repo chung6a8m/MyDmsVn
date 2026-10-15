@@ -21,9 +21,9 @@ Status: **In progress / not release-verified** (2026-10-15).
 
 - Baseline: locked restore succeeded; Desktop.Tests Release `net48` 200/200 and `net8.0-windows` 200/200, zero skipped.
 - L1 RED→GREEN: login arbitration, active-account validation, disabled revalidation/session clearing, Login ViewModel, LoginForm, Login-only smoke and idle boundary/background-poll behavior.
-- L2 Desktop after first vertical slice: Release `net48` 206/206 and `net8.0-windows` 206/206, zero skipped. After idle/disabled-account additions, `net8.0-windows` is 208/208 and Server.Application `net8.0` is 134/134, zero skipped; the final `net48` Desktop rerun is still required.
+- L2 Desktop after idle/disabled-account additions: Release `net48` 208/208 and `net8.0-windows` 208/208; Server.Application `net8.0` 134/134; zero skipped.
 - Both production host projects build Release with zero warnings/errors (`Desktop.App` `net48`; `Desktop.AppCore` `net8.0-windows`).
-- SQL environment prerequisites and approval preflight are present. The focused `SecurityProvisioning` runner is currently blocked before discovery because the required reviewed non-SQL classification manifest is stale after the production dependency changes (`MissingSqlCategory, InvalidOrStaleExemption`). This was not bypassed and is not a SQL pass.
+- SQL environment prerequisites and approval preflight are present. The reviewed non-SQL classification manifest was mechanically refreshed with repo inventory fingerprints after production dependency changes and its dual-TFM classification test passed 2/2. Focused `SecurityProvisioning` completed on both TFMs: each selected/discovered/executed 36 cases, skipped 0, with watchdog and ownership reconciliation complete. The first `net48` attempt used an overlong artifact path and failed before DB ownership journaling; the accepted rerun used a short artifact root. This focused result is L2 only, not L3 acceptance.
 - L3: not run against final revision.
 - L4 packaged real-user walkthroughs/concurrency/failure probes: not run.
 
