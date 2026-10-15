@@ -1,6 +1,6 @@
 # P4.1 — Desktop Login, authenticated session and logout
 
-Status: **In progress — automated L3 verified** (2026-10-15; packaged/manual L4 remains open). Follow-up to completed P4 shell/UI foundations, **not** evidence that P4 already shipped interactive Login. Depends on existing P3 Login/current-user contracts, P4 host/LocalApiClient wiring and **P3.1 verified first-administrator enrollment**. Must precede P5/P6 real-user interactive acceptance. See `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md`.
+Status: **In progress — automated L3 verified, packaged L4 partial** (2026-10-16; idle-expiry/relogin remains open). Follow-up to completed P4 shell/UI foundations, **not** evidence that P4 already shipped interactive Login. Depends on existing P3 Login/current-user contracts, P4 host/LocalApiClient wiring and **P3.1 verified first-administrator enrollment**. Must precede P5/P6 real-user interactive acceptance. See `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md`.
 
 Read: `AGENTS.md`, `docs/CONTRACTS.md`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/TEST_STRATEGY.md`, `docs/P3_VERIFICATION.md`, `docs/plans/20261008-006-phase-4-desktop.md` and `docs/plans/20261008-007-phase-6-local-hardening.md`.
 
@@ -61,6 +61,7 @@ P3 already contains `LoginCommandHandler`/BCrypt. P4 hosts currently render a sh
 - [x] Concurrency regression: pause a user-A request **before** Local dispatcher admission/authorization, log out A and log in B, then resume it; assert it is denied/canceled and **never authorized/audited as B**. Independently pause an already-authorized user-A write, switch sessions, and assert any permitted commit/audit retains A's user ID while its late response never updates B's UI. Run parallel Local requests and Login attempts to prove no cross-request/session identity bleed.
 - [x] Safe STA tests for `LoginForm` and shell on **both `net48` and `net8.0-windows`**: control handles, DPI, compact layout, keyboard access, theme, disposal and no `DataError`/`ThreadException`/UnhandledException default modal dialog. Tests must be bounded; never open an unhandled Login prompt in headless CI.
 - [ ] Manual smoke from packaged binaries: clean DB -> P3.1 CLI provisioning -> login -> catalog/receipt/stock permission checks -> logout -> another user -> expiry/relogin -> restart. Record environment, target TFM, pass/fail/blocked and screenshots without credentials.
+  - Partial evidence (2026-10-16): approved disposable DB and separate SQL identities; attended Administrator Login on both packaged TFMs; real receipt Post/read-only parity, stock balance/card, logout/Login return and restart; second zero-permission user authenticated and received server-side `The operation is not permitted`. Idle-expiry observation stopped at approximately 13.5/30 minutes for PR creation, so expiry/relogin remains unverified and this item stays open.
 
 ## Exit / acceptance criteria
 
