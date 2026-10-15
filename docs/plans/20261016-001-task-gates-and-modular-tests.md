@@ -1,6 +1,6 @@
 # TESTGATE — Task-scoped execution, strict single-pass PR gate, and modular test projects
 
-**Status:** Proposed / not implemented · **Date:** 2026-10-16 · **Scope:** cross-phase test infrastructure and Codex workflow. This is an implementation plan, **not** evidence that the runner, project split, or CI features below exist or have passed. Read `AGENTS.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_STRATEGY.md`, ADR 0005, proposed ADR 0006, `tests/README.md`, SQLPERF-T04/T05/T06 verification, and the affected phase plan.
+**Status:** T01 policy/docs implemented in this PR; T02–T06 proposed / not implemented · **Date:** 2026-10-16 · **Scope:** cross-phase test infrastructure and Codex workflow. This is an implementation plan, **not** evidence that the runner, project split, or CI features below exist or have passed. Read `AGENTS.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_STRATEGY.md`, ADR 0005, proposed ADR 0006, `tests/README.md`, SQLPERF-T04/T05/T06 verification, and the affected phase plan.
 
 ## Problem and constraints
 
@@ -58,10 +58,12 @@ This is an **illustrative target structure**, not a request to create empty shel
 
 ### TESTGATE-T01 — Immediate Codex discipline and task gate contracts (documentation PR)
 
-- [ ] Update `AGENTS.md`, policy, strategy and tests README to mandate L1/L2 focused execution, an explicit per-task matrix, no full SQL/solution suite during normal inner loops, and a frozen-revision L3 boundary.
-- [ ] Attach an actual task-level selection matrix to P4.1 without changing any previously recorded test evidence/status. For new plans, require the same contract at plan creation.
-- [ ] Propose ADR 0006 and record what scripts/projects **are not yet implemented**. Preserve ADR 0005. Add command examples using only existing runner flags.
-- [ ] Static verify links, filenames and policy/ADR/plan consistency. As docs-only change, record SQL/GUI as **not run**.
+- [x] Update `AGENTS.md`, policy, strategy and tests README to mandate L1/L2 focused execution, an explicit per-task matrix, no full SQL/solution suite during normal inner loops, and a frozen-revision L3 boundary.
+- [x] Attach an actual task-level selection matrix to P4.1 without changing any previously recorded test evidence/status. For new plans, require the same contract at plan creation.
+- [x] Propose ADR 0006 and record what scripts/projects **are not yet implemented**. Preserve ADR 0005. Add command examples using only existing runner flags.
+- [x] Static verify links, filenames and policy/ADR/plan consistency. As docs-only change, record SQL/GUI as **not run**.
+
+**T01 evidence:** Repository paths and current P4.1 verified/partial status were inspected; documentation links and actual existing test project names were cross-checked. No runtime SQL/GUI suite was executed for this documentation-only change.
 
 **Exit:** a Codex agent can determine which existing commands to run after each task without inventing tools or repeating unrelated full SQL; no reduced release acceptance.
 
