@@ -111,6 +111,23 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             SessionChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        internal void RequireReauthentication()
+        {
+            lock (_sync)
+            {
+                if (_state == DesktopSessionState.Expired && _currentUser == null)
+                {
+                    return;
+                }
+
+                _authenticationGeneration++;
+                _currentUser = null;
+                _state = DesktopSessionState.Expired;
+            }
+
+            SessionChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         public void RecordUserActivity()
         {
             lock (_sync)

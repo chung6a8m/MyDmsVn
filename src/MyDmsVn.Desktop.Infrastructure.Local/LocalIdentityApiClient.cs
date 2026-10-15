@@ -135,7 +135,10 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             if (!response.IsSuccess &&
                 response.Error!.Status == ApiStatusCode.Unauthorized)
             {
-                _session.SignOut();
+                if (_session.State != DesktopSessionState.Expired)
+                {
+                    _session.SignOut();
+                }
             }
 
             return response;

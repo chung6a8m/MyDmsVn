@@ -129,6 +129,7 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.False(current.IsSuccess);
                 Assert.Equal("Auth.Unauthorized", current.Error!.Code);
                 Assert.False(session.IsAuthenticated);
+                Assert.Equal(DesktopSessionState.Expired, session.State);
             }
         }
 

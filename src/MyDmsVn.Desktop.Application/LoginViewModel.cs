@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,7 +19,8 @@ namespace MyDmsVn.Desktop.Application
         public LoginViewModel(
             IIdentityApiClient identityClient,
             IDesktopNotificationService notifications,
-            IDesktopExceptionReporter? exceptionReporter = null)
+            IDesktopExceptionReporter? exceptionReporter = null,
+            IDesktopSession? session = null)
             : base(notifications, exceptionReporter)
         {
             _identityClient = identityClient ?? throw new ArgumentNullException(nameof(identityClient));
@@ -27,6 +28,16 @@ namespace MyDmsVn.Desktop.Application
             CancelCommand = new RelayCommand(CancelCurrentOperation);
             TogglePasswordVisibilityCommand = new RelayCommand(
                 () => IsPasswordVisible = !IsPasswordVisible);
+
+            if (session?.State == DesktopSessionState.Expired)
+            {
+                ApplyApiError(
+                    MapError(
+                        new ApiError(
+                            ApiStatusCode.Unauthorized,
+                            "Auth.SessionChanged",
+                            "The previous session is no longer valid.")));
+            }
         }
 
         public string Username

@@ -157,7 +157,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
                         if (!accountIsActive)
                         {
-                            _session.SignOut();
+                            _session.RequireReauthentication();
                             var inactive = ApiResponse<T>.Failure(
                                 new ApiError(
                                     ApiStatusCode.Unauthorized,
@@ -178,6 +178,13 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                     if (transformResponse != null)
                     {
                         response = transformResponse(response, scope.CorrelationId);
+                    }
+
+                    if (hasActor &&
+                        !response.IsSuccess &&
+                        response.Error!.Status == ApiStatusCode.Unauthorized)
+                    {
+                        _session.RequireReauthentication();
                     }
 
                     if (!response.IsSuccess)

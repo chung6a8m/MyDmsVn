@@ -1,3 +1,4 @@
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
@@ -64,6 +65,22 @@ namespace MyDmsVn.Desktop.Tests
             Assert.True(viewModel.HasErrors);
         }
 
+        [Fact]
+        public void Expired_session_shows_an_explicit_reauthentication_notice()
+        {
+            var client = new StubIdentityClient(
+                ApiResponse<CurrentUserDto>.Success(
+                    new CurrentUserDto(42, "operator", "Operator")));
+            var viewModel = new LoginViewModel(
+                client,
+                new DesktopNotificationCenter(),
+                session: new StubSession(DesktopSessionState.Expired));
+
+            Assert.Equal(
+                "Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.",
+                viewModel.ErrorMessage);
+        }
+
         private sealed class StubIdentityClient : IIdentityApiClient
         {
             private readonly ApiResponse<CurrentUserDto> _response;
@@ -88,6 +105,21 @@ namespace MyDmsVn.Desktop.Tests
             {
                 return Task.FromResult(_response);
             }
+        }
+
+        private sealed class StubSession : IDesktopSession
+        {
+            public StubSession(DesktopSessionState state)
+            {
+                State = state;
+            }
+
+            public event EventHandler? SessionChanged;
+            public bool IsAuthenticated => false;
+            public DesktopSessionState State { get; }
+            public CurrentUserDto? CurrentUser => null;
+            public long Version => 0;
+            public void SignOut() => SessionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }
