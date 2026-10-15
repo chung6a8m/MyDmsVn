@@ -82,6 +82,14 @@ Before marking a roadmap task complete:
 4. SQL integration / Windows UI tests in appropriately configured environment.
 5. Document tests executed, skipped and blocked with reasons.
 
+### Progressive Codex execution and evidence
+
+Use the mandatory [Codex Test Execution Policy](CODEX_TEST_EXECUTION_POLICY.md) when implementing subsequent plans. It distinguishes (1) focused inner-loop checks, (2) affected-task validation, (3) final PR acceptance, and (4) specialized release/performance/stress gates. The test scope must expand at the final gate-affecting revision; a focused green run cannot satisfy a required unfiltered full-suite gate. Tests should not be rerun merely to inflate evidence, but earlier regression results become stale after source, test/theory-row, SQL/migration, inventory/manifest, runner/harness, or build/CI changes that can affect discovery, execution, scope, or results. Rerun the applicable complete L3 gates against the final relevant revision.
+
+For code-bearing PRs, the final gate includes the supported Release build/tests and full **unfiltered** SQL integration on both `net48` and `net8.0` where applicable to the repository acceptance contract. No accepted SQL result may rely on missing approval, SQL skips, category-only filters, partial TRX or unverified ownership. The existing `Invoke-SqlIntegrationBenchmark.ps1` strict runner currently makes 1 warm-up plus 3 measured passes per TFM; it is **not** a configurable one-pass PR runner. Use its existing strict verification where required until a separately reviewed single-pass strict gate exists, or report the gate as blocked. Do not present plain `dotnet test` as equivalent or invent a runner mode. A baseline/candidate **A/B comparison** is mandatory only when a plan explicitly requires performance evidence, not for routine functional work.
+
+A documentation-only PR with no runtime, test harness, build or CI behavior changes may substitute reviewable static/document checks, explicitly recording the SQL/GUI suites as not run and the reason. Every PR must carry the execution report described in the policy; a code-bearing PR with an environment-blocked required gate is **not verified / not ready for acceptance** and must not have its plan gate checked off. Keep WinForms GUI assembly serialization and resource-based SQL isolation from ADR 0005 unchanged.
+
 ## SQL integration measurement safety
 
 SQL integration mutation requires both `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` targeting `master` and an operator-maintained `MYDMSVN_SQL_TEST_APPROVAL_FILE`. The harness verifies the live effective database, exact instance identity/fingerprint, approval lifetime and version-specific DMV permission before DDL. It repeats the live check before teardown. Database ownership is journaled and flushed before creation, corroborated with a database marker and live metadata, and quarantined rather than dropped when ownership is ambiguous.

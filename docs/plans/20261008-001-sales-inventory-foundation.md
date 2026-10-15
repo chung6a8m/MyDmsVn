@@ -114,6 +114,14 @@ Implement **Products, Warehouses, Employees, Customers, Goods Receipts, Stock Le
 - [x] Test inactive Products, Warehouses and Employees remain visible historically but cannot be used for new receipt posting; a Draft created before deactivation must fail Post until references become valid again.
 - [x] No direct Create/Update/Delete client API for balances/ledger.
 
+## Execution of remaining P5 GUI acceptance only (Codex policy, 2026-10-15)
+
+This applies **only** to the unchecked P5.1 catalog/lookup interactive smoke and P5.4 full-slice GUI walkthrough. Completed P5 features, test results and checkbox evidence are unchanged. Follow [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md):
+
+- Require verified P3.1 provisioning and actual P4.1 Login/session before the authenticated walkthroughs. For any new GUI fix, run small bounded ViewModel/STA checks (L1/L2), then inspect catalog debounce, lookup invalidation/refresh, Draft/Post, StockBalance/StockCard, duplicate-Post denial and absence of modal hangs from the actual production hosts on both `net48` and `net8.0-windows`.
+- Real packaged/interactive observations are the **remaining P5 acceptance evidence** (L4), not a replacement for the completed automation. When a fix changes source, tests/theory rows, SQL/migrations, inventory/manifests, harness/runner or build/CI inputs affecting the gate, rerun the complete Release and **full dual-TFM unfiltered SQL** PR gate (L3) against the final relevant revision; `FastSQL`/`SecurityProvisioning` category tests serve only development iteration. Do not run SQLPERF A/B measurement repeats for an unchanged manual walkthrough.
+- Record actual commands, TFM and pass/fail/skip counts, manual evidence and blockers in a PR Test Execution Report. Keep existing `[ ]` entries pending if the real Login/Windows/SQL prerequisite cannot be verified; do not relabel old headless shell smoke as authenticated GUI acceptance.
+
 ## Reusable acceptance walkthrough
 
 **Given:** Product SP001 active; Warehouse KHO01 active; Employee NV001 active; sufficient permissions.
