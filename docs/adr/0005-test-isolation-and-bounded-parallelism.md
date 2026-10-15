@@ -4,7 +4,7 @@ Status: **Accepted** · Date: 2026-10-15
 
 ## Context
 
-At the MVP stage the SQL integration assembly uses `[assembly: CollectionBehavior(DisableTestParallelization = true)]` to avoid SQL overload and command timeouts when many disposable databases and migrations are started at once. `Desktop.Tests` separately disables assembly parallelization to protect WinForms/STA/UI tests from competing global interface state. SQLPERF-T04/T05 investigates migrated fixture reuse and bounded parallel execution; the current serial fallback must be preserved until those experiments meet their safety gates.
+At the MVP stage the SQL integration assembly uses `[assembly: CollectionBehavior(DisableTestParallelization = true)]` to avoid SQL overload and command timeouts when many disposable databases and migrations are started at once. `Desktop.Tests` separately disables assembly parallelization to protect WinForms/STA/UI tests from competing global interface state. SQLPERF-T04/T05/T06 were completed in PR #23 (merged on 2026-10-15). T04 evaluated migrated-fixture reuse and rejected it because no SQL-backed test class had a sufficiently safe reset boundary; guarded per-test disposable databases remain. T05 implemented independently verified SQL responsibility categories and a dual-TFM focused runner, but did not adopt its optional bounded-parallel experiment because adequate isolation/capacity evidence was unavailable. T06 completed sequential dual-TFM benchmarks (median full-suite gains: 11.23% on `net48` and 8.56% on `net8.0`), retaining SQL assembly-level serialization. See [T04 decision](../SQLPERF_T04_DECISION.md), [T05 verification](../SQLPERF_T05_VERIFICATION.md), and [T06 verification](../SQLPERF_T06_VERIFICATION.md). These completed work items do not establish that parallel SQL execution is safe.
 
 The user clarified that a preference for sequential tests refers specifically to Desktop tests involving real GUI state, including mouse/keyboard simulation, focus and STA controls. It is not a perpetual policy for every SQL integration test.
 
@@ -25,7 +25,7 @@ The user clarified that a preference for sequential tests refers specifically to
 
 ## Consequences / tradeoffs
 
-Parallel SQL execution is a **future capability requiring proof**, not a completed part of T04/T05 and not permission to weaken release gates. Isolation per database can cost more resources; migrated fixtures reduce setup but make ownership/reset correctness more demanding. Conservative exclusive collections may still be required. The policy does not mandate a specific concurrency limit, new framework, CI topology or unimplemented feature flag.
+Parallel SQL execution is a **future capability requiring separate proof**: it was **not implemented or validated** by the now-completed T04/T05/T06 work, and their completion is not permission to weaken release gates. Isolation per database can cost more resources; migrated fixtures reduce setup but make ownership/reset correctness more demanding. Conservative exclusive collections may still be required. The policy does not mandate a specific concurrency limit, new framework, CI topology or unimplemented feature flag.
 
 ## Required tests / evidence for future implementation
 
