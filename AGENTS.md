@@ -60,6 +60,15 @@ If documents contradict each other, flag the issue in the change summary; do not
 - Test transaction commit, rollback, parallel updates, duplicate posting, permissions and parity of Local/HTTP adapters as described in `docs/TEST_STRATEGY.md`.
 - If Windows GUI, SQL Server or targeting packs are unavailable, report the limitation honestly; do not mark their tests as passed.
 
+### Test parallelization and resource isolation
+
+- Decide parallel safety from **resource ownership and observable isolation**, not merely from the test-project name, SQL test trait, or test duration. Test classification (for example `FastSQL`, `MigrationSchema`, `SecurityProvisioning`, `SqlConcurrency`) is separate from execution/isolation policy.
+- For SQL integration tests, the existing `[assembly: CollectionBehavior(DisableTestParallelization = true)]` is a **transitional safety guard**, not the long-term architectural default. Aim for **bounded xUnit collection-level parallelism** between independently owned databases/resources only after adversarial isolation, cleanup, capacity, repeatability and both-TFM gates pass. Do not remove the current guard merely to improve a benchmark; retain a proven serial fallback.
+- A migrated database fixture may be reused only with explicit ownership, complete reset/teardown and no overlapping writes or unsafe shared state. Tests sharing mutable fixture state must be coordinated by the same collection or a separately proven equivalent mechanism. SQL migration/history, schema mutation, security provisioning and multi-session race tests require isolation appropriate to their behavior.
+- Continue to serialize Desktop tests that create/use WinForms controls, interact with global UI state, drive real mouse/keyboard/focus or rely on shared message-loop/process state. STA execution by itself does **not** make simulated GUI input parallel-safe. The present `Desktop.Tests` assembly-wide guard stays in place; pure ViewModel tests may be separated into independent parallel-compatible projects/collections only after proof.
+- Unit/architecture/contract tests without shared mutable resources should retain normal xUnit collection parallelism. A collection guard applies only within its test assembly/process; runner/CI coordination is required for shared SQL/UI resources across processes and target frameworks. Do not confuse deliberate multi-session concurrency **inside one test** with runner-level parallelism.
+- Keep SQLPERF acceptance measurements for `net48` and `net8.0` sequential unless the measurement protocol is explicitly revalidated. Preserve approval, ownership journaling, mandatory SQL-case inventory, watchdog, zero-skipped required tests and release gates. See `docs/adr/0005-test-isolation-and-bounded-parallelism.md` and `docs/TEST_STRATEGY.md`.
+
 ## Useful starting prompts
 
 - "Implement P0 from `docs/plans/20261008-002-phase-0-foundation.md`; create solution skeleton, DI and build verification only."
