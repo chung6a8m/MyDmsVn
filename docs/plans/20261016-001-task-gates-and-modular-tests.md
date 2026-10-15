@@ -1,6 +1,6 @@
 # TESTGATE — Task-scoped execution, strict single-pass PR gate, and modular test projects
 
-**Status:** T01 policy/docs implemented in this PR; T02–T06 proposed / not implemented · **Date:** 2026-10-16 · **Scope:** cross-phase test infrastructure and Codex workflow. This is an implementation plan, **not** evidence that the runner, project split, or CI features below exist or have passed. Read `AGENTS.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_STRATEGY.md`, ADR 0005, proposed ADR 0006, `tests/README.md`, SQLPERF-T04/T05/T06 verification, and the affected phase plan.
+**Status:** T01 policy/docs implemented in this PR; T02–T05 proposed / not implemented · **Date:** 2026-10-16 · **Scope:** cross-phase test infrastructure and Codex workflow. This is an implementation plan, **not** evidence that the runner or project split exists or has passed. Read `AGENTS.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_STRATEGY.md`, ADR 0005, proposed ADR 0006, `tests/README.md`, SQLPERF-T04/T05/T06 verification, and the affected phase plan.
 
 ## Problem and constraints
 
@@ -13,7 +13,7 @@ Current baseline:
 - SQLPERF-T04 rejected fixture reuse under the then-available safety evidence. Do not reopen that decision without new adversarial tests.
 - P4.1's existing L3 evidence and remaining L4 activities must not be overwritten or falsely reported as having been rerun by this documentation-only plan.
 
-Objectives: minimize repeated SQL work **during task implementation**; retain full correctness, security, migration, both-TFM coverage and real-SQL isolation **at merge**; make actual and missing gates observable.
+Objectives: minimize repeated SQL work **during task implementation**; retain full correctness, security, migration, both-TFM coverage and real-SQL isolation **at merge**; make actual and missing gates observable. **Execution is local-only for this plan:** Codex runs L1/L2/L3 on the approved developer machine, not again on CI. No new CI workflow, CI test-gate enforcement, CI SQL runner or duplicate full-suite acceptance execution is authorized. Revisit CI only through a separately requested plan.
 
 ## Gate definitions
 
@@ -21,10 +21,10 @@ Objectives: minimize repeated SQL work **during task implementation**; retain fu
 |---|---|---|---|
 | L1 | On edit/fix | Affected test method/class, pure unit/contract/VM tests; approved focused real SQL only when necessary | Full unfiltered SQL/solution test as an automatic inner-loop action |
 | L2 | Once per task after affected tests are green | Explicit affected project/TFMs + affected module/category + mandatory adversarial scenarios | Unrelated full SQL suite, or dropping a required real-SQL assertion |
-| L3 | One planned final attempt after all gate-affecting edits and L2 gates are green | Full required Release/dual-TFM regression, including **strict unfiltered** real SQL | Filter-only SQL, stale revision, incomplete TRX or missing inventory/cleanup |
+| L3 | One planned **local** final attempt after all gate-affecting edits and L2 gates are green | Full required Release/dual-TFM regression, including **strict unfiltered** real SQL | Filter-only SQL, stale revision, incomplete TRX or missing inventory/cleanup |
 | L4 | Only a separately triggered plan-specific requirement | Manual packaged GUI, migration recovery, stress or SQLPERF A/B repeated benchmarks | Repeating L4 benchmark for ordinary feature development |
 
-"One final run" means one planned **acceptance invocation** at a frozen revision. L3 must be rerun for the affected complete gate if it fails or a code/test/theory row, SQL/migration, inventory, runner/harness, build or CI input relevant to the gate changes afterward. Never downgrade acceptance or mark blocked gates green.
+"One final run" means one planned **acceptance invocation** at a frozen revision. L3 must be rerun for the affected complete gate if it fails or a code/test/theory row, SQL/migration, inventory, runner/harness, build input relevant to the gate changes afterward. Never downgrade acceptance or mark blocked gates green.
 
 Each task gate must declare: project and TFM, test selection rule and why it is complete for the task, real-SQL dependency and category, cross-module impacts, prerequisite build, exact existing executable command, timeout/watchdog, observed pass/fail/skip, failure cleanup, evidence artifact and outstanding manual check. No automatic fallback from absent SQL approval to skipped mandatory tests.
 
@@ -87,9 +87,9 @@ This is an **illustrative target structure**, not a request to create empty shel
 - [ ] Reconcile source/discovery/TRX globally across all eligible assemblies, including overlapping categories, theory rows and method-scoped exemptions.
 - [ ] Capture sanitized per-task evidence (revision/project/TFM/filter/discovered/executed/passed/failed/skipped/time), final gate reuse invalidation and bounded-run diagnostics.
 - [ ] Add CLI/parser/manifest negative tests for omitted task, category typo, duplicated identities across projects, missing-case/project, unsafe simultaneous resource use and absent approval.
-- [ ] Have CI consume the **same** selection manifest and independently check it, not just trust what the local runner chose.
+- [ ] Independently validate the local manifest selection against source/discovery/expanded theory rows; never trust only the local runner's filtered test list. Do not add CI orchestration or CI test execution.
 
-**Exit:** identical contract locally and in CI; no silent test omissions or concurrent SQL overload.
+**Exit:** a reproducible, independently checked **local-only** task/final contract; no silent test omissions, concurrent SQL overload or duplicate CI full-suite run.
 
 ### TESTGATE-T04 — Separate pure session/VM and GUI test projects (code PR)
 
@@ -113,22 +113,14 @@ This is an **illustrative target structure**, not a request to create empty shel
 
 **Exit:** every required old behavior is still executed exactly as intended and mandatory SQL coverage is complete across the new projects.
 
-### TESTGATE-T06 — CI rollout, regressions and cost verification
-
-- [ ] Enforce L2 manifest gates and L3 required status/checks without auto-invoking SQLPERF benchmarks on ordinary PRs; preserve dual-TFM/GUI/manual L4 requirements.
-- [ ] Pin artifact identity to final gate-affecting revision (commit SHA plus inputs), invalidate stale evidence on relevant edits, permit explicit targeted repairs and complete gate re-runs when invalidated.
-- [ ] Distinguish blocked, skipped, failed and not run. Ensure no green status from absence of SQL approval, headless interactive Login, missing Windows or partial gate.
-- [ ] Capture inner-loop task cost and end-of-PR cost separately (elapsed time, SQL invocations, owned DB count, case coverage), compare against pre-change baseline without mixing benchmark medians with developer elapsed time.
-- [ ] Update all future plan templates/guidance so each new feature has an executable task gate mapping and at most one *planned* final full acceptance boundary.
-
-**Exit:** quality gate CI proves completeness and optimized developer cadence; no regression in existing SQLPERF safety evidence.
-
 ## Scope safeguards and blockers
+
+- **No CI rollout in TESTGATE-T01–T05.** Do not add/modify CI workflows or require CI to repeat local full SQL/desktop acceptance. Existing unrelated CI configuration is outside this plan; any future CI adoption requires a separate explicit user decision.
 
 - Production SQL schema, DbUp migration runner, RepoDb/Dapper behavior, permissions and authentication semantics are out of scope.
 - No parallel SQL experiments or migrated fixture reuse without separate safety evidence and approved ADR 0005 gates.
 - Never run destructive SQL against an unapproved instance. Keep `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` (`master`) and `MYDMSVN_SQL_TEST_APPROVAL_FILE` operator-managed; do not commit raw values.
-- Work cannot be claimed as `passed` until supported Windows TFMs and approved SQL resource gates were actually executed. Docs-only T01 must not mark implementation T02–T06 complete.
+- Work cannot be claimed as `passed` until supported Windows TFMs and approved SQL resource gates were actually executed locally. Docs-only T01 must not mark implementation T02–T05 complete.
 - Existing P4.1 completed acceptance/checkmarks are preserved; future changes must establish whether historical evidence remains applicable to the final code revision.
 
 ## Future PR acceptance report template
