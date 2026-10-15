@@ -1,6 +1,6 @@
 # P4.1 — Desktop Login, authenticated session and logout
 
-Status: **In progress** (implementation started 2026-10-15; mandatory SQL, final L3 and packaged/manual L4 gates remain open). Follow-up to completed P4 shell/UI foundations, **not** evidence that P4 already shipped interactive Login. Depends on existing P3 Login/current-user contracts, P4 host/LocalApiClient wiring and **P3.1 verified first-administrator enrollment**. Must precede P5/P6 real-user interactive acceptance. See `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md`.
+Status: **In progress — automated L3 verified** (2026-10-15; packaged/manual L4 remains open). Follow-up to completed P4 shell/UI foundations, **not** evidence that P4 already shipped interactive Login. Depends on existing P3 Login/current-user contracts, P4 host/LocalApiClient wiring and **P3.1 verified first-administrator enrollment**. Must precede P5/P6 real-user interactive acceptance. See `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md`.
 
 Read: `AGENTS.md`, `docs/CONTRACTS.md`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/TEST_STRATEGY.md`, `docs/P3_VERIFICATION.md`, `docs/plans/20261008-006-phase-4-desktop.md` and `docs/plans/20261008-007-phase-6-local-hardening.md`.
 
