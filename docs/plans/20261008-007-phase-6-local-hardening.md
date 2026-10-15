@@ -107,6 +107,15 @@ At phase completion, update both the detailed checklist and the roadmap with mat
 - [x] Verify release artifact contents contain no admin/migrator connection strings, migration automation or unexpected elevated privileges; verify hashes/signature where applicable.
 - [ ] Evidence: deterministic package/build scripts, installation guide, artifact manifest/hashes and VM install/upgrade test records. (Script/guide/manifest/hash evidence complete 2026-10-13; VM install/upgrade records pending.)
 
+## Test execution for outstanding P6 verification and release work (Codex policy, 2026-10-15)
+
+Follow [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md) **only for currently unchecked P6 verification/operational work** (remaining T01–T04 evidence and T05–T08). This does not reopen completed implementation, checked tests or historical verification:
+
+- **L1/L2 for corrective code changes:** run focused secure-config, permission, audit/error, Application, Desktop STA and/or approved SQL categories matching the change. Developer focused tests cannot satisfy the deployment release matrix. Real full-disk denial, runtime-principal rotation, Windows VM install/upgrade, migration crash/restore drills require separately controlled environments.
+- **L3 after the final behavioral change:** run the required Release targets, Desktop/architecture/application regressions and **unfiltered dual-TFM SQL suites**, with discovery/inventory, instance approval, TRX, watchdog, positive ownership and zero skipped mandatory cases. The current strict SQL `baseline` runner is multi-pass; a one-pass strict PR command does not exist. Environment-blocked gates remain blocked, not replaced by filtered suites or plain `dotnet test`.
+- **L4 for pending P6 gates:** retain all T01–T08/G1–G5 evidence: both installed hosts with real P3.1/P4.1 Login, P5 GUI/stock invariants, supported SQL principal/rotation, safe backup/restore/migration-failure recovery, two-version compatibility, offline/full-disk cases and packaging/secret checks. Label automated vs VM/manual evidence and owner/environment; never perform destructive tests on production or an unapproved SQL instance. Repeated SQLPERF A/B benchmarking does not substitute for operational verification.
+- Supply the PR Test Execution Report and P6 release verification matrix for new evidence. Reuse completed evidence **only when unchanged and still applicable**. Keep the original pending `[ ]` entries and release sign-off blocked until all specific outstanding gates are satisfied.
+
 ## P6-T05 — End-to-end functional and Windows GUI smoke
 
 ### Implementation requirements

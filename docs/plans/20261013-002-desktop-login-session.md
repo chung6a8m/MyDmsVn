@@ -4,6 +4,15 @@ Status: **Not started** (2026-10-13). Follow-up to completed P4 shell/UI foundat
 
 Read: `AGENTS.md`, `docs/CONTRACTS.md`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/TEST_STRATEGY.md`, `docs/P3_VERIFICATION.md`, `docs/plans/20261008-006-phase-4-desktop.md` and `docs/plans/20261008-007-phase-6-local-hardening.md`.
 
+## Test execution for pending P4.1 tasks (Codex policy, 2026-10-15)
+
+For **P4.1-T01–T05 and their still-open exit gates only**, follow [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md). This is prospective guidance, not implementation or test-pass evidence:
+
+- **L1 — while editing:** run deterministic Application/session/ViewModel and request-actor tests nearest to the changed logic; pure session/fake-clock tests need no SQL.
+- **L2 — before completing a task:** run affected Desktop STA/UI tests on `net48` and `net8.0-windows`. For SQL identity, provisioning, authorization and account revalidation, use approved focused `SecurityProvisioning` and any other relevant SQL category, plus the plan's race/failure scenarios. Filtered SQL tests are not the final SQL gate.
+- **L3 — after the final behavioral change:** validate applicable Release targets, Desktop tests and **unfiltered SQL suites on both `net48` and `net8.0`** using independent inventory/TRX, watchdog, instance approval, owned-database reconciliation and zero mandatory skips. The existing strict SQL runner is multi-pass; no single-pass strict PR switch is implemented. Block acceptance rather than marking a missing SQL/Windows gate green.
+- **L4 — per P4.1-T05:** separately run packaged-binary, real-user Login/logout/expiry walkthroughs and specified concurrency/failure probes. Headless shell smoke or injected test sessions do not establish real Login. Capture exact commands/TFMs/pass-fail-skip counts, manual results and blockers in the PR Test Execution Report without exposing credentials or showing modal dialogs unattended.
+
 ## Goal and boundaries
 
 Provide one shared, keyboard-friendly and responsive WinForms `LoginForm` + `LoginViewModel` and a deterministic per-host desktop session lifecycle, reused by both `net48` and `net8.0-windows`. Login through the **existing `IIdentityApiClient`/Application Login** path; do not introduce a parallel password/SQL implementation or require P7 HTTP/token infrastructure for Local Mode.
