@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +15,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class PermissionRegistryMigrationTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Upgrade_backfills_historical_assignments_as_non_authorizing_drift()
     {
         var database = await SqlTestDatabase.CreateAsync(

@@ -38,7 +38,7 @@ public sealed class PermissionSynchronizationIntegrationTests
         Assert.Equal("2026-10-14T01:02:03.0000000Z", canonical);
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Approved_plan_activates_manifest_and_repeat_plan_is_idempotent()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -99,7 +99,7 @@ public sealed class PermissionSynchronizationIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Apply_rejects_database_drift_and_records_no_committed_sync()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -151,7 +151,7 @@ public sealed class PermissionSynchronizationIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Apply_rejects_assignment_drift_not_visible_in_the_catalog()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -195,7 +195,7 @@ public sealed class PermissionSynchronizationIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Apply_rejects_administrator_membership_added_after_grant_plan_review()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -270,7 +270,7 @@ public sealed class PermissionSynchronizationIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Apply_rejects_expired_approval_and_audits_without_catalog_mutation()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -309,7 +309,7 @@ public sealed class PermissionSynchronizationIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Historical_assignment_stays_denied_until_declared_key_is_independently_activated()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -414,7 +414,7 @@ public sealed class PermissionSynchronizationIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Competing_apply_attempts_commit_once_without_duplicate_catalog_or_role_rows()
     {
         var database = await CreateMigratedDatabaseAsync();

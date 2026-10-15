@@ -251,7 +251,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Concurrent_updates_with_one_expected_version_allow_exactly_one_commit()
     {
         var database = await CreateDatabaseAsync();
@@ -288,7 +288,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Concurrent_creates_in_separate_uows_issue_unique_server_numbers()
     {
         var database = await CreateDatabaseAsync();
@@ -758,7 +758,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Reconciliation_reports_no_transient_difference_while_receipts_post_concurrently()
     {
         var database = await CreateDatabaseAsync();
@@ -808,7 +808,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Concurrent_posts_for_same_receipt_commit_exactly_once()
     {
         var database = await CreateDatabaseAsync();
@@ -892,7 +892,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Update_that_locks_first_wins_and_post_rejects_the_stale_snapshot()
     {
         var database = await CreateDatabaseAsync();
@@ -969,7 +969,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Post_that_locks_first_wins_and_update_cannot_replace_posted_lines()
     {
         var database = await CreateDatabaseAsync();
@@ -1137,7 +1137,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Deactivation_and_post_serialize_in_both_lock_orders_for_every_reference()
     {
         var database = await CreateDatabaseAsync();
@@ -1202,7 +1202,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Concurrent_receipt_posts_serialize_on_catalog_locks_and_preserve_the_balance_sum()
     {
         var database = await CreateDatabaseAsync();
@@ -1275,7 +1275,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Concurrent_balance_upserts_block_on_StockBalances_and_preserve_the_sum()
     {
         var database = await CreateDatabaseAsync();

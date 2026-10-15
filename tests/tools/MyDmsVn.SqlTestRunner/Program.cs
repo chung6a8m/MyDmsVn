@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestHarness;
 using MyDmsVn.SqlTestRunner.Benchmark;
+using MyDmsVn.SqlTestRunner.Focused;
+using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Processes;
+using MyDmsVn.SqlTestRunner.Reconciliation;
 
 namespace MyDmsVn.SqlTestRunner;
 
@@ -31,6 +35,11 @@ internal static class Program
                 .ConfigureAwait(false)
                 ? 0
                 : 2;
+        }
+
+        if (string.Equals(args[0], "focused-run", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunFocusedAsync(ParseOptions(args), cancellationToken).ConfigureAwait(false);
         }
 
         if (!string.Equals(args[0], "baseline", StringComparison.OrdinalIgnoreCase))
@@ -60,6 +69,38 @@ internal static class Program
                     new[] { "net48", "net8.0" },
                     TimeSpan.FromMinutes(30),
                     OverallRunTimeout: TimeSpan.FromHours(4)),
+                cancellationToken)
+            .ConfigureAwait(false);
+        return result.IsComplete ? 0 : 3;
+    }
+
+    private static async Task<int> RunFocusedAsync(
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken)
+    {
+        var required = new[]
+        {
+            "repo", "project", "artifacts", "approval", "category", "frameworks",
+        };
+        if (required.Any(key => !values.ContainsKey(key)))
+        {
+            return 64;
+        }
+
+        Environment.SetEnvironmentVariable(SqlTestHarnessEnvironment.ApprovalFileVariable, values["approval"]);
+        Directory.CreateDirectory(values["artifacts"]);
+        using var runner = new OwnedProcessRunner();
+        var result = await new FocusedRunCoordinator(new EnvironmentPreflightGate(), runner)
+            .RunAsync(
+                new FocusedRunOptions(
+                    Path.GetFullPath(values["repo"]),
+                    Path.GetFullPath(values["project"]),
+                    Path.GetFullPath(values["artifacts"]),
+                    Path.GetFullPath(values["approval"]),
+                    values["category"],
+                    values["frameworks"].Split(',', StringSplitOptions.RemoveEmptyEntries),
+                    TimeSpan.FromMinutes(30),
+                    TimeSpan.FromHours(1)),
                 cancellationToken)
             .ConfigureAwait(false);
         return result.IsComplete ? 0 : 3;

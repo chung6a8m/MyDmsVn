@@ -23,7 +23,8 @@ public sealed class BenchmarkRunCoordinatorTests
             process,
             new StubResultGate(),
             new StubOwnershipGate(),
-            new StubReportExporter());
+            new StubReportExporter(),
+            new StubClassificationGate(true));
 
         var result = await coordinator.RunAsync(Options(), CancellationToken.None);
 
@@ -40,13 +41,35 @@ public sealed class BenchmarkRunCoordinatorTests
             process,
             new StubResultGate(),
             new StubOwnershipGate(),
-            new StubReportExporter());
+            new StubReportExporter(),
+            new StubClassificationGate(true));
         var options = Options() with { OverallTimeout = TimeSpan.FromMilliseconds(50) };
 
         var result = await coordinator.RunAsync(options, CancellationToken.None);
 
         Assert.False(result.IsComplete);
         Assert.Empty(process.Commands);
+    }
+
+    [Fact]
+    public async Task Invalid_classification_on_later_tfm_blocks_before_any_process_launch()
+    {
+        var process = new RecordingProcessRunner();
+        var classification = new StubClassificationGate(assemblyPath =>
+            !assemblyPath.Contains("net8.0", StringComparison.Ordinal));
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            process,
+            new StubResultGate(),
+            new StubOwnershipGate(),
+            new StubReportExporter(),
+            classification);
+
+        var result = await coordinator.RunAsync(Options(), CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        Assert.Empty(process.Commands);
+        Assert.Equal(2, classification.AssemblyPaths.Count);
     }
 
     [Fact]
@@ -59,7 +82,8 @@ public sealed class BenchmarkRunCoordinatorTests
             process,
             new StubResultGate(),
             new StubOwnershipGate(),
-            new StubReportExporter());
+            new StubReportExporter(),
+            new StubClassificationGate(true));
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -108,7 +132,8 @@ public sealed class BenchmarkRunCoordinatorTests
             process,
             new StubResultGate(),
             ownership,
-            new StubReportExporter());
+            new StubReportExporter(),
+            new StubClassificationGate(true));
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -132,7 +157,8 @@ public sealed class BenchmarkRunCoordinatorTests
             process,
             new StubResultGate(),
             ownership,
-            new StubReportExporter());
+            new StubReportExporter(),
+            new StubClassificationGate(true));
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -153,7 +179,8 @@ public sealed class BenchmarkRunCoordinatorTests
             process,
             new StubResultGate(),
             ownership,
-            new StubReportExporter());
+            new StubReportExporter(),
+            new StubClassificationGate(true));
 
         var result = await coordinator.RunAsync(
             fixture.Options with { OverallTimeout = TimeSpan.FromMilliseconds(50) },
@@ -175,7 +202,8 @@ public sealed class BenchmarkRunCoordinatorTests
             process,
             new StubResultGate(),
             new StubOwnershipGate(),
-            new StubReportExporter());
+            new StubReportExporter(),
+            new StubClassificationGate(true));
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -198,7 +226,8 @@ public sealed class BenchmarkRunCoordinatorTests
             new RecordingProcessRunner(),
             new StubResultGate(),
             new StubOwnershipGate(),
-            exporter);
+            exporter,
+            new StubClassificationGate(true));
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -217,7 +246,8 @@ public sealed class BenchmarkRunCoordinatorTests
             new RecordingProcessRunner(),
             new StubResultGate(),
             new StubOwnershipGate(),
-            new StubReportExporter(returnMissingPaths: true));
+            new StubReportExporter(returnMissingPaths: true),
+            new StubClassificationGate(true));
 
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
@@ -255,6 +285,28 @@ public sealed class BenchmarkRunCoordinatorTests
         {
             Directory.Delete(directory, true);
         }
+    }
+
+    [Fact]
+    public void Trx_gate_rejects_an_incomplete_independent_sql_classification()
+    {
+        var gate = new TrxBenchmarkResultGate(
+            new StaticSourceInventory(),
+            new StubMigrationManifestGate(),
+            new StubClassificationGate(false));
+
+        var valid = gate.IsValid(
+            new BenchmarkResultEvidence(
+                "assembly.dll",
+                "The following Tests are available:\n",
+                "missing.trx",
+                "missing-timing.jsonl",
+                "run-1",
+                "net8.0",
+                0,
+                "repo"));
+
+        Assert.False(valid);
     }
 
     [Fact]
@@ -612,5 +664,25 @@ public sealed class BenchmarkRunCoordinatorTests
     private sealed class StubMigrationManifestGate : IBenchmarkMigrationManifestGate
     {
         public bool IsValid(string repositoryRoot, string manifestPath, string tfm) => true;
+    }
+
+    private sealed class StubClassificationGate : IBenchmarkClassificationGate
+    {
+        private readonly Func<string, bool> _isValid;
+
+        public StubClassificationGate(bool valid)
+            : this(_ => valid)
+        {
+        }
+
+        public StubClassificationGate(Func<string, bool> isValid) => _isValid = isValid;
+
+        public List<string> AssemblyPaths { get; } = new List<string>();
+
+        public bool IsValid(string assemblyPath, string repositoryRoot)
+        {
+            AssemblyPaths.Add(assemblyPath);
+            return _isValid(assemblyPath);
+        }
     }
 }

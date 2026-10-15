@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
@@ -9,7 +9,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class SqlTestDatabaseLifecycleTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Create_and_dispose_only_manages_a_generated_database()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(
@@ -52,7 +52,7 @@ public sealed class SqlTestDatabaseLifecycleTests
         Assert.Contains("master", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Provisioning_failure_after_create_attempts_guarded_cleanup()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(
@@ -78,7 +78,7 @@ public sealed class SqlTestDatabaseLifecycleTests
         Assert.Equal(0, remaining);
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Failed_teardown_can_be_retried_without_losing_database_ownership()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(
@@ -109,7 +109,7 @@ public sealed class SqlTestDatabaseLifecycleTests
         Assert.Equal(0, remaining);
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Teardown_does_not_clear_an_unrelated_master_connection_pool()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(
