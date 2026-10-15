@@ -1,5 +1,7 @@
 # Test harness
 
+**TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
+
 **Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. Schedule the complete unfiltered SQL acceptance at the final gate-affecting revision. The strict runner currently executes one warm-up and three measured passes per TFM; the proposed `Invoke-TestGate.ps1` and strict single-pass mode are **not implemented**. See [Codex policy](../docs/CODEX_TEST_EXECUTION_POLICY.md) and [current task matrix](../docs/TEST_GATE_MATRIX.md).
 
 P0 tests require Windows, the .NET 8 SDK selected by `global.json`, and the .NET Framework 4.8 targeting pack/runtime. Run from the repository root:
