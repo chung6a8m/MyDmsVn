@@ -49,6 +49,40 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Draft_post_button_posts_current_version_and_locks_the_editor()
+        {
+            StaTest.Run(
+                cancellationToken =>
+                {
+                    using (var guard = new WinFormsTestGuard())
+                    using (var fixture = new Fixture())
+                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    {
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
+
+                        Assert.True(control.PostButton.Enabled);
+                        control.PostButton.PerformClick();
+                        control.LastOperation.GetAwaiter().GetResult();
+
+                        Assert.NotNull(fixture.Api.LastPost);
+                        Assert.Equal(41, fixture.Api.LastPost!.ReceiptId);
+                        Assert.Equal("AQIDBAUGBwg=", fixture.Api.LastPost.ExpectedVersion);
+                        Assert.Equal("Posted", fixture.Editor.Status);
+                        Assert.False(control.PostButton.Enabled);
+                        Assert.False(control.SaveButton.Enabled);
+                        Assert.NotNull(fixture.Notifications.LastNotification);
+                        Assert.Equal(
+                            "Goods receipt posted.",
+                            fixture.Notifications.LastNotification!.Message);
+                        Assert.Empty(guard.Exceptions);
+                    }
+                },
+                TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void Draft_commands_update_lines_and_validation_errors_stay_inline()
         {
             StaTest.Run(
@@ -796,6 +830,7 @@ namespace MyDmsVn.Desktop.Tests
             public int GetCalls { get; private set; }
             public GoodsReceiptDto CurrentReceipt { get; set; } = Receipt();
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
+            public PostGoodsReceiptRequest? LastPost { get; private set; }
             public int CreateCalls { get; private set; }
             public bool ControlCreateResponse { get; set; }
             public IList<GoodsReceiptListRequest> ListRequests { get; } =
@@ -879,8 +914,17 @@ namespace MyDmsVn.Desktop.Tests
 
             public Task<ApiResponse<PostGoodsReceiptResponse>> PostAsync(
                 PostGoodsReceiptRequest request,
-                CancellationToken cancellationToken) =>
-                throw new NotSupportedException();
+                CancellationToken cancellationToken)
+            {
+                LastPost = request;
+                CurrentReceipt = Receipt(status: "Posted");
+                return Task.FromResult(
+                    ApiResponse<PostGoodsReceiptResponse>.Success(
+                        new PostGoodsReceiptResponse(
+                            request.ReceiptId,
+                            "Posted",
+                            new DateTime(2026, 10, 10, 1, 2, 3, DateTimeKind.Utc))));
+            }
 
             public static GoodsReceiptDto Receipt(
                 string status = "Posted",

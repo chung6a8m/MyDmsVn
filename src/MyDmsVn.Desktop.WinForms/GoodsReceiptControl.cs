@@ -84,6 +84,7 @@ namespace MyDmsVn.Desktop.WinForms
                 Visible = false,
             };
             SaveButton = CreateButton("Save", () => SetOperation(SaveAsync()));
+            PostButton = CreateButton("Post", () => SetOperation(PostAsync()));
 
             LineGrid = new BootstrapGrid { Dock = DockStyle.Fill, TabStop = true };
             LineGrid.Click += (_, __) => SelectActiveLine();
@@ -161,6 +162,7 @@ namespace MyDmsVn.Desktop.WinForms
         public Label PageLabel { get; }
         public BootstrapButton NewButton { get; }
         public BootstrapButton SaveButton { get; }
+        public BootstrapButton PostButton { get; }
         public BootstrapButton AddLineButton { get; }
         public BootstrapButton RemoveLineButton { get; }
         public Label StatusLabel { get; }
@@ -321,6 +323,21 @@ namespace MyDmsVn.Desktop.WinForms
                     {
                         EnterAccessDeniedEditorState(true);
                     }
+                }
+            }
+            ApplyState();
+        }
+
+        private async Task PostAsync()
+        {
+            var posted = await _editor.PostAsync(CancellationToken.None).ConfigureAwait(true);
+            if (posted)
+            {
+                _workflowMessage = null;
+                await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
+                if (_list.IsAccessDenied)
+                {
+                    EnterAccessDeniedEditorState(true);
                 }
             }
             ApplyState();
@@ -769,6 +786,10 @@ namespace MyDmsVn.Desktop.WinForms
                 EmployeeLookup.Enabled = canEdit;
                 NoteEditor.Enabled = canEdit;
                 SaveButton.Enabled = canEdit;
+                PostButton.Enabled = canEdit &&
+                    _editor.Id.HasValue &&
+                    !string.IsNullOrWhiteSpace(_editor.Version) &&
+                    !_editor.IsDirty;
                 AddLineButton.Enabled = canEdit;
                 RemoveLineButton.Enabled = canEdit && _selectedLine != null;
                 ProductLookup.Enabled = canEdit && _selectedLine != null;
@@ -925,6 +946,7 @@ namespace MyDmsVn.Desktop.WinForms
             AddField(panel, "Version", VersionLabel);
             var commands = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true };
             commands.Controls.Add(SaveButton);
+            commands.Controls.Add(PostButton);
             commands.Controls.Add(new Label { Text = "Total", AutoSize = true, Padding = new Padding(12, 8, 0, 0) });
             commands.Controls.Add(TotalLabel);
             commands.Controls.Add(BusyIndicator);
