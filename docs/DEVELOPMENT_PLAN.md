@@ -82,10 +82,10 @@ See [P3.1 detailed plan](plans/20261013-001-initial-security-provisioning-permis
 ## P4.1 — Interactive desktop Login and session (new)
 
 See [P4.1 detailed plan](plans/20261013-002-desktop-login-session.md) and [current verification evidence](P4_1_VERIFICATION.md). **In progress**; implementation and final automated L3 (dual-runtime Desktop/Application plus strict unfiltered dual-TFM SQL) are verified, while packaged interactive L4 remains open.
-- [ ] P4.1-T01 shared fail-closed session state/current-user accessor and auth contract integration.
-- [ ] P4.1-T02/T03 shared LoginForm/LoginViewModel and production Login-first bootstrap in both desktop hosts; no fake authenticated startup.
-- [ ] P4.1-T04 explicit logout, expiration/relogin, cross-user cache teardown and stale-result cancellation.
-- [ ] P4.1-T05 dual-runtime STA, application/SQL and packaged interactive smoke tests.
+- [x] P4.1-T01 shared fail-closed session state/current-user accessor and auth contract integration.
+- [x] P4.1-T02/T03 shared LoginForm/LoginViewModel and production Login-first bootstrap in both desktop hosts; no fake authenticated startup.
+- [x] P4.1-T04 explicit logout, expiration/relogin, cross-user cache teardown and stale-result cancellation.
+- [ ] P4.1-T05 dual-runtime STA, application/SQL and packaged interactive smoke tests. (Automated dual-runtime/Application/strict SQL coverage complete 2026-10-15; packaged attended smoke remains open.)
 **Exit:** both hosts block business access until a real login and can run authenticated P5 walkthroughs.
 
 ## P5 — Sales & Inventory Foundation
