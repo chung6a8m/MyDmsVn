@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using ErrorOr;
@@ -43,6 +43,61 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.False(session.IsAuthenticated);
                 Assert.Equal(DesktopSessionState.Expired, session.State);
             }
+        }
+
+        [Fact]
+        public async Task Activity_after_idle_deadline_expires_instead_of_reviving_session()
+        {
+            var clock = new FakeMonotonicClock();
+            using (var provider = CreateProvider(clock))
+            {
+                var identity = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                var activity = provider.GetRequiredService<IDesktopSessionActivity>();
+                Assert.True((await identity.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None)).IsSuccess);
+
+                clock.Advance(TimeSpan.FromMinutes(16));
+                activity.RecordUserActivity();
+
+                Assert.False(session.IsAuthenticated);
+                Assert.Equal(DesktopSessionState.Expired, session.State);
+                Assert.False(activity.ExpireIfIdle());
+            }
+        }
+
+        [Fact]
+        public async Task Request_after_idle_deadline_is_not_admitted_before_timer_tick()
+        {
+            var clock = new FakeMonotonicClock();
+            using (var provider = CreateProvider(clock))
+            {
+                var identity = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                Assert.True((await identity.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None)).IsSuccess);
+
+                clock.Advance(TimeSpan.FromMinutes(16));
+                var response = await identity.GetCurrentUserAsync(CancellationToken.None);
+
+                Assert.False(response.IsSuccess);
+                Assert.False(session.IsAuthenticated);
+                Assert.Equal(DesktopSessionState.Expired, session.State);
+            }
+        }
+
+        private static ServiceProvider CreateProvider(FakeMonotonicClock clock)
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<IMonotonicClock>(clock);
+            services.AddSingleton(new DesktopSessionOptions(TimeSpan.FromMinutes(15)));
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddScoped<IUserAccountValidator, ActiveAccountValidator>();
+            services.AddTransient<IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>, LoginHandler>();
+            return services.BuildServiceProvider();
         }
 
         private sealed class FakeMonotonicClock : IMonotonicClock

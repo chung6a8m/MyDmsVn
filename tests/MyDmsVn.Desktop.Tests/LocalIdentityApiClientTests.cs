@@ -217,6 +217,42 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Late_current_user_validation_from_user_a_cannot_sign_out_user_b()
+        {
+            var validator = new PausingSecondAccountValidator();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton<IUserAccountValidator>(validator);
+            services.AddTransient<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
+                UserSpecificLoginHandler>();
+            using (var provider = services.BuildServiceProvider())
+            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+            {
+                var identity = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                Assert.True((await identity.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None)).IsSuccess);
+
+                var staleCurrentUser = identity.GetCurrentUserAsync(CancellationToken.None);
+                await WaitForSignalAsync(validator.SecondCallStarted, timeout.Token);
+                session.SignOut();
+                Assert.True((await identity.LoginAsync(
+                    new LoginRequest("manager", "secret"),
+                    CancellationToken.None)).IsSuccess);
+
+                validator.CompleteSecondCall(isActive: false);
+                var staleResponse = await staleCurrentUser;
+
+                Assert.False(staleResponse.IsSuccess);
+                Assert.True(session.IsAuthenticated);
+                Assert.Equal("manager", session.CurrentUser!.Username);
+            }
+        }
+
+        [Fact]
         public async Task Request_waiting_for_account_validation_is_rejected_after_session_switch()
         {
             var validator = new PausingSecondAccountValidator();
@@ -426,6 +462,68 @@ namespace MyDmsVn.Desktop.Tests
 
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => login);
                 Assert.False(session.IsAuthenticated);
+                Assert.Equal(DesktopSessionState.Unauthenticated, session.State);
+            }
+        }
+
+        [Fact]
+        public async Task Canceled_login_cannot_establish_a_session_when_account_validation_ignores_cancellation()
+        {
+            var validator = new PausingFirstAccountValidator();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton<IUserAccountValidator>(validator);
+            services.AddTransient<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
+                SuccessfulLoginHandler>();
+
+            using (var provider = services.BuildServiceProvider())
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var client = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                var login = client.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    cancellation.Token);
+                await validator.FirstCallStarted;
+
+                cancellation.Cancel();
+                validator.CompleteFirstCall(isActive: true);
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => login);
+                Assert.False(session.IsAuthenticated);
+                Assert.Equal(DesktopSessionState.Unauthenticated, session.State);
+            }
+        }
+
+        [Fact]
+        public async Task Canceled_login_cleans_up_when_account_validation_observes_cancellation()
+        {
+            var validator = new CancellationAwareAccountValidator();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton<IUserAccountValidator>(validator);
+            services.AddTransient<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
+                SuccessfulLoginHandler>();
+
+            using (var provider = services.BuildServiceProvider())
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var client = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                var login = client.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    cancellation.Token);
+                await validator.Started;
+
+                cancellation.Cancel();
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => login);
+                Assert.False(session.IsAuthenticated);
+                Assert.Equal(DesktopSessionState.Unauthenticated, session.State);
             }
         }
 
@@ -676,6 +774,23 @@ namespace MyDmsVn.Desktop.Tests
 
             public void CompleteFirstCall(bool isActive) =>
                 _firstCall.TrySetResult(isActive);
+        }
+
+        private sealed class CancellationAwareAccountValidator : IUserAccountValidator
+        {
+            private readonly TaskCompletionSource<bool> _started =
+                new TaskCompletionSource<bool>();
+
+            public Task Started => _started.Task;
+
+            public async Task<bool> IsActiveAsync(
+                int userId,
+                CancellationToken cancellationToken)
+            {
+                _started.TrySetResult(true);
+                await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+                return true;
+            }
         }
 
         private sealed class SuccessfulLoginHandler

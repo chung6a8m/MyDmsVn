@@ -71,22 +71,34 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
         internal bool TryCaptureActor(out CurrentUser actor, out long generation)
         {
+            bool expired;
+            bool captured;
             lock (_sync)
             {
+                expired = ExpireIfIdleUnsafe();
                 generation = _authenticationGeneration;
                 if (_state != DesktopSessionState.Authenticated || _currentUser == null)
                 {
                     actor = global::MyDmsVn.Server.Application.Identity.CurrentUser.Anonymous;
-                    return false;
+                    captured = false;
                 }
-
-                actor = global::MyDmsVn.Server.Application.Identity.CurrentUser.Authenticated(
-                    _currentUser.UserId,
-                    _currentUser.Username,
-                    _currentUser.DisplayName,
-                    true);
-                return true;
+                else
+                {
+                    actor = global::MyDmsVn.Server.Application.Identity.CurrentUser.Authenticated(
+                        _currentUser.UserId,
+                        _currentUser.Username,
+                        _currentUser.DisplayName,
+                        true);
+                    captured = true;
+                }
             }
+
+            if (expired)
+            {
+                SessionChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            return captured;
         }
 
         internal bool IsCurrent(long generation)
@@ -151,32 +163,36 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
         public void RecordUserActivity()
         {
+            bool expired;
             lock (_sync)
             {
-                if (_state == DesktopSessionState.Authenticated)
+                expired = ExpireIfIdleUnsafe();
+                if (!expired && _state == DesktopSessionState.Authenticated)
                 {
                     _lastUserActivity = _clock.Elapsed;
                 }
+            }
+
+            if (expired)
+            {
+                SessionChanged?.Invoke(this, EventArgs.Empty);
             }
         }
 
         public bool ExpireIfIdle()
         {
+            bool expired;
             lock (_sync)
             {
-                if (_state != DesktopSessionState.Authenticated ||
-                    _clock.Elapsed - _lastUserActivity < _options.IdleTimeout)
-                {
-                    return false;
-                }
-
-                _authenticationGeneration++;
-                _currentUser = null;
-                _state = DesktopSessionState.Expired;
+                expired = ExpireIfIdleUnsafe();
             }
 
-            SessionChanged?.Invoke(this, EventArgs.Empty);
-            return true;
+            if (expired)
+            {
+                SessionChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            return expired;
         }
 
         internal bool TryBeginAuthentication(out long authenticationGeneration)
@@ -200,7 +216,10 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             return true;
         }
 
-        internal bool TrySignIn(CurrentUserDto currentUser, long authenticationGeneration)
+        internal bool TrySignIn(
+            CurrentUserDto currentUser,
+            long authenticationGeneration,
+            System.Threading.CancellationToken cancellationToken)
         {
             if (currentUser == null)
             {
@@ -209,7 +228,8 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
             lock (_sync)
             {
-                if (_authenticationGeneration != authenticationGeneration)
+                if (cancellationToken.IsCancellationRequested ||
+                    _authenticationGeneration != authenticationGeneration)
                 {
                     return false;
                 }
@@ -231,6 +251,20 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 return _state == DesktopSessionState.Authenticating &&
                     _authenticationGeneration == authenticationGeneration;
             }
+        }
+
+        private bool ExpireIfIdleUnsafe()
+        {
+            if (_state != DesktopSessionState.Authenticated ||
+                _clock.Elapsed - _lastUserActivity < _options.IdleTimeout)
+            {
+                return false;
+            }
+
+            _authenticationGeneration++;
+            _currentUser = null;
+            _state = DesktopSessionState.Expired;
+            return true;
         }
     }
 }

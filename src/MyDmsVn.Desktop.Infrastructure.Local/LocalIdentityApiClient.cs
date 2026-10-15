@@ -42,27 +42,12 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                         "Auth.AlreadyAuthenticated",
                         "Sign out before signing in as another user."));
             }
-            ApiResponse<CurrentUserDto> response;
+
             try
             {
-                response = await _dispatcher.SendAsync(
-                    new LoginCommand(request.Username, request.Password),
-                    null,
-                    (result, correlationId) =>
-                    {
-                        if (result.IsSuccess &&
-                            !_session.IsAuthenticationCurrent(authenticationGeneration))
-                        {
-                            return ApiResponse<CurrentUserDto>.Failure(
-                                new ApiError(
-                                    ApiStatusCode.Unauthorized,
-                                    "Auth.SessionChanged",
-                                    "The login result is no longer current. Sign in again.",
-                                    correlationId: correlationId));
-                        }
-
-                        return result;
-                    },
+                return await LoginCoreAsync(
+                    request,
+                    authenticationGeneration,
                     cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -70,6 +55,33 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 _session.CancelAuthentication(authenticationGeneration);
                 throw;
             }
+        }
+
+        private async Task<ApiResponse<CurrentUserDto>> LoginCoreAsync(
+            LoginRequest request,
+            long authenticationGeneration,
+            CancellationToken cancellationToken)
+        {
+            ApiResponse<CurrentUserDto> response;
+            response = await _dispatcher.SendAsync(
+                new LoginCommand(request.Username, request.Password),
+                null,
+                (result, correlationId) =>
+                {
+                    if (result.IsSuccess &&
+                        !_session.IsAuthenticationCurrent(authenticationGeneration))
+                    {
+                        return ApiResponse<CurrentUserDto>.Failure(
+                            new ApiError(
+                                ApiStatusCode.Unauthorized,
+                                "Auth.SessionChanged",
+                                "The login result is no longer current. Sign in again.",
+                                correlationId: correlationId));
+                    }
+
+                    return result;
+                },
+                cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
             if (!response.IsSuccess)
@@ -124,8 +136,13 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 }
             }
 
-            if (!_session.TrySignIn(response.Data!, authenticationGeneration))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_session.TrySignIn(
+                response.Data!,
+                authenticationGeneration,
+                cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 return ApiResponse<CurrentUserDto>.Failure(
                     new ApiError(
                         ApiStatusCode.Unauthorized,
@@ -151,15 +168,6 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                         "Database.Unavailable",
                         "Account validation is temporarily unavailable.",
                         correlationId: response.Error.CorrelationId));
-            }
-
-            if (!response.IsSuccess &&
-                response.Error!.Status == ApiStatusCode.Unauthorized)
-            {
-                if (_session.State != DesktopSessionState.Expired)
-                {
-                    _session.SignOut();
-                }
             }
 
             return response;
