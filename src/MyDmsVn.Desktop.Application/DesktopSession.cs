@@ -26,4 +26,34 @@ namespace MyDmsVn.Desktop.Application
 
         void SignOut();
     }
+
+    public interface IDesktopSessionActivity
+    {
+        void RecordUserActivity();
+
+        bool ExpireIfIdle();
+    }
+
+    public interface IMonotonicClock
+    {
+        TimeSpan Elapsed { get; }
+    }
+
+    public sealed class DesktopSessionOptions
+    {
+        public DesktopSessionOptions(TimeSpan idleTimeout)
+        {
+            if (idleTimeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(idleTimeout));
+            }
+
+            IdleTimeout = idleTimeout;
+        }
+
+        public TimeSpan IdleTimeout { get; }
+
+        public static DesktopSessionOptions Default { get; } =
+            new DesktopSessionOptions(TimeSpan.FromMinutes(30));
+    }
 }

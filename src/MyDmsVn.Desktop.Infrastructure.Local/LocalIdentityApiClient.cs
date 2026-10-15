@@ -99,10 +99,17 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
         public async Task<ApiResponse<CurrentUserDto>> GetCurrentUserAsync(
             CancellationToken cancellationToken)
         {
-            return await _dispatcher.SendAsync(
+            var response = await _dispatcher.SendAsync(
                 new GetCurrentUserQuery(),
                 null,
                 cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccess &&
+                response.Error!.Status == ApiStatusCode.Unauthorized)
+            {
+                _session.SignOut();
+            }
+
+            return response;
         }
     }
 }

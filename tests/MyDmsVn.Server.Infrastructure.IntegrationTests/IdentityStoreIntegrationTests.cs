@@ -46,12 +46,16 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                 using var provider = services.BuildServiceProvider();
                 var userStore = provider.GetRequiredService<IUserStore>();
                 var permissionStore = provider.GetRequiredService<IPermissionStore>();
+                var accountValidator = provider.GetRequiredService<IUserAccountValidator>();
 
                 var user = await userStore.FindByNormalizedUsernameAsync(
                     "OPERATOR",
                     CancellationToken.None);
                 Assert.NotNull(user);
                 Assert.Equal(userId, user!.UserId);
+                Assert.True(await accountValidator.IsActiveAsync(
+                    userId,
+                    CancellationToken.None));
                 var initialPermission = await permissionStore.GetSnapshotAsync(
                     userId,
                     PermissionKeys.CatalogProductsWrite,
@@ -90,6 +94,9 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                 await connection.ExecuteAsync(
                     "UPDATE dbo.Users SET IsActive = 0 WHERE UserId = @userId;",
                     new { userId });
+                Assert.False(await accountValidator.IsActiveAsync(
+                    userId,
+                    CancellationToken.None));
                 var inactivePermission = await permissionStore.GetSnapshotAsync(
                     userId,
                     PermissionKeys.CatalogProductsWrite,

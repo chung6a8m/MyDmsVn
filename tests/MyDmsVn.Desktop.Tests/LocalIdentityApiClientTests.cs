@@ -107,6 +107,32 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Disabled_account_revalidation_clears_the_desktop_session()
+        {
+            var validator = new SwitchableAccountValidator();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton<IUserAccountValidator>(validator);
+            services.AddTransient<IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>, SuccessfulLoginHandler>();
+            using (var provider = services.BuildServiceProvider())
+            {
+                var client = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                Assert.True((await client.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None)).IsSuccess);
+                validator.IsActive = false;
+
+                var current = await client.GetCurrentUserAsync(CancellationToken.None);
+
+                Assert.False(current.IsSuccess);
+                Assert.Equal("Auth.Unauthorized", current.Error!.Code);
+                Assert.False(session.IsAuthenticated);
+            }
+        }
+
+        [Fact]
         public async Task Signing_out_invalidates_a_login_that_is_still_in_flight()
         {
             var delayedHandler = new DelayedLoginHandler();
@@ -262,6 +288,14 @@ namespace MyDmsVn.Desktop.Tests
             {
                 return Task.FromResult(false);
             }
+        }
+
+        private sealed class SwitchableAccountValidator : IUserAccountValidator
+        {
+            public bool IsActive { get; set; } = true;
+
+            public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken) =>
+                Task.FromResult(IsActive);
         }
 
         private sealed class SuccessfulLoginHandler

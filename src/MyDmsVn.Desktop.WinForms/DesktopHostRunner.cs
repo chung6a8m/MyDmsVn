@@ -51,7 +51,19 @@ namespace MyDmsVn.Desktop.WinForms
                 }
 
                 using (var shell = shellFactory())
+                using (var expiryTimer = new Timer { Interval = 1000 })
                 {
+                    var activity = session as IDesktopSessionActivity;
+                    var activityFilter = activity == null
+                        ? null
+                        : new DesktopSessionActivityFilter(activity);
+                    if (activityFilter != null)
+                    {
+                        System.Windows.Forms.Application.AddMessageFilter(activityFilter);
+                    }
+
+                    expiryTimer.Tick += (_, _) => activity?.ExpireIfIdle();
+                    expiryTimer.Start();
                     EventHandler sessionChanged = (_, _) =>
                     {
                         if (session.IsAuthenticated || shell.IsDisposed)
@@ -75,6 +87,12 @@ namespace MyDmsVn.Desktop.WinForms
                     }
                     finally
                     {
+                        expiryTimer.Stop();
+                        if (activityFilter != null)
+                        {
+                            System.Windows.Forms.Application.RemoveMessageFilter(activityFilter);
+                        }
+
                         session.SessionChanged -= sessionChanged;
                     }
                 }

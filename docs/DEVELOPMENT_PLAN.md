@@ -19,7 +19,7 @@
 | **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Complete (2026-10-09) |
 | **P3.1** | **First Administrator + continuous permission sync** | Permission registry, additive catalog migration, controlled deployment sync, first-admin CLI, tests | **Complete** (T01–T07 verified 2026-10-14) |
 | **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Complete (2026-10-09) |
-| **P4.1** | **Interactive Login and session** | Shared dual-host LoginForm/ViewModel, current-user session, logout/expiry/relogin and STA tests | **Not started** (new 2026-10-13) |
+| **P4.1** | **Interactive Login and session** | Shared dual-host LoginForm/ViewModel, current-user session, logout/expiry/relogin and STA tests | **In progress** (implementation underway 2026-10-15; SQL/L3/L4 gates open) |
 | **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | In progress (P5.4 implementation/automated gate complete 2026-10-12; authenticated interactive smoke pending) |
 | **P6** | Local v1 hardening | Deployment/migration instructions, logging, secure configuration, two desktop host smoke, release checklist | In progress (detailed P6-T01/T02 complete 2026-10-12; P6-T03/T04 implementation and developer-workstation automated/package gates complete 2026-10-13; VM/operational gates pending) |
 | **P7** | HTTP API v2 & parity | ASP.NET Core 8 API + HTTP adapter, auth and contract parity; no shared DB credentials on remote desktop | Not started |
@@ -81,7 +81,7 @@ See [P3.1 detailed plan](plans/20261013-001-initial-security-provisioning-permis
 
 ## P4.1 — Interactive desktop Login and session (new)
 
-See [P4.1 detailed plan](plans/20261013-002-desktop-login-session.md). **Not started**, depends on verified P3.1 and existing P3/P4.
+See [P4.1 detailed plan](plans/20261013-002-desktop-login-session.md) and [current verification evidence](P4_1_VERIFICATION.md). **In progress**; implementation and focused dual-runtime Desktop checks have started, while mandatory SQL, final L3 and packaged interactive L4 gates remain open.
 - [ ] P4.1-T01 shared fail-closed session state/current-user accessor and auth contract integration.
 - [ ] P4.1-T02/T03 shared LoginForm/LoginViewModel and production Login-first bootstrap in both desktop hosts; no fake authenticated startup.
 - [ ] P4.1-T04 explicit logout, expiration/relogin, cross-user cache teardown and stale-result cancellation.

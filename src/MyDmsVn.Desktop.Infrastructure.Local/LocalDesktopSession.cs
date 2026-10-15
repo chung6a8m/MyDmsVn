@@ -5,12 +5,23 @@ using MyDmsVn.Server.Application.Identity;
 
 namespace MyDmsVn.Desktop.Infrastructure.Local
 {
-    internal sealed class LocalDesktopSession : IDesktopSession
+    internal sealed class LocalDesktopSession : IDesktopSession, IDesktopSessionActivity
     {
         private readonly object _sync = new object();
+        private readonly IMonotonicClock _clock;
+        private readonly DesktopSessionOptions _options;
         private CurrentUserDto? _currentUser;
         private long _authenticationGeneration;
         private DesktopSessionState _state = DesktopSessionState.Unauthenticated;
+        private TimeSpan _lastUserActivity;
+
+        public LocalDesktopSession(
+            IMonotonicClock clock,
+            DesktopSessionOptions options)
+        {
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _options = options ?? throw new ArgumentNullException(nameof(options));
+        }
 
         public event EventHandler? SessionChanged;
 
@@ -100,6 +111,36 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             SessionChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        public void RecordUserActivity()
+        {
+            lock (_sync)
+            {
+                if (_state == DesktopSessionState.Authenticated)
+                {
+                    _lastUserActivity = _clock.Elapsed;
+                }
+            }
+        }
+
+        public bool ExpireIfIdle()
+        {
+            lock (_sync)
+            {
+                if (_state != DesktopSessionState.Authenticated ||
+                    _clock.Elapsed - _lastUserActivity < _options.IdleTimeout)
+                {
+                    return false;
+                }
+
+                _authenticationGeneration++;
+                _currentUser = null;
+                _state = DesktopSessionState.Expired;
+            }
+
+            SessionChanged?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
         internal bool TryBeginAuthentication(out long authenticationGeneration)
         {
             lock (_sync)
@@ -138,6 +179,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 _authenticationGeneration++;
                 _currentUser = currentUser;
                 _state = DesktopSessionState.Authenticated;
+                _lastUserActivity = _clock.Elapsed;
             }
 
             SessionChanged?.Invoke(this, EventArgs.Empty);
