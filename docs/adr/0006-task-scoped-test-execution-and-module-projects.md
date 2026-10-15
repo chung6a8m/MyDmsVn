@@ -16,10 +16,11 @@ These facts create a risk that AI development repeatedly invokes expensive, unre
 4. **Single-pass strict PR acceptance:** Add a dedicated functional PR mode that executes the **complete unfiltered current-commit SQL inventory once per TFM**, sequentially. Reuse the existing independent discovery/theory-case and classification checks, zero-mandatory-skip enforcement, operator-approved SQL identity and `master` preflight, bounded process-tree watchdog, durable ownership journal, live reconciliation/quarantine and sanitized TRX/report evidence. Keep benchmark warm-up/repeated sampling under a separate explicitly requested L4 mode. The proposed mode is **not implemented** by this ADR.
 5. **Modular test projects:** Incrementally extract pure tests into non-SQL projects; partition SQL tests into module-focused assemblies and maintain cross-module integration/upgrade/concurrency regression where needed. Provide a single source-controlled inventory across all projects to prevent lost/duplicated cases, stale exemptions, hidden theory rows or missing TFMs. Use one serialized SQL process/TFM at a time on the current approved capacity-constrained instance until safe cross-process coordination and measured capacity are proven.
 6. **No safety tradeoffs:** Preserve ADR 0005's per-test disposable database isolation, exclusive GUI-interacting STA tests, resource-based concurrency policy, SQL migration/history coverage and current release assertions. A `dotnet test` exit code or category-filtered pass alone is never an L3 SQL acceptance certificate.
+7. **Local-only rollout:** TESTGATE-T01–T05 use local Codex/developer runs for task and final acceptance. Do not create/modify CI test workflows or make CI repeat the full SQL suite already run locally. CI adoption is deferred until separately requested and reviewed.
 
 ## Rollout boundary
 
-This ADR records a **proposed target**, not evidence that a new gate runner, single-pass SQL mode, split assemblies, module selectors or CI enforcement exists. Until an implementation is reviewed and verified, existing scripts and the existing strict multi-pass acceptance protocol remain the only available accepted SQL paths. Documentation-only changes do not retroactively invalidate previously accepted functional evidence.
+This ADR records a **proposed target**, not evidence that a new gate runner, single-pass SQL mode, split assemblies or module selectors exist. Until an implementation is reviewed and verified, existing scripts and the existing strict multi-pass acceptance protocol remain the only available accepted SQL paths. Documentation-only changes do not retroactively invalidate previously accepted functional evidence.
 
 Implement in separately reviewable stages defined by [the execution plan](../plans/20261016-001-task-gates-and-modular-tests.md). Do not edit production persistence, grant more SQL privileges, enable SQL parallelism, or move tests en masse in this policy PR.
 
@@ -36,10 +37,10 @@ Implement in separately reviewable stages defined by [the execution plan](../pla
 
 - Normal feature tasks pay only task-scoped test cost; final correctness still covers the complete mandatory matrix.
 - Stale-final-revision invalidation remains mandatory even if it requires another full run.
-- CI and local Codex execution must consume the same eventual manifest and verify it independently of the selection being audited.
+- Local Codex gate selection must be independently verified against source/discovery/theory-row inventory rather than trusting only the selected filtered results. No CI rollout or duplicate CI full-suite gate is included.
 - Migration to new assemblies must prove one-to-one source/discovery/TRX identities on both SQL TFMs, no lost or duplicated theory rows, all required coverage preserved, failed/aborted-run reconciliation and no SQL/GUI concurrency cross-process regression.
-- Quantify task-loop elapsed time separately from full PR acceptance cost; avoid asserting a speedup until measured.
+- Do not claim a performance gain from project partitioning without separately measured evidence; cost measurement is not a mandatory implementation gate.
 
 ## Related decisions
 
-[ADR 0005](0005-test-isolation-and-bounded-parallelism.md) continues to govern **isolation/parallel safety**. ADR 0006 would govern **when and what to execute**. If ADR 0006 is accepted, adjust status here and update policy/CI consistently; do not rewrite the established performance benchmark results.
+[ADR 0005](0005-test-isolation-and-bounded-parallelism.md) continues to govern **isolation/parallel safety**. ADR 0006 would govern **when and what to execute**. If ADR 0006 is accepted, adjust its status and local execution policy consistently. CI remains out of scope until explicitly requested; do not rewrite the established performance benchmark results.
