@@ -557,6 +557,10 @@ namespace MyDmsVn.Desktop.Tests
         {
             public event EventHandler? SessionChanged;
             public bool IsAuthenticated => CurrentUser != null;
+
+            public DesktopSessionState State => IsAuthenticated
+                ? DesktopSessionState.Authenticated
+                : DesktopSessionState.Unauthenticated;
             public CurrentUserDto? CurrentUser { get; private set; }
             public long Version { get; private set; }
             public void SignOut() => SetCurrentUser(null);

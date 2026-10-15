@@ -5,11 +5,12 @@ using MyDmsVn.Server.Application.Identity;
 
 namespace MyDmsVn.Desktop.Infrastructure.Local
 {
-    internal sealed class LocalDesktopSession : IDesktopSession, ICurrentUserAccessor
+    internal sealed class LocalDesktopSession : IDesktopSession
     {
         private readonly object _sync = new object();
         private CurrentUserDto? _currentUser;
         private long _authenticationGeneration;
+        private DesktopSessionState _state = DesktopSessionState.Unauthenticated;
 
         public event EventHandler? SessionChanged;
 
@@ -35,6 +36,17 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             }
         }
 
+        public DesktopSessionState State
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _state;
+                }
+            }
+        }
+
         public long Version
         {
             get
@@ -46,18 +58,32 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             }
         }
 
-        CurrentUser ICurrentUserAccessor.Current
+        internal bool TryCaptureActor(out CurrentUser actor, out long generation)
         {
-            get
+            lock (_sync)
             {
-                var user = CurrentUser;
-                return user == null
-                    ? global::MyDmsVn.Server.Application.Identity.CurrentUser.Anonymous
-                    : global::MyDmsVn.Server.Application.Identity.CurrentUser.Authenticated(
-                        user.UserId,
-                        user.Username,
-                        user.DisplayName,
-                        true);
+                generation = _authenticationGeneration;
+                if (_state != DesktopSessionState.Authenticated || _currentUser == null)
+                {
+                    actor = global::MyDmsVn.Server.Application.Identity.CurrentUser.Anonymous;
+                    return false;
+                }
+
+                actor = global::MyDmsVn.Server.Application.Identity.CurrentUser.Authenticated(
+                    _currentUser.UserId,
+                    _currentUser.Username,
+                    _currentUser.DisplayName,
+                    true);
+                return true;
+            }
+        }
+
+        internal bool IsCurrent(long generation)
+        {
+            lock (_sync)
+            {
+                return _state == DesktopSessionState.Authenticated &&
+                    _authenticationGeneration == generation;
             }
         }
 
@@ -65,25 +91,34 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
         {
             lock (_sync)
             {
+                _state = DesktopSessionState.LoggingOut;
                 _authenticationGeneration++;
                 _currentUser = null;
+                _state = DesktopSessionState.Unauthenticated;
             }
 
             SessionChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        internal long BeginAuthentication()
+        internal bool TryBeginAuthentication(out long authenticationGeneration)
         {
-            long authenticationGeneration;
             lock (_sync)
             {
+                if (_state == DesktopSessionState.Authenticated ||
+                    _state == DesktopSessionState.LoggingOut)
+                {
+                    authenticationGeneration = _authenticationGeneration;
+                    return false;
+                }
+
                 _authenticationGeneration++;
                 _currentUser = null;
+                _state = DesktopSessionState.Authenticating;
                 authenticationGeneration = _authenticationGeneration;
             }
 
             SessionChanged?.Invoke(this, EventArgs.Empty);
-            return authenticationGeneration;
+            return true;
         }
 
         internal bool TrySignIn(CurrentUserDto currentUser, long authenticationGeneration)
@@ -102,10 +137,20 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
                 _authenticationGeneration++;
                 _currentUser = currentUser;
+                _state = DesktopSessionState.Authenticated;
             }
 
             SessionChanged?.Invoke(this, EventArgs.Empty);
             return true;
+        }
+
+        internal bool IsAuthenticationCurrent(long authenticationGeneration)
+        {
+            lock (_sync)
+            {
+                return _state == DesktopSessionState.Authenticating &&
+                    _authenticationGeneration == authenticationGeneration;
+            }
         }
     }
 }

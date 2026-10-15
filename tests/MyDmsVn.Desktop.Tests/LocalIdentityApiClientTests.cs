@@ -59,12 +59,61 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Login_while_authenticated_is_rejected_without_replacing_the_current_user()
+        {
+            using (var provider = CreateProvider())
+            {
+                var client = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                var first = await client.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None);
+
+                var second = await client.LoginAsync(
+                    new LoginRequest("manager", "secret"),
+                    CancellationToken.None);
+
+                Assert.True(first.IsSuccess);
+                Assert.False(second.IsSuccess);
+                Assert.Equal("Auth.AlreadyAuthenticated", second.Error!.Code);
+                Assert.Equal(42, session.CurrentUser!.UserId);
+                Assert.Equal("operator", session.CurrentUser.Username);
+            }
+        }
+
+        [Fact]
+        public async Task Login_result_does_not_create_a_session_when_sql_account_validation_rejects_it()
+        {
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddScoped<IUserAccountValidator, InactiveAccountValidator>();
+            services.AddTransient<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
+                SuccessfulLoginHandler>();
+            using (var provider = services.BuildServiceProvider())
+            {
+                var client = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+
+                var response = await client.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None);
+
+                Assert.False(response.IsSuccess);
+                Assert.Equal("Auth.Unauthorized", response.Error!.Code);
+                Assert.False(session.IsAuthenticated);
+            }
+        }
+
+        [Fact]
         public async Task Signing_out_invalidates_a_login_that_is_still_in_flight()
         {
             var delayedHandler = new DelayedLoginHandler();
             var services = new ServiceCollection();
             services.AddServerApplication();
             services.AddLocalDesktopAdapter();
+            services.AddScoped<IUserAccountValidator, ActiveAccountValidator>();
             services.AddSingleton<
                 IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>>(delayedHandler);
 
@@ -117,7 +166,7 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
-        public void Pending_login_invalidates_the_old_principals_desktop_requests()
+        public void Explicit_logout_then_pending_login_invalidates_the_old_principals_desktop_requests()
         {
             StaTest.Run(
                 cancellationToken =>
@@ -126,6 +175,7 @@ namespace MyDmsVn.Desktop.Tests
                     var services = new ServiceCollection();
                     services.AddServerApplication();
                     services.AddLocalDesktopAdapter();
+                    services.AddScoped<IUserAccountValidator, ActiveAccountValidator>();
                     services.AddSingleton<
                         IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>>(handler);
 
@@ -149,6 +199,7 @@ namespace MyDmsVn.Desktop.Tests
                             new AllowedPermissionApiClient(),
                             session))
                         {
+                            session.SignOut();
                             var login = client.LoginAsync(
                                 new LoginRequest("manager", "secret"),
                                 cancellationToken);
@@ -190,10 +241,27 @@ namespace MyDmsVn.Desktop.Tests
             var services = new ServiceCollection();
             services.AddServerApplication();
             services.AddLocalDesktopAdapter();
+            services.AddScoped<IUserAccountValidator, ActiveAccountValidator>();
             services.AddTransient<
                 IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
                 SuccessfulLoginHandler>();
             return services.BuildServiceProvider();
+        }
+
+        private sealed class ActiveAccountValidator : IUserAccountValidator
+        {
+            public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(true);
+            }
+        }
+
+        private sealed class InactiveAccountValidator : IUserAccountValidator
+        {
+            public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(false);
+            }
         }
 
         private sealed class SuccessfulLoginHandler

@@ -28,6 +28,8 @@ namespace MyDmsVn.Desktop.WinForms
             services.AddSingleton<IUiDispatcher>(
                 new SynchronizationContextUiDispatcher(uiContext));
             services.AddTransient<FoundationViewModel>();
+            services.AddTransient<LoginViewModel>();
+            services.AddTransient<LoginForm>();
             services.AddTransient<ICatalogControlFactory, CatalogControlFactory>();
             services.AddTransient<IGoodsReceiptControlFactory, GoodsReceiptControlFactory>();
             services.AddTransient<IInventoryControlFactory, InventoryControlFactory>();

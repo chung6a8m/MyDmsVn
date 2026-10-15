@@ -44,7 +44,9 @@ namespace MyDmsVn.Desktop.App
                 databaseConfiguration.ConnectionString))
             {
                 return DesktopHostRunner.Run(
-                    provider.GetRequiredService<FoundationShellForm>(),
+                    () => provider.GetRequiredService<LoginForm>(),
+                    () => provider.GetRequiredService<FoundationShellForm>(),
+                    provider.GetRequiredService<IDesktopSession>(),
                     smokeTest);
             }
         }

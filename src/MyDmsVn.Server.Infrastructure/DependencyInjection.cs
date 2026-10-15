@@ -50,6 +50,9 @@ namespace MyDmsVn.Server.Infrastructure
                 ServiceDescriptor.Scoped<IUserStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
             services.Replace(
+                ServiceDescriptor.Scoped<IUserAccountValidator>(
+                    serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
+            services.Replace(
                 ServiceDescriptor.Scoped<IPermissionStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
             services.AddSingleton<RepoDbMappingInitializer>();

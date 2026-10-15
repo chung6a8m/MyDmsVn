@@ -19,8 +19,9 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             services.TryAddSingleton<IDesktopSession>(
                 provider => provider.GetRequiredService<LocalDesktopSession>());
             services.RemoveAll<ICurrentUserAccessor>();
-            services.AddSingleton<ICurrentUserAccessor>(
-                provider => provider.GetRequiredService<LocalDesktopSession>());
+            services.AddScoped<LocalRequestCurrentUserAccessor>();
+            services.AddScoped<ICurrentUserAccessor>(
+                provider => provider.GetRequiredService<LocalRequestCurrentUserAccessor>());
             services.AddTransient<IFoundationApiClient, LocalFoundationApiClient>();
             services.AddTransient<IIdentityApiClient, LocalIdentityApiClient>();
             services.AddTransient<IPermissionApiClient, LocalPermissionApiClient>();
