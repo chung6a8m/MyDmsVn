@@ -813,6 +813,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
     {
         var database = await CreateDatabaseAsync();
         SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
         Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? first = null;
         Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? second = null;
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -821,7 +822,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
@@ -884,6 +885,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await SqlConcurrencyCleanup.CompleteAsync(
                 gate,
                 cancellation,
+                provider,
                 database.DisposeAsync,
                 first,
                 second);
@@ -895,6 +897,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
     {
         var database = await CreateDatabaseAsync();
         SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
         Task<ErrorOr.ErrorOr<GoodsReceiptDto>>? update = null;
         Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? post = null;
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -903,7 +906,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
@@ -959,6 +962,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await SqlConcurrencyCleanup.CompleteAsync(
                 gate,
                 cancellation,
+                provider,
                 database.DisposeAsync,
                 update,
                 post);
@@ -970,6 +974,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
     {
         var database = await CreateDatabaseAsync();
         SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
         Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? post = null;
         Task<ErrorOr.ErrorOr<GoodsReceiptDto>>? update = null;
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -978,7 +983,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
@@ -1038,6 +1043,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await SqlConcurrencyCleanup.CompleteAsync(
                 gate,
                 cancellation,
+                provider,
                 database.DisposeAsync,
                 post,
                 update);
@@ -1136,12 +1142,14 @@ public sealed class GoodsReceiptCommandIntegrationTests
     {
         var database = await CreateDatabaseAsync();
         var cleanupIncomplete = false;
+        ServiceProvider? provider = null;
+        using var cleanupCancellation = new CancellationTokenSource();
         try
         {
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
@@ -1185,7 +1193,11 @@ public sealed class GoodsReceiptCommandIntegrationTests
         {
             if (!cleanupIncomplete)
             {
-                await database.DisposeAsync();
+                await SqlConcurrencyCleanup.CompleteAsync(
+                    gate: null,
+                    cleanupCancellation,
+                    provider,
+                    database.DisposeAsync);
             }
         }
     }
@@ -1195,6 +1207,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
     {
         var database = await CreateDatabaseAsync();
         SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
         Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? firstPost = null;
         Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? secondPost = null;
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -1203,7 +1216,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
@@ -1255,6 +1268,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await SqlConcurrencyCleanup.CompleteAsync(
                 gate,
                 cancellation,
+                provider,
                 database.DisposeAsync,
                 firstPost,
                 secondPost);
@@ -1266,6 +1280,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
     {
         var database = await CreateDatabaseAsync();
         SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
         Task? first = null;
         Task? second = null;
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -1274,7 +1289,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
@@ -1325,6 +1340,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await SqlConcurrencyCleanup.CompleteAsync(
                 gate,
                 cancellation,
+                provider,
                 database.DisposeAsync,
                 first,
                 second);

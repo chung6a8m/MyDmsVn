@@ -1,4 +1,4 @@
-# SQLPERF-T02 / T03 verification
+﻿# SQLPERF-T02 / T03 verification
 
 **Date:** 2026-10-15  
 **Base:** `2a139c258027f336cb1ded66a071a68c491ce08b`  
@@ -50,7 +50,7 @@ dotnet test MyDmsVn.sln -c Release --no-build --no-restore -m:1 `
 | Gate | Actual result |
 |---|---|
 | Release solution build | Passed, 0 warnings / 0 errors |
-| Gate/failure-path tests at final code | 6 / 6 passed per TFM |
+| Gate/failure-path tests at benchmark revision | 6 / 6 passed per TFM |
 | Six modified GoodsReceipt concurrency tests, 20 consecutive runs | `net48`: 120 / 120; `net8.0`: 120 / 120; zero failed/skipped |
 | Strict candidate benchmark | 2 / 2 warm-ups and 6 / 6 measured runs accepted |
 | Every benchmark TRX | 220 / 220 passed; zero failed/skipped/not-executed |
@@ -58,12 +58,30 @@ dotnet test MyDmsVn.sln -c Release --no-build --no-restore -m:1 `
 | Full Release regression — Application | 133 / 133 per TFM |
 | Full Release regression — Desktop | 200 / 200 per TFM |
 | Full Release regression — Architecture | 5 / 5 |
-| Full Release regression — Integration | 220 / 220 per TFM |
+| Full Release regression — Integration | 220 / 220 per TFM at benchmark revision; 222 / 222 per TFM after review fixes |
 | Full Release regression — SQL harness | 52 / 52 per TFM |
 | Full Release regression — SQL runner | 68 / 68 |
-| Independent code review | No remaining Critical or Important findings |
+| Review status | Initial independent review had no remaining Critical or Important findings; PR review round 1 later found two P2 failure-path issues, both fixed and verified below |
 
-The accepted inventory increased from the T01 baseline's 213 cases to 220 because this change adds seven gate, failure-path and pool-lifetime tests. The strict runner reconciled source/discovery/TRX identities on every accepted pass.
+The accepted benchmark inventory increased from the T01 baseline's 213 cases to 220 because the benchmark revision adds seven gate, failure-path and pool-lifetime tests. The strict runner reconciled source/discovery/TRX identities on every accepted pass. Two review regressions added after that benchmark bring the current integration inventory to 222; the historical benchmark result remains explicitly tied to 220 cases and was not rewritten.
+
+## Review round 1 follow-up
+
+The PR review identified two P2 failure-path races. The transaction-owned `sp_getapplock` had the same 10-second timeout as each observation window, so it could expire before the controller released it. Root `ServiceProvider` instances declared with `using` inside the scenario `try` could also be disposed before the outer cleanup released, canceled and drained the SQL tasks.
+
+The follow-up changes make the holder APP lock wait for controller release or command cancellation (`@LockTimeout = -1`) while retaining the existing 30-second operation cancellation and 15-second cleanup drain watchdogs. Cleanup now owns the root provider and applies the explicit order `release -> cancel -> close controller -> drain tasks -> dispose provider -> guarded database teardown`. All five direct provider-backed concurrency scenarios and the reference lock-order loop use that lifecycle.
+
+Fresh review-fix verification on 2026-10-15:
+
+| Gate | Actual result |
+|---|---|
+| Mutation check with the former 10-second APP-lock timeout | New delayed-observation regression failed after 11 seconds because the holder had completed; restoring controller-controlled wait made it pass |
+| Provider cleanup red/green | Missing cleanup overload failed compilation; after implementation, the regression proved the provider remains alive while a started task is incomplete and is disposed before guarded teardown |
+| Affected gate + concurrency subset | 14 / 14 passed on `net48`; 14 / 14 passed on `net8.0` |
+| Release solution build | Passed, 0 warnings / 0 errors |
+| Full Release regression — Integration | 222 / 222 passed on `net48`; 222 / 222 passed on `net8.0` |
+| Other full Release suites | Application 133 / 133 per TFM; Desktop 200 / 200 per TFM; Architecture 5 / 5; SQL harness 52 / 52 per TFM; SQL runner 68 / 68 |
+| Cleanup reconciliation | 322 recently written direct-run journal records were `Disposed`; final live disposable-database count was zero |
 
 ## Performance evidence and decision
 

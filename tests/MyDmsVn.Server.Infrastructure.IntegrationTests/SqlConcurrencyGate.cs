@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -27,7 +27,7 @@ internal sealed class SqlConcurrencyGate : IDisposable
             "DECLARE @testGateResult int; " +
             "EXEC @testGateResult = sys.sp_getapplock " +
             "@Resource = N'" + EscapeSqlLiteral(resourceName) + "', " +
-            "@LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 10000; " +
+            "@LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = -1; " +
             "IF @testGateResult < 0 THROW 51000, 'The SQL test concurrency gate timed out.', 1;";
     }
 

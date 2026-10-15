@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -16,9 +16,24 @@ internal static class SqlConcurrencyCleanup
         Func<Task> guardedCleanup,
         params Task?[] startedTasks) =>
         await CompleteAsync(
+                gate,
+                cancellation,
+                rootProvider: null,
+                guardedCleanup,
+                startedTasks)
+            .ConfigureAwait(false);
+
+    public static async Task CompleteAsync(
+        SqlConcurrencyGate? gate,
+        CancellationTokenSource cancellation,
+        IDisposable? rootProvider,
+        Func<Task> guardedCleanup,
+        params Task?[] startedTasks) =>
+        await CompleteAsync(
                 gate == null ? null : () => gate.ReleaseAsync(CancellationToken.None),
                 gate == null ? null : new Action(gate.Dispose),
                 cancellation,
+                rootProvider,
                 guardedCleanup,
                 DefaultDrainTimeout,
                 startedTasks)
@@ -28,6 +43,24 @@ internal static class SqlConcurrencyCleanup
         Func<Task>? release,
         Action? closeController,
         CancellationTokenSource cancellation,
+        Func<Task> guardedCleanup,
+        TimeSpan drainTimeout,
+        params Task?[] startedTasks)
+        => await CompleteAsync(
+                release,
+                closeController,
+                cancellation,
+                rootProvider: null,
+                guardedCleanup,
+                drainTimeout,
+                startedTasks)
+            .ConfigureAwait(false);
+
+    internal static async Task CompleteAsync(
+        Func<Task>? release,
+        Action? closeController,
+        CancellationTokenSource cancellation,
+        IDisposable? rootProvider,
         Func<Task> guardedCleanup,
         TimeSpan drainTimeout,
         params Task?[] startedTasks)
@@ -52,6 +85,11 @@ internal static class SqlConcurrencyCleanup
         }
 
         await ObserveAsync(all).ConfigureAwait(false);
+        if (rootProvider != null)
+        {
+            Capture(rootProvider.Dispose, errors);
+        }
+
         await CaptureAsync(guardedCleanup, errors).ConfigureAwait(false);
 
         if (errors.Count != 0)

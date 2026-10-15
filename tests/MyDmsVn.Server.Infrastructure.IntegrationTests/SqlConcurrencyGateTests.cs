@@ -1,15 +1,84 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class SqlConcurrencyGateTests
 {
+    [SqlServerFact]
+    public async Task Holder_waits_for_controller_release_when_observation_is_delayed_past_ten_seconds()
+    {
+        var adminConnectionString = Environment.GetEnvironmentVariable(
+            SqlTestDatabase.ConnectionStringEnvironmentVariable)!;
+        var database = await SqlTestDatabase.CreateAsync(adminConnectionString);
+        SqlConcurrencyGate? gate = null;
+        SqlConnection? holderConnection = null;
+        SqlTransaction? holderTransaction = null;
+        Task<int>? holder = null;
+        using var holderCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        try
+        {
+            using (var setup = new SqlConnection(database.ConnectionString))
+            {
+                await setup.ExecuteAsync(
+                    "CREATE TABLE dbo.TestGateDelayedObservation " +
+                    "(Id int NOT NULL CONSTRAINT PK_TestGateDelayedObservation PRIMARY KEY, Value int NOT NULL); " +
+                    "INSERT dbo.TestGateDelayedObservation (Id, Value) VALUES (1, 0);");
+            }
+
+            gate = await SqlConcurrencyGate.AcquireAsync(
+                database.ConnectionString,
+                "delayed-observation",
+                CancellationToken.None);
+            using (var setup = new SqlConnection(database.ConnectionString))
+            {
+                await setup.ExecuteAsync(
+                    "CREATE TRIGGER dbo.TR_TestGateDelayedObservation " +
+                    "ON dbo.TestGateDelayedObservation AFTER UPDATE AS " +
+                    "BEGIN SET NOCOUNT ON; " + gate.TransactionWaitSql + " END;");
+            }
+
+            holderConnection = new SqlConnection(database.ConnectionString);
+            await holderConnection.OpenAsync();
+            var holderSessionId = await holderConnection.QuerySingleAsync<int>("SELECT @@SPID;");
+            holderTransaction = holderConnection.BeginTransaction();
+            holder = holderConnection.ExecuteAsync(
+                new CommandDefinition(
+                    "UPDATE dbo.TestGateDelayedObservation SET Value = Value + 1 WHERE Id = 1;",
+                    transaction: holderTransaction,
+                    cancellationToken: holderCancellation.Token));
+            await gate.WaitForHolderAsync(
+                holderSessionId,
+                "dbo.TestGateDelayedObservation",
+                TimeSpan.FromSeconds(5),
+                CancellationToken.None);
+
+            await Task.Delay(TimeSpan.FromSeconds(11));
+            Assert.False(holder.IsCompleted);
+
+            await gate.ReleaseAsync(CancellationToken.None);
+            Assert.Equal(1, await holder);
+            holderTransaction.Commit();
+        }
+        finally
+        {
+            await SqlConcurrencyCleanup.CompleteAsync(
+                gate,
+                holderCancellation,
+                () => DisposeDatabaseResourcesAsync(
+                    database,
+                    holderTransaction,
+                    holderConnection),
+                holder);
+        }
+    }
+
     [SqlServerFact]
     public async Task Canceled_observation_releases_gate_and_drains_the_holder_before_database_disposal()
     {
@@ -366,6 +435,42 @@ public sealed class SqlConcurrencyGateTests
         Assert.False(guardedCleanupCalled);
     }
 
+    [Fact]
+    public async Task Cleanup_keeps_root_provider_alive_until_started_tasks_are_drained()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var services = new ServiceCollection();
+        services.AddSingleton<DisposalTracker>();
+        var provider = services.BuildServiceProvider();
+        var tracker = provider.GetRequiredService<DisposalTracker>();
+        var stalled = new TaskCompletionSource<object?>();
+        var guardedCleanupCalled = false;
+
+        var cleanup = SqlConcurrencyCleanup.CompleteAsync(
+            release: null,
+            closeController: null,
+            cancellation,
+            provider,
+            () =>
+            {
+                Assert.True(tracker.IsDisposed);
+                guardedCleanupCalled = true;
+                return Task.CompletedTask;
+            },
+            TimeSpan.FromSeconds(1),
+            stalled.Task);
+
+        await Task.Delay(50);
+        Assert.False(tracker.IsDisposed);
+        Assert.False(guardedCleanupCalled);
+
+        stalled.SetResult(null);
+        await cleanup;
+
+        Assert.True(tracker.IsDisposed);
+        Assert.True(guardedCleanupCalled);
+    }
+
     private static async Task DisposeDatabaseResourcesAsync(
         SqlTestDatabase database,
         params IDisposable?[] resources)
@@ -395,6 +500,16 @@ public sealed class SqlConcurrencyGateTests
         if (errors.Count != 0)
         {
             throw new AggregateException("SQL concurrency resource disposal failed.", errors);
+        }
+    }
+
+    private sealed class DisposalTracker : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
         }
     }
 }
