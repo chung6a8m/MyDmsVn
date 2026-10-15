@@ -114,7 +114,9 @@ namespace MyDmsVn.Desktop.Application
                     catch (Exception exception)
                     {
                         IsAuthenticated = false;
-                        ApplyUnexpectedError(exception);
+                        ApplyUnexpectedError(
+                            exception,
+                            "Không thể đăng nhập. Vui lòng thử lại hoặc liên hệ hỗ trợ.");
                     }
                     finally
                     {

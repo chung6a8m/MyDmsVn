@@ -152,7 +152,9 @@ namespace MyDmsVn.Desktop.Application
                 new DesktopNotification(DesktopNotificationKind.Error, userMessage));
         }
 
-        protected void ApplyUnexpectedError(Exception exception)
+        protected void ApplyUnexpectedError(
+            Exception exception,
+            string message = "An unexpected error occurred.")
         {
             if (exception == null)
             {
@@ -176,7 +178,7 @@ namespace MyDmsVn.Desktop.Application
                 new ApiError(
                     ApiStatusCode.InternalServerError,
                     "Desktop.UnexpectedError",
-                    "An unexpected error occurred.",
+                    message,
                     correlationId: correlationId));
         }
 

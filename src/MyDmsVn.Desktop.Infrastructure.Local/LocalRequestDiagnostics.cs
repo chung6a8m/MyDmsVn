@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
@@ -157,7 +157,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
                         if (!accountIsActive)
                         {
-                            _session.RequireReauthentication();
+                            _session.RequireReauthentication(generation);
                             var inactive = ApiResponse<T>.Failure(
                                 new ApiError(
                                     ApiStatusCode.Unauthorized,
@@ -184,7 +184,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                         !response.IsSuccess &&
                         response.Error!.Status == ApiStatusCode.Unauthorized)
                     {
-                        _session.RequireReauthentication();
+                        _session.RequireReauthentication(generation);
                     }
 
                     if (!response.IsSuccess)

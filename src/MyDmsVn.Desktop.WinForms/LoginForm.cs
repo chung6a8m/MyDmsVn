@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Threading;
@@ -14,6 +14,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly Label _errorSummary;
         private readonly ProgressBar _busyIndicator;
         private readonly CheckBox _showPassword;
+        private bool _disposed;
 
         public LoginForm(LoginViewModel viewModel)
         {
@@ -133,6 +134,13 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (disposing)
             {
+                if (_disposed)
+                {
+                    base.Dispose(disposing);
+                    return;
+                }
+
+                _disposed = true;
                 _lifetime.Cancel();
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
                 LoginButton.Click -= OnLoginClick;
@@ -169,9 +177,22 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
         {
+            if (_disposed || IsDisposed || Disposing)
+            {
+                return;
+            }
+
             if (InvokeRequired && IsHandleCreated)
             {
-                BeginInvoke(new Action(ApplyViewModelState));
+                try
+                {
+                    BeginInvoke(new Action(ApplyViewModelState));
+                }
+                catch (InvalidOperationException) when (_disposed || IsDisposed || Disposing || !IsHandleCreated)
+                {
+                    // The form closed between the handle check and BeginInvoke.
+                }
+
                 return;
             }
 

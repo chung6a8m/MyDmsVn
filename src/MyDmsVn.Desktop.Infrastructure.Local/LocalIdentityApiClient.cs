@@ -42,28 +42,49 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                         "Auth.AlreadyAuthenticated",
                         "Sign out before signing in as another user."));
             }
-            var response = await _dispatcher.SendAsync(
-                new LoginCommand(request.Username, request.Password),
-                null,
-                (result, correlationId) =>
-                {
-                    if (result.IsSuccess &&
-                        !_session.IsAuthenticationCurrent(authenticationGeneration))
+            ApiResponse<CurrentUserDto> response;
+            try
+            {
+                response = await _dispatcher.SendAsync(
+                    new LoginCommand(request.Username, request.Password),
+                    null,
+                    (result, correlationId) =>
                     {
-                        return ApiResponse<CurrentUserDto>.Failure(
-                            new ApiError(
-                                ApiStatusCode.Unauthorized,
-                                "Auth.SessionChanged",
-                                "The login result is no longer current. Sign in again.",
-                                correlationId: correlationId));
-                    }
+                        if (result.IsSuccess &&
+                            !_session.IsAuthenticationCurrent(authenticationGeneration))
+                        {
+                            return ApiResponse<CurrentUserDto>.Failure(
+                                new ApiError(
+                                    ApiStatusCode.Unauthorized,
+                                    "Auth.SessionChanged",
+                                    "The login result is no longer current. Sign in again.",
+                                    correlationId: correlationId));
+                        }
 
-                    return result;
-                },
-                cancellationToken).ConfigureAwait(false);
+                        return result;
+                    },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _session.CancelAuthentication(authenticationGeneration);
+                throw;
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
             if (!response.IsSuccess)
             {
+                _session.CancelAuthentication(authenticationGeneration);
+                if (response.Error!.Code == "InternalError")
+                {
+                    return ApiResponse<CurrentUserDto>.Failure(
+                        new ApiError(
+                            ApiStatusCode.InternalServerError,
+                            "Database.Unavailable",
+                            "Credential validation is temporarily unavailable.",
+                            correlationId: response.Error.CorrelationId));
+                }
+
                 return response;
             }
 
@@ -84,7 +105,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 }
                 catch (Exception)
                 {
-                    _session.SignOut();
+                    _session.CancelAuthentication(authenticationGeneration);
                     return ApiResponse<CurrentUserDto>.Failure(
                         new ApiError(
                             ApiStatusCode.InternalServerError,
@@ -94,7 +115,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
                 if (!isActive)
                 {
-                    _session.SignOut();
+                    _session.CancelAuthentication(authenticationGeneration);
                     return ApiResponse<CurrentUserDto>.Failure(
                         new ApiError(
                             ApiStatusCode.Unauthorized,

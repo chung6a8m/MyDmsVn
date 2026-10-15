@@ -111,13 +111,14 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             SessionChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        internal void RequireReauthentication()
+        internal bool RequireReauthentication(long expectedGeneration)
         {
             lock (_sync)
             {
-                if (_state == DesktopSessionState.Expired && _currentUser == null)
+                if (_state != DesktopSessionState.Authenticated ||
+                    _authenticationGeneration != expectedGeneration)
                 {
-                    return;
+                    return false;
                 }
 
                 _authenticationGeneration++;
@@ -126,6 +127,26 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             }
 
             SessionChanged?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
+        internal bool CancelAuthentication(long expectedGeneration)
+        {
+            lock (_sync)
+            {
+                if (_state != DesktopSessionState.Authenticating ||
+                    _authenticationGeneration != expectedGeneration)
+                {
+                    return false;
+                }
+
+                _authenticationGeneration++;
+                _currentUser = null;
+                _state = DesktopSessionState.Unauthenticated;
+            }
+
+            SessionChanged?.Invoke(this, EventArgs.Empty);
+            return true;
         }
 
         public void RecordUserActivity()

@@ -11,6 +11,7 @@ using MyDmsVn.Desktop.Infrastructure.Local;
 using MyDmsVn.Desktop.WinForms;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Identity;
+using MyDmsVn.Server.Application.Security;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
@@ -151,6 +152,98 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.Equal("Database.Unavailable", response.Error!.Code);
                 Assert.Equal(ApiStatusCode.InternalServerError, response.Error.Status);
                 Assert.False(provider.GetRequiredService<IDesktopSession>().IsAuthenticated);
+            }
+        }
+
+        [Fact]
+        public async Task Sql_failure_during_credential_lookup_is_reported_as_database_unavailable()
+        {
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddTransient<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
+                ThrowingLoginHandler>();
+            using (var provider = services.BuildServiceProvider())
+            {
+                var response = await provider.GetRequiredService<IIdentityApiClient>().LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None);
+
+                Assert.False(response.IsSuccess);
+                Assert.Equal("Database.Unavailable", response.Error!.Code);
+                Assert.Equal(DesktopSessionState.Unauthenticated,
+                    provider.GetRequiredService<IDesktopSession>().State);
+            }
+        }
+
+        [Fact]
+        public async Task Late_account_validation_from_user_a_cannot_expire_user_b_session()
+        {
+            var validator = new PausingSecondAccountValidator();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton<IUserAccountValidator>(validator);
+            services.AddSingleton<IPermissionStore>(new AllowPermissionStore());
+            services.AddTransient<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
+                UserSpecificLoginHandler>();
+            using (var provider = services.BuildServiceProvider())
+            {
+                var identity = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                Assert.True((await identity.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None)).IsSuccess);
+
+                var oldRequest = provider.GetRequiredService<IPermissionApiClient>()
+                    .CheckAsync("Catalog.Products.Read", CancellationToken.None);
+                await validator.SecondCallStarted;
+                session.SignOut();
+                Assert.True((await identity.LoginAsync(
+                    new LoginRequest("manager", "secret"),
+                    CancellationToken.None)).IsSuccess);
+
+                validator.CompleteSecondCall(isActive: false);
+                var oldResponse = await oldRequest;
+
+                Assert.False(oldResponse.IsSuccess);
+                Assert.True(session.IsAuthenticated);
+                Assert.Equal("manager", session.CurrentUser!.Username);
+            }
+        }
+
+        [Fact]
+        public async Task Late_validation_from_old_login_attempt_cannot_clear_new_session()
+        {
+            var validator = new PausingFirstAccountValidator();
+            var services = new ServiceCollection();
+            services.AddServerApplication();
+            services.AddLocalDesktopAdapter();
+            services.AddSingleton<IUserAccountValidator>(validator);
+            services.AddTransient<
+                IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>,
+                UserSpecificLoginHandler>();
+            using (var provider = services.BuildServiceProvider())
+            {
+                var identity = provider.GetRequiredService<IIdentityApiClient>();
+                var session = provider.GetRequiredService<IDesktopSession>();
+                var oldLogin = identity.LoginAsync(
+                    new LoginRequest("operator", "secret"),
+                    CancellationToken.None);
+                await validator.FirstCallStarted;
+
+                session.SignOut();
+                Assert.True((await identity.LoginAsync(
+                    new LoginRequest("manager", "secret"),
+                    CancellationToken.None)).IsSuccess);
+                validator.CompleteFirstCall(isActive: false);
+                var oldResponse = await oldLogin;
+
+                Assert.False(oldResponse.IsSuccess);
+                Assert.True(session.IsAuthenticated);
+                Assert.Equal("manager", session.CurrentUser!.Username);
             }
         }
 
@@ -304,6 +397,15 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        private sealed class AllowPermissionStore : IPermissionStore
+        {
+            public Task<PermissionSnapshot> GetSnapshotAsync(
+                int userId,
+                string permissionKey,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(new PermissionSnapshot(true, false));
+        }
+
         private sealed class InactiveAccountValidator : IUserAccountValidator
         {
             public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
@@ -326,6 +428,78 @@ namespace MyDmsVn.Desktop.Tests
             {
                 throw new InvalidOperationException("SQL detail");
             }
+        }
+
+        private sealed class ThrowingLoginHandler
+            : IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>
+        {
+            public Task<ErrorOr<CurrentUserDto>> Handle(
+                LoginCommand request,
+                CancellationToken cancellationToken) =>
+                throw new InvalidOperationException("SQL detail");
+        }
+
+        private sealed class UserSpecificLoginHandler
+            : IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>
+        {
+            public Task<ErrorOr<CurrentUserDto>> Handle(
+                LoginCommand request,
+                CancellationToken cancellationToken)
+            {
+                var userId = request.Username == "manager" ? 84 : 42;
+                return Task.FromResult<ErrorOr<CurrentUserDto>>(
+                    new CurrentUserDto(userId, request.Username, request.Username));
+            }
+        }
+
+        private sealed class PausingSecondAccountValidator : IUserAccountValidator
+        {
+            private readonly TaskCompletionSource<bool> _secondCallStarted =
+                new TaskCompletionSource<bool>();
+            private readonly TaskCompletionSource<bool> _secondCall =
+                new TaskCompletionSource<bool>();
+            private int _callCount;
+
+            public Task SecondCallStarted => _secondCallStarted.Task;
+
+            public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
+            {
+                if (Interlocked.Increment(ref _callCount) != 2)
+                {
+                    return Task.FromResult(true);
+                }
+
+                _secondCallStarted.TrySetResult(true);
+                return _secondCall.Task;
+            }
+
+            public void CompleteSecondCall(bool isActive) =>
+                _secondCall.TrySetResult(isActive);
+        }
+
+        private sealed class PausingFirstAccountValidator : IUserAccountValidator
+        {
+            private readonly TaskCompletionSource<bool> _firstCallStarted =
+                new TaskCompletionSource<bool>();
+            private readonly TaskCompletionSource<bool> _firstCall =
+                new TaskCompletionSource<bool>();
+            private int _callCount;
+
+            public Task FirstCallStarted => _firstCallStarted.Task;
+
+            public Task<bool> IsActiveAsync(int userId, CancellationToken cancellationToken)
+            {
+                if (Interlocked.Increment(ref _callCount) != 1)
+                {
+                    return Task.FromResult(true);
+                }
+
+                _firstCallStarted.TrySetResult(true);
+                return _firstCall.Task;
+            }
+
+            public void CompleteFirstCall(bool isActive) =>
+                _firstCall.TrySetResult(isActive);
         }
 
         private sealed class SuccessfulLoginHandler
