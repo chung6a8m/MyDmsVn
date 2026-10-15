@@ -103,11 +103,21 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
         internal bool IsCurrent(long generation)
         {
+            bool expired;
+            bool current;
             lock (_sync)
             {
-                return _state == DesktopSessionState.Authenticated &&
+                expired = ExpireIfIdleUnsafe();
+                current = _state == DesktopSessionState.Authenticated &&
                     _authenticationGeneration == generation;
             }
+
+            if (expired)
+            {
+                SessionChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            return current;
         }
 
         public void SignOut()
