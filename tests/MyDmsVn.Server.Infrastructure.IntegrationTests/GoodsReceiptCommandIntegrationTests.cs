@@ -812,12 +812,17 @@ public sealed class GoodsReceiptCommandIntegrationTests
     public async Task Concurrent_posts_for_same_receipt_commit_exactly_once()
     {
         var database = await CreateDatabaseAsync();
+        SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? first = null;
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? second = null;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
         {
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
@@ -832,21 +837,34 @@ public sealed class GoodsReceiptCommandIntegrationTests
                 created = create.Value;
             }
 
-            await CreateSignalTableAsync(database.ConnectionString);
-            await CreateGoodsReceiptSignalTriggerAsync(
+            gate = await SqlConcurrencyGate.AcquireAsync(
                 database.ConnectionString,
-                "FirstSameReceiptPostHasHeaderLock",
+                "same-receipt",
+                CancellationToken.None);
+            await CreateGoodsReceiptGateTriggerAsync(
+                database.ConnectionString,
+                gate,
                 "EXISTS (SELECT 1 FROM inserted WHERE ReceiptId = " + created.Id + " AND Status = 'Posted')");
             recordingConnectionFactory.Clear();
 
-            var first = PostInOwnScopeAsync(provider, created);
-            await recordingConnectionFactory.TakeNextSessionIdAsync();
-            await WaitForSignalAsync(database.ConnectionString, "FirstSameReceiptPostHasHeaderLock");
-            var second = PostInOwnScopeAsync(provider, created);
+            first = PostInOwnScopeAsync(provider, created, cancellation.Token);
+            var firstSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForHolderAsync(
+                firstSessionId,
+                "dbo.GoodsReceipts",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            second = PostInOwnScopeAsync(provider, created, cancellation.Token);
             var secondSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
-            await WaitForSqlLockWaitAsync(database.ConnectionString, secondSessionId);
+            await gate.WaitForBusinessBlockAsync(
+                secondSessionId,
+                firstSessionId,
+                "dbo.GoodsReceipts",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
             Assert.False(second.IsCompleted);
 
+            await gate.ReleaseAsync(CancellationToken.None);
             var results = await AwaitWithTimeoutAsync(Task.WhenAll(first, second));
 
             Assert.Single(results, result => !result.IsError);
@@ -864,7 +882,13 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
         finally
         {
-            await database.DisposeAsync();
+            await SqlConcurrencyCleanup.CompleteAsync(
+                gate,
+                cancellation,
+                provider,
+                database.DisposeAsync,
+                first,
+                second);
         }
     }
 
@@ -872,20 +896,49 @@ public sealed class GoodsReceiptCommandIntegrationTests
     public async Task Update_that_locks_first_wins_and_post_rejects_the_stale_snapshot()
     {
         var database = await CreateDatabaseAsync();
+        SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
+        Task<ErrorOr.ErrorOr<GoodsReceiptDto>>? update = null;
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? post = null;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
         {
+            await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
-            var created = await CreateReceiptAsync(provider, seed, "initial", seed.Product1Id, 1m);
-            await CreateSignalTableAsync(database.ConnectionString);
-            await CreateGoodsReceiptSignalTriggerAsync(
+            var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
+            provider = CreateProvider(
                 database.ConnectionString,
-                "UpdateHasHeaderLock",
+                seed.UserId,
+                allow: true,
+                connectionFactory: recordingConnectionFactory);
+            var created = await CreateReceiptAsync(provider, seed, "initial", seed.Product1Id, 1m);
+            gate = await SqlConcurrencyGate.AcquireAsync(
+                database.ConnectionString,
+                "update-first",
+                CancellationToken.None);
+            await CreateGoodsReceiptGateTriggerAsync(
+                database.ConnectionString,
+                gate,
                 "EXISTS (SELECT 1 FROM inserted WHERE Note = N'update-wins')");
+            recordingConnectionFactory.Clear();
 
-            var update = UpdateInOwnScopeAsync(provider, created, seed, "update-wins", 7m);
-            await WaitForSignalAsync(database.ConnectionString, "UpdateHasHeaderLock");
-            var post = PostInOwnScopeAsync(provider, created);
+            update = UpdateInOwnScopeAsync(
+                provider, created, seed, "update-wins", 7m, cancellation.Token);
+            var updateSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForHolderAsync(
+                updateSessionId,
+                "dbo.GoodsReceipts",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            post = PostInOwnScopeAsync(provider, created, cancellation.Token);
+            var postSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForBusinessBlockAsync(
+                postSessionId,
+                updateSessionId,
+                "dbo.GoodsReceipts",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            await gate.ReleaseAsync(CancellationToken.None);
             var results = await AwaitWithTimeoutAsync(Task.WhenAll(
                 ObserveUpdateAsync(update),
                 ObservePostAsync(post)));
@@ -906,7 +959,13 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
         finally
         {
-            await database.DisposeAsync();
+            await SqlConcurrencyCleanup.CompleteAsync(
+                gate,
+                cancellation,
+                provider,
+                database.DisposeAsync,
+                update,
+                post);
         }
     }
 
@@ -914,20 +973,49 @@ public sealed class GoodsReceiptCommandIntegrationTests
     public async Task Post_that_locks_first_wins_and_update_cannot_replace_posted_lines()
     {
         var database = await CreateDatabaseAsync();
+        SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? post = null;
+        Task<ErrorOr.ErrorOr<GoodsReceiptDto>>? update = null;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
         {
+            await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
-            var created = await CreateReceiptAsync(provider, seed, "initial", seed.Product1Id, 3m);
-            await CreateSignalTableAsync(database.ConnectionString);
-            await CreateGoodsReceiptSignalTriggerAsync(
+            var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
+            provider = CreateProvider(
                 database.ConnectionString,
-                "PostHasAllLocks",
+                seed.UserId,
+                allow: true,
+                connectionFactory: recordingConnectionFactory);
+            var created = await CreateReceiptAsync(provider, seed, "initial", seed.Product1Id, 3m);
+            gate = await SqlConcurrencyGate.AcquireAsync(
+                database.ConnectionString,
+                "post-first",
+                CancellationToken.None);
+            await CreateGoodsReceiptGateTriggerAsync(
+                database.ConnectionString,
+                gate,
                 "EXISTS (SELECT 1 FROM inserted WHERE Status = 'Posted')");
+            recordingConnectionFactory.Clear();
 
-            var post = PostInOwnScopeAsync(provider, created);
-            await WaitForSignalAsync(database.ConnectionString, "PostHasAllLocks");
-            var update = UpdateInOwnScopeAsync(provider, created, seed, "late-update", 9m);
+            post = PostInOwnScopeAsync(provider, created, cancellation.Token);
+            var postSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForHolderAsync(
+                postSessionId,
+                "dbo.GoodsReceipts",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            update = UpdateInOwnScopeAsync(
+                provider, created, seed, "late-update", 9m, cancellation.Token);
+            var updateSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForBusinessBlockAsync(
+                updateSessionId,
+                postSessionId,
+                "dbo.GoodsReceipts",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            await gate.ReleaseAsync(CancellationToken.None);
             var results = await AwaitWithTimeoutAsync(Task.WhenAll(
                 ObservePostAsync(post),
                 ObserveUpdateAsync(update)));
@@ -952,7 +1040,13 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
         finally
         {
-            await database.DisposeAsync();
+            await SqlConcurrencyCleanup.CompleteAsync(
+                gate,
+                cancellation,
+                provider,
+                database.DisposeAsync,
+                post,
+                update);
         }
     }
 
@@ -1047,17 +1141,19 @@ public sealed class GoodsReceiptCommandIntegrationTests
     public async Task Deactivation_and_post_serialize_in_both_lock_orders_for_every_reference()
     {
         var database = await CreateDatabaseAsync();
+        var cleanupIncomplete = false;
+        ServiceProvider? provider = null;
+        using var cleanupCancellation = new CancellationTokenSource();
         try
         {
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
                 connectionFactory: recordingConnectionFactory);
-            await CreateSignalTableAsync(database.ConnectionString);
             var cases = new[]
             {
                 new InactiveReferenceCase("Warehouses", "WarehouseId", seed.WarehouseId, "GoodsReceipt.WarehouseInactive"),
@@ -1069,75 +1165,40 @@ public sealed class GoodsReceiptCommandIntegrationTests
             {
                 var deactivationFirst = await CreateReceiptAsync(
                     provider, seed, "deactivate-first-" + item.TableName, seed.Product1Id, 1m);
-                recordingConnectionFactory.Clear();
-                var deactivationSignal = "DeactivateHasLock" + item.TableName;
-                await CreateReferenceSignalTriggerAsync(database.ConnectionString, item, deactivationSignal);
-                var deactivate = SetReferenceActiveAsync(database.ConnectionString, item, isActive: false);
-                await WaitForSignalAsync(database.ConnectionString, deactivationSignal);
-                var balanceBeforeRejectedPost = await GetBalanceQuantityAsync(
-                    database.ConnectionString, seed.WarehouseId, seed.Product1Id);
-                var blockedPost = PostInOwnScopeAsync(provider, deactivationFirst);
-                var blockedPostSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
-                await WaitForSqlLockWaitAsync(database.ConnectionString, blockedPostSessionId);
-                Assert.False(blockedPost.IsCompleted);
-                await AwaitWithTimeoutAsync(Task.WhenAll(deactivate, ObserveCompletionAsync(blockedPost)));
-                var rejected = await blockedPost;
-                Assert.True(rejected.IsError);
-                Assert.Equal(item.ExpectedErrorCode, rejected.FirstError.Code);
-                await AssertDraftHasNoInventoryAsync(database.ConnectionString, deactivationFirst.Id);
-                Assert.Equal(
-                    balanceBeforeRejectedPost,
-                    await GetBalanceQuantityAsync(database.ConnectionString, seed.WarehouseId, seed.Product1Id));
-                await DropTriggerAsync(database.ConnectionString, "TR_TestReferenceSignal");
-                await SetReferenceActiveAsync(database.ConnectionString, item, isActive: true);
+                await RunDeactivationFirstScenarioAsync(
+                    database.ConnectionString,
+                    provider,
+                    recordingConnectionFactory,
+                    seed,
+                    item,
+                    deactivationFirst);
 
                 var postFirst = await CreateReceiptAsync(
                     provider, seed, "post-first-" + item.TableName, seed.Product1Id, 2m);
-                recordingConnectionFactory.Clear();
-                var postSignal = "PostHasLocks" + item.TableName;
-                await CreateGoodsReceiptSignalTriggerAsync(
+                await RunPostFirstScenarioAsync(
                     database.ConnectionString,
-                    postSignal,
-                    "EXISTS (SELECT 1 FROM inserted WHERE ReceiptId = " + postFirst.Id + " AND Status = 'Posted')");
-                var winningPost = PostInOwnScopeAsync(provider, postFirst);
-                await recordingConnectionFactory.TakeNextSessionIdAsync();
-                await WaitForSignalAsync(database.ConnectionString, postSignal);
-                var balanceBeforeWinningPost = await GetBalanceQuantityAsync(
-                    database.ConnectionString, seed.WarehouseId, seed.Product1Id);
-                var deactivationSession = new TaskCompletionSource<int>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
-                var blockedDeactivate = SetReferenceActiveAsync(
-                    database.ConnectionString,
+                    provider,
+                    recordingConnectionFactory,
+                    seed,
                     item,
-                    isActive: false,
-                    deactivationSession);
-                var blockedDeactivationSessionId = await AwaitWithTimeoutAsync(deactivationSession.Task);
-                await WaitForSqlLockWaitAsync(database.ConnectionString, blockedDeactivationSessionId);
-                Assert.False(blockedDeactivate.IsCompleted);
-                await AwaitWithTimeoutAsync(Task.WhenAll(ObserveCompletionAsync(winningPost), blockedDeactivate));
-                var posted = await winningPost;
-                Assert.False(posted.IsError);
-                using (var connection = new SqlConnection(database.ConnectionString))
-                {
-                    Assert.Equal(0, await connection.QuerySingleAsync<int>(
-                        "SELECT COUNT(*) FROM dbo." + item.TableName + " WHERE " + item.KeyColumn + " = @id AND IsActive = 1;",
-                        new { id = item.Id }));
-                    Assert.Equal(2m, await connection.QuerySingleAsync<decimal>(
-                        "SELECT QuantityChange FROM dbo.StockLedger WHERE DocumentId = @receiptId;",
-                        new { receiptId = postFirst.Id }));
-                }
-
-                Assert.Equal(
-                    balanceBeforeWinningPost + 2m,
-                    await GetBalanceQuantityAsync(database.ConnectionString, seed.WarehouseId, seed.Product1Id));
-
-                await DropTriggerAsync(database.ConnectionString, "TR_TestGoodsReceiptSignal");
-                await SetReferenceActiveAsync(database.ConnectionString, item, isActive: true);
+                    postFirst);
             }
+        }
+        catch (SqlConcurrencyCleanupIncompleteException)
+        {
+            cleanupIncomplete = true;
+            throw;
         }
         finally
         {
-            await database.DisposeAsync();
+            if (!cleanupIncomplete)
+            {
+                await SqlConcurrencyCleanup.CompleteAsync(
+                    gate: null,
+                    cleanupCancellation,
+                    provider,
+                    database.DisposeAsync);
+            }
         }
     }
 
@@ -1145,37 +1206,52 @@ public sealed class GoodsReceiptCommandIntegrationTests
     public async Task Concurrent_receipt_posts_serialize_on_catalog_locks_and_preserve_the_balance_sum()
     {
         var database = await CreateDatabaseAsync();
+        SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? firstPost = null;
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? secondPost = null;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
         {
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
                 connectionFactory: recordingConnectionFactory);
             var first = await CreateReceiptAsync(provider, seed, "balance-one", seed.Product1Id, 4m);
             var second = await CreateReceiptAsync(provider, seed, "balance-two", seed.Product1Id, 6m);
-            await CreateSignalTableAsync(database.ConnectionString);
-            await CreateStockBalanceSignalTriggerAsync(
+            gate = await SqlConcurrencyGate.AcquireAsync(
                 database.ConnectionString,
-                "FirstBalanceInsertIsUncommitted",
+                "catalog-lock-order",
+                CancellationToken.None);
+            await CreateStockBalanceGateTriggerAsync(
+                database.ConnectionString,
+                gate,
                 "EXISTS (SELECT 1 FROM inserted WHERE WarehouseId = " + seed.WarehouseId +
                 " AND ProductId = " + seed.Product1Id + " AND Quantity = 4)");
             recordingConnectionFactory.Clear();
 
-            var firstPost = PostInOwnScopeAsync(provider, first);
-            await recordingConnectionFactory.TakeNextSessionIdAsync();
-            await WaitForSignalAsync(database.ConnectionString, "FirstBalanceInsertIsUncommitted");
-            var secondPost = PostInOwnScopeAsync(provider, second);
+            firstPost = PostInOwnScopeAsync(provider, first, cancellation.Token);
+            var firstSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForHolderAsync(
+                firstSessionId,
+                "dbo.Warehouses",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            secondPost = PostInOwnScopeAsync(provider, second, cancellation.Token);
             var secondSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
-            await WaitForSqlLockWaitOnObjectAsync(
-                database.ConnectionString,
+            await gate.WaitForBusinessBlockAsync(
                 secondSessionId,
-                "dbo.Warehouses");
+                firstSessionId,
+                "dbo.Warehouses",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
             Assert.False(secondPost.IsCompleted);
 
+            await gate.ReleaseAsync(CancellationToken.None);
             var results = await AwaitWithTimeoutAsync(Task.WhenAll(firstPost, secondPost));
 
             Assert.All(results, result => Assert.False(result.IsError));
@@ -1189,7 +1265,13 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
         finally
         {
-            await database.DisposeAsync();
+            await SqlConcurrencyCleanup.CompleteAsync(
+                gate,
+                cancellation,
+                provider,
+                database.DisposeAsync,
+                firstPost,
+                secondPost);
         }
     }
 
@@ -1197,37 +1279,52 @@ public sealed class GoodsReceiptCommandIntegrationTests
     public async Task Concurrent_balance_upserts_block_on_StockBalances_and_preserve_the_sum()
     {
         var database = await CreateDatabaseAsync();
+        SqlConcurrencyGate? gate = null;
+        ServiceProvider? provider = null;
+        Task? first = null;
+        Task? second = null;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
         {
             await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
             var seed = await SeedAsync(database.ConnectionString);
             var recordingConnectionFactory = new SessionRecordingConnectionFactory(database.ConnectionString);
-            using var provider = CreateProvider(
+            provider = CreateProvider(
                 database.ConnectionString,
                 seed.UserId,
                 allow: true,
                 connectionFactory: recordingConnectionFactory);
-            await CreateSignalTableAsync(database.ConnectionString);
-            await CreateStockBalanceSignalTriggerAsync(
+            gate = await SqlConcurrencyGate.AcquireAsync(
                 database.ConnectionString,
-                "FirstDirectBalanceInsertIsUncommitted",
+                "stock-balance-upsert",
+                CancellationToken.None);
+            await CreateStockBalanceGateTriggerAsync(
+                database.ConnectionString,
+                gate,
                 "EXISTS (SELECT 1 FROM inserted WHERE WarehouseId = " + seed.WarehouseId +
                 " AND ProductId = " + seed.Product1Id + " AND Quantity = 4)");
             recordingConnectionFactory.Clear();
 
-            var first = ApplyBalanceDeltaInOwnUnitOfWorkAsync(
-                provider, seed.WarehouseId, seed.Product1Id, 4m);
-            await recordingConnectionFactory.TakeNextSessionIdAsync();
-            await WaitForSignalAsync(database.ConnectionString, "FirstDirectBalanceInsertIsUncommitted");
-            var second = ApplyBalanceDeltaInOwnUnitOfWorkAsync(
-                provider, seed.WarehouseId, seed.Product1Id, 6m);
+            first = ApplyBalanceDeltaInOwnUnitOfWorkAsync(
+                provider, seed.WarehouseId, seed.Product1Id, 4m, cancellation.Token);
+            var firstSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForHolderAsync(
+                firstSessionId,
+                "dbo.StockBalances",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            second = ApplyBalanceDeltaInOwnUnitOfWorkAsync(
+                provider, seed.WarehouseId, seed.Product1Id, 6m, cancellation.Token);
             var secondSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
-            await WaitForSqlLockWaitOnObjectAsync(
-                database.ConnectionString,
+            await gate.WaitForBusinessBlockAsync(
                 secondSessionId,
-                "dbo.StockBalances");
+                firstSessionId,
+                "dbo.StockBalances",
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
             Assert.False(second.IsCompleted);
 
+            await gate.ReleaseAsync(CancellationToken.None);
             await AwaitWithTimeoutAsync(Task.WhenAll(first, second));
 
             using var connection = new SqlConnection(database.ConnectionString);
@@ -1240,7 +1337,13 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
         finally
         {
-            await database.DisposeAsync();
+            await SqlConcurrencyCleanup.CompleteAsync(
+                gate,
+                cancellation,
+                provider,
+                database.DisposeAsync,
+                first,
+                second);
         }
     }
 
@@ -1299,29 +1402,190 @@ public sealed class GoodsReceiptCommandIntegrationTests
 
     private static async Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>> PostInOwnScopeAsync(
         ServiceProvider provider,
-        GoodsReceiptDto receipt)
+        GoodsReceiptDto receipt,
+        CancellationToken cancellationToken = default)
     {
         using var scope = provider.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<ISender>().Send(
             new PostGoodsReceiptCommand(
                 new PostGoodsReceiptRequest(receipt.Id, receipt.Version)),
-            CancellationToken.None);
+            cancellationToken);
+    }
+
+    private static async Task RunDeactivationFirstScenarioAsync(
+        string connectionString,
+        ServiceProvider provider,
+        SessionRecordingConnectionFactory recordingConnectionFactory,
+        SeedData seed,
+        InactiveReferenceCase reference,
+        GoodsReceiptDto receipt)
+    {
+        SqlConcurrencyGate? gate = null;
+        Task? deactivate = null;
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? blockedPost = null;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            gate = await SqlConcurrencyGate.AcquireAsync(
+                connectionString,
+                "deactivate-first-" + reference.TableName,
+                CancellationToken.None);
+            await CreateReferenceGateTriggerAsync(connectionString, reference, gate);
+            recordingConnectionFactory.Clear();
+            var holderSession = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            deactivate = SetReferenceActiveAsync(
+                connectionString,
+                reference,
+                isActive: false,
+                holderSession,
+                cancellation.Token);
+            var holderSessionId = await AwaitWithTimeoutAsync(holderSession.Task);
+            await gate.WaitForHolderAsync(
+                holderSessionId,
+                "dbo." + reference.TableName,
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            var balanceBeforeRejectedPost = await GetBalanceQuantityAsync(
+                connectionString,
+                seed.WarehouseId,
+                seed.Product1Id);
+
+            blockedPost = PostInOwnScopeAsync(provider, receipt, cancellation.Token);
+            var blockedPostSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForBusinessBlockAsync(
+                blockedPostSessionId,
+                holderSessionId,
+                "dbo." + reference.TableName,
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            Assert.False(blockedPost.IsCompleted);
+
+            await gate.ReleaseAsync(CancellationToken.None);
+            await AwaitWithTimeoutAsync(Task.WhenAll(deactivate, ObserveCompletionAsync(blockedPost)));
+            var rejected = await blockedPost;
+            Assert.True(rejected.IsError);
+            Assert.Equal(reference.ExpectedErrorCode, rejected.FirstError.Code);
+            await AssertDraftHasNoInventoryAsync(connectionString, receipt.Id);
+            Assert.Equal(
+                balanceBeforeRejectedPost,
+                await GetBalanceQuantityAsync(connectionString, seed.WarehouseId, seed.Product1Id));
+        }
+        finally
+        {
+            await SqlConcurrencyCleanup.CompleteAsync(
+                gate,
+                cancellation,
+                async () =>
+                {
+                    await DropTriggerAsync(connectionString, "TR_TestReferenceSignal");
+                    await SetReferenceActiveAsync(connectionString, reference, isActive: true);
+                },
+                deactivate,
+                blockedPost);
+        }
+    }
+
+    private static async Task RunPostFirstScenarioAsync(
+        string connectionString,
+        ServiceProvider provider,
+        SessionRecordingConnectionFactory recordingConnectionFactory,
+        SeedData seed,
+        InactiveReferenceCase reference,
+        GoodsReceiptDto receipt)
+    {
+        SqlConcurrencyGate? gate = null;
+        Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>>? winningPost = null;
+        Task? blockedDeactivate = null;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            gate = await SqlConcurrencyGate.AcquireAsync(
+                connectionString,
+                "post-first-" + reference.TableName,
+                CancellationToken.None);
+            await CreateGoodsReceiptGateTriggerAsync(
+                connectionString,
+                gate,
+                "EXISTS (SELECT 1 FROM inserted WHERE ReceiptId = " + receipt.Id + " AND Status = 'Posted')");
+            recordingConnectionFactory.Clear();
+            winningPost = PostInOwnScopeAsync(provider, receipt, cancellation.Token);
+            var holderSessionId = await recordingConnectionFactory.TakeNextSessionIdAsync();
+            await gate.WaitForHolderAsync(
+                holderSessionId,
+                "dbo." + reference.TableName,
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            var balanceBeforeWinningPost = await GetBalanceQuantityAsync(
+                connectionString,
+                seed.WarehouseId,
+                seed.Product1Id);
+
+            var deactivationSession = new TaskCompletionSource<int>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            blockedDeactivate = SetReferenceActiveAsync(
+                connectionString,
+                reference,
+                isActive: false,
+                deactivationSession,
+                cancellation.Token);
+            var blockedDeactivationSessionId = await AwaitWithTimeoutAsync(deactivationSession.Task);
+            await gate.WaitForBusinessBlockAsync(
+                blockedDeactivationSessionId,
+                holderSessionId,
+                "dbo." + reference.TableName,
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None);
+            Assert.False(blockedDeactivate.IsCompleted);
+
+            await gate.ReleaseAsync(CancellationToken.None);
+            await AwaitWithTimeoutAsync(Task.WhenAll(ObserveCompletionAsync(winningPost), blockedDeactivate));
+            var posted = await winningPost;
+            Assert.False(posted.IsError);
+            using (var connection = new SqlConnection(connectionString))
+            {
+                Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                    "SELECT COUNT(*) FROM dbo." + reference.TableName + " WHERE " + reference.KeyColumn +
+                    " = @id AND IsActive = 1;",
+                    new { id = reference.Id }));
+                Assert.Equal(2m, await connection.QuerySingleAsync<decimal>(
+                    "SELECT QuantityChange FROM dbo.StockLedger WHERE DocumentId = @receiptId;",
+                    new { receiptId = receipt.Id }));
+            }
+
+            Assert.Equal(
+                balanceBeforeWinningPost + 2m,
+                await GetBalanceQuantityAsync(connectionString, seed.WarehouseId, seed.Product1Id));
+        }
+        finally
+        {
+            await SqlConcurrencyCleanup.CompleteAsync(
+                gate,
+                cancellation,
+                async () =>
+                {
+                    await DropTriggerAsync(connectionString, "TR_TestGoodsReceiptSignal");
+                    await SetReferenceActiveAsync(connectionString, reference, isActive: true);
+                },
+                winningPost,
+                blockedDeactivate);
+        }
     }
 
     private static async Task ApplyBalanceDeltaInOwnUnitOfWorkAsync(
         ServiceProvider provider,
         int warehouseId,
         int productId,
-        decimal delta)
+        decimal delta,
+        CancellationToken cancellationToken = default)
     {
         using var scope = provider.CreateScope();
         var factory = scope.ServiceProvider.GetRequiredService<IUnitOfWorkFactory>();
-        using var unitOfWork = await factory.CreateAsync(CancellationToken.None);
+        using var unitOfWork = await factory.CreateAsync(cancellationToken);
         unitOfWork.BeginTransaction();
         await unitOfWork.Repository<IGoodsReceiptWriteRepository>().ApplyStockBalanceDeltasAsync(
             warehouseId,
             new Dictionary<int, decimal> { [productId] = delta },
-            CancellationToken.None);
+            cancellationToken);
         unitOfWork.Commit();
     }
 
@@ -1364,17 +1628,9 @@ public sealed class GoodsReceiptCommandIntegrationTests
         await task;
     }
 
-    private static async Task CreateSignalTableAsync(string connectionString)
-    {
-        using var connection = new SqlConnection(connectionString);
-        await connection.ExecuteAsync(
-            "CREATE TABLE dbo.TestConcurrencySignals " +
-            "(SignalName nvarchar(128) NOT NULL CONSTRAINT PK_TestConcurrencySignals PRIMARY KEY);");
-    }
-
-    private static async Task CreateGoodsReceiptSignalTriggerAsync(
+    private static async Task CreateGoodsReceiptGateTriggerAsync(
         string connectionString,
-        string signalName,
+        SqlConcurrencyGate gate,
         string condition)
     {
         await DropTriggerAsync(connectionString, "TR_TestGoodsReceiptSignal");
@@ -1382,14 +1638,13 @@ public sealed class GoodsReceiptCommandIntegrationTests
         await connection.ExecuteAsync(
             "CREATE TRIGGER dbo.TR_TestGoodsReceiptSignal ON dbo.GoodsReceipts AFTER UPDATE AS " +
             "BEGIN SET NOCOUNT ON; IF (" + condition + ") BEGIN " +
-            "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
-            "WAITFOR DELAY '00:00:05'; END; END;");
+            gate.TransactionWaitSql + " END; END;");
     }
 
-    private static async Task CreateReferenceSignalTriggerAsync(
+    private static async Task CreateReferenceGateTriggerAsync(
         string connectionString,
         InactiveReferenceCase reference,
-        string signalName)
+        SqlConcurrencyGate gate)
     {
         await DropTriggerAsync(connectionString, "TR_TestReferenceSignal");
         using var connection = new SqlConnection(connectionString);
@@ -1397,13 +1652,12 @@ public sealed class GoodsReceiptCommandIntegrationTests
             "CREATE TRIGGER dbo.TR_TestReferenceSignal ON dbo." + reference.TableName + " AFTER UPDATE AS " +
             "BEGIN SET NOCOUNT ON; IF EXISTS (SELECT 1 FROM inserted WHERE " + reference.KeyColumn +
             " = " + reference.Id + " AND IsActive = 0) BEGIN " +
-            "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
-            "WAITFOR DELAY '00:00:05'; END; END;");
+            gate.TransactionWaitSql + " END; END;");
     }
 
-    private static async Task CreateStockBalanceSignalTriggerAsync(
+    private static async Task CreateStockBalanceGateTriggerAsync(
         string connectionString,
-        string signalName,
+        SqlConcurrencyGate gate,
         string condition)
     {
         await DropTriggerAsync(connectionString, "TR_TestStockBalanceSignal");
@@ -1411,90 +1665,13 @@ public sealed class GoodsReceiptCommandIntegrationTests
         await connection.ExecuteAsync(
             "CREATE TRIGGER dbo.TR_TestStockBalanceSignal ON dbo.StockBalances AFTER INSERT, UPDATE AS " +
             "BEGIN SET NOCOUNT ON; IF (" + condition + ") BEGIN " +
-            "INSERT dbo.TestConcurrencySignals (SignalName) VALUES (N'" + EscapeSqlLiteral(signalName) + "'); " +
-            "WAITFOR DELAY '00:00:05'; END; END;");
+            gate.TransactionWaitSql + " END; END;");
     }
 
     private static async Task DropTriggerAsync(string connectionString, string triggerName)
     {
         using var connection = new SqlConnection(connectionString);
         await connection.ExecuteAsync("DROP TRIGGER IF EXISTS dbo." + triggerName + ";");
-    }
-
-    private static async Task WaitForSignalAsync(string connectionString, string signalName)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        using var connection = new SqlConnection(connectionString);
-        while (DateTime.UtcNow < deadline)
-        {
-            var found = await connection.QuerySingleAsync<int>(
-                "SELECT COUNT(*) FROM dbo.TestConcurrencySignals WITH (NOLOCK) WHERE SignalName = @signalName;",
-                new { signalName });
-            if (found == 1)
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException("The expected SQL lock-order signal was not observed: " + signalName);
-    }
-
-    private static async Task WaitForSqlLockWaitAsync(string connectionString, int sessionId)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        using var connection = new SqlConnection(connectionString);
-        while (DateTime.UtcNow < deadline)
-        {
-            var waitType = await connection.QuerySingleOrDefaultAsync<string>(
-                "SELECT wait_type FROM sys.dm_exec_requests " +
-                "WHERE session_id = @sessionId AND blocking_session_id > 0;",
-                new { sessionId });
-            if (waitType != null && waitType.StartsWith("LCK_M_", StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException(
-            "SQL session " + sessionId + " did not enter an LCK_M_* wait before the lock holder completed.");
-    }
-
-    private static async Task WaitForSqlLockWaitOnObjectAsync(
-        string connectionString,
-        int sessionId,
-        string qualifiedTableName)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        using var connection = new SqlConnection(connectionString);
-        while (DateTime.UtcNow < deadline)
-        {
-            var waitType = await connection.QuerySingleOrDefaultAsync<string>(
-                "SELECT TOP (1) request.wait_type " +
-                "FROM sys.dm_exec_requests AS request " +
-                "INNER JOIN sys.dm_tran_locks AS waitingLock " +
-                "ON waitingLock.request_session_id = request.session_id " +
-                "INNER JOIN sys.partitions AS partitionInfo " +
-                "ON partitionInfo.hobt_id = waitingLock.resource_associated_entity_id " +
-                "WHERE request.session_id = @sessionId AND request.blocking_session_id > 0 " +
-                "AND request.wait_type LIKE N'LCK[_]M[_]%' AND waitingLock.request_status = N'WAIT' " +
-                "AND waitingLock.resource_database_id = DB_ID() " +
-                "AND partitionInfo.object_id = OBJECT_ID(@qualifiedTableName);",
-                new { sessionId, qualifiedTableName });
-            if (waitType != null && waitType.StartsWith("LCK_M_", StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException(
-            "SQL session " + sessionId + " did not enter an LCK_M_* wait on " + qualifiedTableName +
-            " before the lock holder completed.");
     }
 
     private static async Task EnsureCrossSessionDmvPermissionAsync(string connectionString)
@@ -1533,19 +1710,23 @@ public sealed class GoodsReceiptCommandIntegrationTests
         string connectionString,
         InactiveReferenceCase reference,
         bool isActive,
-        TaskCompletionSource<int>? openedSession = null)
+        TaskCompletionSource<int>? openedSession = null,
+        CancellationToken cancellationToken = default)
     {
         using var connection = new SqlConnection(connectionString);
-        await connection.OpenAsync();
+        await connection.OpenAsync(cancellationToken);
         if (openedSession != null)
         {
-            openedSession.SetResult(await connection.QuerySingleAsync<int>("SELECT @@SPID;"));
+            openedSession.SetResult(await connection.QuerySingleAsync<int>(
+                new CommandDefinition("SELECT @@SPID;", cancellationToken: cancellationToken)));
         }
 
         var affected = await connection.ExecuteAsync(
-            "UPDATE dbo." + reference.TableName + " SET IsActive = @isActive WHERE " +
-            reference.KeyColumn + " = @id;",
-            new { isActive, id = reference.Id });
+            new CommandDefinition(
+                "UPDATE dbo." + reference.TableName + " SET IsActive = @isActive WHERE " +
+                reference.KeyColumn + " = @id;",
+                new { isActive, id = reference.Id },
+                cancellationToken: cancellationToken));
         Assert.Equal(1, affected);
     }
 
@@ -1572,9 +1753,6 @@ public sealed class GoodsReceiptCommandIntegrationTests
             new { warehouseId, productId });
     }
 
-    private static string EscapeSqlLiteral(string value) =>
-        value.Replace("'", "''");
-
     private static async Task<ErrorOr.ErrorOr<PostGoodsReceiptResponse>> PostAfterSignalInOwnScopeAsync(
         ServiceProvider provider,
         GoodsReceiptDto receipt,
@@ -1593,7 +1771,8 @@ public sealed class GoodsReceiptCommandIntegrationTests
         GoodsReceiptDto created,
         SeedData seed,
         string note,
-        decimal quantity)
+        decimal quantity,
+        CancellationToken cancellationToken = default)
     {
         using var scope = provider.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<ISender>().Send(
@@ -1606,7 +1785,7 @@ public sealed class GoodsReceiptCommandIntegrationTests
                     seed.EmployeeId,
                     note,
                     new[] { new SaveGoodsReceiptLineRequest(seed.Product1Id, quantity, 1m) })),
-            CancellationToken.None);
+            cancellationToken);
     }
 
     private static async Task<StoredAggregateSnapshot> LoadAggregateSnapshotAsync(

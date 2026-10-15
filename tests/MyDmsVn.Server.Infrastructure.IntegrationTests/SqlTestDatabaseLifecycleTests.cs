@@ -108,4 +108,50 @@ public sealed class SqlTestDatabaseLifecycleTests
             new { databaseName = database.DatabaseName });
         Assert.Equal(0, remaining);
     }
+
+    [SqlServerFact]
+    public async Task Teardown_does_not_clear_an_unrelated_master_connection_pool()
+    {
+        var adminConnectionString = Environment.GetEnvironmentVariable(
+            SqlTestDatabase.ConnectionStringEnvironmentVariable)!;
+        var poolBuilder = new SqlConnectionStringBuilder(adminConnectionString)
+        {
+            ApplicationName = "MyDmsVn-T03-Unrelated-" + Guid.NewGuid().ToString("N"),
+            Pooling = true,
+            MinPoolSize = 0,
+            MaxPoolSize = 1,
+        };
+        var pooledMasterConnectionString = poolBuilder.ConnectionString;
+        try
+        {
+            Guid firstConnectionId;
+            using (var pooled = new SqlConnection(pooledMasterConnectionString))
+            {
+                await pooled.OpenAsync();
+                firstConnectionId = pooled.ClientConnectionId;
+            }
+
+            var database = await SqlTestDatabase.CreateAsync(adminConnectionString);
+            await database.DisposeAsync();
+
+            Guid preservedConnectionId;
+            using (var pooled = new SqlConnection(pooledMasterConnectionString))
+            {
+                await pooled.OpenAsync();
+                preservedConnectionId = pooled.ClientConnectionId;
+            }
+
+            Assert.Equal(firstConnectionId, preservedConnectionId);
+
+            SqlConnection.ClearPool(new SqlConnection(pooledMasterConnectionString));
+            using var replacement = new SqlConnection(pooledMasterConnectionString);
+            await replacement.OpenAsync();
+
+            Assert.NotEqual(preservedConnectionId, replacement.ClientConnectionId);
+        }
+        finally
+        {
+            SqlConnection.ClearPool(new SqlConnection(pooledMasterConnectionString));
+        }
+    }
 }
