@@ -48,6 +48,19 @@ Prevent a single Desktop.Infrastructure assembly from pulling SQL and server ass
 
 Cross-layer constructs forbidden: UI classes in Contracts; ADO.NET connections in DTOs; MediatR IRequest/ErrorOr in public JSON; HTTP IResult in Application handlers.
 
+
+### Repository resolution (command side)
+
+`IUnitOfWork.Repository<TRepository>()` is an **allowed, UoW-scoped repository resolver**, not a general-purpose service locator. It is consistent with Clean Architecture **only when the dependency direction remains inward**:
+
+- `IUnitOfWork`, `IUnitOfWorkFactory` and the business repository interfaces used by handlers (for example `IGoodsReceiptWriteRepository`) belong to `Server.Application` or another appropriate inner layer. Their concrete implementations, repository factories, and SQL execution context remain in `Server.Infrastructure`.
+- Command handlers may resolve **repository interfaces only** through an explicitly owned `IUnitOfWork`. Never request a concrete `Sql*Repository`, expose SQL/RepoDb/Dapper implementation details in Application or Domain, or turn `Repository<TRepository>()` into arbitrary `GetService<T>()` / `Resolve<T>()` dependency lookup.
+- All repositories resolved from one UoW use the **same UoW-owned connection** and, when a transaction is active, the **same explicit transaction** for every relevant database operation (including async operations). No repository may create an independent connection/transaction for work that belongs to that UoW.
+- Standalone CQRS reads use dedicated Application query-service interfaces (implemented with Dapper), without creating a UoW unnecessarily. Reads that must observe or participate in an active command transaction must share its connection and transaction through an explicit Infrastructure execution context.
+- Repository lookup inside a handler makes its repository dependencies less visible in the constructor. Keep those dependencies strongly typed, use explicit registrations, and cover missing registrations and cross-repository transaction behavior with tests. Do not replace the established UoW resolver solely for stylistic preference.
+
+See `docs/PERSISTENCE.md` and accepted `docs/adr/0002-explicit-unit-of-work.md`. This rule **clarifies** the existing Explicit UoW decision; it does not change the transaction model.
+
 ## 3. Modules
 
 Initial bounded modules:

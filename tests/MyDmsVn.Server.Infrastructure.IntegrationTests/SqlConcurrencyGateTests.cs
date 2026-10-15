@@ -11,7 +11,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class SqlConcurrencyGateTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Holder_waits_for_controller_release_when_observation_is_delayed_past_ten_seconds()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(
@@ -79,7 +79,7 @@ public sealed class SqlConcurrencyGateTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Canceled_observation_releases_gate_and_drains_the_holder_before_database_disposal()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(
@@ -152,7 +152,7 @@ public sealed class SqlConcurrencyGateTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Canceled_release_can_be_retried_without_leaving_the_controller_lock_held()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(
@@ -190,7 +190,7 @@ public sealed class SqlConcurrencyGateTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Observer_identifies_app_gate_holder_and_business_block_without_reading_uncommitted_signal()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(
@@ -289,7 +289,7 @@ public sealed class SqlConcurrencyGateTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public async Task Failure_after_confirmed_business_block_cancels_tasks_before_database_disposal()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(

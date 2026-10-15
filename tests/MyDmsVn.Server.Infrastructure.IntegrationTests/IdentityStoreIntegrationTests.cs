@@ -18,7 +18,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
 {
     public sealed class IdentityStoreIntegrationTests
     {
-        [SqlServerFact]
+        [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
         public async Task User_and_permission_stores_read_current_sql_state_and_replace_hash_atomically()
         {
             var database = await CreateMigratedDatabaseAsync();
@@ -103,7 +103,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             }
         }
 
-        [SqlServerFact]
+        [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
         public async Task Identity_unique_relationship_constraints_reject_duplicates()
         {
             var database = await CreateMigratedDatabaseAsync();
@@ -142,7 +142,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             }
         }
 
-        [SqlServerFact]
+        [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
         public async Task Login_with_an_outdated_bcrypt_hash_rehashes_through_the_sql_store()
         {
             var database = await CreateMigratedDatabaseAsync();
@@ -181,7 +181,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             }
         }
 
-        [SqlServerFact]
+        [SqlServerFact(SqlTestCategory.SecurityProvisioning, SqlTestCategory.SqlConcurrency)]
         public async Task Permission_snapshot_never_exposes_role_grant_without_concurrent_direct_deny()
         {
             var database = await CreateMigratedDatabaseAsync();

@@ -243,6 +243,16 @@ internal sealed class SqlConcurrencyGate : IDisposable
                 exception,
                 cancellationToken);
         }
+        catch (InvalidOperationException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            // Microsoft.Data.SqlClient on net48 can surface command cancellation as
+            // InvalidOperationException ("Operation cancelled by user.") instead of
+            // SqlException. Preserve the caller-visible cancellation contract across TFMs.
+            throw new OperationCanceledException(
+                "SQL wait observation was canceled.",
+                exception,
+                cancellationToken);
+        }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException(

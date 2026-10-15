@@ -16,7 +16,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class SchemaCompatibilityIntegrationTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -90,7 +90,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Current_database_passes_repeatable_read_only_preflight()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -113,7 +113,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Migrated_database_without_permission_sync_fails_runtime_preflight()
     {
         var database = await CreateMigratedDatabaseAsync(markPermissionReleaseCurrent: false);
@@ -131,7 +131,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Database_synced_to_old_permission_release_fails_runtime_preflight()
     {
         var database = await CreateMigratedDatabaseAsync(markPermissionReleaseCurrent: false);
@@ -156,7 +156,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Changed_manifest_under_current_release_fails_runtime_preflight()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -191,7 +191,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Permission_catalog_constraint_tampering_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -217,7 +217,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Permission_activation_audit_constraint_tampering_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -243,7 +243,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Permission_key_collation_tampering_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -290,7 +290,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Permission_unique_index_with_unexpected_included_column_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -315,7 +315,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Permission_primary_key_with_descending_key_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -340,7 +340,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Permission_primary_key_with_ignore_duplicate_key_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -365,7 +365,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Permission_unique_index_with_ignore_duplicate_key_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -390,7 +390,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Permission_schema_column_rename_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -414,7 +414,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Sequence_with_wrong_increment_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -437,7 +437,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Cycling_goods_receipt_sequence_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -460,7 +460,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Consumed_goods_receipt_sequence_remains_compatible()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -484,7 +484,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Current_database_with_unmanaged_database_ddl_trigger_is_unknown()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -508,7 +508,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Applied_artifacts_without_matching_journal_entry_are_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -531,7 +531,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Disabled_or_untrusted_check_constraint_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -554,7 +554,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_check_constraint_with_wrong_predicate_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -579,7 +579,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_check_constraint_with_case_changed_literal_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -605,7 +605,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_check_constraint_on_wrong_table_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -632,7 +632,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_column_nullability_and_default_change_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -656,7 +656,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Catalog_nul_function_with_wrong_body_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -705,7 +705,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Missing_required_unique_index_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -728,7 +728,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_unique_index_with_wrong_key_definition_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -753,7 +753,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_filtered_index_without_filter_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -777,7 +777,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Missing_required_primary_key_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -800,7 +800,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Disabled_or_untrusted_foreign_key_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -823,7 +823,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_foreign_key_with_wrong_column_mapping_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -848,7 +848,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_foreign_key_with_cascade_action_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -873,7 +873,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Disabled_append_only_trigger_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -896,7 +896,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Required_append_only_trigger_with_no_op_body_is_partial()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -920,7 +920,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Clean_known_prefix_is_too_old()
     {
         var database = await CreateMigratedDatabaseAsync();
@@ -951,7 +951,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Future_and_forked_histories_fail_with_distinct_codes()
     {
         var futureDatabase = await CreateMigratedDatabaseAsync();

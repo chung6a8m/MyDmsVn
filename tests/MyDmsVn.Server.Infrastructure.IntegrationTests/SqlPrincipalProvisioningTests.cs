@@ -12,7 +12,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class SqlPrincipalProvisioningTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_rejects_the_same_runtime_and_migration_identity()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -40,7 +40,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_rejects_an_existing_elevated_runtime_identity()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -76,7 +76,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_and_startup_reject_direct_object_alter_permission()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -125,7 +125,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_rejects_direct_user_impersonation_permission()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -159,7 +159,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Startup_rejects_direct_user_impersonation_permission()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -200,7 +200,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_and_startup_reject_direct_users_insert_permission()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -251,7 +251,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_and_startup_reject_disallowed_users_column_update()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -298,7 +298,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_and_startup_reject_schema_dml_permission()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -347,7 +347,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_and_startup_reject_full_permission_sync_state_read()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -394,7 +394,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -555,7 +555,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Runtime_preflight_rejects_unexpected_filtered_unique_index()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -596,7 +596,7 @@ public sealed class SqlPrincipalProvisioningTests
         }
     }
 
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Runtime_preflight_detects_unlisted_object_without_data_grants()
     {
         var database = await SqlTestDatabase.CreateAsync(

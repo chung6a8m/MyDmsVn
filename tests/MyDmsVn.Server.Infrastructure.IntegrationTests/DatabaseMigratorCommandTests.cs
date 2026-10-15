@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -14,7 +14,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class DatabaseMigratorCommandTests
 {
-    [SqlServerFact]
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Unknown_command_exits_without_modifying_the_database()
     {
         var database = await SqlTestDatabase.CreateAsync(
