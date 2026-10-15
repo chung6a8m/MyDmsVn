@@ -36,6 +36,12 @@ A test trait is a **responsibility label**, not permission to run concurrently. 
 
 Before removing or narrowing a serial guard, document the isolation/ownership matrix, maximum active databases/connections, capacity evidence, cancellation and failed-test cleanup, repeatable stress runs on both supported TFMs, and a tested rollback to serial behavior. Treat a timeout, deadlock, contamination, leaked connection or orphaned database as a failed experiment. SQLPERF benchmarks continue to run `net48` and `net8.0` sequentially for comparable measurements; focused and category-filtered runs cannot replace unfiltered SQL release gates.
 
+## 2.2. Task gates and final full regression
+
+Every new implementation plan must specify an executable L2 task-gate matrix: changed module/dependencies, test project and TFM, actual reviewed selectors, mandatory real-SQL category/adversarial checks, approval/cleanup constraints and evidence. Codex runs smallest correct focused L1 and affected L2 gates; do **not** default to `dotnet test MyDmsVn.sln` or unfiltered SQL after each task. See [Test Gate Matrix](TEST_GATE_MATRIX.md) and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
+
+Plan one full L3 invocation only at the final gate-affecting revision after L2 is green. Required unfiltered dual-TFM SQL cases, approval, independent inventory/discovery/TRX, zero mandatory skips, watchdog and ownership checks remain intact. An L3 failure or relevant code/test/migration/harness/build/CI edit invalidates affected evidence; focused repair must precede rerunning the applicable full gate. A strict single-pass PR runner and module-scoped gate orchestration are **proposed, not implemented**; the current strict runner is multi-pass. Benchmark repetition is specialized L4, not the default feature gate. See [TESTGATE plan](plans/20261016-001-task-gates-and-modular-tests.md) and [proposed ADR 0006](adr/0006-task-scoped-test-execution-and-module-projects.md); ADR 0005 still governs isolation.
+
 ## 3. Mandatory SQL scenarios
 
 1. DbUp clean install and re-run unchanged.
