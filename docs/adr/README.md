@@ -8,6 +8,7 @@ Accepted decisions supersede conflicting example snippets in historical `project
 | [0002](0002-explicit-unit-of-work.md) | Explicit rather than ambient UnitOfWork | Accepted |
 | [0003](0003-compatibility-and-legacy-passwords.md) | Dual-runtime, RepoDb versions, legacy PasswordSalt | Accepted |
 | [0004](0004-p5-ledger-and-posting.md) | P5 transactionally posted stock ledger and balances | Accepted / proposed schema details |
+| [0005](0005-test-isolation-and-bounded-parallelism.md) | Test resource isolation and bounded SQL parallelism; keep GUI-interacting Desktop tests serialized | Accepted |
 
 ## New ADR template
 

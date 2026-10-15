@@ -20,6 +20,22 @@
 - At least one clean Windows build of each host during P0/P6. Do not claim Linux CI proves WinForms parity.
 - Contract DTO tests run for both applicable targets.
 
+## 2.1. Test parallelization and isolation policy
+
+The enduring architecture rule is **selective serialization by isolation boundary**, not an assembly-wide ban on parallel tests. SQL integration test execution may be parallelized in a bounded manner after ownership, cleanup and host capacity are proven. The current SQL integration assembly-level `DisableTestParallelization = true` is a temporary fail-safe; **do not remove it as part of an unvalidated optimization**. The separate `Desktop.Tests` guard remains appropriate for GUI-interacting tests until a safe split is demonstrated. See accepted [ADR 0005](adr/0005-test-isolation-and-bounded-parallelism.md).
+
+| Workload / resource | Preferred policy | Required boundary |
+|---|---|---|
+| Pure Application, Architecture, contract and non-UI ViewModel logic | Preserve xUnit collection-level parallelism by default | No shared mutable process or external state |
+| SQL mapping/CRUD with independently owned disposable databases | Eligible for bounded collection-level parallelism | Each parallel collection owns isolated DB/state, verified disposal and approved instance; resource cap based on evidence |
+| SQL tests using one migrated fixture | Serialize access within the shared mutable fixture unless independently proven safe | Explicit collection ownership, complete reset of data/schema/security/identity/sequence state, drained operations and bounded fixture disposal |
+| SQL migration/history/schema drift, security bootstrap/permissions, locking and special multi-session cases | Use fresh/dedicated resources and selective exclusive execution as needed | Never rely on test-category names alone; prove absence of cross-test interference |
+| Desktop WinForms / focus / mouse / keyboard / message-loop interaction | Serialize GUI-interacting execution; retain current Desktop assembly guard | STA plus deterministic cleanup, dialog suppression and no competing global UI input |
+
+A test trait is a **responsibility label**, not permission to run concurrently. xUnit collections coordinate tests inside one assembly; they do not arbitrate SQL instances, GUI focus or fixtures used by separate testhost processes. Configure runner/CI orchestration separately to prevent conflicting cross-process/TFM workloads. Genuine concurrency assertions within one test must still launch the required independent SQL sessions.
+
+Before removing or narrowing a serial guard, document the isolation/ownership matrix, maximum active databases/connections, capacity evidence, cancellation and failed-test cleanup, repeatable stress runs on both supported TFMs, and a tested rollback to serial behavior. Treat a timeout, deadlock, contamination, leaked connection or orphaned database as a failed experiment. SQLPERF benchmarks continue to run `net48` and `net8.0` sequentially for comparable measurements; focused and category-filtered runs cannot replace unfiltered SQL release gates.
+
 ## 3. Mandatory SQL scenarios
 
 1. DbUp clean install and re-run unchanged.

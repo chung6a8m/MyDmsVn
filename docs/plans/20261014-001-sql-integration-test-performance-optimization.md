@@ -149,3 +149,14 @@ For each PR/task, deliver a small before/after comparison table, changed files, 
 ## 6. Out of scope
 
 Production query/index/schema tuning without application evidence, raising SQL Server RAM as the default fix, new business functionality, redesign of P3.1 permission synchronization or P4.1 Login, changing target frameworks, test mocks replacing mandatory SQL checks, and benchmarking unrelated WinForms/Desktop UI.
+
+## 7. Follow-up architecture clarification — isolation and bounded parallelism (2026-10-15)
+
+Accepted [ADR 0005](../adr/0005-test-isolation-and-bounded-parallelism.md) clarifies the **long-term policy** without changing the already defined T04/T05 deliverables or retroactively claiming a passed gate:
+
+- **SQL assembly-wide serialization is provisional.** The instructions in sections 2, T03, T05 and safeguard 5 to retain serial execution remain binding **until** independent isolation, SQL resource/capacity, hostile cleanup and repeatability evidence justify a controlled change. Do not remove `DisableTestParallelization` as an unmeasured shortcut.
+- **Target state:** bounded xUnit collection-level parallelism for tests with independently owned resources; selective serialization for tests sharing mutable fixtures or requiring exclusive SQL state. A single migrated fixture is not safe for parallel writes without independently demonstrated isolation. Categories/traits such as `FastSQL` describe intent and must not be treated as concurrency authorization.
+- **Scope separation:** `Desktop.Tests` deliberately remains serialized for real WinForms/STA/input/focus or shared UI-state interactions. Pure unit tests are not subject to this Desktop rule. The T01/T06 benchmark requirement to run `net48` and `net8.0` **sequentially** addresses cross-process measurement reproducibility, not mandatory per-test serialization.
+- **Future implementation gate:** before narrowing/removing an SQL assembly guard, record the collection/fixture ownership matrix, cross-process protections, bounded SQL limits, failure/timeout/abandoned-operation cleanup, dual-TFM repeat/stress evidence, exact benchmark comparison and tested serial fallback. Preserve independent SQL discovery, zero mandatory skips, approval, ownership reconciliation and all release assertions.
+
+This addendum is **documentation-only**. It does not assert that T04/T05/T06 or any parallel runner capability has been implemented or validated. Integrate it with the final SQLPERF changes after the in-flight implementation is merged; resolve documentation conflicts by preserving both the acceptance gates and this architectural intent.
