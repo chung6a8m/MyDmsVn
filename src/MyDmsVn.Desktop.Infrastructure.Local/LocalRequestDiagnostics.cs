@@ -169,6 +169,18 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                         }
                     }
 
+                    if (hasActor && !_session.IsCurrent(generation))
+                    {
+                        var stale = ApiResponse<T>.Failure(
+                            new ApiError(
+                                ApiStatusCode.Unauthorized,
+                                "Auth.SessionChanged",
+                                "The session changed before the request was admitted.",
+                                correlationId: scope.CorrelationId));
+                        scope.RecordError(stale.Error!.Code);
+                        return stale;
+                    }
+
                     var sender = requestScope.ServiceProvider.GetRequiredService<ISender>();
                     var result = await sender.Send(request, cancellationToken).ConfigureAwait(false);
                     var response = ApiResponseMapper.Map(

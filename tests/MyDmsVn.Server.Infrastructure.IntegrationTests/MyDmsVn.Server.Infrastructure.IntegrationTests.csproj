@@ -17,6 +17,8 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\MyDmsVn.Desktop.Application\MyDmsVn.Desktop.Application.csproj" />
+    <ProjectReference Include="..\..\src\MyDmsVn.Desktop.Infrastructure.Local\MyDmsVn.Desktop.Infrastructure.Local.csproj" />
     <ProjectReference Include="..\..\src\MyDmsVn.Server.DbMigrator\MyDmsVn.Server.DbMigrator.csproj" />
     <ProjectReference Include="..\..\src\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
     <ProjectReference Include="..\MyDmsVn.SqlTestHarness\MyDmsVn.SqlTestHarness.csproj" />

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Desktop.Application;
 
 namespace MyDmsVn.Desktop.WinForms
@@ -11,9 +12,9 @@ namespace MyDmsVn.Desktop.WinForms
     {
         private readonly LoginViewModel _viewModel;
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
-        private readonly Label _errorSummary;
-        private readonly ProgressBar _busyIndicator;
-        private readonly CheckBox _showPassword;
+        private readonly BootstrapAlert _errorSummary;
+        private readonly BootstrapProgressBar _busyIndicator;
+        private readonly BootstrapCheckBox _showPassword;
         private bool _disposed;
 
         public LoginForm(LoginViewModel viewModel)
@@ -26,42 +27,41 @@ namespace MyDmsVn.Desktop.WinForms
             MaximizeBox = false;
             MinimizeBox = false;
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(420, 300);
-            MinimumSize = new Size(420, 300);
+            ClientSize = new Size(420, 340);
+            MinimumSize = new Size(420, 340);
 
-            UsernameTextBox = new TextBox { Dock = DockStyle.Fill, TabIndex = 0 };
-            PasswordTextBox = new TextBox
+            UsernameTextBox = new BootstrapTextBox { Dock = DockStyle.Fill, TabIndex = 0 };
+            PasswordTextBox = new BootstrapTextBox
             {
                 Dock = DockStyle.Fill,
                 TabIndex = 1,
                 UseSystemPasswordChar = true,
             };
-            _showPassword = new CheckBox
+            _showPassword = new BootstrapCheckBox
             {
                 Text = "Hiện mật khẩu",
                 AutoSize = true,
                 TabIndex = 2,
             };
-            _errorSummary = new Label
-            {
-                AutoSize = false,
-                Dock = DockStyle.Fill,
-                ForeColor = Color.Firebrick,
-                TextAlign = ContentAlignment.MiddleLeft,
-            };
-            _busyIndicator = new ProgressBar
+            _errorSummary = new BootstrapAlert
             {
                 Dock = DockStyle.Fill,
-                Style = ProgressBarStyle.Marquee,
+                Variant = BootstrapVariant.Danger,
                 Visible = false,
             };
-            LoginButton = new Button
+            _busyIndicator = new BootstrapProgressBar
+            {
+                Dock = DockStyle.Fill,
+                Indeterminate = true,
+                Visible = false,
+            };
+            LoginButton = new BootstrapButton
             {
                 Text = "Đăng nhập",
                 AutoSize = true,
                 TabIndex = 3,
             };
-            CancelButtonControl = new Button
+            CancelButtonControl = new BootstrapButton
             {
                 Text = "Thoát",
                 AutoSize = true,
@@ -99,15 +99,15 @@ namespace MyDmsVn.Desktop.WinForms
                 Text = "Đăng nhập",
                 Font = new Font(Font, FontStyle.Bold),
                 AutoSize = true,
-            });
-            layout.Controls.Add(new Label { Text = "Tên đăng nhập", AutoSize = true });
-            layout.Controls.Add(UsernameTextBox);
-            layout.Controls.Add(new Label { Text = "Mật khẩu", AutoSize = true });
-            layout.Controls.Add(PasswordTextBox);
-            layout.Controls.Add(_showPassword);
-            layout.Controls.Add(_busyIndicator);
-            layout.Controls.Add(_errorSummary);
-            layout.Controls.Add(buttons);
+            }, 0, 0);
+            layout.Controls.Add(new Label { Text = "Tên đăng nhập", AutoSize = true }, 0, 1);
+            layout.Controls.Add(UsernameTextBox, 0, 2);
+            layout.Controls.Add(new Label { Text = "Mật khẩu", AutoSize = true }, 0, 3);
+            layout.Controls.Add(PasswordTextBox, 0, 4);
+            layout.Controls.Add(_showPassword, 0, 5);
+            layout.Controls.Add(_busyIndicator, 0, 6);
+            layout.Controls.Add(_errorSummary, 0, 7);
+            layout.Controls.Add(buttons, 0, 8);
             Controls.Add(layout);
 
             AcceptButton = LoginButton;
@@ -120,13 +120,13 @@ namespace MyDmsVn.Desktop.WinForms
             ApplyViewModelState();
         }
 
-        public TextBox UsernameTextBox { get; }
+        public BootstrapTextBox UsernameTextBox { get; }
 
-        public TextBox PasswordTextBox { get; }
+        public BootstrapTextBox PasswordTextBox { get; }
 
-        public Button LoginButton { get; }
+        public BootstrapButton LoginButton { get; }
 
-        public Button CancelButtonControl { get; }
+        public BootstrapButton CancelButtonControl { get; }
 
         public LoginViewModel ViewModel => _viewModel;
 
@@ -207,10 +207,12 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             _busyIndicator.Visible = _viewModel.IsBusy;
+            LoginButton.Loading = _viewModel.IsBusy;
             LoginButton.Enabled = !_viewModel.IsBusy;
             UsernameTextBox.Enabled = !_viewModel.IsBusy;
             PasswordTextBox.Enabled = !_viewModel.IsBusy;
             _errorSummary.Text = _viewModel.ErrorMessage ?? string.Empty;
+            _errorSummary.Visible = !string.IsNullOrWhiteSpace(_viewModel.ErrorMessage);
         }
     }
 }

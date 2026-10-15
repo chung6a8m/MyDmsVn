@@ -500,6 +500,22 @@
           "Newtonsoft.Json": "[13.0.4, )"
         }
       },
+      "mydmsvn.desktop.application": {
+        "type": "Project",
+        "dependencies": {
+          "CommunityToolkit.Mvvm": "[8.4.2, )",
+          "MyDmsVn.Contracts": "[1.0.0, )"
+        }
+      },
+      "mydmsvn.desktop.infrastructure.local": {
+        "type": "Project",
+        "dependencies": {
+          "MediatR": "[12.5.0, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.2, )",
+          "MyDmsVn.Desktop.Application": "[1.0.0, )",
+          "MyDmsVn.Server.Application": "[1.0.0, )"
+        }
+      },
       "mydmsvn.server.application": {
         "type": "Project",
         "dependencies": {
@@ -560,6 +576,18 @@
         "contentHash": "gwLD2KfCuwQesP17aVh4h6lpiMPEVt5Lbpndo0ej903hNUUTtyxt3ARdDjmuydBRTAUICc7OVKVbaOvc6SQYXA==",
         "dependencies": {
           "System.Memory": "4.6.3"
+        }
+      },
+      "CommunityToolkit.Mvvm": {
+        "type": "CentralTransitive",
+        "requested": "[8.4.2, )",
+        "resolved": "8.4.2",
+        "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg==",
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "10.0.1",
+          "System.ComponentModel.Annotations": "5.0.0",
+          "System.Memory": "4.6.3",
+          "System.Runtime.CompilerServices.Unsafe": "6.1.2"
         }
       },
       "ErrorOr": {
@@ -999,6 +1027,22 @@
           "Newtonsoft.Json": "[13.0.4, )"
         }
       },
+      "mydmsvn.desktop.application": {
+        "type": "Project",
+        "dependencies": {
+          "CommunityToolkit.Mvvm": "[8.4.2, )",
+          "MyDmsVn.Contracts": "[1.0.0, )"
+        }
+      },
+      "mydmsvn.desktop.infrastructure.local": {
+        "type": "Project",
+        "dependencies": {
+          "MediatR": "[12.5.0, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.2, )",
+          "MyDmsVn.Desktop.Application": "[1.0.0, )",
+          "MyDmsVn.Server.Application": "[1.0.0, )"
+        }
+      },
       "mydmsvn.server.application": {
         "type": "Project",
         "dependencies": {
@@ -1057,6 +1101,12 @@
         "requested": "[4.2.0, )",
         "resolved": "4.2.0",
         "contentHash": "gwLD2KfCuwQesP17aVh4h6lpiMPEVt5Lbpndo0ej903hNUUTtyxt3ARdDjmuydBRTAUICc7OVKVbaOvc6SQYXA=="
+      },
+      "CommunityToolkit.Mvvm": {
+        "type": "CentralTransitive",
+        "requested": "[8.4.2, )",
+        "resolved": "8.4.2",
+        "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg=="
       },
       "ErrorOr": {
         "type": "CentralTransitive",
