@@ -6,10 +6,10 @@
 **Date:** 2026-10-16  
 **Goal:** Replace the unused MVP permission subsystem completely with a single configured superuser, code-defined permission catalog and deliberate operator-managed RBAC through UI/import.  
 **Architecture:** One authorization path over current authenticated identity and a code registry. Database stores accounts, role/user assignments, the protected singleton superuser binding and audit, not a synchronized permission catalog. The obsolete subsystem is physically removed.  
-**Tech stack:** Existing C# targets `net48`, `net8.0`, `net8.0-windows` as declared; WinForms, current Application/Contracts/Local adapters, SQL Server, DbUp, explicit UnitOfWork, RepoDb/Dapper and xUnit. No library/framework replacement.  
+**Tech stack:** Active product/test target `net48`; historical product `net8.0`/`net8.0-windows` parked; runner tool-only `net8.0`; WinForms, current Application/Contracts/Local adapters, SQL Server, DbUp, explicit UnitOfWork, RepoDb/Dapper and xUnit. No library/framework replacement.
 **Spec:** [ADR 0007 — Code-defined permissions and a single configured superuser](../adr/0007-code-defined-permissions-and-single-superuser.md).
 
-**Roadmap/TFM prerequisite (2026-10-16):** SEC-REBUILD comes **after** [NET8-PAUSE](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) and [TESTGATE T04/T05](20261016-002-modular-test-projects.md). Both are proposed and **not yet implemented** at this planning revision. The `net48` / `net8.0` matrices and two-target strict SQL commands below describe the original baseline. At actual T00, bind gates to the **real reviewed active target list**: after a verified pause, `net48` is the active SQL/WinForms target, while parked .NET 8 coverage remains historical and must be fully restored/reverified before P7. Do not execute unsupported TFMs, delete their historical logical-case identities or treat them as PASS; preserve strict unfiltered Final on every approved *active* TFM. Net8-only gate tooling may remain as a proven tooling dependency. Until pause implementation is verified, current dual-TFM gates still apply.
+**Roadmap/TFM prerequisite (2026-10-16):** SEC-REBUILD comes after accepted NET8-PAUSE and implemented TESTGATE T04/T05. In the current migration candidate, active SQL/WinForms is `net48`, historical .NET 8 is PARKED/NOT RUN, and the runner is tool-only `net8.0`; NET8-PAUSE T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with duration comparison and merge still open. At SEC-REBUILD T00, bind to the then accepted manifest rather than old dual-target examples. Do not delete historical logical identities or treat parked results as PASS; P7 requires [reviewed reactivation](../REACTIVATE_NET8.md).
 
 ## 1. Execution order, authority and workspace boundary
 
@@ -24,7 +24,7 @@ The required order is:
 
 Read [AGENTS](../../AGENTS.md), the spec, [TESTGATE T01–T03](20261016-001-task-gates-and-modular-tests.md), [TESTGATE T04–T05](20261016-002-modular-test-projects.md), [test policy](../CODEX_TEST_EXECUTION_POLICY.md), [gate matrix](../TEST_GATE_MATRIX.md) and [test strategy](../TEST_STRATEGY.md).
 
-Current repository T01–T03 Task/Final implementation is **verified**; the separate NET8-PAUSE and T04/T05 implementation gates are **not yet satisfied** at this planning revision. This documentation PR does not change application/runtime targets or implement the proposed split/security code. Do not reset/stash/overwrite a developer workspace, guess future runner/project names or move product tests before verified prerequisites.
+TESTGATE T01–T03 is verified; NET8-PAUSE T01–T05 runtime gates pass at `6b0ce337`, while its same-protocol duration comparison and merge remain open; modular T04/T05 also remain unsatisfied prerequisites. This plan does not implement the split/security code. Do not move product tests before the prerequisite evidence is accepted.
 
 The documents may merge before the prerequisite code. Product implementation starts only after T00 verifies the committed/reviewed prerequisite results. Rebase the implementation branch onto that revision, then bind this plan to the actual project/TFM/runner manifest. Missing prerequisites mean **BLOCKED**, not permission to return to the old monolithic test path.
 

@@ -107,6 +107,8 @@ public sealed class ProgramTests
         var options = repository.Options();
 
         Assert.True(TestGateProvenance.Verify(options));
+        Assert.True(TestGateProvenance.VerifyCleanRevision(repository.Root, repository.RevisionValue));
+        Assert.False(TestGateProvenance.VerifyCleanRevision(repository.Root, Revision));
         Assert.False(TestGateProvenance.Verify(options with
         {
             ManifestPath = Path.Combine(repository.Root, "external.json"),
@@ -253,6 +255,7 @@ public sealed class ProgramTests
                     "--project", Path.Combine(root, "tests.csproj"),
                     "--artifacts", Path.Combine(root, "artifacts"),
                     "--approval", Path.Combine(root, "approval.json"),
+                    "--frameworks", "net48",
                 },
                 (options, cancellationToken) =>
                 {
@@ -273,7 +276,7 @@ public sealed class ProgramTests
     }
 
     [Fact]
-    public async Task Pr_acceptance_maps_to_a_single_pass_profile_for_both_tfms()
+    public async Task Pr_acceptance_maps_to_a_single_pass_profile_for_selected_tfms()
     {
         var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ProgramTests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -289,6 +292,7 @@ public sealed class ProgramTests
                     "--artifacts", Path.Combine(root, "artifacts"),
                     "--approval", Path.Combine(root, "approval.json"),
                     "--revision", Revision,
+                    "--frameworks", "net48",
                 },
                 (options, cancellationToken) => throw new InvalidOperationException("Baseline must not run."),
                 (options, cancellationToken) =>
@@ -306,7 +310,74 @@ public sealed class ProgramTests
             Assert.Equal(1, received.MeasuredPasses);
             Assert.Equal("pr-acceptance", received.Mode);
             Assert.Equal(Revision, received.Revision);
-            Assert.Equal(new[] { "net48", "net8.0" }, received.TargetFrameworks);
+            Assert.Equal(new[] { "net48" }, received.TargetFrameworks);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("net9.0")]
+    [InlineData("net48,net48")]
+    [InlineData("net8.0,net48")]
+    public async Task Strict_modes_reject_invalid_framework_arrays_before_runner_creation(string frameworks)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ProgramTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var called = false;
+            var result = await Program.RunAsync(
+                new[]
+                {
+                    "pr-acceptance", "--repo", root, "--project", Path.Combine(root, "tests.csproj"),
+                    "--artifacts", Path.Combine(root, "artifacts"), "--approval", Path.Combine(root, "approval.json"),
+                    "--revision", Revision, "--frameworks", frameworks,
+                },
+                (_, _) => throw new InvalidOperationException(),
+                (_, _) =>
+                {
+                    called = true;
+                    return Task.FromResult(new BenchmarkRunResult(true, Array.Empty<BenchmarkFrameworkRun>()));
+                },
+                CancellationToken.None);
+
+            Assert.Equal(64, result);
+            Assert.False(called);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("net48")]
+    [InlineData("net8.0")]
+    [InlineData("net48,net8.0")]
+    public async Task Strict_modes_accept_supported_active_or_reactivation_framework_order(string frameworks)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MyDmsVn.ProgramTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            BenchmarkRunOptions? received = null;
+            var exit = await Program.RunAsync(new[]
+            {
+                "pr-acceptance", "--repo", root, "--project", Path.Combine(root, "tests.csproj"),
+                "--artifacts", Path.Combine(root, "artifacts"), "--approval", Path.Combine(root, "approval.json"),
+                "--revision", Revision, "--frameworks", frameworks,
+            }, (_, _) => throw new InvalidOperationException(), (options, _) =>
+            {
+                received = options;
+                return Task.FromResult(new BenchmarkRunResult(true, Array.Empty<BenchmarkFrameworkRun>()));
+            }, CancellationToken.None);
+
+            Assert.Equal(0, exit);
+            Assert.Equal(frameworks.Split(','), received!.TargetFrameworks);
         }
         finally
         {

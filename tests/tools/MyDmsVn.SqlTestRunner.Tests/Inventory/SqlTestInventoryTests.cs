@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Inventory;
@@ -339,14 +340,29 @@ public sealed class SqlTestInventoryTests
         var actual = TestMethodInventory.Read(assemblyPath)
             .Select(method => method.FullyQualifiedName)
             .ToHashSet(StringComparer.Ordinal);
-        var assembly = Assembly.LoadFrom(assemblyPath);
-        var expected = assembly.GetTypes()
-            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
-            .Where(method => method.CustomAttributes.Any(attribute =>
-                attribute.AttributeType.Name == "SqlServerFactAttribute"))
-            .Select(method => method.DeclaringType!.FullName + "." + method.Name)
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
+        var context = new AssemblyLoadContext("sql-derived-fact-test-" + Guid.NewGuid().ToString("N"), true);
+        var resolver = new AssemblyDependencyResolver(assemblyPath);
+        context.Resolving += (_, name) =>
+        {
+            var dependency = resolver.ResolveAssemblyToPath(name);
+            return dependency is null ? null : context.LoadFromAssemblyPath(dependency);
+        };
+        string[] expected;
+        try
+        {
+            var assembly = context.LoadFromAssemblyPath(assemblyPath);
+            expected = assembly.GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
+                .Where(method => method.CustomAttributes.Any(attribute =>
+                    attribute.AttributeType.Name == "SqlServerFactAttribute"))
+                .Select(method => method.DeclaringType!.FullName + "." + method.Name)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
+        }
+        finally
+        {
+            context.Unload();
+        }
 
         Assert.NotEmpty(expected);
         Assert.DoesNotContain(expected, method => !actual.Contains(method));

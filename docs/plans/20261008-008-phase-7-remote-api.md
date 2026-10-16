@@ -1,6 +1,6 @@
 # P7 — ASP.NET Core 8 HTTP API and adapter parity
 
-Status: **Not started; final item in the ordered active roadmap.** Depends on the [remaining P5 acceptance and P6 release plan](20261016-004-remaining-p5-acceptance-and-p6-hardening.md), completed SEC-REBUILD, and **re-activation/verification of the .NET 8 application TFM** if [NET8-PAUSE](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) has been implemented. This plan still proposes a `net8.0` Server.Api; temporary pause does not cancel that requirement. Read ADR 0001, `docs/CONTRACTS.md`, `docs/SECURITY.md`.
+Status: **Not started; final item in the ordered active roadmap.** Depends on remaining P5/P6, completed SEC-REBUILD, and successful execution of the reviewed [.NET 8 reactivation procedure](../REACTIVATE_NET8.md) (or a separately approved alternate framework plan). The parked application graph cannot host the proposed `net8.0` Server.Api, and tool-only runner net8 is not evidence of readiness.
 
 ## Test execution for not-yet-started P7 (Codex policy, 2026-10-15)
 
@@ -8,7 +8,7 @@ Apply [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md) to **P7-T
 
 - **L1:** prefer focused Application/DTO, status/JSON mapping, token/session and `HttpApiClient` tests while editing. No SQL for purely in-memory mapping.
 - **L2:** exercise ASP.NET Core endpoint/adapter integration and approved real SQL for permissions, identity, transactions, migration compatibility and concurrency as applicable. Choose focused `FastSQL`, `MigrationSchema`, `SecurityProvisioning` or `SqlConcurrency` by actual test responsibility, not by speed. Include negative 401/403, revoked permission, bearer/session expiry and Local-versus-HTTP parity cases.
-- **L3:** after the final gate-affecting change (including tests/theory rows, SQL/migrations, inventories/manifests, harness/runner and build/CI inputs), run relevant Release builds and full regressions across supported TFMs, including **unfiltered `net48` and `net8.0` SQL** with mandatory inventory/TRX, approval, watchdog, ownership and zero required skips. No single-pass strict SQL PR runner exists; filtered categories or plain `dotnet test` alone are not equivalent. If a mandatory gate is unavailable, report `Blocked/Not verified`.
+- **L3:** after reactivation and the final gate-affecting change, run relevant Release builds/full regressions across restored TFMs, including manifest-owned unfiltered `net48` and `net8.0` SQL with inventory/TRX, approval, watchdog, ownership and zero required skips. Filtered categories or plain `dotnet test` are not equivalent. If a mandatory gate is unavailable, report `Blocked/Not verified`.
 - **L4:** provide plan-specific remote package/API security, SQL credential exclusion and compatibility evidence separately. PR Test Execution Reports must show actual commands/results and any manual or environmental blockers; this text does not claim that the future P7 host is implemented.
 
 ## Objective

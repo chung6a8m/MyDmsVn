@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
@@ -9,7 +10,7 @@ namespace MyDmsVn.SqlTestRunner.Tests;
 public sealed class TestProjectBuildContractTests
 {
     [Fact]
-    public void Runner_test_project_prepares_both_inventory_tfms_from_a_clean_checkout()
+    public void Runner_test_project_prepares_only_the_active_sql_tfm_from_a_clean_checkout()
     {
         var projectPath = Path.Combine(
             RepositoryRoot(),
@@ -20,17 +21,73 @@ public sealed class TestProjectBuildContractTests
         var document = XDocument.Load(projectPath);
         var invocations = document.Descendants("MSBuild").ToArray();
 
-        Assert.Contains(document.Descendants("Exec"), element =>
-            ((string?)element.Attribute("Command"))?.Contains("dotnet restore", StringComparison.Ordinal) == true &&
-            ((string?)element.Attribute("Command"))?.Contains(
-                "MyDmsVn.Server.Infrastructure.IntegrationTests.csproj",
-                StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(document.Descendants("Exec"), element =>
+            ((string?)element.Attribute("Command"))?.Contains("dotnet restore", StringComparison.Ordinal) == true);
         Assert.Contains(invocations, element =>
             ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true);
-        Assert.Contains(invocations, element =>
+        Assert.Equal(2, invocations.Count(element =>
             ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
+            ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true));
+        Assert.DoesNotContain(invocations, element =>
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net8.0", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public void Candidate_projects_declare_the_reviewed_active_frameworks()
+    {
+        var expected = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["src/MyDmsVn.Contracts/MyDmsVn.Contracts.csproj"] = "net48",
+            ["src/MyDmsVn.SharedKernel/MyDmsVn.SharedKernel.csproj"] = "net48",
+            ["src/MyDmsVn.Server.Domain/MyDmsVn.Server.Domain.csproj"] = "net48",
+            ["src/MyDmsVn.Server.Application/MyDmsVn.Server.Application.csproj"] = "net48",
+            ["src/MyDmsVn.Server.Infrastructure/MyDmsVn.Server.Infrastructure.csproj"] = "net48",
+            ["src/MyDmsVn.Server.DbMigrator/MyDmsVn.Server.DbMigrator.csproj"] = "net48",
+            ["src/MyDmsVn.Desktop.Application/MyDmsVn.Desktop.Application.csproj"] = "net48",
+            ["src/MyDmsVn.Desktop.Infrastructure.Local/MyDmsVn.Desktop.Infrastructure.Local.csproj"] = "net48",
+            ["src/MyDmsVn.Desktop.WinForms/MyDmsVn.Desktop.WinForms.csproj"] = "net48",
+            ["src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj"] = "net48",
+            ["tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj"] = "net48",
+            ["tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj"] = "net48",
+            ["tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj"] = "net48",
+            ["tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj"] = "net48",
+            ["tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj"] = "net48",
+            ["tests/MyDmsVn.SqlTestHarness/MyDmsVn.SqlTestHarness.csproj"] = "netstandard2.0",
+            ["tests/tools/MyDmsVn.SqlTestRunner/MyDmsVn.SqlTestRunner.csproj"] = "net8.0",
+            ["tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj"] = "net8.0",
+        };
+
+        foreach (var item in expected)
+        {
+            var project = XDocument.Load(Path.Combine(
+                RepositoryRoot(),
+                item.Key.Replace('/', Path.DirectorySeparatorChar)));
+            var declared = project.Descendants()
+                .Where(element => element.Name.LocalName is "TargetFramework" or "TargetFrameworks")
+                .SelectMany(element => element.Value.Split(';'))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+
+            Assert.Equal(new[] { item.Value }, declared);
+        }
+    }
+
+    [Fact]
+    public void Candidate_solution_and_release_matrix_park_the_modern_host()
+    {
+        var root = RepositoryRoot();
+        var solution = File.ReadAllText(Path.Combine(root, "MyDmsVn.sln"));
+        var release = File.ReadAllText(Path.Combine(root, "deployment", "release", "Publish-LocalRelease.ps1"));
+
+        Assert.DoesNotContain("MyDmsVn.Desktop.AppCore", solution, StringComparison.Ordinal);
+        Assert.DoesNotContain("MyDmsVn.Desktop.AppCore", release, StringComparison.Ordinal);
+        Assert.DoesNotContain("net8.0-windows", release, StringComparison.Ordinal);
+        Assert.Contains("MyDmsVn.Desktop.App.csproj", release, StringComparison.Ordinal);
+        Assert.Contains("MyDmsVn.Server.DbMigrator.csproj", release, StringComparison.Ordinal);
+        Assert.True(
+            release.Split("'-f', 'net48'", StringSplitOptions.None).Length >= 3,
+            "Both the desktop host and admin migrator must publish net48.");
     }
 
     private static string RepositoryRoot()

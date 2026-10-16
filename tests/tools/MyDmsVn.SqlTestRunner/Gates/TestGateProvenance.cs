@@ -29,20 +29,35 @@ internal static class TestGateProvenance
                 return false;
             }
 
+            var trackedManifest = Git(root, "ls-files", "--error-unmatch", "--", ReviewedManifest);
+            return VerifyCleanRevision(root, options.Revision) && trackedManifest.ExitCode == 0;
+        }
+        catch (Exception exception) when (
+            exception is IOException ||
+            exception is UnauthorizedAccessException ||
+            exception is InvalidOperationException ||
+            exception is System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    public static bool VerifyCleanRevision(string repositoryRoot, string revision)
+    {
+        if (string.IsNullOrWhiteSpace(revision)) return false;
+        try
+        {
+            var root = Path.GetFullPath(repositoryRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var topLevel = Git(root, "rev-parse", "--show-toplevel");
             var head = Git(root, "rev-parse", "HEAD");
             var status = Git(root, "status", "--porcelain", "--untracked-files=all");
-            var trackedManifest = Git(root, "ls-files", "--error-unmatch", "--", ReviewedManifest);
             return topLevel.ExitCode == 0 &&
-                   string.Equals(
-                       Path.GetFullPath(topLevel.Output.Trim()),
-                       root,
-                       StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(Path.GetFullPath(topLevel.Output.Trim()), root, StringComparison.OrdinalIgnoreCase) &&
                    head.ExitCode == 0 &&
-                   string.Equals(head.Output.Trim(), options.Revision, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(head.Output.Trim(), revision, StringComparison.OrdinalIgnoreCase) &&
                    status.ExitCode == 0 &&
-                   string.IsNullOrWhiteSpace(status.Output) &&
-                   trackedManifest.ExitCode == 0;
+                   string.IsNullOrWhiteSpace(status.Output);
         }
         catch (Exception exception) when (
             exception is IOException ||

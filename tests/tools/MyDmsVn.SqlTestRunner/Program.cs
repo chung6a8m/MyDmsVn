@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestHarness;
@@ -67,6 +68,11 @@ internal static class Program
             return await RunFocusedAsync(ParseOptions(args), cancellationToken).ConfigureAwait(false);
         }
 
+        if (string.Equals(args[0], "gui-acceptance", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunGuiAcceptanceAsync(ParseOptions(args), cancellationToken).ConfigureAwait(false);
+        }
+
         if (string.Equals(args[0], "test-gate", StringComparison.Ordinal))
         {
             if (!TryParseTestGateOptions(args, out var testGateOptions))
@@ -111,6 +117,8 @@ internal static class Program
             !values.TryGetValue("project", out var project) ||
             !values.TryGetValue("artifacts", out var artifacts) ||
             !values.TryGetValue("approval", out var approval) ||
+            !values.TryGetValue("frameworks", out var frameworkValue) ||
+            !TryParseFrameworks(frameworkValue, out var frameworks) ||
             (isAcceptance &&
              (!values.TryGetValue("revision", out var revision) ||
               !RevisionPattern.IsMatch(revision))))
@@ -127,7 +135,7 @@ internal static class Program
                     Path.GetFullPath(project),
                     Path.GetFullPath(artifacts),
                     Path.GetFullPath(approval),
-                    new[] { "net48", "net8.0" },
+                    frameworks,
                     TimeSpan.FromMinutes(30),
                     WarmupPasses: isAcceptance ? 0 : 1,
                     MeasuredPasses: isAcceptance ? 1 : 3,
@@ -156,6 +164,11 @@ internal static class Program
             return 64;
         }
 
+        if (!TryParseFrameworks(values["frameworks"], out var frameworks))
+        {
+            return 64;
+        }
+
         Environment.SetEnvironmentVariable(SqlTestHarnessEnvironment.ApprovalFileVariable, values["approval"]);
         Directory.CreateDirectory(values["artifacts"]);
         using var runner = new OwnedProcessRunner();
@@ -165,7 +178,7 @@ internal static class Program
             Path.GetFullPath(values["artifacts"]),
             Path.GetFullPath(values["approval"]),
             values["category"],
-            values["frameworks"].Split(',', StringSplitOptions.RemoveEmptyEntries),
+            frameworks,
             TimeSpan.FromMinutes(30),
             TimeSpan.FromHours(1));
         var guarded = await new SqlExecutionLeaseGuard().RunAsync(
@@ -177,6 +190,62 @@ internal static class Program
             result => !result.RecoveryRequired,
             cancellationToken).ConfigureAwait(false);
         return guarded.Acquired && guarded.Result.IsComplete ? 0 : 3;
+    }
+
+    private static async Task<int> RunGuiAcceptanceAsync(
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken)
+    {
+        var required = new[] { "repo", "project", "artifacts", "framework", "revision", "timeout-seconds" };
+        if (required.Any(key => !values.ContainsKey(key)) ||
+            !string.Equals(values["framework"], "net48", StringComparison.Ordinal) ||
+            !RevisionPattern.IsMatch(values["revision"]) ||
+            !int.TryParse(values["timeout-seconds"], out var timeoutSeconds) || timeoutSeconds <= 0)
+        {
+            return 64;
+        }
+
+        var repositoryRoot = Path.GetFullPath(values["repo"]);
+        if (!TestGateProvenance.VerifyCleanRevision(repositoryRoot, values["revision"])) return 3;
+        var manifestPath = Path.Combine(repositoryRoot, "tests", "test-gates.v1.json");
+        TestFrameworkProfile? profile;
+        try { profile = TestGateManifestLoader.Load(manifestPath).FrameworkProfile; }
+        catch (InvalidDataException) { return 64; }
+        if (profile is null) return 64;
+
+        var projectPath = Path.IsPathRooted(values["project"])
+            ? Path.GetFullPath(values["project"])
+            : Path.GetFullPath(Path.Combine(repositoryRoot, values["project"]));
+        var options = new GuiTestAcceptanceOptions(
+            repositoryRoot, projectPath, values["framework"],
+            Path.GetFullPath(values["artifacts"]), TimeSpan.FromSeconds(timeoutSeconds), values["revision"])
+        {
+            ApprovedProjectPath = Path.GetFullPath(Path.Combine(repositoryRoot,
+                profile.GuiProject.Replace('/', Path.DirectorySeparatorChar))),
+            ApprovedFrameworks = profile.ActiveGuiFrameworks,
+        };
+        using var runner = new GuiOwnedProcessRunner();
+        var result = await new GuiTestAcceptanceCoordinator(
+            runner, new GuiTestSourceInventory(), new GuiProcessSafetyProbe(), new GlobalGuiExecutionLease())
+            .RunAsync(options, cancellationToken).ConfigureAwait(false);
+        if (!result.IsComplete) return 3;
+
+        var report = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            revision = options.Revision,
+            framework = options.Framework,
+            project = result.Project,
+            sourceMethods = result.SourceMethods,
+            discoveredCases = result.DiscoveredCases,
+            executedCases = result.ExecutedCases,
+            durationMilliseconds = result.Duration.TotalMilliseconds,
+            watchdogClean = true,
+            guiLeaseClean = true,
+        });
+        await File.WriteAllTextAsync(Path.Combine(options.ArtifactRoot, "desktop-d2.sanitized.json"), report, cancellationToken)
+            .ConfigureAwait(false);
+        return 0;
     }
 
     private static async Task<BenchmarkRunResult> RunBaselineAsync(
@@ -306,5 +375,27 @@ internal static class Program
         }
 
         return values;
+    }
+
+    private static bool TryParseFrameworks(string value, out IReadOnlyList<string> frameworks)
+    {
+        frameworks = Array.Empty<string>();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var parsed = value.Split(',', StringSplitOptions.None);
+        var supported = new[] { "net48", "net8.0" };
+        if (parsed.Any(string.IsNullOrWhiteSpace) ||
+            parsed.Any(item => !supported.Contains(item, StringComparer.Ordinal)) ||
+            parsed.Distinct(StringComparer.Ordinal).Count() != parsed.Length ||
+            !parsed.SequenceEqual(supported.Where(item => parsed.Contains(item, StringComparer.Ordinal)), StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        frameworks = parsed;
+        return true;
     }
 }

@@ -19,7 +19,8 @@ If documents contradict each other, flag the issue in the change summary; do not
 
 ## Fixed technical decisions
 
-- **Current checked-in source is still dual-target** (`net48`, `net8.0`, `net8.0-windows` as declared). The [temporary .NET 8 pause plan](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) is PROPOSED, NOT IMPLEMENTED; do not assume a TFM was removed until a verified implementation PR changes the project/manifest matrix. No .NET 10 upgrade.
+- **This NET8-PAUSE candidate checkout actively targets `net48` for application, SQL and Desktop projects.** Historical `net8.0` / `net8.0-windows` logical-case metadata is retained as `PARKED / NOT RUN`; `MyDmsVn.Desktop.AppCore` is parked outside the solution. The SQL runner and runner tests remain tool-only `net8.0` and do not count as application/SQL coverage. `main` and unrelated PRs keep their supported matrix until this migration is accepted and merged. See the [temporary .NET 8 pause plan](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md), ADR 0008 and [reactivation procedure](docs/REACTIVATE_NET8.md). No .NET 10 upgrade.
+- NET8-PAUSE T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; same-protocol duration comparison and merge remain open. Do not treat this candidate as the merged `main` matrix.
 - RepoDb `1.16.0`; RepoDb.SqlServer `1.16.1`; RepoDb.SqlServer.BulkOperations `1.16.2`.
 - Explicit UnitOfWork only: scope owns a single open connection and optional transaction; repositories and Dapper queries within that scope share them explicitly. No ambient/static AsyncLocal transaction.
 - RepoDb for command-side storage, Dapper for query-side DTO projection; DbUp for versioned SQL migrations.
@@ -47,7 +48,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 1. Inspect the repo and [ordered active roadmap](docs/plans/README.md); do the first unimplemented prerequisite in sequence. TESTGATE T01–T03 remains **verified context**, not a task to redo. The ordinary dual-TFM SQL gate applies on `main`/unrelated PRs until a verified NET8-PAUSE code PR merges. **Only the specifically approved NET8-PAUSE implementation PR** may use its plan's Stage B candidate-only active-`net48` L3 transition after T01 owner-reviewed baseline/scope authorization, T02 actual TFM change and T03 validated runner/manifest. All other PRs retain their currently declared supported TFMs.
 2. State the scope and affected layers before implementation; avoid changing unrelated modules.
 3. Make a minimal vertical change with automated tests.
-4. Build each **actually declared mandatory project × TFM** on Windows with its targeting packs. Normally that means both `net48` and `net8.0` / `net8.0-windows` until accepted NET8-PAUSE; **Stage B candidate migration** is the sole approved exception for parked TFMs, and must build all active projects plus verified tool-only exceptions.
+4. Build each **actually declared mandatory project × TFM** on Windows with its targeting packs. In this Stage B candidate that means active application/test `net48` plus verified tool-only runner `net8.0`; parked application/GUI TFMs are `NOT RUN`, never PASS. Other branches follow their checked-in declarations.
 5. Run applicable tests. SQL Server integration tests must target an isolated disposable test database, **not production**.
 6. Summarize changed files, tests run and their actual results, remaining risks, and the next roadmap task. Only check off acceptance criteria supported by evidence.
 7. Update plan checkboxes/status when tasks are genuinely complete; record significant deviations in an ADR.
@@ -89,7 +90,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 
 ## Useful starting prompts
 
-- "Follow [the ordered active roadmap](docs/plans/README.md). TESTGATE-T01–T03 is verified context; implement the temporary reversible net8 TFM pause plan next, using task-scoped validation and explicit runner-framework parameters."
+- "Follow [the ordered active roadmap](docs/plans/README.md). Complete NET8-PAUSE T05's frozen envelope after runner authorization fix `5b1813c` before modularization."
 - "After NET8-PAUSE is actually implemented and accepted, implement [TESTGATE-T04/T05 modular test projects](docs/plans/20261016-002-modular-test-projects.md) using the actual target matrix."
 - "After modularization, implement [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md); then complete the [remaining P5 GUI/P6 operational gates](docs/plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md), then P7."
 

@@ -11,6 +11,19 @@ namespace MyDmsVn.SqlTestRunner.Tests.Inventory;
 
 public sealed class LogicalCaseIdentityTests
 {
+    [Theory]
+    [InlineData("src/App/Case.cs", true)]
+    [InlineData("tests/App.Tests/Case.cs", true)]
+    [InlineData(".superpowers/sdd/probe.cs", false)]
+    [InlineData(".sqlperf/private/probe.json", false)]
+    [InlineData("artifacts/probe.cs", false)]
+    [InlineData("tests/App.Tests/bin/Release/probe.cs", false)]
+    [InlineData("tests/App.Tests/obj/probe.json", false)]
+    public void Reviewed_source_inventory_excludes_private_and_generated_artifacts(string path, bool expected)
+    {
+        Assert.Equal(expected, TestMethodInventory.IsReviewedRepositoryPath(path));
+    }
+
     [Fact]
     public void Durable_key_ignores_physical_owner_and_classification_order()
     {

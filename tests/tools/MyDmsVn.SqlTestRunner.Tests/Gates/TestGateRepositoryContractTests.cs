@@ -28,6 +28,35 @@ public sealed class TestGateRepositoryContractTests
             manifest.LogicalCases.SelectMany(item => item.Frameworks)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal));
+        var plan = "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8";
+        foreach (var task in Enumerable.Range(1, 5).Select(index => $"NET8-PAUSE-T0{index}"))
+        {
+            Assert.NotEmpty(TestGateManifestValidator.Select(
+                manifest, RepositoryRoot(), TestGateMode.Task, plan, task).Gates);
+        }
+
+        var final = TestGateManifestValidator.Select(
+            manifest, RepositoryRoot(), TestGateMode.Final, plan, "NET8-PAUSE-T05");
+        var sql = Assert.Single(final.Gates, gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance);
+        Assert.Equal(new[] { "net48" }, sql.Frameworks);
+        Assert.Equal(manifest.FrameworkProfile!.SqlProject, sql.Project);
+    }
+
+    [Fact]
+    public void Net8_pause_final_executes_every_required_non_gui_test_project()
+    {
+        var final = TestGateManifestValidator.Select(
+            LoadManifest(), RepositoryRoot(), TestGateMode.Final,
+            "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8", "NET8-PAUSE-T05");
+
+        Assert.Equal(new[]
+        {
+            "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+            "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+            "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+            "tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj",
+        }, final.Gates.Where(gate => gate.StrictMode == TestGateStrictMode.DotnetTest)
+            .Select(gate => gate.Project).OrderBy(value => value, StringComparer.Ordinal));
     }
 
     [Fact]
@@ -105,8 +134,8 @@ public sealed class TestGateRepositoryContractTests
             manifest,
             RepositoryRoot(),
             TestGateMode.Task,
-            "20261016-001",
-            "TESTGATE-T03");
+            "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8",
+            "NET8-PAUSE-T01");
 
     private static bool Audit(TestGateManifest manifest, RepositoryEvidence evidence)
     {
@@ -120,13 +149,17 @@ public sealed class TestGateRepositoryContractTests
                 return false;
             }
 
-            var frameworks = manifest.LogicalCases.Where(item => string.Equals(
+            var historicalFrameworks = manifest.LogicalCases.Where(item => string.Equals(
                     item.OwnerProject,
                     owner,
                     StringComparison.OrdinalIgnoreCase))
                 .SelectMany(item => item.Frameworks)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            var frameworks = manifest.FrameworkProfile is { } profile &&
+                string.Equals(owner, profile.SqlProject, StringComparison.OrdinalIgnoreCase)
+                    ? historicalFrameworks.Intersect(profile.ActiveSqlFrameworks, StringComparer.OrdinalIgnoreCase).ToArray()
+                    : historicalFrameworks;
             foreach (var tfm in frameworks)
             {
                 if (!evidence.Discovery.TryGetValue((owner, tfm), out var discovered))
@@ -204,26 +237,27 @@ public sealed class TestGateRepositoryContractTests
     private static RepositoryEvidence LoadEvidence()
     {
         var root = RepositoryRoot();
-        const string runner = "tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj";
-        const string integration = "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj";
-        var source = new Dictionary<string, IReadOnlyList<TestMethodDescriptor>>(StringComparer.OrdinalIgnoreCase)
+        var manifest = LoadManifest();
+        var source = new Dictionary<string, IReadOnlyList<TestMethodDescriptor>>(StringComparer.OrdinalIgnoreCase);
+        var discovery = new Dictionary<(string Owner, string Tfm), IReadOnlyList<DiscoveredTestCase>>();
+        foreach (var owner in manifest.LogicalCases.Select(item => item.OwnerProject)
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            [runner] = TestMethodInventory.Read(typeof(TestGateRepositoryContractTests).Assembly.Location),
-            [integration] = TestMethodInventory.Read(Path.Combine(
-                root,
-                "tests",
-                "MyDmsVn.Server.Infrastructure.IntegrationTests",
-                "bin",
-                "Release",
-                "net8.0",
-                "MyDmsVn.Server.Infrastructure.IntegrationTests.dll")),
-        };
-        var discovery = new Dictionary<(string Owner, string Tfm), IReadOnlyList<DiscoveredTestCase>>
-        {
-            [(runner, "net8.0")] = Discover(root, runner, "net8.0"),
-            [(integration, "net48")] = Discover(root, integration, "net48"),
-            [(integration, "net8.0")] = Discover(root, integration, "net8.0"),
-        };
+            var historical = manifest.LogicalCases.Where(item => string.Equals(item.OwnerProject, owner, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(item => item.Frameworks).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var frameworks = manifest.FrameworkProfile is { } profile &&
+                string.Equals(owner, profile.SqlProject, StringComparison.OrdinalIgnoreCase)
+                    ? profile.ActiveSqlFrameworks
+                    : historical;
+            var assembly = Path.Combine(root, Path.GetDirectoryName(owner)!, "bin", "Release", frameworks[0],
+                Path.GetFileNameWithoutExtension(owner) + ".dll");
+            source[owner] = TestMethodInventory.Read(assembly);
+            foreach (var framework in frameworks)
+            {
+                discovery[(owner, framework)] = Discover(root, owner, framework);
+            }
+        }
+
         return new RepositoryEvidence(source, discovery);
     }
 

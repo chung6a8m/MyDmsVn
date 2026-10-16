@@ -10,7 +10,11 @@ param(
     [string] $ArtifactRoot,
 
     [Parameter(Mandatory = $true)]
-    [string] $ApprovalFile
+    [string] $ApprovalFile,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string[]] $Frameworks
 )
 
 $workingTree = & git -C $RepositoryRoot status --porcelain
@@ -34,5 +38,6 @@ $runnerProject = Join-Path $PSScriptRoot 'MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestR
     --project $TestProject `
     --artifacts $ArtifactRoot `
     --approval $ApprovalFile `
-    --revision $revision
+    --revision $revision `
+    --frameworks ($Frameworks -join ',')
 exit $LASTEXITCODE

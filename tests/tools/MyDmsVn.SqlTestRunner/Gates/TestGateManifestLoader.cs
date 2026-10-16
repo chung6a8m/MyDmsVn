@@ -65,8 +65,29 @@ public static class TestGateManifestLoader
             gates,
             logicalCases,
             mappings,
-            exemptions);
+            exemptions)
+        {
+            FrameworkProfile = document.FrameworkProfile is null
+                ? null
+                : ToFrameworkProfile(document.FrameworkProfile),
+        };
     }
+
+    private static TestFrameworkProfile ToFrameworkProfile(FrameworkProfileDocument value) => new(
+        Required(value.ProfileId, "frameworkProfile.profileId"),
+        Required(value.PlanId, "frameworkProfile.planId"),
+        Required(value.SqlProject, "frameworkProfile.sqlProject"),
+        RequiredStrings(value.ActiveSqlFrameworks, "frameworkProfile.activeSqlFrameworks"),
+        RequiredStrings(value.HistoricalSqlFrameworks, "frameworkProfile.historicalSqlFrameworks"),
+        Required(value.GuiProject, "frameworkProfile.guiProject"),
+        RequiredStrings(value.ActiveGuiFrameworks, "frameworkProfile.activeGuiFrameworks"),
+        RequiredStrings(value.HistoricalGuiFrameworks, "frameworkProfile.historicalGuiFrameworks"),
+        Required(value.ToolOnlyProjects, "frameworkProfile.toolOnlyProjects")
+            .Select(project => new TestFrameworkProject(
+                Required(project.Project, "frameworkProfile.toolOnlyProjects.project"),
+                RequiredStrings(project.Frameworks, "frameworkProfile.toolOnlyProjects.frameworks")))
+            .ToArray(),
+        Positive(value.MinimumHistoricalSqlLogicalCases, "frameworkProfile.minimumHistoricalSqlLogicalCases"));
 
     private static TestGateDefinition ToGate(GateDocument value)
     {
@@ -194,6 +215,28 @@ public static class TestGateManifestLoader
 
         [JsonRequired]
         public ExemptionDocument[]? Exemptions { get; set; }
+
+        public FrameworkProfileDocument? FrameworkProfile { get; set; }
+    }
+
+    private sealed class FrameworkProfileDocument
+    {
+        [JsonRequired] public string? ProfileId { get; set; }
+        [JsonRequired] public string? PlanId { get; set; }
+        [JsonRequired] public string? SqlProject { get; set; }
+        [JsonRequired] public string[]? ActiveSqlFrameworks { get; set; }
+        [JsonRequired] public string[]? HistoricalSqlFrameworks { get; set; }
+        [JsonRequired] public string? GuiProject { get; set; }
+        [JsonRequired] public string[]? ActiveGuiFrameworks { get; set; }
+        [JsonRequired] public string[]? HistoricalGuiFrameworks { get; set; }
+        [JsonRequired] public FrameworkProjectDocument[]? ToolOnlyProjects { get; set; }
+        [JsonRequired] public int MinimumHistoricalSqlLogicalCases { get; set; }
+    }
+
+    private sealed class FrameworkProjectDocument
+    {
+        [JsonRequired] public string? Project { get; set; }
+        [JsonRequired] public string[]? Frameworks { get; set; }
     }
 
     private sealed class GateDocument

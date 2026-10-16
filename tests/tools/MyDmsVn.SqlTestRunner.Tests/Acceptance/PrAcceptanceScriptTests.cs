@@ -16,7 +16,21 @@ public sealed class PrAcceptanceScriptTests
         Assert.Contains("git -C $RepositoryRoot rev-parse HEAD", script, StringComparison.Ordinal);
         Assert.Contains("pr-acceptance", script, StringComparison.Ordinal);
         Assert.Contains("--revision $revision", script, StringComparison.Ordinal);
+        Assert.Contains("[string[]] $Frameworks", script, StringComparison.Ordinal);
+        Assert.Contains("--frameworks ($Frameworks -join ',')", script, StringComparison.Ordinal);
         Assert.DoesNotContain("baseline", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Strict_wrappers_require_and_forward_reviewed_framework_arrays()
+    {
+        var root = RepositoryRoot();
+        foreach (var name in new[] { "Invoke-SqlPrAcceptance.ps1", "Invoke-SqlIntegrationBenchmark.ps1" })
+        {
+            var script = File.ReadAllText(Path.Combine(root, "tests", "tools", name));
+            Assert.Contains("[string[]] $Frameworks", script, StringComparison.Ordinal);
+            Assert.Contains("--frameworks ($Frameworks -join ',')", script, StringComparison.Ordinal);
+        }
     }
 
     private static string RepositoryRoot()

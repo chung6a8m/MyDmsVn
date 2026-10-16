@@ -41,6 +41,12 @@ public static class TestGateManifestValidator
             throw new InvalidDataException("The requested test-gate identity has no reviewed gates.");
         }
 
+        if (manifest.FrameworkProfile is { } selectedProfile &&
+            string.Equals(selectedProfile.PlanId, planId, StringComparison.Ordinal))
+        {
+            ValidateFrameworkProfile(manifest, selectedProfile, planId);
+        }
+
         foreach (var gate in gates)
         {
             ValidateGate(root, gate);
@@ -56,13 +62,16 @@ public static class TestGateManifestValidator
 
         if (mode == TestGateMode.Final)
         {
-            ValidateFinalSqlContract(gates);
+            ValidateFinalSqlContract(manifest, gates, planId);
         }
 
         return new TestGateSelection(mode, planId, taskId, gates);
     }
 
-    private static void ValidateFinalSqlContract(IReadOnlyCollection<TestGateDefinition> gates)
+    private static void ValidateFinalSqlContract(
+        TestGateManifest manifest,
+        IReadOnlyCollection<TestGateDefinition> gates,
+        string planId)
     {
         var sqlGates = gates.Where(gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
             .ToArray();
@@ -74,8 +83,18 @@ public static class TestGateManifestValidator
             TestGateEvidenceKind.SanitizedReport,
             TestGateEvidenceKind.Ownership,
         };
+        var expectedFrameworks = (IReadOnlyList<string>)new[] { "net48", "net8.0" };
+        if (manifest.FrameworkProfile is { } profile &&
+            string.Equals(profile.PlanId, planId, StringComparison.Ordinal))
+        {
+            expectedFrameworks = profile.ActiveSqlFrameworks;
+        }
+
         if (sqlGates.Length != 1 ||
-            !sqlGates[0].Frameworks.SequenceEqual(new[] { "net48", "net8.0" }, StringComparer.Ordinal) ||
+            !sqlGates[0].Frameworks.SequenceEqual(expectedFrameworks, StringComparer.Ordinal) ||
+            (manifest.FrameworkProfile is { } activeProfile &&
+             string.Equals(activeProfile.PlanId, planId, StringComparison.Ordinal) &&
+             !string.Equals(sqlGates[0].Project, activeProfile.SqlProject, StringComparison.Ordinal)) ||
             sqlGates[0].Selection.Kind != TestGateSelectionKind.UnfilteredProject ||
             sqlGates[0].Selection.Patterns.Count != 0 ||
             sqlGates[0].Resources.Sql != TestGateResourceRequirement.RequiredExclusive ||
@@ -83,7 +102,35 @@ public static class TestGateManifestValidator
             requiredEvidence.Any(kind => !sqlGates[0].Evidence.Contains(kind)))
         {
             throw new InvalidDataException(
-                "Final requires one reviewed unfiltered exclusive SQL acceptance gate for net48 and net8.0.");
+                "Final requires one reviewed unfiltered exclusive SQL acceptance gate for the active framework profile.");
+        }
+    }
+
+    private static void ValidateFrameworkProfile(
+        TestGateManifest manifest,
+        TestFrameworkProfile profile,
+        string planId)
+    {
+        if (string.IsNullOrWhiteSpace(profile.ProfileId) ||
+            !string.Equals(profile.PlanId, planId, StringComparison.Ordinal) ||
+            profile.ActiveSqlFrameworks.Count == 0 ||
+            profile.ActiveGuiFrameworks.Count == 0 ||
+            profile.MinimumHistoricalSqlLogicalCases <= 0 ||
+            profile.ActiveSqlFrameworks.Any(tfm => !profile.HistoricalSqlFrameworks.Contains(tfm, StringComparer.Ordinal)) ||
+            profile.ActiveGuiFrameworks.Any(tfm => !profile.HistoricalGuiFrameworks.Contains(tfm, StringComparer.Ordinal)) ||
+            profile.ToolOnlyProjects.Any(project =>
+                string.Equals(project.Project, profile.SqlProject, StringComparison.Ordinal) ||
+                string.Equals(project.Project, profile.GuiProject, StringComparison.Ordinal)))
+        {
+            throw new InvalidDataException("The reviewed active/historical framework profile is invalid.");
+        }
+
+        var historicalSqlCases = manifest.LogicalCases.Count(item =>
+            string.Equals(item.OwnerProject, profile.SqlProject, StringComparison.Ordinal) &&
+            profile.HistoricalSqlFrameworks.All(tfm => item.Frameworks.Contains(tfm, StringComparer.Ordinal)));
+        if (historicalSqlCases < profile.MinimumHistoricalSqlLogicalCases)
+        {
+            throw new InvalidDataException("The historical SQL logical-case inventory shrank below its reviewed floor.");
         }
     }
 

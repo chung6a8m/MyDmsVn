@@ -19,8 +19,7 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $net48Directory = Join-Path $OutputRoot 'desktop-net48-win-x86'
-$net8Directory = Join-Path $OutputRoot 'desktop-net8-win-x64'
-$adminDirectory = Join-Path $OutputRoot 'admin-migrator-net8-win-x64'
+$adminDirectory = Join-Path $OutputRoot 'admin-migrator-net48-win-x86'
 $manifestPath = Join-Path $OutputRoot 'release-manifest.json'
 
 function Invoke-DotNet {
@@ -144,13 +143,9 @@ if (-not $SkipPublish) {
             '-c', 'Release', '-f', 'net48', '--no-restore', '--nologo',
             '-p:PlatformTarget=x86', "-p:Version=$Version", '-o', $net48Directory)
         Invoke-DotNet @(
-            'publish', 'src/MyDmsVn.Desktop.AppCore/MyDmsVn.Desktop.AppCore.csproj',
-            '-c', 'Release', '-f', 'net8.0-windows', '--no-restore', '--nologo',
-            '-p:PlatformTarget=x64', "-p:Version=$Version", '-o', $net8Directory)
-        Invoke-DotNet @(
             'publish', 'src/MyDmsVn.Server.DbMigrator/MyDmsVn.Server.DbMigrator.csproj',
-            '-c', 'Release', '-f', 'net8.0', '--no-restore', '--nologo',
-            '-p:PlatformTarget=x64', "-p:Version=$Version", '-o', $adminDirectory)
+            '-c', 'Release', '-f', 'net48', '--no-restore', '--nologo',
+            '-p:PlatformTarget=x86', "-p:Version=$Version", '-o', $adminDirectory)
     }
     finally {
         Pop-Location
@@ -160,14 +155,13 @@ elseif (Test-Path -LiteralPath $manifestPath) {
     Remove-Item -LiteralPath $manifestPath -Force
 }
 
-foreach ($directory in @($net48Directory, $net8Directory, $adminDirectory)) {
+foreach ($directory in @($net48Directory, $adminDirectory)) {
     if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
         throw "Release.PackageMissing: expected directory '$directory'."
     }
 }
 
 Assert-DesktopArtifactSafe $net48Directory
-Assert-DesktopArtifactSafe $net8Directory
 
 $manifest = [ordered]@{
     product = 'MyDmsVn Local v1'
@@ -190,8 +184,7 @@ $manifest = [ordered]@{
     }
     packages = @(
         (New-PackageManifest 'Desktop .NET Framework 4.8' 'net48' 'win-x86' 'publish-directory' '.NET Framework 4.8' $net48Directory),
-        (New-PackageManifest 'Desktop .NET 8' 'net8.0-windows' 'win-x64' 'framework-dependent' '.NET 8 Desktop Runtime x64' $net8Directory),
-        (New-PackageManifest 'Admin migrator' 'net8.0' 'win-x64' 'framework-dependent-admin-only' '.NET 8 Runtime x64' $adminDirectory)
+        (New-PackageManifest 'Admin migrator' 'net48' 'win-x86' 'publish-directory-admin-only' '.NET Framework 4.8' $adminDirectory)
     )
 }
 

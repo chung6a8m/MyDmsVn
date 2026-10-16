@@ -55,6 +55,29 @@ public sealed class PrAcceptanceRunTests
         Assert.Equal("pr-acceptance", Assert.Single(exporter.Evidence).Mode);
     }
 
+    [Fact]
+    public async Task Direct_profile_rejects_the_single_framework_candidate_exception()
+    {
+        using var fixture = new Fixture();
+        var process = new RecordingProcessRunner();
+        var exporter = new StubAcceptanceReportExporter();
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            process,
+            new StubResultGate(),
+            new StubOwnershipGate(),
+            exporter,
+            new StubClassificationGate());
+
+        var result = await coordinator.RunAsync(
+            fixture.Options with { TargetFrameworks = new[] { "net48" } },
+            CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        Assert.Empty(process.Commands);
+        Assert.Empty(exporter.Evidence);
+    }
+
     [Theory]
     [InlineData(1, 1, "net48,net8.0")]
     [InlineData(0, 2, "net48,net8.0")]

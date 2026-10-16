@@ -50,19 +50,19 @@ This is a plan, not a description of current files. P0 creates the directories/p
 
 | Project | Planned TFM | Depends on |
 |---|---|---|
-| Contracts | `net48;net8.0` or proven `netstandard2.0` | minimal/no app packages |
-| SharedKernel | `net48;net8.0` or proven `netstandard2.0` | minimal |
-| Server.Domain | `net48;net8.0` | SharedKernel |
-| Server.Application | `net48;net8.0` | Domain, Contracts where appropriate |
-| Server.Infrastructure | `net48;net8.0` | Application, Domain, SQL libraries |
-| Server.DbMigrator | `net48;net8.0` if required | DbUp, scripts |
-| Server.Api (P7) | `net8.0` | Application, Infrastructure, Contracts |
-| Desktop.Application | `net48;net8.0` | Contracts |
-| Desktop.Infrastructure.Local | `net48;net8.0` | Desktop.Application, Application |
-| Desktop.Infrastructure.Http (P7) | `net48;net8.0` | Desktop.Application, Contracts |
-| Desktop.WinForms | `net48;net8.0-windows` | Desktop.Application |
+| Contracts | active `net48`; historical `net8.0` parked | minimal/no app packages |
+| SharedKernel | active `net48`; historical `net8.0` parked | minimal |
+| Server.Domain | active `net48`; historical `net8.0` parked | SharedKernel |
+| Server.Application | active `net48`; historical `net8.0` parked | Domain, Contracts where appropriate |
+| Server.Infrastructure | active `net48`; historical `net8.0` parked | Application, Domain, SQL libraries |
+| Server.DbMigrator | active `net48` | DbUp, scripts |
+| Server.Api (P7) | future `net8.0`; blocked on reactivation | Application, Infrastructure, Contracts |
+| Desktop.Application | active `net48`; historical `net8.0` parked | Contracts |
+| Desktop.Infrastructure.Local | active `net48`; historical `net8.0` parked | Desktop.Application, Application |
+| Desktop.Infrastructure.Http (P7) | future; bind after reactivation | Desktop.Application, Contracts |
+| Desktop.WinForms | active `net48`; historical `net8.0-windows` parked | Desktop.Application |
 | Desktop.App | `net48` | UI, local composition, server infra |
-| Desktop.AppCore | `net8.0-windows` | UI, local composition, server infra |
+| Desktop.AppCore | source parked; historical `net8.0-windows` | UI, local composition, server infra |
 
 **Important:** An assembly targeting `net8.0` cannot be referenced by a `net48` host. P0 must verify dependencies/TFMs before committing project skeletons. A test project's targets are chosen based on runner/OS support, not necessarily duplicated blindly.
 

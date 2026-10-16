@@ -11,7 +11,7 @@ namespace MyDmsVn.Desktop.Tests
     public sealed class ReleasePackagingTests
     {
         [Fact]
-        public async Task Manifest_only_mode_hashes_both_hosts_and_separate_admin_package()
+        public async Task Manifest_only_mode_hashes_active_desktop_and_separate_admin_package()
         {
             var fixture = CreateFixture();
             try
@@ -28,7 +28,9 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.Equal(8, manifest["schemaSupport"]!.Value<int>("minimum"));
                 Assert.Equal(8, manifest["schemaSupport"]!.Value<int>("maximum"));
                 Assert.IsType<bool>(manifest["sourceTreeDirty"]!.Value<bool>());
-                Assert.Equal(3, manifest["packages"]!.Count());
+                Assert.Equal(2, manifest["packages"]!.Count());
+                Assert.All(manifest["packages"]!, package =>
+                    Assert.Equal("net48", package.Value<string>("targetFramework")));
                 Assert.All(
                     manifest["packages"]!,
                     package => Assert.All(
@@ -51,7 +53,7 @@ namespace MyDmsVn.Desktop.Tests
             var fixture = CreateFixture();
             try
             {
-                File.WriteAllText(Path.Combine(fixture.Net8Directory, fileName), content);
+                File.WriteAllText(Path.Combine(fixture.DesktopDirectory, fileName), content);
 
                 var result = await RunPackagingScriptAsync(fixture.Root, "1.2.3");
 
@@ -72,15 +74,12 @@ namespace MyDmsVn.Desktop.Tests
                 "MyDmsVn.ReleaseTests",
                 Guid.NewGuid().ToString("N"));
             var net48 = Path.Combine(root, "desktop-net48-win-x86");
-            var net8 = Path.Combine(root, "desktop-net8-win-x64");
-            var admin = Path.Combine(root, "admin-migrator-net8-win-x64");
+            var admin = Path.Combine(root, "admin-migrator-net48-win-x86");
             Directory.CreateDirectory(net48);
-            Directory.CreateDirectory(net8);
             Directory.CreateDirectory(admin);
             File.WriteAllText(Path.Combine(net48, "MyDmsVn.Desktop.App.exe"), "net48-host");
-            File.WriteAllText(Path.Combine(net8, "MyDmsVn.Desktop.AppCore.dll"), "net8-host");
-            File.WriteAllText(Path.Combine(admin, "MyDmsVn.Server.DbMigrator.dll"), "admin-only");
-            return new PackagingFixture(root, net8);
+            File.WriteAllText(Path.Combine(admin, "MyDmsVn.Server.DbMigrator.exe"), "admin-only");
+            return new PackagingFixture(root, net48);
         }
 
         private static async Task<ProcessResult> RunPackagingScriptAsync(
@@ -124,14 +123,14 @@ namespace MyDmsVn.Desktop.Tests
 
         private sealed class PackagingFixture
         {
-            public PackagingFixture(string root, string net8Directory)
+            public PackagingFixture(string root, string desktopDirectory)
             {
                 Root = root;
-                Net8Directory = net8Directory;
+                DesktopDirectory = desktopDirectory;
             }
 
             public string Root { get; }
-            public string Net8Directory { get; }
+            public string DesktopDirectory { get; }
         }
 
         private sealed class ProcessResult
