@@ -23,9 +23,5 @@
       Projects="..\..\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj"
       Targets="Build"
       Properties="Configuration=$(Configuration);TargetFramework=net48" />
-    <MSBuild
-      Projects="..\..\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net8.0" />
   </Target>
 </Project>

@@ -126,18 +126,18 @@ The existing TESTGATE manifest-owned `-Mode Final` must remain the authoritative
 
 ### NET8-PAUSE-T01 — Baseline/authority and target/dependency audit
 
-- [ ] Freeze the starting revision **before changing targets**; enumerate all source/test/vendor/host `.csproj` target declarations, `.sln`, lock/assets, conditional `#if NET8_0`, app outputs and dependency edges. Record the dual-target baseline and independently auditable prior logical-case/test evidence; **obtain/review the owner-approved candidate-only transition scope at T01** (projects, parked AppCore, tool exceptions, historical/active lists). This is the prerequisite for Stage B's narrow cutover acceptance; do not claim historic net8 cases ran on the net48-only candidate revision.
-- [ ] Check which net8-only tools can compile with retargeted references. Resolve the compatibility checkpoint above before code edits; explicitly approve any narrow exception. Include reversibility and the P7 block in an ADR or owner-approved decision record.
-- [ ] Verify T01–T03 Task/Final gate implementation, immutable SQL logical IDs and approval/cleanup safeguards at the actual revision. Do not reimplement these features.
+- [x] Freeze the starting revision **before changing targets**; enumerate all source/test/vendor/host `.csproj` target declarations, `.sln`, lock/assets, conditional `#if NET8_0`, app outputs and dependency edges. Record the dual-target baseline and independently auditable prior logical-case/test evidence; **obtain/review the owner-approved candidate-only transition scope at T01** (projects, parked AppCore, tool exceptions, historical/active lists). This is the prerequisite for Stage B's narrow cutover acceptance; do not claim historic net8 cases ran on the net48-only candidate revision.
+- [x] Check which net8-only tools can compile with retargeted references. Resolve the compatibility checkpoint above before code edits; explicitly approve any narrow exception. Include reversibility and the P7 block in an ADR or owner-approved decision record.
+- [x] Verify T01–T03 Task/Final gate implementation, immutable SQL logical IDs and approval/cleanup safeguards at the actual revision. Do not reimplement these features.
 
 **T01 L2 gate:** static project graph / manifest validation; no SQL test run. Evidence: signed-off target table, dependency diagnosis, agreed exception list, before inventory counts by project × TFM.
 
 ### NET8-PAUSE-T02 — Minimal, reversible project and solution changes
 
-- [ ] **Only after approved T01 candidate scope binding**, for genuine dual-target application/test projects change `TargetFrameworks` to `TargetFramework` `net48` (WinForms: drop `net8.0-windows`). Use **Stage B active-target test rules** for this migration branch; keep source and framework-specific code for restoration, do not delete package/API branches or alter business rules.
-- [ ] Keep the legacy host. Park the **net8-only AppCore** out of the active build/package path using explicit documented solution/release configuration while preserving the project/source. Verify no active net48 project improperly references it.
-- [ ] Fix only independently identified net8-only tool dependencies without weakening inventory verification. Keep `netstandard2.0` harness. Update project/sln/publish scripts **atomically**, including vendor references/locked restore as needed. Do not hide a broken project behind a silent build exclusion.
-- [ ] Confirm `dotnet restore --locked-mode` and Release build of each active project, with the net8 tool host/tests compiled separately if retained; record parked builds as **out of scope**, not passed.
+- [x] **Only after approved T01 candidate scope binding**, for genuine dual-target application/test projects change `TargetFrameworks` to `TargetFramework` `net48` (WinForms: drop `net8.0-windows`). Use **Stage B active-target test rules** for this migration branch; keep source and framework-specific code for restoration, do not delete package/API branches or alter business rules.
+- [x] Keep the legacy host. Park the **net8-only AppCore** out of the active build/package path using explicit documented solution/release configuration while preserving the project/source. Verify no active net48 project improperly references it.
+- [x] Fix only independently identified net8-only tool dependencies without weakening inventory verification. Keep `netstandard2.0` harness. Update project/sln/publish scripts **atomically**, including vendor references/locked restore as needed. Do not hide a broken project behind a silent build exclusion.
+- [x] Confirm `dotnet restore --locked-mode` and Release build of each active project, with the net8 tool host/tests compiled separately if retained; record parked builds as **out of scope**, not passed.
 
 **T02 L2 gate:** Windows locked restore + focused Release builds, compilation/reference-boundary checks. No SQL DDL required. Failure of an essential runner/host compilation is BLOCKED.
 
