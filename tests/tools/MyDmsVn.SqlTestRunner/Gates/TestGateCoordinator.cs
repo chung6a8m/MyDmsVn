@@ -434,6 +434,7 @@ public sealed class TestGateCoordinator
                 options.PlanId + "/" + options.TaskId + "/" + gate.GateId,
                 options.ArtifactRoot,
                 TimeSpan.FromSeconds(gate.CommandTimeoutSeconds),
+                TimeSpan.FromSeconds(gate.CommandTimeoutSeconds),
                 recovery),
             cancellationToken).ConfigureAwait(false);
         if (acquired.Lease is null ||

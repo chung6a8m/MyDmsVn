@@ -23,6 +23,7 @@ public sealed record SqlExecutionLeaseRequest(
     string GateIdentity,
     string PrivateArtifactRoot,
     TimeSpan ResourceTimeout,
+    TimeSpan RecoveryTimeout,
     IAbandonedSqlRunRecovery Recovery);
 
 public sealed record SqlExecutionLeaseAcquireResult(
@@ -51,7 +52,7 @@ public interface ISqlExecutionLeaseFactory
 
 public interface IProcessLivenessProbe
 {
-    bool IsLive(int processId);
+    bool IsLive(int processId, DateTimeOffset leaseStartedAtUtc);
 }
 
 public sealed record SqlExecutionLeaseGuardResult<T>(bool Acquired, T Result);
@@ -90,6 +91,7 @@ public sealed class SqlExecutionLeaseGuard
                 fingerprint,
                 gateIdentity,
                 artifactRoot,
+                timeout,
                 timeout,
                 new BenchmarkAbandonedSqlRunRecovery(approvalFile)),
             cancellationToken).ConfigureAwait(false);
@@ -326,7 +328,7 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
         }
 
         if (record.CompletionState == SqlExecutionLeaseCompletionState.Active &&
-            IsLiveOrUnknown(record.OwningProcessId))
+            IsLiveOrUnknown(record.OwningProcessId, record.StartedAtUtc))
         {
             return SqlExecutionLeaseAcquireStatus.BlockedRecovery;
         }
@@ -334,6 +336,10 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            using var recoveryDeadline = new CancellationTokenSource(request.RecoveryTimeout);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                recoveryDeadline.Token);
             var abandoned = new AbandonedSqlRun(
                 record.ResourceKey,
                 record.OwningProcessId,
@@ -341,10 +347,10 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
                 record.StartedAtUtc,
                 record.PrivateArtifactRoot,
                 record.GateIdentity);
-            var recovered = request.Recovery.ReconcileAsync(abandoned, cancellationToken)
+            var recovered = request.Recovery.ReconcileAsync(abandoned, linked.Token)
                 .GetAwaiter()
                 .GetResult();
-            cancellationToken.ThrowIfCancellationRequested();
+            linked.Token.ThrowIfCancellationRequested();
             if (!recovered)
             {
                 return SqlExecutionLeaseAcquireStatus.BlockedRecovery;
@@ -353,17 +359,21 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
             _store.MarkRecovered(record);
             return SqlExecutionLeaseAcquireStatus.Recovered;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return SqlExecutionLeaseAcquireStatus.Cancelled;
         }
+        catch (OperationCanceledException)
+        {
+            return SqlExecutionLeaseAcquireStatus.BlockedRecovery;
+        }
     }
 
-    private bool IsLiveOrUnknown(int processId)
+    private bool IsLiveOrUnknown(int processId, DateTimeOffset leaseStartedAtUtc)
     {
         try
         {
-            return _processes.IsLive(processId);
+            return _processes.IsLive(processId, leaseStartedAtUtc);
         }
         catch (Exception exception) when (
             exception is InvalidOperationException ||
@@ -417,7 +427,8 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
         if (string.IsNullOrWhiteSpace(request.ApprovedInstanceFingerprint) ||
             string.IsNullOrWhiteSpace(request.GateIdentity) ||
             string.IsNullOrWhiteSpace(request.PrivateArtifactRoot) ||
-            request.ResourceTimeout <= TimeSpan.Zero)
+            request.ResourceTimeout <= TimeSpan.Zero ||
+            request.RecoveryTimeout <= TimeSpan.Zero)
         {
             throw new ArgumentException("A complete positive SQL lease request is required.", nameof(request));
         }
@@ -440,12 +451,13 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
 
 internal sealed class SystemProcessLivenessProbe : IProcessLivenessProbe
 {
-    public bool IsLive(int processId)
+    public bool IsLive(int processId, DateTimeOffset leaseStartedAtUtc)
     {
         try
         {
             using var process = Process.GetProcessById(processId);
-            return !process.HasExited;
+            return !process.HasExited &&
+                new DateTimeOffset(process.StartTime).ToUniversalTime() <= leaseStartedAtUtc;
         }
         catch (ArgumentException)
         {

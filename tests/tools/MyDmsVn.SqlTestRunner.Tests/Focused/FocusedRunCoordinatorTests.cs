@@ -104,6 +104,7 @@ public sealed class FocusedRunCoordinatorTests
             "20261016-001/TESTGATE-T03/Task",
             fixture.Options.ArtifactRoot,
             TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(2),
             new SuccessfulRecovery());
         var first = await leaseFactory.AcquireAsync(firstRequest, CancellationToken.None);
         var process = new RecordingProcessRunner(command =>

@@ -107,6 +107,7 @@ public sealed class SqlExecutionLeaseTests
             "20261016-001/TESTGATE-T03/Final",
             artifactRoot,
             TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(2),
             new SuccessfulRecovery());
         var factory = Factory(store);
         var first = await factory.AcquireAsync(request, CancellationToken.None);
@@ -238,6 +239,64 @@ public sealed class SqlExecutionLeaseTests
     }
 
     [Fact]
+    public async Task Recovery_deadline_cancels_reconciliation_and_preserves_the_unresolved_lease()
+    {
+        using var store = new TemporaryLeaseStore();
+        const string fingerprint = "recovery-deadline";
+        WritePriorLease(store, fingerprint);
+        using var abandoned = Abandon(fingerprint);
+        var stalledRecovery = new UntilCancelledRecovery();
+        var factory = new SqlExecutionLeaseFactory(
+            new FileSqlExecutionLeaseStore(store.Root),
+            new FixedProcessProbe(isLive: false));
+
+        var timedOut = await factory.AcquireAsync(
+            Request(
+                store,
+                fingerprint,
+                recovery: stalledRecovery,
+                recoveryTimeout: TimeSpan.FromMilliseconds(50)),
+            CancellationToken.None);
+        var retry = await factory.AcquireAsync(
+            Request(store, fingerprint, recovery: new SuccessfulRecovery()),
+            CancellationToken.None);
+
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.BlockedRecovery, timedOut.Status);
+        Assert.True(stalledRecovery.ReceivedCancellation);
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.Recovered, retry.Status);
+        retry.Lease!.Complete();
+        await retry.Lease.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Recycled_PID_does_not_block_recovery_for_the_abandoned_owner()
+    {
+        using var store = new TemporaryLeaseStore();
+        var events = new List<string>();
+        const string fingerprint = "recycled-owner-pid";
+        WritePriorLease(
+            store,
+            fingerprint,
+            owningProcessId: Environment.ProcessId,
+            startedAtUtc: DateTimeOffset.UtcNow.AddYears(-50));
+        using var abandoned = Abandon(fingerprint);
+
+        var result = await new SqlExecutionLeaseFactory(
+            new FileSqlExecutionLeaseStore(store.Root),
+            new SystemProcessLivenessProbe()).AcquireAsync(
+                Request(
+                    store,
+                    fingerprint,
+                    recovery: new RecordingRecovery(events, succeeds: true)),
+                CancellationToken.None);
+
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.Recovered, result.Status);
+        Assert.Equal(new[] { "recover" }, events);
+        result.Lease!.Complete();
+        await result.Lease.DisposeAsync();
+    }
+
+    [Fact]
     public async Task Shared_SQL_entry_guard_serializes_operations_for_the_same_approved_instance()
     {
         using var store = new TemporaryLeaseStore();
@@ -336,11 +395,13 @@ public sealed class SqlExecutionLeaseTests
         TemporaryLeaseStore store,
         string fingerprint,
         TimeSpan? timeout = null,
-        IAbandonedSqlRunRecovery? recovery = null) => new SqlExecutionLeaseRequest(
+        IAbandonedSqlRunRecovery? recovery = null,
+        TimeSpan? recoveryTimeout = null) => new SqlExecutionLeaseRequest(
             fingerprint,
             "20261016-001/TESTGATE-T03/Final",
             Path.Combine(store.Root, "private-artifacts"),
             timeout ?? TimeSpan.FromSeconds(2),
+            recoveryTimeout ?? TimeSpan.FromSeconds(2),
             recovery ?? new SuccessfulRecovery());
 
     private static async Task AssertBlockedRecovery(
@@ -379,7 +440,9 @@ public sealed class SqlExecutionLeaseTests
     private static void WritePriorLease(
         TemporaryLeaseStore store,
         string fingerprint,
-        string? resourceKey = null)
+        string? resourceKey = null,
+        int? owningProcessId = null,
+        DateTimeOffset? startedAtUtc = null)
     {
         var artifactRoot = Path.Combine(store.Root, "prior-artifacts");
         Directory.CreateDirectory(artifactRoot);
@@ -387,9 +450,9 @@ public sealed class SqlExecutionLeaseTests
         new FileSqlExecutionLeaseStore(store.Root).Write(new SqlExecutionLeaseRecord(
             1,
             resourceKey ?? expectedKey,
-            12345,
+            owningProcessId ?? 12345,
             Guid.NewGuid().ToString("N"),
-            DateTimeOffset.UtcNow.AddMinutes(-1),
+            startedAtUtc ?? DateTimeOffset.UtcNow.AddMinutes(-1),
             artifactRoot,
             "20261016-001/TESTGATE-T03/Final",
             SqlExecutionLeaseCompletionState.Active),
@@ -453,6 +516,27 @@ public sealed class SqlExecutionLeaseTests
         }
     }
 
+    private sealed class UntilCancelledRecovery : IAbandonedSqlRunRecovery
+    {
+        public bool ReceivedCancellation { get; private set; }
+
+        public async Task<bool> ReconcileAsync(
+            AbandonedSqlRun lease,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return false;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                ReceivedCancellation = true;
+                throw;
+            }
+        }
+    }
+
     private sealed class FixedProcessProbe : IProcessLivenessProbe
     {
         private readonly bool _isLive;
@@ -462,7 +546,7 @@ public sealed class SqlExecutionLeaseTests
             _isLive = isLive;
         }
 
-        public bool IsLive(int processId) => _isLive;
+        public bool IsLive(int processId, DateTimeOffset leaseStartedAtUtc) => _isLive;
     }
 
     private sealed class FixedApproval : ITestGateApprovalReader
