@@ -151,7 +151,7 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.RepositoryAndQueryIntegrationTests.RepoDb_mapping_initialization_is_thread_safe_and_retries_after_failure",
-    "MethodBodyFingerprint": "d7b3a49e21974a753f4bac4fcdad982f7bd5069a65f3f4735ec03fa65bb3cd3b",
+    "MethodBodyFingerprint": "e94e48411ff80db05fe9c477f612faa713032ca73ad43e221d1cca77d0b59ba1",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on active net48 after moving to Foundation.Tests: the method uses pure RepoDb mapping initialization with a fail-once fake; it issues no database DDL/DML."
   },
