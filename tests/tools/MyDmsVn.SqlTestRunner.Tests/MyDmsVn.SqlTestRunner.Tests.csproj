@@ -27,4 +27,10 @@
       Targets="Build"
       Properties="Configuration=$(Configuration);TargetFramework=net48" />
   </Target>
+  <Target Name="BuildDesktopSessionInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.Desktop.Session.Tests\MyDmsVn.Desktop.Session.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
 </Project>

@@ -24,7 +24,7 @@ namespace MyDmsVn.Desktop.Tests
             };
             var messenger = new WeakReferenceMessenger();
             var messages = new List<CatalogChangedMessage>();
-            var recipient = new object();
+            var recipient = messages;
             messenger.Register<CatalogChangedMessage>(recipient, (_, message) => messages.Add(message));
             using (var viewModel = CreateProduct(client, new ControllableDelay(), messenger))
             {
@@ -70,7 +70,7 @@ namespace MyDmsVn.Desktop.Tests
             };
             var messenger = new WeakReferenceMessenger();
             var messages = new List<CatalogChangedMessage>();
-            var recipient = new object();
+            var recipient = messages;
             messenger.Register<CatalogChangedMessage>(recipient, (_, message) => messages.Add(message));
             using (var viewModel = CreateProduct(client, new ControllableDelay(), messenger))
             {
@@ -96,7 +96,7 @@ namespace MyDmsVn.Desktop.Tests
         {
             var messenger = new WeakReferenceMessenger();
             var messages = new List<CatalogChangedMessage>();
-            var recipient = new object();
+            var recipient = messages;
             messenger.Register<CatalogChangedMessage>(recipient, (_, message) => messages.Add(message));
             var dispatcher = new ImmediateUiDispatcher();
             var notifications = new DesktopNotificationCenter();
@@ -140,7 +140,7 @@ namespace MyDmsVn.Desktop.Tests
         {
             var messenger = new WeakReferenceMessenger();
             var messages = new List<CatalogChangedMessage>();
-            var recipient = new object();
+            var recipient = messages;
             messenger.Register<CatalogChangedMessage>(recipient, (_, message) => messages.Add(message));
             var dispatcher = new ImmediateUiDispatcher();
             var notifications = new DesktopNotificationCenter();
@@ -611,7 +611,7 @@ namespace MyDmsVn.Desktop.Tests
             var client = new FakeProductClient { ControlCreateResponse = true };
             var messenger = new WeakReferenceMessenger();
             var messages = new List<CatalogChangedMessage>();
-            var recipient = new object();
+            var recipient = messages;
             messenger.Register<CatalogChangedMessage>(recipient, (_, message) => messages.Add(message));
             var notifications = new DesktopNotificationCenter();
             var viewModel = new ProductCatalogViewModel(
