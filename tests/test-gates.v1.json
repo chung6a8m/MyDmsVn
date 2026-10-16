@@ -311,6 +311,102 @@
       ]
     },
     {
+      "gateId": "net8-pause-t05-final-application",
+      "planId": "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8",
+      "taskId": "NET8-PAUSE-T05",
+      "mode": "Final",
+      "project": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Server.Application",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "UnfilteredProject",
+        "patterns": []
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 900,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "net8-pause-t05-final-harness",
+      "planId": "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8",
+      "taskId": "NET8-PAUSE-T05",
+      "mode": "Final",
+      "project": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "SqlTestHarness",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "UnfilteredProject",
+        "patterns": []
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 900,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "net8-pause-t05-final-architecture",
+      "planId": "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8",
+      "taskId": "NET8-PAUSE-T05",
+      "mode": "Final",
+      "project": "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Architecture",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "UnfilteredProject",
+        "patterns": []
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 900,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
       "gateId": "net8-pause-t05-final-sql",
       "planId": "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8",
       "taskId": "NET8-PAUSE-T05",
@@ -4429,7 +4525,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Acceptance.PrAcceptanceRunTests.Sanitized_export_contains_only_aggregate_counts_and_revision()",
-      "reviewedCodeFingerprint": "e076cc07928ab836ab3aeac962ee64daa10b5db5aba8231c7706ef4b7f8dcc9f",
+      "reviewedCodeFingerprint": "a3244d5fab7887ca4d9ff167688b0b7900c7c021896fb5358cc3df30e38941e1",
       "classification": [
         "NonSql"
       ],
@@ -4615,7 +4711,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Baseline_runs_one_warmup_and_three_measured_passes_in_alternating_tfm_order()",
-      "reviewedCodeFingerprint": "7b895d1829739e2532539869a0d3a9aa171850ce70f121f769630316535430a9",
+      "reviewedCodeFingerprint": "01692df3d3d9a56bf1aa221df977811409fb558ca3c0cbdaa680bfe0010dd38f",
       "classification": [
         "NonSql"
       ],
@@ -4633,7 +4729,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Blocked_preflight_never_launches_a_test_process()",
-      "reviewedCodeFingerprint": "3dc2e701a56fd25bbee0fb1db47fa3711a8c37bcd62a8a70ff224f39118243e5",
+      "reviewedCodeFingerprint": "831fe073716cc8e57c87c24d078b6f99549888771c420b1b0e84b137352fe3c5",
       "classification": [
         "NonSql"
       ],
@@ -4651,7 +4747,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Every_execution_receives_the_isolated_journal_directory()",
-      "reviewedCodeFingerprint": "564d59612e78fa61e6c017295339b9d831cf9f97d0c7d694282a6cd0844ecfd2",
+      "reviewedCodeFingerprint": "d25adff7fbd5ad0947e749d9aab81d47181e9ac9d160d0124bd2953173277b79",
       "classification": [
         "NonSql"
       ],
@@ -4669,7 +4765,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Invalid_classification_on_later_tfm_blocks_before_any_process_launch()",
-      "reviewedCodeFingerprint": "12e2db466813757c8ccf34cc8931546d0f64ee9dd5359c56be34c67a389e30dc",
+      "reviewedCodeFingerprint": "fba6743061f74f44b8d417866a2fdbcaee6d40ffe7cef9ea9e96b6dae88ab305",
       "classification": [
         "NonSql"
       ],
@@ -4687,7 +4783,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Missing_required_report_output_is_incomplete()",
-      "reviewedCodeFingerprint": "d4ffab61bd297ed017ceffbf737675b3c0de72980879fef4d4e5e10324c5a9f5",
+      "reviewedCodeFingerprint": "5f9fe53a6d74739eb1cc999f04e8630e784d5c503d76d5a34991a2cd9f35f0a5",
       "classification": [
         "NonSql"
       ],
@@ -4723,7 +4819,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Overall_deadline_cancels_a_blocked_preflight_and_returns_incomplete()",
-      "reviewedCodeFingerprint": "f3ca86f2069c69a2b82c9ef8646c2f502599ec006b0d0381861e83b0d0cd0562",
+      "reviewedCodeFingerprint": "c7f7e58e1070c8176d56c8787bd2a384b1825a6b0585fcf93c04789450c0c0a6",
       "classification": [
         "NonSql"
       ],
@@ -4741,7 +4837,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Passed_process_with_unresolved_ownership_is_incomplete()",
-      "reviewedCodeFingerprint": "b7bb5aa055cb2d42cf21d89535ea342d574a3765c72d0457bd554359a23b2300",
+      "reviewedCodeFingerprint": "586f4ede8f1cb69113312a58fa95763d2e60998b0eba170dfd797fe67f776ae8",
       "classification": [
         "NonSql"
       ],
@@ -4759,7 +4855,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Required_report_export_failure_is_incomplete()",
-      "reviewedCodeFingerprint": "aa1ddb7a82f4c7128ee29097de6598866a68dcec1ebcc1346be5dab39618337f",
+      "reviewedCodeFingerprint": "68b866a7ed81e44ef2fe022d34548002bcfae922842b58c8d839f7438379d044",
       "classification": [
         "NonSql"
       ],
@@ -4777,7 +4873,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Benchmark.BenchmarkRunCoordinatorTests.Timed_out_process_still_reconciles_ownership()",
-      "reviewedCodeFingerprint": "341e192416cfe5854cf596132b5e1dc706bfb6cf54f09b682927ee3e827cb7a5",
+      "reviewedCodeFingerprint": "5a87287ec3992a5f65b0d32561b7a03cd54123a6d8619cb0b8ab58d8db2d25b5",
       "classification": [
         "NonSql"
       ],
@@ -4889,7 +4985,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Focused.FocusedRunCoordinatorTests.Failed_focused_run_is_recovered_from_the_shared_ownership_layout_on_next_acquisition()",
-      "reviewedCodeFingerprint": "1ed41f9c83c2fe873db0204d9fbd1aa10dd5d9aa89a4d408139f34c356e4bf77",
+      "reviewedCodeFingerprint": "880e64e45f467a9e9fade6d9e51d9f77d44b8b2c3b57e791d36b1458d1bdfae9",
       "classification": [
         "NonSql"
       ],
@@ -4907,7 +5003,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Focused.FocusedRunCoordinatorTests.Failed_result_gate_after_execution_cannot_skip_ownership_reconciliation()",
-      "reviewedCodeFingerprint": "692a6b7265df245135edbcaf6d48674c720e90255b8a5aa5aad3407ef2e6f5c6",
+      "reviewedCodeFingerprint": "6bb57784386da9988d50729172bd1197993ce6a349bdf9b9a3250399848ad11b",
       "classification": [
         "NonSql"
       ],
@@ -4925,7 +5021,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Focused.FocusedRunCoordinatorTests.Preflight_exception_before_execution_returns_incomplete_without_recovery()",
-      "reviewedCodeFingerprint": "f34d513fd419a7c5d7837fcc2c74efe77a39c7f6ecf3607085b161ce82ae754b",
+      "reviewedCodeFingerprint": "a15dcd2769f8241e4267836bfa4fccbd234474f55a0680b68d7e5d8f0b4be850",
       "classification": [
         "NonSql"
       ],
@@ -4943,7 +5039,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Focused.FocusedRunCoordinatorTests.Stale_classification_blocks_before_discovery_or_execution()",
-      "reviewedCodeFingerprint": "4e6de12c66ee76824addf5c6fc9c05735b69844b4bfa0c8b368350fcbd387b3b",
+      "reviewedCodeFingerprint": "e8a44d1f5dc916006ffa79aa4ed5b6738a97af100eed863794f61677f7425a0b",
       "classification": [
         "NonSql"
       ],
@@ -4961,7 +5057,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Focused.FocusedRunCoordinatorTests.Timed_out_execution_still_uses_bounded_ownership_reconciliation()",
-      "reviewedCodeFingerprint": "9d11b1c718122a6fc58bfb26698a0ffdc005b97f561ac51e706e5335905653c2",
+      "reviewedCodeFingerprint": "f5970f52421140721acd7a3e567540852603a7e43eb3ddfa47831757a27d8d90",
       "classification": [
         "NonSql"
       ],
@@ -5581,7 +5677,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateManifestTests.Final_rejects_DotnetTest_gates_with_unguarded_resources(MyDmsVn.SqlTestRunner.Gates.TestGateResourceRequirement,MyDmsVn.SqlTestRunner.Gates.TestGateResourceRequirement)",
-      "reviewedCodeFingerprint": "71aaf3b4cef0644991af34c664d95ee43459640ac7d55de6acab22700345c541",
+      "reviewedCodeFingerprint": "53f37f210a6bfe6c06904c9005076dd7a557c2fd136c98c92bea14f09bc8f3b8",
       "classification": [
         "NonSql"
       ],
@@ -5603,7 +5699,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateManifestTests.Final_selection_requires_one_unfiltered_exclusive_dual_tfm_SQL_acceptance_gate()",
-      "reviewedCodeFingerprint": "132825737bc8e1d7c6687e75c5176803f1cff2ce783da4d54859f6903c3a4d0a",
+      "reviewedCodeFingerprint": "e958c4823a20fc8173f8c611355956cc7972fea9c2ce5c2497c591993d24fb34",
       "classification": [
         "NonSql"
       ],
@@ -5621,7 +5717,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateManifestTests.Load_accepts_the_exact_v1_shape()",
-      "reviewedCodeFingerprint": "55b978602bbd406d575478245c10747c99dc5867c63d4da4a54ef56b225a1f4b",
+      "reviewedCodeFingerprint": "3f543bed77f49445156526e22e98720a2edc0c0db64caa8356436f2d8c248771",
       "classification": [
         "NonSql"
       ],
@@ -5675,7 +5771,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateManifestTests.Select_rejects_missing_declared_tfm_and_empty_filter()",
-      "reviewedCodeFingerprint": "3f9b0a3cae62f9631c81b0eab958ad764f9d5f3a369c263fa5a70331beeee3ce",
+      "reviewedCodeFingerprint": "36ff3402355e6f878246a618ce75f6f144cc562a197226905a0eba0e2ec18d72",
       "classification": [
         "NonSql"
       ],
@@ -5693,7 +5789,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateManifestTests.Select_rejects_paths_outside_repository_and_missing_projects()",
-      "reviewedCodeFingerprint": "f496b1b8afe89c24e50aea3985b7473a8ddc555cbf96eb0c49dd5abe4e530cd3",
+      "reviewedCodeFingerprint": "fcbb62abc3a91f1b61ecd74605fa2b0055a65ca7a79554671ead79e740e38ede",
       "classification": [
         "NonSql"
       ],
@@ -5711,7 +5807,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateManifestTests.Select_rejects_unknown_or_omitted_plan_task_and_empty_gate_set()",
-      "reviewedCodeFingerprint": "359657072fdace30896c1aea4eea589cb02a0342abcdee3907b380fb49c00c6b",
+      "reviewedCodeFingerprint": "5c5890c1e73115f04967ceaec3b2f4f518bc0d7def773c59bdc0b4a25fd8b849",
       "classification": [
         "NonSql"
       ],
@@ -5729,7 +5825,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateManifestTests.Select_returns_only_exact_task_or_final_gates()",
-      "reviewedCodeFingerprint": "ed31ab569ed4d357a29d6c0fb5d604bd691003a876fba8f1865a44896821df2a",
+      "reviewedCodeFingerprint": "5a31631871bbce575b83f253ba7eee37065b86e082da3a157ea41aac59b1feb3",
       "classification": [
         "NonSql"
       ],
@@ -5747,7 +5843,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateRepositoryContractTests.Current_manifest_matches_source_and_expanded_discovery_for_every_declared_tfm()",
-      "reviewedCodeFingerprint": "bee855961c2c79e59c83637a799f7b7058fefae44da7972ec9ce005d09d8b868",
+      "reviewedCodeFingerprint": "fbf52f99cdef819509dddb674f16423615c4364770f861dab07202be0bd3dea2",
       "classification": [
         "NonSql"
       ],
@@ -5765,7 +5861,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateRepositoryContractTests.Repository_contract_rejects_inventory_and_gate_mutations()",
-      "reviewedCodeFingerprint": "0d1b3fe0152b41afcbd8962c2a84530407f726fff34a2a0879491e572d2aa44b",
+      "reviewedCodeFingerprint": "52f7e2c13f1cecc413f1c50235782f5d8bdb6ced08ed20a7f3ac9709a1dcfc9c",
       "classification": [
         "NonSql"
       ],
@@ -5801,7 +5897,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.LogicalCaseIdentityTests.Bind_execution_preserves_outcome_and_duration()",
-      "reviewedCodeFingerprint": "57a7da29d591e643ab5279e4bf5aa567489ea67352e486de0df0117741d8bd0f",
+      "reviewedCodeFingerprint": "4036c6c3b79065d6ded154e1b6be991951e3a88eca18a18e3ed59de8501f1805",
       "classification": [
         "NonSql"
       ],
@@ -5819,7 +5915,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.LogicalCaseIdentityTests.Bind_maps_reordered_theory_rows_by_opaque_locator()",
-      "reviewedCodeFingerprint": "743fb7c461f54f323919b4343064adcbf67ac38a071008048eda52f68d599591",
+      "reviewedCodeFingerprint": "8c2173c9e2a5dfb4b78d3eb5804c51beb9b7c2e11dfabf94ff013858656ccedf",
       "classification": [
         "NonSql"
       ],
@@ -5837,7 +5933,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.LogicalCaseIdentityTests.Bind_rejects_duplicate_locator_or_row_id()",
-      "reviewedCodeFingerprint": "a0cbde63c6054391e3150b2b9a5183156507de5a6438c725605a25efca8d02d3",
+      "reviewedCodeFingerprint": "71f8030127027920405aabed054b62e46932e2e3810ff52f96c10a099b9a8e2f",
       "classification": [
         "NonSql"
       ],
@@ -5855,7 +5951,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.LogicalCaseIdentityTests.Bind_rejects_missing_and_unexpected_rows()",
-      "reviewedCodeFingerprint": "d5a5bf0cbf1e74bfbe5fa702cc9f0c963a5ad787176025b59efb9798863e9c45",
+      "reviewedCodeFingerprint": "b73691adac6608040dbaade3e4cc120e81c2f965206b975771172db77c927ad6",
       "classification": [
         "NonSql"
       ],
@@ -5873,7 +5969,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.LogicalCaseIdentityTests.Bind_rejects_overloaded_discovery_name_as_ambiguous()",
-      "reviewedCodeFingerprint": "6dd7bdcba8f242a720e3c93b1dbf7dbbc626a4c91ef467670b546f33d312f37e",
+      "reviewedCodeFingerprint": "b9cfffe683b8aca0fdc8d6178d10510b37c09c2e06c212435c1922ca111ee622",
       "classification": [
         "NonSql"
       ],
@@ -5891,7 +5987,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.LogicalCaseIdentityTests.Bind_source_requires_matching_fingerprint_and_classification()",
-      "reviewedCodeFingerprint": "5320ebb195e9759de70d11e1b604f3132ae08dae756333180155172c1b53a502",
+      "reviewedCodeFingerprint": "f906b54ab641ca3eca3a3c05d94730c7b41330f46c5fa1d901df4f66f3ba5556",
       "classification": [
         "NonSql"
       ],
@@ -5909,7 +6005,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.LogicalCaseIdentityTests.Binder_does_not_return_raw_display_or_arguments()",
-      "reviewedCodeFingerprint": "2bbf837419ac32b69ea07352b7a895273fa93ebb0de3d29b52ce489c9f86a5f0",
+      "reviewedCodeFingerprint": "2148a9c946929ce4249c62e73c6ac10ba7196116abf7601f2a99ae2bf357f33e",
       "classification": [
         "NonSql"
       ],
@@ -5999,7 +6095,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.SqlTestClassificationTests.Integration_inventory_is_fully_classified_from_the_reviewed_manifest(System.String)",
-      "reviewedCodeFingerprint": "715020df8febeac406e2c15c86158e450927de2b00499c1b0c7128bca371d7be",
+      "reviewedCodeFingerprint": "211853fe1542a40a9941f6c081db1b746de95b9b2534087437f7b69c6f659330",
       "classification": [
         "NonSql"
       ],
@@ -6111,7 +6207,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.SqlTestInventoryTests.Either_reviewed_tfm_fingerprint_matches_the_same_method_exemption()",
-      "reviewedCodeFingerprint": "cc7591a34801cb0732dee4520317aa259cc22c75c5052f0a5567dc6425c7398b",
+      "reviewedCodeFingerprint": "a52776c72c7db77330d61e05d4055cafe702cf84a9bd99789e53ef47fa686bdc",
       "classification": [
         "NonSql"
       ],
@@ -6331,7 +6427,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.SqlTestInventoryTests.Stale_fingerprint_is_not_an_exemption()",
-      "reviewedCodeFingerprint": "1c34af46dbb9c09da82201561c0247b118f3fb52c9aecdf2847c8281cdb144e9",
+      "reviewedCodeFingerprint": "140139928127e8992ec52978b4d0d7503a61e7c1e4d2ae4f5fc4429c0fb29f4c",
       "classification": [
         "NonSql"
       ],
@@ -6349,7 +6445,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Inventory.SqlTestInventoryTests.Unresolved_dependency_cannot_be_approved_by_a_matching_fingerprint()",
-      "reviewedCodeFingerprint": "bcb55016516437c22cbd3ba539ad2c5f1d9122f81c611a5d782733945af135f0",
+      "reviewedCodeFingerprint": "b4102a9e741eec5f0a5295cecb3f19c878ddd71e8464c41b62fd1ee9630600e7",
       "classification": [
         "NonSql"
       ],
@@ -6385,7 +6481,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Processes.OwnedProcessRunnerTests.Deadline_terminates_only_the_owned_process_tree()",
-      "reviewedCodeFingerprint": "26b2b26bb0e9f565ff544cc716b1aaa7bf34e5103905113727e953c7bb1ba3cc",
+      "reviewedCodeFingerprint": "ea3a16ca3e31f367e0e75894913abef9f3e856fac17e2d74de1b5f387a0acefa",
       "classification": [
         "NonSql"
       ],
@@ -6403,7 +6499,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Processes.OwnedProcessRunnerTests.Normal_command_drains_stdout_and_stderr()",
-      "reviewedCodeFingerprint": "96d4574ca09136dffa8ab536b48bdc83d6161b0b57df0680456021f3fc406ceb",
+      "reviewedCodeFingerprint": "dfefa9d8caa8650c34eb4766b5e7c926e72021c37f0659da5f22acb992ae140d",
       "classification": [
         "NonSql"
       ],
@@ -6657,7 +6753,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Reconciliation.LogicalCaseInventoryReconcilerTests.Invalid_method_exemption_is_rejected()",
-      "reviewedCodeFingerprint": "50c2289cfe1f5c0712a801c2f32103be04aa945d362b0cca5ea6d5ba4d37a701",
+      "reviewedCodeFingerprint": "117ac66957c1d01e5f8d31c2b8475d84152224f24211a2c6f158210535b20c60",
       "classification": [
         "NonSql"
       ],
@@ -6675,7 +6771,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Reconciliation.LogicalCaseInventoryReconcilerTests.Missing_or_ambiguous_identity_mapping_is_rejected()",
-      "reviewedCodeFingerprint": "34aebab8db711089b4fb32fc251b8bd075df54d5881946da64afbd01271152bb",
+      "reviewedCodeFingerprint": "354fbcbec25cf9637e7a778e679c27ac505cc523ddfdd6361cff38ef4a1dec83",
       "classification": [
         "NonSql"
       ],
@@ -7177,7 +7273,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Reporting.SqlPerformanceReportExporterTests.Exporter_accepts_helper_timings_attributed_to_the_public_test()",
-      "reviewedCodeFingerprint": "56d0a03976b213f427bc2dbe17a3dfd213a9af2bbfe72e77edb6aedaa651eecd",
+      "reviewedCodeFingerprint": "1d6cceb887a36ecd91dab6c5725fd071008c48d3613496f1899c0e137ba230dd",
       "classification": [
         "NonSql"
       ],
@@ -7195,7 +7291,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Reporting.SqlPerformanceReportExporterTests.Exporter_rejects_create_and_drop_timing_from_a_different_run()",
-      "reviewedCodeFingerprint": "7ce231661173e02a14f5b26a6b4405d756924aa2fce506e027f2339aa82b9bd5",
+      "reviewedCodeFingerprint": "662e3cafa671caa79d5b7fe8fc38eee6890659b7462bb71189a1c24f7f9cb097",
       "classification": [
         "NonSql"
       ],
@@ -7213,7 +7309,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Reporting.SqlPerformanceReportExporterTests.Exporter_rejects_malformed_timing_event_instead_of_omitting_it()",
-      "reviewedCodeFingerprint": "8f503770dd68ae0432ba905345f1dfd2f2c2c38d6b524d0f6f5d97b0012878e1",
+      "reviewedCodeFingerprint": "7bcb5845a62806abf14b30ae54fd43d8bdb6b62f6e826d478aa68f3bd7a6f656",
       "classification": [
         "NonSql"
       ],
@@ -7231,7 +7327,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Reporting.SqlPerformanceReportExporterTests.Exporter_rejects_missing_required_measured_pass()",
-      "reviewedCodeFingerprint": "76feced4e019c72253afb018da96d5de9f85f9bb645b4816420bb5bcd81c0025",
+      "reviewedCodeFingerprint": "da268da1da0577b9bbb652ceffdb84bdf40454f2b02939e37d8f2d179267e7b7",
       "classification": [
         "NonSql"
       ],
@@ -7249,7 +7345,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Reporting.SqlPerformanceReportExporterTests.Exporter_reports_three_pass_test_and_class_statistics_with_stage_reconciliation()",
-      "reviewedCodeFingerprint": "e8308b6c7af4bf9112a44e94e69f08a4ec0defedeb03c8c1522b4464d10c50cb",
+      "reviewedCodeFingerprint": "31c5554b4b7269f46984a0b69a91b073ffa9ae46e2360ad7057aae73f634b7fa",
       "classification": [
         "NonSql"
       ],
@@ -7267,7 +7363,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Reporting.SqlPerformanceReportExporterTests.Exporter_writes_sanitized_deterministic_reports_from_measured_accepted_runs()",
-      "reviewedCodeFingerprint": "a197cb1ca33ecc33747dff4772b646f8f510b052d0255c4ba348d5bdab196066",
+      "reviewedCodeFingerprint": "ffa94197c7d825b02ad5f36d7bcb221eb05f29dd25522ec09a78e9e7de4729b0",
       "classification": [
         "NonSql"
       ],
@@ -7423,7 +7519,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateManifestTests.Net8_pause_final_uses_reviewed_active_sql_profile_and_rejects_tool_only_runner_coverage()",
-      "reviewedCodeFingerprint": "985ff3e52c0941b6e17ad146df3af2aa3fd7f28338f4c2f22bd616cfc99d3991",
+      "reviewedCodeFingerprint": "51aa137ab0389268deee0889afbd76d5e5d63b172d91f315ff9087cf744b9525",
       "classification": [
         "NonSql"
       ],
@@ -7619,6 +7715,2892 @@
         {
           "rowKey": "row-abad4561ed70a510",
           "locatorSha256": "abad4561ed70a5105cb056ca0405667e34a0180341dbcd5b73aed929b2daca0b"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b37fbef69f62b5d595d7",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApiResponseMapperTests.Authorization_errors_do_not_expose_private_details(ErrorOr.ErrorType,MyDmsVn.Contracts.ApiStatusCode,System.String)",
+      "reviewedCodeFingerprint": "99285d646f13cdcefc7f81fb0bc0fdf0f43079555a958eb88ad75a71b3ad0bb8",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-d0bdbbb926eb42fd",
+          "locatorSha256": "d0bdbbb926eb42fdb7ab1034a178b172210816eff8e62ccc3b947230dd2c1b27"
+        },
+        {
+          "rowKey": "row-d678a295e5f2330e",
+          "locatorSha256": "d678a295e5f2330ee512e63cb5809a4ea181c45794c1508b11bc86f62730e253"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-cd751e15a37f7dd33b24",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApiResponseMapperTests.Invalid_credentials_keep_the_safe_public_login_code_and_message()",
+      "reviewedCodeFingerprint": "6719cc2c45f0fb679c6fb14e798ef22ff2af247c950e290ca46cce155ae56758",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-19ee13aec6dd29d5ad50",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApiResponseMapperTests.Known_error_types_map_to_transport_neutral_status_metadata(ErrorOr.ErrorType,MyDmsVn.Contracts.ApiStatusCode,System.String)",
+      "reviewedCodeFingerprint": "0db18cbaeeba32dec9e04e0dca53b3fd2506bfa5dbb5d4ac84043dfad61a8538",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-acc919fa4e07745c",
+          "locatorSha256": "acc919fa4e07745c13dd08f066dd66c794650e7793dc1e890c28daa8136f454d"
+        },
+        {
+          "rowKey": "row-b94d688e5acbc001",
+          "locatorSha256": "b94d688e5acbc001204d360ea205fb4d9c56659aa980918542333138b85c08e7"
+        },
+        {
+          "rowKey": "row-e948131f341f5c79",
+          "locatorSha256": "e948131f341f5c7987b2828dfd34677b8c20cc7bea28f7b9981cec1fe5584d93"
+        },
+        {
+          "rowKey": "row-c4f4e8848a299fcd",
+          "locatorSha256": "c4f4e8848a299fcd9a12b0759000c43a8186e51dd47ab32f38d4a838b6180549"
+        },
+        {
+          "rowKey": "row-e69aeea7dbe784f0",
+          "locatorSha256": "e69aeea7dbe784f0262c5ec14e5aca3e336a5bcc5e95b9d7ac2a5f18172b46fc"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-25f8c2f034307812a911",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApiResponseMapperTests.Mixed_error_precedence_is_independent_of_enumeration_order()",
+      "reviewedCodeFingerprint": "d0813e63db647ef772a1910f54fb35ed65b92ff9d4c74eb275d82a3662bae773",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-8a542f1c16a685d4894c",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApiResponseMapperTests.Success_maps_the_typed_value()",
+      "reviewedCodeFingerprint": "e0376ce58af07b8aaea84b676f206623834a4552b86517390c895046a62380b1",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-cc99307704b0796c413d",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApiResponseMapperTests.Unexpected_errors_do_not_expose_internal_details()",
+      "reviewedCodeFingerprint": "808c44de620e9bfd384a6d21b557421ab58d692a9960623e025ce68346070d55",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-5089192e5df1bb191d88",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApiResponseMapperTests.Unknown_error_types_do_not_expose_internal_details_alone_or_in_mixed_sets()",
+      "reviewedCodeFingerprint": "50ab93203aa5f0c84a09678c9e3f138aa87a5e961af1ce360bc6607bc3b26ac4",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-202aa6f216ea524f5b87",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApiResponseMapperTests.Validation_field_paths_follow_the_json_naming_policy()",
+      "reviewedCodeFingerprint": "134f1f3aa8dc967f3a0a7005ac7c884cb93e674c79a09c18eef99e70fb53ac9b",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-444c72b865409e7bed16",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApplicationPipelineTests.Async_validation_returns_typed_errors_before_handler_runs()",
+      "reviewedCodeFingerprint": "1d744b185e51c6efdf1378f58d58d09e4e4fb47902eb16305ae6c98fd9a956f8",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-5eab97bd73118c3ba878",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApplicationPipelineTests.Cancellation_is_rethrown_without_exception_reporting()",
+      "reviewedCodeFingerprint": "cf97cb9d309c5da0e3f55feed16aa0b3403cbe7d58666d40fecded2348087e16",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-9bc7e72145cb64c6d01d",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApplicationPipelineTests.Handler_exception_becomes_an_unexpected_typed_error()",
+      "reviewedCodeFingerprint": "6d9d8b4b92e0a20ea21c8f7feb724535b46cdfe915fa54aef79b10b1ccbf566c",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-60c4794d1a1b37d1f351",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApplicationPipelineTests.Multiple_async_validators_use_independent_contexts_without_duplicate_failures()",
+      "reviewedCodeFingerprint": "ffc80ed9bd32fe5b85d22247a11508a831900482918343c6694e651d7165c1ab",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-2ba54ef195d3678c0184",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApplicationPipelineTests.Server_application_registers_and_dispatches_typed_requests()",
+      "reviewedCodeFingerprint": "06c23369f05d08e676e3cbb88650f32f209b40b1f203f8be0648166d0fbc955f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-85e1f72c402d5f1ce1dd",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ApplicationPipelineTests.Validators_sharing_a_scoped_dependency_do_not_run_concurrently()",
+      "reviewedCodeFingerprint": "bc66d1cb2c71cce07977b9f93033eb7688591135ec68c8e9847f27d173ce1590",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-9a9e2e1224a79aff0ed3",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Anonymous_current_user_query_returns_unauthorized()",
+      "reviewedCodeFingerprint": "832732d186a192bd1c7e1dd0c6333be0efb466f104276300ee2f30d53f576bf5",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-eef10f1a1b19e7648e97",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Approved_legacy_verification_rehashes_with_bcrypt_and_empty_legacy_salt()",
+      "reviewedCodeFingerprint": "69f76c1f9a0a9489c3d6eafd8b4125893c0180790c463163fccc1e93c328401a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-d9ef8754266ef8db9ef7",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Audit_entry_rejects_non_utc_timestamp()",
+      "reviewedCodeFingerprint": "85c61cc5bf13ea26f29dd9257e624f163647eddd1b2dbe5ccbefa517fc87ec88",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-488e5aa0d184eb67a094",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Concurrent_rehash_with_the_same_password_allows_the_losing_login()",
+      "reviewedCodeFingerprint": "141e29856cb1b19d7bf5a2eed982808fe57000b5aa930554a14076bd2874036d",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-385a4cd00404a1213cf1",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Current_user_query_rejects_a_cached_identity_when_the_account_is_disabled()",
+      "reviewedCodeFingerprint": "907301dc2db7bd2fb2146c8656a5a7a3fa2fe9a3a964b245f1cb44078a9a3956",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-fb0586dd9498a1d7ebfb",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Current_user_query_returns_only_active_authenticated_identity()",
+      "reviewedCodeFingerprint": "1fd4e536e7097da0b90dc719b9acc4ba670e92acf99c1e0d17314c83a4a28bf9",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-91d415ce43e0dc6079be",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Failed_atomic_rehash_rejects_a_password_reset_or_deactivated_account(System.Boolean,System.String)",
+      "reviewedCodeFingerprint": "07bc0aadf71f780b984e24dcd7a60f4937e3d7cdc8653274f7c6313d73c2a721",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-778919d521ca264e",
+          "locatorSha256": "778919d521ca264e55c20e63a0ac1fb94fc520478ff11f85b8c3c95938c160c9"
+        },
+        {
+          "rowKey": "row-8d391ae62c40b632",
+          "locatorSha256": "8d391ae62c40b632d8a6523ca406d4d24eabb0e39e6afae7f3448c144dc2c525"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b6d145037fcfff6870a5",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Non_current_login_paths_still_apply_one_current_hash_verification_cost(System.String)",
+      "reviewedCodeFingerprint": "4a8a9f8b0dd5201d6ee46ae5e26cf44d454cc4b99b0e3c54d6abb5b3b735ee5b",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-3f8532781795cba1",
+          "locatorSha256": "3f8532781795cba18d8a69b888ed7a750a6224d16cc9990f12811752fdd5f7aa"
+        },
+        {
+          "rowKey": "row-d4127910394de62c",
+          "locatorSha256": "d4127910394de62c2c5be7691daddc8c6ddd8b8719736e3dc8c6c96bc94559d2"
+        },
+        {
+          "rowKey": "row-85d528de60551156",
+          "locatorSha256": "85d528de60551156893417734e727fd15d253c24b98887f0cc59507a396799a2"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-7227a13704688ae14404",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Valid_current_hash_returns_user_and_records_safe_utc_audit()",
+      "reviewedCodeFingerprint": "403e2eb0a1522f63e2b2fc982b8e43c3f8bb3f0f7c95a1932ca361a561a41201",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-4e2b97fcea4bf9368fd5",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.AuthenticationTests.Wrong_disabled_or_unsupported_credentials_return_same_public_error(System.Boolean,System.String,System.String)",
+      "reviewedCodeFingerprint": "dbe8feb7bd28493e60f4123b5e3c1eee83a70f5a050a724c08ea82f01398950a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-8e3040ed0d085006",
+          "locatorSha256": "8e3040ed0d085006f1d76edda9eecd86afd276a0ffff870066ba7fa5b33a13f3"
+        },
+        {
+          "rowKey": "row-2ecec40745b07b01",
+          "locatorSha256": "2ecec40745b07b01488fe104b5f28bc987d84491b48f9bdf02e4f45a043304ea"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-90cbde71a2ae43819773",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Catalog_requests_declare_exact_read_and_write_permissions()",
+      "reviewedCodeFingerprint": "037fa15f83d0a3490b13bcbdde10512521a50c5c31c69f703fcb46f595a2259c",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-3f0d714e31e56fe20a9d",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Catalog_save_validation_rejects_nul_in_code_and_name_before_writes()",
+      "reviewedCodeFingerprint": "5f18a9bd942b51b4cc477f9d6a053a3c264cd6a4afcbeefac394b5426f6eba40",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-cf2f59b14210fa882ea8",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Catalog_search_validation_rejects_overlong_and_nul_before_query_services()",
+      "reviewedCodeFingerprint": "d69add015f7d2f5d7ade0eed00d8cf66cc08982e3210954060b8bde0319038c2",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-6bf0aacad64cae035b8d",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Create_product_commits_authenticated_user_audit_and_returns_contract_dto()",
+      "reviewedCodeFingerprint": "8ad79bd84cb77d9373ddb6790bbd51700d6f957ceda49888d2ab8bd2ff1bb949",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-7439b9b9e659d7562140",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Denied_catalog_mutation_never_opens_a_unit_of_work()",
+      "reviewedCodeFingerprint": "6d9eb0a8054631af2abcc0e257c2276a407f9894f29f520c79f5b46e1e1559bb",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-10bab507314fd964a6e8",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Duplicate_employee_user_link_maps_to_specific_conflict()",
+      "reviewedCodeFingerprint": "8b0f59a95bed03e0f7a21df936b3a0bb70a593a8d3ae3bda85e538004206962a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-8c0548dfc4fdc5fd51b9",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Duplicate_product_code_maps_to_deterministic_conflict_and_does_not_commit()",
+      "reviewedCodeFingerprint": "27f5eab2e99078a6d71f261c81fbbf90cd9ec0b0712c90e077bb0d6748f89b6d",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-57de47081233b68c6a0e",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Other_catalog_updates_do_not_query_after_committing()",
+      "reviewedCodeFingerprint": "2e6f271002e1d4178f5d55834cbb54464ca7cfae8917a3b3f9b3f01e1bdcfd96",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-5cb307a9e985e24bb25b",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Product_get_and_lookup_map_missing_and_active_only_query_contracts()",
+      "reviewedCodeFingerprint": "8793c62e96088abdc1d9aa2fc320109c1660706324d2ab2adc4691395d6edde3",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-6d2e492187d64f4b4a44",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Product_list_query_preserves_deterministic_page_from_query_service()",
+      "reviewedCodeFingerprint": "e2b69d6459184a6ccff15b2913a26a93e917eebec78a4685002969f0c4b830b6",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-12232f4f6711e09a7603",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Product_validation_rejects_display_whitespace_before_opening_a_unit_of_work()",
+      "reviewedCodeFingerprint": "e7b71877a8fa23b814310dfe238c65a92904537699e61f3e58d0b599a06696f5",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-9475b26c35f9a3b56366",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Set_product_active_commits_requested_state_with_update_audit()",
+      "reviewedCodeFingerprint": "c5bedf33bdaa9c3dbd4099cf2558f428f2667655114f530c108f804c1de5ffff",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-f723785447632b8697ea",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Update_product_does_not_read_back_after_committing()",
+      "reviewedCodeFingerprint": "3476f6108c070a306bd9a94a4382eae6197a663665186c30164a218c0902052a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-c25f228dff5e678fa6ce",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.CatalogApplicationTests.Update_product_persists_update_audit_and_returns_not_found_when_missing()",
+      "reviewedCodeFingerprint": "cee491e37e1778ee4e0b24ace64fc5e6c65efd60a794a46f18864c0bc1944124",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-f056dc83cd161573d432",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Failure_contract_round_trips_a_support_correlation_id()",
+      "reviewedCodeFingerprint": "9613a95abeb0b60f52afcf5a2fcbe94767af18480f9088fa58841d12b01da65c",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-84e16056eba9307aafeb",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Goods_receipt_contracts_expose_opaque_expected_and_current_version_tokens()",
+      "reviewedCodeFingerprint": "fa855a54fdcf423af8e2a7a1efdedf77780126d8ca3b4ce32f749ad26d0d5be6",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-d37a4c8876c63ed70659",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Goods_receipt_read_contracts_round_trip_search_and_catalog_display_state()",
+      "reviewedCodeFingerprint": "aadaac30b0f2ee8aa8c5df94f7b9c4b303bb108dbbbb35bf064b776e72e62b61",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-2d5aa31a9902f9fd1756",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Http_deserialization_restores_transport_status_metadata(ErrorOr.ErrorType,MyDmsVn.Contracts.ApiStatusCode)",
+      "reviewedCodeFingerprint": "c4858f34b3ace52b3caa5834507601ad2442f87e4282881ad0484085fa6e2267",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-247733114ea96bba",
+          "locatorSha256": "247733114ea96bba3b70e63a6776ed3f05e08d82507d3bf7aceda983dc0d6b04"
+        },
+        {
+          "rowKey": "row-5927556a22f34e76",
+          "locatorSha256": "5927556a22f34e76b2fe6715df9485c10ffeb9c40c0fe86ea57de5263e6a5c0f"
+        },
+        {
+          "rowKey": "row-e69710cca5fed0bc",
+          "locatorSha256": "e69710cca5fed0bcceecb76476a24d4672db06ba6da37f22f9b968a31d73cf8d"
+        },
+        {
+          "rowKey": "row-a7d0baf4474bce0f",
+          "locatorSha256": "a7d0baf4474bce0f77f746a3b944058be1fd4533d63e1f842802a9598eac96f5"
+        },
+        {
+          "rowKey": "row-a72b28e0efba23a3",
+          "locatorSha256": "a72b28e0efba23a36f45890434352fa16d7d645ad171ba5117d71843705d76a3"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-d3ed81cc1b617cfe3615",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Inventory_read_contracts_round_trip_filters_and_historical_display_state()",
+      "reviewedCodeFingerprint": "530ef4eb751571acf43536c5e3b1ce200bbf95f40646532b06952e438d704380",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-2088de5fd52d3fde04d2",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Pagination_and_no_content_have_explicit_non_null_success_values()",
+      "reviewedCodeFingerprint": "2dc020ec828878783125b84e8a2b75ebcf93bb5a2bc465bed71f4806727de40d",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-f5ebd2a78dc3b535fbaf",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Pagination_decimal_and_utc_values_have_a_stable_wire_shape()",
+      "reviewedCodeFingerprint": "8f0a21c86870305ce21cf2ae6e1aaff73b41478b6901df8495f53ce97da7ece9",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-bff3234c14cb97bcc59b",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Planned_p5_command_dtos_have_stable_golden_json()",
+      "reviewedCodeFingerprint": "1eacb08a42406c4165b52b0c83a0e61b3b627a1d235c162d37a3d125679ed310",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-29e729ac4ad67e2b278a",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Posted_timestamp_is_serialized_as_utc_iso_8601()",
+      "reviewedCodeFingerprint": "3e2dfbd8401c781a3aca556efee083d032c2018c0bd1c9f6f0069019773c5b4f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-9c5d7facaae3ce04259d",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Receipt_date_preserves_the_calendar_day_for_every_datetime_kind(System.DateTimeKind)",
+      "reviewedCodeFingerprint": "d65de2584373fc14c0c5ac396b628dfaf762f065fe668a319938e15841992ef5",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-69f927f9da2aa0b6",
+          "locatorSha256": "69f927f9da2aa0b6514846aa980b54246ed618d945f7d582f6e793bcaaa61672"
+        },
+        {
+          "rowKey": "row-f88fbb4501624b66",
+          "locatorSha256": "f88fbb4501624b66ba4bf8de878f68e8eb46fd7239d280ea6726b3664931beed"
+        },
+        {
+          "rowKey": "row-69b4afdbaed6d349",
+          "locatorSha256": "69b4afdbaed6d349cec95373fea23e1d39f0e616b9291329409a328ce67bdd4d"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b2efc49d7698956985eb",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Serializer_rejects_ambiguous_or_empty_envelopes(System.String)",
+      "reviewedCodeFingerprint": "e285a0004bf7dba9eb661ba3db9e71a2f43c5094508f95e375626734a9114383",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-e95067ca1e7a9eac",
+          "locatorSha256": "e95067ca1e7a9eace9a0216a00bd4769eb4a1661b711984412f7d4a6972073fb"
+        },
+        {
+          "rowKey": "row-24918713e9ea00cc",
+          "locatorSha256": "24918713e9ea00cc56e800f8841428e8f5b1866f4f4ee71b8e46c66a1e485382"
+        },
+        {
+          "rowKey": "row-068a3ced1d731dce",
+          "locatorSha256": "068a3ced1d731dce61dde676615d6a4bc5645121068c050fbdd8dcd3e1b6648d"
+        },
+        {
+          "rowKey": "row-80f4d4e2d40e77b5",
+          "locatorSha256": "80f4d4e2d40e77b53171bcb2abf83ca99230a6bdbff13a3f06ddbb3e5a7b8662"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-bebb0fcb76217697a566",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Serializer_round_trips_success_failure_and_value_type_envelopes()",
+      "reviewedCodeFingerprint": "8207374aea701c981c7bafc92b2b1547c68e059c29043d3f0940064ef5b92317",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-61efb055d46b8c043abe",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Serializer_uses_stable_camel_case_shape_and_omits_inactive_branch()",
+      "reviewedCodeFingerprint": "d2670478b82892ff6fbd4349c16bedb5939c5bf01423ae3ef9747a956d5dad46",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-45e215754ba3351c4921",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ContractEnvelopeTests.Success_and_failure_factories_create_only_one_meaningful_branch()",
+      "reviewedCodeFingerprint": "9442f681c3e79a4451c507bfaf77ddba795ebf8362b3c1860038f345ea129cbb",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-e7efceb29f218a37bbd2",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Create_draft_commits_one_aggregate_transaction_and_returns_server_values()",
+      "reviewedCodeFingerprint": "c1c81de307618089a7490170a0367820899c185c379aa6a92cc2e1513029786f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-3c61805897f96b95ecfc",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Explicit_deny_blocks_update_list_and_get_before_storage_access()",
+      "reviewedCodeFingerprint": "833f430025acef2eccce4874240a8c0985b52f3c5c9f03f2786fb80e8144f387",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-87cfe932dd4476c8a580",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Explicit_post_deny_never_opens_a_unit_of_work()",
+      "reviewedCodeFingerprint": "d81d833e7e28f00e4049f0dbee7ff09cd79a7d1a5cab71e28ecdc86ae69b0c90",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-fd56a0d8812172706a0c",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Explicit_post_deny_records_denied_audit_without_false_success()",
+      "reviewedCodeFingerprint": "eaf87cb91281ede53adac3c792f527428eca2db487ade35fc33e222de67cfbc9",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-4687370e1b8b8116b0d0",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Explicit_write_deny_never_opens_a_unit_of_work()",
+      "reviewedCodeFingerprint": "6ec10f3d9c106d3066db73c2a80aac9f86dbc958b6cc27716233da1947fd788a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-e5d7264ce4c6f34183c4",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Goods_receipt_requests_declare_separate_read_and_write_permissions()",
+      "reviewedCodeFingerprint": "0a42e299a0abeae8854863afdd3e0869bb0c1c86e04d5f937b47a52e9be0ebb6",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-72e6d9a83961f1ed0f21",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Inactive_reference_returns_field_validation_and_rolls_back_the_aggregate()",
+      "reviewedCodeFingerprint": "1646dcfb9f249400b4e5b926b8aeded48f7b93e810198014bf1aa1425f124f12",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-6a8dcef93a633bd6d719",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Invalid_aggregate_is_rejected_before_a_unit_of_work_is_opened()",
+      "reviewedCodeFingerprint": "26f8e5162e4960b8de7223cd0f5fee094b1326ed607e0e2a73f20048ab8d3aaf",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-c66d8a7186b2a26f0ea7",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Invalid_expected_version_is_rejected_before_a_unit_of_work_is_opened()",
+      "reviewedCodeFingerprint": "95474e27c2c5be3c5908e2d472bf9c619796265372aaa9fede6e48673421df95",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-60ca09f312e02daa8a18",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Invalid_list_request_is_rejected_before_query_execution(System.Int32,System.Int32,System.String,System.String)",
+      "reviewedCodeFingerprint": "4e612d68f2b9a0cb44cbb6924be36600b58f3d0bd7e5cc4f50c32a969b39b9dd",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-738193221fb97d60",
+          "locatorSha256": "738193221fb97d60f36c5dd45060010e74cc85bab2df14e51f1138a3f3d3bd54"
+        },
+        {
+          "rowKey": "row-bc42f7394e1a71cb",
+          "locatorSha256": "bc42f7394e1a71cb3ec1c974b6300ad95f5b0df510faca76f961f24378558062"
+        },
+        {
+          "rowKey": "row-f79fec5228741979",
+          "locatorSha256": "f79fec5228741979a3893b263a01c35799cb81b4bfc0b0ca9261153c4d2fbf2b"
+        },
+        {
+          "rowKey": "row-b823783ac423691d",
+          "locatorSha256": "b823783ac423691d2c7336aa8520dcc0a42b1feb099aec71cbacde6a42002b1f"
+        },
+        {
+          "rowKey": "row-edc98f45979658fa",
+          "locatorSha256": "edc98f45979658fa993394c1a3a679e662b682bd23e6c081f6ea74f0f9a903bd"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b488a10a0e748594046f",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Invalid_post_is_rejected_before_a_unit_of_work_is_opened(System.Int64,System.String)",
+      "reviewedCodeFingerprint": "1dc20b6e73a909bf11c08e7f58df629df9902418061038ee5be14ec743e36af2",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-c7d6fe69d67f9e1e",
+          "locatorSha256": "c7d6fe69d67f9e1e4f113e78869b8cb6b5326351a303e81ae1ac654d5eff999b"
+        },
+        {
+          "rowKey": "row-136d23470543642c",
+          "locatorSha256": "136d23470543642cc380a87356cd1094e7e78e8be8a30e683c96ad9afd80f3e6"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b62fd805af02491bc70d",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Line_values_outside_sql_decimal_shape_are_rejected_before_a_unit_of_work_is_opened(System.Boolean)",
+      "reviewedCodeFingerprint": "10ccad8d35ab927a25773241a55184ace0eea1809c63b0a57bf97a4be555579c",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-8ffc384770170ba6",
+          "locatorSha256": "8ffc384770170ba62cbcc5ddce72803f1f46d50a254867ed15ea6a2b2b33edff"
+        },
+        {
+          "rowKey": "row-50bfafd74877a330",
+          "locatorSha256": "50bfafd74877a330357d49675354b4a6ce82ec66856bc77dd0ef8dd62a19ca34"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-fc15bca19bb60492ce94",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.List_delegates_once_and_get_maps_missing_receipt()",
+      "reviewedCodeFingerprint": "1db10881c36346f07c7e75eda04ee678462fd6b3328ec5ba476d621a9f67031a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-da894f01a22ccd601083",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.More_than_200_lines_are_rejected_before_a_unit_of_work_is_opened()",
+      "reviewedCodeFingerprint": "6fd6032a5f64bf09494058d0858556d6e629ccb9585f0bf9b3fbbc0ce9e0921c",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-5243e911909315ff1fc6",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Non_positive_get_id_is_rejected_before_query_execution(System.Int64)",
+      "reviewedCodeFingerprint": "4e2b6965d00ebf792c46d7f6f7a09716fdc620292b9042a798127d22c37b72b3",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-efc041a1ba08f3fb",
+          "locatorSha256": "efc041a1ba08f3fb195f465b4ec565aab88546a48cfb6527e2d49db11620d6ae"
+        },
+        {
+          "rowKey": "row-6e72aeabfda6c31c",
+          "locatorSha256": "6e72aeabfda6c31c0d63b6f3124746142158a7ce37028e0cc627990acc2ad8e3"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-9dc6a289ed67eea5381a",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Null_line_entry_is_rejected_before_a_unit_of_work_is_opened(System.Boolean)",
+      "reviewedCodeFingerprint": "f32aaac10d04b93849650dba17dd052d1792e9ffad711443356b056eb07ef2bf",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-a4e5e3b09698f2f8",
+          "locatorSha256": "a4e5e3b09698f2f8b76740b1192fecab82c10a6f1743e539eb493d9e81ad583e"
+        },
+        {
+          "rowKey": "row-1f856263caeaa9c6",
+          "locatorSha256": "1f856263caeaa9c698dfdb658d66b72829df7813020f60c9d10e4e74f2270973"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-6741d538f1b978cd08e5",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Post_commit_audit_failure_is_reported_without_claiming_business_rollback()",
+      "reviewedCodeFingerprint": "ae84787d8d311e652708a3c79b389bda698b980ca5faf7974f4b9016868acd5e",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-42aad6bc40e9bfd72de0",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Post_commit_result_survives_audit_sink_and_failure_reporter_failure()",
+      "reviewedCodeFingerprint": "f7482bc1b95b87d57b735442ed38d3dc5a6b0ebc231abef2bd451b0e1a516b1e",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-2a0c2a26cd14a47efa17",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Post_conditional_transition_failure_returns_concurrency_conflict()",
+      "reviewedCodeFingerprint": "81ce196bb0d31427106132da9ff1f0ba40a849485d10b3fa74c9752a308d2f39",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-43df87e9487ebf8594f2",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Post_locks_revalidates_and_mutates_the_aggregate_in_one_transaction()",
+      "reviewedCodeFingerprint": "c0856a7a40b953ce3ec22dc08ba762681ba05a31269a945f329505fbeb4b8974",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-aae9a5fa06e4bc5b25c4",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Post_maps_locked_header_conflicts_before_loading_lines(System.String,System.Byte,System.String)",
+      "reviewedCodeFingerprint": "28fcc64df810cea0a1b2702e7cb0769aa661ccd1563bb2870a84c92a0a48c4d7",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-844a88b548701ad0",
+          "locatorSha256": "844a88b548701ad05eb79294bc47d91dfa62185baa019b73b7a0d201757cf4af"
+        },
+        {
+          "rowKey": "row-1faf8ba5c741e649",
+          "locatorSha256": "1faf8ba5c741e649df48614cedefbf75252e2a66d62552be819611fce18063f9"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-e8db9a4c8dcbfc7ea94a",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Post_only_user_cannot_write_or_read_goods_receipts()",
+      "reviewedCodeFingerprint": "9072576cdde854b42f60ed2c9d6370ea287f993c1e530e92aa5d40068777647a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-da56e2915e556d6bc1b0",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Post_rejects_inactive_references_before_status_ledger_or_balance_changes()",
+      "reviewedCodeFingerprint": "27c133df1c795ea6003cac5b09d095ebcf27fc883f80698f7079be196ad357c9",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-24355f97927e4dd4d5db",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Post_revalidates_line_invariants_before_mutation()",
+      "reviewedCodeFingerprint": "c1740c0881ed1841c3f91c497de09772e8de5d262b5954be10bf2a1467ef5fc5",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-6a909936e24c0f2c6c3d",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Search_longer_than_128_characters_is_rejected_before_query_execution()",
+      "reviewedCodeFingerprint": "762b3d2a91b693bab6ac1bd2d852007da4dc405c654e40dd8ba692327c532d35",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b9e2296d6412a0f06443",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Successful_post_audit_is_emitted_only_after_the_business_commit()",
+      "reviewedCodeFingerprint": "9c9675290f16e43af95d88effd1de6b53a0c88772f27decb73b194944535045f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-ef9ab5b8b7cd962daf6e",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.GoodsReceiptApplicationTests.Update_draft_maps_locked_header_conflicts_without_changing_lines(System.String,System.Byte,System.String)",
+      "reviewedCodeFingerprint": "0e80dcaab89b24643ad8260dbcdfd9a4d4519230d9447a5495ebae4718af4152",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-30ad00e67f164ab7",
+          "locatorSha256": "30ad00e67f164ab738e530fdd949b83ef2c7af7166a3043a4d39a75aa1a65e68"
+        },
+        {
+          "rowKey": "row-03cab8e63be53105",
+          "locatorSha256": "03cab8e63be531051913d7175f8bc02c44dc0bb54376badaf0afa3fe3318589a"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-7e5b555be692d5f49d80",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.IdentityAbstractionTests.Anonymous_identity_is_unauthenticated_and_inactive()",
+      "reviewedCodeFingerprint": "e08ca74f91d77a7449bef02f45b12e71619ddb4c0fb6117b5f7c9e12b6d5cc14",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-3db61fa92821228fd219",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.IdentityAbstractionTests.Application_registration_defaults_to_anonymous_current_user()",
+      "reviewedCodeFingerprint": "455a86282e16aacb703f83d4cb8e386cc416e04e6e30058f4b22d63ffdd80bf8",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-f4a56600713c37a56584",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.IdentityAbstractionTests.Blank_username_cannot_be_normalized(System.String)",
+      "reviewedCodeFingerprint": "ce81236d7ccb6acf9e1ff5677ee90cff221119f0969981a9345bb0f7bdfde291",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-d0e86d6dbf1a506a",
+          "locatorSha256": "d0e86d6dbf1a506ab9c6e796c938d42c61c64077704e0dafe8679a2a8ae676cf"
+        },
+        {
+          "rowKey": "row-849ba3dbbf6ed9fe",
+          "locatorSha256": "849ba3dbbf6ed9feb1228b41915a872482cfa76da400fdd96f330fe7f09fb4d2"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b771f90bf29e0530f5b0",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.IdentityAbstractionTests.Long_non_default_new_password_is_accepted()",
+      "reviewedCodeFingerprint": "63a546227b2982254468647d7f619c10a77a002da0a4c7f90478c38f23c6b30f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-5fbb612e4037aa32347c",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.IdentityAbstractionTests.New_password_policy_enforces_bcrypt_utf8_byte_boundary()",
+      "reviewedCodeFingerprint": "bf158833d370d6b6eda5a52aeba95623c850bb55664b65ec7daaee61868fbb12",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-9357a491fac6b6a8ff04",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.IdentityAbstractionTests.Username_normalization_is_trimmed_and_invariant(System.String,System.String)",
+      "reviewedCodeFingerprint": "fd455ce56c8156a38e6a14bf7bcdd0ec6c56bd41a5eb2d5ce3439d5b789400ff",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-17291228b8b061a6",
+          "locatorSha256": "17291228b8b061a694edbd18b4474c16c0557d14bfc79e773f538bddc56723bd"
+        },
+        {
+          "rowKey": "row-03ebd8ab33153b53",
+          "locatorSha256": "03ebd8ab33153b533e2db5dbe597c7edba986769a73e40551861e341a5839f6e"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-266b5cda5913caeb1720",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.IdentityAbstractionTests.Weak_default_or_username_based_new_password_is_rejected(System.String)",
+      "reviewedCodeFingerprint": "215fd54cbfe883846d46b28ee4d7909dd71700f946c5e513d377f7ec22502a4f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-a77b7504818c10a5",
+          "locatorSha256": "a77b7504818c10a579d89d50f47f4f996caa455ac6e5504cc7aadf2d0e712df8"
+        },
+        {
+          "rowKey": "row-9374fd3a179c7065",
+          "locatorSha256": "9374fd3a179c70655de5dfd9dee1b5a37d2db1ca52d24a4d8490d95835499eb4"
+        },
+        {
+          "rowKey": "row-9ca166dd08f5517e",
+          "locatorSha256": "9ca166dd08f5517ea6e9c203e04b022973ab91b6b9b6d4f75ee0f1dfc9728c21"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-f57d0507d0eee7f58e91",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.InventoryQueryApplicationTests.Handlers_forward_valid_requests_to_the_query_service()",
+      "reviewedCodeFingerprint": "7c028b32650cd7640f6b15ec5bfd61a87865637b643731bd3d1360926b3dca8a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-ca13701648e971374f14",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.InventoryQueryApplicationTests.Inventory_queries_use_distinct_read_permissions()",
+      "reviewedCodeFingerprint": "3ed8e3a94b4f9f5997736b7d6ceb92483536e309a164d5a5d8212a1d37bd3486",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-5f01ff952e838db8ebbf",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.InventoryQueryApplicationTests.Validators_reject_invalid_filters_paging_search_and_date_ranges()",
+      "reviewedCodeFingerprint": "c179d22e45d19668df3665e74bddf5695cc4f259bb032e91ce34cd896bfb45eb",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-2920a59837e125ce284a",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionAuthorizationTests.Anonymous_application_command_returns_unauthorized_without_query_or_mutation()",
+      "reviewedCodeFingerprint": "204092e096d71c83c325d8cd8ff139a7649edbd644ab5923c319da77a7286d13",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b367378c7d84927c6202",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionAuthorizationTests.Direct_user_decision_overrides_role_union()",
+      "reviewedCodeFingerprint": "87ff3e5a0b74e8860249b8317290760ba11299b2b30f6857e60533fae47fd6cf",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-71d2fb50b12c2ebc995f",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionAuthorizationTests.Inactive_catalog_key_denies_even_when_a_direct_or_role_grant_exists()",
+      "reviewedCodeFingerprint": "d4a5dfda9f5439c1aa14c095accb9ffa53c0f0477ee32e02727c7633d0f43fa8",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-73b434c0fc8f6992d3b2",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionAuthorizationTests.Inactive_code_lifecycle_denies_both_authorization_overloads_before_querying_sql(MyDmsVn.Server.Application.Security.PermissionLifecycleStatus)",
+      "reviewedCodeFingerprint": "19ee09dd04a3abfd73097f6f34b7e4d278a733b570d90018bd152cfa904bbbcd",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-8b3ca201465b15e3",
+          "locatorSha256": "8b3ca201465b15e3d076971ba356ea5a8f9bebfd51940928851df9c04d34f22e"
+        },
+        {
+          "rowKey": "row-a4fd9587233ce432",
+          "locatorSha256": "a4fd9587233ce432ec74e7484dba924babede6645e06bafbcdea6655f17b1147"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-3cfd7070cb78d5945339",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionAuthorizationTests.Role_union_allows_only_when_no_direct_override_exists()",
+      "reviewedCodeFingerprint": "43d5914e7444c6bd848f6b92a4c84a35ae9e090b0d5cce65c8049be6daaf9ebe",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-765f8643f9585e9c08c1",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionAuthorizationTests.Unauthorized_application_command_never_reaches_handler()",
+      "reviewedCodeFingerprint": "d3313252a1994f75ddb25cbb8f1916a5305e15f0f9b6264bf2822a3bda0058de",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-4d70ca41d4ae77b80777",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionAuthorizationTests.Unknown_permission_and_inactive_or_anonymous_user_fail_closed()",
+      "reviewedCodeFingerprint": "bbf196263cb41cce6d14d3be92b71f7603f0c56b86d08e2ab1016c25b28a82fa",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b0891ef64842a677e2ae",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionRegistryTests.Catalog_activation_and_administrator_grant_policies_are_independent()",
+      "reviewedCodeFingerprint": "60655bc713d5e7b3bcdbf082493ea8dbd5026396d5db07315e22b8a5f77c1fdf",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-1d1fdf79e47cf4e87dcb",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionRegistryTests.Current_release_is_bound_to_the_exact_manifest_fingerprint()",
+      "reviewedCodeFingerprint": "af9828e8891a1904304a325544fb45950257f72f8f2d4baa957eb0810b453853",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-f4d650296578fbce5294",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionRegistryTests.Default_registry_is_deterministic_and_covers_every_declared_key()",
+      "reviewedCodeFingerprint": "907d187160e3926c1fe46cdc3087da46acf85a59db7318c30fad4e8209dfce25",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-325dac6f417c94f563b5",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionRegistryTests.Registry_rejects_case_collisions_and_invalid_metadata()",
+      "reviewedCodeFingerprint": "2ded9703b84a14576094262b2c3fac4c4e203f7e9996cbd062499e7154540a32",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-a6837facb64584168bdb",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.PermissionRegistryTests.Registry_validation_rejects_a_referenced_key_missing_from_manifest()",
+      "reviewedCodeFingerprint": "08e27d24095e605730077d8b4d2561f6f9c6a50266068bc822878e1c89e0ed1e",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-9f4bb20d23d41b960062",
+      "ownerProject": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Server.Application.Tests.ServerApplicationRegistrationTests.Registered_foundation_probe_reports_ready()",
+      "reviewedCodeFingerprint": "93938281f8d02ec0c4d75c9dcc11eaa92e6edd3b942a6028f21c457de86500a6",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-c4407a2ea5fe09f2c06a",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Approval.SqlInstanceApprovalLoaderTests.Expired_approval_is_rejected()",
+      "reviewedCodeFingerprint": "b082765c56b8eaae064155353b0a8c80c4a2f3180859980cf203598b02d865fc",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b38c2389c948bf2431fc",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Approval.SqlInstanceApprovalLoaderTests.Fingerprint_not_matching_the_declared_identity_is_rejected()",
+      "reviewedCodeFingerprint": "2413cf1627fb1594c3a578737ac5ad27f300d9078e41427be1dc1f7fbc45ad90",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-155bb2e25d56f26b1bf9",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Approval.SqlInstanceApprovalLoaderTests.Invalid_security_fields_are_rejected(System.String,System.String)",
+      "reviewedCodeFingerprint": "576793057a1737bbb617dfbc199b0e7a9f952d6ae6b0ec4cd4bfe18a7b18d2a1",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-8dfc50998d69825e",
+          "locatorSha256": "8dfc50998d69825e92dbcf9b7e70516919d56f716b3daacdec19b2b739dfd0b7"
+        },
+        {
+          "rowKey": "row-4b726050eb8cdaa2",
+          "locatorSha256": "4b726050eb8cdaa268ff21e6599c00f84d88cccc11fbdcf398e1043dea657a1c"
+        },
+        {
+          "rowKey": "row-600cf7060cfebdc8",
+          "locatorSha256": "600cf7060cfebdc880876e4d0dbbac5e89c88adefe52f6ef524b8279f8763820"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-7dae8130ce7ff9694f47",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Approval.SqlInstanceApprovalLoaderTests.Malformed_json_is_rejected()",
+      "reviewedCodeFingerprint": "a44d201cdab77e65cbd70597af0cbd3e6fb14bbac42c7e94c6b9dd00ddb4acd5",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-73fdb25cc00b8000f0c5",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Approval.SqlInstanceApprovalLoaderTests.Missing_approval_file_is_rejected()",
+      "reviewedCodeFingerprint": "429c25b7cca91c14175b6c15522ef6e4208e40073c8c04cc3e475be196555772",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-8d6d656509374fbd4fbd",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Approval.SqlInstanceApprovalLoaderTests.Valid_approval_preserves_exact_identity_and_verified_fingerprint()",
+      "reviewedCodeFingerprint": "4f77d30fa392cd3cb05acfec7a4543d518ecaadb9885213daeff6fb62cf35390",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-57dd394fce2c7243f682",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Diagnostics.SensitiveValueRedactorTests.Redaction_removes_every_supplied_sensitive_value_case_insensitively()",
+      "reviewedCodeFingerprint": "1da818fa896bf6aa83db27c61cf8c9da79b3968db79d931713d4ccf4e5bf2af5",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-980fd5696948f6ea4d85",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Diagnostics.SensitiveValueRedactorTests.Short_fingerprint_exposes_only_the_first_twelve_hex_characters()",
+      "reviewedCodeFingerprint": "60e1ff75858994cd21b11c21f0a4089653c8bad195f3ca1586ae18e47cf71c11",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-e31704c811fa6bf933d5",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.DatabaseOwnershipReconcilerTests.Crash_window_or_terminal_records_are_ambiguous_when_database_exists(MyDmsVn.SqlTestHarness.Ownership.DatabaseOwnershipState)",
+      "reviewedCodeFingerprint": "64d67648086932a47eae25be3176860cbef216ff906129836a32362f5fcb54ef",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-490b968972a2ff12",
+          "locatorSha256": "490b968972a2ff124682d690e796905ebfd40f13d7e2478fcef8b98254ea87b6"
+        },
+        {
+          "rowKey": "row-ce762e0291c68aa3",
+          "locatorSha256": "ce762e0291c68aa365a12d4f426f031fb140041ec3d2d98abdd5bc77c0e1234a"
+        },
+        {
+          "rowKey": "row-8deb086d3066b534",
+          "locatorSha256": "8deb086d3066b534bc44ca0cb07b2e361641cb588a7193ddb6cba25772d4422b"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-ade6cc523ff0d2733d9b",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.DatabaseOwnershipReconcilerTests.Exact_created_record_marker_and_metadata_are_positively_owned()",
+      "reviewedCodeFingerprint": "c0a8c55de25b04e3314a7657d8d97edc0c747ba69432e13f0dbf4df75391e9b7",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-8f43dd3a168ec53134b8",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.DatabaseOwnershipReconcilerTests.Matching_database_owned_by_another_active_run_is_not_cleanable()",
+      "reviewedCodeFingerprint": "629d3c25cacf98ae2ac4cfd2004240c5fd8af7f05eb42fefb4c0bebd2fa09c9f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-c51a5a72e92ee7bd63f2",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.DatabaseOwnershipReconcilerTests.Missing_live_database_is_absent()",
+      "reviewedCodeFingerprint": "443e84f902ae628f4093610bd20dc9153c50e8b8b138ef9e35bedd5a313ebd1a",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-72feca575279314677d9",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.DatabaseOwnershipReconcilerTests.Missing_or_wrong_marker_is_unowned()",
+      "reviewedCodeFingerprint": "fd3e503e67270eeb22275dc68478d52f34550eebcdff86b5b897b6cb551547f3",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-270d802eaea6c7b69fba",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.DatabaseOwnershipReconcilerTests.Stale_database_id_or_create_date_is_ambiguous()",
+      "reviewedCodeFingerprint": "b8c8a3d0b2185a84bb64bcaff613b9125b03a72ee3ce81bf4467fcbdd1b445d4",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-adedb43c9e81b995463b",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Concurrent_writers_produce_complete_independent_records()",
+      "reviewedCodeFingerprint": "29718da745d357e4fef632412e7f416a643bd16071f830ab9baa040f8898f2ab",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-05cf15cf443fd8f842e6",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Create_intent_is_durable_and_readable_after_reopening()",
+      "reviewedCodeFingerprint": "8ef2f0ad5c34ca422c69b27c7f7190cceab6ed7aec90e20c2085fdfdfa9ad0a2",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-73db24188fae8ad72e4e",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Durable_record_contains_no_connection_string_raw_host_or_credential()",
+      "reviewedCodeFingerprint": "bbbe5a26cca679a2b67895549ddfd91a7adf3e04d699da12db4e671eac202898",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b0c4e1706bff05e5b55b",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Exhausted_replace_retries_preserve_the_prior_durable_record()",
+      "reviewedCodeFingerprint": "fa7a6856b00bca35f3b24256ca5bf9d412c94f08b51e5c98c27ebebb85dd56e3",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-7b02a2fc2699c486224b",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Failed_durable_flush_reports_failure_and_leaves_no_authorizing_record()",
+      "reviewedCodeFingerprint": "ffcd81af79678bd31417b8e86ec5d0f437dbc97bb69c45e094e18332b3ac3c82",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-3c28832d489cef9995b0",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Invalid_transition_is_rejected_without_changing_the_record()",
+      "reviewedCodeFingerprint": "8460241f95a963df5bb2f9efe1427946079730192162a61ef7bc97532ed85f41",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-28ddc69273c9475becd3",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Non_transient_replace_failure_is_not_retried_and_preserves_the_prior_record()",
+      "reviewedCodeFingerprint": "b8474e5f9b736903136eea5e1fc93d1da73842b73bace14fb57d2ed85c486ef0",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-a202937a2977721325fb",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Orphan_temporary_write_is_detected_instead_of_accepted()",
+      "reviewedCodeFingerprint": "b832755cf8518b873e7299848b99d9e593a08f2bd82f06afe989db766db45590",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-2fd9730eb91196eb8ec8",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Replaying_the_same_create_intent_is_idempotent()",
+      "reviewedCodeFingerprint": "9b7b67c1a662658f5ec7e76677eaf52bf864de6549a6ad09f550bb7239ef826e",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-f12c25dc1939dc38b61c",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Ownership.FileDatabaseOwnershipJournalTests.Transient_replace_failure_is_retried_without_losing_the_record()",
+      "reviewedCodeFingerprint": "221d29b6311d23b89ff57172d000cffce0682a5b0f5ec3e88211f40d6ae3c96f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-cfd46971fbfb607eb98a",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Changed_live_identity_is_not_accepted_from_a_previous_validation()",
+      "reviewedCodeFingerprint": "5b239fb4a8692b0bb7dc0ddef2b8641807441ed52cc985f467c8575f9efe2503",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-4e8441d6d98f577685f4",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Connection_failure_has_a_distinct_failure_category_and_no_ddl()",
+      "reviewedCodeFingerprint": "30ce2686c4bcb8d8423b0d51bd63a96dab261a1719d61b07eae262bd9abb5c3b",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-c355ea13a4ba03185ee8",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Effective_database_other_than_master_fails_closed()",
+      "reviewedCodeFingerprint": "18d7074338f2dcde0938ae8ba6d6419552a0549fbd90a22524faa68d685efd42",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-6b9fa028668cb98db388",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Endpoint_mismatch_rejects_an_unintended_alias_target()",
+      "reviewedCodeFingerprint": "dba5beee82396e320f6e45a6f1c966a6e177778de01d3e666e7481e8b04950fb",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-19d8b5a646d3311a0a91",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Expired_approval_is_rechecked_at_validation_time()",
+      "reviewedCodeFingerprint": "6eb20ed9733bb725696ba58d9df6f216eeab32ac380b9c494b312cfc904fc1ad",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-1d082686c47166d013c8",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Invalid_connection_configuration_fails_before_opening_or_ddl(System.String)",
+      "reviewedCodeFingerprint": "5775e6668d8821ddd941f882f956e00bad6f417de510062e143d4bc08957afac",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-7c138fbc2f05aa44",
+          "locatorSha256": "7c138fbc2f05aa4482a472e3532ec7d9599450ab068b4e60994ba0f6db210867"
+        },
+        {
+          "rowKey": "row-9338c8f1023d957e",
+          "locatorSha256": "9338c8f1023d957e975fb4968b33ed1562b19ca7703cfa414910d648a34342e1"
+        },
+        {
+          "rowKey": "row-00b53a954b69a7d8",
+          "locatorSha256": "00b53a954b69a7d82446bb756fbfdae5258b0eb193d25aa8ba26f5e39677052a"
+        },
+        {
+          "rowKey": "row-7cbcd3812c686036",
+          "locatorSha256": "7cbcd3812c6860360fad69eda9e166a2ccc71c0f80d647ad6021ad3a1bd872e9"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-41e3aa5a64230dde7a0b",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Missing_version_specific_dmv_permission_is_reported(System.Int32,System.String)",
+      "reviewedCodeFingerprint": "59a67dcd6d86f6764b8eb4e61bdba01808f4b94599fee36a1257573b46125283",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "row-74a755249197bd1a",
+          "locatorSha256": "74a755249197bd1aedc566feca91e34c7d661f1cbdbd93a01aad3e09c8e502ea"
+        },
+        {
+          "rowKey": "row-9a7e22acd4d116f7",
+          "locatorSha256": "9a7e22acd4d116f7028b1da36c0cd30814c9215e3b127e637a6f64dfa5a01680"
+        },
+        {
+          "rowKey": "row-15e328e6f304552f",
+          "locatorSha256": "15e328e6f304552f4f9b619167e6ea36f0c5c67c7a205d167e0fa6a509d4a908"
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-5dd9345dcfbcc8c32424",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Server_identity_mismatch_fails_closed()",
+      "reviewedCodeFingerprint": "678f39ecf17fae3cc362655ceb9d4c3ac0c9e62ad420e4cad3bea9192133efbd",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-35562afc9cd0c9aeecc6",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Unreadable_instance_identity_fails_closed()",
+      "reviewedCodeFingerprint": "8e09f7cd2b7d0cd82ce7ddfa999b2d1997042cb6d566ad43e0c96961c95b5de4",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-777f6a532605d44db0b3",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Preflight.SqlPreflightValidatorTests.Valid_live_identity_and_permission_issue_a_scoped_authorization()",
+      "reviewedCodeFingerprint": "d7694d61fec52255aef951ebe468557bc013957d88e88a04844d52e21d177160",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-4169e16ac9619a2fa256",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.SqlTestOperationScopeTests.Concurrent_json_lines_are_complete_and_exclude_sensitive_values()",
+      "reviewedCodeFingerprint": "ac745fea639934f1dfa4d2aef67370e66cd39ef8074cd27e1c862d2cf1131c7c",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-1b42cca044404b412890",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.SqlTestOperationScopeTests.Disabled_context_emits_no_event()",
+      "reviewedCodeFingerprint": "9d82e024a34752adea0ff7aecca999f2559d9ee58f2c7ae28322e22e60c0f62c",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-c82301ae44d7543949ba",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.SqlTestOperationScopeTests.Enabled_context_records_expected_migration_invocation_separately()",
+      "reviewedCodeFingerprint": "182c436a245c0268a3307b7fdfaf6d2d7987fc246ae5a77b4fe92da5f7a4937c",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-294901c919f738847fdd",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.SqlTestOperationScopeTests.Failure_and_cancellation_outcomes_are_explicit()",
+      "reviewedCodeFingerprint": "8d768a0f8e94889fea21757710e27502d6fd439157e7aa2ef5918ba2e243f775",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-10db1ec66de0ae910342",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.SqlTestOperationScopeTests.Successful_scope_emits_every_required_field()",
+      "reviewedCodeFingerprint": "b32d2a31cdba1bde3d84929d2da0b2fb7657378995b4588f88df24e1dd741254",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-fbc4fab447a9efc2fc39",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.TimingIntervalReconcilerTests.Negative_sampling_residual_is_preserved_and_labeled()",
+      "reviewedCodeFingerprint": "1a5fa8f0f7edc84a9037b09d13fdfc15859ccd13a7a3f81fcb43d36f7380455f",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-039aa0fe404bac313874",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.TimingIntervalReconcilerTests.Nested_intervals_are_subtracted_once_and_residual_uses_union_time()",
+      "reviewedCodeFingerprint": "abaa57f4cfc4cab1d264b3a9ce90ed07338005d3fea5f3f6543137792a28a111",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-0532ff4fa5bc2d5cbbd5",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.TimingIntervalReconcilerTests.Overlapping_siblings_are_labeled_instead_of_added_to_elapsed_time()",
+      "reviewedCodeFingerprint": "7a9f583db02008816bd671a93c39d9166c50acf80dc342b65d6599a1789852cf",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-151d705ad8906ba00015",
+      "ownerProject": "tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestHarness.Tests.Timing.TimingIntervalReconcilerTests.Repeated_logical_operation_ids_in_different_tests_remain_distinct_instances()",
+      "reviewedCodeFingerprint": "f4ba985ef7ca81c462b4b3d5cd1c77b39c44dbbeef342b0aaa3d28f6bea49de2",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-cef7f97d6dc82ab0cd75",
+      "ownerProject": "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Architecture.Tests.ArchitectureBoundaryTests.Core_projects_do_not_reference_transport_ui_or_database_packages()",
+      "reviewedCodeFingerprint": "ec743d13df9397d9a64e6ec5558867a73fb18fcd7c4621879b4f4868aa73620d",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-41f4f13bf3876c9ba6ed",
+      "ownerProject": "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Architecture.Tests.ArchitectureBoundaryTests.Desktop_application_public_api_does_not_expose_mediatr_or_erroror()",
+      "reviewedCodeFingerprint": "2ed9584d27d1b3c43c45fb21f2896345bd9c7624004ce04cf427cc0a1cdabdd4",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-8f1526a4389881b141a1",
+      "ownerProject": "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Architecture.Tests.ArchitectureBoundaryTests.Persistence_infrastructure_has_no_static_ambient_transaction_storage()",
+      "reviewedCodeFingerprint": "086276d99365b09d86e1d560c4d661705998926a9b79b2099aed103135161636",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-b4b57dd1fb67915cf7d6",
+      "ownerProject": "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Architecture.Tests.ArchitectureBoundaryTests.Server_application_has_no_http_ui_or_database_assembly_references()",
+      "reviewedCodeFingerprint": "69c6c8db8c4c74bf3ca846bacf97c977a5d64b01e789d9b24ea1b6f2ec7105b0",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-18c299f6d9e01142c6f7",
+      "ownerProject": "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.Architecture.Tests.ArchitectureBoundaryTests.Source_projects_obey_allowed_reference_directions()",
+      "reviewedCodeFingerprint": "763d6c3a28a9bbaff68587f29f3e04e8705601676bc663b805d5c79a8f098b0b",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
+        }
+      ]
+    },
+    {
+      "logicalCaseId": "case-eb9d885e06477e440789",
+      "ownerProject": "tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj",
+      "frameworks": [
+        "net8.0"
+      ],
+      "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateRepositoryContractTests.Net8_pause_final_executes_every_required_non_gui_test_project()",
+      "reviewedCodeFingerprint": "191d5a9df53dd16b3b87329c6485bab036ed9e5e16d714e007601c05c6e51756",
+      "classification": [
+        "NonSql"
+      ],
+      "rows": [
+        {
+          "rowKey": "fact",
+          "locatorSha256": null
         }
       ]
     }
@@ -8488,7 +11470,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "e076cc07928ab836ab3aeac962ee64daa10b5db5aba8231c7706ef4b7f8dcc9f"
+      "reviewedCodeFingerprint": "a3244d5fab7887ca4d9ff167688b0b7900c7c021896fb5358cc3df30e38941e1"
     },
     {
       "exemptionId": "fingerprint-boundary-3d3ddf4971d3364b",
@@ -8497,7 +11479,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "7b895d1829739e2532539869a0d3a9aa171850ce70f121f769630316535430a9"
+      "reviewedCodeFingerprint": "01692df3d3d9a56bf1aa221df977811409fb558ca3c0cbdaa680bfe0010dd38f"
     },
     {
       "exemptionId": "fingerprint-boundary-4e81bc9da2fdfe36",
@@ -8506,7 +11488,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "3dc2e701a56fd25bbee0fb1db47fa3711a8c37bcd62a8a70ff224f39118243e5"
+      "reviewedCodeFingerprint": "831fe073716cc8e57c87c24d078b6f99549888771c420b1b0e84b137352fe3c5"
     },
     {
       "exemptionId": "fingerprint-boundary-e2125c93d0107fe9",
@@ -8515,7 +11497,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "564d59612e78fa61e6c017295339b9d831cf9f97d0c7d694282a6cd0844ecfd2"
+      "reviewedCodeFingerprint": "d25adff7fbd5ad0947e749d9aab81d47181e9ac9d160d0124bd2953173277b79"
     },
     {
       "exemptionId": "fingerprint-boundary-e6ae5682a5b4c332",
@@ -8524,7 +11506,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "12e2db466813757c8ccf34cc8931546d0f64ee9dd5359c56be34c67a389e30dc"
+      "reviewedCodeFingerprint": "fba6743061f74f44b8d417866a2fdbcaee6d40ffe7cef9ea9e96b6dae88ab305"
     },
     {
       "exemptionId": "fingerprint-boundary-e819f03dc9589ad4",
@@ -8533,7 +11515,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "d4ffab61bd297ed017ceffbf737675b3c0de72980879fef4d4e5e10324c5a9f5"
+      "reviewedCodeFingerprint": "5f9fe53a6d74739eb1cc999f04e8630e784d5c503d76d5a34991a2cd9f35f0a5"
     },
     {
       "exemptionId": "fingerprint-boundary-ceec57303d613c41",
@@ -8542,7 +11524,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "f3ca86f2069c69a2b82c9ef8646c2f502599ec006b0d0381861e83b0d0cd0562"
+      "reviewedCodeFingerprint": "c7f7e58e1070c8176d56c8787bd2a384b1825a6b0585fcf93c04789450c0c0a6"
     },
     {
       "exemptionId": "fingerprint-boundary-ce05e7af3a535dec",
@@ -8551,7 +11533,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "b7bb5aa055cb2d42cf21d89535ea342d574a3765c72d0457bd554359a23b2300"
+      "reviewedCodeFingerprint": "586f4ede8f1cb69113312a58fa95763d2e60998b0eba170dfd797fe67f776ae8"
     },
     {
       "exemptionId": "fingerprint-boundary-49456f8b8b714b69",
@@ -8560,7 +11542,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "aa1ddb7a82f4c7128ee29097de6598866a68dcec1ebcc1346be5dab39618337f"
+      "reviewedCodeFingerprint": "68b866a7ed81e44ef2fe022d34548002bcfae922842b58c8d839f7438379d044"
     },
     {
       "exemptionId": "fingerprint-boundary-824695d9b7e3498d",
@@ -8569,7 +11551,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "341e192416cfe5854cf596132b5e1dc706bfb6cf54f09b682927ee3e827cb7a5"
+      "reviewedCodeFingerprint": "5a87287ec3992a5f65b0d32561b7a03cd54123a6d8619cb0b8ab58d8db2d25b5"
     },
     {
       "exemptionId": "fingerprint-boundary-c0d11979ccd35894",
@@ -8578,7 +11560,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "1ed41f9c83c2fe873db0204d9fbd1aa10dd5d9aa89a4d408139f34c356e4bf77"
+      "reviewedCodeFingerprint": "880e64e45f467a9e9fade6d9e51d9f77d44b8b2c3b57e791d36b1458d1bdfae9"
     },
     {
       "exemptionId": "fingerprint-boundary-5d2f424af2b04f40",
@@ -8587,7 +11569,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "692a6b7265df245135edbcaf6d48674c720e90255b8a5aa5aad3407ef2e6f5c6"
+      "reviewedCodeFingerprint": "6bb57784386da9988d50729172bd1197993ce6a349bdf9b9a3250399848ad11b"
     },
     {
       "exemptionId": "fingerprint-boundary-cf9bdacef5ada564",
@@ -8596,7 +11578,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "f34d513fd419a7c5d7837fcc2c74efe77a39c7f6ecf3607085b161ce82ae754b"
+      "reviewedCodeFingerprint": "a15dcd2769f8241e4267836bfa4fccbd234474f55a0680b68d7e5d8f0b4be850"
     },
     {
       "exemptionId": "fingerprint-boundary-66f80d0cb6e098d2",
@@ -8605,7 +11587,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "4e6de12c66ee76824addf5c6fc9c05735b69844b4bfa0c8b368350fcbd387b3b"
+      "reviewedCodeFingerprint": "e8a44d1f5dc916006ffa79aa4ed5b6738a97af100eed863794f61677f7425a0b"
     },
     {
       "exemptionId": "fingerprint-boundary-2cb2e973f0d44b74",
@@ -8614,7 +11596,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "9d11b1c718122a6fc58bfb26698a0ffdc005b97f561ac51e706e5335905653c2"
+      "reviewedCodeFingerprint": "f5970f52421140721acd7a3e567540852603a7e43eb3ddfa47831757a27d8d90"
     },
     {
       "exemptionId": "fingerprint-boundary-adb89d2c3242d3bb",
@@ -8623,7 +11605,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "71aaf3b4cef0644991af34c664d95ee43459640ac7d55de6acab22700345c541"
+      "reviewedCodeFingerprint": "53f37f210a6bfe6c06904c9005076dd7a557c2fd136c98c92bea14f09bc8f3b8"
     },
     {
       "exemptionId": "fingerprint-boundary-32483bc06c247bd4",
@@ -8632,7 +11614,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "132825737bc8e1d7c6687e75c5176803f1cff2ce783da4d54859f6903c3a4d0a"
+      "reviewedCodeFingerprint": "e958c4823a20fc8173f8c611355956cc7972fea9c2ce5c2497c591993d24fb34"
     },
     {
       "exemptionId": "fingerprint-boundary-09249f937c49ed91",
@@ -8641,7 +11623,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "55b978602bbd406d575478245c10747c99dc5867c63d4da4a54ef56b225a1f4b"
+      "reviewedCodeFingerprint": "3f543bed77f49445156526e22e98720a2edc0c0db64caa8356436f2d8c248771"
     },
     {
       "exemptionId": "fingerprint-boundary-459dff21706762fe",
@@ -8650,7 +11632,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "3f9b0a3cae62f9631c81b0eab958ad764f9d5f3a369c263fa5a70331beeee3ce"
+      "reviewedCodeFingerprint": "36ff3402355e6f878246a618ce75f6f144cc562a197226905a0eba0e2ec18d72"
     },
     {
       "exemptionId": "fingerprint-boundary-65c977b723a11acd",
@@ -8659,7 +11641,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "f496b1b8afe89c24e50aea3985b7473a8ddc555cbf96eb0c49dd5abe4e530cd3"
+      "reviewedCodeFingerprint": "fcbb62abc3a91f1b61ecd74605fa2b0055a65ca7a79554671ead79e740e38ede"
     },
     {
       "exemptionId": "fingerprint-boundary-d9b39a234722bffe",
@@ -8668,7 +11650,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "359657072fdace30896c1aea4eea589cb02a0342abcdee3907b380fb49c00c6b"
+      "reviewedCodeFingerprint": "5c5890c1e73115f04967ceaec3b2f4f518bc0d7def773c59bdc0b4a25fd8b849"
     },
     {
       "exemptionId": "fingerprint-boundary-bbfdfa47e1948fa7",
@@ -8677,7 +11659,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "ed31ab569ed4d357a29d6c0fb5d604bd691003a876fba8f1865a44896821df2a"
+      "reviewedCodeFingerprint": "5a31631871bbce575b83f253ba7eee37065b86e082da3a157ea41aac59b1feb3"
     },
     {
       "exemptionId": "fingerprint-boundary-e654b81ff437bb51",
@@ -8686,7 +11668,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "bee855961c2c79e59c83637a799f7b7058fefae44da7972ec9ce005d09d8b868"
+      "reviewedCodeFingerprint": "fbf52f99cdef819509dddb674f16423615c4364770f861dab07202be0bd3dea2"
     },
     {
       "exemptionId": "fingerprint-boundary-6f28abc6a5022e8a",
@@ -8695,7 +11677,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "0d1b3fe0152b41afcbd8962c2a84530407f726fff34a2a0879491e572d2aa44b"
+      "reviewedCodeFingerprint": "52f7e2c13f1cecc413f1c50235782f5d8bdb6ced08ed20a7f3ac9709a1dcfc9c"
     },
     {
       "exemptionId": "fingerprint-boundary-5485a53c51cdb416",
@@ -8704,7 +11686,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "57a7da29d591e643ab5279e4bf5aa567489ea67352e486de0df0117741d8bd0f"
+      "reviewedCodeFingerprint": "4036c6c3b79065d6ded154e1b6be991951e3a88eca18a18e3ed59de8501f1805"
     },
     {
       "exemptionId": "fingerprint-boundary-ebd14823845d8af8",
@@ -8713,7 +11695,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "743fb7c461f54f323919b4343064adcbf67ac38a071008048eda52f68d599591"
+      "reviewedCodeFingerprint": "8c2173c9e2a5dfb4b78d3eb5804c51beb9b7c2e11dfabf94ff013858656ccedf"
     },
     {
       "exemptionId": "fingerprint-boundary-9c0d43e290e7bd18",
@@ -8722,7 +11704,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "a0cbde63c6054391e3150b2b9a5183156507de5a6438c725605a25efca8d02d3"
+      "reviewedCodeFingerprint": "71f8030127027920405aabed054b62e46932e2e3810ff52f96c10a099b9a8e2f"
     },
     {
       "exemptionId": "fingerprint-boundary-e793e776ebbd53ab",
@@ -8731,7 +11713,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "d5a5bf0cbf1e74bfbe5fa702cc9f0c963a5ad787176025b59efb9798863e9c45"
+      "reviewedCodeFingerprint": "b73691adac6608040dbaade3e4cc120e81c2f965206b975771172db77c927ad6"
     },
     {
       "exemptionId": "fingerprint-boundary-8c7295a03e79e853",
@@ -8740,7 +11722,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "6dd7bdcba8f242a720e3c93b1dbf7dbbc626a4c91ef467670b546f33d312f37e"
+      "reviewedCodeFingerprint": "b9cfffe683b8aca0fdc8d6178d10510b37c09c2e06c212435c1922ca111ee622"
     },
     {
       "exemptionId": "fingerprint-boundary-873f8bfb9a01f999",
@@ -8749,7 +11731,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "5320ebb195e9759de70d11e1b604f3132ae08dae756333180155172c1b53a502"
+      "reviewedCodeFingerprint": "f906b54ab641ca3eca3a3c05d94730c7b41330f46c5fa1d901df4f66f3ba5556"
     },
     {
       "exemptionId": "fingerprint-boundary-3c952748518e6abf",
@@ -8758,7 +11740,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "2bbf837419ac32b69ea07352b7a895273fa93ebb0de3d29b52ce489c9f86a5f0"
+      "reviewedCodeFingerprint": "2148a9c946929ce4249c62e73c6ac10ba7196116abf7601f2a99ae2bf357f33e"
     },
     {
       "exemptionId": "fingerprint-boundary-e428334bc33843ed",
@@ -8767,7 +11749,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "715020df8febeac406e2c15c86158e450927de2b00499c1b0c7128bca371d7be"
+      "reviewedCodeFingerprint": "211853fe1542a40a9941f6c081db1b746de95b9b2534087437f7b69c6f659330"
     },
     {
       "exemptionId": "fingerprint-boundary-0b1f4a7294069410",
@@ -8776,7 +11758,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "cc7591a34801cb0732dee4520317aa259cc22c75c5052f0a5567dc6425c7398b"
+      "reviewedCodeFingerprint": "a52776c72c7db77330d61e05d4055cafe702cf84a9bd99789e53ef47fa686bdc"
     },
     {
       "exemptionId": "fingerprint-boundary-cd5dc913910d1d81",
@@ -8785,7 +11767,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "1c34af46dbb9c09da82201561c0247b118f3fb52c9aecdf2847c8281cdb144e9"
+      "reviewedCodeFingerprint": "140139928127e8992ec52978b4d0d7503a61e7c1e4d2ae4f5fc4429c0fb29f4c"
     },
     {
       "exemptionId": "fingerprint-boundary-8d4f19cffb87d487",
@@ -8794,7 +11776,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "bcb55016516437c22cbd3ba539ad2c5f1d9122f81c611a5d782733945af135f0"
+      "reviewedCodeFingerprint": "b4102a9e741eec5f0a5295cecb3f19c878ddd71e8464c41b62fd1ee9630600e7"
     },
     {
       "exemptionId": "fingerprint-boundary-520c03b9f8363d29",
@@ -8803,7 +11785,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "26b2b26bb0e9f565ff544cc716b1aaa7bf34e5103905113727e953c7bb1ba3cc"
+      "reviewedCodeFingerprint": "ea3a16ca3e31f367e0e75894913abef9f3e856fac17e2d74de1b5f387a0acefa"
     },
     {
       "exemptionId": "fingerprint-boundary-151eb861dd8f4cc6",
@@ -8812,7 +11794,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "96d4574ca09136dffa8ab536b48bdc83d6161b0b57df0680456021f3fc406ceb"
+      "reviewedCodeFingerprint": "dfefa9d8caa8650c34eb4766b5e7c926e72021c37f0659da5f22acb992ae140d"
     },
     {
       "exemptionId": "fingerprint-boundary-8ba06f0669b539d5",
@@ -8821,7 +11803,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "50c2289cfe1f5c0712a801c2f32103be04aa945d362b0cca5ea6d5ba4d37a701"
+      "reviewedCodeFingerprint": "117ac66957c1d01e5f8d31c2b8475d84152224f24211a2c6f158210535b20c60"
     },
     {
       "exemptionId": "fingerprint-boundary-3c3f50d6b4c8e98a",
@@ -8830,7 +11812,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "34aebab8db711089b4fb32fc251b8bd075df54d5881946da64afbd01271152bb"
+      "reviewedCodeFingerprint": "354fbcbec25cf9637e7a778e679c27ac505cc523ddfdd6361cff38ef4a1dec83"
     },
     {
       "exemptionId": "fingerprint-boundary-33291c5084c840f9",
@@ -8839,7 +11821,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "56d0a03976b213f427bc2dbe17a3dfd213a9af2bbfe72e77edb6aedaa651eecd"
+      "reviewedCodeFingerprint": "1d6cceb887a36ecd91dab6c5725fd071008c48d3613496f1899c0e137ba230dd"
     },
     {
       "exemptionId": "fingerprint-boundary-7069e8ca6197b33f",
@@ -8848,7 +11830,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "7ce231661173e02a14f5b26a6b4405d756924aa2fce506e027f2339aa82b9bd5"
+      "reviewedCodeFingerprint": "662e3cafa671caa79d5b7fe8fc38eee6890659b7462bb71189a1c24f7f9cb097"
     },
     {
       "exemptionId": "fingerprint-boundary-f4c05515b04f0717",
@@ -8857,7 +11839,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "8f503770dd68ae0432ba905345f1dfd2f2c2c38d6b524d0f6f5d97b0012878e1"
+      "reviewedCodeFingerprint": "7bcb5845a62806abf14b30ae54fd43d8bdb6b62f6e826d478aa68f3bd7a6f656"
     },
     {
       "exemptionId": "fingerprint-boundary-73107f19c59c2d42",
@@ -8866,7 +11848,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "76feced4e019c72253afb018da96d5de9f85f9bb645b4816420bb5bcd81c0025"
+      "reviewedCodeFingerprint": "da268da1da0577b9bbb652ceffdb84bdf40454f2b02939e37d8f2d179267e7b7"
     },
     {
       "exemptionId": "fingerprint-boundary-c39b198a836c11a8",
@@ -8875,7 +11857,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "e8308b6c7af4bf9112a44e94e69f08a4ec0defedeb03c8c1522b4464d10c50cb"
+      "reviewedCodeFingerprint": "31c5554b4b7269f46984a0b69a91b073ffa9ae46e2360ad7057aae73f634b7fa"
     },
     {
       "exemptionId": "fingerprint-boundary-1d2d94d320472dbb",
@@ -8884,7 +11866,7 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "a197cb1ca33ecc33747dff4772b646f8f510b052d0255c4ba348d5bdab196066"
+      "reviewedCodeFingerprint": "ffa94197c7d825b02ad5f36d7bcb221eb05f29dd25522ec09a78e9e7de4729b0"
     },
     {
       "exemptionId": "fingerprint-boundary-c54ef83387ce5e6e",
@@ -8893,7 +11875,16 @@
         "NonSql"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "985ff3e52c0941b6e17ad146df3af2aa3fd7f28338f4c2f22bd616cfc99d3991"
+      "reviewedCodeFingerprint": "51aa137ab0389268deee0889afbd76d5e5d63b172d91f315ff9087cf744b9525"
+    },
+    {
+      "exemptionId": "fingerprint-boundary-eb9d885e06477e44",
+      "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateRepositoryContractTests.Net8_pause_final_executes_every_required_non_gui_test_project()",
+      "classification": [
+        "NonSql"
+      ],
+      "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
+      "reviewedCodeFingerprint": "191d5a9df53dd16b3b87329c6485bab036ed9e5e16d714e007601c05c6e51756"
     }
   ]
 }
