@@ -57,19 +57,62 @@ The new permission rebuild will intentionally replace the old P3.1 sync/Administ
 - [ ] Verify current SEC-REBUILD authentication/permission administration/bootstrap, operator CLI runbook, actual migration separation, installed diagnostics/audit, security limitations of client-side direct SQL and recovery support.
 - [ ] Produce the full release evidence matrix and owner sign-off for gates **G1 deployment/schema, G2 SQL/data safety, G3 security/diagnostics, G4 GUI/regression and G5 identity/release decision**. Update `docs/DEVELOPMENT_PLAN.md` only upon verified exits. Without that evidence, v1 is **not ready for production**.
 
-## 3. L1/L2 task gates and final L3 boundary
+## 3. Task-scoped L1/L2 gate contract (bind actual post-T04/T05/SEC-REBUILD projects)
 
-| Work item | Fast task gate (L1/L2) | SQL only if affected | Manual/L4 obligation |
+**Authority:** Every `REMAIN-...` task must have a reviewed **project × actual TFM × source-discovered selector** and nonempty expected Fact/Theory identities before the implementer claims Task PASS. The current source still has the anchors below, but **after TESTGATE-T04/T05 extraction and SEC-REBUILD** their physical paths, methods and categories may change: bind those from the *committed implementation revision* to the versioned manifest; do not run a deleted original test project or copy fictional module selectors.
+
+**Historical/active target distinction:** After successful NET8-PAUSE, pure Application/SQL/WinForms tests use `net48`. The SQL runner (and any retained compatible architecture checker) may still run on tool-only `net8.0`. Desktop.AppCore/`net8.0-windows` and SQL `net8.0` are PARKED/NOT RUN until a separate restoration is verified; if NET8-PAUSE has not actually passed, current dual-TFM gates still apply. Never infer that runner-only net8 tests prove net8 application behavior.
+
+**Binding manifest:** Proposed stable `planId=20261016-004-remaining-p5-acceptance-and-p6-hardening`; `taskId` must equal the subsection ID verbatim (for example `REMAIN-P5-GUI-01`). Before any task runs, register and review unique `gateId`s for **non-GUI, non-SQL Task cases** with exact project, framework list, `NonSql` category, reviewed selector, build prerequisites, source/discovery/TRX identity checks and bounded timeout. Current Task mode rejects SQL/GUI resources; **do not mislabel WinForms or SQL as `NonSql` to bypass it**. Bind affected SQL project + category to the verified guarded T05 runner with approval/owner/cleanup, and use a separately verified whole-tree GUI D1/D2 launcher. T05 must supply a reviewed multi-project strict Final; do not reuse T03's single-project Final for modularized tests.
+
+### Per-task L2 matrix: current source anchors, mandatory selection and evidence
+
+| Task | Non-SQL project / actual TFM and **reviewed current-source class anchors** | SQL category and actual project owner | GUI/operational and mandatory evidence |
 |---|---|---|---|
-| P5-GUI-01 | Scoped Desktop ViewModel + STA control tests, actual active TFM, bounded watchdog | Focused `FastSQL` only for changed persistence behavior | Real Catalog/lookup/debounce/messenger walkthrough |
-| P5-GUI-02 | Scoped posting/client/STA tests | Affected `FastSQL`/`SqlConcurrency` selected by behavior | Actual Draft/Post/balance/card/duplicate Post |
-| P6-OPS-01 | Migrator/config/packager, secure principal/diag tests | `MigrationSchema`/`SecurityProvisioning` for real SQL changes | Clean-machine principal/rotation/upgrade/full disk |
-| P6-T05 | Focused GUI/auth/lookup tests | Affected category only | Packaged UI, permissions, no modal hangs |
-| P6-T06 | Backup/compatibility script inspection and restoration harness checks | Dedicated approved restore/drill environment, never production | Executed backup/restore/migration-failure runbook |
-| P6-T07 | Focused UI, contract, inventory invariants | Reviewed affected categories; full SQL only at Final | Nonfunctional/target regression |
-| P6-T08 | Evidence/audit/readiness review | **No repeated SQL when frozen Final evidence already matches** | Owner-reviewed release decision |
+| **REMAIN-P5-GUI-01** | Current `Server.Application.Tests` × `net48`: `CatalogApplicationTests`; Desktop VM anchor `CatalogViewModelTests`, `CatalogLookupViewModelTests`, `DebouncedAsyncActionTests` × **active GUI/VM project's declared TFM** after T04 | `FastSQL` for changed CRUD/lookup storage only; current `CatalogBackendIntegrationTests` / `CatalogMappingIntegrationTests` in original SQL project until moved; actual T05 module owner thereafter | Reviewed bounded GUI D1 for `CatalogControlTests`/`CatalogLookupViewModelTests`, explicit cancellation/messenger/lookup cases; manual packaged all four catalogs, receipt-open lookup reload, latest filter/Refresh, same-process not cross-process; screenshots/environment |
+| **REMAIN-P5-GUI-02** | Current `Server.Application.Tests` × `net48`: `GoodsReceiptApplicationTests`, `InventoryQueryApplicationTests`; Desktop VM `GoodsReceiptEditorViewModelTests`, `InventoryViewModelTests` on actual post-T04 project | `FastSQL` for posting/stock mapping; `SqlConcurrency` if changed Post race/idempotency; original `GoodsReceiptCommandIntegrationTests`, `InventoryQueryIntegrationTests` until T05 module move | GUI D1 `GoodsReceiptControlTests`/`InventoryControlTests`; packaged Draft→Post→StockCard/Balance→duplicate Post denied, reauth/restricted user and stale rowversion; ledger/balance reconciliation evidence |
+| **REMAIN-P6-OPS-01** | Current `Server.Application.Tests` `AuthenticationTests`/`PermissionAuthorizationTests` × `net48` if still valid **after SEC-REBUILD**; runner/tool boundary `TestProjectBuildContractTests` on its actual tool TFM; active WinForms package smoke as separate GUI gate | `MigrationSchema` for schema compatibility, `SecurityProvisioning` for principal/bootstrap; source anchor `SchemaCompatibilityIntegrationTests`/`SqlPrincipalProvisioningTests` until split | Controlled clean-machine install/publish, runtime/admin principal boundaries, rotation, full-disk, log redaction/audit, dual-version schema rollout; record artifact SHA, OS/SQL, user/tester, PASS/FAIL/BLOCKED |
+| **REMAIN-P6-T05** | `CatalogApplicationTests`, `GoodsReceiptApplicationTests`, `InventoryQueryApplicationTests` × active `net48` in their real post-T04/T05 assembly; Desktop `DesktopHostRunnerTests`, `LoginFormTests`/`ProductionDiagnosticsTests` as reviewed | Only affected `FastSQL`/`SecurityProvisioning`/`SqlConcurrency` L2; new SEC-REBUILD permission implementation/tests must be used, not obsolete registry tests | Bounded GUI D1/full D2 at release for packaged Login, all catalogs, Draft/Post/stock/card, messenger, error/modal/disabled user/permission and logout; retain manual checklist separately |
+| **REMAIN-P6-T06** | Current architecture/compatibility validation `SchemaCompatibilityPolicyTests` (original SQL assembly, reviewed classification) and `TestProjectBuildContractTests` (tool-only), as actually moved/retargeted. A SQL-backed class is **not** eligible for pure Task merely by its name | Dedicated approved `MigrationSchema` plus actual SQL failure/recovery categories if code changed. **Restore drills** require isolated approved backup/restore environment, not automatic dev database mutation | Separate-DB verified backup restoration, partial migration/concurrent migrator, safe forward-fix/restore decision, disk/network/commit uncertainty, real recovery timings/runbooks; no production DDL |
+| **REMAIN-P6-T07** | Current `Server.Application.Tests`: `ApplicationPipelineTests`, `ContractEnvelopeTests`, `GoodsReceiptApplicationTests`; Desktop `InventoryViewModelTests`, `UiDispatcherTests`; architecture `ArchitectureBoundaryTests` on its **actual compatible target**, not invented net48 | Reviewed actual `FastSQL`, `SqlConcurrency`, `MigrationSchema`, `SecurityProvisioning` coverage as affected; post-T05 global case/owner bijection | Large grid/paging/cancel/offline, business invariant and Post races; bounded GUI/STA, supported Release matrix; full strict SQL belongs to frozen L3 **not after each edit** |
+| **REMAIN-P6-T08** | Static operator runbook/release manifest and explicit `ArchitectureBoundaryTests`/`ProductionDiagnosticsTests` only when changed; source-reviewed project/TFM | **None** for pure sign-off/docs audit; rely on fresh matching frozen Final evidence, trigger focused SQL only for a code/SQL change | G1–G5 release matrix, legal legacy hash decision, SEC-REBUILD administration/bootstrap, evidence owners/dates, explicit temporary net8 exclusion; cannot sign off blocked gates |
 
-Before every execution resolve **the actual checked-in project × TFM matrix**, selectors and manifest-owned Task/Final implementation. Retain outer GUI watchdog, serial real-SQL approval/owned databases and strict cleanup. Never run speculative project paths or a now-empty selector. Run one planned Release L3 only after task gates pass and gate inputs are frozen; after a gate-affecting edit, invalidate/repeat the affected mandatory Final gate. Re-run SQLPERF benchmarking only with a separate approved performance objective.
+**Per-row L2 exit:** record the task, commit SHA, actual project×TFM, selector and *expected discovered/tested count*, source/discovery/TRX reconciliation, build status, case pass/fail/skip, nonzero exit/timeout, SQL approval/preflight/owned DB cleanup where applicable, bounded GUI state and separately identified manual evidence. Never use a missing/new test name as an empty green selection. If T04/T05 moved or SEC-REBUILD deleted a named class, replace the selector only after a reviewer records the exact renamed/replacement case identities; label unresolved selectors `NOT YET BOUND / BLOCKED`.
+
+### Existing runnable focused *non-GUI* command examples (before project extraction)
+
+These use **currently existing** source class names. They are valid **only while the original project still owns the cases**, on a committed, restored build whose `.csproj` declares the requested TFM. After T04/T05, use its manifest-owned `Task` for the real replacement project; do not treat ad hoc commands as evidence of manifest Task selection.
+
+```powershell
+# Select verified current Application non-SQL cases; no SQL approval needed.
+$app = 'tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj'
+dotnet test $app -c Release -f net48 --filter 'FullyQualifiedName~CatalogApplicationTests'
+dotnet test $app -c Release -f net48 --filter 'FullyQualifiedName~GoodsReceiptApplicationTests|FullyQualifiedName~InventoryQueryApplicationTests'
+```
+
+**After module split (proposed manifest-owned Task; NOT runnable until registered and reviewed):**
+
+```powershell
+$remainingPlan = '20261016-004-remaining-p5-acceptance-and-p6-hardening'
+$artifactRoot = '.sqlperf/p6-task-' + [guid]::NewGuid().ToString('N').Substring(0,12)
+& ./tests/tools/Invoke-TestGate.ps1 -Mode Task -PlanId $remainingPlan `
+  -TaskId 'REMAIN-P5-GUI-01' -ArtifactRoot $artifactRoot
+```
+
+**SQL L2:** resolve **actual post-T05 module `.csproj` path**, category and complete case selector from its *implemented* gated test runner; supply explicit `-Frameworks @('net48')` if it is supported by that verified wrapper and use valid `MYDMSVN_SQL_TEST_APPROVAL_FILE` on an explicitly approved non-production instance. Preserve global cross-process SQL lease, per-project source/discovery/TRX, zero mandatory skips, whole-tree watchdog, owned DB reconciliation and cleanup. `Invoke-FocusedSqlIntegrationTests.ps1` is currently a **single-original-project / one-category** helper; do not claim it supports unverified moved module+category selection. If unavailable, record SQL L2 **BLOCKED**, never fall back to a raw SQL `dotnet test`.
+
+**GUI L2 and release D2:** no GUI whole-tree watchdog is verified in this planning revision. T04-A must produce one with deterministic timeout, child termination/orphan failure, complete TRX/Fact/Theory reconciliation, STA serialization and `DataError`/modal capture. GUI-bearing `dotnet test` / `--list-tests` alone do not satisfy required GUI gates. Until a verified launcher + actual project bindings exist, GUI D1/D2 is `BLOCKED / NOT RUN`.
+
+### Bounded budgets and Final acceptance
+
+| Execution | Upper-bound contract (adjust only after source-reviewed evidence) | Required result |
+|---|---|---|
+| Pure L1/L2/manifest Task | **300s per test process; 900s aggregate Task**, nonempty selector | Exact pass/fail/skip count + revision; no incomplete TRX |
+| Guarded SQL L2 / L3 | **1200s per SQL project/TFM invocation; 7200s overall Final** while current case count applies; refuse unbounded SQL executions | Approved instance, full discovery/theory rows, watchdog, ownership/cleanup |
+| GUI D1/D2 | **900s per GUI project/active TFM whole tree**, or a reviewed stricter threshold derived from baseline | No modal hang, STA/serial, forced cleanup and separate TRX |
+| Manual package/restore/VM L4 | Operator-controlled bounded scenario with explicit deadline, safe approved non-production environment and recovery rollback | Screen/runbook/tester/time/result; a partial/manual stop is **NOT VERIFIED** |
+
+**Final acceptance is an evidence envelope, not one loose `dotnet test`:** after all task gates are green and inputs frozen, use **verified post-T05 manifest-owned Final** with **unfiltered all active SQL project(s)** and required non-SQL modules/Architecture (tool-only target where necessary); separately execute complete GUI D2 and required clean-machine/backup/restore L4, all bound to the same release revision/artifact manifest where applicable. SQL retains approval/inventory/TRX/ownership/watchdog/cleanup and zero mandatory skips. No completed P5/P6 stage may rely on obsolete old permission behavior from before SEC-REBUILD. A later gate-affecting edit invalidates and repeats the *affected complete mandatory gate*, not the full suite after every small edit.
 
 ## 4. Remaining P6 release evidence matrix
 
