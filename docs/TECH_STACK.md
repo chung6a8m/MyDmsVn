@@ -4,14 +4,14 @@ Status: decisions approved by project owner on 2026-10-08.
 
 ## Runtime lifecycle note (2026-10-16)
 
-The checked-in projects are **still dual-target** where currently declared. The active [NET8-PAUSE implementation plan](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) proposes *temporarily* dropping the second `net8.0` / `net8.0-windows` TFM from multi-target projects to reduce Codex test latency. **The plan has not been executed**: do not report .NET 8 removed, ignore the modern host/tool-only dependencies, or skip today's dual-TFM strict tests. A separate verified implementation PR must determine compatibility exceptions and preserve TFM-selectable test tools. Re-enable net8 for P7 Server.Api and modern desktop parity unless a separate runtime change is approved.
+The NET8-PAUSE candidate actively declares `net48` for product, SQL and Desktop projects. Historical `net8.0` / `net8.0-windows` logical cases remain in the reviewed manifest as `PARKED / NOT RUN`; AppCore source is retained but excluded from the solution/release. The strict/focused runner remains tool-only `net8.0` with explicit framework selection. T05 acceptance and merge are still required before this scope becomes the branch baseline. Restore .NET 8 through [the reviewed procedure](REACTIVATE_NET8.md) before P7 Server.Api or modern desktop parity unless a separate runtime plan is approved.
 
 ## Runtimes
 
 - Desktop legacy host: `net48` (WinForms / Windows, .NET Framework 4.8).
-- Desktop modern host and shared WinForms library: `net8.0-windows`, and multi-target shared code appropriately.
-- Application/Infrastructure libraries: `net48;net8.0` where required to serve both hosts; pure cross-target contracts may choose `netstandard2.0` **only after checking feature/runtime compatibility**.
-- ASP.NET Core Server.Api (P7): `net8.0`.
+- Desktop modern host: parked AppCore source formerly `net8.0-windows`; not built or shipped during the pause.
+- Application/Infrastructure libraries and shared WinForms: active `net48`; historical net8 targets are retained in the reactivation contract, not current binaries.
+- ASP.NET Core Server.Api (P7): future `net8.0`, blocked on reviewed reactivation or an approved alternate framework plan.
 - Windows + Visual Studio 2022, installed .NET 8 SDK and .NET Framework 4.8 developer targeting pack.
 
 **No automatic migration to .NET 10.** .NET 8 support lifecycle is a documented operational risk to revisit separately; it is an explicit compatibility decision.

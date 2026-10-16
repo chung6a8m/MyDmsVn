@@ -1,6 +1,6 @@
 # Testing strategy and quality gates
 
-**Roadmap/TFM scope (2026-10-16):** The currently checked-in code/test targets are still dual-TFM; on `main` and unrelated PRs all declared SQL/WinForms targets remain mandatory until a NET8-PAUSE implementation PR has been reviewed, passed and merged. The [NET8-PAUSE plan](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) explicitly authorizes **only that candidate migration PR's Stage B** (after T01 reviewed target/baseline authorization, T02 target removal and T03 parameterized runner verification) to run the complete **active `net48` SQL + GUI + non-SQL acceptance matrix** at the frozen candidate revision. `net8.0`/`net8.0-windows` entries then remain `PARKED / NOT RUN`, never counted as PASS; no currently active case is waived. Once merged, the versioned manifest-approved active list applies to future PRs; restoring net8 requires full dual-TFM validation. See the [ordered roadmap](plans/README.md).
+**Roadmap/TFM scope (2026-10-16):** This authorized NET8-PAUSE Stage B candidate declares active `net48` application, SQL and GUI targets; `net8.0`/`net8.0-windows` product entries are retained as `PARKED / NOT RUN`. The runner and runner tests remain tool-only `net8.0`. The versioned manifest preserves the 209-case historical SQL floor and binds candidate Final to the real active SQL owner on `net48`. T05 must still prove the complete frozen SQL + GUI + non-SQL + Release envelope before merge. Other branches follow their checked-in declarations; restoration follows [REACTIVATE_NET8](REACTIVATE_NET8.md) and requires full dual-target validation.
 
 ## 1. Test layers
 
@@ -17,8 +17,8 @@
 ## 2. Cross-target matrix
 
 - `net48` compile/run on Windows with installed Framework 4.8 targeting/runtime.
-- `net8.0` Application, Infrastructure and integration tests.
-- `net8.0-windows` WinForms and modern host on Windows.
+- Historical `net8.0` Application, Infrastructure and integration coverage is parked during the pause.
+- Historical `net8.0-windows` WinForms/AppCore coverage is parked; the active GUI gate is bounded `net48` D2.
 - At least one clean Windows build of each host during P0/P6. Do not claim Linux CI proves WinForms parity.
 - Contract DTO tests run for both applicable targets.
 
@@ -97,7 +97,7 @@ Before marking a roadmap task complete:
 
 Use the mandatory [Codex Test Execution Policy](CODEX_TEST_EXECUTION_POLICY.md) when implementing subsequent plans. It distinguishes (1) focused inner-loop checks, (2) affected-task validation, (3) final PR acceptance, and (4) specialized release/performance/stress gates. The test scope must expand at the final gate-affecting revision; a focused green run cannot satisfy a required unfiltered full-suite gate. Tests should not be rerun merely to inflate evidence, but earlier regression results become stale after source, test/theory-row, SQL/migration, inventory/manifest, runner/harness, or build/CI changes that can affect discovery, execution, scope, or results. Rerun the applicable complete L3 gates against the final relevant revision.
 
-For code-bearing PRs, the final gate includes the supported Release build/tests and full **unfiltered** SQL integration on **every approved active TFM** (both `net48` and `net8.0` today except for the specific NET8-PAUSE Stage B candidate, then `net48` until explicitly restored). No accepted SQL result may rely on missing approval, SQL skips, category-only filters, partial TRX or unverified ownership. Use `Invoke-SqlPrAcceptance.ps1` for one strict sequential pass per TFM. `Invoke-SqlIntegrationBenchmark.ps1` remains the 1-warm-up/3-measured-pass performance protocol. Do not present plain `dotnet test` as equivalent. A baseline/candidate **A/B comparison** is mandatory only when a plan explicitly requires performance evidence, not for routine functional work.
+For code-bearing PRs, the final gate includes supported Release build/tests and full **unfiltered** SQL integration on every manifest-approved active TFM. This Stage B candidate uses only active SQL `net48`; historical net8 is NOT RUN. Supply `-Frameworks @('net48')` to the lower-level strict wrapper when a plan explicitly uses it; candidate acceptance itself remains manifest-owned. No accepted SQL result may rely on missing approval, skips, filters, partial TRX or unverified ownership. `Invoke-SqlIntegrationBenchmark.ps1` remains opt-in L4 and also requires an explicit framework array.
 
 A documentation-only PR with no runtime, test harness, build or CI behavior changes may substitute reviewable static/document checks, explicitly recording the SQL/GUI suites as not run and the reason. Every PR must carry the execution report described in the policy; a code-bearing PR with an environment-blocked required gate is **not verified / not ready for acceptance** and must not have its plan gate checked off. Keep WinForms GUI assembly serialization and resource-based SQL isolation from ADR 0005 unchanged.
 
@@ -105,7 +105,7 @@ A documentation-only PR with no runtime, test harness, build or CI behavior chan
 
 SQL integration mutation requires both `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` targeting `master` and an operator-maintained `MYDMSVN_SQL_TEST_APPROVAL_FILE`. The harness verifies the live effective database, exact instance identity/fingerprint, approval lifetime and version-specific DMV permission before DDL. It repeats the live check before teardown. Database ownership is journaled and flushed before creation, corroborated with a database marker and live metadata, and quarantined rather than dropped when ownership is ambiguous.
 
-Use `tests/tools/Invoke-SqlIntegrationBenchmark.ps1` for accepted SQLPERF measurements. **In the currently implemented dual-TFM protocol** it runs `net48` and `net8.0` sequentially beneath a Windows Job Object, uses unique TRX/timing artifacts and treats timeout, partial/missing TRX, nonzero exit, mandatory skips or reconciliation failure as incomplete. Build/restore is outside measured time. Run one labeled warm-up and at least three valid warm passes per TFM; invalid passes are replaced, never included in medians.
+Use `tests/tools/Invoke-SqlIntegrationBenchmark.ps1 -Frameworks <reviewed-array>` only for plan-triggered SQLPERF measurements. It runs the selected supported TFMs sequentially beneath a Windows Job Object, with unique TRX/timing artifacts and fail-closed reconciliation. The pause profile is `@('net48')`; `@('net48','net8.0')` becomes valid again only after the product SQL target is restored and built.
 
 TRX duration is authoritative inclusive test time. Timing JSONL is opt-in and records explicit create/migration/drop scopes. Reports use interval unions, exclusive attribution, overlap and residual; nested stage durations are never added to TRX or wall-clock. Raw connection strings, hosts, approval data, theory values, journals and local paths must not enter shareable reports. Missing DMV permission/data is reported as unavailable, not zero.
 

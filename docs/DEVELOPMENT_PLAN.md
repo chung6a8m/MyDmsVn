@@ -1,13 +1,13 @@
 # Development Plan — MyDmsVn v1 → v2
 
-**As of 2026-10-16:** P0–P4.1 foundational implementation is complete. **P4.1 is closed by explicit product-owner acceptance**, supported by automated L3 and attended packaged Login/manual UI evidence; the long idle-expiry/relogin observation was not completed and is recorded as an accepted *P4.1-only* evidence exception in [P4.1 verification](P4_1_VERIFICATION.md). P5 implementation/automated gates are complete, but its two interactive acceptance checks remain open; P6 release gates are open. TESTGATE-T01–T03 have been implemented. All target frameworks in the checked-in code remain unchanged until NET8-PAUSE is implemented.
+**As of 2026-10-16:** P0–P4.1 foundational implementation is complete. **P4.1 is closed by explicit product-owner acceptance**, with its recorded idle-expiry exception. P5 interactive acceptance and P6 release gates remain open. TESTGATE-T01–T03 is verified; NET8-PAUSE T01–T04 is implemented in the migration candidate and T05 acceptance remains open. Candidate product/SQL/GUI targets are active `net48`; historical net8 is PARKED/NOT RUN and the runner remains tool-only `net8.0`.
 
 ## Active roadmap — execute in this exact order
 
 | Order | Plan | Purpose / actual status |
 |---:|---|---|
 | 1 | [TESTGATE-T01–T03 — task gates](plans/20261016-001-task-gates-and-modular-tests.md) | **Verified/complete; retained ACTIVE for mandatory context and acceptance policy**, do not rerun T01–T03 by default |
-| 2 | [NET8-PAUSE — temporary second-TFM removal](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | **Proposed/not implemented**; pause `net8.0` / WinForms `net8.0-windows` in multi-target projects; preserve configurable TFM tooling and restore path |
+| 2 | [NET8-PAUSE — temporary second-TFM removal](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | **T01–T04 implemented; T05 open**; active net48 candidate with parked net8 inventory and reviewed restore path |
 | 3 | [TESTGATE-T04/T05 — modular test projects](plans/20261016-002-modular-test-projects.md) | Proposed; execute only after verified task/final and TFM-scope transition |
 | 4 | [SEC-REBUILD — permission system](plans/20261016-003-permission-system-rebuild.md) | Proposed; replace legacy permission system only after T04/T05 verification |
 | 5 | [P5 GUI acceptance + P6 local hardening remainder](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | **Open**; remaining two P5 manual UI gates + P6 T01–T04 operational gaps and T05–T08 release checks |
@@ -20,7 +20,7 @@ The [active plan index](plans/README.md) is the canonical Codex starting point. 
 - Read `AGENTS.md`, this roadmap and the active task plan before editing; do not start a later numbered plan if earlier implementation/gates are blocked.
 - Inner-loop L1/L2 checks are task-focused; use only the relevant project/selector and genuinely needed real-SQL categories. No routine full-solution SQL testing after each edit.
 - Run manifest-owned final acceptance **once after inputs freeze**, subject to rerun when gate-affecting inputs change. Use strict unfiltered real SQL, complete logical-case inventory/discovery/TRX reconciliation, watchdog, explicit instance approval, owned-db cleanup and zero mandatory skips.
-- Today `main` and unrelated PRs still require dual SQL/GUI TFMs. NET8-PAUSE **does not change code in this documentation PR**; **only its future T01-authorized candidate implementation PR** may transition to a reviewed active `net48` Final after changing target/runner inputs (Stage B), retaining strict approval/inventory/GUI/cleanup and marking parked net8 NOT RUN. After the migration PR passes and merges, the reduced active matrix governs later work; restoring net8 requires complete new dual-target gates. See [NET8-PAUSE §5](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md#5-two-stage-cutover-acceptance-activation-rollback-and-re-enable-conditions).
+- This authorized candidate has transitioned declarations and tooling to reviewed Stage B. T05 must still prove active `net48` Final, bounded GUI D2, builds/packages and restore drill at one frozen revision before merge. Other branches follow their checked-in matrix. Restoring net8 requires the complete [reactivation procedure](REACTIVATE_NET8.md), not an isolated project edit.
 - Do not mark blocked/manual/unperformed tests green. P4.1's specific owner acceptance does not waive P5/P6 conditions; P7 is a separate future scope with an independently enforceable HTTP boundary.
 - Leave SQLPERF's completed benchmarking and fixture safety decision in the archive. DbUp, RepoDb, Dapper, UnitOfWork, platform security constraints and package pins are unchanged by this documentation PR.
 

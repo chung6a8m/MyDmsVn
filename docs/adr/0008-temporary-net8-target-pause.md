@@ -28,7 +28,7 @@ The Stage B exception is bound only to this plan and implementation candidate. I
 
 ## Re-enable and rollback
 
-Reactivation restores the recorded dual declarations (`net48;net8.0` and `net48;net8.0-windows`), returns AppCore and the modern release package to the active graph, restores dual active manifest/profile arrays and runner fixture builds, and executes fresh full dual-TFM SQL, GUI, architecture, build and package acceptance. Historical results are never relabeled as current proof.
+Reactivation follows [the reviewed procedure](../REACTIVATE_NET8.md): restore recorded dual declarations (`net48;net8.0` and `net48;net8.0-windows`), return AppCore and the modern release package to the active graph, restore dual manifest/profile arrays and runner fixture builds, then execute fresh full dual-TFM SQL, GUI, architecture, build and package acceptance. Historical results are never relabeled as current proof.
 
 Rollback is required if the tool/reference graph is incoherent, strict inventory guarantees weaken, watchdog or cleanup becomes ambiguous, active release coverage is unacceptable, or the reduced-TFM Final fails. Rollback restores the baseline declarations and gate profile before rerunning affected gates.
 

@@ -2,18 +2,19 @@
 
 **Status:** Human-readable guidance, 2026-10-16. The v1 manifest and local `Invoke-TestGate.ps1` Task/Final runner are implemented and TESTGATE-T03 Final L3 is verified at its recorded frozen revision. T04/T05 split projects remain proposed. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [T04/T05](plans/20261016-002-modular-test-projects.md), and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
 
-**Upcoming (not yet implemented):** [NET8-PAUSE](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) requires adding explicit `-Frameworks`/`--frameworks` selection to strict SQL acceptance and benchmark tooling without removing the existing focused `-Frameworks` parameter. None of these **new strict parameters** exists yet. **The tool inventory and runnable commands below describe the current pre-pause dual-TFM repository only.** `main`/unrelated PRs keep that dual matrix until the dedicated NET8-PAUSE implementation merges; only its owner-approved **Stage B candidate**, after T01/T02/T03, may use the verified full **active `net48` Final** plus bounded GUI/Release gates. Later work binds to the merged active project × TFM manifest (net8 PARKED/NOT RUN until restored). A net8-only runner's own TFM must never count as a second SQL test pass.
+**NET8-PAUSE candidate tooling:** explicit `-Frameworks`/`--frameworks` selection is implemented for focused, strict PR and benchmark paths. The reviewed profile binds SQL and Desktop owners to active `net48`, preserves historical net8 inventory, and records runner projects as tool-only `net8.0`. T01–T05 candidate gates and the external GUI D2 launcher are registered; T05 execution remains open. A net8-only runner never counts as SQL/product coverage.
 
 ## Tool inventory (actually available)
 
 | Scope | Command / project | Acceptance meaning |
 |---|---|---|
-| Pure Application/contract | `dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net8.0 --filter "FullyQualifiedName~<reviewed type>"` (and `net48` where relevant) | Focused L1/L2 only |
-| Desktop/STA | `dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --filter "FullyQualifiedName~<reviewed type>"` (also `net8.0-windows`) | Focused L1/L2 only; respect serialized GUI |
+| Pure Application/contract | `dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net48 --filter "FullyQualifiedName~<reviewed type>"` | Focused L1/L2 only |
+| Desktop/STA | reviewed focused `net48` selectors; full D2 only through `Invoke-GuiTestAcceptance.ps1` | Focused L1/L2 or bounded D2 as applicable |
 | SQL category | `tests/tools/Invoke-FocusedSqlIntegrationTests.ps1` with all mandatory parameters; use the runnable PowerShell example below and a reviewed category | Focused L1/L2 only; full category may still be broad |
-| SQL PR acceptance | `tests/tools/Invoke-SqlPrAcceptance.ps1` (`pr-acceptance`) | Strict one-pass sequential unfiltered L3 gate on both SQL TFMs |
-| SQL performance baseline | `tests/tools/Invoke-SqlIntegrationBenchmark.ps1` (`baseline`) | Specialized multi-pass L4 measurement path |
-| Manifest task/final runner | `tests/tools/Invoke-TestGate.ps1` + `tests/test-gates.v1.json` | Exact local Task selection; Final clean-revision runner with serialized strict dual-TFM SQL and sanitized aggregate evidence |
+| SQL PR acceptance | `Invoke-SqlPrAcceptance.ps1 -Frameworks @('net48')` | Lower-level strict one-pass unfiltered candidate path; manifest Final owns acceptance |
+| SQL performance baseline | `Invoke-SqlIntegrationBenchmark.ps1 -Frameworks <reviewed-array>` | Specialized multi-pass L4 measurement path |
+| Manifest task/final runner | `Invoke-TestGate.ps1` + `tests/test-gates.v1.json` | Exact Task selection; candidate Final binds clean revision to active net48 SQL |
+| Desktop GUI D2 | `Invoke-GuiTestAcceptance.ps1` | Clean-revision unfiltered net48 source/discovery/TRX with GUI lease and process-tree watchdog |
 
 ### Existing, runnable SQL L2 example (PowerShell from repository root)
 
@@ -28,7 +29,7 @@ tests/tools/Invoke-FocusedSqlIntegrationTests.ps1 `
   -ArtifactRoot .sqlperf/focused-security-l2-001 `
   -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
   -Category SecurityProvisioning `
-  -Frameworks @('net48', 'net8.0')
+  -Frameworks @('net48')
 ```
 
 This is a **category-filtered L1/L2 check only**, not L3 acceptance. Verify current selectors/category against source and discovery; choose a different unique artifact directory for each invocation. Do not use `--no-build` after changing runner code without rebuilding it. Raw generated artifacts remain local; publish only the sanitized summary described in [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
@@ -38,7 +39,9 @@ This is a **category-filtered L1/L2 check only**, not L3 acceptance. Verify curr
 Build the runner/tests for the exact revision first. Task mode needs no SQL approval and accepts no project/TFM/filter override:
 
 ```powershell
-tests/tools/Invoke-TestGate.ps1 -Mode Task -PlanId '20261016-001' -TaskId 'TESTGATE-T03' -ArtifactRoot '.sqlperf/testgate-t03-task'
+tests/tools/Invoke-TestGate.ps1 -Mode Task `
+  -PlanId '20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8' `
+  -TaskId 'NET8-PAUSE-T03' -ArtifactRoot '.sqlperf/net8-pause-t03-task'
 ```
 
 Final mode additionally requires `-ApprovalFile`; the wrapper rejects a dirty tree, binds evidence to `HEAD`, serializes access to the approved instance, then runs the manifest order. Exit codes are `0` complete, `2` resource/preflight denied, `3` incomplete, and `64` usage error.

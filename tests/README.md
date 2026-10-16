@@ -1,6 +1,6 @@
 # Test harness
 
-**2026-10-16 target planning:** Source/tests still declare `net48;net8.0` (WinForms `net48;net8.0-windows`) as applicable. The [proposed NET8-PAUSE plan](../docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) has **not** edited targets or test runner yet. Its implementation must retain/add explicit framework parameters on focused and strict tools, preserving a controlled return to .NET 8 and complete SQL case inventory. Until that PR is accepted, the full dual-TFM commands below remain current.
+**2026-10-16 candidate targets:** NET8-PAUSE declares active application/SQL/Desktop `net48`; product `net8.0`/`net8.0-windows` is historical `PARKED / NOT RUN`. The runner remains tool-only `net8.0`. Focused, strict PR and benchmark tools require explicit framework arrays, and the manifest preserves the historical SQL inventory. T05 acceptance is still required before merge; reactivation uses [the reviewed procedure](../docs/REACTIVATE_NET8.md).
 
 **TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
 
@@ -18,7 +18,7 @@ dotnet test MyDmsVn.sln -c Release --no-build --no-restore
 
 Use [Codex Test Execution Policy](../docs/CODEX_TEST_EXECUTION_POLICY.md) to select tests in four stages: focused edit loop, affected-task check, final PR regression, and specialized release/performance verification. The generic `dotnet test MyDmsVn.sln` command above is a convenient local check **not an SQL acceptance certificate**: it does not itself prove SQL method/theory-row discovery-to-TRX reconciliation, zero required SQL skips, process-tree watchdog coverage or post-run database ownership reconciliation.
 
-For SQL development iteration, use the existing `Invoke-FocusedSqlIntegrationTests.ps1` category runner documented below; run the relevant unit/desktop test projects for other changes. After the final gate-affecting change (including test/theory-row, SQL/migration, inventory/manifest, runner/harness, or build/CI edits), a code-bearing PR needs full applicable Release and unfiltered SQL evidence on both SQL TFMs, not only category filters. Record the final verified revision; do not reuse pre-change acceptance artifacts. The strict functional path is `Invoke-SqlPrAcceptance.ps1` (one pass per TFM); `Invoke-SqlIntegrationBenchmark.ps1` is reserved for required multi-pass performance evidence. For doc-only changes, report static checks and clearly label SQL/GUI suites not run.
+For SQL development iteration, use `Invoke-FocusedSqlIntegrationTests.ps1 -Frameworks @('net48')` with a reviewed category. After final gate-affecting changes freeze, this candidate needs manifest-owned `NET8-PAUSE-T05` Final: one unfiltered active-net48 SQL pass plus separate bounded GUI D2 and Release evidence. Lower-level strict and benchmark wrappers also require `-Frameworks`. Historical net8 is outside the active profile and recorded NOT RUN.
 
 Write a **reviewed, sanitized** Test Execution Report in the PR: changed surface, selected scope per stage, exact commands/TFMs, passed/failed/skipped counts, strict SQL inventory/ownership/watchdog **outcomes** when applicable, and `passed` / `failed` / `blocked` / `not run` for remaining mandatory gates. Keep raw TRX, timing JSONL, discovery files, approval/ownership journals and local ZIPs on the approved machine, not as PR attachments or public links. Review any export individually; even archives named `shareable` may contain ownership tokens, instance fingerprints, approval IDs, database identifiers, local paths or theory arguments. Never disclose raw SQL connection strings, host/instance identifiers, credentials, journals or unsanitized test artifacts. See the [evidence publication boundary](../docs/CODEX_TEST_EXECUTION_POLICY.md#evidence-publication-boundary-mandatory).
 
@@ -29,10 +29,10 @@ WinForms tests create and dispose controls on an STA thread through `StaTest`. E
 ## Test parallelization and isolation (current behavior)
 
 - `tests/MyDmsVn.Desktop.Tests/AssemblyInfo.cs` disables xUnit parallelization for this assembly. **Keep it enabled** while WinForms tests involve STA controls, global window/focus state, message loops or real/simulated mouse and keyboard input. STA does not isolate global GUI state. Non-GUI ViewModel tests may later move into independently verified parallel-compatible collections or projects.
-- `tests/MyDmsVn.Server.Infrastructure.IntegrationTests/AssemblyInfo.cs` also disables assembly parallelization **today**, to protect SQL Server from concurrent disposable database creation/migrations. This is a temporary safety fallback, not a requirement to serialize all SQL tests forever. Do not delete it until a bounded collection-level design has demonstrated isolation, ownership, cleanup and acceptable SQL load on both `net48` and `net8.0`.
+- `tests/MyDmsVn.Server.Infrastructure.IntegrationTests/AssemblyInfo.cs` also disables assembly parallelization to protect disposable database creation/migrations. Do not remove it until bounded isolation/cleanup/load evidence passes active `net48` and, after reactivation, restored `net8.0`.
 - The other test assemblies have no corresponding assembly-wide prohibition in current source. xUnit normally parallelizes across collections; tests within one collection are sequential. SQL category traits (`FastSQL`, `MigrationSchema`, `SecurityProvisioning`, `SqlConcurrency`) do **not** independently define a parallel-execution policy.
 - When using a shared migrated SQL fixture, coordinate every test that can mutate its database within an explicit owning collection (or another independently proven synchronization boundary). Separate collections can run concurrently only when their resources are independently isolated and a safe capacity cap is enforced. Cross-process and cross-TFM execution requires runner/CI coordination: xUnit collection controls do not span processes.
-- The SQLPERF benchmark runner intentionally executes the `net48` and `net8.0` full suites **sequentially**; this is measurement orchestration, not a permanent rule for test methods in a framework. Preserve the watchdog, approved non-production SQL instance, ownership safeguards, required-case inventory and unfiltered acceptance checks. Do not invent a parallel-mode switch before it has been implemented and verified.
+- The SQLPERF benchmark runner executes each explicitly selected framework sequentially; the pause selection is `net48`. Preserve watchdog, approval, ownership, inventory and unfiltered checks. Dual selection returns only with product-target reactivation.
 
 See `docs/TEST_STRATEGY.md` and `docs/adr/0005-test-isolation-and-bounded-parallelism.md` for the policy and evidence required before changing these guards.
 
@@ -72,36 +72,40 @@ tests\tools\Invoke-SqlIntegrationBenchmark.ps1 `
   -RepositoryRoot (Get-Location) `
   -TestProject tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
   -ArtifactRoot .sqlperf\run-001 `
-  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
+  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
+  -Frameworks @('net48')
 ```
 
-For final functional L3, first freeze and commit all gate-affecting inputs, build the runner and both integration-test TFMs, then invoke the one-pass wrapper from the clean repository:
+For a lower-level strict probe, first freeze and commit all gate-affecting inputs, build the runner and active integration-test TFM, then invoke the one-pass wrapper from the clean repository. Candidate acceptance remains manifest-owned:
 
 ```powershell
 dotnet build tests\tools\MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj -c Release
 dotnet build tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net48
-dotnet build tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net8.0
 tests\tools\Invoke-SqlPrAcceptance.ps1 `
   -RepositoryRoot (Get-Location) `
   -TestProject tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
   -ArtifactRoot .sqlperf\pr-acceptance-001 `
-  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
+  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
+  -Frameworks @('net48')
 ```
 
-The wrapper rejects a dirty tree, resolves the exact commit, and runs `net48` then `net8.0` without a filter, warm-up or measured repetition. It reuses the strict classification, discovery/theory-row, TRX, timing, process watchdog, preflight and ownership gates and writes a sanitized aggregate JSON report per TFM. Any missing/failed/skipped case, timeout, nonzero exit, incomplete journal, ambiguous/leaked owned database or missing report fails the command.
+The wrapper rejects a dirty tree, resolves the exact commit, and runs each reviewed selected TFM without a filter, warm-up or measured repetition. It reuses strict classification, discovery/theory-row, TRX, timing, watchdog, preflight and ownership gates.
 
-For the manifest-owned TESTGATE-T03 Final contract, use a fresh ignored artifact root from a clean committed revision:
+For the manifest-owned NET8-PAUSE-T05 Final contract, use a fresh ignored artifact root from a clean committed revision:
 
 ```powershell
-$artifactRoot = '.sqlperf/tg3-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
-tests/tools/Invoke-TestGate.ps1 -Mode Final -PlanId '20261016-001' -TaskId 'TESTGATE-T03' -ArtifactRoot $artifactRoot -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
+$artifactRoot = '.sqlperf/net8-pause-t05-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
+tests/tools/Invoke-TestGate.ps1 -Mode Final `
+  -PlanId '20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8' `
+  -TaskId 'NET8-PAUSE-T05' -ArtifactRoot $artifactRoot `
+  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
 ```
 
 Keep this short unique root so `net48` ownership-journal atomic-write paths retain Windows `MAX_PATH` headroom. The wrapper defaults to the current repository and `tests/test-gates.v1.json`. Exit codes are `0` complete, `2` approval/resource/preflight denial, `3` incomplete execution/reconciliation/report, and `64` invalid CLI usage. Raw TRX, timing, ownership journals and lease state stay local; publish only the reviewed sanitized aggregate JSON.
 
 Raw TRX, journals and timing JSONL stay ignored/local. Timing is off by default; the runner sets `MYDMSVN_SQL_TEST_TIMINGS=1`, a unique run ID and a local output path. A timeout, missing/corrupt TRX, nonzero exit, failed/skipped mandatory case, inventory mismatch, ownership ambiguity or approval failure makes the run incomplete.
 
-For bounded development iteration, run one explicit SQL responsibility category on both TFMs:
+For bounded development iteration, run one explicit SQL responsibility category on active `net48`:
 
 ```powershell
 tests\tools\Invoke-FocusedSqlIntegrationTests.ps1 `
@@ -109,13 +113,14 @@ tests\tools\Invoke-FocusedSqlIntegrationTests.ps1 `
   -TestProject tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
   -ArtifactRoot .sqlperf\focused-fastsql `
   -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
-  -Category FastSQL
+  -Category FastSQL `
+  -Frameworks @('net48')
 ```
 
 Valid categories are `FastSQL`, `MigrationSchema`, `SecurityProvisioning` and `SqlConcurrency`. `FastSQL` contains only tests that access SQL Server; pure tests remain in the reviewed method-level non-SQL exemption manifest. Each exemption fingerprint covers its declaring source, same-assembly methods reached through its compiled call graph (including async/iterator state machines), and the project/dependency boundary of reached cross-assembly helpers. Relevant changes therefore require review while unrelated source, generated output and commit metadata do not create drift. The helper runs discovery/execution under the owned-process-tree watchdog, preserves caller-owned harness environment variables, reports selected methods plus discovered/executed/skipped cases per TFM, reconciles theory rows and ownership after every launched execution, and fails closed on a mismatch or timeout. A focused green run never replaces the unfiltered benchmark/release gate.
 
 The harness creates a unique database named `MyDmsVn_Test_<32 hex digits>`, disables pooling for its database connection, and only drops the exact generated name it owns. Name validation rejects production-like names and incomplete test prefixes. Teardown does not call global `SqlConnection.ClearAllPools()`: owned database and production migrator connections are non-pooled, and the one test that deliberately enables a migration pool clears that exact pool itself. `SINGLE_USER WITH ROLLBACK IMMEDIATE` remains the guarded cleanup boundary for positively owned databases; unrelated pools must remain intact. Never point the variable at production or grant the test principal access to production data.
 
-When either required variable is absent, SQL-dependent tests are reported as skipped with the missing-variable reason; guardrail tests still run. Skips are convenient for local non-SQL work but are invalid for SQL acceptance. The repository acceptance gate sets both variables and runs both `net48` and `net8.0` targets sequentially.
+When either required variable is absent, SQL-dependent tests are reported as skipped with the missing-variable reason; guardrail tests still run. Skips are invalid for SQL acceptance. The candidate Final sets both variables and runs active `net48`; historical net8 remains NOT RUN.
 
 The deployment migrator is a separate executable and is not run by desktop startup. P6 replaced the original shared setting with the migration-only `MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING` or `MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING_FILE`; see `docs/CONFIGURATION_AND_SQL_SECURITY.md`. The target must be an already-created application database. The migrator does not create or drop databases and rejects missing catalogs, SQL Server system databases, unmanaged databases, future/forked history and partial schema. The `dbo.P1TestProbe` fixture is embedded only in this test project and is never loaded by the deployment migrator.

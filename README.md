@@ -6,11 +6,11 @@ Windows desktop-first SME business management, beginning with **Sales & Inventor
 
 P0/P1/P2/P3/P3.1/P4 implementation is complete. P4.1 Login/session is **closed by explicit product-owner manual-UI acceptance**, with a documented incomplete packaged idle-expiry observation; the owner exception does not close remaining P5/P6 release gates. P5 business features and automated tests exist, but P5.1/P5.4 interactive acceptance remains open. P6 operational/release acceptance remains open. TESTGATE T01–T03 are verified; modularization, permission-system replacement and P7 are future work.
 
-**Next implementation plan:** [Temporary reversible pause of the second .NET 8 TFM](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md), after reading [TESTGATE-T01–T03](docs/plans/20261016-001-task-gates-and-modular-tests.md). **The .NET 8 TFM is NOT removed in the current code.** Follow the [ordered active roadmap](docs/plans/README.md) and [Development Plan](docs/DEVELOPMENT_PLAN.md); completed/superseded plans are in the [archive](docs/plans/archive/README.md).
+**Current candidate:** [NET8-PAUSE](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) T01–T04 are implemented; T05 frozen SQL/GUI/Release acceptance remains open. Application, SQL and Desktop projects actively target `net48`; historical .NET 8 case metadata and the parked AppCore source remain for [reviewed reactivation](docs/REACTIVATE_NET8.md). The runner's tool-only `net8.0` target is not product coverage. Follow the [ordered active roadmap](docs/plans/README.md) and [Development Plan](docs/DEVELOPMENT_PLAN.md).
 
 ## Approved technology and boundaries
 
-- C#, currently `.NET Framework 4.8` and `.NET 8` (`net8.0-windows` for modern WinForms); no unapproved move to .NET 10. See [Tech Stack](docs/TECH_STACK.md).
+- C#, active product/runtime target `.NET Framework 4.8`; `.NET 8` product targets are temporarily parked while the test runner remains tool-only `net8.0`. No unapproved move to .NET 10. See [Tech Stack](docs/TECH_STACK.md).
 - Clean Architecture/modular monolith, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork.
 - RepoDb for write-side storage, Dapper for read models, SQL Server and versioned DbUp migrations.
 - Shared WinForms/CommunityToolkit.Mvvm views, Bootstrap5WinFormUI and BootstrapSourceGrid; LocalApiClient for v1, HttpApiClient planned for v2.
