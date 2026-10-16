@@ -1,5 +1,7 @@
 # Testing strategy and quality gates
 
+**Roadmap/TFM scope (2026-10-16):** The actual checked-in code/test targets are **still dual-TFM**, so the dual `net48`/`net8.0` SQL and modern WinForms requirements below remain valid **today**. The [NET8-PAUSE plan](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) will temporarily change the active application/test matrix only after a separate implementation PR passes. At that point Codex must follow the actual reviewed manifest-approved active TFM list, retain strict unfiltered SQL and preserve reactivation/inventory evidence. Do not run an undeclared TFM or treat a parked TFM as passed. See the [ordered roadmap](plans/README.md).
+
 ## 1. Test layers
 
 | Layer | Coverage | Preferred evidence |

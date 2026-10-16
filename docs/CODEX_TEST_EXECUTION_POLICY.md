@@ -2,6 +2,8 @@
 
 **Status:** Repository procedure (2026-10-15). Applies to future implementation tasks and pull requests for MyDmsVn, subject to more stringent requirements in the specific plan. Read with [TEST_STRATEGY.md](TEST_STRATEGY.md), [ADR 0005](adr/0005-test-isolation-and-bounded-parallelism.md) and [tests/README.md](../tests/README.md).
 
+**Ordered roadmap/TFM note (2026-10-16):** [TESTGATE-T01–T03](plans/20261016-001-task-gates-and-modular-tests.md) is verified but deliberately retained as active context. The *next* proposed execution item is [NET8-PAUSE](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md), followed by T04/T05 modularization, SEC-REBUILD, remaining P5/P6 acceptance and P7. **NET8-PAUSE has not been implemented:** current dual-TFM commands and guards are still mandatory. After its verified implementation, apply the reviewed *active* SQL TFM list at the manifest-owned Final gate (one strict unfiltered pass per active TFM), retaining explicit selection parameters and historical dual-TFM reactivation evidence. Do not run unsupported targets or relabel parked tests as PASS; a new feature PR cannot bypass a mandatory active gate.
+
 ## Intent and hard boundaries
 
 Choose **the smallest correct set of tests during development**, then provide **complete evidence at the required PR/release gate**. Test responsibility traits (such as `FastSQL`) select relevant checks; they do not authorize test parallelization or shared SQL fixtures. Keep the existing SQL and WinForms assembly serial guards, approved non-production SQL instances, positive database ownership proof, and existing dual-target/release acceptance rules. Do not suppress, skip, mock, or filter mandatory regression cases merely to reduce duration.

@@ -2,6 +2,8 @@
 
 **Status:** Human-readable guidance, 2026-10-16. The v1 manifest and local `Invoke-TestGate.ps1` Task/Final runner are implemented and TESTGATE-T03 Final L3 is verified at its recorded frozen revision. T04/T05 split projects remain proposed. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [T04/T05](plans/20261016-002-modular-test-projects.md), and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
 
+**Upcoming (not yet implemented):** [NET8-PAUSE](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) requires adding explicit `-Frameworks`/`--frameworks` selection to strict SQL acceptance and benchmark tooling without removing the existing focused `-Frameworks` parameter. None of these **new strict parameters** exists yet. The actual current dual-TFM commands below remain accurate until a verified implementation changes project targets/manifests. An indispensable net8-only runner's own TFM must never be mistaken for a second SQL test pass.
+
 ## Tool inventory (actually available)
 
 | Scope | Command / project | Acceptance meaning |

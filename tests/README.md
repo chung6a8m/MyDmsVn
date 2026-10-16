@@ -1,5 +1,7 @@
 # Test harness
 
+**2026-10-16 target planning:** Source/tests still declare `net48;net8.0` (WinForms `net48;net8.0-windows`) as applicable. The [proposed NET8-PAUSE plan](../docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) has **not** edited targets or test runner yet. Its implementation must retain/add explicit framework parameters on focused and strict tools, preserving a controlled return to .NET 8 and complete SQL case inventory. Until that PR is accepted, the full dual-TFM commands below remain current.
+
 **TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
 
 **Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. `Invoke-TestGate.ps1` now reads the checked-in v1 manifest: Task mode cannot accept project/TFM/filter overrides, while Final binds a clean revision to one strict unfiltered pass per SQL TFM. The multi-pass `baseline` remains a performance tool; T04/T05 split projects remain proposed.
