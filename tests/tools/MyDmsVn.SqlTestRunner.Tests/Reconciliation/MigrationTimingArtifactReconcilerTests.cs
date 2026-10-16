@@ -97,6 +97,26 @@ public sealed class MigrationTimingArtifactReconcilerTests
 
         Assert.True(result.IsComplete);
         Assert.Equal(1, result.ExpectedCount);
+
+        using var emptyScope = new Fixture();
+        emptyScope.WriteArtifact();
+        var emptyResult = emptyScope.Reconcile(
+            "net8.0",
+            Executed("Namespace.ExampleTests.Case", "net8.0"),
+            "tests/ExampleTests/ExampleTests.csproj");
+        Assert.True(emptyResult.IsComplete);
+        Assert.Equal(0, emptyResult.ExpectedCount);
+
+        using var unreviewedScope = new Fixture();
+        unreviewedScope.WriteArtifact(
+            Invocation("Case", "net8.0", "ExampleTests.Case.unreviewed"),
+            Timing("Case", "net8.0", "ExampleTests.Case.unreviewed"));
+        var unreviewedResult = unreviewedScope.Reconcile(
+            "net8.0",
+            Executed("Namespace.ExampleTests.Case", "net8.0"),
+            "tests/ExampleTests/ExampleTests.csproj");
+        Assert.False(unreviewedResult.IsComplete);
+        Assert.NotEmpty(unreviewedResult.UnexpectedKeys);
     }
 
     [Fact]

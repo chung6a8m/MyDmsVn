@@ -40,6 +40,7 @@ public static class MigrationTimingArtifactReconciler
         var manifestEntries = entries
             .Where(entry => entry.Tfms.Contains(tfm, StringComparer.Ordinal))
             .ToArray();
+        var allowEmptyScope = !string.IsNullOrWhiteSpace(ownerProjectPath) && manifestEntries.Length == 0;
         var auditedInvocationSuffixes = new HashSet<string>(
             manifestEntries.Select(entry => "|" + entry.InvocationId),
             StringComparer.Ordinal);
@@ -110,10 +111,17 @@ public static class MigrationTimingArtifactReconciler
             missing,
             unexpected);
         Compare(recordedInvocations, timingEvents, missing, unexpected);
+        if (allowEmptyScope && (recordedInvocations.Count > 0 || timingEvents.Count > 0))
+        {
+            unexpected.AddRange(recordedInvocations);
+            unexpected.AddRange(timingEvents);
+        }
+
         return new MigrationTimingArtifactReconciliation(
             manifestExpected.Count,
             missing.OrderBy(key => key, StringComparer.Ordinal).ToArray(),
-            unexpected.OrderBy(key => key, StringComparer.Ordinal).ToArray());
+            unexpected.OrderBy(key => key, StringComparer.Ordinal).ToArray(),
+            allowEmptyScope);
     }
 
     private static List<string> BuildManifestExpectations(
@@ -213,11 +221,13 @@ public sealed class MigrationTimingArtifactReconciliation
     public MigrationTimingArtifactReconciliation(
         int expectedCount,
         IReadOnlyList<string> missingKeys,
-        IReadOnlyList<string> unexpectedKeys)
+        IReadOnlyList<string> unexpectedKeys,
+        bool allowEmptyScope = false)
     {
         ExpectedCount = expectedCount;
         MissingKeys = missingKeys;
         UnexpectedKeys = unexpectedKeys;
+        AllowEmptyScope = allowEmptyScope;
     }
 
     public int ExpectedCount { get; }
@@ -226,8 +236,10 @@ public sealed class MigrationTimingArtifactReconciliation
 
     public IReadOnlyList<string> UnexpectedKeys { get; }
 
+    private bool AllowEmptyScope { get; }
+
     public bool IsComplete =>
-        ExpectedCount > 0 && MissingKeys.Count == 0 && UnexpectedKeys.Count == 0;
+        (ExpectedCount > 0 || AllowEmptyScope) && MissingKeys.Count == 0 && UnexpectedKeys.Count == 0;
 
     public static MigrationTimingArtifactReconciliation Invalid(string reason) =>
         new MigrationTimingArtifactReconciliation(0, Array.Empty<string>(), new[] { reason });
