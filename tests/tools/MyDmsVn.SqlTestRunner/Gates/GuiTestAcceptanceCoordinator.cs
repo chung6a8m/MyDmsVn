@@ -116,33 +116,26 @@ public sealed class GlobalGuiExecutionLease : IGuiExecutionLease
 {
     public IDisposable? TryAcquire(TimeSpan timeout)
     {
-        var mutex = new Mutex(false, "Global\\MyDmsVn.GuiAcceptance.v1");
-        try
+        var semaphore = new Semaphore(1, 1, "Global\\MyDmsVn.GuiAcceptance.v1");
+        if (!semaphore.WaitOne(timeout))
         {
-            if (!mutex.WaitOne(timeout))
-            {
-                mutex.Dispose();
-                return null;
-            }
-        }
-        catch (AbandonedMutexException)
-        {
-            // Ownership transfers to this process; release it through the returned handle.
+            semaphore.Dispose();
+            return null;
         }
 
-        return new MutexReleaser(mutex);
+        return new SemaphoreReleaser(semaphore);
     }
 
-    private sealed class MutexReleaser : IDisposable
+    private sealed class SemaphoreReleaser : IDisposable
     {
-        private Mutex? _mutex;
-        public MutexReleaser(Mutex mutex) => _mutex = mutex;
+        private Semaphore? _semaphore;
+        public SemaphoreReleaser(Semaphore semaphore) => _semaphore = semaphore;
         public void Dispose()
         {
-            var mutex = Interlocked.Exchange(ref _mutex, null);
-            if (mutex is null) return;
-            mutex.ReleaseMutex();
-            mutex.Dispose();
+            var semaphore = Interlocked.Exchange(ref _semaphore, null);
+            if (semaphore is null) return;
+            semaphore.Release();
+            semaphore.Dispose();
         }
     }
 }

@@ -70,6 +70,17 @@ public sealed class GuiTestAcceptanceCoordinatorTests
         Assert.Equal(0, process.Calls);
     }
 
+    [Fact]
+    public async Task Global_gui_lease_can_be_released_after_an_async_thread_switch()
+    {
+        var lease = new GlobalGuiExecutionLease().TryAcquire(TimeSpan.FromSeconds(1));
+        Assert.NotNull(lease);
+
+        var exception = await Record.ExceptionAsync(() => Task.Run(() => lease!.Dispose()));
+
+        Assert.Null(exception);
+    }
+
     private sealed class GuiFixture : IDisposable
     {
         public GuiFixture()
