@@ -1,6 +1,6 @@
-# TESTGATE — Task-scoped execution, strict single-pass PR gate, and modular test projects
+# TESTGATE — Task-scoped execution and strict SQL gate orchestration (T01–T03)
 
-**Status:** T01 policy/docs implemented in this PR; T02–T05 proposed / not implemented · **Date:** 2026-10-16 · **Scope:** cross-phase test infrastructure and Codex workflow. This is an implementation plan, **not** evidence that the runner or project split exists or has passed. Read `AGENTS.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_STRATEGY.md`, ADR 0005, proposed ADR 0006, `tests/README.md`, SQLPERF-T04/T05/T06 verification, and the affected phase plan.
+**Status:** T01 policy/docs implemented; T02–T03 proposed / not implemented · **Date:** 2026-10-16 · **Scope:** cross-phase test policy, strict SQL PR acceptance, and task/final orchestration. This is an implementation plan, **not** evidence that the runner or manifest exists or has passed. **T04/T05 modular test projects are tracked exclusively in [the follow-on plan](20261016-002-modular-test-projects.md).** Read `AGENTS.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_STRATEGY.md`, ADR 0005, proposed ADR 0006, `tests/README.md`, SQLPERF-T04/T05/T06 verification, and the affected phase plan.
 
 ## Problem and constraints
 
@@ -40,21 +40,11 @@ Each task gate must declare: project and TFM, test selection rule and why it is 
 
 These are selection rules, not a claim that every named test exists. Do not rerun P4.1's already verified historical L3 solely for this docs PR. Continue unresolved real-user expiry/relogin L4 acceptance separately.
 
-## Proposed target assemblies (subject to source inventory)
+## Follow-on modularization (separate plan)
 
-- `MyDmsVn.Server.Application.Tests`, `MyDmsVn.Architecture.Tests`: keep existing pure tests and normal safe parallelism.
-- `MyDmsVn.Desktop.Session.Tests`: pure session/dispatcher/ViewModel logic, no UI handles or SQL.
-- `MyDmsVn.Desktop.WinForms.Tests`: GUI-interacting STA tests, serialized, dual Windows TFMs.
-- `MyDmsVn.SqlTests.Foundation`: DAL/UoW/SQL harness integration.
-- `MyDmsVn.SqlTests.Security`: login, identity, grants/denies, provisioning.
-- `MyDmsVn.SqlTests.Catalog`: master data SQL CRUD/mapping.
-- `MyDmsVn.SqlTests.Inventory`: receipt, stock, posting, real concurrency.
-- `MyDmsVn.SqlTests.Migrations`: DbUp, schema drift, migration history/upgrade and failure recovery.
-- `MyDmsVn.SqlTestHarness` and `MyDmsVn.SqlTestRunner`: shared ownership/approval/runner infrastructure rather than duplicating SQL lifecycle code.
+**TESTGATE-T04** (Desktop pure/GUI test project split) and **TESTGATE-T05** (SQL module test project partitioning), including their proposed target assemblies, per-task gate matrices and code-PR acceptance, live in [20261016-002-modular-test-projects.md](20261016-002-modular-test-projects.md). Their original IDs and dependencies on T02/T03 are retained; neither has been implemented by this documentation split.
 
-This is an **illustrative target structure**, not a request to create empty shell assemblies. Boundaries follow the actual test inventory, and cross-module tests may remain in a specifically documented integration project. A test project is a build/runtime boundary; module and category remain orthogonal metadata. Do not use an assembly name as proof that its tests do not touch SQL.
-
-## Logical test-case identity and migration reconciliation (T03–T05 contract)
+## Logical test-case identity and migration reconciliation (T03 foundation)
 
 Project/assembly name and framework-generated VSTest/TRX GUID are **physical execution metadata**, not durable test identities. Before any split, define and version a deterministic logical-case key for each target framework:
 
@@ -65,18 +55,16 @@ Project/assembly name and framework-generated VSTest/TRX GUID are **physical exe
 - Normalize the method identity consistently across old/new projects (including overload signatures and generic arity when needed). For a Fact use a fixed `Fact` row marker. For a Theory use a deterministic row key from canonical, type-tagged argument representation (for example a SHA-256 fingerprint computed locally), or an explicitly assigned stable, opaque row ID when argument-based discovery is nondeterministic. Freeze and test the canonicalization version before comparing inventories. Do not commit or publish raw theory arguments, and do not rely on display names, array position, raw TRX GUIDs, assembly names or count equality as identity.
 - Record the **old → new** project/assembly location separately from the logical key. If a move also changes the method signature, theory row identity, TFM or category, require an explicit reviewer-approved old → new **logical-key mapping and coverage rationale**; unapproved reclassification, collisions, missing rows or duplicate ownership fail closed. Module remains an independently reviewed business label, not inferred solely from the destination assembly.
 - On **each TFM independently**, snapshot the source method inventory and independently discovered expanded cases **before** moving files, then reconcile source → discovery → executed TRX logical keys both before and after. Require one-to-one coverage/multiplicity (including method-scoped exemptions, skipped/blocked cases and all mandatory theory rows) plus a bijective before → after mapping. Reject dropped/added-unreviewed, duplicated, ambiguous or nondeterministic cases even if aggregate counts match. Preserve original local TRX for audit while only publishing aggregate sanitized reconciliation evidence.
-- Implement these checks in T03/T04/T05 runner/inventory work; this documentation does **not** claim that a logical-key collector, row canonicalizer or cross-project inventory verifier already exists.
+- Implement the common identity and reconciliation infrastructure in T03 before using it for the T04/T05 moves in [the modular plan](20261016-002-modular-test-projects.md); this documentation does **not** claim that a logical-key collector, row canonicalizer or cross-project inventory verifier already exists.
 
-## TESTGATE's own task-level L2 gate matrix (T02–T05)
+## TESTGATE's own task-level L2 gate matrix (T02–T03)
 
-**Status: prospective contract, not execution evidence.** This matrix applies to the **TESTGATE implementation tasks themselves**, unlike the P4.1 worked example above. Command IDs R/H/D/S below refer only to tools and projects verified in the current repository. Their selectors must be rechecked against the actual source/discovery **at the task's revision**; add tests as the corresponding functionality is implemented and fail the task gate if required negative coverage is absent. The proposed `Invoke-TestGate.ps1`, `pr-acceptance` mode and new module/desktop test projects are **not** runnable yet.
+**Status: prospective contract, not execution evidence.** This matrix applies to **TESTGATE-T02/T03** themselves, unlike the P4.1 worked example above; T04/T05 use their [separate matrix](20261016-002-modular-test-projects.md). Command IDs R/H/D/S below refer only to tools and projects verified in the current repository. Their selectors must be rechecked against the actual source/discovery **at the task's revision**; add tests as the corresponding functionality is implemented and fail the task gate if required negative coverage is absent. The proposed `Invoke-TestGate.ps1`, `pr-acceptance` mode and new module/desktop test projects are **not** runnable yet.
 
 | Task | Affected projects, TFMs and L2 selection | Real SQL trigger, required adverse cases and gate | Exit / evidence |
 |---|---|---|---|
 | **T02 — single-pass strict runner** | **R**: entire existing `MyDmsVn.SqlTestRunner.Tests` (`net8.0`); **H** (`net48`, `net8.0`) only if shared harness is changed. Keep baseline coordinator, inventory, discovery/TRX and watchdog tests in scope. | No routine full SQL at L2. If a changed SQL guard/approval/ownership path needs live validation, use **S** with the *affected, reviewed category* on `net48` and `net8.0`. Add negative runner tests for wrong/missing approval, stale/duplicate/missing inventory or theory rows, skipped mandatory cases, partial TRX, timeout/child-process leak, incomplete journal and ambiguous ownership; every failure must fail closed. The **one-pass unfiltered real SQL acceptance on both TFMs** belongs to this task PR's **final L3**, not another L2 repetition. | R (and conditional H/S) green with non-empty current selection; independently review negative-case inventory. L3 once at frozen revision must reconcile both complete TFMs and existing strict-path expectations. No code-bearing task accepted solely on R/H or a filtered S result. |
 | **T03 — manifest + orchestration** | **R** (`net8.0`) for parser, manifest, identity and runner logic; **H** if ownership/preflight harness changed. Run new task-gate parser/selection tests in R after they exist; inspect source-discovered cases rather than trusting a filter alone. | **S** on `net48` and `net8.0` only when a change exercises real SQL ownership, cleanup or cross-process locking. Negative cases: unknown/omitted task, unrecognized category, empty selector, missing TFM/project, duplicate/ambiguous logical keys/theory rows, unsafe simultaneous runners, stale revision, absent approval, cancellation/crash and orphan-reconciliation. Prove cross-process SQL serialization in a bounded approved test where relevant; never infer it from xUnit assembly guards. | Real manifest and new orchestrator are mandatory for exit; until implemented, their CLI invocations are **BLOCKED / NOT IMPLEMENTED**, not commands to paste. Record negative tests and per-TFM source/discovery/TRX reconciliation; final global SQL regression only at L3. |
-| **T04 — Desktop pure/GUI split** | **D** on the existing `MyDmsVn.Desktop.Tests` for `net48` and `net8.0-windows` *before* extraction. After moving tests, run the **actual created** pure/GUI project(s) on their verified TFMs plus the remaining old project, not a nonexistent target project. Keep GUI-interacting cases serialized. | Normally **no SQL** for pure VM/STA file moves. If SQL-backed identity/adapters/harness are altered, use **S `SecurityProvisioning`** on both SQL TFMs and any additional category justified by the changed behavior. Adverse checks: STA cleanup, unexpected dialogs/DataError, cancellation/timeout, global focus/input isolation and duplicate/missing or reclassified Fact/Theory rows. | Existing and created project targets pass; independent per-TFM before/after logical-case bijection and reviewed old→new mapping required. Missing Windows/TFM, new project not yet created or uncovered GUI cases = **BLOCKED**, not green. |
-| **T05 — module SQL test split** | **R** (`net8.0`) for runner/global inventory changes; **H** on both TFMs when shared harness changes. **S** on the *original* integration project only while it still owns the selected cases; after relocation use T03's **verified implemented** guarded task runner and verified new project paths/TFMs. | Category per actual module/behavior: Catalog/Foundation CRUD → `FastSQL`; Inventory posting/locks → `FastSQL` + `SqlConcurrency` when affected; Security/permissions → `SecurityProvisioning`; DbUp/schema/history → `MigrationSchema` (also `SecurityProvisioning` if bootstrap affected). Run each required category separately and sequentially on both TFMs; include failure/rollback/timeout, migrations and cross-module permission/posting scenarios as applicable. A moved project must **not** be run through bare `dotnet test` as a substitute for the guarded SQL gate. | For each move, independently reconcile all old/new method and expanded Theory cases, exemptions and classifications on each SQL TFM; reject missing/duplicate/ambiguous cases and incomplete ownership cleanup. If T03's guarded cross-project selection is missing or a category unexpectedly discovers zero required cases, **BLOCKED**. One full unfiltered global SQL gate at final L3. |
 
 ### Existing command catalog for the matrix
 
@@ -97,17 +85,6 @@ dotnet test tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.cspr
 dotnet test tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj -c Release -f net8.0
 ```
 
-**D — Current focused Desktop session/GUI coverage before project extraction:**
-
-```powershell
-$desktopTests = 'tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj'
-$desktopFilter = 'FullyQualifiedName~MyDmsVn.Desktop.Tests.LoginViewModelTests|FullyQualifiedName~MyDmsVn.Desktop.Tests.LoginFormTests|FullyQualifiedName~MyDmsVn.Desktop.Tests.DesktopSessionExpiryTests|FullyQualifiedName~MyDmsVn.Desktop.Tests.UiDispatcherTests'
-dotnet test $desktopTests -c Release -f net48 --filter $desktopFilter
-dotnet test $desktopTests -c Release -f net8.0-windows --filter $desktopFilter
-```
-
-These four reviewed **existing class selectors** form an initial affected subset, not a complete new-project gate. Expand the focused selectors after inventorying the actual moved and GUI-dependent classes; after extraction record and run the new *verified* project paths with their real TFMs (no placeholder project is an executable command). Both GUI TFMs and the complete before/after theory-case inventory must still pass for T04 acceptance.
-
 **S — Existing guarded focused real-SQL category (only after operator approval and build):**
 
 Prerequisites: supported Windows/.NET tooling, `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` targeting effective `master` on a reviewed **non-production** instance, a current operator-managed `MYDMSVN_SQL_TEST_APPROVAL_FILE`, and fresh artifact storage. Missing/expired approval, unavailable Windows/SQL, required DMV permissions or any cleanup failure = **BLOCKED/FAILED**, never a skipped mandatory case or reported pass.
@@ -126,11 +103,11 @@ $artifactRoot = '.sqlperf/testgate-l2-' + [guid]::NewGuid().ToString('N')
   -Frameworks @('net48', 'net8.0')
 ```
 
-The existing wrapper accepts **one category**, not `module + category`; repeat **S** sequentially with a *new* artifact root for each genuinely affected category. This command is only valid while the source project still contains that category. Once tests move, the new guarded cross-project runner must be implemented/verified **before** using it; until then, mark that task gate blocked. Never invoke direct `dotnet test` for new SQL assemblies to bypass approval, process watchdog or ownership reconciliation.
+The existing wrapper accepts **one category**, not `module + category`; repeat **S** sequentially with a *new* artifact root for each genuinely affected category. This command is valid for the current original SQL project; cross-project migration belongs to [T05](20261016-002-modular-test-projects.md) and cannot bypass approval, process watchdog or ownership reconciliation.
 
-**Gate accounting for each T02–T05 task:** Before L2, record reviewed source/module/dependency changes, selected class/category and why the scope is complete, project/TFM and exact actual command; after L2, record revision, discovered/executed/passed/failed/skipped counts (mandatory skips = 0), timeout/watchdog and ownership cleanup outcomes where applicable, source/inventory reconciliation, local artifact location (not public), and `PASS / FAIL / BLOCKED / NOT RUN` with reasons. New runners/tests cannot be claimed as executed until present and independently discovered. If a required negative test, new project, SQL approval or supported platform is absent, keep the task gate open; do not silently narrow coverage.
+**Gate accounting for T02–T03:** Before L2, record reviewed source/module/dependency changes, selected class/category and why the scope is complete, project/TFM and exact actual command; after L2, record revision, discovered/executed/passed/failed/skipped counts (mandatory skips = 0), timeout/watchdog and ownership cleanup outcomes where applicable, source/inventory reconciliation, local artifact location (not public), and `PASS / FAIL / BLOCKED / NOT RUN` with reasons. New runners/tests cannot be claimed as executed until present and independently discovered. If a required negative test, new project, SQL approval or supported platform is absent, keep the task gate open; do not silently narrow coverage.
 
-**Separate final L3 boundary:** Do **not** perform full unfiltered SQL after each T02–T05 task. For each code-bearing implementation PR, after all affected L2 tests and gate-affecting edits are frozen, invoke the **applicable complete** Release/dual-TFM regression with strict inventory/discovery/TRX, zero mandatory skips, approval, watchdog and positively owned database reconciliation. T02 must demonstrate the new one-pass mode on real SQL at this boundary; until that mode has separately passed review, use the existing strict multi-pass path or mark L3 blocked. At T05 include **all** old/new SQL test projects, not just migrated categories. A failure or later relevant edit invalidates the affected L3 evidence and requires a fresh applicable complete gate. Raw TRX/journals/timings remain local; publish only reviewed sanitized aggregate evidence. No TESTGATE CI rollout is authorized.
+**Separate final L3 boundary:** Do **not** perform full unfiltered SQL after each T02–T03 task. For each code-bearing implementation PR, after all affected L2 tests and gate-affecting edits are frozen, invoke the **applicable complete** Release/dual-TFM regression with strict inventory/discovery/TRX, zero mandatory skips, approval, watchdog and positively owned database reconciliation. T02 must demonstrate the new one-pass mode on real SQL at this boundary; until that mode has separately passed review, use the existing strict multi-pass path or mark L3 blocked. The T05 all-project final acceptance is defined in [the modular plan](20261016-002-modular-test-projects.md). A failure or later relevant edit invalidates the affected L3 evidence and requires a fresh applicable complete gate. Raw TRX/journals/timings remain local; publish only reviewed sanitized aggregate evidence. No TESTGATE CI rollout is authorized.
 
 ## Tasks / reviewable PR slices
 
@@ -169,36 +146,21 @@ The existing wrapper accepts **one category**, not `module + category`; repeat *
 
 **Exit:** a reproducible, independently checked **local-only** task/final contract; no silent test omissions, concurrent SQL overload or duplicate CI full-suite run.
 
-### TESTGATE-T04 — Separate pure session/VM and GUI test projects (code PR)
+## Follow-on tasks
 
-- [ ] Inventory every existing Desktop method/theory case per TFM; classify pure/no-SQL vs STA/control/global-state and capture normalized logical identities and old → new assembly mappings, not only before/after counts.
-- [ ] Extract eligible pure tests without bringing `UseWindowsForms` or SQL initialization into the new project when avoidable; preserve both supported target runtimes and test behavior.
-- [ ] Keep GUI-interacting tests serialized; retain STA, disposal, unhandled exception/DataError protection, modal dialog suppression and bounded worker cleanup.
-- [ ] Update solution/project references and scripts, guard against duplicate execution, validate both `net48` and `net8.0-windows`.
-- [ ] Require per-TFM source/discovery/TRX one-to-one logical-case reconciliation (including expanded theory rows, categories and reviewed renames); fail on duplicate/missing/ambiguous identities. Only narrow Desktop assembly serialization if independently proven safe; retain an explicit serial fallback.
+- [TESTGATE-T04 — Separate pure session/VM and GUI test projects](20261016-002-modular-test-projects.md#testgate-t04--separate-pure-desktop-sessionvm-and-gui-tests)
+- [TESTGATE-T05 — Incremental SQL test-assembly partitioning](20261016-002-modular-test-projects.md#testgate-t05--incremental-sql-test-assembly-partitioning)
 
-**Exit:** unchanged assertions + passing dual-runtime GUI and pure tests, no SQL dependency added to pure tests.
-
-### TESTGATE-T05 — Incrementally partition SQL test assemblies (one or more code PRs)
-
-- [ ] Snapshot original SQL + reviewed non-SQL logical method/expanded-case identities, old assembly locations, categories, migration audit call sites and exemption fingerprints on BOTH TFMs using the versioned key defined above.
-- [ ] Create shared harness without bypassing the existing approval and ownership guards. Move one coherent module at a time; preserve test-only embedded SQL scripts/resources/assembly metadata.
-- [ ] Rebuild classification/exemption manifests per moved assembly and independent global aggregation; unknown cases/default SQL requirements fail closed.
-- [ ] Include full scenarios for cross-module inventory and permission checks, migrations/drift, aborted/failed upgrades, transactions, race conditions and cleanup.
-- [ ] Serialize SQL processes against the approved instance until cross-process/TFM resource coordination and bounded capacity have independent acceptance evidence.
-- [ ] Require full **before/after** per-TFM source → discovery → TRX logical-case reconciliation and an explicit bijective old → new location/key mapping; negative-test missing/duplicate/ambiguous assemblies and theory rows, renames, categorization drift and non-deterministic row identities. Never accept raw TRX ID or aggregate-count parity alone.
-- [ ] Run focused new-project gates, then final two-TFM strict acceptance; record execution and resource/time delta without promising a speedup from project splitting alone.
-
-**Exit:** every required old behavior is still executed exactly as intended and mandatory SQL coverage is complete across the new projects.
+**Status:** both remain proposed/not implemented. Consult their own per-task L2 matrices, prerequisite gates and PR acceptance rules; do not fold their implementation into T01–T03's task gates.
 
 ## Scope safeguards and blockers
 
-- **No CI rollout in TESTGATE-T01–T05.** Do not add/modify CI workflows or require CI to repeat local full SQL/desktop acceptance. Existing unrelated CI configuration is outside this plan; any future CI adoption requires a separate explicit user decision.
+- **No CI rollout in TESTGATE-T01–T03 or the separate T04/T05 plan.** Do not add/modify CI workflows or require CI to repeat local full SQL/desktop acceptance. Existing unrelated CI configuration is outside this plan; any future CI adoption requires a separate explicit user decision.
 
 - Production SQL schema, DbUp migration runner, RepoDb/Dapper behavior, permissions and authentication semantics are out of scope.
 - No parallel SQL experiments or migrated fixture reuse without separate safety evidence and approved ADR 0005 gates.
 - Never run destructive SQL against an unapproved instance. Keep `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` (`master`) and `MYDMSVN_SQL_TEST_APPROVAL_FILE` operator-managed; do not commit raw values.
-- Work cannot be claimed as `passed` until supported Windows TFMs and approved SQL resource gates were actually executed locally. Docs-only T01 must not mark implementation T02–T05 complete.
+- Work cannot be claimed as `passed` until supported Windows TFMs and approved SQL resource gates were actually executed locally. Docs-only changes must not mark T02/T03 or downstream T04/T05 implementation complete.
 - Existing P4.1 completed acceptance/checkmarks are preserved; future changes must establish whether historical evidence remains applicable to the final code revision.
 
 ## Future PR acceptance report template
