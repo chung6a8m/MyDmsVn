@@ -1,7 +1,7 @@
 # TESTGATE follow-up — Temporary removal of the .NET 8 application/test TFM
 
 **Plan ID:** `20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8`  
-**Status:** T01–T04 IMPLEMENTED IN CANDIDATE; T05 FROZEN ACCEPTANCE OPEN. Not accepted/merged until every T05 gate passes.
+**Status:** T01–T04 implemented; T05 re-verification is pending after runner authorization fix `5b1813cedeba41331d9dac13e52f57978fd0e3de` invalidated the earlier candidate envelope. Same-protocol duration comparison also remains open because the T01 baseline contains no comparable dual-TFM Final timing. Candidate transition remains pending review/merge.
 **Sequence:** after [TESTGATE-T01–T03](20261016-001-task-gates-and-modular-tests.md), before [TESTGATE-T04/T05 modularization](20261016-002-modular-test-projects.md).  
 **Decision (2026-10-16):** temporarily suspend the second `net8.0` TFM in dual-target non-WinForms projects, and `net8.0-windows` in dual-target WinForms projects, to reduce Codex feedback time; keep a reversible path back to both targets.
 
@@ -162,13 +162,13 @@ The existing TESTGATE manifest-owned `-Mode Final` must remain the authoritative
 
 ### NET8-PAUSE-T05 — Frozen one-pass acceptance and restore drill
 
-- [ ] Freeze gate-affecting inputs (projects, build scripts, runner, manifests, tests/theory, SQL/migrations), recording the exact **Stage B candidate transition authorization** and reviewed active TFM list. Run affected focused L2, then **one planned** locally approved manifest-governed Final covering **all required non-GUI projects** and the **entire unfiltered net48 SQL test inventory exactly once**; separately execute the full bounded GUI D2 and Release/build/package checks, **all at the same revision**. Require zero skips and source/discovery/TRX bijection, process exit, watchdog, approved SQL owner journal and cleanup. A successful old `TESTGATE-T03` Final alone is **not** NET8-PAUSE acceptance.
+- [ ] Freeze gate-affecting inputs (projects, build scripts, runner, manifests, tests/theory, SQL/migrations), recording the exact **Stage B candidate transition authorization** and reviewed active TFM list. Run affected focused L2, then **one planned** locally approved manifest-governed Final covering **all required non-GUI projects** and the **entire unfiltered net48 SQL test inventory exactly once**; separately execute the full bounded GUI D2 and Release/build/package checks, **all at the same revision**. Require zero skips and source/discovery/TRX bijection, process exit, watchdog, approved SQL owner journal and cleanup. A successful old `TESTGATE-T03` Final alone is **not** NET8-PAUSE acceptance. Previous evidence on `78e5dbc` is superseded by the runner authorization change; rerun the full envelope.
 - [ ] Run approved non-SQL Application/Desktop/Architecture/runner gates on their **actual active TFMs**, bounded STA GUI checks and build/package checks. Record parked modern-host evidence as NOT RUN with the accepted temporary scope.
 - [ ] Drill reactivation in an isolated branch/worktree: restore `net48;net8.0`, `net48;net8.0-windows`, tool/manifest framework arrays and modern-host build; prove source/discovery logical keys for `net8.0` still map correctly. Do not claim dual-TFM release quality without executing its full gate.
-- [ ] Compare duration (same environment and protocol, with setup/outliers explained); **do not claim a fixed 50% speedup**. Publish reviewed sanitized aggregates only; no raw TRX/SQL identifiers/approval journals.
-- [ ] If the final revision changes gate inputs after passing, rerun the relevant mandatory Final gate; do not reuse stale acceptance artifacts. SQL/Windows unavailable is BLOCKED/NOT RUN.
+- [ ] Compare duration (same environment and protocol, with setup/outliers explained); **do not claim a fixed 50% speedup**. The T01 baseline records no comparable dual-TFM Final timing. T05 records candidate command durations and makes no speedup claim; this comparison remains open until comparable baseline evidence exists. Publish reviewed sanitized aggregates only; no raw TRX/SQL identifiers/approval journals.
+- [ ] If the final revision changes gate inputs after passing, rerun the relevant mandatory Final gate; do not reuse stale acceptance artifacts. SQL/Windows unavailable is BLOCKED/NOT RUN. The prior envelope on `78e5dbc8bd26823b3f43c73daf68d49a1d025182` is invalidated by `5b1813cedeba41331d9dac13e52f57978fd0e3de`; bind the replacement evidence to the frozen rerun revision.
 
-**T05 exit:** reduced-TFM execution is effective only after the **manifest Final + external GUI D2 + build/architecture/package envelope** above is verified at the same frozen final revision and the restoration steps are tested. A failed, omitted or unavailable required gate remains BLOCKED and is never waived solely to improve speed.
+**T05 exit:** still open pending a fresh manifest Final, external GUI D2, build/architecture/package envelope and restoration drill at one frozen candidate revision. The same-protocol duration comparison also remains open because no matching dual-TFM baseline duration is recorded; no speedup is claimed.
 
 ## 5. Two-stage cutover acceptance, activation, rollback and re-enable conditions
 
@@ -199,7 +199,7 @@ The existing TESTGATE manifest-owned `-Mode Final` must remain the authoritative
 
 ## 6. Explicit per-task L2 execution matrix (bind exact source cases before work)
 
-**Current runnable commands:** T01–T05 identities are registered under the full plan ID. T01–T04 implementation evidence is recorded; T05 Final/GUI/Release commands require a clean frozen revision and approved resources. Do not report older ad-hoc tests as manifest evidence. An unavailable selector, approval, TFM, watchdog or cleanup result is `BLOCKED/NOT RUN`.
+**Current runnable commands:** T01–T05 identities are registered under the full plan ID. T01–T04 implementation evidence is recorded; T05 must rerun its manifest Final, GUI D2, Release and restoration envelope after the runner authorization fix. Do not report superseded or ad-hoc runs as current manifest evidence. The same-protocol duration comparison remains open as documented above. An unavailable selector, approval, TFM, watchdog or cleanup result is `BLOCKED/NOT RUN`.
 
 | Task | Actual project × TFM, verified class selector / prerequisite | L2 command or required binding | SQL category, timeout and evidence |
 |---|---|---|---|

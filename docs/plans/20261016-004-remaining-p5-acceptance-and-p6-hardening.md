@@ -101,7 +101,7 @@ $artifactRoot = '.sqlperf/p6-task-' + [guid]::NewGuid().ToString('N').Substring(
 
 **SQL L2:** resolve **actual post-T05 module `.csproj` path**, category and complete case selector from its *implemented* gated test runner; supply explicit `-Frameworks @('net48')` if it is supported by that verified wrapper and use valid `MYDMSVN_SQL_TEST_APPROVAL_FILE` on an explicitly approved non-production instance. Preserve global cross-process SQL lease, per-project source/discovery/TRX, zero mandatory skips, whole-tree watchdog, owned DB reconciliation and cleanup. `Invoke-FocusedSqlIntegrationTests.ps1` is currently a **single-original-project / one-category** helper; do not claim it supports unverified moved module+category selection. If unavailable, record SQL L2 **BLOCKED**, never fall back to a raw SQL `dotnet test`.
 
-**GUI L2 and release D2:** NET8-PAUSE-T03 provides the initial `Invoke-GuiTestAcceptance.ps1` whole-tree launcher for the original active-net48 Desktop project. NET8-PAUSE-T05 must execute it at the frozen revision, and modular T04-A must revalidate/extend it after project splitting. Direct GUI-bearing `dotnet test` / `--list-tests` still cannot substitute for D2.
+**GUI L2 and release D2:** NET8-PAUSE-T03 provides the initial `Invoke-GuiTestAcceptance.ps1` whole-tree launcher for the original active-net48 Desktop project. NET8-PAUSE-T05 GUI D2 passed on the earlier candidate but must be repeated with the fresh envelope after runner authorization fix `5b1813c`; modular T04-A must revalidate/extend it after project splitting. Direct GUI-bearing `dotnet test` / `--list-tests` still cannot substitute for D2.
 
 ### Bounded budgets and Final acceptance
 

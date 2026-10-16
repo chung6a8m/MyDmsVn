@@ -1,6 +1,6 @@
 # TESTGATE — Modular Desktop and SQL test projects (T04–T05)
 
-**Status:** Proposed / NOT IMPLEMENTED; blocked until NET8-PAUSE T05 accepts the implemented T01–T04 candidate · **Date:** 2026-10-16 · **Scope:** cross-phase test project partitioning; local-only execution.
+**Status:** Proposed / NOT IMPLEMENTED; blocked until NET8-PAUSE's remaining duration comparison and review/merge close · **Date:** 2026-10-16 · **Scope:** cross-phase test project partitioning; local-only execution.
 
 ## Prerequisite and exact active vs historical framework baseline
 
@@ -22,7 +22,7 @@ NET8-PAUSE must also have resolved the net8-only runner/Architecture references 
 Read `AGENTS.md`, [Codex test policy](../CODEX_TEST_EXECUTION_POLICY.md), [test gate matrix](../TEST_GATE_MATRIX.md), [test strategy](../TEST_STRATEGY.md), [tests README](../../tests/README.md), [proposed ADR 0006](../adr/0006-task-scoped-test-execution-and-module-projects.md), and accepted [ADR 0005](../adr/0005-test-isolation-and-bounded-parallelism.md).
 
 - **T01–T03 are verified complete** and define the current Task/Final contract and historical baseline. Do not reimplement or rerun these tasks merely because this plan is active.
-- **T02 already implemented** one-pass strict `pr-acceptance`; NET8-PAUSE-T03 added explicit framework arrays and the candidate profile. T05 must still accept the frozen active-net48 envelope before this plan runs.
+- **T02 already implemented** one-pass strict `pr-acceptance`; NET8-PAUSE-T03 added explicit framework arrays and the candidate profile. NET8-PAUSE T05 envelope must be rerun after runner authorization fix `5b1813c` before this plan runs.
 - **T03 is implemented** with versioned logical-case identities, manifest-owned Task/Final, global SQL serialization and case-level reconciliation. It does **not** yet make arbitrary GUI projects safe to run or allow multiple `SqlPrAcceptance` gates in one Final. Verify those capabilities independently before moving GUI/SQL cases; missing support is **BLOCKED**.
 - **T04 and T05 are separate reviewable code PR(s)**. A move from one assembly to another is a change to test execution ownership, not permission to shrink coverage. A follow-up modularization PR does not reopen SQLPERF-T04 fixture reuse or authorize SQL/GUI parallelism.
 - **Desktop outer watchdog prerequisite:** NET8-PAUSE-T03 implemented and negatively verified `Invoke-GuiTestAcceptance.ps1` for the original active-net48 Desktop project. NET8-PAUSE-T05 must execute it at the accepted frozen revision. Before modularization, T04-A must **revalidate/reuse or strengthen that launcher** for the new project graph; direct GUI `dotnet test` / `--list-tests` remains an invalid gate substitute.
