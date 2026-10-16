@@ -160,6 +160,41 @@ public sealed class FocusedRunCoordinatorTests
         await second.Lease.DisposeAsync();
     }
 
+    [Fact]
+    public async Task Recovery_accepts_an_empty_journal_only_when_discovery_and_trx_prove_zero_execution()
+    {
+        var artifactRoot = Path.Combine(Path.GetTempPath(), "mdv-zero-execution-" + Guid.NewGuid().ToString("N"));
+        var runId = "focused-fastsql-net48-zero";
+        var runRoot = Path.Combine(artifactRoot, runId);
+        var journal = Path.Combine(runRoot, "ownership", runId);
+        Directory.CreateDirectory(journal);
+        File.WriteAllText(
+            Path.Combine(runRoot, "discovery.txt"),
+            "No test matches the given testcase filter `Category=FastSQL`.\r\n");
+        File.WriteAllText(
+            Path.Combine(runRoot, runId + ".trx"),
+            "<TestRun><ResultSummary outcome=\"Completed\"><Counters total=\"0\" executed=\"0\" passed=\"0\" failed=\"0\" error=\"0\" timeout=\"0\" aborted=\"0\" inconclusive=\"0\" notExecuted=\"0\" /></ResultSummary></TestRun>");
+        var ownership = new RecordingOwnershipGate(isComplete: false);
+        var recovery = new BenchmarkAbandonedSqlRunRecovery("unused-approval", ownership);
+        var abandoned = new AbandonedSqlRun(
+            "resource",
+            123,
+            "invocation",
+            DateTimeOffset.UtcNow,
+            artifactRoot,
+            "legacy/focused-run/FastSQL");
+
+        try
+        {
+            Assert.True(await recovery.ReconcileAsync(abandoned, CancellationToken.None));
+            Assert.Empty(ownership.Evidence);
+        }
+        finally
+        {
+            Directory.Delete(artifactRoot, recursive: true);
+        }
+    }
+
     private static CommandResult Success(string output = "") => new CommandResult(
         0,
         false,

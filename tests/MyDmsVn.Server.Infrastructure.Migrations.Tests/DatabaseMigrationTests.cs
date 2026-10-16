@@ -424,26 +424,31 @@ public sealed class DatabaseMigrationTests
     }
 
     [Fact]
+    [Trait("Category", "MigrationSchema")]
     public void Master_database_is_rejected_before_connecting() =>
         AssertSystemDatabaseRejected(
             "Server=invalid.invalid;Database=master;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
 
     [Fact]
+    [Trait("Category", "MigrationSchema")]
     public void Model_database_is_rejected_before_connecting() =>
         AssertSystemDatabaseRejected(
             "Server=invalid.invalid;Database=model;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
 
     [Fact]
+    [Trait("Category", "MigrationSchema")]
     public void Msdb_database_is_rejected_before_connecting() =>
         AssertSystemDatabaseRejected(
             "Server=invalid.invalid;Database=msdb;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
 
     [Fact]
+    [Trait("Category", "MigrationSchema")]
     public void Tempdb_database_is_rejected_before_connecting() =>
         AssertSystemDatabaseRejected(
             "Server=invalid.invalid;Database=tempdb;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
 
     [Fact]
+    [Trait("Category", "MigrationSchema")]
     public void Unspecified_database_is_rejected_before_connecting() =>
         AssertSystemDatabaseRejected(
             "Server=invalid.invalid;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");

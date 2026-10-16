@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Benchmark;
 using MyDmsVn.SqlTestRunner.Processes;
@@ -745,6 +746,11 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         {
             var runId = Path.GetFileName(journal);
             var artifactRoot = Directory.GetParent(journal)!.Parent!.FullName;
+            if (IsVerifiedZeroExecution(artifactRoot, journal))
+            {
+                continue;
+            }
+
             var result = await _ownershipGate.ValidateAsync(
                 new BenchmarkOwnershipEvidence(
                     runId,
@@ -760,5 +766,52 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         }
 
         return true;
+    }
+
+    private static bool IsVerifiedZeroExecution(string artifactRoot, string journal)
+    {
+        var runRoot = Path.Combine(artifactRoot, Path.GetFileName(journal));
+        if (Directory.Exists(runRoot))
+        {
+            artifactRoot = runRoot;
+        }
+
+        if (Directory.EnumerateFileSystemEntries(journal).Any())
+        {
+            return false;
+        }
+
+        var discoveryPath = Path.Combine(artifactRoot, "discovery.txt");
+        if (!File.Exists(discoveryPath) ||
+            !File.ReadAllText(discoveryPath).Contains(
+                "No test matches the given testcase filter",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var trxFiles = Directory.GetFiles(artifactRoot, "*.trx", SearchOption.TopDirectoryOnly);
+        if (trxFiles.Length != 1)
+        {
+            return false;
+        }
+
+        try
+        {
+            var document = XDocument.Load(trxFiles[0]);
+            var counters = document.Descendants().SingleOrDefault(element => element.Name.LocalName == "Counters");
+            var summary = document.Descendants().SingleOrDefault(element => element.Name.LocalName == "ResultSummary");
+            var unitTestResults = document.Descendants().Count(element => element.Name.LocalName == "UnitTestResult");
+            return counters is not null &&
+                summary is not null &&
+                string.Equals((string?)summary.Attribute("outcome"), "Completed", StringComparison.Ordinal) &&
+                unitTestResults == 0 &&
+                new[] { "total", "executed", "passed", "failed", "error", "timeout", "aborted", "inconclusive", "notExecuted" }
+                    .All(name => (string?)counters.Attribute(name) == "0");
+        }
+        catch (System.Xml.XmlException)
+        {
+            return false;
+        }
     }
 }

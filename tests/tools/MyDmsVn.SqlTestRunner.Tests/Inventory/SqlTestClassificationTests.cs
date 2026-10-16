@@ -84,6 +84,20 @@ public sealed class SqlTestClassificationTests
                 "Release",
                 tfm,
                 "MyDmsVn.Server.Infrastructure.Catalog.Tests.dll"),
+            Path.Combine(
+                root,
+                "tests",
+                "MyDmsVn.Server.Infrastructure.Foundation.Tests",
+                "bin",
+                "Release",
+                tfm,
+                "MyDmsVn.Server.Infrastructure.Foundation.Tests.dll"),
+            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", "bin", "Release", tfm,
+                "MyDmsVn.Server.Infrastructure.Security.Tests.dll"),
+            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Inventory.Tests", "bin", "Release", tfm,
+                "MyDmsVn.Server.Infrastructure.Inventory.Tests.dll"),
+            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Migrations.Tests", "bin", "Release", tfm,
+                "MyDmsVn.Server.Infrastructure.Migrations.Tests.dll"),
         };
         var manifestPath = Path.Combine(root, "tests", "tools", "sql-test-nonsql-exemptions.json");
 

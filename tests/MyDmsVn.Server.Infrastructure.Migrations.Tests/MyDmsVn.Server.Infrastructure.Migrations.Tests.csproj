@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="dbup-sqlserver" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MyDmsVn.SqlTestHarness\MyDmsVn.SqlTestHarness.csproj" />
+    <ProjectReference Include="..\..\src\MyDmsVn.Desktop.Application\MyDmsVn.Desktop.Application.csproj" />
+    <ProjectReference Include="..\..\src\MyDmsVn.Desktop.Infrastructure.Local\MyDmsVn.Desktop.Infrastructure.Local.csproj" />
+    <ProjectReference Include="..\..\src\MyDmsVn.Server.DbMigrator\MyDmsVn.Server.DbMigrator.csproj" />
+    <ProjectReference Include="..\..\src\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlTestDatabase.cs" Link="SqlTestDatabase.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlTestDatabaseName.cs" Link="SqlTestDatabaseName.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\MeasuredDatabaseMigrationRunner.cs" Link="MeasuredDatabaseMigrationRunner.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\TestDatabaseMigrationRunner.cs" Link="TestDatabaseMigrationRunner.cs" />
+    <EmbeddedResource Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\TestScripts\*.sql" Link="TestScripts\%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

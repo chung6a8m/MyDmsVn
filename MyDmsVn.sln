@@ -57,6 +57,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Desktop.Session.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructure.Catalog.Tests", "tests\MyDmsVn.Server.Infrastructure.Catalog.Tests\MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj", "{A168AC6D-2E75-4366-85FB-3A7FABEB096D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructure.Foundation.Tests", "tests\MyDmsVn.Server.Infrastructure.Foundation.Tests\MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj", "{EC36CB8D-43F6-43B3-BC88-29B9FCC972A8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructure.Security.Tests", "tests\MyDmsVn.Server.Infrastructure.Security.Tests\MyDmsVn.Server.Infrastructure.Security.Tests.csproj", "{23DEE51B-C7FD-44E8-8D9F-203AAAA42C5D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructure.Inventory.Tests", "tests\MyDmsVn.Server.Infrastructure.Inventory.Tests\MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj", "{93092814-57CB-444B-86A5-4316D647D71A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructure.Migrations.Tests", "tests\MyDmsVn.Server.Infrastructure.Migrations.Tests\MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj", "{DDBECF01-C73B-48E4-91DC-3F16DB101074}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -158,6 +166,22 @@ Global
 		{A168AC6D-2E75-4366-85FB-3A7FABEB096D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A168AC6D-2E75-4366-85FB-3A7FABEB096D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A168AC6D-2E75-4366-85FB-3A7FABEB096D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EC36CB8D-43F6-43B3-BC88-29B9FCC972A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EC36CB8D-43F6-43B3-BC88-29B9FCC972A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EC36CB8D-43F6-43B3-BC88-29B9FCC972A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EC36CB8D-43F6-43B3-BC88-29B9FCC972A8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23DEE51B-C7FD-44E8-8D9F-203AAAA42C5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23DEE51B-C7FD-44E8-8D9F-203AAAA42C5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23DEE51B-C7FD-44E8-8D9F-203AAAA42C5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23DEE51B-C7FD-44E8-8D9F-203AAAA42C5D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{93092814-57CB-444B-86A5-4316D647D71A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93092814-57CB-444B-86A5-4316D647D71A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93092814-57CB-444B-86A5-4316D647D71A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93092814-57CB-444B-86A5-4316D647D71A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DDBECF01-C73B-48E4-91DC-3F16DB101074}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DDBECF01-C73B-48E4-91DC-3F16DB101074}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DDBECF01-C73B-48E4-91DC-3F16DB101074}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DDBECF01-C73B-48E4-91DC-3F16DB101074}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{19B402F7-3500-487D-BDDF-69C76A73AC62} = {D37D8AC9-764D-4B64-810F-A0B495FC0A53}
@@ -184,5 +208,8 @@ Global
 		{328F0859-E6C4-4117-B684-E65F114ADBED} = {B88231A0-86D4-4514-B20B-04E2C6A49579}
 		{11DAE03D-4D5B-4344-B91E-EE2C48767A0D} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
 		{A168AC6D-2E75-4366-85FB-3A7FABEB096D} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
+		{23DEE51B-C7FD-44E8-8D9F-203AAAA42C5D} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
+		{93092814-57CB-444B-86A5-4316D647D71A} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
+		{DDBECF01-C73B-48E4-91DC-3F16DB101074} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
 	EndGlobalSection
 EndGlobal

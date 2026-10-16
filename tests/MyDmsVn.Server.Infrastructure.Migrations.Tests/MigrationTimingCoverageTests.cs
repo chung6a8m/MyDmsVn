@@ -10,6 +10,7 @@ using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Trait("Category", "MigrationSchema")]
 public sealed class MigrationTimingCoverageTests
 {
     [Fact]

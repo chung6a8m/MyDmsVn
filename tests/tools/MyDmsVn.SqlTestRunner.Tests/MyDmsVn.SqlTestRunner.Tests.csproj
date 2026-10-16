@@ -27,6 +27,30 @@
       Targets="Build"
       Properties="Configuration=$(Configuration);TargetFramework=net48" />
   </Target>
+  <Target Name="BuildFoundationInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.Server.Infrastructure.Foundation.Tests\MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
+  <Target Name="BuildSecurityInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.Server.Infrastructure.Security.Tests\MyDmsVn.Server.Infrastructure.Security.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
+  <Target Name="BuildInventoryInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.Server.Infrastructure.Inventory.Tests\MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
+  <Target Name="BuildMigrationsInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.Server.Infrastructure.Migrations.Tests\MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
   <Target Name="BuildGuiInventoryFixture" BeforeTargets="Build">
     <MSBuild
       Projects="..\..\MyDmsVn.Desktop.Tests\MyDmsVn.Desktop.Tests.csproj"

@@ -329,7 +329,7 @@ public sealed class TestGateManifestTests
     }
 
     [Fact]
-    public void Checked_in_T05_B_Final_binds_the_original_and_catalog_SQL_projects()
+    public void Checked_in_T05_B_Final_binds_each_current_SQL_test_project()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "tests", "test-gates.v1.json")))
@@ -347,6 +347,10 @@ public sealed class TestGateManifestTests
         {
             "modular-t05-b-sql-original",
             "modular-t05-b-sql-catalog",
+            "modular-t05-b-sql-foundation",
+            "modular-t05-b-sql-security",
+            "modular-t05-b-sql-inventory",
+            "modular-t05-b-sql-migrations",
         }, System.Linq.Enumerable.Select(selection.Gates, gate => gate.GateId));
     }
 

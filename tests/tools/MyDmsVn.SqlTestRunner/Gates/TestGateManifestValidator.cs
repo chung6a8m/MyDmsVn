@@ -183,8 +183,13 @@ public static class TestGateManifestValidator
             throw new InvalidDataException("The reviewed active/historical framework profile is invalid.");
         }
 
+        var historicalSqlOwners = manifest.Gates
+            .Where(gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
+            .Select(gate => gate.Project)
+            .Append(profile.SqlProject)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var historicalSqlCases = manifest.LogicalCases.Count(item =>
-            (string.Equals(item.OwnerProject, profile.SqlProject, StringComparison.Ordinal) ||
+            (historicalSqlOwners.Contains(item.OwnerProject) ||
              item.Classification.Any(SqlLogicalCaseCategories.Contains)) &&
             profile.HistoricalSqlFrameworks.All(tfm => item.Frameworks.Contains(tfm, StringComparer.Ordinal)));
         if (historicalSqlCases < profile.MinimumHistoricalSqlLogicalCases)
