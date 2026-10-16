@@ -20,7 +20,7 @@ These facts create a risk that AI development repeatedly invokes expensive, unre
 
 ## Rollout boundary
 
-This ADR remains **Proposed** as a whole because T04/T05 split assemblies and module selectors are not implemented. T02 single-pass SQL and T03 v1 manifest/Task/Final orchestration now exist; T03 is not acceptance-verified until its frozen Final L3 evidence is recorded. Documentation-only changes do not retroactively invalidate previously accepted functional evidence.
+This ADR remains **Proposed** as a whole because T04/T05 split assemblies and module selectors are not implemented. T02 single-pass SQL and T03 v1 manifest/Task/Final orchestration are implemented and acceptance-verified at the frozen revisions recorded in the core TESTGATE plan. Documentation-only changes do not retroactively invalidate that functional evidence.
 
 Implement in separately reviewable stages: [TESTGATE-T01–T03 execution policy, strict one-pass gate and orchestration](../plans/20261016-001-task-gates-and-modular-tests.md) and [TESTGATE-T04/T05 modular Desktop and SQL test projects](../plans/20261016-002-modular-test-projects.md). Do not edit production persistence, grant more SQL privileges, enable SQL parallelism, or move tests en masse in this policy PR.
 
