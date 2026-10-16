@@ -42,8 +42,29 @@ if ($Mode -eq 'Final') {
 }
 
 $runnerProject = Join-Path $PSScriptRoot 'MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj'
+$runnerProjectDirectory = Split-Path -Parent $runnerProject
+$runnerOutput = Join-Path $runnerProjectDirectory 'bin\Release\net8.0'
+$artifactRootFull = if ([IO.Path]::IsPathRooted($ArtifactRoot)) {
+    [IO.Path]::GetFullPath($ArtifactRoot)
+} else {
+    [IO.Path]::GetFullPath((Join-Path $RepositoryRoot $ArtifactRoot))
+}
+$shadowRoot = Join-Path $artifactRootFull '.runner'
+
+& dotnet build $runnerProject -c Release -f net8.0 --no-restore
+if ($LASTEXITCODE -ne 0) {
+    exit 3
+}
+
+New-Item -ItemType Directory -Path $shadowRoot -Force | Out-Null
+Get-ChildItem -LiteralPath $runnerOutput | Copy-Item -Destination $shadowRoot -Recurse -Force
+$runnerDll = Join-Path $shadowRoot 'MyDmsVn.SqlTestRunner.dll'
+if (-not (Test-Path -LiteralPath $runnerDll -PathType Leaf)) {
+    exit 3
+}
+
 $arguments = @(
-    'run', '--project', $runnerProject, '-c', 'Release', '--no-build', '--',
+    $runnerDll,
     'test-gate', '--repo', $RepositoryRoot, '--manifest', $ManifestPath,
     '--mode', $Mode, '--plan', $PlanId, '--task', $TaskId, '--artifacts', $ArtifactRoot
 )

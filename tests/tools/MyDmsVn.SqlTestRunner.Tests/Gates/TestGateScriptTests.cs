@@ -14,6 +14,10 @@ public sealed class TestGateScriptTests
         Assert.Contains("test-gate", script, StringComparison.Ordinal);
         Assert.Contains("$RepositoryRoot = (Get-Location).Path", script, StringComparison.Ordinal);
         Assert.Contains("$ManifestPath = 'tests/test-gates.v1.json'", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet build $runnerProject -c Release -f net8.0 --no-restore", script, StringComparison.Ordinal);
+        Assert.Contains("'.runner'", script, StringComparison.Ordinal);
+        Assert.Contains("MyDmsVn.SqlTestRunner.dll", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("'run', '--project'", script, StringComparison.Ordinal);
         Assert.Contains("git -C $RepositoryRoot status --porcelain", script, StringComparison.Ordinal);
         Assert.Contains("git -C $RepositoryRoot rev-parse HEAD", script, StringComparison.Ordinal);
         Assert.Contains("$Revision", script, StringComparison.Ordinal);
