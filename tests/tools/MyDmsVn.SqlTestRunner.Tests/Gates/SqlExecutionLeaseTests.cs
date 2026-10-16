@@ -4,7 +4,10 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using MyDmsVn.SqlTestRunner.Benchmark;
 using MyDmsVn.SqlTestRunner.Gates;
+using MyDmsVn.SqlTestRunner.Processes;
+using MyDmsVn.SqlTestRunner.Reporting;
 using Xunit;
 
 namespace MyDmsVn.SqlTestRunner.Tests.Gates;
@@ -94,6 +97,31 @@ public sealed class SqlExecutionLeaseTests
     }
 
     [Fact]
+    public async Task Completed_lease_remains_reusable_after_its_artifacts_are_deleted()
+    {
+        using var store = new TemporaryLeaseStore();
+        const string fingerprint = "completed-deleted-artifacts";
+        var artifactRoot = Path.Combine(store.Root, "completed-artifacts");
+        var request = new SqlExecutionLeaseRequest(
+            fingerprint,
+            "20261016-001/TESTGATE-T03/Final",
+            artifactRoot,
+            TimeSpan.FromSeconds(2),
+            new SuccessfulRecovery());
+        var factory = Factory(store);
+        var first = await factory.AcquireAsync(request, CancellationToken.None);
+        first.Lease!.Complete();
+        await first.Lease.DisposeAsync();
+        Directory.Delete(artifactRoot, recursive: true);
+
+        var second = await factory.AcquireAsync(request, CancellationToken.None);
+
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.Acquired, second.Status);
+        second.Lease!.Complete();
+        await second.Lease.DisposeAsync();
+    }
+
+    [Fact]
     public async Task Unresolved_disposal_requires_recovery_before_the_next_acquisition()
     {
         using var store = new TemporaryLeaseStore();
@@ -110,6 +138,23 @@ public sealed class SqlExecutionLeaseTests
             CancellationToken.None);
 
         Assert.Equal(new[] { "recover" }, events);
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.BlockedRecovery, second.Status);
+        Assert.Null(second.Lease);
+    }
+
+    [Fact]
+    public async Task Unresolved_lease_with_deleted_artifacts_stays_blocked_for_recovery()
+    {
+        using var store = new TemporaryLeaseStore();
+        const string fingerprint = "unresolved-deleted-artifacts";
+        var factory = Factory(store);
+        var request = Request(store, fingerprint);
+        var first = await factory.AcquireAsync(request, CancellationToken.None);
+        await first.Lease!.DisposeAsync();
+        Directory.Delete(request.PrivateArtifactRoot, recursive: true);
+
+        var second = await factory.AcquireAsync(request, CancellationToken.None);
+
         Assert.Equal(SqlExecutionLeaseAcquireStatus.BlockedRecovery, second.Status);
         Assert.Null(second.Lease);
     }
@@ -230,6 +275,59 @@ public sealed class SqlExecutionLeaseTests
         Assert.True(completed.Acquired);
         Assert.True(completed.Result);
     }
+
+    [Fact]
+    public async Task External_cancellation_during_preflight_does_not_poison_the_next_guarded_run()
+    {
+        using var store = new TemporaryLeaseStore();
+        var entered = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var coordinator = new BenchmarkRunCoordinator(
+            new SignallingBlockingPreflightGate(entered),
+            new NoProcessRunner(),
+            new UnusedResultGate(),
+            new UnusedOwnershipGate(),
+            new UnusedReportExporter(),
+            new AcceptingClassificationGate());
+        var guard = new SqlExecutionLeaseGuard(
+            new FixedApproval("cancelled-preflight-instance"),
+            Factory(store));
+        using var cancellation = new CancellationTokenSource();
+        var first = guard.RunAsync(
+            "approval.json",
+            "legacy/pr-acceptance",
+            Path.Combine(store.Root, "cancelled-preflight"),
+            TimeSpan.FromSeconds(2),
+            token => coordinator.RunAsync(BenchmarkOptions(store), token),
+            result => !result.RecoveryRequired,
+            cancellation.Token);
+        await entered.Task;
+        cancellation.Cancel();
+
+        var cancelled = await first;
+        var second = await guard.RunAsync(
+            "approval.json",
+            "legacy/pr-acceptance",
+            Path.Combine(store.Root, "next-run"),
+            TimeSpan.FromSeconds(2),
+            _ => Task.FromResult(new BenchmarkRunResult(false, Array.Empty<BenchmarkFrameworkRun>())),
+            result => !result.RecoveryRequired,
+            CancellationToken.None);
+
+        Assert.True(cancelled.Acquired);
+        Assert.False(cancelled.Result.IsComplete);
+        Assert.False(cancelled.Result.RecoveryRequired);
+        Assert.True(second.Acquired);
+    }
+
+    private static BenchmarkRunOptions BenchmarkOptions(TemporaryLeaseStore store) =>
+        new BenchmarkRunOptions(
+            store.Root,
+            Path.Combine(store.Root, "tests.csproj"),
+            Path.Combine(store.Root, "benchmark-artifacts"),
+            Path.Combine(store.Root, "approval.json"),
+            new[] { "net48" },
+            TimeSpan.FromSeconds(5),
+            OverallRunTimeout: TimeSpan.FromMinutes(1));
 
     private static SqlExecutionLeaseFactory Factory(TemporaryLeaseStore store) =>
         new SqlExecutionLeaseFactory(new FileSqlExecutionLeaseStore(store.Root));
@@ -378,6 +476,57 @@ public sealed class SqlExecutionLeaseTests
             fingerprint = _fingerprint;
             return true;
         }
+    }
+
+    private sealed class SignallingBlockingPreflightGate : IBenchmarkPreflightGate
+    {
+        private readonly TaskCompletionSource<object?> _entered;
+
+        public SignallingBlockingPreflightGate(TaskCompletionSource<object?> entered) =>
+            _entered = entered;
+
+        public async Task<bool> ValidateAsync(CancellationToken cancellationToken)
+        {
+            _entered.TrySetResult(null);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return true;
+        }
+    }
+
+    private sealed class AcceptingClassificationGate : IBenchmarkClassificationGate
+    {
+        public bool IsValid(string assemblyPath, string repositoryRoot) => true;
+    }
+
+    private sealed class NoProcessRunner : IProcessRunner
+    {
+        public Task<CommandResult> RunAsync(CommandSpec command, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("SQL execution must not start during preflight cancellation.");
+    }
+
+    private sealed class UnusedResultGate : IBenchmarkResultGate
+    {
+        public bool IsValid(BenchmarkResultEvidence evidence) =>
+            throw new InvalidOperationException("Result validation is not expected.");
+    }
+
+    private sealed class UnusedOwnershipGate : IBenchmarkOwnershipGate
+    {
+        public Task<BenchmarkOwnershipResult> ValidateAsync(
+            BenchmarkOwnershipEvidence evidence,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Ownership reconciliation is not expected.");
+    }
+
+    private sealed class UnusedReportExporter : IBenchmarkReportExporter
+    {
+        public IReadOnlyList<string> ExpectedReportPaths(BenchmarkReportEvidence evidence) =>
+            throw new InvalidOperationException("Report export is not expected.");
+
+        public Task<BenchmarkReportExportResult> ExportAsync(
+            BenchmarkReportEvidence evidence,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Report export is not expected.");
     }
 
     private enum LeaseDamage

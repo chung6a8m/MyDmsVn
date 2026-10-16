@@ -690,10 +690,19 @@ public sealed class TestGateCoordinator
 internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecovery
 {
     private readonly string _approvalFile;
+    private readonly IBenchmarkOwnershipGate _ownershipGate;
 
     public BenchmarkAbandonedSqlRunRecovery(string approvalFile)
+        : this(approvalFile, new BenchmarkOwnershipGate())
+    {
+    }
+
+    internal BenchmarkAbandonedSqlRunRecovery(
+        string approvalFile,
+        IBenchmarkOwnershipGate ownershipGate)
     {
         _approvalFile = approvalFile;
+        _ownershipGate = ownershipGate ?? throw new ArgumentNullException(nameof(ownershipGate));
     }
 
     public async Task<bool> ReconcileAsync(AbandonedSqlRun lease, CancellationToken cancellationToken)
@@ -710,11 +719,10 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
             return false;
         }
 
-        var gate = new BenchmarkOwnershipGate();
         foreach (var journal in journals)
         {
             var runId = Path.GetFileName(journal);
-            var result = await gate.ValidateAsync(
+            var result = await _ownershipGate.ValidateAsync(
                 new BenchmarkOwnershipEvidence(
                     runId,
                     journal,

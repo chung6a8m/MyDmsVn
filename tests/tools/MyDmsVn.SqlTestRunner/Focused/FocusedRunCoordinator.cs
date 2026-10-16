@@ -123,12 +123,15 @@ public sealed class FocusedRunCoordinator
                 var runId = "focused-" + options.Category.ToLowerInvariant() + "-" +
                     tfm.Replace('.', '-') + "-" + Guid.NewGuid().ToString("N");
                 var runRoot = Path.Combine(options.ArtifactRoot, runId);
-                var journal = Path.Combine(runRoot, "ownership");
+                var journal = Path.Combine(options.ArtifactRoot, "ownership", runId);
                 var discoveryPath = Path.Combine(runRoot, "discovery.txt");
                 var trxName = runId + ".trx";
                 var trxPath = Path.Combine(runRoot, trxName);
                 var timingPath = Path.Combine(runRoot, "timing.jsonl");
-                var recoveryPath = Path.Combine(runRoot, "ownership-recovery.json");
+                var recoveryPath = Path.Combine(
+                    options.ArtifactRoot,
+                    "ownership-recovery-" + runId + ".json");
+                Directory.CreateDirectory(runRoot);
                 Directory.CreateDirectory(journal);
                 File.WriteAllText(discoveryPath, discovery.StandardOutput);
 
@@ -212,8 +215,7 @@ public sealed class FocusedRunCoordinator
 
             return new FocusedRunResult(true, runs, recovery.RecoveryRequired);
         }
-        catch (OperationCanceledException) when (
-            deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
             return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
         }

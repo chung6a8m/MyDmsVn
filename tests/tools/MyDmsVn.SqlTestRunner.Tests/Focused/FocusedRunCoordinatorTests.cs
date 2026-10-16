@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Benchmark;
 using MyDmsVn.SqlTestRunner.Focused;
+using MyDmsVn.SqlTestRunner.Gates;
 using MyDmsVn.SqlTestRunner.Processes;
 using MyDmsVn.SqlTestRunner.Reconciliation;
 using Xunit;
@@ -91,6 +92,58 @@ public sealed class FocusedRunCoordinatorTests
         Assert.True(evidence.ProcessSucceeded);
     }
 
+    [Fact]
+    public async Task Failed_focused_run_is_recovered_from_the_shared_ownership_layout_on_next_acquisition()
+    {
+        using var fixture = new Fixture();
+        var leaseStore = new FileSqlExecutionLeaseStore(Path.Combine(fixture.Root, "lease-store"));
+        var leaseFactory = new SqlExecutionLeaseFactory(leaseStore);
+        const string fingerprint = "focused-recovery-layout";
+        var firstRequest = new SqlExecutionLeaseRequest(
+            fingerprint,
+            "20261016-001/TESTGATE-T03/Task",
+            fixture.Options.ArtifactRoot,
+            TimeSpan.FromSeconds(2),
+            new SuccessfulRecovery());
+        var first = await leaseFactory.AcquireAsync(firstRequest, CancellationToken.None);
+        var process = new RecordingProcessRunner(command =>
+            command.Arguments.Contains("--list-tests", StringComparison.Ordinal)
+                ? Success("The following Tests are available:\n    Example.Tests.Fast\n")
+                : Success());
+        var failedOwnership = new RecordingOwnershipGate(isComplete: false);
+        var focused = new FocusedRunCoordinator(
+            new StubPreflightGate(),
+            process,
+            new StubClassificationGate(true),
+            new StubResultGate(true),
+            failedOwnership);
+
+        var focusedResult = await focused.RunAsync(fixture.Options, CancellationToken.None);
+        await first.Lease!.DisposeAsync();
+        var recoveryOwnership = new RecordingOwnershipGate(isComplete: true);
+        var second = await leaseFactory.AcquireAsync(
+            firstRequest with
+            {
+                Recovery = new BenchmarkAbandonedSqlRunRecovery(
+                    fixture.Options.ApprovalFile,
+                    recoveryOwnership),
+            },
+            CancellationToken.None);
+
+        Assert.False(focusedResult.IsComplete);
+        Assert.True(focusedResult.RecoveryRequired);
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.Recovered, second.Status);
+        var evidence = Assert.Single(recoveryOwnership.Evidence);
+        Assert.Equal(
+            Path.Combine(fixture.Options.ArtifactRoot, "ownership", evidence.ExecutionId),
+            evidence.JournalDirectory);
+        Assert.Equal(
+            Path.Combine(fixture.Options.ArtifactRoot, "ownership-recovery-" + evidence.ExecutionId + ".json"),
+            evidence.RecoveryArtifactPath);
+        second.Lease!.Complete();
+        await second.Lease.DisposeAsync();
+    }
+
     private static CommandResult Success(string output = "") => new CommandResult(
         0,
         false,
@@ -145,6 +198,10 @@ public sealed class FocusedRunCoordinatorTests
 
     private sealed class RecordingOwnershipGate : IBenchmarkOwnershipGate
     {
+        private readonly bool _isComplete;
+
+        public RecordingOwnershipGate(bool isComplete = true) => _isComplete = isComplete;
+
         public List<BenchmarkOwnershipEvidence> Evidence { get; } = new List<BenchmarkOwnershipEvidence>();
 
         public bool ReceivedCancelledToken { get; private set; }
@@ -155,8 +212,14 @@ public sealed class FocusedRunCoordinatorTests
         {
             Evidence.Add(evidence);
             ReceivedCancelledToken |= cancellationToken.IsCancellationRequested;
-            return Task.FromResult(new BenchmarkOwnershipResult(true, evidence.RecoveryArtifactPath));
+            return Task.FromResult(new BenchmarkOwnershipResult(_isComplete, evidence.RecoveryArtifactPath));
         }
+    }
+
+    private sealed class SuccessfulRecovery : IAbandonedSqlRunRecovery
+    {
+        public Task<bool> ReconcileAsync(AbandonedSqlRun lease, CancellationToken cancellationToken) =>
+            Task.FromResult(true);
     }
 
     private sealed class Fixture : IDisposable
@@ -179,6 +242,8 @@ public sealed class FocusedRunCoordinatorTests
                 TimeSpan.FromSeconds(5),
                 TimeSpan.FromMinutes(1));
         }
+
+        public string Root => _root;
 
         public FocusedRunOptions Options { get; }
 

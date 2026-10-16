@@ -57,8 +57,7 @@ public sealed class BenchmarkRunCoordinator
         {
             return await RunCoreAsync(options, runs, recovery, linked.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (
-            deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
             return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }

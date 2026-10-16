@@ -320,6 +320,11 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
             return SqlExecutionLeaseAcquireStatus.Acquired;
         }
 
+        if (!Directory.Exists(record.PrivateArtifactRoot))
+        {
+            return SqlExecutionLeaseAcquireStatus.BlockedRecovery;
+        }
+
         if (record.CompletionState == SqlExecutionLeaseCompletionState.Active &&
             IsLiveOrUnknown(record.OwningProcessId))
         {
@@ -565,7 +570,6 @@ internal sealed record SqlExecutionLeaseRecord(
         !string.IsNullOrWhiteSpace(InvocationId) &&
         StartedAtUtc <= DateTimeOffset.UtcNow &&
         Path.IsPathFullyQualified(PrivateArtifactRoot) &&
-        Directory.Exists(PrivateArtifactRoot) &&
         !string.IsNullOrWhiteSpace(GateIdentity) &&
         Enum.IsDefined(CompletionState);
 
