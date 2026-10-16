@@ -220,21 +220,24 @@ public sealed class TestGateCoordinator
             var globalSource = new List<BoundLogicalCase>();
             var globalDiscovered = new List<BoundLogicalCase>();
             var globalExecuted = new List<ExecutedLogicalCase>();
+            var sqlGates = selection.Gates.Where(gate =>
+                gate.StrictMode == TestGateStrictMode.SqlPrAcceptance).ToArray();
+            var sqlGatesExecuted = false;
             foreach (var gate in selection.Gates)
             {
                 if (gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
                 {
-                    var sqlStatus = await RunSqlGateAsync(
-                        options,
-                        manifest,
-                        gate,
-                        manifestFingerprint,
-                        runs,
-                        globalExpected,
-                        globalSource,
-                        globalDiscovered,
-                        globalExecuted,
-                        linked.Token).ConfigureAwait(false);
+                    if (sqlGatesExecuted)
+                    {
+                        continue;
+                    }
+
+                    sqlGatesExecuted = true;
+                    var sqlStatus = await RunSqlGatesAsync(
+                            options, manifest, sqlGates, manifestFingerprint, runs,
+                            globalExpected, globalSource, globalDiscovered, globalExecuted,
+                            linked.Token)
+                        .ConfigureAwait(false);
                     if (sqlStatus != TestGateRunStatus.Succeeded)
                     {
                         return new TestGateRunResult(sqlStatus, runs);
@@ -406,10 +409,10 @@ public sealed class TestGateCoordinator
         }
     }
 
-    private async Task<TestGateRunStatus> RunSqlGateAsync(
+    private async Task<TestGateRunStatus> RunSqlGatesAsync(
         TestGateRunOptions options,
         TestGateManifest manifest,
-        TestGateDefinition gate,
+        IReadOnlyList<TestGateDefinition> gates,
         string manifestFingerprint,
         List<TestGateFrameworkResult> frameworks,
         List<ExpectedLogicalCase> globalExpected,
@@ -418,23 +421,24 @@ public sealed class TestGateCoordinator
         List<ExecutedLogicalCase> globalExecuted,
         CancellationToken cancellationToken)
     {
-        if (options.Mode != TestGateMode.Final ||
+        if (options.Mode != TestGateMode.Final || gates.Count == 0 ||
             string.IsNullOrWhiteSpace(options.ApprovalFile) ||
             string.IsNullOrWhiteSpace(options.Revision) ||
-            gate.Frameworks.Count == 0 ||
+            gates.Any(gate => gate.Frameworks.Count == 0) ||
             !_approval.TryLoad(options.ApprovalFile, out var instanceFingerprint))
         {
             return TestGateRunStatus.ResourceDenied;
         }
 
         var recovery = _recovery ?? new BenchmarkAbandonedSqlRunRecovery(options.ApprovalFile);
+        var leaseTimeout = TestGateTimeoutBudget.Calculate(gates.Select(gate => gate.OverallTimeoutSeconds));
         var acquired = await _leases.AcquireAsync(
             new SqlExecutionLeaseRequest(
                 instanceFingerprint,
-                options.PlanId + "/" + options.TaskId + "/" + gate.GateId,
+                options.PlanId + "/" + options.TaskId + "/" + string.Join("+", gates.Select(gate => gate.GateId)),
                 options.ArtifactRoot,
-                TimeSpan.FromSeconds(gate.CommandTimeoutSeconds),
-                TimeSpan.FromSeconds(gate.CommandTimeoutSeconds),
+                leaseTimeout,
+                leaseTimeout,
                 recovery),
             cancellationToken).ConfigureAwait(false);
         if (acquired.Lease is null ||
@@ -450,139 +454,150 @@ public sealed class TestGateCoordinator
             Environment.SetEnvironmentVariable(
                 SqlTestHarnessEnvironment.ApprovalFileVariable,
                 options.ApprovalFile);
-            var benchmark = await _sqlAcceptance.RunAsync(
-                new BenchmarkRunOptions(
-                    options.RepositoryRoot,
-                    FullPath(options.RepositoryRoot, gate.Project),
-                    options.ArtifactRoot,
-                    options.ApprovalFile,
-                    gate.Frameworks,
-                    TimeSpan.FromSeconds(gate.CommandTimeoutSeconds),
-                    WarmupPasses: 0,
-                    MeasuredPasses: 1,
-                    OverallRunTimeout: TimeSpan.FromSeconds(gate.OverallTimeoutSeconds))
+            var recoveryRequired = acquired.Status == SqlExecutionLeaseAcquireStatus.Recovered;
+            foreach (var gate in gates)
+            {
+                var benchmarkArtifactRoot = Path.Combine(options.ArtifactRoot, gate.GateId);
+                Directory.CreateDirectory(benchmarkArtifactRoot);
+                var benchmark = await _sqlAcceptance.RunAsync(
+                    new BenchmarkRunOptions(
+                        options.RepositoryRoot,
+                        FullPath(options.RepositoryRoot, gate.Project),
+                        benchmarkArtifactRoot,
+                        options.ApprovalFile,
+                        gate.Frameworks,
+                        TimeSpan.FromSeconds(gate.CommandTimeoutSeconds),
+                        WarmupPasses: 0,
+                        MeasuredPasses: 1,
+                        OverallRunTimeout: TimeSpan.FromSeconds(gate.OverallTimeoutSeconds))
+                    {
+                        Mode = "pr-acceptance",
+                        Revision = options.Revision,
+                        ManifestAuthorizedActiveFrameworkProfile = true,
+                    }, cancellationToken).ConfigureAwait(false);
+                recoveryRequired |= benchmark.RecoveryRequired;
+
+                if (!benchmark.IsComplete || benchmark.Runs.Count != gate.Frameworks.Count ||
+                    !benchmark.Runs.Select(run => run.Tfm).SequenceEqual(gate.Frameworks, StringComparer.Ordinal))
                 {
-                    Mode = "pr-acceptance",
-                    Revision = options.Revision,
-                    ManifestAuthorizedActiveFrameworkProfile = true,
-                },
-                cancellationToken).ConfigureAwait(false);
-            if (!benchmark.RecoveryRequired)
+                    if (!recoveryRequired)
+                    {
+                        acquired.Lease.Complete();
+                    }
+
+                    return TestGateRunStatus.Incomplete;
+                }
+
+                var expected = new List<ExpectedLogicalCase>();
+                var source = new List<BoundLogicalCase>();
+                var discovered = new List<BoundLogicalCase>();
+                var executed = new List<ExecutedLogicalCase>();
+                foreach (var run in benchmark.Runs)
+                {
+                    var project = FullPath(options.RepositoryRoot, gate.Project);
+                    var sourceBinding = LogicalCaseBinder.BindSource(
+                        _sourceInventory.Read(AssemblyPath(project, run.Tfm)),
+                        manifest.LogicalCases,
+                        gate.Project,
+                        run.Tfm,
+                        manifest.Exemptions);
+                    var discoveryBinding = LogicalCaseBinder.BindDiscovery(
+                        VstestDiscoveryParser.Parse(run.DiscoveryOutput, run.Tfm),
+                        manifest.LogicalCases,
+                        gate.Project,
+                        run.Tfm);
+                    var trx = TrxResultParser.TryParse(run.TrxPath, run.Tfm);
+                    if (!trx.IsComplete)
+                    {
+                        return TestGateRunStatus.Incomplete;
+                    }
+
+                    var executionBinding = LogicalCaseBinder.BindExecution(
+                        trx.Results,
+                        manifest.LogicalCases,
+                        gate.Project,
+                        run.Tfm);
+                    if (!sourceBinding.IsComplete || !discoveryBinding.IsComplete || !executionBinding.IsComplete)
+                    {
+                        return TestGateRunStatus.Incomplete;
+                    }
+
+                    source.AddRange(sourceBinding.Cases);
+                    discovered.AddRange(discoveryBinding.Cases);
+                    executed.AddRange(executionBinding.Cases);
+                    expected.AddRange(sourceBinding.Cases.Select(item => new ExpectedLogicalCase(
+                        item.LogicalKey,
+                        item.LogicalCaseId,
+                        item.OwnerProject,
+                        item.Tfm,
+                        item.NormalizedMethodSignature,
+                        item.RowKey,
+                        item.ReviewedCodeFingerprint,
+                        item.Classification)));
+                    frameworks.Add(new TestGateFrameworkResult(
+                        gate.GateId,
+                        run.Tfm,
+                        sourceBinding.Cases.Count,
+                        discoveryBinding.Cases.Count,
+                        executionBinding.Cases.Count,
+                        run.Command.Duration));
+                }
+
+                if (!LogicalCaseInventoryReconciler.Reconcile(
+                        expected,
+                        source,
+                        discovered,
+                        executed).IsComplete)
+                {
+                    return TestGateRunStatus.Incomplete;
+                }
+
+                globalExpected.AddRange(expected);
+                globalSource.AddRange(source);
+                globalDiscovered.AddRange(discovered);
+                globalExecuted.AddRange(executed);
+
+                var report = await _reports.ExportAsync(
+                    new TestGateReportEvidence(
+                        Path.Combine(options.ArtifactRoot, gate.GateId + ".sanitized.json"),
+                        options.PlanId,
+                        options.TaskId,
+                        options.Mode,
+                        gate.GateId,
+                        options.Revision,
+                        manifestFingerprint,
+                        gate.Frameworks.Select(tfm => gate.Module + "/" + tfm).ToArray(),
+                        source.Count,
+                        discovered.Count,
+                        executed.Count,
+                        executed.Count(item => item.Outcome == TestOutcome.Passed),
+                        executed.Count(item => item.Outcome == TestOutcome.Failed),
+                        executed.Count(item => item.Outcome == TestOutcome.Skipped),
+                        TimeSpan.FromTicks(benchmark.Runs.Sum(run => run.Command.Duration.Ticks)),
+                        TimedOut: benchmark.Runs.Any(run => run.Command.TimedOut),
+                        ResourceDenied: false,
+                        RecoveryRequired: recoveryRequired,
+                        WatchdogClean: benchmark.Runs.All(run => !run.Command.TimedOut),
+                        OwnershipClean: benchmark.IsComplete,
+                        InventoryComplete: true,
+                        PrivateValues: new[]
+                        {
+                            options.ArtifactRoot,
+                            options.ApprovalFile,
+                            instanceFingerprint,
+                        }),
+                    cancellationToken).ConfigureAwait(false);
+                if (!report.IsComplete)
+                {
+                    return TestGateRunStatus.Incomplete;
+                }
+            }
+
+            if (!recoveryRequired)
             {
                 acquired.Lease.Complete();
             }
 
-            if (!benchmark.IsComplete || benchmark.Runs.Count != gate.Frameworks.Count ||
-                !benchmark.Runs.Select(run => run.Tfm).SequenceEqual(gate.Frameworks, StringComparer.Ordinal))
-            {
-                return TestGateRunStatus.Incomplete;
-            }
-
-            var expected = new List<ExpectedLogicalCase>();
-            var source = new List<BoundLogicalCase>();
-            var discovered = new List<BoundLogicalCase>();
-            var executed = new List<ExecutedLogicalCase>();
-            foreach (var run in benchmark.Runs)
-            {
-                var project = FullPath(options.RepositoryRoot, gate.Project);
-                var sourceBinding = LogicalCaseBinder.BindSource(
-                    _sourceInventory.Read(AssemblyPath(project, run.Tfm)),
-                    manifest.LogicalCases,
-                    gate.Project,
-                    run.Tfm,
-                    manifest.Exemptions);
-                var discoveryBinding = LogicalCaseBinder.BindDiscovery(
-                    VstestDiscoveryParser.Parse(run.DiscoveryOutput, run.Tfm),
-                    manifest.LogicalCases,
-                    gate.Project,
-                    run.Tfm);
-                var trx = TrxResultParser.TryParse(run.TrxPath, run.Tfm);
-                if (!trx.IsComplete)
-                {
-                    return TestGateRunStatus.Incomplete;
-                }
-
-                var executionBinding = LogicalCaseBinder.BindExecution(
-                    trx.Results,
-                    manifest.LogicalCases,
-                    gate.Project,
-                    run.Tfm);
-                if (!sourceBinding.IsComplete || !discoveryBinding.IsComplete || !executionBinding.IsComplete)
-                {
-                    return TestGateRunStatus.Incomplete;
-                }
-
-                source.AddRange(sourceBinding.Cases);
-                discovered.AddRange(discoveryBinding.Cases);
-                executed.AddRange(executionBinding.Cases);
-                expected.AddRange(sourceBinding.Cases.Select(item => new ExpectedLogicalCase(
-                    item.LogicalKey,
-                    item.LogicalCaseId,
-                    item.OwnerProject,
-                    item.Tfm,
-                    item.NormalizedMethodSignature,
-                    item.RowKey,
-                    item.ReviewedCodeFingerprint,
-                    item.Classification)));
-                frameworks.Add(new TestGateFrameworkResult(
-                    gate.GateId,
-                    run.Tfm,
-                    sourceBinding.Cases.Count,
-                    discoveryBinding.Cases.Count,
-                    executionBinding.Cases.Count,
-                    run.Command.Duration));
-            }
-
-            if (!LogicalCaseInventoryReconciler.Reconcile(
-                    expected,
-                    source,
-                    discovered,
-                    executed).IsComplete)
-            {
-                return TestGateRunStatus.Incomplete;
-            }
-
-            globalExpected.AddRange(expected);
-            globalSource.AddRange(source);
-            globalDiscovered.AddRange(discovered);
-            globalExecuted.AddRange(executed);
-
-            var report = await _reports.ExportAsync(
-                new TestGateReportEvidence(
-                    Path.Combine(options.ArtifactRoot, gate.GateId + ".sanitized.json"),
-                    options.PlanId,
-                    options.TaskId,
-                    options.Mode,
-                    gate.GateId,
-                    options.Revision,
-                    manifestFingerprint,
-                    gate.Frameworks.Select(tfm => gate.Module + "/" + tfm).ToArray(),
-                    source.Count,
-                    discovered.Count,
-                    executed.Count,
-                    executed.Count(item => item.Outcome == TestOutcome.Passed),
-                    executed.Count(item => item.Outcome == TestOutcome.Failed),
-                    executed.Count(item => item.Outcome == TestOutcome.Skipped),
-                    TimeSpan.FromTicks(benchmark.Runs.Sum(run => run.Command.Duration.Ticks)),
-                    TimedOut: benchmark.Runs.Any(run => run.Command.TimedOut),
-                    ResourceDenied: false,
-                    RecoveryRequired: acquired.Status == SqlExecutionLeaseAcquireStatus.Recovered,
-                    WatchdogClean: benchmark.Runs.All(run => !run.Command.TimedOut),
-                    OwnershipClean: benchmark.IsComplete,
-                    InventoryComplete: true,
-                    PrivateValues: new[]
-                    {
-                        options.ArtifactRoot,
-                        options.ApprovalFile,
-                        instanceFingerprint,
-                    }),
-                cancellationToken).ConfigureAwait(false);
-            if (!report.IsComplete)
-            {
-                return TestGateRunStatus.Incomplete;
-            }
-
-            acquired.Lease.Complete();
             return TestGateRunStatus.Succeeded;
         }
         finally
@@ -709,13 +724,18 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
 
     public async Task<bool> ReconcileAsync(AbandonedSqlRun lease, CancellationToken cancellationToken)
     {
-        var ownershipRoot = Path.Combine(lease.PrivateArtifactRoot, "ownership");
-        if (!Directory.Exists(ownershipRoot))
-        {
-            return false;
-        }
-
-        var journals = Directory.GetDirectories(ownershipRoot);
+        var artifactRoots = new[] { lease.PrivateArtifactRoot }
+            .Concat(Directory.Exists(lease.PrivateArtifactRoot)
+                ? Directory.GetDirectories(lease.PrivateArtifactRoot)
+                : Array.Empty<string>())
+            .ToArray();
+        var journals = artifactRoots
+            .SelectMany(root =>
+            {
+                var ownershipRoot = Path.Combine(root, "ownership");
+                return Directory.Exists(ownershipRoot) ? Directory.GetDirectories(ownershipRoot) : Array.Empty<string>();
+            })
+            .ToArray();
         if (journals.Length == 0)
         {
             return false;
@@ -724,11 +744,12 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         foreach (var journal in journals)
         {
             var runId = Path.GetFileName(journal);
+            var artifactRoot = Directory.GetParent(journal)!.Parent!.FullName;
             var result = await _ownershipGate.ValidateAsync(
                 new BenchmarkOwnershipEvidence(
                     runId,
                     journal,
-                    Path.Combine(lease.PrivateArtifactRoot, "ownership-recovery-" + runId + ".json"),
+                    Path.Combine(artifactRoot, "ownership-recovery-" + runId + ".json"),
                     _approvalFile,
                     ProcessSucceeded: false),
                 cancellationToken).ConfigureAwait(false);

@@ -8,6 +8,14 @@ namespace MyDmsVn.SqlTestRunner.Gates;
 
 public static class TestGateManifestValidator
 {
+    private static readonly HashSet<string> SqlLogicalCaseCategories = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "FastSQL",
+        "MigrationSchema",
+        "SecurityProvisioning",
+        "SqlConcurrency",
+    };
+
     public static TestGateSelection Select(
         TestGateManifest manifest,
         string repositoryRoot,
@@ -62,7 +70,7 @@ public static class TestGateManifestValidator
 
         if (mode == TestGateMode.Final)
         {
-            ValidateFinalSqlContract(manifest, gates, planId);
+            ValidateFinalSqlContract(manifest, gates, planId, taskId);
         }
 
         return new TestGateSelection(mode, planId, taskId, gates);
@@ -71,7 +79,8 @@ public static class TestGateManifestValidator
     private static void ValidateFinalSqlContract(
         TestGateManifest manifest,
         IReadOnlyCollection<TestGateDefinition> gates,
-        string planId)
+        string planId,
+        string taskId)
     {
         var sqlGates = gates.Where(gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
             .ToArray();
@@ -83,25 +92,76 @@ public static class TestGateManifestValidator
             TestGateEvidenceKind.SanitizedReport,
             TestGateEvidenceKind.Ownership,
         };
+        var modularTask = taskId is "TESTGATE-T05-B" or "TESTGATE-T05-C" or "TESTGATE-T05-D";
+        var activeProfile = manifest.FrameworkProfile is { } profile &&
+            (!modularTask || string.Equals(profile.PlanId, planId, StringComparison.Ordinal))
+                ? profile
+                : null;
         var expectedFrameworks = (IReadOnlyList<string>)new[] { "net48", "net8.0" };
-        if (manifest.FrameworkProfile is { } profile)
+        if (activeProfile is not null)
         {
-            expectedFrameworks = profile.ActiveSqlFrameworks;
+            expectedFrameworks = activeProfile.ActiveSqlFrameworks;
+        }
+        else if (sqlGates.Length != 0)
+        {
+            expectedFrameworks = sqlGates[0].Frameworks;
         }
 
-        if (sqlGates.Length != 1 ||
-            !sqlGates[0].Frameworks.SequenceEqual(expectedFrameworks, StringComparer.Ordinal) ||
-            (manifest.FrameworkProfile is { } activeProfile &&
+        if (sqlGates.Length == 0 ||
+            (activeProfile is not null && sqlGates.Length != 1) ||
+            sqlGates.Any(gate =>
+                !gate.Frameworks.SequenceEqual(expectedFrameworks, StringComparer.Ordinal) ||
+                gate.Selection.Kind != TestGateSelectionKind.UnfilteredProject ||
+                gate.Selection.Patterns.Count != 0 ||
+                gate.Resources.Sql != TestGateResourceRequirement.RequiredExclusive ||
+                gate.Resources.Gui != TestGateResourceRequirement.None ||
+                requiredEvidence.Any(kind => !gate.Evidence.Contains(kind))) ||
+            sqlGates.Select(gate => gate.Project)
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count() != sqlGates.Length ||
+            (activeProfile is not null &&
              !string.Equals(sqlGates[0].Project, activeProfile.SqlProject, StringComparison.Ordinal)) ||
-            sqlGates[0].Selection.Kind != TestGateSelectionKind.UnfilteredProject ||
-            sqlGates[0].Selection.Patterns.Count != 0 ||
-            sqlGates[0].Resources.Sql != TestGateResourceRequirement.RequiredExclusive ||
-            sqlGates[0].Resources.Gui != TestGateResourceRequirement.None ||
-            requiredEvidence.Any(kind => !sqlGates[0].Evidence.Contains(kind)))
+            (activeProfile is null &&
+             !HasCompleteModularSqlOwnership(manifest.LogicalCases, sqlGates, expectedFrameworks)))
         {
             throw new InvalidDataException(
-                "Final requires one reviewed unfiltered exclusive SQL acceptance gate for the active framework profile.");
+                "Final requires reviewed unfiltered exclusive SQL acceptance gates with unique project and complete case ownership for the active framework profile.");
         }
+    }
+
+    private static bool HasCompleteModularSqlOwnership(
+        IReadOnlyList<LogicalCaseDefinition> logicalCases,
+        IReadOnlyList<TestGateDefinition> sqlGates,
+        IReadOnlyList<string> expectedFrameworks)
+    {
+        var gateProjects = sqlGates.Select(gate => gate.Project)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var sqlCategories = sqlGates.SelectMany(gate => gate.Classification)
+            .Where(category => !string.Equals(category, "NonSql", StringComparison.Ordinal))
+            .ToHashSet(StringComparer.Ordinal);
+        var sqlCases = logicalCases.Where(item =>
+            (gateProjects.Contains(item.OwnerProject) || item.Classification.Any(sqlCategories.Contains)) &&
+            item.Frameworks.Any(expectedFrameworks.Contains)).ToArray();
+        if (sqlCases.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var gate in sqlGates)
+        {
+            var owned = sqlCases.Where(item =>
+                string.Equals(item.OwnerProject, gate.Project, StringComparison.OrdinalIgnoreCase) &&
+                gate.Frameworks.All(tfm => item.Frameworks.Contains(tfm, StringComparer.Ordinal))).ToArray();
+            if (owned.Length == 0 || gate.Classification.Any(category =>
+                    !owned.Any(item => item.Classification.Contains(category, StringComparer.Ordinal))))
+            {
+                return false;
+            }
+        }
+
+        return sqlCases.All(item => gateProjects.Contains(item.OwnerProject) &&
+            sqlGates.Count(gate =>
+                string.Equals(gate.Project, item.OwnerProject, StringComparison.OrdinalIgnoreCase) &&
+                gate.Frameworks.All(tfm => item.Frameworks.Contains(tfm, StringComparer.Ordinal))) == 1);
     }
 
     private static void ValidateFrameworkProfile(
@@ -124,7 +184,8 @@ public static class TestGateManifestValidator
         }
 
         var historicalSqlCases = manifest.LogicalCases.Count(item =>
-            string.Equals(item.OwnerProject, profile.SqlProject, StringComparison.Ordinal) &&
+            (string.Equals(item.OwnerProject, profile.SqlProject, StringComparison.Ordinal) ||
+             item.Classification.Any(SqlLogicalCaseCategories.Contains)) &&
             profile.HistoricalSqlFrameworks.All(tfm => item.Frameworks.Contains(tfm, StringComparer.Ordinal)));
         if (historicalSqlCases < profile.MinimumHistoricalSqlLogicalCases)
         {

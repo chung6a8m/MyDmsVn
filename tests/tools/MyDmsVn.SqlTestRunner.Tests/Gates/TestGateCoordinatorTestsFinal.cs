@@ -39,6 +39,24 @@ public sealed class TestGateCoordinatorTestsFinal
         Assert.Equal(new[] { "net48", "net8.0" }, result.Frameworks.Select(item => item.Tfm));
     }
 
+    [Fact]
+    public async Task Modular_Final_runs_every_SQL_project_under_one_global_lease()
+    {
+        using var repository = new FinalRepository(multiProject: true);
+        var events = new List<string>();
+
+        var result = await Coordinator(repository, events).RunAsync(repository.Options(), CancellationToken.None);
+
+        Assert.True(result.Status == TestGateRunStatus.Succeeded,
+            result.Status + ": " + string.Join(",", events));
+        Assert.Equal(1, events.Count(item => item == "approval"));
+        Assert.Equal(1, events.Count(item => item == "lease"));
+        Assert.Equal(4, events.Count(item => item.StartsWith("run-", StringComparison.Ordinal)));
+        Assert.Equal(2, events.Count(item => item == "report"));
+        Assert.Equal(4, result.Frameworks.Count);
+        Assert.Equal(1, events.Count(item => item == "release"));
+    }
+
     [Theory]
     [InlineData(FinalFailure.Approval, TestGateRunStatus.ResourceDenied)]
     [InlineData(FinalFailure.LeaseTimeout, TestGateRunStatus.ResourceDenied)]
@@ -229,12 +247,15 @@ public sealed class TestGateCoordinatorTestsFinal
             }
 
             var runs = new List<BenchmarkFrameworkRun>();
+            var testName = options.TestProject.Contains("Sql.Module.Tests", StringComparison.Ordinal)
+                ? "Sql.Module.Tests.Case"
+                : "Sql.Tests.Case";
             foreach (var tfm in options.TargetFrameworks)
             {
                 _events.Add("preflight-" + tfm);
                 _events.Add("run-" + tfm);
                 var trx = Path.Combine(_repository.Root, tfm + ".trx");
-                var name = _failure == FinalFailure.Reconciliation ? "Sql.Tests.Unexpected" : "Sql.Tests.Case";
+                var name = _failure == FinalFailure.Reconciliation ? "Sql.Tests.Unexpected" : testName;
                 File.WriteAllText(
                     trx,
                     "<TestRun xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\"><Results>" +
@@ -271,11 +292,14 @@ public sealed class TestGateCoordinatorTestsFinal
                 _recorded = true;
             }
 
+            var methodName = assemblyPath.Contains("Sql.Module.Tests", StringComparison.Ordinal)
+                ? "Sql.Module.Tests.Case"
+                : "Sql.Tests.Case";
             return new[]
             {
-                new TestMethodDescriptor("Sql.Tests.Case", false, FinalRepository.Fingerprint)
+                new TestMethodDescriptor(methodName, false, FinalRepository.Fingerprint)
                 {
-                    NormalizedSignature = "Sql.Tests.Case()",
+                    NormalizedSignature = methodName + "()",
                 },
             };
         }
@@ -315,15 +339,22 @@ public sealed class TestGateCoordinatorTestsFinal
     {
         public const string Fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-        public FinalRepository()
+        public FinalRepository(bool multiProject = false)
         {
             Root = Path.Combine(Path.GetTempPath(), "mydms-final-gate-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path.Combine(Root, "tests", "Sql.Tests"));
+            if (multiProject)
+            {
+                Directory.CreateDirectory(Path.Combine(Root, "tests", "Sql.Module.Tests"));
+                File.WriteAllText(
+                    Path.Combine(Root, "tests", "Sql.Module.Tests", "Sql.Module.Tests.csproj"),
+                    "<Project><PropertyGroup><TargetFrameworks>net48;net8.0</TargetFrameworks></PropertyGroup></Project>");
+            }
             File.WriteAllText(
                 Path.Combine(Root, "tests", "Sql.Tests", "Sql.Tests.csproj"),
                 "<Project><PropertyGroup><TargetFrameworks>net48;net8.0</TargetFrameworks></PropertyGroup></Project>");
             Manifest = Path.Combine(Root, "manifest.json");
-            File.WriteAllText(Manifest, Json());
+            File.WriteAllText(Manifest, multiProject ? MultiProjectJson() : Json());
             Approval = Path.Combine(Root, "approval.json");
             File.WriteAllText(Approval, "{}");
         }
@@ -344,7 +375,7 @@ public sealed class TestGateCoordinatorTestsFinal
           "schemaVersion": 1,
           "gates": [{
             "gateId": "final-sql", "planId": "20261016-001", "taskId": "TESTGATE-T03", "mode": "Final",
-            "project": "tests/Sql.Tests/Sql.Tests.csproj", "frameworks": ["net48", "net8.0"], "module": "SQL", "classification": ["SqlIntegration"],
+            "project": "tests/Sql.Tests/Sql.Tests.csproj", "frameworks": ["net48", "net8.0"], "module": "SQL", "classification": ["NonSql"],
             "selection": { "kind": "UnfilteredProject", "patterns": [] }, "buildPrerequisites": [],
             "resources": { "sql": "RequiredExclusive", "gui": "None" }, "strictMode": "SqlPrAcceptance",
             "commandTimeoutSeconds": 5, "overallTimeoutSeconds": 30,
@@ -355,6 +386,43 @@ public sealed class TestGateCoordinatorTestsFinal
             "normalizedMethodSignature": "Sql.Tests.Case()", "reviewedCodeFingerprint": "{{Fingerprint}}",
             "classification": ["NonSql"], "rows": [{ "rowKey": "fact", "locatorSha256": null }]
           }],
+          "identityMappings": [], "exemptions": []
+        }
+        """;
+
+        private static string MultiProjectJson() => $$"""
+        {
+          "schemaVersion": 1,
+          "gates": [
+            {
+              "gateId": "final-sql-core", "planId": "20261016-001", "taskId": "TESTGATE-T03", "mode": "Final",
+              "project": "tests/Sql.Tests/Sql.Tests.csproj", "frameworks": ["net48", "net8.0"], "module": "Core", "classification": ["NonSql"],
+              "selection": { "kind": "UnfilteredProject", "patterns": [] }, "buildPrerequisites": [],
+              "resources": { "sql": "RequiredExclusive", "gui": "None" }, "strictMode": "SqlPrAcceptance",
+              "commandTimeoutSeconds": 5, "overallTimeoutSeconds": 30,
+              "evidence": ["Source", "Discovery", "Trx", "SanitizedReport", "Ownership"]
+            },
+            {
+              "gateId": "final-sql-module", "planId": "20261016-001", "taskId": "TESTGATE-T03", "mode": "Final",
+              "project": "tests/Sql.Module.Tests/Sql.Module.Tests.csproj", "frameworks": ["net48", "net8.0"], "module": "Module", "classification": ["NonSql"],
+              "selection": { "kind": "UnfilteredProject", "patterns": [] }, "buildPrerequisites": [],
+              "resources": { "sql": "RequiredExclusive", "gui": "None" }, "strictMode": "SqlPrAcceptance",
+              "commandTimeoutSeconds": 5, "overallTimeoutSeconds": 30,
+              "evidence": ["Source", "Discovery", "Trx", "SanitizedReport", "Ownership"]
+            }
+          ],
+          "logicalCases": [
+            {
+              "logicalCaseId": "sql-case-core", "ownerProject": "tests/Sql.Tests/Sql.Tests.csproj", "frameworks": ["net48", "net8.0"],
+              "normalizedMethodSignature": "Sql.Tests.Case()", "reviewedCodeFingerprint": "{{Fingerprint}}",
+              "classification": ["NonSql"], "rows": [{ "rowKey": "fact", "locatorSha256": null }]
+            },
+            {
+              "logicalCaseId": "sql-case-module", "ownerProject": "tests/Sql.Module.Tests/Sql.Module.Tests.csproj", "frameworks": ["net48", "net8.0"],
+              "normalizedMethodSignature": "Sql.Module.Tests.Case()", "reviewedCodeFingerprint": "{{Fingerprint}}",
+              "classification": ["NonSql"], "rows": [{ "rowKey": "fact", "locatorSha256": null }]
+            }
+          ],
           "identityMappings": [], "exemptions": []
         }
         """;

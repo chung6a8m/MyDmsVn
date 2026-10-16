@@ -257,8 +257,12 @@ public sealed class TestGateManifestTests
         Assert.Throws<InvalidDataException>(() => TestGateManifestValidator.Select(
             Manifest(unitOnly), repository.Root, TestGateMode.Final, "20261016-001", "TESTGATE-T03"));
 
+        var legacyCase = new LogicalCaseDefinition(
+            "legacy-sql-case", "sql-tests.csproj", new[] { "net48", "net8.0" },
+            "Legacy.SqlCase()", new string('b', 64), new[] { "NonSql" },
+            new[] { new TheoryRowDefinition("fact", null) });
         var selection = TestGateManifestValidator.Select(
-            Manifest(unitOnly, mandatorySql),
+            ManifestWithCases(new[] { legacyCase }, unitOnly, mandatorySql),
             repository.Root,
             TestGateMode.Final,
             "20261016-001",
@@ -266,6 +270,113 @@ public sealed class TestGateManifestTests
 
         Assert.Equal(2, selection.Gates.Count);
     }
+
+    [Fact]
+    public void Modular_Final_accepts_multiple_unique_unfiltered_SQL_projects_with_complete_ownership()
+    {
+        using var repository = new TestRepository();
+        repository.AddProject("sql-module-a.csproj", "net48");
+        repository.AddProject("sql-module-b.csproj", "net48");
+        var first = SqlGate("module-a", "sql-module-a.csproj", "FastSQL");
+        var second = SqlGate("module-b", "sql-module-b.csproj", "MigrationSchema");
+        var manifest = ManifestWithCases(
+            new[]
+            {
+                Case("case-a", "sql-module-a.csproj", "FastSQL"),
+                Case("case-b", "sql-module-b.csproj", "MigrationSchema"),
+            },
+            first,
+            second);
+
+        var selection = TestGateManifestValidator.Select(
+            manifest,
+            repository.Root,
+            TestGateMode.Final,
+            "20261016-002",
+            "TESTGATE-T05-B");
+
+        Assert.Equal(new[] { "module-a", "module-b" },
+            System.Linq.Enumerable.Select(selection.Gates, gate => gate.GateId));
+    }
+
+    [Fact]
+    public void Modular_Final_rejects_duplicate_SQL_project_ownership()
+    {
+        using var repository = new TestRepository();
+        repository.AddProject("sql-module-a.csproj", "net48");
+        var first = SqlGate("module-a", "sql-module-a.csproj", "FastSQL");
+        var duplicate = SqlGate("module-b", "sql-module-a.csproj", "MigrationSchema");
+        var manifest = ManifestWithCases(
+            new[] { Case("case-a", "sql-module-a.csproj", "FastSQL") },
+            first,
+            duplicate);
+
+        Assert.Throws<InvalidDataException>(() => TestGateManifestValidator.Select(
+            manifest, repository.Root, TestGateMode.Final, "20261016-002", "TESTGATE-T05-B"));
+    }
+
+    [Fact]
+    public void Modular_Final_rejects_SQL_case_without_a_project_gate_owner()
+    {
+        using var repository = new TestRepository();
+        repository.AddProject("sql-module-a.csproj", "net48");
+        var manifest = ManifestWithCases(
+            new[] { Case("case-a", "sql-module-b.csproj", "FastSQL") },
+            SqlGate("module-a", "sql-module-a.csproj", "FastSQL"));
+
+        Assert.Throws<InvalidDataException>(() => TestGateManifestValidator.Select(
+            manifest, repository.Root, TestGateMode.Final, "20261016-002", "TESTGATE-T05-B"));
+    }
+
+    [Fact]
+    public void Checked_in_T05_B_Final_binds_the_original_and_catalog_SQL_projects()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "tests", "test-gates.v1.json")))
+        {
+            root = root.Parent;
+        }
+
+        Assert.NotNull(root);
+        var manifest = TestGateManifestLoader.Load(Path.Combine(root!.FullName, "tests", "test-gates.v1.json"));
+
+        var selection = TestGateManifestValidator.Select(
+            manifest, root.FullName, TestGateMode.Final, "20261016-002-modular-test-projects", "TESTGATE-T05-B");
+
+        Assert.Equal(new[]
+        {
+            "modular-t05-b-sql-original",
+            "modular-t05-b-sql-catalog",
+        }, System.Linq.Enumerable.Select(selection.Gates, gate => gate.GateId));
+    }
+
+    private static TestGateDefinition SqlGate(string gateId, string project, string category) =>
+        Gate(gateId, taskId: "TESTGATE-T05-B", mode: TestGateMode.Final,
+            project: project, frameworks: new[] { "net48" }) with
+        {
+            PlanId = "20261016-002",
+            Classification = new[] { category },
+            StrictMode = TestGateStrictMode.SqlPrAcceptance,
+            Resources = new TestGateResources(TestGateResourceRequirement.RequiredExclusive,
+                TestGateResourceRequirement.None),
+            Evidence = new[]
+            {
+                TestGateEvidenceKind.Source, TestGateEvidenceKind.Discovery,
+                TestGateEvidenceKind.Trx, TestGateEvidenceKind.SanitizedReport,
+                TestGateEvidenceKind.Ownership,
+            },
+        };
+
+    private static LogicalCaseDefinition Case(string id, string owner, string category) =>
+        new(id, owner, new[] { "net48" }, id + "()",
+            new string('a', 64), new[] { category },
+            new[] { new TheoryRowDefinition("fact", null) });
+
+    private static TestGateManifest ManifestWithCases(
+        IReadOnlyList<LogicalCaseDefinition> cases,
+        params TestGateDefinition[] gates) => new TestGateManifest(
+        1, gates, cases, Array.Empty<IdentityMappingDefinition>(),
+        Array.Empty<TestGateExemptionDefinition>());
 
     [Theory]
     [InlineData(TestGateResourceRequirement.RequiredExclusive, TestGateResourceRequirement.None)]
@@ -443,6 +554,12 @@ public sealed class TestGateManifestTests
                 Net8Project.Replace("net8.0", "net48", StringComparison.Ordinal));
             File.WriteAllText(Path.Combine(Root, "desktop-net48.csproj"),
                 Net8Project.Replace("net8.0", "net48", StringComparison.Ordinal));
+        }
+
+        public void AddProject(string name, string frameworks)
+        {
+            File.WriteAllText(Path.Combine(Root, name),
+                "<Project><PropertyGroup><TargetFrameworks>" + frameworks + "</TargetFrameworks></PropertyGroup></Project>");
         }
 
         public string Root { get; }
