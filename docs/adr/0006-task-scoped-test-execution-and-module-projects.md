@@ -22,7 +22,7 @@ These facts create a risk that AI development repeatedly invokes expensive, unre
 
 This ADR records a **proposed target**, not evidence that a new gate runner, single-pass SQL mode, split assemblies or module selectors exist. Until an implementation is reviewed and verified, existing scripts and the existing strict multi-pass acceptance protocol remain the only available accepted SQL paths. Documentation-only changes do not retroactively invalidate previously accepted functional evidence.
 
-Implement in separately reviewable stages defined by [the execution plan](../plans/20261016-001-task-gates-and-modular-tests.md). Do not edit production persistence, grant more SQL privileges, enable SQL parallelism, or move tests en masse in this policy PR.
+Implement in separately reviewable stages: [TESTGATE-T01–T03 execution policy, strict one-pass gate and orchestration](../plans/20261016-001-task-gates-and-modular-tests.md) and [TESTGATE-T04/T05 modular Desktop and SQL test projects](../plans/20261016-002-modular-test-projects.md). Do not edit production persistence, grant more SQL privileges, enable SQL parallelism, or move tests en masse in this policy PR.
 
 ## Alternatives considered
 
@@ -38,7 +38,7 @@ Implement in separately reviewable stages defined by [the execution plan](../pla
 - Normal feature tasks pay only task-scoped test cost; final correctness still covers the complete mandatory matrix.
 - Stale-final-revision invalidation remains mandatory even if it requires another full run.
 - Local Codex gate selection must be independently verified against source/discovery/theory-row inventory rather than trusting only the selected filtered results. Publish only a reviewed sanitized evidence summary; retain raw TRX, timing and ownership/approval journals locally. No CI rollout or duplicate CI full-suite gate is included.
-- Migration to new assemblies must prove one-to-one **logical-case-key** source/discovery/TRX reconciliation independently on both SQL TFMs and explicit old → new mappings, not raw TRX IDs or count-only parity. Reject unstable row keys, unreviewed renames/categories, lost or duplicated theory rows; preserve all required coverage, failed/aborted-run reconciliation and no SQL/GUI concurrency cross-process regression. Details are in the TESTGATE plan.
+- Migration to new assemblies must prove one-to-one **logical-case-key** source/discovery/TRX reconciliation independently on both SQL TFMs and explicit old → new mappings, not raw TRX IDs or count-only parity. Reject unstable row keys, unreviewed renames/categories, lost or duplicated theory rows; preserve all required coverage, failed/aborted-run reconciliation and no SQL/GUI concurrency cross-process regression. T03 defines the shared identity contract in the [core TESTGATE plan](../plans/20261016-001-task-gates-and-modular-tests.md); migration-specific task gates and evidence are in the [modularization plan](../plans/20261016-002-modular-test-projects.md).
 - Do not claim a performance gain from project partitioning without separately measured evidence; cost measurement is not a mandatory implementation gate.
 
 ## Related decisions

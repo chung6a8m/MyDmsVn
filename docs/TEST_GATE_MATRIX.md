@@ -1,6 +1,6 @@
 # Test Gate Matrix — current tooling and P4.1 example
 
-**Status:** Human-readable guidance only, 2026-10-16. The proposed gate manifest and `Invoke-TestGate.ps1` DO NOT EXIST yet. See [TESTGATE plan](plans/20261016-001-task-gates-and-modular-tests.md), [Codex policy](CODEX_TEST_EXECUTION_POLICY.md), and [P4.1](plans/20261013-002-desktop-login-session.md). This document does not re-open any already verified P4.1 gate.
+**Status:** Human-readable guidance only, 2026-10-16. The proposed gate manifest and `Invoke-TestGate.ps1` DO NOT EXIST yet. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [TESTGATE T04/T05 modular task gates](plans/20261016-002-modular-test-projects.md), [Codex policy](CODEX_TEST_EXECUTION_POLICY.md), and [P4.1](plans/20261013-002-desktop-login-session.md). This document does not re-open any already verified P4.1 gate.
 
 ## Tool inventory (actually available)
 
