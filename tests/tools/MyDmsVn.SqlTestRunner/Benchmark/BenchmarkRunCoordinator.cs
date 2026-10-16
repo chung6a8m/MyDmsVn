@@ -440,9 +440,15 @@ public sealed class SourceSqlTestClassificationGate : IBenchmarkClassificationGa
             "sql-test-nonsql-exemptions.json");
         try
         {
+            var methods = TestMethodInventory.Read(assemblyPath);
+            var methodNames = methods.Select(method => method.FullyQualifiedName)
+                .ToHashSet(StringComparer.Ordinal);
+            var projectExemptions = NonSqlExemptionManifest.Read(manifestPath)
+                .Where(exemption => methodNames.Contains(exemption.MethodName))
+                .ToArray();
             return SqlTestClassificationVerifier.Verify(
-                    TestMethodInventory.Read(assemblyPath),
-                    NonSqlExemptionManifest.Read(manifestPath))
+                    methods,
+                    projectExemptions)
                 .IsComplete;
         }
         catch (Exception exception) when (

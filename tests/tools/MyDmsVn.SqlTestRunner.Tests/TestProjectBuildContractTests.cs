@@ -26,7 +26,7 @@ public sealed class TestProjectBuildContractTests
         Assert.Contains(invocations, element =>
             ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true);
-        Assert.Equal(3, invocations.Count(element =>
+        Assert.Equal(4, invocations.Count(element =>
             ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true));
         Assert.DoesNotContain(invocations, element =>
@@ -50,6 +50,7 @@ public sealed class TestProjectBuildContractTests
             ["src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj"] = "net48",
             ["tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj"] = "net48",
             ["tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj"] = "net48",
+            ["tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj"] = "net48",
             ["tests/MyDmsVn.SqlTestHarness.Tests/MyDmsVn.SqlTestHarness.Tests.csproj"] = "net48",
             ["tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj"] = "net48",
             ["tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj"] = "net48",
