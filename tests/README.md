@@ -1,5 +1,9 @@
 # Test harness
 
+**TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
+
+**Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. Schedule the complete unfiltered SQL acceptance at the final gate-affecting revision. The strict runner currently executes one warm-up and three measured passes per TFM; the proposed `Invoke-TestGate.ps1` and strict single-pass mode are **not implemented**. See [Codex policy](../docs/CODEX_TEST_EXECUTION_POLICY.md) and [current task matrix](../docs/TEST_GATE_MATRIX.md).
+
 P0 tests require Windows, the .NET 8 SDK selected by `global.json`, and the .NET Framework 4.8 targeting pack/runtime. Run from the repository root:
 
 ```powershell
@@ -14,7 +18,7 @@ Use [Codex Test Execution Policy](../docs/CODEX_TEST_EXECUTION_POLICY.md) to sel
 
 For SQL development iteration, use the existing `Invoke-FocusedSqlIntegrationTests.ps1` category runner documented below; run the relevant unit/desktop test projects for other changes. After the final gate-affecting change (including test/theory-row, SQL/migration, inventory/manifest, runner/harness, or build/CI edits), a code-bearing PR needs full applicable Release and unfiltered SQL evidence on both SQL TFMs, not only category filters. Record the final verified revision; do not reuse pre-change acceptance artifacts. The current strict SQL acceptance path is the multi-pass `Invoke-SqlIntegrationBenchmark.ps1` runner (one warm-up, three measured passes per TFM). No dedicated one-pass strict PR mode is implemented; do not invent one. For doc-only changes, report static checks and clearly label SQL/GUI suites not run.
 
-Write a Test Execution Report in the PR: changed surface, selected scope per stage, exact commands/TFMs, passed/failed/skipped counts, strict SQL inventory/ownership/watchdog outcome when applicable, and `passed` / `failed` / `blocked` / `not run` for remaining mandatory gates. Never disclose raw SQL connection strings, instance identifiers, credentials, journals or unsanitized test artifacts.
+Write a **reviewed, sanitized** Test Execution Report in the PR: changed surface, selected scope per stage, exact commands/TFMs, passed/failed/skipped counts, strict SQL inventory/ownership/watchdog **outcomes** when applicable, and `passed` / `failed` / `blocked` / `not run` for remaining mandatory gates. Keep raw TRX, timing JSONL, discovery files, approval/ownership journals and local ZIPs on the approved machine, not as PR attachments or public links. Review any export individually; even archives named `shareable` may contain ownership tokens, instance fingerprints, approval IDs, database identifiers, local paths or theory arguments. Never disclose raw SQL connection strings, host/instance identifiers, credentials, journals or unsanitized test artifacts. See the [evidence publication boundary](../docs/CODEX_TEST_EXECUTION_POLICY.md#evidence-publication-boundary-mandatory).
 
 WinForms tests create and dispose controls on an STA thread through `StaTest`. Each action receives a cancellation token; a timeout cancels the action and waits for cleanup before returning. Actions that cannot cooperate with cancellation, including fatal-process scenarios, must run in a bounded subprocess.
 

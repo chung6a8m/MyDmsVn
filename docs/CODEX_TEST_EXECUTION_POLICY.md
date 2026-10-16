@@ -8,6 +8,22 @@ Choose **the smallest correct set of tests during development**, then provide **
 
 Before executing a test command, identify the change surface, affected projects/TFMs, needed infrastructure, applicable plan gates and the next test stage. Prefer `--no-build` or `--no-restore` only after a successful corresponding build/restore **for that exact revision, configuration and target**. A failed test should lead to a focused fix/re-run. **L3 evidence must match the final gate-affecting revision**, not merely the last application-behavior edit. After changes to source code, tests/theory rows, SQL scripts/migrations, independent test inventory/classification manifests, harness/runner, or build/CI configuration that can affect scope, discovery, execution, or results, rerun the applicable complete L3 gates (including strict unfiltered dual-TFM SQL when required). Record the verified commit SHA and fresh discovery/TRX/ownership evidence; do not reuse results from before these changes. The static-only exception below applies to strictly documentation-only PRs; policy/acceptance changes in a code-bearing PR still require checking whether additional gates were introduced.
 
+## Mandatory task execution budget
+
+**Do not run whole-solution or unfiltered SQL suites automatically while editing or after individual tasks.** Declare affected modules and cross-module dependencies, exact test projects/TFMs, reviewed selectors, SQL category (only if needed), task-specific real SQL/race scenarios, SQL approvals, timeout/cleanup and pass/fail/skip/blocked evidence **before** each L2 task gate. Use the [current gate matrix](TEST_GATE_MATRIX.md) and include such a table in every new implementation plan.
+
+After all focused L2 gates are green and all gate-affecting edits are frozen, schedule **one planned final L3 invocation** with the complete mandatory regression and strict unfiltered SQL on both TFMs. If the gate fails or gate-affecting files later change, its evidence becomes stale and the relevant complete L3 checks MUST be rerun after focused repairs. An absolute single-execution cap must never weaken acceptance.
+
+**Current rollout is local-only:** For TESTGATE-T01–T05, perform L1/L2 and mandatory final L3 on the approved local developer/Codex environment. Publish only a separately prepared, reviewed, sanitized evidence summary in the PR; keep raw test artifacts local. Do not add CI triggers, CI test-gate enforcement or a second CI full SQL suite. Existing unrelated CI configuration is outside this plan; any CI rollout must be separately requested. Local L3 is still mandatory for code-bearing PRs and cannot be replaced by focused tests.
+
+**Implemented-tool boundary:** Today's strict SQL runner performs one warm-up and three measured passes **per TFM**; it is NOT a strict single-pass PR acceptance command. The proposed `Invoke-TestGate.ps1`, module-scoped project runner and strict `pr-acceptance` mode do NOT exist. Never fabricate those flags; use existing strict tooling or report L3 blocked. L4 benchmark repetition is not routine feature validation. See [TESTGATE plan](plans/20261016-001-task-gates-and-modular-tests.md) and [proposed ADR 0006](adr/0006-task-scoped-test-execution-and-module-projects.md), which do not replace ADR 0005 isolation policy.
+
+## Evidence publication boundary (mandatory)
+
+- **Local verification:** retain original TRX, timing JSONL, approval/ownership journals, discovery files and other runner artifacts in the approved local environment for audit/reconciliation. Do not attach raw artifact directories, ZIP archives, raw TRX or unreviewed generated reports to a PR, issue, CI log or public link. Treat review/approval identifiers, ownership tokens, live SQL fingerprints, database/host identifiers, local paths, credentials and theory arguments as potentially sensitive even if they are not passwords.
+- **PR/shareable evidence:** create a separate human-reviewed sanitized Test Execution Report containing the tested commit, project/TFM, selected gate, independently reconciled method/theory-case totals, passed/failed/skipped/blocked counts, watchdog outcome, approved-instance preflight outcome (without identifying the instance), ownership/disposal/reconciliation result and any outstanding gate. Include only intentionally sanitized evidence references or non-sensitive checksums if useful; a checksum does not make the underlying artifact publishable. Remove absolute paths and raw test values.
+- **Review before publication:** inspect the *actual* exported text and any attachment for secrets, machine/database/approval identifiers, raw journals, theory values and local paths. Do not assume that a runner output or a ZIP labeled `shareable` was automatically sanitized. If a safe exporter is not available, prepare a manual aggregate summary and keep the source files local. Report evidence that could not be safely shared as locally retained, not as publicly attached or independently reproduced.
+
 ## Four levels
 
 | Level / trigger | Minimum expectation | What does **not** suffice |
@@ -51,8 +67,9 @@ Include this concise section in each implementation PR, adjusting rows to the ac
 - L1 focused checks: <commands, project/TFM, pass/fail/skip, or not run>
 - L2 task checks: <commands, project/TFM, pass/fail/skip, or not run>
 - L3 final Release/SQL/Desktop gate: <commands, exact revision, pass/fail/skip, or BLOCKED with reason>
-- SQL acceptance (if required): <unfiltered each TFM; inventory/discovery/TRX, watchdog, approval and ownership status; sanitized evidence references>
+- SQL acceptance (if required): <unfiltered each TFM; inventory/discovery/TRX, watchdog, approval and ownership status; aggregate sanitized evidence only; raw files local>
 - L4 plan-specific gates: <executed results, not applicable, or blocked>
+- Public evidence review: <sanitized report reviewed; raw TRX/journals/timings/approval material retained locally; no raw ZIP attached>
 - Open risks / remaining manual or environment-dependent work: ...
 - Readiness: READY only when every mandatory gate has evidence; otherwise NOT VERIFIED / BLOCKED.
 ```

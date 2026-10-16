@@ -13,6 +13,20 @@ For **P4.1-T01–T05 and their still-open exit gates only**, follow [Codex Test 
 - **L3 — after the final gate-affecting change** (including tests/theory rows, SQL/migrations, inventories/manifests, harness/runner and build/CI inputs): validate applicable Release targets, Desktop tests and **unfiltered SQL suites on both `net48` and `net8.0`** using independent inventory/TRX, watchdog, instance approval, owned-database reconciliation and zero mandatory skips. The existing strict SQL runner is multi-pass; no single-pass strict PR switch is implemented. Block acceptance rather than marking a missing SQL/Windows gate green.
 - **L4 — per P4.1-T05:** separately run packaged-binary, real-user Login/logout/expiry walkthroughs and specified concurrency/failure probes. Headless shell smoke or injected test sessions do not establish real Login. Capture exact commands/TFMs/pass-fail-skip counts, manual results and blockers in the PR Test Execution Report without exposing credentials or showing modal dialogs unattended.
 
+### Task-specific quality gates for future P4.1 changes (2026-10-16)
+
+This matrix applies **prospectively** to remaining P4.1 work or new gate-affecting changes. The project currently records completed automated L3 verification and partial packaged/manual L4 acceptance in `docs/P4_1_VERIFICATION.md`; these historical results and task checkboxes are not reset by this docs-only change. See [current gate matrix](../TEST_GATE_MATRIX.md) and [TESTGATE rollout](20261016-001-task-gates-and-modular-tests.md).
+
+| Task | L1/L2: minimum affected tests | SQL escalation (only where required) | Unfiltered SQL |
+|---|---|---|---|
+| T01 Session state/actor | Focused Application/desktop session and request-actor/fake clock tests, supported TFMs | Approved `SecurityProvisioning` if SQL account validation changes; add any actual affected category | Not per-task |
+| T02 Login UI/ViewModel | Deterministic Login VM plus bounded Desktop STA on `net48` and `net8.0-windows` | None for pure UI/VM changes | Not per-task |
+| T03 Host startup/auth gate | Focused host/DI/STA and fail-closed authentication tests | `SecurityProvisioning` for SQL identity/auth; other categories only as genuinely affected | Not per-task |
+| T04 Logout/expiry/races | Fake scheduler, admission actor, stale response and affected STA tests | `SecurityProvisioning` for revocation; `SqlConcurrency` when real SQL locking/session behavior changes | Not per-task |
+| T05 Verification and remaining manual gates | Missing focused tests, required packaged/real-user Login/logout/idle-expiry/relogin evidence | Mandatory unfiltered dual-TFM strict SQL **once at final revision** when prior L3 evidence is absent/invalidated | Final L3 only |
+
+Codex must first verify the exact current test names and commands rather than assuming a proposed project split has already occurred. The existing focused runner only accepts one SQL category per call; it is not a `module + category` selector. No strict single-pass PR mode exists yet. Continue to use current safe tooling if an L3 rerun is genuinely necessary, or state `BLOCKED / NOT VERIFIED`; do not automatically repeat the completed L3 only to finish unrelated manual L4 checks.
+
 ## Goal and boundaries
 
 Provide one shared, keyboard-friendly and responsive WinForms `LoginForm` + `LoginViewModel` and a deterministic per-host desktop session lifecycle, reused by both `net48` and `net8.0-windows`. Login through the **existing `IIdentityApiClient`/Application Login** path; do not introduce a parallel password/SQL implementation or require P7 HTTP/token infrastructure for Local Mode.
