@@ -10,6 +10,7 @@ Read `AGENTS.md`, [Codex test policy](../CODEX_TEST_EXECUTION_POLICY.md), [test 
 - **T02** is the prerequisite for the proposed strict **one-pass** unfiltered SQL acceptance. The currently documented strict SQL path is the multi-pass `baseline` benchmark; never invent `pr-acceptance` flags or substitute bare `dotnet test`.
 - **T03** provides a versioned, independently verified *logical-case identity*, checked-in manifest, `Task`/`Final` gate orchestration, safe cross-project SQL process coordination and source/discovery/TRX reconciliation. **T04 may inventory existing projects before T03 completes, but MUST NOT migrate cases without a working reviewed identity/reconciliation gate. T05 MUST NOT migrate SQL cases until T02 and T03's guarded cross-project path is implemented and verified.** An absent prerequisite means `BLOCKED`, not a relaxed test.
 - **T04 and T05 are separate reviewable code PR(s)**. A move from one assembly to another is a change to test execution ownership, not permission to shrink coverage. A follow-up modularization PR does not reopen SQLPERF-T04 fixture reuse or authorize SQL/GUI parallelism.
+- **Desktop outer watchdog prerequisite:** Before GUI-bearing Desktop baseline/discovery, T04-A must identify and verify an existing bounded test launcher or implement/review one. It must enforce a whole-process-tree deadline, terminate/drain descendants on timeout, preserve per-TFM exit status and complete TRX evidence, and reject incomplete output or cleanup failures. This documentation PR does not establish an executable launcher. Until it is verified, Desktop `dotnet test` invocations (including `--list-tests`) are **BLOCKED**, not permitted as gate commands. T03's SQL process guard is not implicitly a GUI guard.
 
 **No CI rollout:** all L1/L2 and applicable final L3 gates are local on a reviewed developer/Codex machine. Do not add or modify CI workflows or duplicate locally completed full SQL acceptance in CI. CI adoption requires a separate request. Retain raw TRX, approval and ownership journals locally; publish only reviewed sanitized aggregate evidence.
 
@@ -52,22 +53,22 @@ For **each TFM separately**, capture (1) source method inventory and exemptions/
 
 ### T04 implementation checklist
 
-- [ ] **T04-A — Baseline inventory.** Record every `MyDmsVn.Desktop.Tests` source method and expanded Fact/Theory row **on both `net48` and `net8.0-windows`**; inspect dependencies/transitive UI startup, global state, STA attributes, shared fixtures, test resources and exception/UI dialog handlers. Classify `pure` or `GUI` with rationale. Freeze source/discovery/TRX identities and exemptions for the pre-move revision.
+- [ ] **T04-A — Baseline inventory and bounded execution.** First verify a Desktop outer watchdog that times out/terminates the **entire test process tree**, records real exit codes, checks complete TRX and cleanup, and fails closed on orphaned processes. Without it, executable Desktop discovery and baseline gates are **BLOCKED**. Record every `MyDmsVn.Desktop.Tests` source method and expanded Fact/Theory row **on both `net48` and `net8.0-windows`**; inspect dependencies/transitive UI startup, global state, STA attributes, shared fixtures, test resources and exception/UI dialog handlers. Classify `pure` or `GUI` with rationale. Freeze source/discovery/TRX identities and exemptions for the pre-move revision.
 - [ ] **T04-B — Extraction.** Move *only* proven pure session/dispatcher/VM tests to a real non-UI test project without `UseWindowsForms`/SQL initialization where possible. Keep all control/message-loop/global input/state tests in a serialized GUI project; retain STA, explicit dispose, modal-dialog suppression, `DataGridView.DataError`/unhandled exception capture and bounded cancellation.
-- [ ] **T04-C — Project/runner updates.** Update solution, references, discoverability, test resources and manifests atomically. No duplicate test compilation or two assemblies claiming the same logical case. Verify both supported Desktop TFMs and preserve current serial fallback unless independent resource-safety evidence justifies a narrower guard.
+- [ ] **T04-C — Project/runner updates.** Update solution, references, discoverability, test resources and manifests atomically. No duplicate test compilation or two assemblies claiming the same logical case. Retain the verified outer watchdog for all GUI-bearing old/new projects and test timeout, descendant termination, partial/missing TRX and orphan cleanup failures. Verify both supported Desktop TFMs and preserve current serial fallback unless independent resource-safety evidence justifies a narrower guard.
 - [ ] **T04-D — Reconciliation and acceptance.** Independently compare **all** old→new logical keys and source/discovery/executed TRX rows per TFM; review intentional method/namespace changes, categorization and dropped cases as hard failures. Verify GUI exception/STA/timeout/teardown and session/VM behavior; save sanitized evidence and perform applicable final L3 once at frozen revision.
 
 ### T04 L2 gate matrix
 
 | Slice | Affected tests / TFM / selection | Adversarial coverage and completeness check | Evidence / exit |
 |---|---|---|---|
-| **T04-A** | **D0**: existing Desktop project, full reviewed source/test inventory and dual-TFM discovery; focused `LoginViewModelTests`, `LoginFormTests`, `DesktopSessionExpiryTests`, `UiDispatcherTests` as initial behavioral checks | Find GUI-dependent helpers and Theory rows **beyond** the four example classes; compare source → independently discovered expanded cases → TRX; flag nondeterministic identity | Frozen per-TFM case inventory, checked classification/STA ownership, no missing rows |
+| **T04-A** | **D0**: existing Desktop project, full reviewed source/test inventory and dual-TFM discovery; focused `LoginViewModelTests`, `LoginFormTests`, `DesktopSessionExpiryTests`, `UiDispatcherTests` as initial checks, **only via a verified bounded watchdog** | Find GUI-dependent helpers and Theory rows **beyond** these classes; compare source → independent expanded discovery → TRX; reject unstable keys, timeout/child leaks | Frozen per-TFM inventory and STA ownership; no missing cases; **BLOCKED** without watchdog |
 | **T04-B** | **D1**: focused old + newly created **actual** pure/GUI project tests, on all applicable verified TFMs; identify changed test classes explicitly | UI startup leaking into pure tests, parallel shared state, modal dialog/DataError, STA and dispose failures, timeouts, duplicate/missing cases | Non-empty focused selection; old→new mapping, failures closed, bounded cleanup |
-| **T04-C/D** | **D2**: complete test inventory across **remaining old + all created** Desktop projects on `net48` and `net8.0-windows`, with no skipped applicable cases | Case-key bijection, unchanged test assertions, TRX statuses, unexpected new UI assembly dependencies, test runner/watchdog failure, no new SQL coupling | Both runtimes pass, identities reconcile and exact local evidence recorded; missing project/TFM/tool = `BLOCKED` |
+| **T04-C/D** | **D2**: watchdog-bounded complete inventory across **remaining old + all created** Desktop projects on `net48` and `net8.0-windows`, with no skipped applicable cases | Case-key bijection, unchanged assertions, TRX statuses, new UI dependencies, timeout/process-tree termination and cleanup failure, no new SQL coupling | Both runtimes pass and reconcile, or **BLOCKED** for missing project/TFM/watchdog; strict dual-TFM SQL L3 remains mandatory for this code PR |
 
-**T04 SQL escalation:** default is **none** if only pure/GUI tests and their project files move. If the move alters SQL-backed identity/adapter behavior, SQL harness or cross-module security dependencies, run **S** (`SecurityProvisioning` and any other actually affected category) on **both** SQL TFMs. SQL tests must use the approved guarded runner; plain `dotnet test` is not an SQL substitute.
+**T04 L2 SQL escalation:** default is **none** when only pure/GUI tests and project files move; this applies **only to focused task-level SQL checks**. If SQL-backed identity/adapter behavior, SQL harness or security dependencies change, run guarded **S** (`SecurityProvisioning` plus actually affected categories) on **both SQL TFMs**. Plain `dotnet test` is not a substitute. **L2 `none` does not waive L3.**
 
-**T04 L3:** after T04-A/B/C/D L2 is green and revision frozen, run full relevant Desktop Release acceptance on both `net48` and `net8.0-windows`, plus all other release/SQL gates actually affected by the PR under the repo's acceptance contract. Do **not** assume SQL L3 was run if it was not required/performed; document the rationale. Missing Windows GUI or bounded runner = `BLOCKED`, not green. L4 interactive GUI walkthrough only if the applicable phase explicitly requires it.
+**T04 L3 (mandatory for a code-bearing PR):** at the frozen gate-affecting revision, run full applicable Desktop Release acceptance on both `net48` and `net8.0-windows` **and strict unfiltered SQL acceptance sequentially on `net48` and `net8.0`**, *even when L2 SQL escalation was `none`*, per `docs/CODEX_TEST_EXECUTION_POLICY.md`. Preserve independent source/discovery/expanded Theory/TRX reconciliation, zero mandatory SQL skips, SQL approval, process watchdog and owned-database cleanup. Use the verified existing strict SQL runner or T02's mode only after it is implemented and reviewed. If supported Windows GUI, bounded Desktop runner, SQL instance/approval or full strict two-TFM SQL evidence is unavailable, record **BLOCKED / NOT VERIFIED**, never READY. L4 interactive GUI walkthrough applies only if separately required by the phase.
 
 ## TESTGATE-T05 — Incremental SQL test-assembly partitioning
 
@@ -75,7 +76,7 @@ For **each TFM separately**, capture (1) source method inventory and exemptions/
 
 ### T05 implementation checklist
 
-- [ ] **T05-A — Baseline and gate verification.** Freeze original SQL **and** reviewed non-SQL source, discovery/expanded Theory, classification/exemption fingerprints, migration audit calls and execution ownership on `net48` and `net8.0`. Demonstrate that the T02/T03 gate can inventory every future eligible project and fails closed on unknown/empty project/category.
+- [ ] **T05-A — Executed pre-move baseline and gate verification.** Freeze original SQL **and** reviewed non-SQL source, discovery/expanded Theory **and executed TRX logical-case keys**, classification/exemption fingerprints, migration audit calls and execution ownership on `net48` and `net8.0`. Before T05-B moves any SQL test, preserve strict unfiltered pre-move **executed TRX on both TFMs**, zero mandatory skips, approved SQL instance, watchdog and verified owned-database cleanup. Reuse historic evidence only when the exact frozen revision/inventory/gate inputs and complete local artifacts match; otherwise execute fresh approved strict baseline or mark **BLOCKED**. Prove T02/T03 inventory rejects unknown/empty project/category.
 - [ ] **T05-B — Common harness and first coherent module.** Reuse the SQL approval, effective `master` preflight, disposable owned database, durable journal, process-tree watchdog, timeout and cleanup guards. Extract one proven module at a time; preserve embedded SQL resources, migrations, assembly metadata, fixtures and tests. Never clone/bypass SQL lifecycle logic.
 - [ ] **T05-C — Gradual expansion.** Classify Catalog/Foundation (`FastSQL`), Security (`SecurityProvisioning`), Inventory (`FastSQL`/`SqlConcurrency`), Migrations (`MigrationSchema`) **by actual behavior**. Keep cross-module posting/permissions/transactions/upgrade/race/recovery cases in an explicit owned home. Rebuild per-assembly classification/exemption inventories and independent global aggregation after every move.
 - [ ] **T05-D — Fail-closed proof and final acceptance.** Add negative tests for missing/duplicated/ambiguous/renamed assemblies/methods/Theory rows, unreviewed category or exemption drift, unstable identities, missing TFM, approval loss, timeout/child leak, crash/incomplete journal, ambiguous database ownership and incomplete cleanups. Prove serialized SQL execution **across processes and TFMs**, not merely xUnit collection guards. Independently reconcile the full pre/post logical-case bijection per TFM, then run one planned strict unfiltered global SQL L3 at frozen PR revision.
@@ -84,10 +85,12 @@ For **each TFM separately**, capture (1) source method inventory and exemptions/
 
 | Slice | Affected tests / TFM / selection | Real-SQL category and required adversarial cases | Evidence / exit |
 |---|---|---|---|
-| **T05-A** | **R** entire SQL runner tests `net8.0`; **H** both TFMs if shared harness changes; original SQL integration project inventory on `net48` + `net8.0`, source + independent discovery | Source/manifest discrepancies, duplicate/unknown cases, Theory row identity, stale exemptions, no SQL DDL needed merely to collect inventory | Baseline manifest, eligible project list, nonempty classification for each TFM and negative test inventory |
+| **T05-A** | **R** entire SQL runner tests `net8.0`; **H** both TFMs if shared harness changes; source + independent expanded discovery **and executed pre-move TRX** of the original SQL project on `net48` and `net8.0` | Unknown/duplicate cases, row identity, stale exemptions; inventory-only checks need no SQL DDL, **but executed TRX requires approved real-SQL strict run** with watchdog, ownership and zero skips | Frozen source/discovery/execution one-to-one identity on each TFM, full original local TRX and strict evidence at the same revision; otherwise **BLOCKED before T05-B** |
 | **T05-B** | **R/H** as affected; **S** on the original SQL project **only while it still owns the selected cases**; moved module via T03's **verified actual guarded** runner, never guessed paths | Per moved module `FastSQL` / `SecurityProvisioning` / `SqlConcurrency` / `MigrationSchema` as applicable; approval, ownership, rollback and fatal/timeout cleanup | Both TFMs, reviewed non-empty module + category selection; before/after logical-key bijection and physical ownership mapping |
 | **T05-C** | **R/H** as affected, gated **each real affected module/category** on **all** old/new SQL assemblies; cross-module tests must be included | Inventory posting and transaction rollback, permission allow/deny/provisioning, schema drift and failed/aborted DbUp, real multi-session contention where affected; negative duplicate/reclassification tests | No missing project/category/theory row, no mandatory skips, complete audited cross-project selection |
 | **T05-D** | **R/H** plus T03 guarded resource/concurrency negative tests; final L2 classification + inventory checks across all assemblies (not full unfiltered real-SQL acceptance yet) | Missing approval, cross-process lock bypass, stale/partial TRX, timeout/orphans/owned DB leaks, ambiguous cleanup; prove SQL resource serialization under reviewed capacity | Independently reconciled source/discovery/multiplicity/exemptions and exact gate inputs before frozen L3 |
+
+**T05-A executed pre-move evidence (hard exit gate before T05-B):** At the frozen *pre-move* gate-affecting revision, independently reconcile **source inventory → expanded discovery → executed TRX logical keys/statuses** on each SQL TFM. Preserve the real strict unfiltered run's original local TRX, classifications/exemptions, project list, tested commit, approval/preflight, watchdog, zero mandatory skips and positive database-ownership/cleanup reconciliation for later comparison. Reuse older strict evidence **only** when its tested commit and all gate-affecting test/theory, migration, manifest, runner and build inputs match exactly and its raw artifacts are still independently auditable; matching counts or a shareable summary alone is insufficient. Otherwise obtain a fresh approved pre-move strict dual-TFM execution; unavailable SQL/approval means **BLOCKED**. This baseline is required once before migration, **not** a new full regression after each module move.
 
 **T05 L3 (mandatory):** one planned **strict unfiltered** SQL acceptance on **all** original/remaining/new assemblies, on `net48` and `net8.0` **sequentially**, against an approved non-production instance, at the final gate-affecting revision. Independently reconcile source, expanded discovery and TRX against the global inventory, zero mandatory skips, real process exits, watchdog/approval/ownership journals and complete cleanup. Preserve all required Release project/architecture regressions. A filtered category, bare `dotnet test`, an unimplemented `pr-acceptance` mode or green aggregate counts alone are NOT acceptance. Report duration/resource deltas without claiming a speedup without controlled A/B evidence; benchmarking itself is conditional L4.
 
@@ -95,24 +98,30 @@ For **each TFM separately**, capture (1) source method inventory and exemptions/
 
 These are **pre-extraction commands for projects shown in the existing T01–T03 plan**, not proof that proposed new projects/modes exist. Review source/discovery at the actual revision, preserve timeouts/GUI watchdog, build the exact inputs and capture artifacts. When projects have been split, record their **real** paths and real supported TFMs from the checked-in solution/manifest; do not execute placeholders or keep filtering the now-empty old assembly.
 
-**D0 — Existing Desktop focused behavioral sample (L1/L2 only):**
+**D0 / D1 / D2 — Desktop selector and coverage catalog (NOT executable gate commands):**
 
-```powershell
-$desktopTests = 'tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj'
-$desktopFilter = 'FullyQualifiedName~MyDmsVn.Desktop.Tests.LoginViewModelTests|FullyQualifiedName~MyDmsVn.Desktop.Tests.LoginFormTests|FullyQualifiedName~MyDmsVn.Desktop.Tests.DesktopSessionExpiryTests|FullyQualifiedName~MyDmsVn.Desktop.Tests.UiDispatcherTests'
-dotnet test $desktopTests -c Release -f net48 --filter $desktopFilter
-dotnet test $desktopTests -c Release -f net8.0-windows --filter $desktopFilter
+**BLOCKED until a reviewed, verified GUI outer watchdog exists.** Direct `dotnet test` commands, including `--list-tests`, must **not** be used as T04 gates on a GUI-capable assembly: unmanaged hangs/modal dialogs can outlive `StaTest`'s cooperative timeout. T04-A must first establish and negatively test a runner that:
+
+- Uses a finite deadline on **the whole `dotnet test` process tree** for each project/TFM; on timeout forcibly terminates/drains all descendants and detects orphans.
+- Collects actual exit code, separately named TRX for each project/TFM, expanded-case discovery and independent reconciliation; rejects timeouts, absent/partial TRX, mandatory skips, unexpectedly empty selectors and cleanup errors.
+- Preserves GUI serialization across old/new project runners, STA/control disposal, dialog/DataError exception capture, and a documented local evidence record; executes both supported TFMs serially when GUI state may conflict.
+
+The following are **reference inputs** for a future tested watchdog launcher, not runnable PowerShell:
+
+```text
+Original project: tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj
+TFMs: net48, net8.0-windows (each separately)
+D0 initial selectors:
+  FullyQualifiedName~MyDmsVn.Desktop.Tests.LoginViewModelTests
+  FullyQualifiedName~MyDmsVn.Desktop.Tests.LoginFormTests
+  FullyQualifiedName~MyDmsVn.Desktop.Tests.DesktopSessionExpiryTests
+  FullyQualifiedName~MyDmsVn.Desktop.Tests.UiDispatcherTests
+D1: --list-tests (discovery only; not execution)
+D2: unfiltered Release execution with unique TRX per TFM
+After extraction: enumerate remaining original + verified new projects/TFMs
 ```
 
-**D1/D2 — Complete Desktop before-move project baseline** (run only in an environment with supported GUI/tooling and a bounded outer watchdog; after moves, replace with verified real project list; `--list-tests` is discovery only):
-
-```powershell
-$desktopTests = 'tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj'
-dotnet test $desktopTests -c Release -f net48 --list-tests
-dotnet test $desktopTests -c Release -f net8.0-windows --list-tests
-dotnet test $desktopTests -c Release -f net48
-dotnet test $desktopTests -c Release -f net8.0-windows
-```
+Until such a wrapper and its failure-path tests exist, record D0/D1/D2 execution as **BLOCKED / NOT RUN**. Do not fall back to unguarded `dotnet test` or claim Desktop readiness; the strict SQL dual-TFM L3 remains separately mandatory for the code-bearing T04 PR.
 
 **R — Existing SQL runner unit/negative suite (no SQL DDL):**
 
