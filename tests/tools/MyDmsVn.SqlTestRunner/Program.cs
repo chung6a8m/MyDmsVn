@@ -174,7 +174,7 @@ internal static class Program
             options.ArtifactRoot,
             options.CommandTimeout,
             token => new FocusedRunCoordinator(new EnvironmentPreflightGate(), runner).RunAsync(options, token),
-            result => result.IsComplete,
+            result => !result.RecoveryRequired,
             cancellationToken).ConfigureAwait(false);
         return guarded.Acquired && guarded.Result.IsComplete ? 0 : 3;
     }
@@ -191,7 +191,7 @@ internal static class Program
             options.CommandTimeout,
             token => new BenchmarkRunCoordinator(new EnvironmentPreflightGate(), runner)
                 .RunAsync(options, token),
-            result => result.IsComplete,
+            result => !result.RecoveryRequired,
             cancellationToken).ConfigureAwait(false);
         return guarded.Acquired
             ? guarded.Result
@@ -213,7 +213,7 @@ internal static class Program
                     runner,
                     reportExporter: new SqlAcceptanceReportExporter())
                 .RunAsync(options, token),
-            result => result.IsComplete,
+            result => !result.RecoveryRequired,
             cancellationToken).ConfigureAwait(false);
         return guarded.Acquired
             ? guarded.Result

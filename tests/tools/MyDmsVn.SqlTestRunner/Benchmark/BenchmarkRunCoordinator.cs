@@ -48,24 +48,26 @@ public sealed class BenchmarkRunCoordinator
         CancellationToken cancellationToken)
     {
         var runs = new List<BenchmarkFrameworkRun>();
+        var recovery = new SqlExecutionRecoveryState();
         using var deadline = new CancellationTokenSource(options.OverallTimeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             deadline.Token);
         try
         {
-            return await RunCoreAsync(options, runs, linked.Token).ConfigureAwait(false);
+            return await RunCoreAsync(options, runs, recovery, linked.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (
             deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            return new BenchmarkRunResult(false, runs);
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }
     }
 
     private async Task<BenchmarkRunResult> RunCoreAsync(
         BenchmarkRunOptions options,
         List<BenchmarkFrameworkRun> runs,
+        SqlExecutionRecoveryState recovery,
         CancellationToken cancellationToken)
     {
         var isAcceptance = string.Equals(
@@ -79,7 +81,7 @@ public sealed class BenchmarkRunCoordinator
                  new[] { "net48", "net8.0" },
                  StringComparer.Ordinal)))
         {
-            return new BenchmarkRunResult(false, runs);
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }
 
         foreach (var tfm in options.TargetFrameworks)
@@ -87,7 +89,7 @@ public sealed class BenchmarkRunCoordinator
             cancellationToken.ThrowIfCancellationRequested();
             if (!_classificationGate.IsValid(AssemblyPath(options, tfm), options.RepositoryRoot))
             {
-                return new BenchmarkRunResult(false, runs);
+                return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
             }
         }
 
@@ -112,7 +114,7 @@ public sealed class BenchmarkRunCoordinator
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!await _preflight.ValidateAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    return new BenchmarkRunResult(false, runs);
+                    return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var discovery = await _processRunner.RunAsync(
@@ -126,7 +128,7 @@ public sealed class BenchmarkRunCoordinator
                     .ConfigureAwait(false);
                 if (discovery.ExitCode != 0 || discovery.TimedOut)
                 {
-                    return new BenchmarkRunResult(false, runs);
+                    return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var label = pass.Kind.ToString().ToLowerInvariant() + "-" + pass.Number.ToString("00");
@@ -161,6 +163,7 @@ public sealed class BenchmarkRunCoordinator
                 try
                 {
                     processLaunched = true;
+                    recovery.ExecutionStarted();
                     result = await _processRunner.RunAsync(
                             new CommandSpec(
                                 "dotnet",
@@ -186,12 +189,16 @@ public sealed class BenchmarkRunCoordinator
                                     result is not null && result.ExitCode == 0 && !result.TimedOut),
                                 ownershipDeadline.Token)
                             .ConfigureAwait(false);
+                        if (ownershipResult.IsComplete)
+                        {
+                            recovery.OwnershipReconciled();
+                        }
                     }
                 }
 
                 if (result is null)
                 {
-                    return new BenchmarkRunResult(false, runs);
+                    return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var trxPath = Path.Combine(options.ArtifactRoot, trxName);
@@ -222,7 +229,7 @@ public sealed class BenchmarkRunCoordinator
                                 "tools",
                                 "sqlperf-t01-migration-invocations.json"))))
                 {
-                    return new BenchmarkRunResult(false, runs);
+                    return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
             }
         }
@@ -254,10 +261,10 @@ public sealed class BenchmarkRunCoordinator
             !actualReportPaths.SetEquals(expectedReportPaths) ||
             expectedReportPaths.Any(path => !File.Exists(path)))
         {
-            return new BenchmarkRunResult(false, runs);
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }
 
-        return new BenchmarkRunResult(true, runs);
+        return new BenchmarkRunResult(true, runs, recovery.RecoveryRequired);
     }
 
     private static string AssemblyPath(BenchmarkRunOptions options, string tfm)
@@ -473,4 +480,16 @@ public sealed record BenchmarkFrameworkRun(
 
 public sealed record BenchmarkRunResult(
     bool IsComplete,
-    IReadOnlyList<BenchmarkFrameworkRun> Runs);
+    IReadOnlyList<BenchmarkFrameworkRun> Runs,
+    bool RecoveryRequired = false);
+
+internal sealed class SqlExecutionRecoveryState
+{
+    private int _unreconciledExecutions;
+
+    public bool RecoveryRequired => _unreconciledExecutions != 0;
+
+    public void ExecutionStarted() => _unreconciledExecutions++;
+
+    public void OwnershipReconciled() => _unreconciledExecutions--;
+}

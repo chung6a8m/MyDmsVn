@@ -44,6 +44,14 @@ public static class TestGateManifestValidator
         foreach (var gate in gates)
         {
             ValidateGate(root, gate);
+            if (mode == TestGateMode.Final &&
+                gate.StrictMode == TestGateStrictMode.DotnetTest &&
+                (gate.Resources.Sql != TestGateResourceRequirement.None ||
+                 gate.Resources.Gui != TestGateResourceRequirement.None))
+            {
+                throw new InvalidDataException(
+                    $"DotnetTest gate '{gate.GateId}' cannot declare unguarded SQL or GUI resources.");
+            }
         }
 
         if (mode == TestGateMode.Final)

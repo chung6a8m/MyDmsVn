@@ -75,11 +75,11 @@ public sealed class SqlExecutionLeaseGuard
         string artifactRoot,
         TimeSpan timeout,
         Func<CancellationToken, Task<T>> operation,
-        Func<T, bool> isComplete,
+        Func<T, bool> canReleaseSafely,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        ArgumentNullException.ThrowIfNull(isComplete);
+        ArgumentNullException.ThrowIfNull(canReleaseSafely);
         if (!_approval.TryLoad(approvalFile, out var fingerprint))
         {
             return new SqlExecutionLeaseGuardResult<T>(false, default!);
@@ -101,7 +101,7 @@ public sealed class SqlExecutionLeaseGuard
         try
         {
             var result = await operation(cancellationToken).ConfigureAwait(false);
-            if (isComplete(result))
+            if (canReleaseSafely(result))
             {
                 acquired.Lease.Complete();
             }
@@ -155,16 +155,12 @@ public sealed class SqlExecutionLease : IAsyncDisposable
 
 public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
 {
-    private const string MutexPrefix = "Local\\MyDmsVn.TestGate.Sql.";
+    private const string MutexPrefix = "Global\\MyDmsVn.TestGate.Sql.";
     private readonly FileSqlExecutionLeaseStore _store;
     private readonly IProcessLivenessProbe _processes;
 
     public SqlExecutionLeaseFactory()
-        : this(new FileSqlExecutionLeaseStore(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MyDmsVn",
-            "TestGate",
-            "leases")))
+        : this(new FileSqlExecutionLeaseStore(DefaultStoreRoot))
     {
     }
 
@@ -203,11 +199,12 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
         CancellationToken cancellationToken,
         TaskCompletionSource<SqlExecutionLeaseAcquireResult> acquisition)
     {
-        using var mutex = new Mutex(initiallyOwned: false, MutexPrefix + resourceKey);
         using var release = new EventWaitHandle(false, EventResetMode.ManualReset);
+        Mutex? mutex = null;
         var acquired = false;
         try
         {
+            mutex = new Mutex(initiallyOwned: false, MutexPrefix + resourceKey);
             var timeoutMilliseconds = checked((int)Math.Min(
                 request.ResourceTimeout.TotalMilliseconds,
                 int.MaxValue));
@@ -272,6 +269,12 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
                 acquisition,
                 priorStatus);
         }
+        catch (UnauthorizedAccessException)
+        {
+            acquisition.TrySetResult(new SqlExecutionLeaseAcquireResult(
+                SqlExecutionLeaseAcquireStatus.BlockedRecovery,
+                null));
+        }
         catch (Exception exception)
         {
             acquisition.TrySetException(exception);
@@ -280,8 +283,10 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
         {
             if (acquired)
             {
-                mutex.ReleaseMutex();
+                mutex!.ReleaseMutex();
             }
+
+            mutex?.Dispose();
         }
     }
 
@@ -291,7 +296,13 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
         CancellationToken cancellationToken,
         bool requireRecord)
     {
-        if (!_store.TryRead(resourceKey, out var record))
+        var readStatus = _store.Read(resourceKey, out var record);
+        if (readStatus == SqlExecutionLeaseReadStatus.Invalid)
+        {
+            return SqlExecutionLeaseAcquireStatus.BlockedRecovery;
+        }
+
+        if (readStatus == SqlExecutionLeaseReadStatus.Missing)
         {
             return requireRecord
                 ? SqlExecutionLeaseAcquireStatus.BlockedRecovery
@@ -414,6 +425,12 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
     }
 
     internal static string MutexName(string fingerprint) => MutexPrefix + Hash(fingerprint);
+
+    internal static string DefaultStoreRoot => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "MyDmsVn",
+        "TestGate",
+        "leases");
 }
 
 internal sealed class SystemProcessLivenessProbe : IProcessLivenessProbe
@@ -455,7 +472,7 @@ public sealed class FileSqlExecutionLeaseStore
     internal void Write(SqlExecutionLeaseRecord record, string? pathResourceKey = null) =>
         WriteAtomic(PathFor(pathResourceKey ?? record.ResourceKey), record);
 
-    internal bool TryRead(string resourceKey, out SqlExecutionLeaseRecord record)
+    internal SqlExecutionLeaseReadStatus Read(string resourceKey, out SqlExecutionLeaseRecord record)
     {
         try
         {
@@ -463,14 +480,14 @@ public sealed class FileSqlExecutionLeaseStore
             if (!File.Exists(path))
             {
                 record = null!;
-                return false;
+                return SqlExecutionLeaseReadStatus.Missing;
             }
 
             record = JsonSerializer.Deserialize<SqlExecutionLeaseRecord>(
                     File.ReadAllText(path),
                     JsonOptions) ??
                 throw new InvalidDataException("The SQL lease record is empty.");
-            return true;
+            return SqlExecutionLeaseReadStatus.Valid;
         }
         catch (Exception exception) when (
             exception is IOException ||
@@ -479,7 +496,7 @@ public sealed class FileSqlExecutionLeaseStore
             exception is InvalidDataException)
         {
             record = null!;
-            return false;
+            return SqlExecutionLeaseReadStatus.Invalid;
         }
     }
 
@@ -513,6 +530,13 @@ public sealed class FileSqlExecutionLeaseStore
             }
         }
     }
+}
+
+internal enum SqlExecutionLeaseReadStatus
+{
+    Missing,
+    Valid,
+    Invalid,
 }
 
 internal enum SqlExecutionLeaseCompletionState

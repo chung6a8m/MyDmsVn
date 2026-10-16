@@ -214,6 +214,46 @@ public sealed class TestGateManifestTests
         Assert.Equal(2, selection.Gates.Count);
     }
 
+    [Theory]
+    [InlineData(TestGateResourceRequirement.RequiredExclusive, TestGateResourceRequirement.None)]
+    [InlineData(TestGateResourceRequirement.None, TestGateResourceRequirement.RequiredExclusive)]
+    public void Final_rejects_DotnetTest_gates_with_unguarded_resources(
+        TestGateResourceRequirement sql,
+        TestGateResourceRequirement gui)
+    {
+        using var repository = new TestRepository();
+        var resourceGate = Gate("resource-bearing-final", mode: TestGateMode.Final) with
+        {
+            Resources = new TestGateResources(sql, gui),
+        };
+        var mandatorySql = Gate(
+            "final-sql",
+            mode: TestGateMode.Final,
+            project: "sql-tests.csproj",
+            frameworks: new[] { "net48", "net8.0" }) with
+        {
+            StrictMode = TestGateStrictMode.SqlPrAcceptance,
+            Resources = new TestGateResources(
+                TestGateResourceRequirement.RequiredExclusive,
+                TestGateResourceRequirement.None),
+            Evidence = new[]
+            {
+                TestGateEvidenceKind.Source,
+                TestGateEvidenceKind.Discovery,
+                TestGateEvidenceKind.Trx,
+                TestGateEvidenceKind.SanitizedReport,
+                TestGateEvidenceKind.Ownership,
+            },
+        };
+
+        Assert.Throws<InvalidDataException>(() => TestGateManifestValidator.Select(
+            Manifest(resourceGate, mandatorySql),
+            repository.Root,
+            TestGateMode.Final,
+            "20261016-001",
+            "TESTGATE-T03"));
+    }
+
     private static TestGateManifest Manifest(params TestGateDefinition[] gates) => new TestGateManifest(
         1,
         gates,

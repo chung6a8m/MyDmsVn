@@ -87,6 +87,29 @@ public sealed class TestGateCoordinatorTestsFinal
         Assert.DoesNotContain("run-net8.0", events);
     }
 
+    [Fact]
+    public async Task Final_preflight_rejection_releases_without_recovery()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.PreflightRejected);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.PreflightRejected),
+            new NoRecovery());
+
+        var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.NotNull(leases.LastLease);
+        Assert.True(leases.LastLease.IsCompleted);
+        Assert.DoesNotContain(events, item => item.StartsWith("run-", StringComparison.Ordinal));
+    }
+
     private static TestGateCoordinator Coordinator(
         FinalRepository repository,
         IList<string> events,
@@ -109,6 +132,7 @@ public sealed class TestGateCoordinatorTestsFinal
         Reconciliation,
         Report,
         Cancelled,
+        PreflightRejected,
     }
 
     private sealed class FinalApproval : ITestGateApprovalReader
@@ -141,6 +165,8 @@ public sealed class TestGateCoordinatorTestsFinal
             _failure = failure;
         }
 
+        public SqlExecutionLease? LastLease { get; private set; }
+
         public Task<SqlExecutionLeaseAcquireResult> AcquireAsync(
             SqlExecutionLeaseRequest request,
             CancellationToken cancellationToken)
@@ -162,9 +188,10 @@ public sealed class TestGateCoordinatorTestsFinal
                 release.WaitOne();
                 _events.Add("release");
             });
+            LastLease = new SqlExecutionLease(release, completion);
             return Task.FromResult(new SqlExecutionLeaseAcquireResult(
                 SqlExecutionLeaseAcquireStatus.Acquired,
-                new SqlExecutionLease(release, completion)));
+                LastLease));
         }
     }
 
@@ -187,6 +214,12 @@ public sealed class TestGateCoordinatorTestsFinal
             Assert.Equal(0, options.WarmupPasses);
             Assert.Equal(1, options.MeasuredPasses);
             Assert.Equal(new[] { "net48", "net8.0" }, options.TargetFrameworks);
+            if (_failure == FinalFailure.PreflightRejected)
+            {
+                _events.Add("preflight-net48");
+                return Task.FromResult(new BenchmarkRunResult(false, Array.Empty<BenchmarkFrameworkRun>()));
+            }
+
             if (_failure == FinalFailure.Cancelled)
             {
                 _events.Add("preflight-net48");

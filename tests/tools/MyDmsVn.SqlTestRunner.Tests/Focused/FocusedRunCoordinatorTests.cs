@@ -29,6 +29,7 @@ public sealed class FocusedRunCoordinatorTests
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
         Assert.False(result.IsComplete);
+        Assert.False(result.RecoveryRequired);
         Assert.Empty(process.Commands);
         Assert.Empty(ownership.Evidence);
     }
@@ -59,6 +60,7 @@ public sealed class FocusedRunCoordinatorTests
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
         Assert.False(result.IsComplete);
+        Assert.False(result.RecoveryRequired);
         Assert.Equal(2, process.Commands.Count);
         Assert.All(process.Commands, command => Assert.Equal(TimeSpan.FromSeconds(5), command.Timeout));
         var evidence = Assert.Single(ownership.Evidence);

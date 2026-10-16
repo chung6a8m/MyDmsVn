@@ -115,6 +115,32 @@ public sealed class SqlExecutionLeaseTests
     }
 
     [Fact]
+    public async Task Corrupt_existing_record_blocks_an_ordinary_acquisition()
+    {
+        using var store = new TemporaryLeaseStore();
+        const string fingerprint = "corrupt-ordinary-acquisition";
+        WritePriorLease(store, fingerprint);
+        File.WriteAllText(Assert.Single(Directory.GetFiles(store.Root)), "{not-json");
+
+        var result = await Factory(store).AcquireAsync(
+            Request(store, fingerprint),
+            CancellationToken.None);
+
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.BlockedRecovery, result.Status);
+        Assert.Null(result.Lease);
+    }
+
+    [Fact]
+    public void Lease_namespace_is_machine_wide()
+    {
+        Assert.StartsWith("Global\\", SqlExecutionLeaseFactory.MutexName("instance-a"), StringComparison.Ordinal);
+        Assert.StartsWith(
+            Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)),
+            SqlExecutionLeaseFactory.DefaultStoreRoot,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Abandoned_owner_recovers_before_returning_the_new_lease()
     {
         using var store = new TemporaryLeaseStore();

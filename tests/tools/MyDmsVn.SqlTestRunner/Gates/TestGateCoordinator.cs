@@ -465,6 +465,11 @@ public sealed class TestGateCoordinator
                     Revision = options.Revision,
                 },
                 cancellationToken).ConfigureAwait(false);
+            if (!benchmark.RecoveryRequired)
+            {
+                acquired.Lease.Complete();
+            }
+
             if (!benchmark.IsComplete || benchmark.Runs.Count != gate.Frameworks.Count ||
                 !benchmark.Runs.Select(run => run.Tfm).SequenceEqual(gate.Frameworks, StringComparer.Ordinal))
             {

@@ -29,6 +29,7 @@ public sealed class BenchmarkRunCoordinatorTests
         var result = await coordinator.RunAsync(Options(), CancellationToken.None);
 
         Assert.False(result.IsComplete);
+        Assert.False(result.RecoveryRequired);
         Assert.Empty(process.Commands);
     }
 
@@ -138,6 +139,7 @@ public sealed class BenchmarkRunCoordinatorTests
         var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
 
         Assert.False(result.IsComplete);
+        Assert.True(result.RecoveryRequired);
         var evidence = Assert.Single(ownership.Evidence);
         Assert.True(evidence.ProcessSucceeded);
         Assert.True(File.Exists(evidence.RecoveryArtifactPath));
