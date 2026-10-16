@@ -45,7 +45,23 @@ public sealed class MigrationTimingCoverageTests
                 Regex.Matches(source, "\\.PerformUpgrade\\(\\)").Count);
 
             Assert.DoesNotContain("new DatabaseMigrationRunner().Migrate(", source, StringComparison.Ordinal);
-            Assert.DoesNotContain("TestDatabaseMigrationRunner.Migrate(", source, StringComparison.Ordinal);
+
+            var wrappedMigrations = Regex.Matches(
+                source,
+                "\\bTestDatabaseMigrationRunner\\s*\\.\\s*Migrate\\s*\\(").Count;
+            if (wrappedMigrations > 0)
+            {
+                var helperPath = Path.Combine(
+                    root,
+                    "tests",
+                    "MyDmsVn.Server.Infrastructure.IntegrationTests",
+                    "TestDatabaseMigrationRunner.cs");
+                Assert.True(File.Exists(helperPath));
+                Assert.Contains(
+                    "MeasuredDatabaseMigrationRunner.Execute(",
+                    File.ReadAllText(helperPath),
+                    StringComparison.Ordinal);
+            }
         }
     }
 
