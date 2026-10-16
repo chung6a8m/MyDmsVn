@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -49,7 +49,10 @@ public static class TestMethodInventory
                             IsAttributeOrDerived(attribute.AttributeType, "Xunit.TheoryAttribute")),
                         fingerprint.Fingerprint,
                         ReadCategories(item.Method),
-                        fingerprint.IsComplete);
+                        fingerprint.IsComplete)
+                    {
+                        NormalizedSignature = LogicalCaseIdentity.NormalizeSignature(item.Method),
+                    };
                 })
                 .OrderBy(item => item.FullyQualifiedName, StringComparer.Ordinal)
                 .ToArray();
@@ -141,10 +144,16 @@ public static class TestMethodInventory
             }
 
             var references = ReadReferencedMethods(method);
-            isComplete &= references.IsComplete;
+            if (!references.IsComplete)
+            {
+                isComplete &= reviewedCode.AddClosedProjectBoundary(method.DeclaringType, selected);
+            }
             foreach (var unresolvedHint in references.UnresolvedMemberHints)
             {
-                isComplete &= reviewedCode.AddProjectBoundaryForHint(unresolvedHint, selected);
+                if (!reviewedCode.AddProjectBoundaryForHint(unresolvedHint, selected))
+                {
+                    isComplete &= reviewedCode.AddClosedProjectBoundary(method.DeclaringType, selected);
+                }
             }
 
             foreach (var referencedMethod in references.Methods)
@@ -197,7 +206,15 @@ public static class TestMethodInventory
             }
         }
 
-        isComplete &= reviewedCode.AddReferencedConstantSources(selected);
+        if (!reviewedCode.AddReferencedConstantSources(selected))
+        {
+            isComplete &= reviewedCode.AddClosedProjectBoundary(rootMethod.DeclaringType, selected);
+        }
+
+        if (!isComplete)
+        {
+            reviewedCode.AddClosedProjectBoundary(rootMethod.DeclaringType, selected);
+        }
 
         if (selected.Count == 0)
         {
@@ -1268,6 +1285,24 @@ public static class TestMethodInventory
             return true;
         }
 
+        public bool AddClosedProjectBoundary(
+            Type? declaringType,
+            IDictionary<string, byte[]> selected)
+        {
+            var source = Find(declaringType);
+            if (source.IsAmbiguous || source.Files.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var file in source.Files)
+            {
+                AddProjectBoundary(file.Key, selected);
+            }
+
+            return true;
+        }
+
         public void AddProjectBoundary(
             string sourcePath,
             IDictionary<string, byte[]> selected)
@@ -1507,6 +1542,8 @@ public sealed record TestMethodDescriptor(
     IReadOnlyList<string> Categories,
     bool IsBodyFingerprintComplete = true)
 {
+    public string NormalizedSignature { get; init; } = FullyQualifiedName + "()";
+
     public TestMethodDescriptor(
         string FullyQualifiedName,
         bool IsTheory,

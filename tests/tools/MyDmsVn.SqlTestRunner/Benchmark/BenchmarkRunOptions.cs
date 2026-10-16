@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace MyDmsVn.SqlTestRunner.Benchmark;
@@ -15,4 +15,8 @@ public sealed record BenchmarkRunOptions(
     TimeSpan? OverallRunTimeout = null)
 {
     public TimeSpan OverallTimeout { get; init; } = OverallRunTimeout ?? TimeSpan.FromHours(4);
+
+    public string Mode { get; init; } = "baseline";
+
+    public string Revision { get; init; } = string.Empty;
 }

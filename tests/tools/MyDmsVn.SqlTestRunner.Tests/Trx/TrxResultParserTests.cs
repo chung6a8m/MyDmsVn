@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using MyDmsVn.SqlTestRunner.Trx;
 using Xunit;
@@ -24,6 +24,11 @@ public sealed class TrxResultParserTests
             Assert.Equal(TestOutcome.Passed, test.Outcome);
             Assert.Equal(TimeSpan.FromMilliseconds(1250), test.Duration);
             Assert.DoesNotContain("secret", test.StableCaseId, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(64, test.PhysicalRowLocator.Length);
+            Assert.DoesNotContain(
+                "secret",
+                test.PhysicalRowLocator,
+                StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

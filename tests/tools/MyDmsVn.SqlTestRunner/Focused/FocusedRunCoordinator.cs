@@ -30,7 +30,8 @@ public sealed record FocusedFrameworkRun(
 
 public sealed record FocusedRunResult(
     bool IsComplete,
-    IReadOnlyList<FocusedFrameworkRun> Runs);
+    IReadOnlyList<FocusedFrameworkRun> Runs,
+    bool RecoveryRequired = false);
 
 public sealed record FocusedResultEvidence(
     string AssemblyPath,
@@ -84,6 +85,7 @@ public sealed class FocusedRunCoordinator
         CancellationToken cancellationToken)
     {
         var runs = new List<FocusedFrameworkRun>();
+        var recovery = new SqlExecutionRecoveryState();
         using var deadline = new CancellationTokenSource(options.OverallTimeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -92,7 +94,7 @@ public sealed class FocusedRunCoordinator
         {
             if (!await _preflight.ValidateAsync(linked.Token).ConfigureAwait(false))
             {
-                return new FocusedRunResult(false, runs);
+                return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
             }
 
             foreach (var tfm in options.TargetFrameworks)
@@ -100,7 +102,7 @@ public sealed class FocusedRunCoordinator
                 var assemblyPath = ResolveAssemblyPath(options.TestProject, tfm);
                 if (!_classificationGate.IsValid(assemblyPath, options.RepositoryRoot))
                 {
-                    return new FocusedRunResult(false, runs);
+                    return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var filter = "Category=" + options.Category;
@@ -115,18 +117,21 @@ public sealed class FocusedRunCoordinator
                     .ConfigureAwait(false);
                 if (discovery.ExitCode != 0 || discovery.TimedOut)
                 {
-                    return new FocusedRunResult(false, runs);
+                    return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var runId = "focused-" + options.Category.ToLowerInvariant() + "-" +
                     tfm.Replace('.', '-') + "-" + Guid.NewGuid().ToString("N");
                 var runRoot = Path.Combine(options.ArtifactRoot, runId);
-                var journal = Path.Combine(runRoot, "ownership");
+                var journal = Path.Combine(options.ArtifactRoot, "ownership", runId);
                 var discoveryPath = Path.Combine(runRoot, "discovery.txt");
                 var trxName = runId + ".trx";
                 var trxPath = Path.Combine(runRoot, trxName);
                 var timingPath = Path.Combine(runRoot, "timing.jsonl");
-                var recoveryPath = Path.Combine(runRoot, "ownership-recovery.json");
+                var recoveryPath = Path.Combine(
+                    options.ArtifactRoot,
+                    "ownership-recovery-" + runId + ".json");
+                Directory.CreateDirectory(runRoot);
                 Directory.CreateDirectory(journal);
                 File.WriteAllText(discoveryPath, discovery.StandardOutput);
 
@@ -148,6 +153,7 @@ public sealed class FocusedRunCoordinator
                 try
                 {
                     processLaunched = true;
+                    recovery.ExecutionStarted();
                     command = await _processRunner.RunAsync(
                             new CommandSpec(
                                 "dotnet",
@@ -172,12 +178,16 @@ public sealed class FocusedRunCoordinator
                                     command is not null && command.ExitCode == 0 && !command.TimedOut),
                                 ownershipDeadline.Token)
                             .ConfigureAwait(false);
+                        if (ownership.IsComplete)
+                        {
+                            recovery.OwnershipReconciled();
+                        }
                     }
                 }
 
                 if (command is null || command.ExitCode != 0 || command.TimedOut || !ownership.IsComplete)
                 {
-                    return new FocusedRunResult(false, runs);
+                    return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var result = _resultGate.Verify(new FocusedResultEvidence(
@@ -199,16 +209,19 @@ public sealed class FocusedRunCoordinator
                     result.IsComplete ? "complete" : "incomplete");
                 if (!result.IsComplete)
                 {
-                    return new FocusedRunResult(false, runs);
+                    return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
                 }
             }
 
-            return new FocusedRunResult(true, runs);
+            return new FocusedRunResult(true, runs, recovery.RecoveryRequired);
         }
-        catch (OperationCanceledException) when (
-            deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
-            return new FocusedRunResult(false, runs);
+            return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
+        }
+        catch (Exception) when (!recovery.RecoveryRequired)
+        {
+            return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
         }
     }
 

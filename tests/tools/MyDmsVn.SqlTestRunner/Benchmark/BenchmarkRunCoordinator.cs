@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -48,32 +48,51 @@ public sealed class BenchmarkRunCoordinator
         CancellationToken cancellationToken)
     {
         var runs = new List<BenchmarkFrameworkRun>();
+        var recovery = new SqlExecutionRecoveryState();
         using var deadline = new CancellationTokenSource(options.OverallTimeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             deadline.Token);
         try
         {
-            return await RunCoreAsync(options, runs, linked.Token).ConfigureAwait(false);
+            return await RunCoreAsync(options, runs, recovery, linked.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (
-            deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
-            return new BenchmarkRunResult(false, runs);
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
+        }
+        catch (Exception) when (!recovery.RecoveryRequired)
+        {
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }
     }
 
     private async Task<BenchmarkRunResult> RunCoreAsync(
         BenchmarkRunOptions options,
         List<BenchmarkFrameworkRun> runs,
+        SqlExecutionRecoveryState recovery,
         CancellationToken cancellationToken)
     {
+        var isAcceptance = string.Equals(
+            options.Mode,
+            "pr-acceptance",
+            StringComparison.Ordinal);
+        if (isAcceptance &&
+            (options.WarmupPasses != 0 ||
+             options.MeasuredPasses != 1 ||
+             !options.TargetFrameworks.SequenceEqual(
+                 new[] { "net48", "net8.0" },
+                 StringComparer.Ordinal)))
+        {
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
+        }
+
         foreach (var tfm in options.TargetFrameworks)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!_classificationGate.IsValid(AssemblyPath(options, tfm), options.RepositoryRoot))
             {
-                return new BenchmarkRunResult(false, runs);
+                return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
             }
         }
 
@@ -81,7 +100,11 @@ public sealed class BenchmarkRunCoordinator
         var passes = Enumerable.Range(1, options.WarmupPasses)
             .Select(number => (Kind: BenchmarkPassKind.Warmup, Number: number))
             .Concat(Enumerable.Range(1, options.MeasuredPasses)
-                .Select(number => (Kind: BenchmarkPassKind.Measured, Number: number)))
+                .Select(number => (
+                    Kind: isAcceptance
+                        ? BenchmarkPassKind.Acceptance
+                        : BenchmarkPassKind.Measured,
+                    Number: number)))
             .ToArray();
         for (var passIndex = 0; passIndex < passes.Length; passIndex++)
         {
@@ -94,7 +117,7 @@ public sealed class BenchmarkRunCoordinator
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!await _preflight.ValidateAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    return new BenchmarkRunResult(false, runs);
+                    return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var discovery = await _processRunner.RunAsync(
@@ -108,7 +131,7 @@ public sealed class BenchmarkRunCoordinator
                     .ConfigureAwait(false);
                 if (discovery.ExitCode != 0 || discovery.TimedOut)
                 {
-                    return new BenchmarkRunResult(false, runs);
+                    return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var label = pass.Kind.ToString().ToLowerInvariant() + "-" + pass.Number.ToString("00");
@@ -143,6 +166,7 @@ public sealed class BenchmarkRunCoordinator
                 try
                 {
                     processLaunched = true;
+                    recovery.ExecutionStarted();
                     result = await _processRunner.RunAsync(
                             new CommandSpec(
                                 "dotnet",
@@ -168,12 +192,16 @@ public sealed class BenchmarkRunCoordinator
                                     result is not null && result.ExitCode == 0 && !result.TimedOut),
                                 ownershipDeadline.Token)
                             .ConfigureAwait(false);
+                        if (ownershipResult.IsComplete)
+                        {
+                            recovery.OwnershipReconciled();
+                        }
                     }
                 }
 
                 if (result is null)
                 {
-                    return new BenchmarkRunResult(false, runs);
+                    return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
 
                 var trxPath = Path.Combine(options.ArtifactRoot, trxName);
@@ -184,7 +212,8 @@ public sealed class BenchmarkRunCoordinator
                     Path.GetFullPath(timingPath),
                     pass.Kind,
                     pass.Number,
-                    result));
+                    result,
+                    discovery.StandardOutput));
                 var assemblyPath = AssemblyPath(options, tfm);
                 if (!ownershipResult.IsComplete || result.ExitCode != 0 || result.TimedOut ||
                     !_resultGate.IsValid(
@@ -203,7 +232,7 @@ public sealed class BenchmarkRunCoordinator
                                 "tools",
                                 "sqlperf-t01-migration-invocations.json"))))
                 {
-                    return new BenchmarkRunResult(false, runs);
+                    return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
             }
         }
@@ -213,31 +242,32 @@ public sealed class BenchmarkRunCoordinator
                     options.ArtifactRoot,
                     options.TargetFrameworks,
                     options.MeasuredPasses,
-                    runs),
+                    runs,
+                    options.Mode,
+                    options.Revision),
                 cancellationToken)
             .ConfigureAwait(false);
-        var expectedReportPaths = options.TargetFrameworks
-            .SelectMany(tfm => new[]
-            {
-                Path.GetFullPath(Path.Combine(
-                    options.ArtifactRoot,
-                    "sqlperf-baseline-" + tfm + ".json")),
-                Path.GetFullPath(Path.Combine(
-                    options.ArtifactRoot,
-                    "sqlperf-baseline-" + tfm + ".md")),
-            })
+        var reportEvidence = new BenchmarkReportEvidence(
+            options.ArtifactRoot,
+            options.TargetFrameworks,
+            options.MeasuredPasses,
+            runs,
+            options.Mode,
+            options.Revision);
+        var expectedReportPaths = _reportExporter.ExpectedReportPaths(reportEvidence)
+            .Select(Path.GetFullPath)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var actualReportPaths = export.ReportPaths
             .Select(Path.GetFullPath)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!export.IsComplete ||
+        if (!export.IsComplete || expectedReportPaths.Count == 0 ||
             !actualReportPaths.SetEquals(expectedReportPaths) ||
             expectedReportPaths.Any(path => !File.Exists(path)))
         {
-            return new BenchmarkRunResult(false, runs);
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }
 
-        return new BenchmarkRunResult(true, runs);
+        return new BenchmarkRunResult(true, runs, recovery.RecoveryRequired);
     }
 
     private static string AssemblyPath(BenchmarkRunOptions options, string tfm)
@@ -438,6 +468,7 @@ public enum BenchmarkPassKind
 {
     Warmup,
     Measured,
+    Acceptance,
 }
 
 public sealed record BenchmarkFrameworkRun(
@@ -447,8 +478,21 @@ public sealed record BenchmarkFrameworkRun(
     string TimingPath,
     BenchmarkPassKind Kind,
     int PassNumber,
-    CommandResult Command);
+    CommandResult Command,
+    string DiscoveryOutput = "");
 
 public sealed record BenchmarkRunResult(
     bool IsComplete,
-    IReadOnlyList<BenchmarkFrameworkRun> Runs);
+    IReadOnlyList<BenchmarkFrameworkRun> Runs,
+    bool RecoveryRequired = false);
+
+internal sealed class SqlExecutionRecoveryState
+{
+    private int _unreconciledExecutions;
+
+    public bool RecoveryRequired => _unreconciledExecutions != 0;
+
+    public void ExecutionStarted() => _unreconciledExecutions++;
+
+    public void OwnershipReconciled() => _unreconciledExecutions--;
+}
