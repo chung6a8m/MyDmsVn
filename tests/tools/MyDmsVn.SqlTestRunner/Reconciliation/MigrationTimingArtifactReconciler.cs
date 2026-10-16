@@ -15,7 +15,8 @@ public static class MigrationTimingArtifactReconciler
         string repositoryRoot,
         string runId,
         string tfm,
-        IReadOnlyCollection<TrxTestResult> executed)
+        IReadOnlyCollection<TrxTestResult> executed,
+        string ownerProjectPath = "")
     {
         if (!File.Exists(artifactPath) || !File.Exists(manifestPath))
         {
@@ -23,7 +24,20 @@ public static class MigrationTimingArtifactReconciler
         }
 
         var invalid = new List<string>();
-        var manifestEntries = MigrationInvocationManifest.Read(manifestPath)
+        var entries = MigrationInvocationManifest.Read(manifestPath);
+        if (!string.IsNullOrWhiteSpace(ownerProjectPath))
+        {
+            var ownerDirectory = Path.GetDirectoryName(Path.GetFullPath(
+                Path.Combine(repositoryRoot, ownerProjectPath.Replace('/', Path.DirectorySeparatorChar))))!;
+            ownerDirectory = ownerDirectory.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            entries = entries.Where(entry => Path.GetFullPath(Path.Combine(
+                    repositoryRoot,
+                    entry.SourceFile.Replace('/', Path.DirectorySeparatorChar)))
+                .StartsWith(ownerDirectory, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
+
+        var manifestEntries = entries
             .Where(entry => entry.Tfms.Contains(tfm, StringComparer.Ordinal))
             .ToArray();
         var auditedInvocationSuffixes = new HashSet<string>(

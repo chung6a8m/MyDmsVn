@@ -230,7 +230,8 @@ public sealed class BenchmarkRunCoordinator
                                 options.RepositoryRoot,
                                 "tests",
                                 "tools",
-                                "sqlperf-t01-migration-invocations.json"))))
+                                "sqlperf-t01-migration-invocations.json"),
+                            options.TestProject)))
                 {
                     return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
@@ -392,7 +393,8 @@ public sealed class TrxBenchmarkResultGate : IBenchmarkResultGate
                 evidence.RepositoryRoot,
                 evidence.RunId,
                 evidence.Tfm,
-                trx.Results)
+                trx.Results,
+                evidence.TestProjectPath)
             .IsComplete;
     }
 }
@@ -475,7 +477,8 @@ public sealed record BenchmarkResultEvidence(
     string Tfm,
     int RunnerExitCode,
     string RepositoryRoot = "",
-    string MigrationManifestPath = "");
+    string MigrationManifestPath = "",
+    string TestProjectPath = "");
 
 public enum BenchmarkPassKind
 {
