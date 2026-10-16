@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
@@ -16,6 +16,13 @@
     <ProjectReference Include="..\MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj" />
   </ItemGroup>
   <Target Name="BuildIntegrationInventoryFixture" BeforeTargets="Build">
+    <Exec
+      Command="dotnet restore &quot;..\..\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj&quot;"
+      WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <MSBuild
+      Projects="..\..\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
     <MSBuild
       Projects="..\..\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj"
       Targets="Build"

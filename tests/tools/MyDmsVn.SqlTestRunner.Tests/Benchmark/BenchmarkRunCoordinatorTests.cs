@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -589,6 +589,13 @@ public sealed class BenchmarkRunCoordinatorTests
         public List<BenchmarkReportEvidence> Evidence { get; } =
             new List<BenchmarkReportEvidence>();
 
+        public IReadOnlyList<string> ExpectedReportPaths(BenchmarkReportEvidence evidence) =>
+            evidence.TargetFrameworks.SelectMany(tfm => new[]
+            {
+                Path.Combine(evidence.ArtifactRoot, "sqlperf-baseline-" + tfm + ".json"),
+                Path.Combine(evidence.ArtifactRoot, "sqlperf-baseline-" + tfm + ".md"),
+            }).ToArray();
+
         public Task<BenchmarkReportExportResult> ExportAsync(
             BenchmarkReportEvidence evidence,
             CancellationToken cancellationToken)
@@ -599,11 +606,7 @@ public sealed class BenchmarkRunCoordinatorTests
                 return Task.FromResult(BenchmarkReportExportResult.Incomplete());
             }
 
-            var paths = evidence.TargetFrameworks.SelectMany(tfm => new[]
-            {
-                Path.Combine(evidence.ArtifactRoot, "sqlperf-baseline-" + tfm + ".json"),
-                Path.Combine(evidence.ArtifactRoot, "sqlperf-baseline-" + tfm + ".md"),
-            }).ToArray();
+            var paths = ExpectedReportPaths(evidence);
             if (_returnMissingPaths)
             {
                 return Task.FromResult(new BenchmarkReportExportResult(true, paths));

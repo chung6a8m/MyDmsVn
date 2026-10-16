@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -19,16 +19,19 @@ namespace MyDmsVn.SqlTestRunner.Reporting;
 
 public interface IBenchmarkReportExporter
 {
+    IReadOnlyList<string> ExpectedReportPaths(BenchmarkReportEvidence evidence);
+
     Task<BenchmarkReportExportResult> ExportAsync(
         BenchmarkReportEvidence evidence,
         CancellationToken cancellationToken);
 }
-
 public sealed record BenchmarkReportEvidence(
     string ArtifactRoot,
     IReadOnlyCollection<string> TargetFrameworks,
     int RequiredMeasuredPassCount,
-    IReadOnlyCollection<BenchmarkFrameworkRun> Runs);
+    IReadOnlyCollection<BenchmarkFrameworkRun> Runs,
+    string Mode = "baseline",
+    string Revision = "");
 
 public sealed record BenchmarkReportExportResult(
     bool IsComplete,
@@ -46,6 +49,13 @@ public sealed class SqlPerformanceReportExporter : IBenchmarkReportExporter
         Converters = { new StringEnumConverter() },
         Formatting = Formatting.Indented,
     };
+
+    public IReadOnlyList<string> ExpectedReportPaths(BenchmarkReportEvidence evidence) =>
+        evidence.TargetFrameworks.SelectMany(tfm => new[]
+        {
+            Path.Combine(evidence.ArtifactRoot, "sqlperf-baseline-" + SafeFileComponent(tfm) + ".json"),
+            Path.Combine(evidence.ArtifactRoot, "sqlperf-baseline-" + SafeFileComponent(tfm) + ".md"),
+        }).ToArray();
 
     public Task<BenchmarkReportExportResult> ExportAsync(
         BenchmarkReportEvidence evidence,

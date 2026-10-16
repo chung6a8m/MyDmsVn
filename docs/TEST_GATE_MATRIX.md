@@ -9,8 +9,9 @@
 | Pure Application/contract | `dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net8.0 --filter "FullyQualifiedName~<reviewed type>"` (and `net48` where relevant) | Focused L1/L2 only |
 | Desktop/STA | `dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --filter "FullyQualifiedName~<reviewed type>"` (also `net8.0-windows`) | Focused L1/L2 only; respect serialized GUI |
 | SQL category | `tests/tools/Invoke-FocusedSqlIntegrationTests.ps1` with all mandatory parameters; use the runnable PowerShell example below and a reviewed category | Focused L1/L2 only; full category may still be broad |
-| SQL full regression | `tests/tools/Invoke-SqlIntegrationBenchmark.ps1` (existing multi-pass `baseline`) | Existing strict L3 evidence path, **expensive**; not a single-pass gate |
-| Future task/final runner | `Invoke-TestGate.ps1`, manifest, `pr-acceptance` | **Proposed, not executable** |
+| SQL PR acceptance | `tests/tools/Invoke-SqlPrAcceptance.ps1` (`pr-acceptance`) | Strict one-pass sequential unfiltered L3 gate on both SQL TFMs |
+| SQL performance baseline | `tests/tools/Invoke-SqlIntegrationBenchmark.ps1` (`baseline`) | Specialized multi-pass L4 measurement path |
+| Future task runner | `Invoke-TestGate.ps1` and manifest | **Proposed, not executable** |
 
 ### Existing, runnable SQL L2 example (PowerShell from repository root)
 

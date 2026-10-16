@@ -1,6 +1,6 @@
 # TESTGATE — Task-scoped execution and strict SQL gate orchestration (T01–T03)
 
-**Status:** T01 policy/docs implemented; T02–T03 proposed / not implemented · **Date:** 2026-10-16 · **Scope:** cross-phase test policy, strict SQL PR acceptance, and task/final orchestration. This is an implementation plan, **not** evidence that the runner or manifest exists or has passed. **T04/T05 modular test projects are tracked exclusively in [the follow-on plan](20261016-002-modular-test-projects.md).** Read `AGENTS.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_STRATEGY.md`, ADR 0005, proposed ADR 0006, `tests/README.md`, SQLPERF-T04/T05/T06 verification, and the affected phase plan.
+**Status:** T01 implemented; T02 code and L2 implemented with final real-SQL L3 pending; T03 proposed / not implemented · **Date:** 2026-10-16 · **Scope:** cross-phase test policy, strict SQL PR acceptance, and task/final orchestration. This plan does not claim T02 acceptance until its frozen-revision real-SQL L3 evidence is recorded. **T04/T05 modular test projects are tracked exclusively in [the follow-on plan](20261016-002-modular-test-projects.md).** Read `AGENTS.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_STRATEGY.md`, ADR 0005, proposed ADR 0006, `tests/README.md`, SQLPERF-T04/T05/T06 verification, and the affected phase plan.
 
 ## Problem and constraints
 
@@ -9,7 +9,7 @@ P4.1 work demonstrates the operational cost of indiscriminately rerunning SQL te
 Current baseline:
 - `tests/MyDmsVn.Server.Infrastructure.IntegrationTests` targets `net48;net8.0` and serializes the SQL assembly. `tests/MyDmsVn.Desktop.Tests` targets `net48;net8.0-windows` and serializes GUI-interacting tests.
 - `Invoke-FocusedSqlIntegrationTests.ps1` supports one existing SQL category per invocation (`FastSQL`, `MigrationSchema`, `SecurityProvisioning`, `SqlConcurrency`); it is NOT the L3 acceptance runner.
-- `Invoke-SqlIntegrationBenchmark.ps1` currently invokes the strict multi-pass `baseline` mode; there is NO existing `--single-pass` PR mode and NO `Invoke-TestGate.ps1`.
+- `Invoke-SqlPrAcceptance.ps1` invokes the strict one-pass `pr-acceptance` mode; `Invoke-SqlIntegrationBenchmark.ps1` retains the multi-pass `baseline` mode. There is NO `Invoke-TestGate.ps1`.
 - SQLPERF-T04 rejected fixture reuse under the then-available safety evidence. Do not reopen that decision without new adversarial tests.
 - P4.1's existing L3 evidence and remaining L4 activities must not be overwritten or falsely reported as having been rerun by this documentation-only plan.
 
@@ -59,7 +59,7 @@ Project/assembly name and framework-generated VSTest/TRX GUID are **physical exe
 
 ## TESTGATE's own task-level L2 gate matrix (T02–T03)
 
-**Status: prospective contract, not execution evidence.** This matrix applies to **TESTGATE-T02/T03** themselves, unlike the P4.1 worked example above; T04/T05 use their [separate matrix](20261016-002-modular-test-projects.md). Command IDs R/H/S below refer only to tools and projects verified in the current repository. Their selectors must be rechecked against the actual source/discovery **at the task's revision**; add tests as the corresponding functionality is implemented and fail the task gate if required negative coverage is absent. The proposed `Invoke-TestGate.ps1`, `pr-acceptance` mode and new module/desktop test projects are **not** runnable yet.
+**Status: task contract; evidence is recorded per task below.** This matrix applies to **TESTGATE-T02/T03** themselves, unlike the P4.1 worked example above; T04/T05 use their [separate matrix](20261016-002-modular-test-projects.md). Command IDs R/H/S below refer only to tools and projects verified in the current repository. Their selectors must be rechecked against the actual source/discovery **at the task's revision**; add tests as the corresponding functionality is implemented and fail the task gate if required negative coverage is absent. `pr-acceptance` exists; the proposed `Invoke-TestGate.ps1` and new module/desktop test projects are not runnable yet.
 
 | Task | Affected projects, TFMs and L2 selection | Real SQL trigger, required adverse cases and gate | Exit / evidence |
 |---|---|---|---|
@@ -124,13 +124,15 @@ The existing wrapper accepts **one category**, not `module + category`; repeat *
 
 ### TESTGATE-T02 — Strict one-pass SQL acceptance runner (code PR; highest priority)
 
-- [ ] Design `pr-acceptance` runner mode (name subject to implementation review), distinct from `baseline` measurements. Ensure one sequential full unfiltered SQL pass per required TFM; no warm-up or measured repetitions.
-- [ ] Reuse, not copy/bypass, existing source + compiled classification/exemption verification, independent discovery and theory rows, source-method/case/TRX matching, mandatory zero skips, minimum/expected case reconciliation, real process exit code and per-TFM artifacts.
+- [x] Design `pr-acceptance` runner mode, distinct from `baseline` measurements. Ensure one sequential full unfiltered SQL pass per required TFM; no warm-up or measured repetitions.
+- [x] Reuse, not copy/bypass, existing source + compiled classification/exemption verification, independent discovery and theory rows, source-method/case/TRX matching, mandatory zero skips, minimum/expected case reconciliation, real process exit code and per-TFM artifacts.
 - [ ] Before any test DDL, validate the actual approved non-production SQL instance, effective `master`, attestation/expiration/DMV permissions. Maintain test harness revalidation before create/drop even when called outside the runner.
-- [ ] Retain owned process-tree watchdog, bounded cancellation/drain, durable create-intent/marker journal, live instance/ownership reconciliation, quarantining ambiguous DBs rather than dropping, and sanitized machine-readable report per commit/TFM.
-- [ ] Fail closed for missing/duplicate/unrecognized source/cases, unexpectedly skipped SQL tests, stale exemption/classification, partial TRX, wrong server/approval, timeout, child process leftovers, incomplete journal or leaked DBs.
+- [x] Retain owned process-tree watchdog, bounded cancellation/drain, durable create-intent/marker journal, live instance/ownership reconciliation, quarantining ambiguous DBs rather than dropping, and sanitized machine-readable report per commit/TFM.
+- [x] Fail closed for missing/duplicate/unrecognized source/cases, unexpectedly skipped SQL tests, stale exemption/classification, partial TRX, wrong server/approval, timeout, child process leftovers, incomplete journal or leaked DBs.
 - [ ] Add runner unit/negative tests for all above and an approved disposable-instance two-TFM real SQL acceptance run. Independently compare manifest/source/discovery/execution totals and pass/fail/skip with the existing strict path.
-- [ ] Prove `baseline` behavior has not changed, and no performance benchmark is run automatically. Document actual invocation **only after implemented**.
+- [x] Prove `baseline` behavior has not changed, and no performance benchmark is run automatically. Document actual invocation **only after implemented**.
+
+**T02 L2 evidence (pre-L3):** `MyDmsVn.SqlTestRunner.Tests` passed 105/105 on `net8.0` in Release. The reviewed negative inventory covers blocked preflight/approval, stale classification, missing/duplicate/theory-row inventory, skipped/failed/partial TRX, timeout and owned process-tree termination, incomplete/ambiguous ownership journals, leaked databases, report failure and exact single-pass profile enforcement. Shared harness code did not change, so H/S were not triggered at L2. No real SQL was executed at L2.
 
 **Exit:** demonstrably equivalent L3 safety at one pass per TFM; no claim of acceptance if SQL approval or Windows is unavailable.
 

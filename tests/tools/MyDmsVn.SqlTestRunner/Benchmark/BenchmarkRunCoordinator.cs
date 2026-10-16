@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -68,6 +68,20 @@ public sealed class BenchmarkRunCoordinator
         List<BenchmarkFrameworkRun> runs,
         CancellationToken cancellationToken)
     {
+        var isAcceptance = string.Equals(
+            options.Mode,
+            "pr-acceptance",
+            StringComparison.Ordinal);
+        if (isAcceptance &&
+            (options.WarmupPasses != 0 ||
+             options.MeasuredPasses != 1 ||
+             !options.TargetFrameworks.SequenceEqual(
+                 new[] { "net48", "net8.0" },
+                 StringComparer.Ordinal)))
+        {
+            return new BenchmarkRunResult(false, runs);
+        }
+
         foreach (var tfm in options.TargetFrameworks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -81,7 +95,11 @@ public sealed class BenchmarkRunCoordinator
         var passes = Enumerable.Range(1, options.WarmupPasses)
             .Select(number => (Kind: BenchmarkPassKind.Warmup, Number: number))
             .Concat(Enumerable.Range(1, options.MeasuredPasses)
-                .Select(number => (Kind: BenchmarkPassKind.Measured, Number: number)))
+                .Select(number => (
+                    Kind: isAcceptance
+                        ? BenchmarkPassKind.Acceptance
+                        : BenchmarkPassKind.Measured,
+                    Number: number)))
             .ToArray();
         for (var passIndex = 0; passIndex < passes.Length; passIndex++)
         {
@@ -184,7 +202,8 @@ public sealed class BenchmarkRunCoordinator
                     Path.GetFullPath(timingPath),
                     pass.Kind,
                     pass.Number,
-                    result));
+                    result,
+                    discovery.StandardOutput));
                 var assemblyPath = AssemblyPath(options, tfm);
                 if (!ownershipResult.IsComplete || result.ExitCode != 0 || result.TimedOut ||
                     !_resultGate.IsValid(
@@ -213,24 +232,25 @@ public sealed class BenchmarkRunCoordinator
                     options.ArtifactRoot,
                     options.TargetFrameworks,
                     options.MeasuredPasses,
-                    runs),
+                    runs,
+                    options.Mode,
+                    options.Revision),
                 cancellationToken)
             .ConfigureAwait(false);
-        var expectedReportPaths = options.TargetFrameworks
-            .SelectMany(tfm => new[]
-            {
-                Path.GetFullPath(Path.Combine(
-                    options.ArtifactRoot,
-                    "sqlperf-baseline-" + tfm + ".json")),
-                Path.GetFullPath(Path.Combine(
-                    options.ArtifactRoot,
-                    "sqlperf-baseline-" + tfm + ".md")),
-            })
+        var reportEvidence = new BenchmarkReportEvidence(
+            options.ArtifactRoot,
+            options.TargetFrameworks,
+            options.MeasuredPasses,
+            runs,
+            options.Mode,
+            options.Revision);
+        var expectedReportPaths = _reportExporter.ExpectedReportPaths(reportEvidence)
+            .Select(Path.GetFullPath)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var actualReportPaths = export.ReportPaths
             .Select(Path.GetFullPath)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!export.IsComplete ||
+        if (!export.IsComplete || expectedReportPaths.Count == 0 ||
             !actualReportPaths.SetEquals(expectedReportPaths) ||
             expectedReportPaths.Any(path => !File.Exists(path)))
         {
@@ -438,6 +458,7 @@ public enum BenchmarkPassKind
 {
     Warmup,
     Measured,
+    Acceptance,
 }
 
 public sealed record BenchmarkFrameworkRun(
@@ -447,7 +468,8 @@ public sealed record BenchmarkFrameworkRun(
     string TimingPath,
     BenchmarkPassKind Kind,
     int PassNumber,
-    CommandResult Command);
+    CommandResult Command,
+    string DiscoveryOutput = "");
 
 public sealed record BenchmarkRunResult(
     bool IsComplete,

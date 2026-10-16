@@ -2,7 +2,7 @@
 
 **TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
 
-**Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. Schedule the complete unfiltered SQL acceptance at the final gate-affecting revision. The strict runner currently executes one warm-up and three measured passes per TFM; the proposed `Invoke-TestGate.ps1` and strict single-pass mode are **not implemented**. See [Codex policy](../docs/CODEX_TEST_EXECUTION_POLICY.md), [current task matrix](../docs/TEST_GATE_MATRIX.md), [TESTGATE-T01–T03](../docs/plans/20261016-001-task-gates-and-modular-tests.md) and [the separate T04/T05 modular test-project plan](../docs/plans/20261016-002-modular-test-projects.md).
+**Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. Schedule the complete unfiltered SQL acceptance at the final gate-affecting revision. `Invoke-SqlPrAcceptance.ps1` runs one strict pass per TFM; the multi-pass `baseline` remains a performance tool. The proposed `Invoke-TestGate.ps1` is **not implemented**. See [Codex policy](../docs/CODEX_TEST_EXECUTION_POLICY.md), [current task matrix](../docs/TEST_GATE_MATRIX.md), [TESTGATE-T01–T03](../docs/plans/20261016-001-task-gates-and-modular-tests.md) and [the separate T04/T05 modular test-project plan](../docs/plans/20261016-002-modular-test-projects.md).
 
 P0 tests require Windows, the .NET 8 SDK selected by `global.json`, and the .NET Framework 4.8 targeting pack/runtime. Run from the repository root:
 
@@ -16,7 +16,7 @@ dotnet test MyDmsVn.sln -c Release --no-build --no-restore
 
 Use [Codex Test Execution Policy](../docs/CODEX_TEST_EXECUTION_POLICY.md) to select tests in four stages: focused edit loop, affected-task check, final PR regression, and specialized release/performance verification. The generic `dotnet test MyDmsVn.sln` command above is a convenient local check **not an SQL acceptance certificate**: it does not itself prove SQL method/theory-row discovery-to-TRX reconciliation, zero required SQL skips, process-tree watchdog coverage or post-run database ownership reconciliation.
 
-For SQL development iteration, use the existing `Invoke-FocusedSqlIntegrationTests.ps1` category runner documented below; run the relevant unit/desktop test projects for other changes. After the final gate-affecting change (including test/theory-row, SQL/migration, inventory/manifest, runner/harness, or build/CI edits), a code-bearing PR needs full applicable Release and unfiltered SQL evidence on both SQL TFMs, not only category filters. Record the final verified revision; do not reuse pre-change acceptance artifacts. The current strict SQL acceptance path is the multi-pass `Invoke-SqlIntegrationBenchmark.ps1` runner (one warm-up, three measured passes per TFM). No dedicated one-pass strict PR mode is implemented; do not invent one. For doc-only changes, report static checks and clearly label SQL/GUI suites not run.
+For SQL development iteration, use the existing `Invoke-FocusedSqlIntegrationTests.ps1` category runner documented below; run the relevant unit/desktop test projects for other changes. After the final gate-affecting change (including test/theory-row, SQL/migration, inventory/manifest, runner/harness, or build/CI edits), a code-bearing PR needs full applicable Release and unfiltered SQL evidence on both SQL TFMs, not only category filters. Record the final verified revision; do not reuse pre-change acceptance artifacts. The strict functional path is `Invoke-SqlPrAcceptance.ps1` (one pass per TFM); `Invoke-SqlIntegrationBenchmark.ps1` is reserved for required multi-pass performance evidence. For doc-only changes, report static checks and clearly label SQL/GUI suites not run.
 
 Write a **reviewed, sanitized** Test Execution Report in the PR: changed surface, selected scope per stage, exact commands/TFMs, passed/failed/skipped counts, strict SQL inventory/ownership/watchdog **outcomes** when applicable, and `passed` / `failed` / `blocked` / `not run` for remaining mandatory gates. Keep raw TRX, timing JSONL, discovery files, approval/ownership journals and local ZIPs on the approved machine, not as PR attachments or public links. Review any export individually; even archives named `shareable` may contain ownership tokens, instance fingerprints, approval IDs, database identifiers, local paths or theory arguments. Never disclose raw SQL connection strings, host/instance identifiers, credentials, journals or unsanitized test artifacts. See the [evidence publication boundary](../docs/CODEX_TEST_EXECUTION_POLICY.md#evidence-publication-boundary-mandatory).
 
@@ -72,6 +72,21 @@ tests\tools\Invoke-SqlIntegrationBenchmark.ps1 `
   -ArtifactRoot .sqlperf\run-001 `
   -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
 ```
+
+For final functional L3, first freeze and commit all gate-affecting inputs, build the runner and both integration-test TFMs, then invoke the one-pass wrapper from the clean repository:
+
+```powershell
+dotnet build tests\tools\MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj -c Release
+dotnet build tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net48
+dotnet build tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net8.0
+tests\tools\Invoke-SqlPrAcceptance.ps1 `
+  -RepositoryRoot (Get-Location) `
+  -TestProject tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
+  -ArtifactRoot .sqlperf\pr-acceptance-001 `
+  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
+```
+
+The wrapper rejects a dirty tree, resolves the exact commit, and runs `net48` then `net8.0` without a filter, warm-up or measured repetition. It reuses the strict classification, discovery/theory-row, TRX, timing, process watchdog, preflight and ownership gates and writes a sanitized aggregate JSON report per TFM. Any missing/failed/skipped case, timeout, nonzero exit, incomplete journal, ambiguous/leaked owned database or missing report fails the command.
 
 Raw TRX, journals and timing JSONL stay ignored/local. Timing is off by default; the runner sets `MYDMSVN_SQL_TEST_TIMINGS=1`, a unique run ID and a local output path. A timeout, missing/corrupt TRX, nonzero exit, failed/skipped mandatory case, inventory mismatch, ownership ambiguity or approval failure makes the run incomplete.
 
