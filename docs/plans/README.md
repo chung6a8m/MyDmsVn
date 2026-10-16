@@ -15,6 +15,8 @@ These are execution instructions, not implementation evidence. Statuses belong t
 | P6 | [Local v1 hardening](20261008-007-phase-6-local-hardening.md) |
 | P7 | [ASP.NET Core v2 / HTTP parity](20261008-008-phase-7-remote-api.md) |
 | **SQLPERF** (cross-phase) | **[SQL integration test performance optimization](20261014-001-sql-integration-test-performance-optimization.md)** — T01–T06 complete (2026-10-15); serial SQL safety and unfiltered release gates remain |
+| **TESTGATE T01–T03** (cross-phase) | [Task-scoped execution and strict SQL gate orchestration](20261016-001-task-gates-and-modular-tests.md) — T01 policy/docs complete; T02–T03 proposed, not verified |
+| **TESTGATE T04–T05** (cross-phase) | [Modular Desktop and SQL test projects](20261016-002-modular-test-projects.md) — proposed, not implemented; requires reviewed T02/T03 gates |
 
 A phase begins only after preceding phase exit checks have evidence. **P3.1 is verified; P4.1 remains a prerequisite for authenticated P5 GUI acceptance and P6 release sign-off.** SQLPERF is an independent test-infrastructure workstream with serial full-suite gates. This is a targeted integration follow-up to completed P3/P4, not a rewrite of their historical evidence. `docs/DEVELOPMENT_PLAN.md` is the summary/source of phase status; task-specific detail is here. `AGENTS.md` is the required AI instructions entry point.
 
