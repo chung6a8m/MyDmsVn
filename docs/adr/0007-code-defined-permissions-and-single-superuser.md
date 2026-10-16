@@ -1,0 +1,50 @@
+# ADR 0007 — Code-defined permissions, database-owned grants and one configured superuser
+
+Status: **Proposed** · Date: 2026-10-16
+
+## Context
+
+P3.1 is implemented and historically verified. It currently combines (a) compile-time permission definitions, (b) runtime SQL catalog activation, and (c) per-release, operator-approved synchronization of definitions and managed `Administrator` role grants. This makes every new feature permission require a release manifest/fingerprint, approvals, dry-run/apply and synchronized SQL state before ordinary use. `SqlSchemaCompatibilityChecker` can block startup on a missing or stale `PermissionSynchronizationState.LastAppliedReleaseId`. The current `PermissionAuthorizationService` gates by source registry status, and `SqlIdentityStore.GetSnapshotAsync` independently gates by `dbo.Permissions.CatalogStatus='Active'`.
+
+The intended product behavior is different: a single configured high-privilege account should enable fast development without per-release permission provisioning, while each customer's existing users, roles, explicit denies and grants remain under that customer's control. Upgrades should reveal new permission keys, **not** grant them automatically to `Administrator` or any other role.
+
+See [SEC-SIMPLE implementation plan](../plans/20261016-003-superuser-and-manual-permission-management.md). The plan must start **after** verified TESTGATE-T04/T05 completion in [20261016-002](../plans/20261016-002-modular-test-projects.md), including the prerequisites T02/T03 in [20261016-001](../plans/20261016-001-task-gates-and-modular-tests.md). These are implementation dependencies, not claims that the work is complete. This documentation PR does not change runtime behavior.
+
+## Proposed decision (requires acceptance before code implementation)
+
+1. **Authority split.** The deterministic `IPermissionRegistry` composed from module definitions is the authoritative **catalog of supported keys** (key, module, description, source-defined lifecycle). SQL `UserPermissions`, `UserRoles`, `Roles` and `RolePermissions` remain authoritative **assignments**. A compiled active key is usable without a per-release SQL catalog insertion or activation. Unknown, undeclared or source-deprecated keys deny, including for the superuser. Registry completeness/duplicate/key-rename checks remain mandatory.
+2. **Single configured application superuser.** Each application-database deployment may have **at most one superuser identity**, selected by a protected configurable `UserName` and anchored to the verified stable `UserId` plus database identity. This is a **user identity**, not an `Administrator` role, wildcard permission, default seeded password, SQL sysadmin or client-side UI flag. Only a valid authenticated, currently active, uniquely resolved and correctly bound account may bypass normal per-key `UserPermissions` / `RolePermissions` decisions for **source-active declared** keys. Preserve application validation, domain rules, audit, SQL least privilege and database transaction checks. Missing/ambiguous/mismatched configuration, renamed/deleted/recreated accounts and failed live-state checks fail closed; a controlled, auditable recovery/rebind tool is required.
+3. **Ordinary RBAC and historical grants are customer-owned.** Non-superusers retain exact-key authorization with direct-user allow/deny precedence (direct deny wins), then active role union, then deny. `Administrator` is treated as an ordinary named role after migration: never infer superuser from its name or membership, never auto-create or auto-regrant role permissions on release upgrade, and never rewrite user/role assignments during a routine upgrade. Existing managed-role records, revocation/tombstones and audit data must be retained for compatibility and investigation.
+4. **Stop per-release permission synchronization as a deployment requirement.** Retire `permissions sync --dry-run/--apply` and automated administrator-grant proposal/apply as normal deployment steps; remove the `LastAppliedReleaseId` startup veto and universal SQL `CatalogStatus` runtime gate only after safe migration checks. DbUp still migrates schema using immutable numbered scripts. New declarations do **not** run privileged SQL writes on Login, Desktop startup, API request or app installation.
+5. **No silent activation of dormant legacy grants.** Historical `RolePermissions` / `UserPermissions` rows that were ineffective because a key was `Unregistered`, `PendingActivation`, `Deprecated`, missing from the old catalog, or otherwise denied must **not** become effective merely because source definitions are now active. A one-time additive compatibility migration/preflight must detect and preserve such rows, quarantine previously ineffective keys at the authorization boundary, and require explicit audited operator adoption or remediation before their grants can take effect. Quarantine is a narrow legacy safety exception, **not** a rebranded per-release activation/sync workflow. New keys without dormant preexisting grants remain usable by superuser immediately and manually assignable to ordinary users.
+6. **Catalog discovery and explicit administration.** Provide `List All Permission Keys` from the running source registry (not from `dbo.Permissions`), with machine-readable export, source status/module/description and reconciliation views for new/unassigned/deprecated/unknown legacy keys. Acknowledging/reviewing a manifest never grants permissions. Customer-controlled UI/import applies explicit reviewed changes through a trusted privileged administration boundary with preview, idempotence, audit and default additive semantics; no arbitrary SQL write privileges are added to the general runtime desktop principal. Where Local v1's direct-SQL trust model cannot enforce this securely, provide a read-only UI/export plus an operator-run maintenance command until a trusted service is available; do not claim insecure client-side writes are protected by application checks.
+7. **Deployment and test boundaries.** Superuser configuration and bootstrap are installation-scoped; do not ship built-in usernames, passwords or fallbacks. Production data is never silently reset or converted. A release needs verified clean-install and upgrade safety, old/current client compatibility analysis, dual-TFM tests and strict approved SQL gates under ADRs 0005/0006 and the current test execution policy. Do not alter CI test workflows or repeat performance benchmarks automatically.
+
+## Non-goals and limits
+
+- No hardcoded `if (username == "admin")` bypass; no unverified `IsSuperuser` flag in client session DTO or user-supplied request; no bypass in raw SQL privileges or inventory/posting/business invariants.
+- No promise that only one account can possess the **same set of RBAC permissions**. Exactly one identity receives the special *bypass* privilege; customers may grant all supported keys to other roles.
+- No rewrite of immutable `002_Identity.sql`/`008_Permission_Provisioning.sql` or retroactive claim that completed P3.1 work did not happen.
+- No automatic elevation of historical `Administrator` memberships or formerly dormant assignments.
+- No claim that Windows Local Mode (which accesses SQL from a client process) provides a remote trusted-server security boundary.
+
+## Alternatives and tradeoffs
+
+- **Keep release approval/sync:** strong controlled activation but expensive per-feature operational steps and continued administrator-grant ownership coupling.
+- **Seed every new permission and grant all to Administrator:** easy automation, rejected because it mutates customer entitlements during upgrades.
+- **Delete `dbo.Permissions` and the SQL gate immediately:** superficially simple, rejected because historical dormant grants could start authorizing unexpectedly.
+- **Treat `Administrator` or client-configured username as superuser without immutable binding:** rejected due to multiple accounts, rename/recreation and client tampering.
+- **Make runtime SQL principal write role grants directly for the admin UI:** rejected in Local Mode without an enforceable trusted boundary.
+
+## Consequences and required evidence
+
+- Feature authors declare, register and test each new stable permission key; no per-release sync artifact or manually maintained fingerprint is required for routine development.
+- The deployment operator owns one highly privileged identity and its recovery procedure. It must be strongly authenticated, audited and preferably used only for development/controlled administration. The superuser bypass still requires correct session/account validation.
+- Customers own assignment changes and review/export/import; adding a feature does not broaden ordinary user privileges. Grant decisions remain exact-key and traceable.
+- Compatibility quarantine and audit add a bounded, one-time migration cost to prevent privilege regression. Evidence must prove that previously denied legacy rows remain ineffective until an explicit reviewed transition, with **no unrequested grant changes**.
+- Gate results must include user/role/direct-deny parity before/after upgrade, re-login/revocation, configuration tampering and per-TFM real-SQL integration tests. An unavailable required SQL/GUI gate is BLOCKED rather than PASS.
+- New plan and later implementation must revise the **current** security runbook/policy only when behavior is implemented and verified. Historical P3.1 plans and verification stay immutable historical evidence.
+
+## Related decisions
+
+[ADR 0005](0005-test-isolation-and-bounded-parallelism.md) governs SQL/GUI isolation. [ADR 0006](0006-task-scoped-test-execution-and-module-projects.md) proposes task/final test gates. This ADR proposes replacing the *future authorization/provisioning direction* of the completed [P3.1 plan](../plans/20261013-001-initial-security-provisioning-permission-sync.md) **after migration**, not its historical implementation record.
