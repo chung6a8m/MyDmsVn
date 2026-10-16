@@ -4,6 +4,18 @@
 **Frozen candidate revision:** `6b0ce337978809cefa7ddaf54d74940fef062e49`
 **Plan:** [NET8-PAUSE T05](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md)
 
+## Supplemental review-fix verification
+
+Reviewer findings on the GUI acceptance and runner build contract were fixed and re-verified at `6b2ff49195926e13c2ae35e1070f5d89a29a6a65` (manifest fingerprint `51e9894746dd5b45440813d228309c6b7355bd599f74f904224655748a223252`). These changes are limited to test-gate tooling, its tests, and the gate manifest; no application/package payload changed.
+
+- Runner test project, full unfiltered `net8.0`: 227/227 passed, 0 skipped.
+- Manifest Final `NET8-PAUSE-T05`: runner 227/227, Application 135/135, Architecture 5/5, SQL harness 52/52; all zero skips and inventory/watchdog/ownership checks clean.
+- Strict SQL `pr-acceptance`: one unfiltered active `net48` pass; 223/223 passed, 0 failed/skipped; preflight, watchdog, ownership reconciliation and cleanup passed. Duration: 511.6 seconds.
+- GUI D2: exact manifest-authorized `tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj` × `net48`; 230 source methods, 231 discovered and 231 executed; watchdog and GUI lease clean. Duration: 19.3 seconds.
+- GUI D2 now builds the approved project before source inventory with build servers/node reuse disabled, binding inspected test IL to the just-built assembly and preventing stale binaries or persistent MSBuild workers from satisfying/hanging the gate.
+
+The earlier package and restore-drill results remain tied to the frozen candidate revision above. Raw TRX, SQL timing records, approval file and ownership journals remain local.
+
 ## Scope and commands
 
 The candidate profile activates `net48` for application, SQL integration and Desktop GUI projects. Product `net8.0` / `net8.0-windows` coverage remains `PARKED / NOT RUN`; the SQL test runner and its tests remain tool-only `net8.0`. The reviewed manifest fingerprint for this envelope was `bd67d42d88350fdc7deacabbbce341ae59326b58c202b1002629e194c0d3bfe5`.

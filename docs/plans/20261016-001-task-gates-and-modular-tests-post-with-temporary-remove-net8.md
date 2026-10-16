@@ -1,7 +1,7 @@
 # TESTGATE follow-up — Temporary removal of the .NET 8 application/test TFM
 
 **Plan ID:** `20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8`  
-**Status:** T01–T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337978809cefa7ddaf54d74940fef062e49`. Same-protocol duration comparison remains open because the T01 baseline contains no comparable dual-TFM Final timing. Candidate transition remains pending review/merge.
+**Status:** T01–T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337978809cefa7ddaf54d74940fef062e49`; reviewer gate fixes were additionally verified by Final SQL and GUI D2 at `6b2ff49195926e13c2ae35e1070f5d89a29a6a65`. Same-protocol duration comparison remains open because the T01 baseline contains no comparable dual-TFM Final timing. Candidate transition remains pending review/merge.
 **Sequence:** after [TESTGATE-T01–T03](20261016-001-task-gates-and-modular-tests.md), before [TESTGATE-T04/T05 modularization](20261016-002-modular-test-projects.md).  
 **Decision (2026-10-16):** temporarily suspend the second `net8.0` TFM in dual-target non-WinForms projects, and `net8.0-windows` in dual-target WinForms projects, to reduce Codex feedback time; keep a reversible path back to both targets.
 
