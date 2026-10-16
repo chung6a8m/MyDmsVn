@@ -184,7 +184,7 @@ public sealed class PersistenceTransactionTests
         {
             TestDatabaseMigrationRunner.Migrate(
                 database.MeasurementContext,
-                "PersistenceTransactionTests.Unit_of_work_transaction_controls_test_repository_changes.test-migration",
+                "PersistenceTransactionTests.CreateMigratedDatabaseAsync.migration-01",
                 database.ConnectionString);
         }
         catch

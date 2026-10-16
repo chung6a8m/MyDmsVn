@@ -574,5 +574,29 @@
       "net8.0"
     ],
     "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "RepositoryAndQueryIntegrationTests.Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write.migration-01",
+    "class": "RepositoryAndQueryIntegrationTests",
+    "method": "Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/RepositoryAndQueryIntegrationTests.cs",
+    "sourceLine": 24,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "PersistenceTransactionTests.CreateMigratedDatabaseAsync.migration-01",
+    "class": "PersistenceTransactionTests",
+    "method": "CreateMigratedDatabaseAsync",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/PersistenceTransactionTests.cs",
+    "sourceLine": 185,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-caller-execution"
   }
 ]

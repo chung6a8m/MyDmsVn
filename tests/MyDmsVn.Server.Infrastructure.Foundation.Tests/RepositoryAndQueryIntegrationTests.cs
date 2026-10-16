@@ -23,7 +23,7 @@ public sealed class RepositoryAndQueryIntegrationTests
         {
             TestDatabaseMigrationRunner.Migrate(
                 database.MeasurementContext,
-                "RepositoryAndQueryIntegrationTests.Repository_and_query_share_committed_data.test-migration",
+                "RepositoryAndQueryIntegrationTests.Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write.migration-01",
                 database.ConnectionString);
             var services = new ServiceCollection();
             services
