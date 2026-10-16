@@ -51,6 +51,24 @@ public sealed class OwnedProcessRunnerTests
     }
 
     [Fact]
+    public async Task Gui_owned_runner_reports_a_fast_process_exit()
+    {
+        using var runner = new GuiOwnedProcessRunner();
+
+        var result = await runner.RunAsync(
+            new CommandSpec(
+                "cmd.exe",
+                "/d /s /c \"exit 0\"",
+                Environment.CurrentDirectory,
+                TimeSpan.FromSeconds(10)),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(result.TimedOut);
+        Assert.Empty(result.TerminatedProcessIds);
+    }
+
+    [Fact]
     public async Task Deadline_terminates_only_the_owned_process_tree()
     {
         using var unrelated = System.Diagnostics.Process.Start(new ProcessStartInfo(

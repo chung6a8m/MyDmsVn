@@ -20,6 +20,7 @@ public sealed class GuiOwnedProcessRunner : IProcessRunner, IDisposable
         var stopwatch = Stopwatch.StartNew();
         using var owned = SuspendedOwnedProcess.Start(command, job);
         var process = owned.Process;
+        var processId = process.Id;
         var stdout = owned.StandardOutput.ReadToEndAsync();
         var stderr = owned.StandardError.ReadToEndAsync();
         using var deadline = new CancellationTokenSource(command.Timeout);
@@ -55,6 +56,8 @@ public sealed class GuiOwnedProcessRunner : IProcessRunner, IDisposable
             throw;
         }
 
+        var exitCode = timedOut ? -1 : owned.ExitCode;
+
         var output = await stdout.ConfigureAwait(false);
         var error = await stderr.ConfigureAwait(false);
         if (unexpectedWindow.Length != 0)
@@ -67,7 +70,7 @@ public sealed class GuiOwnedProcessRunner : IProcessRunner, IDisposable
         try
         {
             orphans = systemProcesses.Select(candidate => candidate.Id)
-                .Where(id => id != process.Id && job.ContainsProcess(id))
+                .Where(id => id != processId && job.ContainsProcess(id))
                 .ToArray();
         }
         finally
@@ -81,8 +84,8 @@ public sealed class GuiOwnedProcessRunner : IProcessRunner, IDisposable
 
         stopwatch.Stop();
         var forced = timedOut || unexpectedWindow.Length != 0 || orphans.Length != 0;
-        return new CommandResult(forced ? -1 : process.ExitCode, timedOut, process.Id, output, error,
-            forced ? new[] { process.Id }.Concat(orphans).ToArray() : Array.Empty<int>(), stopwatch.Elapsed);
+        return new CommandResult(forced ? -1 : exitCode, timedOut, processId, output, error,
+            forced ? new[] { processId }.Concat(orphans).ToArray() : Array.Empty<int>(), stopwatch.Elapsed);
     }
 
     public void Dispose() => _disposed = true;

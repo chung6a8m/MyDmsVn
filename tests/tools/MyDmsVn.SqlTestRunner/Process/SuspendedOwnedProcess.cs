@@ -24,23 +24,36 @@ internal sealed class SuspendedOwnedProcess : IDisposable
         AnonymousPipeServerStream stdoutPipe,
         AnonymousPipeServerStream stderrPipe,
         StreamReader standardOutput,
-        StreamReader standardError)
+        StreamReader standardError,
+        IntPtr processHandle)
     {
         Process = process;
         _stdoutPipe = stdoutPipe;
         _stderrPipe = stderrPipe;
         StandardOutput = standardOutput;
         StandardError = standardError;
+        _processHandle = processHandle;
     }
 
     private readonly AnonymousPipeServerStream _stdoutPipe;
     private readonly AnonymousPipeServerStream _stderrPipe;
+    private IntPtr _processHandle;
 
     public System.Diagnostics.Process Process { get; }
 
     public StreamReader StandardOutput { get; }
 
     public StreamReader StandardError { get; }
+
+    public int ExitCode
+    {
+        get
+        {
+            if (_processHandle == IntPtr.Zero || !GetExitCodeProcess(_processHandle, out var exitCode))
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            return unchecked((int)exitCode);
+        }
+    }
 
     public static SuspendedOwnedProcess Start(CommandSpec command, WindowsJobObject job) =>
         Start(command, (_, processHandle) => job.Assign(processHandle));
@@ -90,12 +103,15 @@ internal sealed class SuspendedOwnedProcess : IDisposable
             }
 
             var process = System.Diagnostics.Process.GetProcessById((int)information.ProcessId);
-            return new SuspendedOwnedProcess(
+            var owned = new SuspendedOwnedProcess(
                 process,
                 stdout,
                 stderr,
                 new StreamReader(stdout, Encoding.UTF8, true, 4096, leaveOpen: true),
-                new StreamReader(stderr, Encoding.UTF8, true, 4096, leaveOpen: true));
+                new StreamReader(stderr, Encoding.UTF8, true, 4096, leaveOpen: true),
+                information.ProcessHandle);
+            information.ProcessHandle = IntPtr.Zero;
+            return owned;
         }
         catch
         {
@@ -131,6 +147,11 @@ internal sealed class SuspendedOwnedProcess : IDisposable
         _stdoutPipe.Dispose();
         _stderrPipe.Dispose();
         Process.Dispose();
+        if (_processHandle != IntPtr.Zero)
+        {
+            CloseHandle(_processHandle);
+            _processHandle = IntPtr.Zero;
+        }
     }
 
     private static string BuildEnvironment(IReadOnlyDictionary<string, string> overrides)
@@ -168,6 +189,9 @@ internal sealed class SuspendedOwnedProcess : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool TerminateProcess(IntPtr processHandle, uint exitCode);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetExitCodeProcess(IntPtr processHandle, out uint exitCode);
 
     [DllImport("kernel32.dll")]
     private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
