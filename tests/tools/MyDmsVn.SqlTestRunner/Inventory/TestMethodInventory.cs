@@ -144,10 +144,16 @@ public static class TestMethodInventory
             }
 
             var references = ReadReferencedMethods(method);
-            isComplete &= references.IsComplete;
+            if (!references.IsComplete)
+            {
+                isComplete &= reviewedCode.AddClosedProjectBoundary(method.DeclaringType, selected);
+            }
             foreach (var unresolvedHint in references.UnresolvedMemberHints)
             {
-                isComplete &= reviewedCode.AddProjectBoundaryForHint(unresolvedHint, selected);
+                if (!reviewedCode.AddProjectBoundaryForHint(unresolvedHint, selected))
+                {
+                    isComplete &= reviewedCode.AddClosedProjectBoundary(method.DeclaringType, selected);
+                }
             }
 
             foreach (var referencedMethod in references.Methods)
@@ -200,7 +206,15 @@ public static class TestMethodInventory
             }
         }
 
-        isComplete &= reviewedCode.AddReferencedConstantSources(selected);
+        if (!reviewedCode.AddReferencedConstantSources(selected))
+        {
+            isComplete &= reviewedCode.AddClosedProjectBoundary(rootMethod.DeclaringType, selected);
+        }
+
+        if (!isComplete)
+        {
+            reviewedCode.AddClosedProjectBoundary(rootMethod.DeclaringType, selected);
+        }
 
         if (selected.Count == 0)
         {
@@ -1266,6 +1280,24 @@ public static class TestMethodInventory
             foreach (var sourceMatch in sourceMatches)
             {
                 AddProjectBoundary(sourceMatch.Key, selected);
+            }
+
+            return true;
+        }
+
+        public bool AddClosedProjectBoundary(
+            Type? declaringType,
+            IDictionary<string, byte[]> selected)
+        {
+            var source = Find(declaringType);
+            if (source.IsAmbiguous || source.Files.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var file in source.Files)
+            {
+                AddProjectBoundary(file.Key, selected);
             }
 
             return true;

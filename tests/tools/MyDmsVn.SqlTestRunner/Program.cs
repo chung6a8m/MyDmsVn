@@ -45,7 +45,8 @@ internal static class Program
         Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> baselineRunner,
         Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> acceptanceRunner,
         Func<TestGateRunOptions, CancellationToken, Task<TestGateRunResult>> testGateRunner,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<TestGateRunOptions, bool>? finalProvenanceVerifier = null)
     {
         if (args.Length == 0)
         {
@@ -73,7 +74,20 @@ internal static class Program
                 return 64;
             }
 
+            var verifyProvenance = finalProvenanceVerifier ?? TestGateProvenance.Verify;
+            if (testGateOptions.Mode == TestGateMode.Final && !verifyProvenance(testGateOptions))
+            {
+                return 3;
+            }
+
             var gateResult = await testGateRunner(testGateOptions, cancellationToken).ConfigureAwait(false);
+            if (gateResult.Status == TestGateRunStatus.Succeeded &&
+                testGateOptions.Mode == TestGateMode.Final &&
+                !verifyProvenance(testGateOptions))
+            {
+                return 3;
+            }
+
             return gateResult.Status switch
             {
                 TestGateRunStatus.Succeeded => 0,
@@ -145,20 +159,24 @@ internal static class Program
         Environment.SetEnvironmentVariable(SqlTestHarnessEnvironment.ApprovalFileVariable, values["approval"]);
         Directory.CreateDirectory(values["artifacts"]);
         using var runner = new OwnedProcessRunner();
-        var result = await new FocusedRunCoordinator(new EnvironmentPreflightGate(), runner)
-            .RunAsync(
-                new FocusedRunOptions(
-                    Path.GetFullPath(values["repo"]),
-                    Path.GetFullPath(values["project"]),
-                    Path.GetFullPath(values["artifacts"]),
-                    Path.GetFullPath(values["approval"]),
-                    values["category"],
-                    values["frameworks"].Split(',', StringSplitOptions.RemoveEmptyEntries),
-                    TimeSpan.FromMinutes(30),
-                    TimeSpan.FromHours(1)),
-                cancellationToken)
-            .ConfigureAwait(false);
-        return result.IsComplete ? 0 : 3;
+        var options = new FocusedRunOptions(
+            Path.GetFullPath(values["repo"]),
+            Path.GetFullPath(values["project"]),
+            Path.GetFullPath(values["artifacts"]),
+            Path.GetFullPath(values["approval"]),
+            values["category"],
+            values["frameworks"].Split(',', StringSplitOptions.RemoveEmptyEntries),
+            TimeSpan.FromMinutes(30),
+            TimeSpan.FromHours(1));
+        var guarded = await new SqlExecutionLeaseGuard().RunAsync(
+            options.ApprovalFile,
+            "legacy/focused-run/" + options.Category,
+            options.ArtifactRoot,
+            options.CommandTimeout,
+            token => new FocusedRunCoordinator(new EnvironmentPreflightGate(), runner).RunAsync(options, token),
+            result => result.IsComplete,
+            cancellationToken).ConfigureAwait(false);
+        return guarded.Acquired && guarded.Result.IsComplete ? 0 : 3;
     }
 
     private static async Task<BenchmarkRunResult> RunBaselineAsync(
@@ -166,11 +184,18 @@ internal static class Program
         CancellationToken cancellationToken)
     {
         using var runner = new OwnedProcessRunner();
-        return await new BenchmarkRunCoordinator(
-                new EnvironmentPreflightGate(),
-                runner)
-            .RunAsync(options, cancellationToken)
-            .ConfigureAwait(false);
+        var guarded = await new SqlExecutionLeaseGuard().RunAsync(
+            options.ApprovalFile,
+            "legacy/baseline",
+            options.ArtifactRoot,
+            options.CommandTimeout,
+            token => new BenchmarkRunCoordinator(new EnvironmentPreflightGate(), runner)
+                .RunAsync(options, token),
+            result => result.IsComplete,
+            cancellationToken).ConfigureAwait(false);
+        return guarded.Acquired
+            ? guarded.Result
+            : new BenchmarkRunResult(false, Array.Empty<BenchmarkFrameworkRun>());
     }
 
     private static async Task<BenchmarkRunResult> RunPrAcceptanceAsync(
@@ -178,12 +203,21 @@ internal static class Program
         CancellationToken cancellationToken)
     {
         using var runner = new OwnedProcessRunner();
-        return await new BenchmarkRunCoordinator(
-                new EnvironmentPreflightGate(),
-                runner,
-                reportExporter: new SqlAcceptanceReportExporter())
-            .RunAsync(options, cancellationToken)
-            .ConfigureAwait(false);
+        var guarded = await new SqlExecutionLeaseGuard().RunAsync(
+            options.ApprovalFile,
+            "legacy/pr-acceptance",
+            options.ArtifactRoot,
+            options.CommandTimeout,
+            token => new BenchmarkRunCoordinator(
+                    new EnvironmentPreflightGate(),
+                    runner,
+                    reportExporter: new SqlAcceptanceReportExporter())
+                .RunAsync(options, token),
+            result => result.IsComplete,
+            cancellationToken).ConfigureAwait(false);
+        return guarded.Acquired
+            ? guarded.Result
+            : new BenchmarkRunResult(false, Array.Empty<BenchmarkFrameworkRun>());
     }
 
     private static async Task<TestGateRunResult> RunTestGateAsync(

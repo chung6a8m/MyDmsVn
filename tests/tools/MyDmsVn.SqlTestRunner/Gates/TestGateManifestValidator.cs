@@ -46,7 +46,37 @@ public static class TestGateManifestValidator
             ValidateGate(root, gate);
         }
 
+        if (mode == TestGateMode.Final)
+        {
+            ValidateFinalSqlContract(gates);
+        }
+
         return new TestGateSelection(mode, planId, taskId, gates);
+    }
+
+    private static void ValidateFinalSqlContract(IReadOnlyCollection<TestGateDefinition> gates)
+    {
+        var sqlGates = gates.Where(gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
+            .ToArray();
+        var requiredEvidence = new[]
+        {
+            TestGateEvidenceKind.Source,
+            TestGateEvidenceKind.Discovery,
+            TestGateEvidenceKind.Trx,
+            TestGateEvidenceKind.SanitizedReport,
+            TestGateEvidenceKind.Ownership,
+        };
+        if (sqlGates.Length != 1 ||
+            !sqlGates[0].Frameworks.SequenceEqual(new[] { "net48", "net8.0" }, StringComparer.Ordinal) ||
+            sqlGates[0].Selection.Kind != TestGateSelectionKind.UnfilteredProject ||
+            sqlGates[0].Selection.Patterns.Count != 0 ||
+            sqlGates[0].Resources.Sql != TestGateResourceRequirement.RequiredExclusive ||
+            sqlGates[0].Resources.Gui != TestGateResourceRequirement.None ||
+            requiredEvidence.Any(kind => !sqlGates[0].Evidence.Contains(kind)))
+        {
+            throw new InvalidDataException(
+                "Final requires one reviewed unfiltered exclusive SQL acceptance gate for net48 and net8.0.");
+        }
     }
 
     private static void ValidateGate(string repositoryRoot, TestGateDefinition gate)

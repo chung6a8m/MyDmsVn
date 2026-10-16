@@ -83,12 +83,35 @@ public sealed class SqlExecutionLeaseTests
         using var store = new TemporaryLeaseStore();
         var factory = Factory(store);
         var first = await factory.AcquireAsync(Request(store, "instance-a"), CancellationToken.None);
+        first.Lease!.Complete();
         await first.Lease!.DisposeAsync();
 
         var second = await factory.AcquireAsync(Request(store, "instance-a"), CancellationToken.None);
 
         Assert.Equal(SqlExecutionLeaseAcquireStatus.Acquired, second.Status);
+        second.Lease!.Complete();
         await second.Lease!.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Unresolved_disposal_requires_recovery_before_the_next_acquisition()
+    {
+        using var store = new TemporaryLeaseStore();
+        var events = new List<string>();
+        var factory = Factory(store);
+        var first = await factory.AcquireAsync(Request(store, "instance-unresolved"), CancellationToken.None);
+        await first.Lease!.DisposeAsync();
+
+        var second = await factory.AcquireAsync(
+            Request(
+                store,
+                "instance-unresolved",
+                recovery: new RecordingRecovery(events, succeeds: false)),
+            CancellationToken.None);
+
+        Assert.Equal(new[] { "recover" }, events);
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.BlockedRecovery, second.Status);
+        Assert.Null(second.Lease);
     }
 
     [Fact]
@@ -141,6 +164,45 @@ public sealed class SqlExecutionLeaseTests
 
         Assert.Equal(SqlExecutionLeaseAcquireStatus.Cancelled, result.Status);
         Assert.Null(result.Lease);
+    }
+
+    [Fact]
+    public async Task Shared_SQL_entry_guard_serializes_operations_for_the_same_approved_instance()
+    {
+        using var store = new TemporaryLeaseStore();
+        var factory = Factory(store);
+        var guard = new SqlExecutionLeaseGuard(new FixedApproval("shared-instance"), factory);
+        var entered = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = guard.RunAsync(
+            "approval.json",
+            "legacy/pr-acceptance",
+            Path.Combine(store.Root, "first"),
+            TimeSpan.FromSeconds(2),
+            async cancellationToken =>
+            {
+                entered.SetResult(null);
+                await release.Task.WaitAsync(cancellationToken);
+                return true;
+            },
+            result => result,
+            CancellationToken.None);
+        await entered.Task;
+
+        var second = await guard.RunAsync(
+            "approval.json",
+            "legacy/focused-run",
+            Path.Combine(store.Root, "second"),
+            TimeSpan.FromMilliseconds(100),
+            _ => Task.FromResult(true),
+            result => result,
+            CancellationToken.None);
+        release.SetResult(null);
+        var completed = await first;
+
+        Assert.False(second.Acquired);
+        Assert.True(completed.Acquired);
+        Assert.True(completed.Result);
     }
 
     private static SqlExecutionLeaseFactory Factory(TemporaryLeaseStore store) =>
@@ -277,6 +339,19 @@ public sealed class SqlExecutionLeaseTests
         }
 
         public bool IsLive(int processId) => _isLive;
+    }
+
+    private sealed class FixedApproval : ITestGateApprovalReader
+    {
+        private readonly string _fingerprint;
+
+        public FixedApproval(string fingerprint) => _fingerprint = fingerprint;
+
+        public bool TryLoad(string path, out string fingerprint)
+        {
+            fingerprint = _fingerprint;
+            return true;
+        }
     }
 
     private enum LeaseDamage

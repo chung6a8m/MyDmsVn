@@ -176,6 +176,44 @@ public sealed class TestGateManifestTests
         Assert.All(selection.Gates, gate => Assert.Equal("TESTGATE-T03", gate.TaskId));
     }
 
+    [Fact]
+    public void Final_selection_requires_one_unfiltered_exclusive_dual_tfm_SQL_acceptance_gate()
+    {
+        using var repository = new TestRepository();
+        var unitOnly = Gate("final-unit", mode: TestGateMode.Final);
+        var mandatorySql = Gate(
+            "final-sql",
+            mode: TestGateMode.Final,
+            project: "sql-tests.csproj",
+            frameworks: new[] { "net48", "net8.0" }) with
+        {
+            StrictMode = TestGateStrictMode.SqlPrAcceptance,
+            Resources = new TestGateResources(
+                TestGateResourceRequirement.RequiredExclusive,
+                TestGateResourceRequirement.None),
+            Evidence = new[]
+            {
+                TestGateEvidenceKind.Source,
+                TestGateEvidenceKind.Discovery,
+                TestGateEvidenceKind.Trx,
+                TestGateEvidenceKind.SanitizedReport,
+                TestGateEvidenceKind.Ownership,
+            },
+        };
+
+        Assert.Throws<InvalidDataException>(() => TestGateManifestValidator.Select(
+            Manifest(unitOnly), repository.Root, TestGateMode.Final, "20261016-001", "TESTGATE-T03"));
+
+        var selection = TestGateManifestValidator.Select(
+            Manifest(unitOnly, mandatorySql),
+            repository.Root,
+            TestGateMode.Final,
+            "20261016-001",
+            "TESTGATE-T03");
+
+        Assert.Equal(2, selection.Gates.Count);
+    }
+
     private static TestGateManifest Manifest(params TestGateDefinition[] gates) => new TestGateManifest(
         1,
         gates,
@@ -305,6 +343,9 @@ public sealed class TestGateManifestTests
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Root);
             File.WriteAllText(Path.Combine(Root, "tests.csproj"), Net8Project);
+            File.WriteAllText(
+                Path.Combine(Root, "sql-tests.csproj"),
+                Net8Project.Replace("<TargetFramework>net8.0</TargetFramework>", "<TargetFrameworks>net48;net8.0</TargetFrameworks>", StringComparison.Ordinal));
         }
 
         public string Root { get; }

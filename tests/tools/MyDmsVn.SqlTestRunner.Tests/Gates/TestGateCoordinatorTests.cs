@@ -44,7 +44,7 @@ public sealed class TestGateCoordinatorTests
 
         var result = await new TestGateCoordinator(
             processes,
-            new StaticInventory(),
+            new TwoMethodInventory(),
             new RecordingReportExporter(new List<string>())).RunAsync(
                 repository.Options(),
                 CancellationToken.None);
@@ -93,6 +93,21 @@ public sealed class TestGateCoordinatorTests
         Assert.Empty(processes.Commands);
     }
 
+    [Fact]
+    public async Task Duplicate_logical_key_across_selected_projects_fails_global_reconciliation()
+    {
+        using var repository = new GateRepository(duplicateProject: true);
+
+        var result = await new TestGateCoordinator(
+            new GateProcessRunner(repository, new List<string>()),
+            new StaticInventory(),
+            new RecordingReportExporter(new List<string>())).RunAsync(
+                repository.Options(),
+                CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+    }
+
     public enum GateFailure
     {
         None,
@@ -112,6 +127,21 @@ public sealed class TestGateCoordinatorTests
             new TestMethodDescriptor("Example.Tests.Case", false, GateRepository.Fingerprint)
             {
                 NormalizedSignature = "Example.Tests.Case()",
+            },
+        };
+    }
+
+    private sealed class TwoMethodInventory : ITestGateSourceInventory
+    {
+        public IReadOnlyList<TestMethodDescriptor> Read(string assemblyPath) => new[]
+        {
+            new TestMethodDescriptor("Example.Tests.Case", false, GateRepository.Fingerprint)
+            {
+                NormalizedSignature = "Example.Tests.Case()",
+            },
+            new TestMethodDescriptor("Example.Tests.Other", false, GateRepository.OtherFingerprint)
+            {
+                NormalizedSignature = "Example.Tests.Other()",
             },
         };
     }
@@ -198,17 +228,25 @@ public sealed class TestGateCoordinatorTests
     private sealed class GateRepository : IDisposable
     {
         public const string Fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        public const string OtherFingerprint = "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         public GateRepository(
             TestGateSelectionKind selectionKind = TestGateSelectionKind.UnfilteredProject,
-            TestGateStrictMode strictMode = TestGateStrictMode.DotnetTest)
+            TestGateStrictMode strictMode = TestGateStrictMode.DotnetTest,
+            bool duplicateProject = false)
         {
             Root = Path.Combine(Path.GetTempPath(), "mydms-test-gate-" + Guid.NewGuid().ToString("N"));
             Project = Path.Combine(Root, "tests", "Example.Tests", "Example.Tests.csproj");
             Directory.CreateDirectory(Path.GetDirectoryName(Project)!);
             File.WriteAllText(Project, "<Project><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>");
+            if (duplicateProject)
+            {
+                var duplicateProjectPath = Path.Combine(Root, "tests", "Duplicate.Tests", "Duplicate.Tests.csproj");
+                Directory.CreateDirectory(Path.GetDirectoryName(duplicateProjectPath)!);
+                File.WriteAllText(duplicateProjectPath, "<Project><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>");
+            }
             Manifest = Path.Combine(Root, "tests", "test-gates.v1.json");
-            File.WriteAllText(Manifest, Json(selectionKind, strictMode));
+            File.WriteAllText(Manifest, Json(selectionKind, strictMode, duplicateProject));
         }
 
         public string Root { get; }
@@ -227,11 +265,45 @@ public sealed class TestGateCoordinatorTests
 
         public void Dispose() => Directory.Delete(Root, recursive: true);
 
-        private static string Json(TestGateSelectionKind selectionKind, TestGateStrictMode strictMode)
+        private static string Json(
+            TestGateSelectionKind selectionKind,
+            TestGateStrictMode strictMode,
+            bool duplicateProject)
         {
             var patterns = selectionKind == TestGateSelectionKind.UnfilteredProject
                 ? "[]"
                 : "[\"Example.Tests.Case\"]";
+            var otherCase = selectionKind == TestGateSelectionKind.UnfilteredProject
+                ? string.Empty
+                : $$"""
+                ,{
+                  "logicalCaseId": "case-other", "ownerProject": "tests/Example.Tests/Example.Tests.csproj", "frameworks": ["net8.0"],
+                  "normalizedMethodSignature": "Example.Tests.Other()", "reviewedCodeFingerprint": "{{OtherFingerprint}}",
+                  "classification": ["NonSql"], "rows": [{ "rowKey": "fact", "locatorSha256": null }]
+                }
+                """;
+            var duplicateGate = duplicateProject
+                ? $$"""
+                ,{
+                  "gateId": "task-duplicate", "planId": "20261016-001", "taskId": "TESTGATE-T03", "mode": "Task",
+                  "project": "tests/Duplicate.Tests/Duplicate.Tests.csproj", "frameworks": ["net8.0"], "module": "Duplicate", "classification": ["NonSql"],
+                  "selection": { "kind": "UnfilteredProject", "patterns": [] },
+                  "buildPrerequisites": [{ "project": "tests/Duplicate.Tests/Duplicate.Tests.csproj", "frameworks": ["net8.0"] }],
+                  "resources": { "sql": "None", "gui": "None" }, "strictMode": "DotnetTest",
+                  "commandTimeoutSeconds": 5, "overallTimeoutSeconds": 30,
+                  "evidence": ["Source", "Discovery", "Trx", "SanitizedReport"]
+                }
+                """
+                : string.Empty;
+            var duplicateCase = duplicateProject
+                ? $$"""
+                ,{
+                  "logicalCaseId": "case-duplicate-owner", "ownerProject": "tests/Duplicate.Tests/Duplicate.Tests.csproj", "frameworks": ["net8.0"],
+                  "normalizedMethodSignature": "Example.Tests.Case()", "reviewedCodeFingerprint": "{{Fingerprint}}",
+                  "classification": ["NonSql"], "rows": [{ "rowKey": "fact", "locatorSha256": null }]
+                }
+                """
+                : string.Empty;
             return $$"""
             {
               "schemaVersion": 1,
@@ -243,12 +315,12 @@ public sealed class TestGateCoordinatorTests
                 "resources": { "sql": "None", "gui": "None" }, "strictMode": "{{strictMode}}",
                 "commandTimeoutSeconds": 5, "overallTimeoutSeconds": 30,
                 "evidence": ["Source", "Discovery", "Trx", "SanitizedReport"]
-              }],
+              }{{duplicateGate}}],
               "logicalCases": [{
                 "logicalCaseId": "case-example", "ownerProject": "tests/Example.Tests/Example.Tests.csproj", "frameworks": ["net8.0"],
                 "normalizedMethodSignature": "Example.Tests.Case()", "reviewedCodeFingerprint": "{{Fingerprint}}",
                 "classification": ["NonSql"], "rows": [{ "rowKey": "fact", "locatorSha256": null }]
-              }],
+              }{{otherCase}}{{duplicateCase}}],
               "identityMappings": [], "exemptions": []
             }
             """;

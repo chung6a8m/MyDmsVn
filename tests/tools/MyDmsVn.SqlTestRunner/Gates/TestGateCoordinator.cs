@@ -216,6 +216,10 @@ public sealed class TestGateCoordinator
             }
 
             var manifestFingerprint = HashFile(options.ManifestPath);
+            var globalExpected = new List<ExpectedLogicalCase>();
+            var globalSource = new List<BoundLogicalCase>();
+            var globalDiscovered = new List<BoundLogicalCase>();
+            var globalExecuted = new List<ExecutedLogicalCase>();
             foreach (var gate in selection.Gates)
             {
                 if (gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
@@ -226,6 +230,10 @@ public sealed class TestGateCoordinator
                         gate,
                         manifestFingerprint,
                         runs,
+                        globalExpected,
+                        globalSource,
+                        globalDiscovered,
+                        globalExecuted,
                         linked.Token).ConfigureAwait(false);
                     if (sqlStatus != TestGateRunStatus.Succeeded)
                     {
@@ -286,6 +294,7 @@ public sealed class TestGateCoordinator
                     }
 
                     var definitions = manifest.LogicalCases;
+                    var selectedDefinitions = SelectDefinitions(definitions, gate, tfm);
                     var source = _sourceInventory.Read(AssemblyPath(project, tfm));
                     var discovered = VstestDiscoveryParser.Parse(discovery.StandardOutput, tfm);
                     var trx = TrxResultParser.TryParse(Path.Combine(runRoot, trxName), tfm);
@@ -294,15 +303,25 @@ public sealed class TestGateCoordinator
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
-                    var sourceBinding = LogicalCaseBinder.BindSource(source, definitions, gate.Project, tfm);
-                    var discoveryBinding = LogicalCaseBinder.BindDiscovery(discovered, definitions, gate.Project, tfm);
-                    var executionBinding = LogicalCaseBinder.BindExecution(trx.Results, definitions, gate.Project, tfm);
-                    if (!sourceBinding.IsComplete || !discoveryBinding.IsComplete || !executionBinding.IsComplete)
+                    var fullSourceBinding = LogicalCaseBinder.BindSource(
+                        source,
+                        definitions,
+                        gate.Project,
+                        tfm,
+                        manifest.Exemptions);
+                    var selectedIds = selectedDefinitions.Select(item => item.LogicalCaseId)
+                        .ToHashSet(StringComparer.Ordinal);
+                    var selectedSource = fullSourceBinding.Cases
+                        .Where(item => selectedIds.Contains(item.LogicalCaseId))
+                        .ToArray();
+                    var discoveryBinding = LogicalCaseBinder.BindDiscovery(discovered, selectedDefinitions, gate.Project, tfm);
+                    var executionBinding = LogicalCaseBinder.BindExecution(trx.Results, selectedDefinitions, gate.Project, tfm);
+                    if (!fullSourceBinding.IsComplete || !discoveryBinding.IsComplete || !executionBinding.IsComplete)
                     {
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
-                    var expected = sourceBinding.Cases.Select(item => new ExpectedLogicalCase(
+                    var expected = selectedSource.Select(item => new ExpectedLogicalCase(
                             item.LogicalKey,
                             item.LogicalCaseId,
                             item.OwnerProject,
@@ -314,21 +333,24 @@ public sealed class TestGateCoordinator
                         .ToArray();
                     var reconciliation = LogicalCaseInventoryReconciler.Reconcile(
                         expected,
-                        sourceBinding.Cases,
+                        selectedSource,
                         discoveryBinding.Cases,
-                        executionBinding.Cases,
-                        manifest.IdentityMappings,
-                        manifest.Exemptions);
+                        executionBinding.Cases);
                     if (!reconciliation.IsComplete)
                     {
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
+                    globalExpected.AddRange(expected);
+                    globalSource.AddRange(selectedSource);
+                    globalDiscovered.AddRange(discoveryBinding.Cases);
+                    globalExecuted.AddRange(executionBinding.Cases);
+
                     stopwatch.Stop();
                     var framework = new TestGateFrameworkResult(
                         gate.GateId,
                         tfm,
-                        sourceBinding.Cases.Count,
+                        selectedSource.Length,
                         discoveryBinding.Cases.Count,
                         executionBinding.Cases.Count,
                         stopwatch.Elapsed);
@@ -347,6 +369,26 @@ public sealed class TestGateCoordinator
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
                 }
+            }
+
+            var globalSelectedIds = globalExpected.Select(item => item.LogicalCaseId)
+                .ToHashSet(StringComparer.Ordinal);
+            var selectedSignatures = globalExpected.Select(item => item.NormalizedMethodSignature)
+                .ToHashSet(StringComparer.Ordinal);
+            if (!LogicalCaseInventoryReconciler.Reconcile(
+                    globalExpected,
+                    globalSource,
+                    globalDiscovered,
+                    globalExecuted,
+                    manifest.IdentityMappings.Where(mapping =>
+                            globalSelectedIds.Contains(mapping.OldLogicalCaseId) &&
+                            globalSelectedIds.Contains(mapping.NewLogicalCaseId))
+                        .ToArray(),
+                    manifest.Exemptions.Where(exemption =>
+                            selectedSignatures.Contains(exemption.NormalizedMethodSignature))
+                        .ToArray()).IsComplete)
+            {
+                return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
             }
 
             return new TestGateRunResult(TestGateRunStatus.Succeeded, runs);
@@ -370,6 +412,10 @@ public sealed class TestGateCoordinator
         TestGateDefinition gate,
         string manifestFingerprint,
         List<TestGateFrameworkResult> frameworks,
+        List<ExpectedLogicalCase> globalExpected,
+        List<BoundLogicalCase> globalSource,
+        List<BoundLogicalCase> globalDiscovered,
+        List<ExecutedLogicalCase> globalExecuted,
         CancellationToken cancellationToken)
     {
         if (options.Mode != TestGateMode.Final ||
@@ -436,7 +482,8 @@ public sealed class TestGateCoordinator
                     _sourceInventory.Read(AssemblyPath(project, run.Tfm)),
                     manifest.LogicalCases,
                     gate.Project,
-                    run.Tfm);
+                    run.Tfm,
+                    manifest.Exemptions);
                 var discoveryBinding = LogicalCaseBinder.BindDiscovery(
                     VstestDiscoveryParser.Parse(run.DiscoveryOutput, run.Tfm),
                     manifest.LogicalCases,
@@ -483,12 +530,15 @@ public sealed class TestGateCoordinator
                     expected,
                     source,
                     discovered,
-                    executed,
-                    manifest.IdentityMappings,
-                    manifest.Exemptions).IsComplete)
+                    executed).IsComplete)
             {
                 return TestGateRunStatus.Incomplete;
             }
+
+            globalExpected.AddRange(expected);
+            globalSource.AddRange(source);
+            globalDiscovered.AddRange(discovered);
+            globalExecuted.AddRange(executed);
 
             var report = await _reports.ExportAsync(
                 new TestGateReportEvidence(
@@ -520,7 +570,13 @@ public sealed class TestGateCoordinator
                         instanceFingerprint,
                     }),
                 cancellationToken).ConfigureAwait(false);
-            return report.IsComplete ? TestGateRunStatus.Succeeded : TestGateRunStatus.Incomplete;
+            if (!report.IsComplete)
+            {
+                return TestGateRunStatus.Incomplete;
+            }
+
+            acquired.Lease.Complete();
+            return TestGateRunStatus.Succeeded;
         }
         finally
         {
@@ -551,6 +607,36 @@ public sealed class TestGateCoordinator
             " --filter \"" + string.Join("|", selection.Patterns.Select(value => "Category=" + value)) + "\"",
         _ => throw new InvalidDataException("Unsupported manifest-owned test selection."),
     };
+
+    private static IReadOnlyList<LogicalCaseDefinition> SelectDefinitions(
+        IReadOnlyCollection<LogicalCaseDefinition> definitions,
+        TestGateDefinition gate,
+        string tfm)
+    {
+        var owned = definitions.Where(definition =>
+            string.Equals(definition.OwnerProject, gate.Project, StringComparison.OrdinalIgnoreCase) &&
+            definition.Frameworks.Contains(tfm, StringComparer.OrdinalIgnoreCase));
+        return gate.Selection.Kind switch
+        {
+            TestGateSelectionKind.UnfilteredProject => owned.ToArray(),
+            TestGateSelectionKind.FullyQualifiedName => owned.Where(definition =>
+                    gate.Selection.Patterns.Any(pattern => MethodName(definition.NormalizedMethodSignature)
+                        .Contains(pattern, StringComparison.Ordinal)))
+                .ToArray(),
+            TestGateSelectionKind.Category => owned.Where(definition =>
+                    gate.Selection.Patterns.Any(pattern => definition.Classification.Contains(
+                        pattern,
+                        StringComparer.Ordinal)))
+                .ToArray(),
+            _ => Array.Empty<LogicalCaseDefinition>(),
+        };
+    }
+
+    private static string MethodName(string normalizedSignature)
+    {
+        var parenthesis = normalizedSignature.IndexOf('(');
+        return parenthesis < 0 ? normalizedSignature : normalizedSignature.Substring(0, parenthesis);
+    }
 
     private static string FullPath(string root, string relative) => Path.GetFullPath(Path.Combine(root, relative));
 

@@ -54,17 +54,91 @@ public interface IProcessLivenessProbe
     bool IsLive(int processId);
 }
 
+public sealed record SqlExecutionLeaseGuardResult<T>(bool Acquired, T Result);
+
+public sealed class SqlExecutionLeaseGuard
+{
+    private readonly ITestGateApprovalReader _approval;
+    private readonly ISqlExecutionLeaseFactory _leases;
+
+    public SqlExecutionLeaseGuard(
+        ITestGateApprovalReader? approval = null,
+        ISqlExecutionLeaseFactory? leases = null)
+    {
+        _approval = approval ?? new TestGateApprovalReader();
+        _leases = leases ?? new SqlExecutionLeaseFactory();
+    }
+
+    public async Task<SqlExecutionLeaseGuardResult<T>> RunAsync<T>(
+        string approvalFile,
+        string gateIdentity,
+        string artifactRoot,
+        TimeSpan timeout,
+        Func<CancellationToken, Task<T>> operation,
+        Func<T, bool> isComplete,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(isComplete);
+        if (!_approval.TryLoad(approvalFile, out var fingerprint))
+        {
+            return new SqlExecutionLeaseGuardResult<T>(false, default!);
+        }
+
+        var acquired = await _leases.AcquireAsync(
+            new SqlExecutionLeaseRequest(
+                fingerprint,
+                gateIdentity,
+                artifactRoot,
+                timeout,
+                new BenchmarkAbandonedSqlRunRecovery(approvalFile)),
+            cancellationToken).ConfigureAwait(false);
+        if (acquired.Lease is null)
+        {
+            return new SqlExecutionLeaseGuardResult<T>(false, default!);
+        }
+
+        try
+        {
+            var result = await operation(cancellationToken).ConfigureAwait(false);
+            if (isComplete(result))
+            {
+                acquired.Lease.Complete();
+            }
+
+            return new SqlExecutionLeaseGuardResult<T>(true, result);
+        }
+        finally
+        {
+            await acquired.Lease.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+}
+
 public sealed class SqlExecutionLease : IAsyncDisposable
 {
     private readonly EventWaitHandle _release;
     private readonly Task _completion;
     private int _disposed;
+    private int _completed;
 
     internal SqlExecutionLease(EventWaitHandle release, Task completion)
     {
         _release = release;
         _completion = completion;
     }
+
+    public void Complete()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            throw new ObjectDisposedException(nameof(SqlExecutionLease));
+        }
+
+        Interlocked.Exchange(ref _completed, 1);
+    }
+
+    internal bool IsCompleted => Volatile.Read(ref _completed) != 0;
 
     public async ValueTask DisposeAsync()
     {
@@ -147,8 +221,9 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
             catch (AbandonedMutexException)
             {
                 acquired = true;
-                var recoveryStatus = Recover(resourceKey, request, cancellationToken);
-                if (recoveryStatus != SqlExecutionLeaseAcquireStatus.Recovered)
+                var recoveryStatus = Recover(resourceKey, request, cancellationToken, requireRecord: true);
+                if (recoveryStatus is SqlExecutionLeaseAcquireStatus.BlockedRecovery or
+                    SqlExecutionLeaseAcquireStatus.Cancelled)
                 {
                     acquisition.TrySetResult(new SqlExecutionLeaseAcquireResult(
                         recoveryStatus,
@@ -182,12 +257,20 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
             }
 
             acquired = true;
+            var priorStatus = Recover(resourceKey, request, cancellationToken, requireRecord: false);
+            if (priorStatus is SqlExecutionLeaseAcquireStatus.BlockedRecovery or
+                SqlExecutionLeaseAcquireStatus.Cancelled)
+            {
+                acquisition.TrySetResult(new SqlExecutionLeaseAcquireResult(priorStatus, null));
+                return;
+            }
+
             HoldAcquired(
                 resourceKey,
                 request,
                 release,
                 acquisition,
-                SqlExecutionLeaseAcquireStatus.Acquired);
+                priorStatus);
         }
         catch (Exception exception)
         {
@@ -205,10 +288,28 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
     private SqlExecutionLeaseAcquireStatus Recover(
         string resourceKey,
         SqlExecutionLeaseRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool requireRecord)
     {
-        if (!_store.TryRead(resourceKey, out var record) ||
-            !record.IsValidFor(resourceKey) ||
+        if (!_store.TryRead(resourceKey, out var record))
+        {
+            return requireRecord
+                ? SqlExecutionLeaseAcquireStatus.BlockedRecovery
+                : SqlExecutionLeaseAcquireStatus.Acquired;
+        }
+
+        if (!record.IsValidFor(resourceKey))
+        {
+            return SqlExecutionLeaseAcquireStatus.BlockedRecovery;
+        }
+
+        if (record.CompletionState is SqlExecutionLeaseCompletionState.Completed or
+            SqlExecutionLeaseCompletionState.Recovered)
+        {
+            return SqlExecutionLeaseAcquireStatus.Acquired;
+        }
+
+        if (record.CompletionState == SqlExecutionLeaseCompletionState.Active &&
             IsLiveOrUnknown(record.OwningProcessId))
         {
             return SqlExecutionLeaseAcquireStatus.BlockedRecovery;
@@ -277,7 +378,14 @@ public sealed class SqlExecutionLeaseFactory : ISqlExecutionLeaseFactory
         release.WaitOne();
         try
         {
-            _store.MarkCompleted(record);
+            if (lease.IsCompleted)
+            {
+                _store.MarkCompleted(record);
+            }
+            else
+            {
+                _store.MarkRecoveryRequired(record);
+            }
             holderCompletion.TrySetResult(null);
         }
         catch (Exception exception)
@@ -383,6 +491,10 @@ public sealed class FileSqlExecutionLeaseStore
         PathFor(record.ResourceKey),
         record with { CompletionState = SqlExecutionLeaseCompletionState.Recovered });
 
+    internal void MarkRecoveryRequired(SqlExecutionLeaseRecord record) => WriteAtomic(
+        PathFor(record.ResourceKey),
+        record with { CompletionState = SqlExecutionLeaseCompletionState.RecoveryRequired });
+
     internal string PathFor(string resourceKey) => Path.Combine(_root, resourceKey + ".lease.json");
 
     private static void WriteAtomic(string path, SqlExecutionLeaseRecord record)
@@ -408,6 +520,7 @@ internal enum SqlExecutionLeaseCompletionState
     Active,
     Completed,
     Recovered,
+    RecoveryRequired,
 }
 
 internal sealed record SqlExecutionLeaseRecord(
@@ -430,7 +543,7 @@ internal sealed record SqlExecutionLeaseRecord(
         Path.IsPathFullyQualified(PrivateArtifactRoot) &&
         Directory.Exists(PrivateArtifactRoot) &&
         !string.IsNullOrWhiteSpace(GateIdentity) &&
-        CompletionState == SqlExecutionLeaseCompletionState.Active;
+        Enum.IsDefined(CompletionState);
 
     public static SqlExecutionLeaseRecord Active(
         string resourceKey,

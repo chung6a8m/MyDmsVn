@@ -138,7 +138,8 @@ public sealed class TestGateRepositoryContractTests
                     source,
                     manifest.LogicalCases,
                     owner,
-                    tfm);
+                    tfm,
+                    manifest.Exemptions);
                 var discoveryBinding = LogicalCaseBinder.BindDiscovery(
                     discovered,
                     manifest.LogicalCases,

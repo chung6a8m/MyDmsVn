@@ -17,7 +17,8 @@ public static class LogicalCaseBinder
         IReadOnlyCollection<TestMethodDescriptor> source,
         IReadOnlyCollection<LogicalCaseDefinition> expected,
         string ownerProject,
-        string tfm)
+        string tfm,
+        IReadOnlyCollection<TestGateExemptionDefinition>? exemptions = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         var context = Prepare(expected, ownerProject, tfm);
@@ -43,6 +44,14 @@ public static class LogicalCaseBinder
             }
 
             var match = matches[0];
+            if (!match.IsBodyFingerprintComplete && !HasReviewedIncompleteFingerprintExemption(
+                    match,
+                    definition,
+                    exemptions ?? Array.Empty<TestGateExemptionDefinition>()))
+            {
+                failures.Add(LogicalCaseBindingFailure.IncompleteFingerprint);
+            }
+
             if (!string.Equals(
                     match.BodyFingerprint,
                     definition.ReviewedCodeFingerprint,
@@ -81,6 +90,15 @@ public static class LogicalCaseBinder
 
         return Result(cases, failures);
     }
+
+    private static bool HasReviewedIncompleteFingerprintExemption(
+        TestMethodDescriptor method,
+        LogicalCaseDefinition definition,
+        IReadOnlyCollection<TestGateExemptionDefinition> exemptions) => exemptions.Any(exemption =>
+            !string.IsNullOrWhiteSpace(exemption.Rationale) &&
+            string.Equals(exemption.NormalizedMethodSignature, definition.NormalizedMethodSignature, StringComparison.Ordinal) &&
+            string.Equals(exemption.ReviewedCodeFingerprint, method.BodyFingerprint, StringComparison.Ordinal) &&
+            new HashSet<string>(exemption.Classification, StringComparer.Ordinal).SetEquals(definition.Classification));
 
     public static LogicalCaseBindingResult BindDiscovery(
         IReadOnlyCollection<DiscoveredTestCase> discovered,

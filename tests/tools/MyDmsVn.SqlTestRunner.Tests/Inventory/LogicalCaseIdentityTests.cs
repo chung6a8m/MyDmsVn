@@ -260,10 +260,26 @@ public sealed class LogicalCaseIdentityTests
             new[] { definition },
             Project,
             "net8.0");
+        var reviewedPartialGraph = LogicalCaseBinder.BindSource(
+            new[] { valid with { IsBodyFingerprintComplete = false } },
+            new[] { definition },
+            Project,
+            "net8.0",
+            new[]
+            {
+                new TestGateExemptionDefinition(
+                    "partial-graph-example",
+                    definition.NormalizedMethodSignature,
+                    definition.Classification,
+                    "Reviewed source is closed over the declaring-file boundary.",
+                    Fingerprint),
+            });
 
         Assert.True(complete.IsComplete);
         Assert.Single(complete.Cases);
-        Assert.True(matchingPartialGraph.IsComplete);
+        Assert.False(matchingPartialGraph.IsComplete);
+        Assert.Contains(LogicalCaseBindingFailure.IncompleteFingerprint, matchingPartialGraph.Failures);
+        Assert.True(reviewedPartialGraph.IsComplete);
         Assert.Contains(LogicalCaseBindingFailure.FingerprintMismatch, stale.Failures);
     }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -65,6 +66,57 @@ public sealed class ProgramTests
         Assert.True(called);
     }
 
+    [Fact]
+    public async Task Test_gate_final_rejects_unverified_or_changed_repository_provenance()
+    {
+        var args = TestGateArguments("Final")
+            .Concat(new[] { "--approval", "approval.json", "--revision", Revision })
+            .ToArray();
+        var calls = 0;
+        var runnerCalled = false;
+
+        var rejectedBeforeRun = await Program.RunAsync(
+            args,
+            (_, _) => throw new InvalidOperationException(),
+            (_, _) => throw new InvalidOperationException(),
+            (_, _) =>
+            {
+                runnerCalled = true;
+                return Task.FromResult(new TestGateRunResult(TestGateRunStatus.Succeeded, Array.Empty<TestGateFrameworkResult>()));
+            },
+            CancellationToken.None,
+            _ => false);
+        var rejectedAfterRun = await Program.RunAsync(
+            args,
+            (_, _) => throw new InvalidOperationException(),
+            (_, _) => throw new InvalidOperationException(),
+            (_, _) => Task.FromResult(new TestGateRunResult(TestGateRunStatus.Succeeded, Array.Empty<TestGateFrameworkResult>())),
+            CancellationToken.None,
+            _ => ++calls == 1);
+
+        Assert.Equal(3, rejectedBeforeRun);
+        Assert.False(runnerCalled);
+        Assert.Equal(3, rejectedAfterRun);
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public void Final_provenance_requires_exact_tracked_manifest_HEAD_and_clean_tree()
+    {
+        using var repository = new ProvenanceRepository();
+        var options = repository.Options();
+
+        Assert.True(TestGateProvenance.Verify(options));
+        Assert.False(TestGateProvenance.Verify(options with
+        {
+            ManifestPath = Path.Combine(repository.Root, "external.json"),
+        }));
+        Assert.False(TestGateProvenance.Verify(options with { Revision = Revision }));
+
+        File.AppendAllText(repository.Manifest, Environment.NewLine);
+        Assert.False(TestGateProvenance.Verify(options));
+    }
+
     [Theory]
     [InlineData("duplicate")]
     [InlineData("unknown")]
@@ -113,7 +165,77 @@ public sealed class ProgramTests
             called(options);
             return Task.FromResult(new TestGateRunResult(TestGateRunStatus.Succeeded, Array.Empty<TestGateFrameworkResult>()));
         },
-        CancellationToken.None);
+        CancellationToken.None,
+        _ => true);
+
+    private sealed class ProvenanceRepository : IDisposable
+    {
+        public ProvenanceRepository()
+        {
+            Root = Path.Combine(Path.GetTempPath(), "MyDmsVn.Provenance", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(Root, "tests"));
+            Manifest = Path.Combine(Root, "tests", "test-gates.v1.json");
+            File.WriteAllText(Manifest, "{}");
+            File.WriteAllText(Path.Combine(Root, ".gitignore"), ".artifacts/" + Environment.NewLine);
+            Git("init");
+            Git("config", "user.email", "test@example.invalid");
+            Git("config", "user.name", "Test");
+            Git("add", ".");
+            Git("commit", "-m", "fixture");
+            RevisionValue = Git("rev-parse", "HEAD").Trim();
+        }
+
+        public string Root { get; }
+        public string Manifest { get; }
+        public string RevisionValue { get; }
+
+        public TestGateRunOptions Options() => new(
+            Root,
+            Manifest,
+            TestGateMode.Final,
+            "20261016-001",
+            "TESTGATE-T03",
+            Path.Combine(Root, ".artifacts"),
+            Path.Combine(Root, "approval.json"),
+            RevisionValue);
+
+        public void Dispose()
+        {
+            foreach (var file in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories))
+            {
+                File.SetAttributes(file, FileAttributes.Normal);
+            }
+
+            Directory.Delete(Root, recursive: true);
+        }
+
+        private string Git(params string[] arguments)
+        {
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    WorkingDirectory = Root,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                },
+            };
+            foreach (var argument in arguments)
+            {
+                process.StartInfo.ArgumentList.Add(argument);
+            }
+
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            var error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            Assert.True(process.ExitCode == 0, error);
+            return output;
+        }
+    }
 
     [Fact]
     public async Task Baseline_required_report_failure_maps_to_exit_code_three_without_SQL()

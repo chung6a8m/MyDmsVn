@@ -291,7 +291,6 @@ public static class LogicalCaseInventoryReconciler
                     StringComparison.Ordinal))
                 .ToArray();
             if (matches.Length == 0 ||
-                !SetEquals(exemption.Classification, new[] { "NonSql" }) ||
                 matches.Any(item =>
                     !SetEquals(item.Classification, exemption.Classification) ||
                     !string.Equals(
