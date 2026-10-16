@@ -16,6 +16,14 @@ namespace MyDmsVn.SqlTestRunner.Tests.Gates;
 public sealed class TestGateCoordinatorTestsFinal
 {
     [Fact]
+    public void Sequential_gate_timeout_budget_is_additive()
+    {
+        Assert.Equal(
+            TimeSpan.FromSeconds(8100),
+            TestGateTimeoutBudget.Calculate(new[] { 900, 7200 }));
+    }
+
+    [Fact]
     public async Task Final_SQL_gate_holds_one_lease_through_T02_reconciliation_and_report()
     {
         using var repository = new FinalRepository();

@@ -25,6 +25,33 @@ public enum TestGateRunStatus
     Incomplete,
 }
 
+internal static class TestGateTimeoutBudget
+{
+    public static TimeSpan Calculate(IEnumerable<int> sequentialGateTimeoutSeconds)
+    {
+        ArgumentNullException.ThrowIfNull(sequentialGateTimeoutSeconds);
+        long totalSeconds = 0;
+        var hasGate = false;
+        foreach (var seconds in sequentialGateTimeoutSeconds)
+        {
+            if (seconds <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sequentialGateTimeoutSeconds));
+            }
+
+            totalSeconds = checked(totalSeconds + seconds);
+            hasGate = true;
+        }
+
+        if (!hasGate)
+        {
+            throw new ArgumentException("At least one sequential gate timeout is required.", nameof(sequentialGateTimeoutSeconds));
+        }
+
+        return TimeSpan.FromSeconds(totalSeconds);
+    }
+}
+
 public sealed record TestGateRunOptions(
     string RepositoryRoot,
     string ManifestPath,
@@ -160,8 +187,9 @@ public sealed class TestGateCoordinator
             return new TestGateRunResult(TestGateRunStatus.ResourceDenied, runs);
         }
 
-        var overallSeconds = selection.Gates.Min(gate => gate.OverallTimeoutSeconds);
-        using var overall = new CancellationTokenSource(TimeSpan.FromSeconds(overallSeconds));
+        var overallTimeout = TestGateTimeoutBudget.Calculate(
+            selection.Gates.Select(gate => gate.OverallTimeoutSeconds));
+        using var overall = new CancellationTokenSource(overallTimeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, overall.Token);
         try
         {
