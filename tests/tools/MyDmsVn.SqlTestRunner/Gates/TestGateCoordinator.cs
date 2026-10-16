@@ -8,10 +8,13 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Inventory;
+using MyDmsVn.SqlTestRunner.Benchmark;
 using MyDmsVn.SqlTestRunner.Processes;
 using MyDmsVn.SqlTestRunner.Reconciliation;
 using MyDmsVn.SqlTestRunner.Reporting;
 using MyDmsVn.SqlTestRunner.Trx;
+using MyDmsVn.SqlTestHarness;
+using MyDmsVn.SqlTestHarness.Approval;
 
 namespace MyDmsVn.SqlTestRunner.Gates;
 
@@ -55,20 +58,76 @@ public sealed class TestGateSourceInventory : ITestGateSourceInventory
         TestMethodInventory.Read(assemblyPath);
 }
 
+public interface ITestGateApprovalReader
+{
+    bool TryLoad(string path, out string fingerprint);
+}
+
+public sealed class TestGateApprovalReader : ITestGateApprovalReader
+{
+    public bool TryLoad(string path, out string fingerprint)
+    {
+        try
+        {
+            fingerprint = SqlInstanceApprovalLoader.Load(path).FingerprintSha256;
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            fingerprint = string.Empty;
+            return false;
+        }
+    }
+}
+
+public interface ITestGateSqlAcceptanceRunner
+{
+    Task<BenchmarkRunResult> RunAsync(BenchmarkRunOptions options, CancellationToken cancellationToken);
+}
+
+public sealed class TestGateSqlAcceptanceRunner : ITestGateSqlAcceptanceRunner
+{
+    private readonly IProcessRunner _processes;
+
+    public TestGateSqlAcceptanceRunner(IProcessRunner processes)
+    {
+        _processes = processes;
+    }
+
+    public Task<BenchmarkRunResult> RunAsync(
+        BenchmarkRunOptions options,
+        CancellationToken cancellationToken) => new BenchmarkRunCoordinator(
+            new EnvironmentPreflightGate(),
+            _processes,
+            reportExporter: new SqlAcceptanceReportExporter()).RunAsync(options, cancellationToken);
+}
+
 public sealed class TestGateCoordinator
 {
     private readonly IProcessRunner _processes;
     private readonly ITestGateSourceInventory _sourceInventory;
     private readonly ITestGateReportExporter _reports;
+    private readonly ITestGateApprovalReader _approval;
+    private readonly ISqlExecutionLeaseFactory _leases;
+    private readonly ITestGateSqlAcceptanceRunner _sqlAcceptance;
+    private readonly IAbandonedSqlRunRecovery? _recovery;
 
     public TestGateCoordinator(
         IProcessRunner processes,
         ITestGateSourceInventory sourceInventory,
-        ITestGateReportExporter reports)
+        ITestGateReportExporter reports,
+        ITestGateApprovalReader? approval = null,
+        ISqlExecutionLeaseFactory? leases = null,
+        ITestGateSqlAcceptanceRunner? sqlAcceptance = null,
+        IAbandonedSqlRunRecovery? recovery = null)
     {
         _processes = processes;
         _sourceInventory = sourceInventory;
         _reports = reports;
+        _approval = approval ?? new TestGateApprovalReader();
+        _leases = leases ?? new SqlExecutionLeaseFactory();
+        _sqlAcceptance = sqlAcceptance ?? new TestGateSqlAcceptanceRunner(processes);
+        _recovery = recovery;
     }
 
     public async Task<TestGateRunResult> RunAsync(
@@ -131,6 +190,23 @@ public sealed class TestGateCoordinator
             var manifestFingerprint = HashFile(options.ManifestPath);
             foreach (var gate in selection.Gates)
             {
+                if (gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
+                {
+                    var sqlStatus = await RunSqlGateAsync(
+                        options,
+                        manifest,
+                        gate,
+                        manifestFingerprint,
+                        runs,
+                        linked.Token).ConfigureAwait(false);
+                    if (sqlStatus != TestGateRunStatus.Succeeded)
+                    {
+                        return new TestGateRunResult(sqlStatus, runs);
+                    }
+
+                    continue;
+                }
+
                 if (gate.StrictMode != TestGateStrictMode.DotnetTest)
                 {
                     return new TestGateRunResult(TestGateRunStatus.ResourceDenied, runs);
@@ -260,6 +336,170 @@ public sealed class TestGateCoordinator
         }
     }
 
+    private async Task<TestGateRunStatus> RunSqlGateAsync(
+        TestGateRunOptions options,
+        TestGateManifest manifest,
+        TestGateDefinition gate,
+        string manifestFingerprint,
+        List<TestGateFrameworkResult> frameworks,
+        CancellationToken cancellationToken)
+    {
+        if (options.Mode != TestGateMode.Final ||
+            string.IsNullOrWhiteSpace(options.ApprovalFile) ||
+            string.IsNullOrWhiteSpace(options.Revision) ||
+            !gate.Frameworks.SequenceEqual(new[] { "net48", "net8.0" }, StringComparer.Ordinal) ||
+            !_approval.TryLoad(options.ApprovalFile, out var instanceFingerprint))
+        {
+            return TestGateRunStatus.ResourceDenied;
+        }
+
+        var recovery = _recovery ?? new BenchmarkAbandonedSqlRunRecovery(options.ApprovalFile);
+        var acquired = await _leases.AcquireAsync(
+            new SqlExecutionLeaseRequest(
+                instanceFingerprint,
+                options.PlanId + "/" + options.TaskId + "/" + gate.GateId,
+                options.ArtifactRoot,
+                TimeSpan.FromSeconds(gate.CommandTimeoutSeconds),
+                recovery),
+            cancellationToken).ConfigureAwait(false);
+        if (acquired.Lease is null ||
+            acquired.Status is SqlExecutionLeaseAcquireStatus.TimedOut or
+                SqlExecutionLeaseAcquireStatus.Cancelled or
+                SqlExecutionLeaseAcquireStatus.BlockedRecovery)
+        {
+            return TestGateRunStatus.ResourceDenied;
+        }
+
+        try
+        {
+            Environment.SetEnvironmentVariable(
+                SqlTestHarnessEnvironment.ApprovalFileVariable,
+                options.ApprovalFile);
+            var benchmark = await _sqlAcceptance.RunAsync(
+                new BenchmarkRunOptions(
+                    options.RepositoryRoot,
+                    FullPath(options.RepositoryRoot, gate.Project),
+                    options.ArtifactRoot,
+                    options.ApprovalFile,
+                    gate.Frameworks,
+                    TimeSpan.FromSeconds(gate.CommandTimeoutSeconds),
+                    WarmupPasses: 0,
+                    MeasuredPasses: 1,
+                    OverallRunTimeout: TimeSpan.FromSeconds(gate.OverallTimeoutSeconds))
+                {
+                    Mode = "pr-acceptance",
+                    Revision = options.Revision,
+                },
+                cancellationToken).ConfigureAwait(false);
+            if (!benchmark.IsComplete || benchmark.Runs.Count != gate.Frameworks.Count ||
+                !benchmark.Runs.Select(run => run.Tfm).SequenceEqual(gate.Frameworks, StringComparer.Ordinal))
+            {
+                return TestGateRunStatus.Incomplete;
+            }
+
+            var expected = new List<ExpectedLogicalCase>();
+            var source = new List<BoundLogicalCase>();
+            var discovered = new List<BoundLogicalCase>();
+            var executed = new List<ExecutedLogicalCase>();
+            foreach (var run in benchmark.Runs)
+            {
+                var project = FullPath(options.RepositoryRoot, gate.Project);
+                var sourceBinding = LogicalCaseBinder.BindSource(
+                    _sourceInventory.Read(AssemblyPath(project, run.Tfm)),
+                    manifest.LogicalCases,
+                    gate.Project,
+                    run.Tfm);
+                var discoveryBinding = LogicalCaseBinder.BindDiscovery(
+                    VstestDiscoveryParser.Parse(run.DiscoveryOutput, run.Tfm),
+                    manifest.LogicalCases,
+                    gate.Project,
+                    run.Tfm);
+                var trx = TrxResultParser.TryParse(run.TrxPath, run.Tfm);
+                if (!trx.IsComplete)
+                {
+                    return TestGateRunStatus.Incomplete;
+                }
+
+                var executionBinding = LogicalCaseBinder.BindExecution(
+                    trx.Results,
+                    manifest.LogicalCases,
+                    gate.Project,
+                    run.Tfm);
+                if (!sourceBinding.IsComplete || !discoveryBinding.IsComplete || !executionBinding.IsComplete)
+                {
+                    return TestGateRunStatus.Incomplete;
+                }
+
+                source.AddRange(sourceBinding.Cases);
+                discovered.AddRange(discoveryBinding.Cases);
+                executed.AddRange(executionBinding.Cases);
+                expected.AddRange(sourceBinding.Cases.Select(item => new ExpectedLogicalCase(
+                    item.LogicalKey,
+                    item.LogicalCaseId,
+                    item.OwnerProject,
+                    item.Tfm,
+                    item.NormalizedMethodSignature,
+                    item.RowKey,
+                    item.ReviewedCodeFingerprint,
+                    item.Classification)));
+                frameworks.Add(new TestGateFrameworkResult(
+                    gate.GateId,
+                    run.Tfm,
+                    sourceBinding.Cases.Count,
+                    discoveryBinding.Cases.Count,
+                    executionBinding.Cases.Count,
+                    run.Command.Duration));
+            }
+
+            if (!LogicalCaseInventoryReconciler.Reconcile(
+                    expected,
+                    source,
+                    discovered,
+                    executed,
+                    manifest.IdentityMappings,
+                    manifest.Exemptions).IsComplete)
+            {
+                return TestGateRunStatus.Incomplete;
+            }
+
+            var report = await _reports.ExportAsync(
+                new TestGateReportEvidence(
+                    Path.Combine(options.ArtifactRoot, gate.GateId + ".sanitized.json"),
+                    options.PlanId,
+                    options.TaskId,
+                    options.Mode,
+                    gate.GateId,
+                    options.Revision,
+                    manifestFingerprint,
+                    gate.Frameworks.Select(tfm => gate.Module + "/" + tfm).ToArray(),
+                    source.Count,
+                    discovered.Count,
+                    executed.Count,
+                    executed.Count(item => item.Outcome == TestOutcome.Passed),
+                    executed.Count(item => item.Outcome == TestOutcome.Failed),
+                    executed.Count(item => item.Outcome == TestOutcome.Skipped),
+                    TimeSpan.FromTicks(benchmark.Runs.Sum(run => run.Command.Duration.Ticks)),
+                    TimedOut: benchmark.Runs.Any(run => run.Command.TimedOut),
+                    ResourceDenied: false,
+                    RecoveryRequired: acquired.Status == SqlExecutionLeaseAcquireStatus.Recovered,
+                    WatchdogClean: benchmark.Runs.All(run => !run.Command.TimedOut),
+                    OwnershipClean: benchmark.IsComplete,
+                    InventoryComplete: true,
+                    PrivateValues: new[]
+                    {
+                        options.ArtifactRoot,
+                        options.ApprovalFile,
+                        instanceFingerprint,
+                    }),
+                cancellationToken).ConfigureAwait(false);
+            return report.IsComplete ? TestGateRunStatus.Succeeded : TestGateRunStatus.Incomplete;
+        }
+        finally
+        {
+            await acquired.Lease.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
     private Task<CommandResult> RunCommand(
         string arguments,
         TestGateRunOptions options,
@@ -326,4 +566,49 @@ public sealed class TestGateCoordinator
         OwnershipClean: true,
         InventoryComplete: true,
         PrivateValues: new[] { options.ArtifactRoot, options.ApprovalFile ?? string.Empty });
+}
+
+internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecovery
+{
+    private readonly string _approvalFile;
+
+    public BenchmarkAbandonedSqlRunRecovery(string approvalFile)
+    {
+        _approvalFile = approvalFile;
+    }
+
+    public async Task<bool> ReconcileAsync(AbandonedSqlRun lease, CancellationToken cancellationToken)
+    {
+        var ownershipRoot = Path.Combine(lease.PrivateArtifactRoot, "ownership");
+        if (!Directory.Exists(ownershipRoot))
+        {
+            return false;
+        }
+
+        var journals = Directory.GetDirectories(ownershipRoot);
+        if (journals.Length == 0)
+        {
+            return false;
+        }
+
+        var gate = new BenchmarkOwnershipGate();
+        foreach (var journal in journals)
+        {
+            var runId = Path.GetFileName(journal);
+            var result = await gate.ValidateAsync(
+                new BenchmarkOwnershipEvidence(
+                    runId,
+                    journal,
+                    Path.Combine(lease.PrivateArtifactRoot, "ownership-recovery-" + runId + ".json"),
+                    _approvalFile,
+                    ProcessSucceeded: false),
+                cancellationToken).ConfigureAwait(false);
+            if (!result.IsComplete)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

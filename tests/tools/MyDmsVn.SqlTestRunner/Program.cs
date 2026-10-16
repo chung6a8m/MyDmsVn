@@ -195,7 +195,10 @@ internal static class Program
         return await new TestGateCoordinator(
                 runner,
                 new TestGateSourceInventory(),
-                new TestGateReportExporter())
+                new TestGateReportExporter(),
+                new TestGateApprovalReader(),
+                new SqlExecutionLeaseFactory(),
+                new TestGateSqlAcceptanceRunner(runner))
             .RunAsync(options, cancellationToken)
             .ConfigureAwait(false);
     }
