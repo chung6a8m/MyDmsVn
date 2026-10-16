@@ -8,7 +8,7 @@
 |---:|---|---|
 | 1 | [TESTGATE-T01–T03 — task gates](plans/20261016-001-task-gates-and-modular-tests.md) | **Verified/complete; retained ACTIVE for mandatory context and acceptance policy**, do not rerun T01–T03 by default |
 | 2 | [NET8-PAUSE — temporary second-TFM removal](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | Accepted and merged as PR #32; duration comparison waived, not measured |
-| 3 | [TESTGATE-T04/T05 — modular test projects](plans/20261016-002-modular-test-projects.md) | Active; T04-A baseline verified at `c7bc4c8`, T04-B/C/D and T05-A/B/C/D remain open |
+| 3 | [TESTGATE-T04/T05 — modular test projects](plans/20261016-002-modular-test-projects.md) | Complete at frozen code revision `973109f`; active SQL `net48` Final passed, historical `net8.0` remains parked/not run |
 | 4 | [SEC-REBUILD — permission system](plans/20261016-003-permission-system-rebuild.md) | Proposed; replace legacy permission system only after T04/T05 verification |
 | 5 | [P5 GUI acceptance + P6 local hardening remainder](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | **Open**; remaining two P5 manual UI gates + P6 T01–T04 operational gaps and T05–T08 release checks |
 | 6 | [P7 — remote API](plans/20261008-008-phase-7-remote-api.md) | Not started; requires completed P6 and restored `net8.0` support (unless independently revised and approved) |
