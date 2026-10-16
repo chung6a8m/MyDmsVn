@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Processes;
@@ -66,6 +67,55 @@ public sealed class OwnedProcessRunnerTests
         Assert.Equal(0, result.ExitCode);
         Assert.False(result.TimedOut);
         Assert.Empty(result.TerminatedProcessIds);
+    }
+
+    [Fact]
+    public async Task Gui_owned_runner_times_out_and_terminates_child_holding_inherited_pipes_after_root_exit()
+    {
+        var childIdFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".pid");
+        var escapedPath = childIdFile.Replace("'", "''", StringComparison.Ordinal);
+        var command = "$startInfo=[System.Diagnostics.ProcessStartInfo]::new('powershell.exe','-NoProfile -Command Start-Sleep -Seconds 30'); $startInfo.UseShellExecute=$false; $startInfo.CreateNoWindow=$true; $child=[System.Diagnostics.Process]::Start($startInfo); [IO.File]::WriteAllText('" + escapedPath + "',[string]$child.Id); exit 0";
+        using var runner = new GuiOwnedProcessRunner();
+        Task<CommandResult>? run = null;
+        try
+        {
+            run = runner.RunAsync(
+                new CommandSpec("powershell.exe", "-NoProfile -Command \"" + command + "\"",
+                    Environment.CurrentDirectory, TimeSpan.FromSeconds(2)),
+                CancellationToken.None);
+            var completed = await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(8)));
+
+            Assert.Same(run, completed);
+            var result = await run;
+            Assert.True(result.TimedOut);
+            Assert.True(File.Exists(childIdFile));
+            var childId = int.Parse(File.ReadAllText(childIdFile));
+            Assert.Contains(childId, result.TerminatedProcessIds);
+            Assert.Throws<ArgumentException>(() => Process.GetProcessById(childId));
+        }
+        finally
+        {
+            if (File.Exists(childIdFile))
+            {
+                var childId = int.Parse(File.ReadAllText(childIdFile));
+                try
+                {
+                    using var child = Process.GetProcessById(childId);
+                    if (!child.HasExited) child.Kill(entireProcessTree: true);
+                }
+                catch (ArgumentException)
+                {
+                }
+
+                File.Delete(childIdFile);
+            }
+
+            if (run is not null)
+            {
+                try { await run.WaitAsync(TimeSpan.FromSeconds(5)); }
+                catch (TimeoutException) { }
+            }
+        }
     }
 
     [Fact]

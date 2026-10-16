@@ -21,20 +21,22 @@ public sealed class GuiOwnedProcessRunner : IProcessRunner, IDisposable
         using var owned = SuspendedOwnedProcess.Start(command, job);
         var process = owned.Process;
         var processId = process.Id;
-        var stdout = owned.StandardOutput.ReadToEndAsync();
-        var stderr = owned.StandardError.ReadToEndAsync();
         using var deadline = new CancellationTokenSource(command.Timeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+        var stdout = owned.StandardOutput.ReadToEndAsync(linked.Token);
+        var stderr = owned.StandardError.ReadToEndAsync(linked.Token);
         var unexpectedWindow = string.Empty;
         var timedOut = false;
+        var terminated = new HashSet<int>();
 
         try
         {
-            while (!process.HasExited)
+            while (GetJobProcessIds(job).Length != 0)
             {
                 unexpectedWindow = FindVisibleJobWindow(job);
                 if (unexpectedWindow.Length != 0)
                 {
+                    terminated.UnionWith(GetJobProcessIds(job));
                     job.Terminate(3);
                     break;
                 }
@@ -47,45 +49,42 @@ public sealed class GuiOwnedProcessRunner : IProcessRunner, IDisposable
         catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             timedOut = true;
+            terminated.UnionWith(GetJobProcessIds(job));
             job.Terminate(1460);
             await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
         }
         catch
         {
+            terminated.UnionWith(GetJobProcessIds(job));
             job.Terminate(1223);
             throw;
         }
 
+        if (!timedOut && !process.HasExited)
+        {
+            await process.WaitForExitAsync(linked.Token).ConfigureAwait(false);
+        }
+
         var exitCode = timedOut ? -1 : owned.ExitCode;
 
-        var output = await stdout.ConfigureAwait(false);
-        var error = await stderr.ConfigureAwait(false);
+        var output = await Drain(stdout, timedOut).ConfigureAwait(false);
+        var error = await Drain(stderr, timedOut).ConfigureAwait(false);
         if (unexpectedWindow.Length != 0)
         {
             error += Environment.NewLine + "[MYDMSVN-UNEXPECTED-UI] " + unexpectedWindow;
         }
 
-        var systemProcesses = Process.GetProcesses();
-        int[] orphans;
-        try
-        {
-            orphans = systemProcesses.Select(candidate => candidate.Id)
-                .Where(id => id != processId && job.ContainsProcess(id))
-                .ToArray();
-        }
-        finally
-        {
-            foreach (var candidate in systemProcesses) candidate.Dispose();
-        }
+        var orphans = GetJobProcessIds(job).Where(id => id != processId).ToArray();
         if (orphans.Length != 0)
         {
+            terminated.UnionWith(orphans);
             job.Terminate(3);
         }
 
         stopwatch.Stop();
-        var forced = timedOut || unexpectedWindow.Length != 0 || orphans.Length != 0;
+        var forced = timedOut || unexpectedWindow.Length != 0 || orphans.Length != 0 || terminated.Count != 0;
         return new CommandResult(forced ? -1 : exitCode, timedOut, processId, output, error,
-            forced ? new[] { processId }.Concat(orphans).ToArray() : Array.Empty<int>(), stopwatch.Elapsed);
+            forced ? new[] { processId }.Concat(terminated).Concat(orphans).Distinct().ToArray() : Array.Empty<int>(), stopwatch.Elapsed);
     }
 
     public void Dispose() => _disposed = true;
@@ -105,6 +104,33 @@ public sealed class GuiOwnedProcessRunner : IProcessRunner, IDisposable
             return false;
         }, IntPtr.Zero);
         return found;
+    }
+
+    private static int[] GetJobProcessIds(WindowsJobObject job)
+    {
+        var processes = Process.GetProcesses();
+        try
+        {
+            return processes.Where(candidate => job.ContainsProcess(candidate.Id))
+                .Select(candidate => candidate.Id)
+                .ToArray();
+        }
+        finally
+        {
+            foreach (var candidate in processes) candidate.Dispose();
+        }
+    }
+
+    private static async Task<string> Drain(Task<string> output, bool timedOut)
+    {
+        try
+        {
+            return await output.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (timedOut)
+        {
+            return string.Empty;
+        }
     }
 
     private static bool IsUnexpectedDialog(IntPtr window)

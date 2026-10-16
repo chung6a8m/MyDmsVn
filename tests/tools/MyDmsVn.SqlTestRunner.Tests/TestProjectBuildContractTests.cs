@@ -21,14 +21,14 @@ public sealed class TestProjectBuildContractTests
         var document = XDocument.Load(projectPath);
         var invocations = document.Descendants("MSBuild").ToArray();
 
-        Assert.Contains(document.Descendants("Exec"), element =>
-            ((string?)element.Attribute("Command"))?.Contains("dotnet restore", StringComparison.Ordinal) == true &&
-            ((string?)element.Attribute("Command"))?.Contains(
-                "MyDmsVn.Server.Infrastructure.IntegrationTests.csproj",
-                StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(document.Descendants("Exec"), element =>
+            ((string?)element.Attribute("Command"))?.Contains("dotnet restore", StringComparison.Ordinal) == true);
         Assert.Contains(invocations, element =>
             ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true);
+        Assert.Equal(2, invocations.Count(element =>
+            ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
+            ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true));
         Assert.DoesNotContain(invocations, element =>
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net8.0", StringComparison.Ordinal) == true);
     }

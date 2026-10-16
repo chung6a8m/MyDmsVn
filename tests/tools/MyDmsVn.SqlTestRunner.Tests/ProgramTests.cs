@@ -107,6 +107,8 @@ public sealed class ProgramTests
         var options = repository.Options();
 
         Assert.True(TestGateProvenance.Verify(options));
+        Assert.True(TestGateProvenance.VerifyCleanRevision(repository.Root, repository.RevisionValue));
+        Assert.False(TestGateProvenance.VerifyCleanRevision(repository.Root, Revision));
         Assert.False(TestGateProvenance.Verify(options with
         {
             ManifestPath = Path.Combine(repository.Root, "external.json"),

@@ -22,6 +22,8 @@ public sealed record GuiTestAcceptanceOptions(
     string Revision = "")
 {
     public string TrxPath => Path.Combine(ArtifactRoot, "desktop-d2-" + Framework + ".trx");
+    public string ApprovedProjectPath { get; init; } = string.Empty;
+    public IReadOnlyList<string> ApprovedFrameworks { get; init; } = Array.Empty<string>();
 }
 
 public sealed record GuiTestAcceptanceResult(
@@ -29,7 +31,11 @@ public sealed record GuiTestAcceptanceResult(
     int SourceMethods,
     int DiscoveredCases,
     int ExecutedCases,
-    TimeSpan Duration);
+    TimeSpan Duration)
+{
+    public string Project { get; init; } = string.Empty;
+    public string Framework { get; init; } = string.Empty;
+}
 
 public interface IGuiTestSourceInventory
 {
@@ -164,8 +170,8 @@ public sealed class GuiTestAcceptanceCoordinator
         CancellationToken cancellationToken)
     {
         if (!OperatingSystem.IsWindows() ||
-            !string.Equals(options.Framework, "net48", StringComparison.Ordinal) ||
             options.Timeout <= TimeSpan.Zero ||
+            !IsApprovedTarget(options) ||
             !File.Exists(options.ProjectPath))
         {
             return Incomplete();
@@ -176,6 +182,10 @@ public sealed class GuiTestAcceptanceCoordinator
 
         Directory.CreateDirectory(options.ArtifactRoot);
         if (File.Exists(options.TrxPath)) File.Delete(options.TrxPath);
+
+        var build = await RunBuild(options, cancellationToken).ConfigureAwait(false);
+        if (!Accept(build)) return Incomplete();
+
         var projectName = Path.GetFileNameWithoutExtension(options.ProjectPath);
         var assembly = Path.Combine(Path.GetDirectoryName(options.ProjectPath)!, "bin", "Release",
             options.Framework, projectName + ".dll");
@@ -199,12 +209,72 @@ public sealed class GuiTestAcceptanceCoordinator
 
         var sourceMethods = source.Select(item => item.FullyQualifiedName).ToHashSet(StringComparer.Ordinal);
         var discoveredMethods = discovered.Select(item => item.MethodName).ToHashSet(StringComparer.Ordinal);
-        var discoveredRows = discovered.Select(item => item.PhysicalRowLocator).ToHashSet(StringComparer.Ordinal);
-        var executedRows = trx.Results.Select(item => item.PhysicalRowLocator).ToHashSet(StringComparer.Ordinal);
-        var complete = sourceMethods.SetEquals(discoveredMethods) && discoveredRows.SetEquals(executedRows) &&
+        var discoveredRows = discovered.Select(item => item.PhysicalRowLocator);
+        var executedRows = trx.Results.Select(item => item.PhysicalRowLocator);
+        var complete = sourceMethods.SetEquals(discoveredMethods) && SameMultiset(discoveredRows, executedRows) &&
             discovered.Count == trx.Results.Count;
+        var project = Path.GetRelativePath(Path.GetFullPath(options.RepositoryRoot), Path.GetFullPath(options.ProjectPath))
+            .Replace(Path.DirectorySeparatorChar, '/');
         return new GuiTestAcceptanceResult(complete, source.Count, discovered.Count, trx.Results.Count,
-            discovery.Duration + execution.Duration);
+            build.Duration + discovery.Duration + execution.Duration)
+        {
+            Project = project,
+            Framework = options.Framework,
+        };
+    }
+
+    private static bool IsApprovedTarget(GuiTestAcceptanceOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.ApprovedProjectPath) ||
+            options.ApprovedFrameworks.Count == 0 ||
+            !options.ApprovedFrameworks.Contains(options.Framework, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        try
+        {
+            return string.Equals(
+                Path.GetFullPath(options.ProjectPath),
+                Path.GetFullPath(options.ApprovedProjectPath),
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private async Task<CommandResult> RunBuild(
+        GuiTestAcceptanceOptions options,
+        CancellationToken cancellationToken)
+    {
+        var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["MYDMSVN_GUI_ACCEPTANCE"] = "1",
+        };
+        return await _processes.RunAsync(new CommandSpec("dotnet",
+            "build \"" + options.ProjectPath + "\" -c Release -f " + options.Framework + " --no-restore",
+            options.RepositoryRoot, options.Timeout, environment), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static bool SameMultiset(IEnumerable<string> left, IEnumerable<string> right)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var value in left)
+        {
+            counts.TryGetValue(value, out var count);
+            counts[value] = count + 1;
+        }
+
+        foreach (var value in right)
+        {
+            if (!counts.TryGetValue(value, out var count)) return false;
+            if (count == 1) counts.Remove(value);
+            else counts[value] = count - 1;
+        }
+
+        return counts.Count == 0;
     }
 
     private async Task<CommandResult> Run(

@@ -205,9 +205,25 @@ internal static class Program
             return 64;
         }
 
+        var repositoryRoot = Path.GetFullPath(values["repo"]);
+        if (!TestGateProvenance.VerifyCleanRevision(repositoryRoot, values["revision"])) return 3;
+        var manifestPath = Path.Combine(repositoryRoot, "tests", "test-gates.v1.json");
+        TestFrameworkProfile? profile;
+        try { profile = TestGateManifestLoader.Load(manifestPath).FrameworkProfile; }
+        catch (InvalidDataException) { return 64; }
+        if (profile is null) return 64;
+
+        var projectPath = Path.IsPathRooted(values["project"])
+            ? Path.GetFullPath(values["project"])
+            : Path.GetFullPath(Path.Combine(repositoryRoot, values["project"]));
         var options = new GuiTestAcceptanceOptions(
-            Path.GetFullPath(values["repo"]), Path.GetFullPath(values["project"]), values["framework"],
-            Path.GetFullPath(values["artifacts"]), TimeSpan.FromSeconds(timeoutSeconds), values["revision"]);
+            repositoryRoot, projectPath, values["framework"],
+            Path.GetFullPath(values["artifacts"]), TimeSpan.FromSeconds(timeoutSeconds), values["revision"])
+        {
+            ApprovedProjectPath = Path.GetFullPath(Path.Combine(repositoryRoot,
+                profile.GuiProject.Replace('/', Path.DirectorySeparatorChar))),
+            ApprovedFrameworks = profile.ActiveGuiFrameworks,
+        };
         using var runner = new GuiOwnedProcessRunner();
         var result = await new GuiTestAcceptanceCoordinator(
             runner, new GuiTestSourceInventory(), new GuiProcessSafetyProbe(), new GlobalGuiExecutionLease())
@@ -219,6 +235,7 @@ internal static class Program
             schemaVersion = 1,
             revision = options.Revision,
             framework = options.Framework,
+            project = result.Project,
             sourceMethods = result.SourceMethods,
             discoveredCases = result.DiscoveredCases,
             executedCases = result.ExecutedCases,
