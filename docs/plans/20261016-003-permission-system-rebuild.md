@@ -9,19 +9,22 @@
 **Tech stack:** Existing C# targets `net48`, `net8.0`, `net8.0-windows` as declared; WinForms, current Application/Contracts/Local adapters, SQL Server, DbUp, explicit UnitOfWork, RepoDb/Dapper and xUnit. No library/framework replacement.  
 **Spec:** [ADR 0007 — Code-defined permissions and a single configured superuser](../adr/0007-code-defined-permissions-and-single-superuser.md).
 
+**Roadmap/TFM prerequisite (2026-10-16):** SEC-REBUILD comes **after** [NET8-PAUSE](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) and [TESTGATE T04/T05](20261016-002-modular-test-projects.md). Both are proposed and **not yet implemented** at this planning revision. The `net48` / `net8.0` matrices and two-target strict SQL commands below describe the original baseline. At actual T00, bind gates to the **real reviewed active target list**: after a verified pause, `net48` is the active SQL/WinForms target, while parked .NET 8 coverage remains historical and must be fully restored/reverified before P7. Do not execute unsupported TFMs, delete their historical logical-case identities or treat them as PASS; preserve strict unfiltered Final on every approved *active* TFM. Net8-only gate tooling may remain as a proven tooling dependency. Until pause implementation is verified, current dual-TFM gates still apply.
+
 ## 1. Execution order, authority and workspace boundary
 
 The required order is:
 
 ```text
-20261016-001-task-gates-and-modular-tests.md  (TESTGATE T01–T03)
+20261016-001-task-gates-and-modular-tests.md  (TESTGATE T01–T03, verified)
+  -> 20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md (NET8-PAUSE)
   -> 20261016-002-modular-test-projects.md   (TESTGATE T04–T05)
   -> 20261016-003-permission-system-rebuild.md (SEC-REBUILD T00–T06)
 ```
 
 Read [AGENTS](../../AGENTS.md), the spec, [TESTGATE T01–T03](20261016-001-task-gates-and-modular-tests.md), [TESTGATE T04–T05](20261016-002-modular-test-projects.md), [test policy](../CODEX_TEST_EXECUTION_POLICY.md), [gate matrix](../TEST_GATE_MATRIX.md) and [test strategy](../TEST_STRATEGY.md).
 
-The owner reports T01–T03 implementation is local and uncommitted. This documentation PR is based on remote `main` commit `8a01b850ad91aaf0a9f67a894ee45b435cbe513e`; it cannot inspect, incorporate or certify those local edits. Do not reset/stash/overwrite that workspace, cherry-pick guessed implementation, move tests before T04/T05, or claim the future runner/project names exist. This PR adds only this plan and ADR 0007; it does not change the two prerequisite plans, AGENTS, test infrastructure or product code.
+Current repository T01–T03 Task/Final implementation is **verified**; the separate NET8-PAUSE and T04/T05 implementation gates are **not yet satisfied** at this planning revision. This documentation PR does not change application/runtime targets or implement the proposed split/security code. Do not reset/stash/overwrite a developer workspace, guess future runner/project names or move product tests before verified prerequisites.
 
 The documents may merge before the prerequisite code. Product implementation starts only after T00 verifies the committed/reviewed prerequisite results. Rebase the implementation branch onto that revision, then bind this plan to the actual project/TFM/runner manifest. Missing prerequisites mean **BLOCKED**, not permission to return to the old monolithic test path.
 
@@ -31,13 +34,13 @@ Explicit owner decisions and this plan/spec supersede conflicting requirements t
 
 - This is a **breaking replacement of an unused MVP**, not an upgrade adapter. Remove obsolete code, SQL objects, old commands, configuration and tests; no legacy/fallback/dual-path implementation, compatibility flag, old-data migration or retained SQL permission catalog.
 - Reset disposable developer/test databases explicitly; no automatic drop/reset in Login, startup, normal migration or this docs PR. Refuse unsupported nonempty databases before any new baseline DDL. Never alter an unapproved database or erase the test harness ownership/approval controls.
-- Keep `net48`/`net8.0` and Windows targets as actually declared. Keep RepoDb `1.16.0`, RepoDb.SqlServer `1.16.1`, RepoDb.SqlServer.BulkOperations `1.16.2`, DbUp, Dapper and explicit UnitOfWork. Follow `.editorconfig`/`.gitattributes` (Markdown UTF-8; CRLF working-tree policy).
+- Keep the **actually declared, approved active** targets (today dual-target; after NET8-PAUSE only the verified scoped matrix) and preserve reactivation. Keep RepoDb `1.16.0`, RepoDb.SqlServer `1.16.1`, RepoDb.SqlServer.BulkOperations `1.16.2`, DbUp, Dapper and explicit UnitOfWork. Follow `.editorconfig`/`.gitattributes` (Markdown UTF-8; CRLF working-tree policy).
 - The independent `PasswordHash`/`PasswordSalt` compatibility requirement in ADR 0003 is not permission-sync legacy and is not removed by this plan. No plaintext/default passwords, secrets in CLI arguments or privileged credentials in Desktop configuration.
 - A valid current session and active account are always required. Superuser bypass concerns registered Active application permissions only; never validation, business invariants, data boundaries, SQL privilege or session expiry.
 - One username-selected, database-bound superuser per application database; `Administrator` has no magic behavior. No user/role auto-grants, catalog activation, startup seeding or synchronization after adding a key.
 - All role/user changes are explicit, authorized and audited. Future catalog-only releases on the **new** baseline leave assignment rows unchanged; no old-system migration fixture is required.
 - Use local L1/L2 focused tests; one planned L3 acceptance invocation per code-bearing PR after edits freeze. No automatic full SQL/solution execution after every edit/task and no new CI rollout. Failure or later gate-affecting edits require a fresh applicable complete gate.
-- Keep real SQL, both required TFMs, approval, process-tree watchdog, independently reconciled source/discovery/TRX, zero mandatory skips, bounded execution and verified cleanup. Application permission approval removal does **not** remove `MYDMSVN_SQL_TEST_APPROVAL_FILE`.
+- Keep real SQL, **every approved active TFM** (currently both, after an accepted NET8-PAUSE scoped to its active matrix), approval, process-tree watchdog, independently reconciled source/discovery/TRX, zero mandatory skips, bounded execution and verified cleanup. Application permission approval removal does **not** remove `MYDMSVN_SQL_TEST_APPROVAL_FILE`.
 
 ### Review focus
 
@@ -198,7 +201,7 @@ New CLI names, implemented and tested before documented as executable: `security
 - [ ] Replace obsolete tests with new invariant tests and complete the per-key `retain/replace/delete-obsolete-behavior` ledger. Keep ordinary authorization, session, SQL privilege, transaction, ownership and migration-safety coverage. Test removals may reduce counts, but require explicit independent review; never weaken expected inventory just to make the gate pass.
 - [ ] Add the catalog-only release scenario using the **new baseline**: add a registered Active key to the composed application, prove it appears in catalog/export and is usable by superuser, deny an unassigned ordinary user, compare complete assignments before/after startup/export/migration, then deliberately grant and verify access. No old-system upgrade support is introduced.
 - [ ] Verify current runbook covers explicit disposable reset, new bootstrap, Login, manual assignment, JSON import, protected-account recovery/rename, Local trust limitation and sanitized audit. Update roadmap status only to the level proven by evidence; do not alter prerequisite task evidence/status.
-- [ ] Run missing focused L2 checks, freeze all gate-affecting inputs, then execute the **actual verified Final command** from T00 once as the planned L3 boundary. Include all required non-SQL/GUI Release gates and strict unfiltered **all SQL projects**, sequentially on `net48` and `net8.0`. No bare `dotnet test` substitute for the strict SQL gate.
+- [ ] Run missing focused L2 checks, freeze all gate-affecting inputs, then execute the **actual verified Final command** from T00 once as the planned L3 boundary. Include all required non-SQL/GUI Release gates and strict unfiltered **all SQL projects**, sequentially on **all actual approved active SQL TFMs** (currently `net48`/`net8.0`; after a verified NET8-PAUSE, `net48` only, until restored). No bare `dotnet test` substitute for the strict SQL gate.
 - [ ] Perform and record the packaged interactive walkthrough: bootstrap and Login; full catalog; ordinary user/role creation and direct Deny; additive import; logout/expiry/relogin; disabled protected account and controlled recovery. Required manual checks not executed remain open/BLOCKED, not implied by unit tests.
 - [ ] Independently reconcile source -> expanded discovery -> TRX by project and TFM; mandatory SQL skips = 0; check exits, watchdog, approval, ownership and cleanup. A failure or later gate-affecting edit invalidates affected L3 evidence; fix with focused tests and rerun the applicable complete gate. Publish only sanitized aggregates and actual command/selection rationale, not raw TRX, credentials, approval or ownership journals.
 
@@ -212,12 +215,12 @@ Aliases are responsibilities, **not guessed new project names**. T00 must bind t
 
 | Alias | Real responsibility and required targets |
 |---|---|
-| A | Application unit/contract tests; current anchor `tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj`; use each actual supported TFM, normally `net48;net8.0` |
+| A | Application unit/contract tests; current anchor `tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj`; use every **actually declared active TFM** (`net48` after accepted pause; add `net8.0` only after restoration) |
 | X | Architecture/registry completeness; current anchor `tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj`; read actual `.csproj` targets, do not invent an unsupported net48 target |
-| S / M | Post-T05 Security / Migration SQL projects; `net48;net8.0`, approved dedicated/fresh DBs as behavior requires |
-| C / I | Post-T05 Catalog / Inventory SQL projects for affected cross-module authorization/persistence regressions; `net48;net8.0` |
-| H / R | Existing SQL harness / runner unit tests when their gate inputs change; H both actual targets, R `net8.0` |
-| D / W | Post-T04 pure Desktop session/VM vs WinForms projects; D actual declared non-GUI targets (normally `net48;net8.0`), W `net48;net8.0-windows` with verified serialized outer watchdog |
+| S / M | Post-T05 Security / Migration SQL projects; **active `net48`** while paused, approved dedicated/fresh DBs as behavior requires; restored `net8.0` runs only after explicit reactivation |
+| C / I | Post-T05 Catalog / Inventory SQL projects for affected cross-module authorization/persistence regressions; **active `net48`** during pause, expanded only on verified restoration |
+| H / R | SQL harness / runner tests when gate inputs change: H on **actual active targets** (normally `net48`); R on tool-only `net8.0` if compatible. Runner-only `net8.0` never counts as a second SQL test pass |
+| D / W | Post-T04 pure Desktop session/VM vs WinForms projects; D/W **active `net48`** while paused (W with tested serialized whole-tree GUI watchdog); restore pure `net8.0` / WinForms `net8.0-windows` only after reviewed reactivation |
 
 | Task | Focused L2 selection and affected dependencies | Real SQL / adversarial obligations | Runnable command binding and evidence |
 |---|---|---|---|
@@ -226,7 +229,7 @@ Aliases are responsibilities, **not guessed new project names**. T00 must bind t
 | T02 | A `PermissionCatalogTests`, X `PermissionRegistryCoverageTests`, D `PermissionCatalogClientTests` | None for pure catalog/composition/export; T01/T06 own real account/grant proof | U + X/D task commands; declared-key/use-case/module completeness checked independently; no SQL connection for export |
 | T03 | A `SecurityAdministrationTests`; S `SecurityAdministrationSqlTests`, `SecurityAdministrationPrincipalTests`; targeted C/I only if shared stores/transactions affected | `SecurityProvisioning` and applicable `FastSQL`; `SqlConcurrency` for conflicting real writes; protected-account credential mutation, least privilege, stale revision, audit rollback | U + guarded Q; actual runtime/maintenance principal evidence, case reconciliation, no unexplained widening of DML |
 | T04 | D `SecurityAdministrationViewModelTests`; W `SecurityAdministrationFormTests`; actual adapter/contract dependencies | None for pure UI; SQL only if adapter change exercises a new persistence path, then reviewed S category | D/W verified Task commands, actual TFM matrix, STA serialization, bounded tree termination/TRX, no modal failures; interactive check separately |
-| T05 | A `PermissionImportValidationTests`; S `PermissionImportSqlTests`; D/W import presentation cases | `SecurityProvisioning`, `SqlConcurrency` when real preview/apply race is exercised; additivity, Deny conflict, revocation, stale digest/revision, size limits, rollback/no-op | U + guarded Q + D/W; rejected payloads write zero rows, accepted delta/audit reconciled on both SQL TFMs |
+| T05 | A `PermissionImportValidationTests`; S `PermissionImportSqlTests`; D/W import presentation cases | `SecurityProvisioning`, `SqlConcurrency` when real preview/apply race is exercised; additivity, Deny conflict, revocation, stale digest/revision, size limits, rollback/no-op | U + guarded Q + D/W; rejected payloads write zero rows, accepted delta/audit reconciled on every **active SQL TFM** |
 | T06 | Focused residual caller/schema/docs/removal/new-release regression tests; R/H if inventories/harness code actually changes | Actual applicable categories for missing L2 assertions only; global full SQL is L3, not another L2 loop | G0 + resolved targeted commands; then one planned verified Final invocation at frozen revision; independent all-project/TFM reconciliation |
 
 ### Executable command catalog and the unknown-local-tool boundary
@@ -249,8 +252,11 @@ Get-ChildItem tests -Recurse -Filter *.csproj | Select-Object -ExpandProperty Fu
 $project = 'tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj'
 # T01 example; replace only with the task's source-reviewed exact class names.
 $selector = 'FullyQualifiedName~SuperuserAuthorizationTests|FullyQualifiedName~PermissionDecisionTests'
-dotnet test $project -c Release -f net48 --filter $selector
-dotnet test $project -c Release -f net8.0 --filter $selector
+$activeApplicationTfms = @('net48') # T00: resolve from reviewed actual project/TFM manifest after NET8-PAUSE; do not guess.
+foreach ($tfm in $activeApplicationTfms) {
+  dotnet test $project -c Release -f $tfm --filter $selector
+  if ($LASTEXITCODE -ne 0) { throw "Application tests failed on $tfm" }
+}
 ```
 
 Nonzero exit, zero/unexpected cases, missing new tests/TFM or incomplete evidence is FAIL/BLOCKED. The T00 manifest must wrap execution in the actual verified timeout/evidence contract, not rely on a filter/exit alone. Build as needed; do not use `--no-build` on stale output. X/H/R use their existing `.csproj` and actual supported targets with reviewed selectors, recorded verbatim in T00.
@@ -274,14 +280,14 @@ if ($LASTEXITCODE -ne 0) { throw 'SQL test build failed.' }
   -ArtifactRoot $artifactRoot `
   -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
   -Category $category `
-  -Frameworks @('net48', 'net8.0')
+  -Frameworks @('net48') # After NET8-PAUSE only; T00 must bind actual approved active SQL targets
 ```
 
 The wrapper/path/parameters above exist at the planning revision for the original project; **post-T05 multi-project ownership/source-inventory compatibility must be verified, not assumed**. When the completed T03/T05 orchestration supplies a different verified Task entry point, T00 records and uses its real invocation instead. Without that binding, Q is BLOCKED; do not point the old runner at new assemblies blindly or fall back to bare SQL `dotnet test`. Run categories/projects/TFMs sequentially with fresh artifact roots and the verified cross-process coordinator.
 
 D/W and Final commands cannot truthfully be fixed from uncommitted local work. T00 must extract the real CLI from implemented source/help and commit exact invocations, manifest paths, watchdog budgets and expected logical-case selectors before their use. Until then they are **BLOCKED / NOT YET BOUND**, not fictional `Invoke-TestGate.ps1` switches. This is an explicit prerequisite, not deferred discretion to lower the gate.
 
-For every invocation record task/revision, changed dependencies, actual project/TFM/selector/category, command, expected/discovered/executed/passed/failed/skipped cases, timeout/exit, approval and cleanup result, sanitized artifact summary and PASS/FAIL/BLOCKED/NOT RUN. Never publish raw credentials, test approval files, ownership journals or raw TRX. L3 includes all required SQL modules and both TFMs without filters; benchmark warm-ups/repetitions are not a routine feature gate.
+For every invocation record task/revision, changed dependencies, actual project/TFM/selector/category, command, expected/discovered/executed/passed/failed/skipped cases, timeout/exit, approval and cleanup result, sanitized artifact summary and PASS/FAIL/BLOCKED/NOT RUN. Never publish raw credentials, test approval files, ownership journals or raw TRX. L3 includes all required SQL modules and all **actual approved active TFMs** without filters; benchmark warm-ups/repetitions are not a routine feature gate.
 
 ## 7. Suggested implementation PR boundaries
 
@@ -305,7 +311,7 @@ Each code-bearing PR has focused L2 and its own applicable frozen-revision L3; d
 - [ ] JSON preview/apply is bounded, additive, reauthorized, revision/digest checked, idempotent and atomic with audit; no silent grant removal or direct Deny overwrite.
 - [ ] Runtime SQL authority is narrow, effective principal tests pass and Local's trusted-process limitation is documented; no maintenance credentials in Desktop.
 - [ ] Current instructions/runbooks/packaging/test manifests describe only the new supported security design; removed tests have reviewed replacement/removal rationale.
-- [ ] All relevant L2 and actual final all-project/dual-TFM L3 gates pass at the final gate-affecting revision, with zero mandatory SQL skips and verified ownership/cleanup.
+- [ ] All relevant L2 and actual final all-project/**active-TFM** L3 gates pass at the final gate-affecting revision, with zero mandatory SQL skips and verified ownership/cleanup.
 - [ ] Required packaged Windows interactive checks are recorded honestly; unresolved tests/manual work remain open rather than being declared complete.
 
 **Evidence for this documentation PR:** source anchors and remote planning revision inspected; design/plan consistency and document links are checked separately before opening the PR. No implementation, database reset, build, SQL or GUI pass is claimed by creating these documents.

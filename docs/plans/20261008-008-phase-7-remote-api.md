@@ -1,10 +1,10 @@
 # P7 — ASP.NET Core 8 HTTP API and adapter parity
 
-Status: Not started. Depends on P6 (including P3.1 provisioning/registry and P4.1 reusable Login UX). Read ADR 0001, `docs/CONTRACTS.md`, `docs/SECURITY.md`.
+Status: **Not started; final item in the ordered active roadmap.** Depends on the [remaining P5 acceptance and P6 release plan](20261016-004-remaining-p5-acceptance-and-p6-hardening.md), completed SEC-REBUILD, and **re-activation/verification of the .NET 8 application TFM** if [NET8-PAUSE](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) has been implemented. This plan still proposes a `net8.0` Server.Api; temporary pause does not cancel that requirement. Read ADR 0001, `docs/CONTRACTS.md`, `docs/SECURITY.md`.
 
 ## Test execution for not-yet-started P7 (Codex policy, 2026-10-15)
 
-Apply [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md) to **P7-T01–T08**, preserving HTTP/Local contract and security acceptance:
+Apply [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md) to **P7-T01–T08**, preserving HTTP/Local contract and security acceptance. The following dual-TFM commands are **future release requirements after restoration**, not permission to run a retired TFM while it is intentionally parked:
 
 - **L1:** prefer focused Application/DTO, status/JSON mapping, token/session and `HttpApiClient` tests while editing. No SQL for purely in-memory mapping.
 - **L2:** exercise ASP.NET Core endpoint/adapter integration and approved real SQL for permissions, identity, transactions, migration compatibility and concurrency as applicable. Choose focused `FastSQL`, `MigrationSchema`, `SecurityProvisioning` or `SqlConcurrency` by actual test responsibility, not by speed. Include negative 401/403, revoked permission, bearer/session expiry and Local-versus-HTTP parity cases.
@@ -32,4 +32,4 @@ P5 user scenario passes with both LocalApiClient and HttpApiClient; authorizatio
 
 ## Avoid
 
-Rewriting UI, duplicating use-case logic in controllers, moving direct SQL to HttpApiClient, transmitting Domain entities, relying on UI-only permission guards. Reuse P3.1 registry and deployment sync for future remote modules; keep P4.1 Login presentation, but implement bearer token lifecycle only in P7 HTTP infrastructure.
+Rewriting UI, duplicating use-case logic in controllers, moving direct SQL to HttpApiClient, transmitting Domain entities, relying on UI-only permission guards. Reuse the **implemented SEC-REBUILD replacement** of the old P3.1 registry/deployment-sync system for new remote permissions (do not reintroduce removed sync semantics); retain the owner-accepted P4.1 Login presentation, but implement bearer token lifecycle only in P7 HTTP infrastructure.

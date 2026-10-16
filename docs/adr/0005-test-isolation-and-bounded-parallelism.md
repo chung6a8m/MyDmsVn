@@ -37,6 +37,6 @@ Parallel SQL execution is a **future capability requiring separate proof**: it w
 
 ## Affected documents
 
-`AGENTS.md`, `docs/TEST_STRATEGY.md`, `tests/README.md`, `docs/plans/20261014-001-sql-integration-test-performance-optimization.md`, and `docs/adr/README.md`.
+`AGENTS.md`, `docs/TEST_STRATEGY.md`, `tests/README.md`, `docs/plans/archive/20261014-001-sql-integration-test-performance-optimization.md`, and `docs/adr/README.md`.
 
 This ADR documents the architectural direction and does **not** change runtime/test code or assert that current SQL assembly parallelization is safe.

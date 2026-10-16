@@ -10,6 +10,7 @@ Accepted decisions supersede conflicting example snippets in historical `project
 | [0004](0004-p5-ledger-and-posting.md) | P5 transactionally posted stock ledger and balances | Accepted / proposed schema details |
 | [0005](0005-test-isolation-and-bounded-parallelism.md) | Test resource isolation and bounded SQL parallelism; keep GUI-interacting Desktop tests serialized | Accepted |
 | [0006](0006-task-scoped-test-execution-and-module-projects.md) | Task-level selection, final acceptance boundaries, and module-scoped test project target | **Proposed** |
+| [0007](0007-code-defined-permissions-and-single-superuser.md) | Code-defined permissions, deliberate RBAC administration, single configured superuser (SEC-REBUILD) | **Approved direction; implementation NOT STARTED** |
 
 ## New ADR template
 

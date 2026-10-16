@@ -1,6 +1,6 @@
 # P4.1 verification evidence — Desktop Login/session
 
-Status: **Automated L3 verified; packaged/manual L4 partially verified, expiry/relogin remains open** (2026-10-16).
+Status: **P4.1 CLOSED by explicit product-owner acceptance (2026-10-16)**. Automated L3 was verified and attended packaged/manual UI exercised real Login/logout and business flow; 30-minute idle-expiry/relogin was **not completely observed** and was accepted as an explicit evidence exception, **not** a passed test. P5/P6 release gates remain open.
 
 ## Audited starting gaps
 
@@ -37,4 +37,8 @@ Status: **Automated L3 verified; packaged/manual L4 partially verified, expiry/r
 - Attended L4 used approved disposable database `MyDmsVn_P41_Acceptance`, separate migration/runtime SQL identities and P3.1-provisioned Administrator credentials without exposing passwords. Both packaged desktop hosts displayed the real Login and authenticated shell. The net8 host posted `GR0000000001`; the net48 host independently reopened it as `Posted`/read-only with total `125.00`. Both hosts showed stock balance `100.0000` and stock-card movement `GR0000000001`/`100.0000`; explicit logout returned each host to `MyDmsVn — Đăng nhập`.
 - A second active local user, `p41_restricted`, with zero roles/direct permissions authenticated in the packaged net8 host. Opening Products produced the server-side status `The operation is not permitted` and no catalog rows. The operator confirmed the same visible status. The 30-minute idle-expiry observation was stopped at approximately 13.5 minutes to create this PR, so packaged expiry/relogin is **not verified** and the full L4 checkbox remains open. No credentials were captured in screenshots, logs or repository files.
 
-Readiness: **AUTOMATED L3 VERIFIED; PACKAGED L4 PARTIAL; NOT RELEASE-COMPLETE**. Keep P4.1 and dependent P5/P6 interactive acceptance open until the packaged idle-expiry/relogin walkthrough has current evidence.
+## Owner acceptance decision (2026-10-16)
+
+The project owner explicitly accepts **P4.1 as complete on the basis of automated L3 and the available attended manual UI evidence**. The original 30-minute packaged expiry/relogin observation remains unverified (stopped at approximately 13.5 minutes), with no invented result. This single owner-approved P4.1 evidence exception does **not** satisfy or waive P5.1/P5.4 UI acceptance, P6 security/operations/release drills, or future changes to expiry behavior. Their remaining tasks are tracked in [the active remainder plan](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md).
+
+Readiness: **P4.1 OWNER-ACCEPTED COMPLETE; AUTOMATED L3 VERIFIED; PACKAGED L4 PARTIAL. LOCAL V1 RELEASE STILL BLOCKED BY P5/P6 REMAINING GATES.**

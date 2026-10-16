@@ -1,67 +1,31 @@
 # MyDmsVn
 
-MyDmsVn is a Windows desktop-first business-management platform for Vietnamese SMEs, initially implementing **Sales & Inventory Foundation**. The design evolves from a locally executed application stack (v1) into an ASP.NET Core Web API client/server solution (v2), without rewriting WinForms views or business handlers.
+Windows desktop-first SME business management, beginning with **Sales & Inventory Foundation** and designed to evolve from a local Application/SQL adapter to a remotely hosted HTTP API without duplicating business handlers.
 
-> Status: P0 foundation implemented. The repository contains a compilable dual-target solution, DI smoke seam, and automated foundation tests; no business features or SQL schema are implemented yet.
+## Current status — 2026-10-16
 
-## Decisions already approved
+P0/P1/P2/P3/P3.1/P4 implementation is complete. P4.1 Login/session is **closed by explicit product-owner manual-UI acceptance**, with a documented incomplete packaged idle-expiry observation; the owner exception does not close remaining P5/P6 release gates. P5 business features and automated tests exist, but P5.1/P5.4 interactive acceptance remains open. P6 operational/release acceptance remains open. TESTGATE T01–T03 are verified; modularization, permission-system replacement and P7 are future work.
 
-- C#, **.NET Framework 4.8 + .NET 8**; use `net8.0-windows` for modern WinForms targets. Do **not** upgrade to .NET 10 without explicit approval.
-- Clean Architecture, modular monolith, MediatR + FluentValidation + ErrorOr.
-- Explicit Unit of Work, RepoDb for writes and Dapper for read models, SQL Server and DbUp.
-- RepoDb `1.16.0`, RepoDb.SqlServer `1.16.1`, RepoDb.SqlServer.BulkOperations `1.16.2`.
-- Preserve both `PasswordHash` and `PasswordSalt` for legacy-system migration; do not assume legacy hash algorithms.
-- Two interchangeable desktop adapters: `LocalApiClient` in v1 and `HttpApiClient` when v2 becomes available.
-- WinForms, CommunityToolkit.Mvvm, [Bootstrap5WinFormUI](https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI) and [BootstrapSourceGrid](https://github.com/chung6a8m/MyDmsVn.BootstrapSourceGrid).
+**Next implementation plan:** [Temporary reversible pause of the second .NET 8 TFM](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md), after reading [TESTGATE-T01–T03](docs/plans/20261016-001-task-gates-and-modular-tests.md). **The .NET 8 TFM is NOT removed in the current code.** Follow the [ordered active roadmap](docs/plans/README.md) and [Development Plan](docs/DEVELOPMENT_PLAN.md); completed/superseded plans are in the [archive](docs/plans/archive/README.md).
 
-## Start here (human and Codex)
+## Approved technology and boundaries
 
-1. Read [AGENTS.md](AGENTS.md) and [AI_CONTEXT.md](AI_CONTEXT.md).
-2. Read [Product requirements](docs/PRD.md) and [Architecture](docs/ARCHITECTURE.md).
-3. Work sequentially through the [Development plan](docs/DEVELOPMENT_PLAN.md).
-4. Continue with P1 in the [Development plan](docs/DEVELOPMENT_PLAN.md); implement P5 only after the P1–P4 gates pass.
-5. Use the [P5 Sales & Inventory plan](docs/plans/20261008-001-sales-inventory-foundation.md) to guide the first vertical slice.
+- C#, currently `.NET Framework 4.8` and `.NET 8` (`net8.0-windows` for modern WinForms); no unapproved move to .NET 10. See [Tech Stack](docs/TECH_STACK.md).
+- Clean Architecture/modular monolith, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork.
+- RepoDb for write-side storage, Dapper for read models, SQL Server and versioned DbUp migrations.
+- Shared WinForms/CommunityToolkit.Mvvm views, Bootstrap5WinFormUI and BootstrapSourceGrid; LocalApiClient for v1, HttpApiClient planned for v2.
+- Security enforcement is mandatory in Application, not just desktop UI. The current permission implementation exists but [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md) is a **proposed replacement**, not current product behavior.
+- Historical legacy password columns remain for safe migration evaluation.
 
-## Documentation index
+## How to work in this repository
 
-| Subject | Document |
-|---|---|
-| Product scope and acceptance | [PRD](docs/PRD.md) |
-| Clean Architecture and adapters | [Architecture](docs/ARCHITECTURE.md) |
-| Project and solution layout | [Project structure](docs/PROJECT_STRUCTURE.md) |
-| Runtime, package pins, coding constraints | [Tech stack](docs/TECH_STACK.md) |
-| Local/HTTP contracts and error conventions | [Contracts](docs/CONTRACTS.md) |
-| Explicit UoW / RepoDb / Dapper / DB migrations | [Persistence](docs/PERSISTENCE.md) |
-| Users, legacy hashing, authorization | [Security](docs/SECURITY.md) |
-| P5 data model and inventory invariants | [Data model](docs/DATA_MODEL.md) |
-| Testing and quality gates | [Test strategy](docs/TEST_STRATEGY.md) |
-| Phase plan and gates | [Development plan](docs/DEVELOPMENT_PLAN.md) |
-| Decisions log | [ADR index](docs/adr/README.md) |
+1. Read [AGENTS.md](AGENTS.md), [PRD](docs/PRD.md), [Architecture](docs/ARCHITECTURE.md) and [Tech Stack](docs/TECH_STACK.md).
+2. Follow the **exact order** of the [six active roadmap entries](docs/plans/README.md). Completed TESTGATE-T01–T03 stays active as context only.
+3. Run focused **Task** tests during implementation; use the guarded manifest-owned strict **Final** acceptance only after gate-affecting inputs are frozen. Never substitute unapproved SQL/GUI tests or run the full SQL suite after every edit.
+4. Publish reviewed sanitized results; do not commit SQL credentials, instance approval files, TRX, ownership journals or other raw diagnostics. Missing external environment means BLOCKED/NOT RUN, not PASSED.
 
-The original [project-idea.md](project-idea.md) is preserved as historical source material. Where it conflicts with approved design choices, **this documentation and accepted ADRs take precedence**.
+## Documentation
 
-## Implementation status
+[Development Plan](docs/DEVELOPMENT_PLAN.md) · [Active plans](docs/plans/README.md) · [Archive](docs/plans/archive/README.md) · [Contracts](docs/CONTRACTS.md) · [Security](docs/SECURITY.md) · [Persistence](docs/PERSISTENCE.md) · [Test Strategy](docs/TEST_STRATEGY.md) · [Test Gate Matrix](docs/TEST_GATE_MATRIX.md) · [Codex policy](docs/CODEX_TEST_EXECUTION_POLICY.md) · [ADR index](docs/adr/README.md)
 
-- [x] Architecture and roadmap documentation created
-- [x] P0 — Solution foundation
-- [ ] P1 — Persistence foundation
-- [ ] P2 — Application pipeline and API response
-- [ ] P3 — Security foundation
-- [ ] P4 — Desktop shell and client adapters
-- [ ] P5 — Sales & Inventory Foundation
-- [ ] P6 — Local v1 hardening / deployment
-- [ ] P7 — Remote API v2 and contract parity
-
-## Local developer environment
-
-Windows, Visual Studio 2022, .NET 8 SDK, and the .NET Framework 4.8 targeting pack/runtime are required for the complete P0 matrix. `global.json` selects the .NET 8 SDK feature band and does not permit a .NET 10 target upgrade.
-
-Verified on Windows on 2026-10-08 with SDK 8.0.425 and the .NET Framework 4.8 targeting pack:
-
-```powershell
-dotnet restore MyDmsVn.sln --locked-mode --nologo
-dotnet build MyDmsVn.sln -c Release --no-restore --nologo
-dotnet test MyDmsVn.sln -c Release --no-build --no-restore --nologo
-```
-
-The Release build completed with 0 warnings and 0 errors across `net48`, `net8.0`, and `net8.0-windows`. The test command passed all 26 test executions across five target runs. P0 performs no SQL integration tests or database actions; those begin in P1 with an explicitly configured isolated disposable database.
+Previous completed dual-framework build/test evidence is historical and is **not** proof that any future TFM reduction, restored net8 target or P7 API has already passed.

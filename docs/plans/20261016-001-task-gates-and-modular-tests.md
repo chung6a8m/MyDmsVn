@@ -2,6 +2,8 @@
 
 **Status:** T01–T03 implemented and verified · **Date:** 2026-10-16 · **Scope:** cross-phase test policy, strict SQL PR acceptance, and task/final orchestration. T02 final real-SQL L3 evidence is recorded below for frozen revision `5a9bfe2dc76f04fe43c9aa91d1f9eb232162cef3`; T03 Final evidence is recorded for frozen revision `98fce5dcbb3fa772b83311e8f63662ce41744eb3`. **T04/T05 modular test projects are tracked exclusively in [the follow-on plan](20261016-002-modular-test-projects.md).**
 
+**Roadmap note (2026-10-16):** This completed T01–T03 plan deliberately remains in the [active roadmap](README.md) as authoritative Codex execution context. The next item is [NET8-PAUSE](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md), then [TESTGATE-T04/T05](20261016-002-modular-test-projects.md), SEC-REBUILD and remaining P5/P6. NET8-PAUSE is **not yet implemented**; the historical dual-TFM test evidence and current strict dual-TFM acceptance contract remain effective until its verified implementation PR.
+
 ## Problem and constraints
 
 P4.1 work demonstrates the operational cost of indiscriminately rerunning SQL tests. On the verified SQLPERF-T06 candidate, an unfiltered median run was 506.604 s (`net48`) and 498.631 s (`net8.0`); the benchmark performs one warm-up plus three measured runs on **each** TFM. These measurements are not an independently established breakdown of the P4.1 session's elapsed time.

@@ -2,7 +2,7 @@
 
 Status: **In progress**. P6-T01/P6-T02 implementation requirements and automatable SQL gates completed on 2026-10-12; P6-T03/P6-T04 implementation and developer-workstation automated/package gates completed on 2026-10-13. Clean-machine runtime-principal/rotation, VM install/upgrade, full-disk, packaged GUI smoke and actual two-client-version evidence remain open. Depends on verified P5 acceptance; do not release P6 while mandatory P5 SQL/concurrency/authorization/Windows GUI gates are blocked. Scope is **Local Mode v1**, not the P7 HTTP service.
 
-Read first: `AGENTS.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`, `docs/SECURITY.md`, `docs/PERSISTENCE.md`, `docs/TEST_STRATEGY.md`, `docs/CONTRACTS.md`, `docs/P3_VERIFICATION.md`, and `docs/plans/20261008-001-sales-inventory-foundation.md`. Existing migrator entry point: `src/MyDmsVn.Server.DbMigrator`.
+Read first: `AGENTS.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`, `docs/SECURITY.md`, `docs/PERSISTENCE.md`, `docs/TEST_STRATEGY.md`, `docs/CONTRACTS.md`, `docs/P3_VERIFICATION.md`, and `docs/plans/archive/20261008-001-sales-inventory-foundation.md`. Existing migrator entry point: `src/MyDmsVn.Server.DbMigrator`.
 
 ## New mandatory identity dependencies (2026-10-13)
 
@@ -109,7 +109,7 @@ At phase completion, update both the detailed checklist and the roadmap with mat
 
 ## Test execution for outstanding P6 verification and release work (Codex policy, 2026-10-15)
 
-Follow [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md) **only for currently unchecked P6 verification/operational work** (remaining T01–T04 evidence and T05–T08). This does not reopen completed implementation, checked tests or historical verification:
+Follow [Codex Test Execution Policy](../../CODEX_TEST_EXECUTION_POLICY.md) **only for currently unchecked P6 verification/operational work** (remaining T01–T04 evidence and T05–T08). This does not reopen completed implementation, checked tests or historical verification:
 
 - **L1/L2 for corrective code changes:** run focused secure-config, permission, audit/error, Application, Desktop STA and/or approved SQL categories matching the change. Developer focused tests cannot satisfy the deployment release matrix. Real full-disk denial, runtime-principal rotation, Windows VM install/upgrade, migration crash/restore drills require separately controlled environments.
 - **L3 after the final gate-affecting change** (including tests/theory rows, SQL/migrations, inventories/manifests, harness/runner and build/CI inputs): run the required Release targets, Desktop/architecture/application regressions and **unfiltered dual-TFM SQL suites**, with discovery/inventory, instance approval, TRX, watchdog, positive ownership and zero skipped mandatory cases. The current strict SQL `baseline` runner is multi-pass; a one-pass strict PR command does not exist. Environment-blocked gates remain blocked, not replaced by filtered suites or plain `dotnet test`.
