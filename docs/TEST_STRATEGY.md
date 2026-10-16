@@ -1,6 +1,6 @@
 # Testing strategy and quality gates
 
-**Roadmap/TFM scope (2026-10-16):** This authorized NET8-PAUSE Stage B candidate declares active `net48` application, SQL and GUI targets; `net8.0`/`net8.0-windows` product entries are retained as `PARKED / NOT RUN`. The runner and runner tests remain tool-only `net8.0`. The versioned manifest preserves the historical SQL inventory and binds candidate Final to the real active SQL owner on `net48`. T05 envelope rerun is pending after runner authorization fix `5b1813c`; the previous candidate reports are stale for current acceptance. Other branches follow their checked-in declarations; restoration follows [REACTIVATE_NET8](REACTIVATE_NET8.md) and requires full dual-target validation.
+**Roadmap/TFM scope (2026-10-16):** This authorized NET8-PAUSE Stage B candidate declares active `net48` application, SQL and GUI targets; `net8.0`/`net8.0-windows` product entries are retained as `PARKED / NOT RUN`. The runner and runner tests remain tool-only `net8.0`. The versioned manifest preserves the historical SQL inventory and binds candidate Final to the real active SQL owner on `net48`. T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; same-protocol duration comparison and merge remain open. Other branches follow their checked-in declarations; restoration follows [REACTIVATE_NET8](REACTIVATE_NET8.md) and requires full dual-target validation.
 
 ## 1. Test layers
 

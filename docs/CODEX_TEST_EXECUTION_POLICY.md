@@ -2,7 +2,7 @@
 
 **Status:** Repository procedure (2026-10-15). Applies to future implementation tasks and pull requests for MyDmsVn, subject to more stringent requirements in the specific plan. Read with [TEST_STRATEGY.md](TEST_STRATEGY.md), [ADR 0005](adr/0005-test-isolation-and-bounded-parallelism.md) and [tests/README.md](../tests/README.md).
 
-**Ordered roadmap/TFM note (2026-10-16):** [TESTGATE-T01–T03](plans/20261016-001-task-gates-and-modular-tests.md) is verified context. In this authorized [NET8-PAUSE](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) candidate, T05 re-verification is pending after runner authorization fix `5b1813c` invalidated the earlier envelope. The active matrix is `net48` for application/SQL/GUI with historical parked net8 inventory; the runner stays tool-only `net8.0`. Other branches use their checked-in matrix until merge. No active gate is waived, and restoration requires [full reviewed dual-target validation](REACTIVATE_NET8.md).
+**Ordered roadmap/TFM note (2026-10-16):** [TESTGATE-T01–T03](plans/20261016-001-task-gates-and-modular-tests.md) is verified context. In this authorized [NET8-PAUSE](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) candidate, T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; same-protocol duration comparison and merge remain open. The active matrix is `net48` for application/SQL/GUI with historical parked net8 inventory; the runner stays tool-only `net8.0`. Other branches use their checked-in matrix until merge. No active gate is waived, and restoration requires [full reviewed dual-target validation](REACTIVATE_NET8.md).
 
 ## Intent and hard boundaries
 

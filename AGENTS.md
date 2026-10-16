@@ -20,7 +20,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 ## Fixed technical decisions
 
 - **This NET8-PAUSE candidate checkout actively targets `net48` for application, SQL and Desktop projects.** Historical `net8.0` / `net8.0-windows` logical-case metadata is retained as `PARKED / NOT RUN`; `MyDmsVn.Desktop.AppCore` is parked outside the solution. The SQL runner and runner tests remain tool-only `net8.0` and do not count as application/SQL coverage. `main` and unrelated PRs keep their supported matrix until this migration is accepted and merged. See the [temporary .NET 8 pause plan](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md), ADR 0008 and [reactivation procedure](docs/REACTIVATE_NET8.md). No .NET 10 upgrade.
-- NET8-PAUSE T05 re-verification is pending: runner authorization fix `5b1813c` invalidated the previous candidate envelope. Do not treat old evidence as current or treat this candidate as the merged `main` matrix.
+- NET8-PAUSE T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; same-protocol duration comparison and merge remain open. Do not treat this candidate as the merged `main` matrix.
 - RepoDb `1.16.0`; RepoDb.SqlServer `1.16.1`; RepoDb.SqlServer.BulkOperations `1.16.2`.
 - Explicit UnitOfWork only: scope owns a single open connection and optional transaction; repositories and Dapper queries within that scope share them explicitly. No ambient/static AsyncLocal transaction.
 - RepoDb for command-side storage, Dapper for query-side DTO projection; DbUp for versioned SQL migrations.

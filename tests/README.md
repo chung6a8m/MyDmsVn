@@ -1,6 +1,6 @@
 # Test harness
 
-**2026-10-16 candidate targets:** NET8-PAUSE declares active application/SQL/Desktop `net48`; product `net8.0`/`net8.0-windows` is historical `PARKED / NOT RUN`. The runner remains tool-only `net8.0`. Focused, strict PR and benchmark tools require explicit framework arrays, and the manifest preserves the historical SQL inventory. The prior T05 envelope was invalidated by runner authorization fix `5b1813c`; re-verification is pending. See [verification](../docs/NET8_PAUSE_T05_VERIFICATION.md) and [the reviewed reactivation procedure](../docs/REACTIVATE_NET8.md).
+**2026-10-16 candidate targets:** NET8-PAUSE declares active application/SQL/Desktop `net48`; product `net8.0`/`net8.0-windows` is historical `PARKED / NOT RUN`. The runner remains tool-only `net8.0`. Focused, strict PR and benchmark tools require explicit framework arrays, and the manifest preserves the historical SQL inventory. T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; same-protocol duration comparison remains open. See [verification](../docs/NET8_PAUSE_T05_VERIFICATION.md) and [the reviewed reactivation procedure](../docs/REACTIVATE_NET8.md).
 
 **TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
 

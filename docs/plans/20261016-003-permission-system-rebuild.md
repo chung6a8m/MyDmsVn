@@ -9,7 +9,7 @@
 **Tech stack:** Active product/test target `net48`; historical product `net8.0`/`net8.0-windows` parked; runner tool-only `net8.0`; WinForms, current Application/Contracts/Local adapters, SQL Server, DbUp, explicit UnitOfWork, RepoDb/Dapper and xUnit. No library/framework replacement.
 **Spec:** [ADR 0007 — Code-defined permissions and a single configured superuser](../adr/0007-code-defined-permissions-and-single-superuser.md).
 
-**Roadmap/TFM prerequisite (2026-10-16):** SEC-REBUILD comes after accepted NET8-PAUSE and implemented TESTGATE T04/T05. In the current migration candidate, active SQL/WinForms is `net48`, historical .NET 8 is PARKED/NOT RUN, and the runner is tool-only `net8.0`; NET8-PAUSE T05 envelope rerun is pending after runner authorization fix `5b1813c`. At SEC-REBUILD T00, bind to the then accepted manifest rather than old dual-target examples. Do not delete historical logical identities or treat parked results as PASS; P7 requires [reviewed reactivation](../REACTIVATE_NET8.md).
+**Roadmap/TFM prerequisite (2026-10-16):** SEC-REBUILD comes after accepted NET8-PAUSE and implemented TESTGATE T04/T05. In the current migration candidate, active SQL/WinForms is `net48`, historical .NET 8 is PARKED/NOT RUN, and the runner is tool-only `net8.0`; NET8-PAUSE T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with duration comparison and merge still open. At SEC-REBUILD T00, bind to the then accepted manifest rather than old dual-target examples. Do not delete historical logical identities or treat parked results as PASS; P7 requires [reviewed reactivation](../REACTIVATE_NET8.md).
 
 ## 1. Execution order, authority and workspace boundary
 
@@ -24,7 +24,7 @@ The required order is:
 
 Read [AGENTS](../../AGENTS.md), the spec, [TESTGATE T01–T03](20261016-001-task-gates-and-modular-tests.md), [TESTGATE T04–T05](20261016-002-modular-test-projects.md), [test policy](../CODEX_TEST_EXECUTION_POLICY.md), [gate matrix](../TEST_GATE_MATRIX.md) and [test strategy](../TEST_STRATEGY.md).
 
-TESTGATE T01–T03 is verified; NET8-PAUSE T01–T04 is implemented and its T05 envelope must be rerun after runner authorization fix `5b1813c`; modular T04/T05 also remain unsatisfied prerequisites. This plan does not implement the split/security code. Do not move product tests before the prerequisite evidence is accepted.
+TESTGATE T01–T03 is verified; NET8-PAUSE T01–T05 runtime gates pass at `6b0ce337`, while its same-protocol duration comparison and merge remain open; modular T04/T05 also remain unsatisfied prerequisites. This plan does not implement the split/security code. Do not move product tests before the prerequisite evidence is accepted.
 
 The documents may merge before the prerequisite code. Product implementation starts only after T00 verifies the committed/reviewed prerequisite results. Rebase the implementation branch onto that revision, then bind this plan to the actual project/TFM/runner manifest. Missing prerequisites mean **BLOCKED**, not permission to return to the old monolithic test path.
 

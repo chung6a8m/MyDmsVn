@@ -2,7 +2,7 @@
 
 **Status:** Human-readable guidance, 2026-10-16. The v1 manifest and local `Invoke-TestGate.ps1` Task/Final runner are implemented and TESTGATE-T03 Final L3 is verified at its recorded frozen revision. T04/T05 split projects remain proposed. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [T04/T05](plans/20261016-002-modular-test-projects.md), and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
 
-**NET8-PAUSE candidate tooling:** explicit `-Frameworks`/`--frameworks` selection is implemented for focused, strict PR and benchmark paths. The reviewed profile binds SQL and Desktop owners to active `net48`, preserves historical net8 inventory, and records runner projects as tool-only `net8.0`. T05 envelope re-verification is pending after runner authorization fix `5b1813c` invalidated the earlier evidence. A net8-only runner never counts as SQL/product coverage.
+**NET8-PAUSE candidate tooling:** explicit `-Frameworks`/`--frameworks` selection is implemented for focused, strict PR and benchmark paths. The reviewed profile binds SQL and Desktop owners to active `net48`, preserves historical net8 inventory, and records runner projects as tool-only `net8.0`. T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; same-protocol duration comparison remains open. A net8-only runner never counts as SQL/product coverage.
 
 ## Tool inventory (actually available)
 
