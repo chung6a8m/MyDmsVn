@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Microsoft.Data.SqlClient;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Benchmark;
 using MyDmsVn.SqlTestRunner.Processes;
@@ -709,6 +710,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
 {
     private readonly string _approvalFile;
     private readonly IBenchmarkOwnershipGate _ownershipGate;
+    private readonly Func<string, string, CancellationToken, Task<bool>> _emptyJournalPathFailureVerifier;
 
     public BenchmarkAbandonedSqlRunRecovery(string approvalFile)
         : this(approvalFile, new BenchmarkOwnershipGate())
@@ -717,10 +719,12 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
 
     internal BenchmarkAbandonedSqlRunRecovery(
         string approvalFile,
-        IBenchmarkOwnershipGate ownershipGate)
+        IBenchmarkOwnershipGate ownershipGate,
+        Func<string, string, CancellationToken, Task<bool>>? emptyJournalPathFailureVerifier = null)
     {
         _approvalFile = approvalFile;
         _ownershipGate = ownershipGate ?? throw new ArgumentNullException(nameof(ownershipGate));
+        _emptyJournalPathFailureVerifier = emptyJournalPathFailureVerifier ?? VerifyNoOwnedDatabasesAsync;
     }
 
     public async Task<bool> ReconcileAsync(AbandonedSqlRun lease, CancellationToken cancellationToken)
@@ -751,6 +755,13 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
                 continue;
             }
 
+            if (IsVerifiedJournalPathFailure(artifactRoot, journal) &&
+                await _emptyJournalPathFailureVerifier(artifactRoot, journal, cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                continue;
+            }
+
             var result = await _ownershipGate.ValidateAsync(
                 new BenchmarkOwnershipEvidence(
                     runId,
@@ -766,6 +777,118 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         }
 
         return true;
+    }
+
+    private async Task<bool> VerifyNoOwnedDatabasesAsync(
+        string artifactRoot,
+        string journal,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var connectionString = Environment.GetEnvironmentVariable(
+                SqlTestHarnessEnvironment.ConnectionStringVariable);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return false;
+            }
+
+            var approval = SqlInstanceApprovalLoader.Load(_approvalFile);
+            var builder = new SqlConnectionStringBuilder(connectionString);
+            if (!string.Equals(builder.InitialCatalog, "master", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            using (var reader = new SqlBenchmarkLiveOwnershipReader(connectionString))
+            {
+                await reader.OpenAsync(cancellationToken).ConfigureAwait(false);
+                var identity = await reader.ReadIdentityAsync(cancellationToken).ConfigureAwait(false);
+                if (identity is null || !string.Equals(
+                        SqlInstanceFingerprint.Create(identity),
+                        approval.FingerprintSha256,
+                        StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM sys.databases WHERE name LIKE N'MyDmsVn[_]Test[_]%';";
+            command.CommandTimeout = 30;
+            var count = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+            return count == 0;
+        }
+        catch (Exception exception) when (
+            exception is IOException ||
+            exception is InvalidDataException ||
+            exception is InvalidOperationException ||
+            exception is SqlException ||
+            exception is UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsVerifiedJournalPathFailure(string artifactRoot, string journal)
+    {
+        var runRoot = Path.Combine(artifactRoot, Path.GetFileName(journal));
+        if (Directory.Exists(runRoot))
+        {
+            artifactRoot = runRoot;
+        }
+
+        if (Directory.EnumerateFileSystemEntries(journal).Any())
+        {
+            return false;
+        }
+
+        var trxFiles = Directory.GetFiles(artifactRoot, "*.trx", SearchOption.TopDirectoryOnly);
+        if (trxFiles.Length != 1)
+        {
+            return false;
+        }
+
+        try
+        {
+            var document = XDocument.Load(trxFiles[0]);
+            var counters = document.Descendants().SingleOrDefault(element => element.Name.LocalName == "Counters");
+            var summary = document.Descendants().SingleOrDefault(element => element.Name.LocalName == "ResultSummary");
+            var failed = document.Descendants().Where(element =>
+                element.Name.LocalName == "UnitTestResult" &&
+                string.Equals((string?)element.Attribute("outcome"), "Failed", StringComparison.Ordinal)).ToArray();
+            if (counters is null || summary is null || failed.Length == 0 ||
+                !string.Equals((string?)summary.Attribute("outcome"), "Failed", StringComparison.Ordinal) ||
+                (string?)counters.Attribute("executed") != (string?)counters.Attribute("total") ||
+                (string?)counters.Attribute("passed") is not { } passed ||
+                (string?)counters.Attribute("failed") is not { } failures ||
+                !int.TryParse(passed, out var passedCount) ||
+                !int.TryParse(failures, out var failedCount) ||
+                passedCount + failedCount != failed.Length ||
+                new[] { "error", "timeout", "aborted", "inconclusive", "notExecuted" }
+                    .Any(name => (string?)counters.Attribute(name) != "0"))
+            {
+                return false;
+            }
+
+            return failed.All(result =>
+            {
+                var message = result.Descendants().SingleOrDefault(element => element.Name.LocalName == "Message")?.Value;
+                var stack = result.Descendants().SingleOrDefault(element => element.Name.LocalName == "StackTrace")?.Value;
+                return message is not null &&
+                    message.Contains("DirectoryNotFoundException", StringComparison.Ordinal) &&
+                    message.Contains(journal, StringComparison.OrdinalIgnoreCase) &&
+                    stack is not null &&
+                    stack.Contains("FileDatabaseOwnershipJournal.WriteAtomically", StringComparison.Ordinal) &&
+                    stack.Contains("SqlTestDatabase.CreateAsync", StringComparison.Ordinal);
+            });
+        }
+        catch (System.Xml.XmlException)
+        {
+            return false;
+        }
     }
 
     private static bool IsVerifiedZeroExecution(string artifactRoot, string journal)

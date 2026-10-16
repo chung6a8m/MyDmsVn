@@ -195,6 +195,53 @@ public sealed class FocusedRunCoordinatorTests
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Recovery_requires_a_positive_database_absence_proof_for_journal_path_failures(
+        bool noOwnedDatabases)
+    {
+        var artifactRoot = Path.Combine(Path.GetTempPath(), "mdv-journal-path-recovery-" + Guid.NewGuid().ToString("N"));
+        var runId = "strict-final-net48-journal-path";
+        var runRoot = Path.Combine(artifactRoot, runId);
+        var journal = Path.Combine(artifactRoot, "ownership", runId);
+        Directory.CreateDirectory(runRoot);
+        Directory.CreateDirectory(journal);
+        File.WriteAllText(
+            Path.Combine(runRoot, "strict-final.trx"),
+            "<TestRun><ResultSummary outcome=\"Failed\"><Counters total=\"1\" executed=\"1\" passed=\"0\" failed=\"1\" error=\"0\" timeout=\"0\" aborted=\"0\" inconclusive=\"0\" notExecuted=\"0\" /></ResultSummary><Results><UnitTestResult outcome=\"Failed\"><Output><ErrorInfo><Message>System.IO.DirectoryNotFoundException: " + journal + "</Message><StackTrace>FileDatabaseOwnershipJournal.WriteAtomically SqlTestDatabase.CreateAsync</StackTrace></ErrorInfo></Output></UnitTestResult></Results></TestRun>");
+
+        var ownership = new RecordingOwnershipGate(isComplete: false);
+        var recovery = new BenchmarkAbandonedSqlRunRecovery(
+            "unused-approval",
+            ownership,
+            (_, _, _) => Task.FromResult(noOwnedDatabases));
+        var abandoned = new AbandonedSqlRun(
+            "resource",
+            123,
+            "invocation",
+            DateTimeOffset.UtcNow,
+            artifactRoot,
+            "strict-final");
+
+        try
+        {
+            Assert.Equal(noOwnedDatabases, await recovery.ReconcileAsync(abandoned, CancellationToken.None));
+            if (noOwnedDatabases)
+            {
+                Assert.Empty(ownership.Evidence);
+            }
+            else
+            {
+                Assert.Single(ownership.Evidence);
+            }
+        }
+        finally
+        {
+            Directory.Delete(artifactRoot, recursive: true);
+        }
+    }
+
     private static CommandResult Success(string output = "") => new CommandResult(
         0,
         false,
