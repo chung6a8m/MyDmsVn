@@ -63,7 +63,6 @@ public sealed class SqlTestClassificationTests
 
     [Theory]
     [InlineData("net48")]
-    [InlineData("net8.0")]
     public void Integration_inventory_is_fully_classified_from_the_reviewed_manifest(string tfm)
     {
         var root = FindRepositoryRoot();

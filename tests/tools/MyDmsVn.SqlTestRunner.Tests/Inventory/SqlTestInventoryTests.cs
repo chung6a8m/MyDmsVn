@@ -335,7 +335,7 @@ public sealed class SqlTestInventoryTests
             "MyDmsVn.Server.Infrastructure.IntegrationTests",
             "bin",
             "Release",
-            "net8.0",
+            "net48",
             "MyDmsVn.Server.Infrastructure.IntegrationTests.dll");
         var actual = TestMethodInventory.Read(assemblyPath)
             .Select(method => method.FullyQualifiedName)

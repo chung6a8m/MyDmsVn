@@ -26,7 +26,7 @@ public sealed class TestProjectBuildContractTests
         Assert.Contains(invocations, element =>
             ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true);
-        Assert.Equal(2, invocations.Count(element =>
+        Assert.Equal(3, invocations.Count(element =>
             ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true));
         Assert.DoesNotContain(invocations, element =>

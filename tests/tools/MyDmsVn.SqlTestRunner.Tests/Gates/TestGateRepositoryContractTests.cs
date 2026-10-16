@@ -102,7 +102,7 @@ public sealed class TestGateRepositoryContractTests
 
         var missingProject = manifest with
         {
-            Gates = manifest.Gates.Select((gate, index) => index == 0
+            Gates = manifest.Gates.Select(gate => gate.GateId == "net8-pause-t01-audit"
                     ? gate with { Project = "tests/Missing.Tests/Missing.Tests.csproj" }
                     : gate)
                 .ToArray(),
@@ -111,7 +111,7 @@ public sealed class TestGateRepositoryContractTests
 
         var missingTfm = manifest with
         {
-            Gates = manifest.Gates.Select((gate, index) => index == 0
+            Gates = manifest.Gates.Select(gate => gate.GateId == "net8-pause-t01-audit"
                     ? gate with { Frameworks = new[] { "net48" } }
                     : gate)
                 .ToArray(),
