@@ -54,6 +54,19 @@ These are selection rules, not a claim that every named test exists. Do not reru
 
 This is an **illustrative target structure**, not a request to create empty shell assemblies. Boundaries follow the actual test inventory, and cross-module tests may remain in a specifically documented integration project. A test project is a build/runtime boundary; module and category remain orthogonal metadata. Do not use an assembly name as proof that its tests do not touch SQL.
 
+## Logical test-case identity and migration reconciliation (T03–T05 contract)
+
+Project/assembly name and framework-generated VSTest/TRX GUID are **physical execution metadata**, not durable test identities. Before any split, define and version a deterministic logical-case key for each target framework:
+
+```text
+(TFM, normalized declaring type + method signature, Fact or Theory row key, SQL category or reviewed non-SQL classification)
+```
+
+- Normalize the method identity consistently across old/new projects (including overload signatures and generic arity when needed). For a Fact use a fixed `Fact` row marker. For a Theory use a deterministic row key from canonical, type-tagged argument representation (for example a SHA-256 fingerprint computed locally), or an explicitly assigned stable, opaque row ID when argument-based discovery is nondeterministic. Freeze and test the canonicalization version before comparing inventories. Do not commit or publish raw theory arguments, and do not rely on display names, array position, raw TRX GUIDs, assembly names or count equality as identity.
+- Record the **old → new** project/assembly location separately from the logical key. If a move also changes the method signature, theory row identity, TFM or category, require an explicit reviewer-approved old → new **logical-key mapping and coverage rationale**; unapproved reclassification, collisions, missing rows or duplicate ownership fail closed. Module remains an independently reviewed business label, not inferred solely from the destination assembly.
+- On **each TFM independently**, snapshot the source method inventory and independently discovered expanded cases **before** moving files, then reconcile source → discovery → executed TRX logical keys both before and after. Require one-to-one coverage/multiplicity (including method-scoped exemptions, skipped/blocked cases and all mandatory theory rows) plus a bijective before → after mapping. Reject dropped/added-unreviewed, duplicated, ambiguous or nondeterministic cases even if aggregate counts match. Preserve original local TRX for audit while only publishing aggregate sanitized reconciliation evidence.
+- Implement these checks in T03/T04/T05 runner/inventory work; this documentation does **not** claim that a logical-key collector, row canonicalizer or cross-project inventory verifier already exists.
+
 ## Tasks / reviewable PR slices
 
 ### TESTGATE-T01 — Immediate Codex discipline and task gate contracts (documentation PR)
@@ -84,7 +97,7 @@ This is an **illustrative target structure**, not a request to create empty shel
 - [ ] Design a reviewed schema containing plan ID, task ID, project/TFM, module/category, exact case selection (or reviewed pattern), build prerequisites, required SQL/GUI resources, strict mode, evidence and timeout.
 - [ ] Implement `Invoke-TestGate.ps1` (name proposed), reading a checked-in manifest, with `Task` and `Final` modes; fail closed on unknown IDs, empty/unexpected selection, missing TFMs, stale source inventory or unsupported options. Never translate a task gate into a full solution run implicitly.
 - [ ] Make runner enforce one SQL process/TFM at a time across separate test projects, not merely per-assembly xUnit serialization. Define cancellation, lock lifetime, recovered crash handling and ownership semantics.
-- [ ] Reconcile source/discovery/TRX globally across all eligible assemblies, including overlapping categories, theory rows and method-scoped exemptions.
+- [ ] Implement the versioned logical-case key and independently reconcile source/discovery/TRX globally on each TFM across all eligible assemblies, including overlapping categories, theory rows, method-scoped exemptions and explicit old/new project mappings. Reject ambiguous row identities and duplicate/missing cases; do not equate raw TRX GUIDs with durable identity.
 - [ ] Capture sanitized per-task evidence (revision/project/TFM/filter/discovered/executed/passed/failed/skipped/time), final gate reuse invalidation and bounded-run diagnostics.
 - [ ] Add CLI/parser/manifest negative tests for omitted task, category typo, duplicated identities across projects, missing-case/project, unsafe simultaneous resource use and absent approval.
 - [ ] Independently validate the local manifest selection against source/discovery/expanded theory rows; never trust only the local runner's filtered test list. Do not add CI orchestration or CI test execution.
@@ -93,22 +106,22 @@ This is an **illustrative target structure**, not a request to create empty shel
 
 ### TESTGATE-T04 — Separate pure session/VM and GUI test projects (code PR)
 
-- [ ] Inventory every existing Desktop method/theory case; classify pure/no-SQL vs STA/control/global-state and maintain exact before/after identities/counts.
+- [ ] Inventory every existing Desktop method/theory case per TFM; classify pure/no-SQL vs STA/control/global-state and capture normalized logical identities and old → new assembly mappings, not only before/after counts.
 - [ ] Extract eligible pure tests without bringing `UseWindowsForms` or SQL initialization into the new project when avoidable; preserve both supported target runtimes and test behavior.
 - [ ] Keep GUI-interacting tests serialized; retain STA, disposal, unhandled exception/DataError protection, modal dialog suppression and bounded worker cleanup.
 - [ ] Update solution/project references and scripts, guard against duplicate execution, validate both `net48` and `net8.0-windows`.
-- [ ] Only narrow Desktop assembly serialization if independently proven safe; retain an explicit serial fallback.
+- [ ] Require per-TFM source/discovery/TRX one-to-one logical-case reconciliation (including expanded theory rows, categories and reviewed renames); fail on duplicate/missing/ambiguous identities. Only narrow Desktop assembly serialization if independently proven safe; retain an explicit serial fallback.
 
 **Exit:** unchanged assertions + passing dual-runtime GUI and pure tests, no SQL dependency added to pure tests.
 
 ### TESTGATE-T05 — Incrementally partition SQL test assemblies (one or more code PRs)
 
-- [ ] Snapshot all original SQL + reviewed non-SQL method identities, expanded theory cases, categories, migration audit call sites and existing exemption fingerprints on BOTH TFMs.
+- [ ] Snapshot original SQL + reviewed non-SQL logical method/expanded-case identities, old assembly locations, categories, migration audit call sites and exemption fingerprints on BOTH TFMs using the versioned key defined above.
 - [ ] Create shared harness without bypassing the existing approval and ownership guards. Move one coherent module at a time; preserve test-only embedded SQL scripts/resources/assembly metadata.
 - [ ] Rebuild classification/exemption manifests per moved assembly and independent global aggregation; unknown cases/default SQL requirements fail closed.
 - [ ] Include full scenarios for cross-module inventory and permission checks, migrations/drift, aborted/failed upgrades, transactions, race conditions and cleanup.
 - [ ] Serialize SQL processes against the approved instance until cross-process/TFM resource coordination and bounded capacity have independent acceptance evidence.
-- [ ] Require full **before/after** method + expanded-case reconciliation with no orphaned or duplicated test; test missing/duplicate assemblies and theory-row drift.
+- [ ] Require full **before/after** per-TFM source → discovery → TRX logical-case reconciliation and an explicit bijective old → new location/key mapping; negative-test missing/duplicate/ambiguous assemblies and theory rows, renames, categorization drift and non-deterministic row identities. Never accept raw TRX ID or aggregate-count parity alone.
 - [ ] Run focused new-project gates, then final two-TFM strict acceptance; record execution and resource/time delta without promising a speedup from project splitting alone.
 
 **Exit:** every required old behavior is still executed exactly as intended and mandatory SQL coverage is complete across the new projects.
@@ -131,8 +144,9 @@ This is an **illustrative target structure**, not a request to create empty shel
 - L1 edit-loop tests, project/TFM/filter/results:
 - L2 task gates (task ID, module/category, project, pass/fail/skip, blockers):
 - L3 one planned final acceptance attempt (or blocked; no fabricated single-pass mode):
-- SQL independently reconciled inventory/discovery/theory rows/TRX:
-- Watchdog, approval, journal/cleanup reconciliation:
+- SQL independently reconciled inventory/discovery/theory rows/TRX (sanitized aggregate, originals retained locally):
+- Watchdog, approved-instance preflight result, journal/cleanup reconciliation (no raw identifiers):
+- Public evidence sanitization review (no raw TRX, approval, ownership/timing journals or unreviewed ZIP):
 - L4 explicit specialized/manual requirements:
 - Exact SQL full-suite invocations and why repeats (if any) were necessary:
 - Ready / NOT VERIFIED / BLOCKED:
