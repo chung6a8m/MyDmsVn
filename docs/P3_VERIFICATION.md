@@ -49,4 +49,4 @@ The configured `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` targeted the guarded d
 - BCrypt configuration must not be downgraded below a factor already persisted for an account. Such a mismatch fails closed until configuration is restored or the credential is reset under the active policy.
 - The password compare-and-swap command currently uses Dapper inside `SqlIdentityStore`; aligning this command-side write with the repository's RepoDb convention is deferred as a review follow-up because changing persistence style is not required to close the P3 security defects above.
 
-Next roadmap task: P4 desktop foundation, starting with `docs/plans/20261008-006-phase-4-desktop.md`.
+Next roadmap task: P4 desktop foundation, starting with `docs/plans/archive/20261008-006-phase-4-desktop.md`.

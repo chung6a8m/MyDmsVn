@@ -17,4 +17,4 @@ P5 must prove a real transaction involving draft receipt, stock movements and st
 ## Consequences
 Reconciliation and SQL Server integration tests for retry, rollback and parallel posting are mandatory. Reversal/returns/valuation require later ADRs; never mutate historic ledger to implement them ad hoc.
 
-See `docs/DATA_MODEL.md` and `docs/plans/20261008-001-sales-inventory-foundation.md`.
+See `docs/DATA_MODEL.md` and `docs/plans/archive/20261008-001-sales-inventory-foundation.md`.

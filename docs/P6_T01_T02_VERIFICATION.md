@@ -2,7 +2,7 @@
 
 Date: 2026-10-13
 
-Scope: detailed P6-T01 and P6-T02 in `docs/plans/20261008-007-phase-6-local-hardening.md`. This is not P6 release sign-off.
+Scope: detailed P6-T01 and P6-T02 in `docs/plans/archive/20261008-007-phase-6-local-hardening.md`. This is not P6 release sign-off.
 
 ## Implemented
 

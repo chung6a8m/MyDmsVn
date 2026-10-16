@@ -45,4 +45,4 @@ Breakdown:
 - Unexpected exceptions are reported through the P2 diagnostic seam and converted to a safe typed internal error. P6 still owns structured logging configuration and must not change the client envelope.
 - Feature API interfaces and DTOs are seams for later phases; P3/P5 still own authorization and business validation/behavior.
 
-Next roadmap task: P3 security foundation, starting with P3-T01 only after reviewing `docs/plans/20261008-005-phase-3-security.md` and its dependencies.
+Next roadmap task: P3 security foundation, starting with P3-T01 only after reviewing `docs/plans/archive/20261008-005-phase-3-security.md` and its dependencies.
