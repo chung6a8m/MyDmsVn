@@ -47,6 +47,38 @@ Preserve/implement one canonical, explicit, validated **active framework list** 
 | `SqlTestRunner.Tests.csproj` fixture target | Currently builds integration test fixture on **both** TFMs before runner tests. Make this follow verified active SQL targets without losing the ability to rebuild both later |
 | TRX/manifest reconciliation | Detect unknown TFM, omitted active project, duplicate/empty selection, stale binary, net8-only tool mistaken for app coverage, missing logical cases or skipped SQL rows; failed/partial cleanup is always a failure |
 
+### 3A. Concrete Task/Final registration and acceptance envelope (MUST implement in T03)
+
+The current `tests/test-gates.v1.json` registers **only** `planId=20261016-001, taskId=TESTGATE-T03`. It has **no NET8-PAUSE gate**. `TestGateManifestValidator.Select` therefore rejects a NET8-PAUSE Task/Final request. Moreover, the **current** `ValidateFinalSqlContract` and `TestGateCoordinator.RunSqlGateAsync` explicitly demand `[net48, net8.0]`: merely editing `frameworks` in JSON will make Final fail. `Task` presently rejects any gate with SQL or GUI resources, and `Final` cannot run GUI-bearing `DotnetTest` gates. These are implementation requirements, not existing capabilities.
+
+**Stable identity:** use the full filename stem as `planId`:
+`20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8`.
+The distinct `taskId`s are `NET8-PAUSE-T01` through `NET8-PAUSE-T05`; do **not** reuse `20261016-001 / TESTGATE-T03`, because that would select unrelated, historical tests. Introduce the following *proposed* manifest entries **only after** verifying the code and real selectors, with all v1-required fields (`project`, `frameworks`, `module`, `classification`, `selection`, `buildPrerequisites`, `resources`, `strictMode`, both timeouts, evidence). The names below are contracts, **not yet registered**.
+
+| `taskId` / proposed `gateId` | Mode; responsible project × proposed active TFM | Exact selection type; required proof |
+|---|---|---|
+| T01 / `net8-pause-t01-audit` | Task, runner tests `tests/tools/MyDmsVn.SqlTestRunner.Tests/*.csproj` × `net8.0` (tool-only) | Reviewed `TestProjectBuildContractTests`, `TestGateManifestTests` and `TestGateRepositoryContractTests` classes, plus separate static project graph / baseline audit. No SQL or GUI resources |
+| T02 / `net8-pause-t02-build` | Task, runner tests × `net8.0` (only after tool dependencies compile) | Reviewed `TestProjectBuildContractTests` + actual architecture reference checks; separate locked restore/Release build matrix for active `net48` and tool-only `net8.0`. If tool project cannot compile, **BLOCKED** |
+| T03 / `net8-pause-t03-runner` | Task, runner tests × `net8.0` | Reviewed `TestGateManifestTests`, `TestGateCoordinatorTestsFinal`, `PrAcceptanceRunTests`, `BenchmarkRunCoordinatorTests`, `TestGateRepositoryContractTests`; add negative framework/ownership/approval/timeout assertions before binding selectors |
+| T04 / `net8-pause-t04-docs` | Task, runner tests × `net8.0` (if runnable) | `TestGateRepositoryContractTests` / `TestProjectBuildContractTests` scoped checks **plus separate** documentation, links and packaging audit; **no GUI test** in ordinary Task |
+| T05 / `net8-pause-t05-task` | Task, runner tests × tool-only `net8.0` | Whole reviewed runner/manifest regression before freezing inputs; no SQL/GUI resource in Task |
+| T05 / `net8-pause-t05-final-runner` | Final, runner tests × tool-only `net8.0` | Unfiltered `DotnetTest` (no SQL/GUI resource); build fixture uses active SQL `net48` only |
+| T05 / `net8-pause-t05-final-app` | Final, `tests/MyDmsVn.Server.Application.Tests/*.csproj` × `net48` | Unfiltered `DotnetTest`; no SQL/GUI resource; source/discovery/TRX |
+| T05 / `net8-pause-t05-final-harness` | Final, `tests/MyDmsVn.SqlTestHarness.Tests/*.csproj` × `net48` | Unfiltered `DotnetTest`; no SQL/GUI resource |
+| T05 / `net8-pause-t05-final-architecture` | Final, `tests/MyDmsVn.Architecture.Tests/*.csproj` × **actual compatible target** (currently tool-only `net8.0`) | Unfiltered `DotnetTest` only after T01/T02 resolve `net8.0` test → `net48` library incompatibility. If replaced, bind verified equivalent architecture coverage; do not silently omit |
+| T05 / `net8-pause-t05-final-sql` | Final, `tests/MyDmsVn.Server.Infrastructure.IntegrationTests/*.csproj` × **`net48`** | **Exactly one** strict `SqlPrAcceptance` gate, unfiltered, `RequiredExclusive` SQL, `Gui=None`; source/discovery/TRX/ownership/watchdog/approval/cleanup |
+| T05 / **GUI D2 (external, NOT manifest `DotnetTest`)** | Packaged/Desktop `tests/MyDmsVn.Desktop.Tests/*.csproj` × `net48` | Independently verified **GUI-aware process-tree watchdog**, STA/serial execution, full unfiltered case-level TRX; bind its sanitized report to the same frozen revision. If no verified GUI launcher, **BLOCKED**, never omit from acceptance |
+
+Full paths above use `*.csproj` to identify the **existing concrete project directories**, not as executable glob arguments: the actual manifest must store the exact existing path (e.g. `tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj`). For Task selectors, verify test classes and expanded cases at the implementation revision; no unexpected empty selection is PASS. The repository's current `net8.0` runner.Tests prebuild also forces **both** SQL fixture TFMs; fix that build prerequisite before any after-pause Task/Final result can be trusted.
+
+**Validator/coordinator change:** replace the two hard-coded dual-SQL-TFM checks with a fail-closed comparison of `gate.Frameworks` to a versioned, **reviewed active SQL framework list**, selected for the exact manifest revision (during pause `[net48]`; on restoration `[net48, net8.0]`). Validate nonempty, allowed/order-stable, distinct, declared/buildable and consistent across CLI, manifest, logical-case selected inventory and runner result. Unknown or manually overridden mismatched target fails. Ensure other programs cannot invoke `pr-acceptance` or `baseline` with a conflicting TFM list that masquerades as manifest Final.
+
+**Final envelope, not a fake single command:** at the frozen commit, run (a) manifest-owned Final covering all the listed **non-GUI** required test projects and the entire active unfiltered SQL inventory **and** (b) the separately guarded full Desktop D2 GUI gate on every active GUI TFM, plus Release builds/packages of both active host and essential tool projects. The acceptance report must **join their revisions, project × TFM lists, identities and outcomes**; Final is **NOT complete** when any required external GUI, build, architecture or packaging gate is missing. Never label the manifest Final by itself as proof that a GUI-capable test ran.
+
+Preserve all historical net8 logical identities in an explicitly versioned **historical/inactive inventory**, not in the **active execution set**; test the active `net48` case-by-case bijection against a reviewed pre-change `net48` baseline and reject any dropped test/row or duplicate owner. Historical `net8.0`/`net8.0-windows` cases are **PARKED / NOT RUN**, never selected, counted as PASS or deleted to shrink the expected total. Reactivation demands a reviewed inventory transition and a new strict full dual-TFM acceptance. The current v1 manifest has no `activeFrameworks` setting: explicitly design/test the versioned schema or a compatible, validated manifest sidecar before changing the default; do not insert an unrecognized JSON property into the strict loader.
+
+**Required adversarial tests:** no matching `planId/taskId`, missing Task/Final entry, duplicate SQL owner, duplicate/empty/unsupported/out-of-order TFM, project graph incompatible with requested TFM, unregistered current logical case, parked case accidentally counted active, stale/inexact inventory or evidence SHA, runner tool TFM counted as SQL TFM, CLI/manifest disagreement, missing approved instance, timed-out/orphaned testhost, partial TRX, missing GUI proof and failed/ambiguous database cleanup. Preserve exact failure statuses and prevent a green report from a shorter-than-expected gate list.
+
 **After implementation, illustrative focused command (exists today):**
 
 ```powershell
@@ -108,13 +140,13 @@ The existing TESTGATE manifest-owned `-Mode Final` must remain the authoritative
 
 ### NET8-PAUSE-T05 — Frozen one-pass acceptance and restore drill
 
-- [ ] Freeze gate-affecting inputs (projects, build scripts, runner, manifests, tests/theory, SQL/migrations). Run affected focused L2, then **one planned** locally approved manifest-governed Final gate: all mandatory active projects and **entire unfiltered net48 SQL test inventory exactly once**, zero skips; preserve TRX/discovery/source bijection, process exit, watchdog, SQL owner journal and cleanup.
+- [ ] Freeze gate-affecting inputs (projects, build scripts, runner, manifests, tests/theory, SQL/migrations). Run affected focused L2, then **one planned** locally approved manifest-governed Final covering **all required non-GUI projects** and the **entire unfiltered net48 SQL test inventory exactly once**; separately execute the full bounded GUI D2 and Release/build/package checks, **all at the same revision**. Require zero skips and source/discovery/TRX bijection, process exit, watchdog, approved SQL owner journal and cleanup. A successful old `TESTGATE-T03` Final alone is **not** NET8-PAUSE acceptance.
 - [ ] Run approved non-SQL Application/Desktop/Architecture/runner gates on their **actual active TFMs**, bounded STA GUI checks and build/package checks. Record parked modern-host evidence as NOT RUN with the accepted temporary scope.
 - [ ] Drill reactivation in an isolated branch/worktree: restore `net48;net8.0`, `net48;net8.0-windows`, tool/manifest framework arrays and modern-host build; prove source/discovery logical keys for `net8.0` still map correctly. Do not claim dual-TFM release quality without executing its full gate.
 - [ ] Compare duration (same environment and protocol, with setup/outliers explained); **do not claim a fixed 50% speedup**. Publish reviewed sanitized aggregates only; no raw TRX/SQL identifiers/approval journals.
 - [ ] If the final revision changes gate inputs after passing, rerun the relevant mandatory Final gate; do not reuse stale acceptance artifacts. SQL/Windows unavailable is BLOCKED/NOT RUN.
 
-**T05 exit:** reduced-TFM execution is effective only after the complete scoped gate is verified at the final relevant revision and the restoration steps are tested. A failed gate is never waived solely to improve speed.
+**T05 exit:** reduced-TFM execution is effective only after the **manifest Final + external GUI D2 + build/architecture/package envelope** above is verified at the same frozen final revision and the restoration steps are tested. A failed, omitted or unavailable required gate remains BLOCKED and is never waived solely to improve speed.
 
 ## 5. Activation, rollback and re-enable conditions
 
@@ -124,7 +156,63 @@ The existing TESTGATE manifest-owned `-Mode Final` must remain the authoritative
 - **Rollback trigger:** incompatible tool/reference graph, loss of strict SQL inventory guarantees, unbounded test process, unexplained behavior drift, unacceptable release target coverage or a failing reduced-TFM L3. Restore baseline target declarations/configuration and re-run affected exact gates; retain evidence of the aborted attempt.
 - **Guardrail:** active-target reduction changes what is presently required, **not** the definition or correctness of any test. No auto-green or suppression by removing rows or classifiers from test inventory.
 
-## 6. Task gate summary / handoff
+## 6. Explicit per-task L2 execution matrix (bind exact source cases before work)
+
+**Current runnable commands vs proposed commands:** Project paths and test classes below were located in the planning-revision repo. T01/T02 preflight can run **static** and **pure, focused** checks directly before the new manifest entries exist; the proposed Task/Final calls are **NOT runnable today**. After T03, every Task must be registered and independently reconciled with its exact case set in the manifest; do not report older ad-hoc `dotnet test` as a manifest Task. In all rows, an unavailable selected test, absent SQL approval, unsupported TFM, changed input after verification or missing watchdog is `BLOCKED/NOT RUN` rather than `PASS`.
+
+| Task | Actual project × TFM, verified class selector / prerequisite | L2 command or required binding | SQL category, timeout and evidence |
+|---|---|---|---|
+| **T01** | `tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj` × **tool-only `net8.0`**; classes `TestProjectBuildContractTests`, `TestGateManifestTests`, `TestGateRepositoryContractTests`. Static inventory of all `src/tests/vendor` .csproj and `global.json`, plus historical inventory | Static commands **G0** below. Focused pure class test **U** below when current tool graph builds; source-review and record selection. Future Task `net8-pause-t01-audit` | `NonSql`, no SQL approval; **300s per selected process / 900s envelope** (through reviewed Task watchdog after T03). Record actual build and source/declared TFM matrix, before logical-case fingerprints, empty/unavailable tests as blocked |
+| **T02** | `Server.Application.Tests` × `net48`; `SqlTestHarness.Tests` × `net48`; legacy `Desktop.App` × `net48`, shared GUI library × `net48`; runner.Tests / Architecture.Tests × tool-only `net8.0` if reference graph repaired. Class `TestProjectBuildContractTests` in runner.Tests | Locked restore **B** and focused, explicit `dotnet build <real.csproj> -c Release -f <declared TFM>`; future Task `net8-pause-t02-build`. **Do not** run AppCore/old net8 project or treat its exclusion as a pass | `NonSql`; 300s/process, 900s overall for Task; record each build exit and skipped/parked project separately. Any broken essential tool dependency blocks T03 |
+| **T03** | `SqlTestRunner.Tests` × `net8.0`; reviewed `TestGateManifestTests`, `TestGateCoordinatorTestsFinal`, `PrAcceptanceRunTests`, `BenchmarkRunCoordinatorTests`, `TestGateRepositoryContractTests`; fixture builds **only active SQL `net48`** | Focused **U3** below for RED→GREEN, then proposed manifest `Task` for `NET8-PAUSE-T03`; reject `Final` until schema, runner and all entries pass negative tests | `NonSql` for pure negative cases; SQL `SecurityProvisioning`/**appropriate affected category** only if actual SQL lifecycle behavior changed; **1200s SQL pass / 7200s aggregate** with real approval, timeout/tree-kill, live ownership/cleanup |
+| **T04** | `TestGateRepositoryContractTests`/ `TestProjectBuildContractTests` × runner.Tests `net8.0` plus exact `src/tests` project inventories and packaging script `deployment/release/Publish-LocalRelease.ps1` | Static **G0** + actual link/target check; proposed manifest `Task` for `NET8-PAUSE-T04`. Review packaged `net48` host target and park modern host explicitly | `NonSql`; 300s/process, 900s Task; packaging/build evidence, docs-link check and negative manifest checks; **no** SQL rerun for docs-only edits |
+| **T05** | `SqlTestRunner.Tests` × tool `net8.0`; `Server.Application.Tests`, `SqlTestHarness.Tests`, SQL project and Desktop.Tests × active `net48`; Architecture.Tests × **verified actual** compatible target | Proposed `Task` `NET8-PAUSE-T05` then **F** manifest Final + verified external **GUI-D2**. Full Release builds/package + isolated restore drill. **F is NOT runnable today** | Approved **unfiltered SQL `net48`** with process-tree watchdog, instance/ownership/cleanup, **1200s SQL process and 7200s Final budget**; GUI-D2 whole-tree **900s/project/TFM** or earlier approved tighter measured bound. Record actual executed/discovered/failed/skipped cases, artifact/revision, mandatory zero SQL skips and independent GUI evidence; missing gate = BLOCKED |
+
+**G0 — runnable static preflight (no SQL or GUI):**
+
+```powershell
+git status --short
+git rev-parse HEAD
+git diff --check
+Get-ChildItem src,tests,vendor -Recurse -Filter *.csproj | Select-Object -ExpandProperty FullName
+Get-ChildItem tests -Recurse -Filter *.csproj | Select-String -Pattern 'TargetFramework'
+```
+
+**U — existing focused pure tests (only if the actual net8-only tool project still builds):**
+
+```powershell
+$runnerTests = 'tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj'
+$selector = 'FullyQualifiedName~TestProjectBuildContractTests|FullyQualifiedName~TestGateManifestTests|FullyQualifiedName~TestGateRepositoryContractTests'
+dotnet test $runnerTests -c Release -f net8.0 --filter $selector
+```
+
+**B — example of existing active build target; enumerate all affected projects and tool-only exceptions:**
+
+```powershell
+dotnet restore MyDmsVn.sln --locked-mode
+dotnet build src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj -c Release -f net48 --no-restore
+dotnet build tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net48 --no-restore
+```
+
+**U3 — existing non-SQL runner tests (selectors refer to real classes; new assertions must first be added):**
+
+```powershell
+$selector = 'FullyQualifiedName~TestGateManifestTests|FullyQualifiedName~TestGateCoordinatorTestsFinal|FullyQualifiedName~PrAcceptanceRunTests|FullyQualifiedName~BenchmarkRunCoordinatorTests|FullyQualifiedName~TestGateRepositoryContractTests'
+dotnet test tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj -c Release -f net8.0 --filter $selector
+```
+
+**F — proposed future manifest-owned Final (NOT runnable until T03 and all registrations pass):**
+
+```powershell
+$pausePlanId = '20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8'
+$artifactRoot = '.sqlperf/net8-pause-final-' + [guid]::NewGuid().ToString('N').Substring(0,12)
+& ./tests/tools/Invoke-TestGate.ps1 -Mode Final -PlanId $pausePlanId -TaskId 'NET8-PAUSE-T05' `
+  -ArtifactRoot $artifactRoot -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
+```
+
+**GUI-D2:** no verified whole-process-tree Desktop launcher exists in the source at this planning revision. **Do not** run direct `dotnet test`/ `--list-tests` against the GUI-capable assembly as proof of readiness. T05 must either bind a new independently reviewed watchdog's actual executable command after its tests pass (unique `net48` TRX, complete source/discovery/theory-row mapping, real exit, STA/serial and child cleanup) **or remain BLOCKED**. A 900s timeout is a *design upper bound*, not evidence of an implemented timer. The Task manifest cannot bypass this by tagging the GUI assembly `NonSql`.
+
+## 7. Task gate summary / handoff
 
 | Task | L1/L2 feedback | SQL scope | Mandatory exit |
 |---|---|---|---|
