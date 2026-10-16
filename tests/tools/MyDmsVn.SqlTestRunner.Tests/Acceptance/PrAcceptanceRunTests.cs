@@ -55,6 +55,39 @@ public sealed class PrAcceptanceRunTests
         Assert.Equal("pr-acceptance", Assert.Single(exporter.Evidence).Mode);
     }
 
+    [Fact]
+    public async Task Profile_runs_one_unfiltered_pass_for_the_active_net48_framework()
+    {
+        using var fixture = new Fixture();
+        var process = new RecordingProcessRunner();
+        var exporter = new StubAcceptanceReportExporter();
+        var coordinator = new BenchmarkRunCoordinator(
+            new StubPreflightGate(true),
+            process,
+            new StubResultGate(),
+            new StubOwnershipGate(),
+            exporter,
+            new StubClassificationGate());
+
+        var result = await coordinator.RunAsync(
+            fixture.Options with { TargetFrameworks = new[] { "net48" } },
+            CancellationToken.None);
+
+        Assert.True(result.IsComplete);
+        Assert.Collection(
+            process.Commands,
+            command => Assert.Contains("--list-tests", command.Arguments),
+            command =>
+            {
+                Assert.Contains("-f net48", command.Arguments);
+                Assert.DoesNotContain("--filter", command.Arguments);
+            });
+        var run = Assert.Single(result.Runs);
+        Assert.Equal("net48", run.Tfm);
+        Assert.Equal(BenchmarkPassKind.Acceptance, run.Kind);
+        Assert.Equal(new[] { "net48" }, Assert.Single(exporter.Evidence).TargetFrameworks);
+    }
+
     [Theory]
     [InlineData(1, 1, "net48,net8.0")]
     [InlineData(0, 2, "net48,net8.0")]

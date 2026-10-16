@@ -80,9 +80,7 @@ public sealed class BenchmarkRunCoordinator
         if (isAcceptance &&
             (options.WarmupPasses != 0 ||
              options.MeasuredPasses != 1 ||
-             !options.TargetFrameworks.SequenceEqual(
-                 new[] { "net48", "net8.0" },
-                 StringComparer.Ordinal)))
+             !IsSupportedAcceptanceFrameworkProfile(options.TargetFrameworks)))
         {
             return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }
@@ -269,6 +267,11 @@ public sealed class BenchmarkRunCoordinator
 
         return new BenchmarkRunResult(true, runs, recovery.RecoveryRequired);
     }
+
+    private static bool IsSupportedAcceptanceFrameworkProfile(
+        IReadOnlyList<string> targetFrameworks) =>
+        targetFrameworks.SequenceEqual(new[] { "net48" }, StringComparer.Ordinal) ||
+        targetFrameworks.SequenceEqual(new[] { "net48", "net8.0" }, StringComparer.Ordinal);
 
     private static string AssemblyPath(BenchmarkRunOptions options, string tfm)
     {
