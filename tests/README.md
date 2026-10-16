@@ -91,11 +91,11 @@ The wrapper rejects a dirty tree, resolves the exact commit, and runs `net48` th
 For the manifest-owned TESTGATE-T03 Final contract, use a fresh ignored artifact root from a clean committed revision:
 
 ```powershell
-$artifactRoot = '.sqlperf/testgate-t03-final-' + [guid]::NewGuid().ToString('N')
+$artifactRoot = '.sqlperf/tg3-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
 tests/tools/Invoke-TestGate.ps1 -Mode Final -PlanId '20261016-001' -TaskId 'TESTGATE-T03' -ArtifactRoot $artifactRoot -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
 ```
 
-The wrapper defaults to the current repository and `tests/test-gates.v1.json`. Exit codes are `0` complete, `2` approval/resource/preflight denial, `3` incomplete execution/reconciliation/report, and `64` invalid CLI usage. Raw TRX, timing, ownership journals and lease state stay local; publish only the reviewed sanitized aggregate JSON.
+Keep this short unique root so `net48` ownership-journal atomic-write paths retain Windows `MAX_PATH` headroom. The wrapper defaults to the current repository and `tests/test-gates.v1.json`. Exit codes are `0` complete, `2` approval/resource/preflight denial, `3` incomplete execution/reconciliation/report, and `64` invalid CLI usage. Raw TRX, timing, ownership journals and lease state stay local; publish only the reviewed sanitized aggregate JSON.
 
 Raw TRX, journals and timing JSONL stay ignored/local. Timing is off by default; the runner sets `MYDMSVN_SQL_TEST_TIMINGS=1`, a unique run ID and a local output path. A timeout, missing/corrupt TRX, nonzero exit, failed/skipped mandatory case, inventory mismatch, ownership ambiguity or approval failure makes the run incomplete.
 

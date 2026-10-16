@@ -493,7 +493,7 @@ Commit: `docs(TESTGATE): document T03 gate operation`
 With an approved non-production SQL instance and operator-managed approval file:
 
 ```powershell
-$artifactRoot = '.sqlperf/testgate-t03-final-' + [guid]::NewGuid().ToString('N')
+$artifactRoot = '.sqlperf/tg3-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
 & ./tests/tools/Invoke-TestGate.ps1 `
   -Mode Final `
   -PlanId '20261016-001' `
