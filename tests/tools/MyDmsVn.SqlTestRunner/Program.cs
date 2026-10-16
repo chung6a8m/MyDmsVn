@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using MyDmsVn.SqlTestHarness;
 using MyDmsVn.SqlTestRunner.Benchmark;
 using MyDmsVn.SqlTestRunner.Focused;
+using MyDmsVn.SqlTestRunner.Gates;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Processes;
 using MyDmsVn.SqlTestRunner.Reconciliation;
@@ -22,19 +23,28 @@ internal static class Program
         RegexOptions.CultureInvariant);
 
     public static Task<int> Main(string[] args) =>
-        RunAsync(args, RunBaselineAsync, RunPrAcceptanceAsync, CancellationToken.None);
+        RunAsync(args, RunBaselineAsync, RunPrAcceptanceAsync, RunTestGateAsync, CancellationToken.None);
 
     internal static async Task<int> RunAsync(
         string[] args,
         Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> baselineRunner,
         CancellationToken cancellationToken) =>
-        await RunAsync(args, baselineRunner, RunPrAcceptanceAsync, cancellationToken)
+        await RunAsync(args, baselineRunner, RunPrAcceptanceAsync, RunTestGateAsync, cancellationToken)
             .ConfigureAwait(false);
 
     internal static async Task<int> RunAsync(
         string[] args,
         Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> baselineRunner,
         Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> acceptanceRunner,
+        CancellationToken cancellationToken) =>
+        await RunAsync(args, baselineRunner, acceptanceRunner, RunTestGateAsync, cancellationToken)
+            .ConfigureAwait(false);
+
+    internal static async Task<int> RunAsync(
+        string[] args,
+        Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> baselineRunner,
+        Func<BenchmarkRunOptions, CancellationToken, Task<BenchmarkRunResult>> acceptanceRunner,
+        Func<TestGateRunOptions, CancellationToken, Task<TestGateRunResult>> testGateRunner,
         CancellationToken cancellationToken)
     {
         if (args.Length == 0)
@@ -54,6 +64,22 @@ internal static class Program
         if (string.Equals(args[0], "focused-run", StringComparison.OrdinalIgnoreCase))
         {
             return await RunFocusedAsync(ParseOptions(args), cancellationToken).ConfigureAwait(false);
+        }
+
+        if (string.Equals(args[0], "test-gate", StringComparison.Ordinal))
+        {
+            if (!TryParseTestGateOptions(args, out var testGateOptions))
+            {
+                return 64;
+            }
+
+            var gateResult = await testGateRunner(testGateOptions, cancellationToken).ConfigureAwait(false);
+            return gateResult.Status switch
+            {
+                TestGateRunStatus.Succeeded => 0,
+                TestGateRunStatus.ResourceDenied => 2,
+                _ => 3,
+            };
         }
 
         var isBaseline = string.Equals(args[0], "baseline", StringComparison.OrdinalIgnoreCase);
@@ -158,6 +184,77 @@ internal static class Program
                 reportExporter: new SqlAcceptanceReportExporter())
             .RunAsync(options, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    private static async Task<TestGateRunResult> RunTestGateAsync(
+        TestGateRunOptions options,
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(options.ArtifactRoot);
+        using var runner = new OwnedProcessRunner();
+        return await new TestGateCoordinator(
+                runner,
+                new TestGateSourceInventory(),
+                new TestGateReportExporter())
+            .RunAsync(options, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static bool TryParseTestGateOptions(string[] args, out TestGateRunOptions options)
+    {
+        options = null!;
+        var allowed = new HashSet<string>(
+            new[] { "repo", "manifest", "mode", "plan", "task", "artifacts", "approval", "revision" },
+            StringComparer.Ordinal);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (args.Length < 3 || (args.Length - 1) % 2 != 0)
+        {
+            return false;
+        }
+
+        for (var index = 1; index < args.Length; index += 2)
+        {
+            var key = args[index];
+            if (!key.StartsWith("--", StringComparison.Ordinal) || index + 1 >= args.Length)
+            {
+                return false;
+            }
+
+            key = key.Substring(2);
+            var value = args[index + 1];
+            if (!allowed.Contains(key) || values.ContainsKey(key) || string.IsNullOrWhiteSpace(value) ||
+                value.StartsWith("--", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            values.Add(key, value);
+        }
+
+        var required = new[] { "repo", "manifest", "mode", "plan", "task", "artifacts" };
+        if (required.Any(key => !values.ContainsKey(key)) ||
+            !Enum.TryParse<TestGateMode>(values["mode"], ignoreCase: false, out var mode) ||
+            (values.TryGetValue("revision", out var suppliedRevision) &&
+             !RevisionPattern.IsMatch(suppliedRevision)) ||
+            (mode == TestGateMode.Final &&
+             (!values.ContainsKey("approval") || !values.ContainsKey("revision"))))
+        {
+            return false;
+        }
+
+        var repository = Path.GetFullPath(values["repo"]);
+        options = new TestGateRunOptions(
+            repository,
+            Path.GetFullPath(values["manifest"], repository),
+            mode,
+            values["plan"],
+            values["task"],
+            Path.GetFullPath(values["artifacts"], repository),
+            values.TryGetValue("approval", out var approval)
+                ? Path.GetFullPath(approval, repository)
+                : null,
+            values.TryGetValue("revision", out var revision) ? revision : null);
+        return true;
     }
 
     private static Dictionary<string, string> ParseOptions(string[] args)
