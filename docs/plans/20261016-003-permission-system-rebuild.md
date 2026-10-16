@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use `superpowers:executing-plans` or `superpowers:subagent-driven-development` to implement this plan task by task. Checkboxes represent work still required, not evidence that it exists.
 
-**Status:** Approved scope/order; NOT IMPLEMENTED; blocked on prerequisite implementation gates.  
+**Status:** Approved scope/order; T00 accepted; T01–T06 implementation gates NOT RUN.
 **Date:** 2026-10-16  
 **Goal:** Replace the unused MVP permission subsystem completely with a single configured superuser, code-defined permission catalog and deliberate operator-managed RBAC through UI/import.  
 **Architecture:** One authorization path over current authenticated identity and a code registry. Database stores accounts, role/user assignments, the protected singleton superuser binding and audit, not a synchronized permission catalog. The obsolete subsystem is physically removed.  
@@ -24,7 +24,7 @@ The required order is:
 
 Read [AGENTS](../../AGENTS.md), the spec, [TESTGATE T01–T03](20261016-001-task-gates-and-modular-tests.md), [TESTGATE T04–T05](20261016-002-modular-test-projects.md), [test policy](../CODEX_TEST_EXECUTION_POLICY.md), [gate matrix](../TEST_GATE_MATRIX.md) and [test strategy](../TEST_STRATEGY.md).
 
-TESTGATE T01–T03 is verified; NET8-PAUSE T01–T05 runtime gates pass at `6b0ce337` and PR #32 merged at `8e310778`; its duration comparison was waived, not measured, at `09d00bfa`. Modular T04/T05 remain an unsatisfied prerequisite. This plan does not implement the split/security code. Do not move product tests before the prerequisite evidence is accepted.
+TESTGATE T01–T03 is verified; NET8-PAUSE T01–T05 runtime gates passed at `6b0ce337` and PR #32 merged at `8e310778`; its duration comparison was waived, not measured, at `09d00bfa`. TESTGATE T04 was accepted with packaged GUI D2 at `7a1e0a3`; TESTGATE T05 was accepted with all-project SQL Final at `973109f`. Exact evidence and TFM limits are recorded in [SEC-REBUILD verification](../SEC_REBUILD_VERIFICATION.md). T00 binds current commands and test ownership before product changes.
 
 The documents may merge before the prerequisite code. Product implementation starts only after T00 verifies the committed/reviewed prerequisite results. Rebase the implementation branch onto that revision, then bind this plan to the actual project/TFM/runner manifest. Missing prerequisites mean **BLOCKED**, not permission to return to the old monolithic test path.
 
@@ -99,13 +99,16 @@ New CLI names, implemented and tested before documented as executable: `security
 
 **Files:** actual gate manifest produced by TESTGATE-T03; post-T04/T05 project/logical-case mapping; create `docs/SEC_REBUILD_VERIFICATION.md` with all implementation gates initially NOT RUN.
 
-- [ ] Verify T01–T03 and T04–T05 are committed/reviewed and their required local evidence is available. Record exact commits, real Task/Final entry points and the verified Desktop watchdog. Do not treat merged plan text or uncommitted local claims as completed gates.
-- [ ] Resolve actual `.csproj` files, declared TFMs, test categories, module labels and source/discovery/TRX identity version. Bind aliases A/X/S/M/C/I/H/R/D/W below to real paths and actual runnable commands.
-- [ ] Inventory every old security test by durable logical-case key per TFM. Classify `retain`, `replace` or `delete-obsolete-behavior`; record replacement/assertion rationale. Preserve old source/discovery evidence locally without maintaining old product behavior in a test compatibility project.
-- [ ] Add SEC-REBUILD T01–T06 selectors and planned new test classes to the checked-in manifest. Expected-but-not-yet-written tests are NOT RUN; no empty-selection pass. Verify manifest parser rejects missing project/TFM/selector and duplicated ownership using focused existing runner tests.
-- [ ] Publish sanitized prerequisite/path/command binding and commit this task's manifest/evidence changes. No unrelated full SQL or GUI baseline is rerun just to produce this mapping; existing evidence is usable only under the prerequisite exact-revision rules.
+- [x] Verify T01–T03 and T04–T05 are committed/reviewed and their required local evidence is available. Record exact commits, real Task/Final entry points and the verified Desktop watchdog. Do not treat merged plan text or uncommitted local claims as completed gates.
+- [x] Resolve actual `.csproj` files, declared TFMs, test categories, module labels and source/discovery/TRX identity version. Bind aliases A/X/S/M/C/I/H/R/D/W below to real paths and actual runnable commands.
+- [x] Inventory every old security test by durable logical-case key per TFM. Classify `retain`, `replace` or `delete-obsolete-behavior`; record replacement/assertion rationale. Preserve old source/discovery evidence locally without maintaining old product behavior in a test compatibility project.
+- [x] Add SEC-REBUILD T01–T06 selectors and planned new test classes to the checked-in manifest. Expected-but-not-yet-written tests are NOT RUN; no empty-selection pass. Verify manifest parser rejects missing project/TFM/selector and duplicated ownership using focused existing runner tests.
+- [x] Publish sanitized prerequisite/path/command binding and commit this task's manifest/evidence changes. No unrelated full SQL or GUI baseline is rerun just to produce this mapping; existing evidence is usable only under the prerequisite exact-revision rules.
 
 **Exit:** exact runnable per-task commands and bounded guards exist at the implementation revision; otherwise every dependent task remains BLOCKED.
+
+
+**T00 evidence (2026-10-17):** Manifest-owned `Invoke-TestGate.ps1 -Mode Task -PlanId '20261016-003-permission-system-rebuild' -TaskId 'SEC-REBUILD-T00'` reported source/discovery/execution 33/33, 33 passed, zero failed/skipped, no timeout, watchdog and ownership clean. Focused runner parser/identity tests also passed 33/33. SQL and GUI were not required or run. The broader repository source/discovery contract attempt exposed a baseline Security/net48 fingerprint discrepancy and is recorded without PASS in `docs/SEC_REBUILD_VERIFICATION.md`; it reproduces with the unchanged accepted manifest and remains open for final L3 reconciliation.
 
 ### SEC-REBUILD-T01 — Atomic replacement of registry, authorization, bootstrap and schema
 

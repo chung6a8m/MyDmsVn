@@ -913,7 +913,452 @@
       "SanitizedReport",
       "Ownership"
     ]
-  }
+  },
+    {
+      "gateId": "sec-rebuild-t00-runner",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T00",
+      "mode": "Task",
+      "project": "tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj",
+      "frameworks": [
+        "net8.0"
+      ],
+      "module": "SqlTestRunner",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "TestGateManifestTests",
+          "LogicalCaseIdentityTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t01-application",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T01",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Server.Application",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "SuperuserAuthorizationTests",
+          "PermissionDecisionTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t01-session",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T01",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "DesktopSession",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "SuperuserSessionTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t02-application",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T02",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Server.Application",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "PermissionCatalogTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t02-architecture",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T02",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Architecture",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "PermissionRegistryCoverageTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t02-session",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T02",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "DesktopSession",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "PermissionCatalogClientTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t03-application",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T03",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Server.Application",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "SecurityAdministrationTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t04-session",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T04",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "DesktopSession",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "SecurityAdministrationViewModelTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t05-application",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T05",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Server.Application",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "PermissionImportValidationTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t05-session",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T05",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "DesktopSession",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "PermissionImportViewModelTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t06-application",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T06",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Server.Application",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "PermissionReleaseRegressionTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t06-architecture",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T06",
+      "mode": "Task",
+      "project": "tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj",
+      "frameworks": [
+        "net48"
+      ],
+      "module": "Architecture",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "PermissionRemovalInventoryTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    },
+    {
+      "gateId": "sec-rebuild-t06-runner",
+      "planId": "20261016-003-permission-system-rebuild",
+      "taskId": "SEC-REBUILD-T06",
+      "mode": "Task",
+      "project": "tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj",
+      "frameworks": [
+        "net8.0"
+      ],
+      "module": "SqlTestRunner",
+      "classification": [
+        "NonSql"
+      ],
+      "selection": {
+        "kind": "FullyQualifiedName",
+        "patterns": [
+          "TestGateManifestTests",
+          "LogicalCaseIdentityTests"
+        ]
+      },
+      "buildPrerequisites": [],
+      "resources": {
+        "sql": "None",
+        "gui": "None"
+      },
+      "strictMode": "DotnetTest",
+      "commandTimeoutSeconds": 300,
+      "overallTimeoutSeconds": 1800,
+      "evidence": [
+        "Source",
+        "Discovery",
+        "Trx",
+        "SanitizedReport"
+      ]
+    }
   ],
   "logicalCases": [
 {"logicalCaseId":"case-241b0d037edb00e42355","ownerProject":"tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj","frameworks":["net48"],"normalizedMethodSignature":"MyDmsVn.Desktop.Tests.DesktopSessionProjectContractTests.Session_project_owns_only_audited_pure_tests_and_is_in_the_active_build_matrix()","reviewedCodeFingerprint":"616e09589e8749a707e71cb6d4c717c27659c1df7893e2ca87bd9b6b733767b3","classification":["NonSql"],"rows":[{"locatorSha256":null,"rowKey":"fact"}]},
