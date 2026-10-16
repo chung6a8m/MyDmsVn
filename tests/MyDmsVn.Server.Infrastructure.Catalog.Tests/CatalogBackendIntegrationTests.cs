@@ -25,7 +25,10 @@ public sealed class CatalogBackendIntegrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "CatalogBackendIntegrationTests.Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups.migration-01",
+                database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             using var provider = CreateProvider(database.ConnectionString, new AllowAllPermissionStore());
@@ -86,7 +89,10 @@ public sealed class CatalogBackendIntegrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "CatalogBackendIntegrationTests.Explicitly_denied_catalog_write_leaves_business_tables_unchanged.migration-01",
+                database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             using var provider = CreateProvider(database.ConnectionString, new ExplicitDenyPermissionStore());
@@ -115,7 +121,10 @@ public sealed class CatalogBackendIntegrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "CatalogBackendIntegrationTests.Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries.migration-01",
+                database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             var services = new ServiceCollection();

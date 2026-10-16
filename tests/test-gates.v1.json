@@ -1079,7 +1079,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.Server.Infrastructure.IntegrationTests.CatalogBackendIntegrationTests.Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries()",
-      "reviewedCodeFingerprint": "c28b30c6c440965e528f89933df84dc7ab49ac73bda69df5cac2d8275af61a2f",
+      "reviewedCodeFingerprint": "b147d5786261ab873f36c6afe05207d2f07f761f9c9173e12f3775c4bc4f5bd6",
       "classification": [
         "FastSQL"
       ],
@@ -1098,7 +1098,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.Server.Infrastructure.IntegrationTests.CatalogBackendIntegrationTests.Explicitly_denied_catalog_write_leaves_business_tables_unchanged()",
-      "reviewedCodeFingerprint": "2d87af8967f1ee51b47fac4f27cffa40249b30439e7d8538ea94cd10bf9e0aa5",
+      "reviewedCodeFingerprint": "c5859dafd7a1b9e9c6506297cffdd8246afc2aab06bb0526bba4e113e9a34f6a",
       "classification": [
         "FastSQL"
       ],
@@ -1117,7 +1117,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.Server.Infrastructure.IntegrationTests.CatalogBackendIntegrationTests.Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups()",
-      "reviewedCodeFingerprint": "2d2f3a8bc14dd700a65809b1af74556195af1981f761fe00bde9fc8feb274839",
+      "reviewedCodeFingerprint": "6933094d9f38570d05713e670d83d82d080f13103a9bac1ce373ecdc8b8f5ba9",
       "classification": [
         "FastSQL"
       ],
@@ -1136,7 +1136,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.Server.Infrastructure.IntegrationTests.CatalogMappingIntegrationTests.Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings()",
-      "reviewedCodeFingerprint": "669b602072631fd9a060a870c29e34e9a2156439dcaaed75d1590dbb4e38c969",
+      "reviewedCodeFingerprint": "4e82e598f1f8207f39fb9acc3092695fb6a469f90b0da2a81131266fdf93118d",
       "classification": [
         "FastSQL"
       ],
@@ -1155,7 +1155,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.Server.Infrastructure.IntegrationTests.CatalogMappingIntegrationTests.Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time()",
-      "reviewedCodeFingerprint": "f93b7411b1de71a5bc0d9a21c4b82855b4a038947f5cfc3d11cd80bfb13c506a",
+      "reviewedCodeFingerprint": "c6fa0a137e3d4098b0b9d198a8a17f107ac5739073de8f0f3baa9a9bd937b106",
       "classification": [
         "FastSQL"
       ],
@@ -11303,7 +11303,7 @@
         "FastSQL"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "c28b30c6c440965e528f89933df84dc7ab49ac73bda69df5cac2d8275af61a2f"
+      "reviewedCodeFingerprint": "b147d5786261ab873f36c6afe05207d2f07f761f9c9173e12f3775c4bc4f5bd6"
     },
     {
       "exemptionId": "fingerprint-boundary-23e84418cfe25e49",
@@ -11312,7 +11312,7 @@
         "FastSQL"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "669b602072631fd9a060a870c29e34e9a2156439dcaaed75d1590dbb4e38c969"
+      "reviewedCodeFingerprint": "4e82e598f1f8207f39fb9acc3092695fb6a469f90b0da2a81131266fdf93118d"
     },
     {
       "exemptionId": "fingerprint-boundary-c69fa0ea15527cfe",
@@ -11321,7 +11321,7 @@
         "FastSQL"
       ],
       "rationale": "Reviewed fallback closes the fingerprint over the declaring test project and its reviewed project-reference boundary because runtime or compiler-generated IL prevents a complete method graph.",
-      "reviewedCodeFingerprint": "f93b7411b1de71a5bc0d9a21c4b82855b4a038947f5cfc3d11cd80bfb13c506a"
+      "reviewedCodeFingerprint": "c6fa0a137e3d4098b0b9d198a8a17f107ac5739073de8f0f3baa9a9bd937b106"
     },
     {
       "exemptionId": "fingerprint-boundary-04ad1f4da57c2054",

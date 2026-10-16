@@ -514,5 +514,65 @@
       "net8.0"
     ],
     "expectedInvocationRule": "once-per-caller-execution"
+  },
+  {
+    "invocationId": "CatalogBackendIntegrationTests.Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups.migration-01",
+    "class": "CatalogBackendIntegrationTests",
+    "method": "Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/CatalogBackendIntegrationTests.cs",
+    "sourceLine": 28,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "CatalogBackendIntegrationTests.Explicitly_denied_catalog_write_leaves_business_tables_unchanged.migration-01",
+    "class": "CatalogBackendIntegrationTests",
+    "method": "Explicitly_denied_catalog_write_leaves_business_tables_unchanged",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/CatalogBackendIntegrationTests.cs",
+    "sourceLine": 89,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "CatalogBackendIntegrationTests.Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries.migration-01",
+    "class": "CatalogBackendIntegrationTests",
+    "method": "Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/CatalogBackendIntegrationTests.cs",
+    "sourceLine": 118,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "CatalogMappingIntegrationTests.Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time.migration-01",
+    "class": "CatalogMappingIntegrationTests",
+    "method": "Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/CatalogMappingIntegrationTests.cs",
+    "sourceLine": 27,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
+    "invocationId": "CatalogMappingIntegrationTests.Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings.migration-01",
+    "class": "CatalogMappingIntegrationTests",
+    "method": "Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/CatalogMappingIntegrationTests.cs",
+    "sourceLine": 107,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
   }
 ]
