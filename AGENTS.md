@@ -4,13 +4,13 @@ Applies to the entire repository. This file is authoritative for AI-assisted cha
 
 ## Mission and status
 
-Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **P0–P4 foundations and P5 implementation/automated gates exist; P5 authenticated interactive acceptance and P6 release gates remain open.** Consult `docs/DEVELOPMENT_PLAN.md` for the current evidence-based status. **P3.1 initial Administrator/continuous permission sync is implemented and verified (PR #18 merged 2026-10-14); P4.1 real Login/session remains planned**, despite historical P3/P4 completion. Implement in small, reviewable phase-scoped changes and do not claim later-phase capabilities exist.
+Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **P0–P4 foundations and P5 implementation/automated gates exist; P5 authenticated interactive acceptance and P6 release gates remain open.** Consult `docs/DEVELOPMENT_PLAN.md` for the current evidence-based status. **P3.1 is historically verified; P4.1 is owner-accepted complete on 2026-10-16 (automated L3 + packaged manual UI evidence, with an explicit unobserved idle-expiry exception); remaining P5 GUI/P6 release gates are not waived**, despite historical P3/P4 completion. Implement in small, reviewable phase-scoped changes and do not claim later-phase capabilities exist.
 
 ## Read-order and precedence
 
 1. This `AGENTS.md`.
 2. `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`.
-3. `docs/DEVELOPMENT_PLAN.md` and the **specific phase plan**.
+3. `docs/DEVELOPMENT_PLAN.md`, [active plans](docs/plans/README.md) **in the recorded order**, and the specific active task; [archive](docs/plans/archive/README.md) is historical, not an execution queue.
 4. Applicable `docs/CONTRACTS.md`, `docs/PERSISTENCE.md`, `docs/SECURITY.md`, `docs/DATA_MODEL.md` and `docs/TEST_STRATEGY.md`.
 5. Accepted decisions in `docs/adr/`.
 6. `project-idea.md` is the raw idea; its examples may be incorrect and are **not implementation instructions**.
@@ -19,7 +19,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 
 ## Fixed technical decisions
 
-- Keep `net48`, `net8.0` and `net8.0-windows` as appropriate. **Do not move to .NET 10.**
+- **Current checked-in source is still dual-target** (`net48`, `net8.0`, `net8.0-windows` as declared). The [temporary .NET 8 pause plan](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) is PROPOSED, NOT IMPLEMENTED; do not assume a TFM was removed until a verified implementation PR changes the project/manifest matrix. No .NET 10 upgrade.
 - RepoDb `1.16.0`; RepoDb.SqlServer `1.16.1`; RepoDb.SqlServer.BulkOperations `1.16.2`.
 - Explicit UnitOfWork only: scope owns a single open connection and optional transaction; repositories and Dapper queries within that scope share them explicitly. No ambient/static AsyncLocal transaction.
 - RepoDb for command-side storage, Dapper for query-side DTO projection; DbUp for versioned SQL migrations.
@@ -28,7 +28,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 - v1 Local uses in-process Application dispatch; v2 HTTP uses the **same DTO/API result semantics**.
 - Preserve legacy `PasswordHash` and `PasswordSalt` columns for migration; no new plaintext or reversible password storage.
 - Authorization is checked on server-side application use cases; UI gating alone is insufficient. UserPermission explicit deny/grant overrides roles; default deny.
-- New features must declare/register permission keys centrally and validate new-key lifecycle in tests. Provision/synchronize permissions under reviewed deployment/administrator privilege only; never seed users/roles or run synchronization from desktop Login/startup. See `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md`.
+- New features must declare/register permission keys centrally and validate new-key lifecycle in tests. Provision/synchronize permissions under reviewed deployment/administrator privilege only; never seed users/roles or run synchronization from desktop Login/startup. Historical source: `docs/plans/archive/20261013-001-initial-security-provisioning-permission-sync.md`. The active [SEC-REBUILD plan](docs/plans/20261016-003-permission-system-rebuild.md) proposes replacing this implementation **after** the test-gate prerequisite.
 - Do not add sales order, issue, returns, pricing, accounting or multi-warehouse receipt to P5 unless separately approved.
 
 ## Coding conventions
@@ -44,7 +44,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 
 ## Work protocol
 
-1. Inspect the repo and phase dependencies; choose the first unfinished phase/task. Do not invent completed code. Cross-phase SQLPERF test-hardening tasks may proceed independently in separate PRs; preserve full dual-TFM SQL gates.
+1. Inspect the repo and [ordered active roadmap](docs/plans/README.md); do the first unimplemented prerequisite in sequence. Keep completed TESTGATE T01–T03 plan **active for context**, not as an instruction to rerun it. Preserve full current dual-TFM SQL gates until the owner-approved pause plan is *implemented and verified*; thereafter use only the manifest-approved active targets without removing safeguards.
 2. State the scope and affected layers before implementation; avoid changing unrelated modules.
 3. Make a minimal vertical change with automated tests.
 4. Build both `net48` and `net8.0` / `net8.0-windows` configurations on an environment with the targeting packs.
@@ -66,7 +66,7 @@ If documents contradict each other, flag the issue in the change summary; do not
 
 - Codex MUST NOT automatically run `dotnet test MyDmsVn.sln`, an unfiltered SQL suite, the strict SQL benchmark, or any full repository regression during L1 edits/fixes or after each L2 task. Run only the smallest correct affected project/class/method and real SQL categories actually required by that task, recording selection and coverage rationale.
 - Every new implementation plan MUST provide an explicit **per-task L2 gate matrix**: affected module/dependencies, projects/TFMs, reviewed test selectors, needed SQL category and adversarial cases, actual runnable commands, timeout/approval/cleanup, and pass/fail/skip/blocked evidence. See [Test Gate Matrix](docs/TEST_GATE_MATRIX.md).
-- Schedule **one planned L3 acceptance invocation** only after all task gates are green and gate-affecting edits are frozen. Preserve unfiltered dual-TFM SQL, discovery/TRX, watchdog, approval and ownership reconciliation. A failed L3 gate or later relevant edit invalidates prior evidence: repair via focused tests, then rerun the affected complete mandatory gate. Never treat stale evidence as green to force exactly one execution.
+- Schedule **one planned L3 acceptance invocation** only after all task gates are green and gate-affecting edits are frozen. Preserve unfiltered SQL for all **currently mandatory, manifest-approved** TFMs (dual-target until NET8-PAUSE is implemented), discovery/TRX, watchdog, approval and ownership reconciliation. A failed L3 gate or later relevant edit invalidates prior evidence: repair via focused tests, then rerun the affected complete mandatory gate. Never treat stale evidence as green to force exactly one execution.
 - **Current tooling:** `Invoke-TestGate.ps1` reads `tests/test-gates.v1.json` and provides manifest-owned `Task`/`Final` modes; Final reuses the strict single-pass `pr-acceptance` path (one unfiltered sequential pass per SQL TFM), requires a clean committed revision and approved SQL resources, and emits only sanitized aggregate evidence. The focused SQL wrapper still selects one category rather than module+category. Do not invent broader selectors or downgrade L3 to plain `dotnet test`; use `baseline` only for plan-triggered measurements.
 - **Local-only acceptance for TESTGATE:** execute focused task checks and the final full dual-TFM SQL gate in the approved local environment; publish only a separately reviewed sanitized aggregate evidence report and retain raw TRX, timing and ownership/approval journals locally (never attach raw ZIPs); do not add CI jobs or require CI to rerun the same full suite. CI adoption requires a separate explicit user request. This does not weaken local L3 evidence or change existing unrelated CI behavior.
 - Performance benchmarks/stress repetitions belong to plan-triggered L4, not ordinary feature L1/L2. [Proposed ADR 0006](docs/adr/0006-task-scoped-test-execution-and-module-projects.md) and the verified [TESTGATE T01–T03 plan](docs/plans/20261016-001-task-gates-and-modular-tests.md) define the current contract; [T04/T05 modularization](docs/plans/20261016-002-modular-test-projects.md) remains future work. Accepted ADR 0005 remains authoritative on isolation/parallelism.
@@ -89,10 +89,8 @@ If documents contradict each other, flag the issue in the change summary; do not
 
 ## Useful starting prompts
 
-- "Implement P0 from `docs/plans/20261008-002-phase-0-foundation.md`; create solution skeleton, DI and build verification only."
-- "Implement P1 from `docs/DEVELOPMENT_PLAN.md` and `docs/PERSISTENCE.md`, including SQL integration tests."
-- "Implement P5.1 master data after P0–P4 quality gates; follow `docs/plans/20261008-001-sales-inventory-foundation.md`."
-- "For future feature PRs, follow `docs/CODEX_TEST_EXECUTION_POLICY.md`: focused L1/L2 checks, then L3 evidence from the final gate-affecting revision. Do not restart completed SQLPERF-T01–T06 without a separately approved task."
-- "Implement P4.1 shared WinForms Login/session in `docs/plans/20261013-002-desktop-login-session.md` after P3.1, then complete authenticated P5/P6 release gates."
+- "Follow [the ordered active roadmap](docs/plans/README.md). TESTGATE-T01–T03 is verified context; implement the temporary reversible net8 TFM pause plan next, using task-scoped validation and explicit runner-framework parameters."
+- "After NET8-PAUSE is actually implemented and accepted, implement [TESTGATE-T04/T05 modular test projects](docs/plans/20261016-002-modular-test-projects.md) using the actual target matrix."
+- "After modularization, implement [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md); then complete the [remaining P5 GUI/P6 operational gates](docs/plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md), then P7."
 
 Do not automatically implement all phases in a single unreviewable change.

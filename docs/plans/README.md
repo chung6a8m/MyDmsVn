@@ -1,39 +1,21 @@
-﻿# Phase execution plans — Codex entry points
+# Active phase roadmap — Codex entry point
 
-These are execution instructions, not implementation evidence. Statuses belong to each plan and the roadmap; P3.1 initial Administrator provisioning/permission synchronization is **complete** after PR #18; P4.1 interactive Login/session is still pending.
+**Date:** 2026-10-16. Execute the following items **in exactly this order**. The first plan remains active for context despite verified completion; it must not be reimplemented. No other plan in this directory is an active work item.
 
-| Phase | Plan |
-|---|---|
-| P0 | [Repository and solution foundation](20261008-002-phase-0-foundation.md) |
-| P1 | [Persistence foundation](20261008-003-phase-1-persistence.md) |
-| P2 | [Application contracts and pipeline](20261008-004-phase-2-application-pipeline.md) |
-| P3 | [Security foundation](20261008-005-phase-3-security.md) |
-| **P3.1** | **[Initial security provisioning and continuous permission synchronization](20261013-001-initial-security-provisioning-permission-sync.md)** — complete (2026-10-14) |
-| P4 | [WinForms desktop foundation](20261008-006-phase-4-desktop.md) |
-| **P4.1** | **[Desktop Login, session and logout](20261013-002-desktop-login-session.md)** — new, not started |
-| P5 | [Sales & Inventory Foundation](20261008-001-sales-inventory-foundation.md) |
-| P6 | [Local v1 hardening](20261008-007-phase-6-local-hardening.md) |
-| P7 | [ASP.NET Core v2 / HTTP parity](20261008-008-phase-7-remote-api.md) |
-| **SQLPERF** (cross-phase) | **[SQL integration test performance optimization](20261014-001-sql-integration-test-performance-optimization.md)** — T01–T06 complete (2026-10-15); serial SQL safety and unfiltered release gates remain |
-| **TESTGATE T01–T03** (cross-phase) | [Task-scoped execution and strict SQL gate orchestration](20261016-001-task-gates-and-modular-tests.md) — T01 policy/docs complete; T02–T03 proposed, not verified |
-| **TESTGATE T04–T05** (cross-phase) | [Modular Desktop and SQL test projects](20261016-002-modular-test-projects.md) — proposed, not implemented; requires reviewed T02/T03 gates |
+| Order | Active plan | State |
+|---:|---|---|
+| 1 | [20261016-001-task-gates-and-modular-tests.md](20261016-001-task-gates-and-modular-tests.md) | TESTGATE-T01–T03 **verified complete**, retained for reference |
+| 2 | [20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | **Proposed / not implemented** — temporarily remove second `net8.0`/`net8.0-windows` TFM while preserving framework-selectable test tooling |
+| 3 | [20261016-002-modular-test-projects.md](20261016-002-modular-test-projects.md) | Proposed TESTGATE-T04/T05, dependent on preceding gates |
+| 4 | [20261016-003-permission-system-rebuild.md](20261016-003-permission-system-rebuild.md) | Proposed, dependent on modularized tests |
+| 5 | [20261016-004-remaining-p5-acceptance-and-p6-hardening.md](20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | Outstanding P5.1/P5.4 interactive checks, P6 T01–T04 operational gaps, P6 T05–T08 and G1–G5 |
+| 6 | [20261008-008-phase-7-remote-api.md](20261008-008-phase-7-remote-api.md) | Future P7 API/HTTP parity; re-enable `net8.0` before implementing the net8 host |
 
-A phase begins only after preceding phase exit checks have evidence. **P3.1 is verified; P4.1 remains a prerequisite for authenticated P5 GUI acceptance and P6 release sign-off.** SQLPERF is an independent test-infrastructure workstream with serial full-suite gates. This is a targeted integration follow-up to completed P3/P4, not a rewrite of their historical evidence. `docs/DEVELOPMENT_PLAN.md` is the summary/source of phase status; task-specific detail is here. `AGENTS.md` is the required AI instructions entry point.
+## Acceptance, archiving and current TFM scope
 
-## Progressive test policy for pending work (2026-10-15)
+- [Historical/superseded plans archive](archive/README.md) contains completed P0/P1/P2/P3/P3.1/P4, owner-accepted P4.1, completed SQLPERF, and the original P5/P6 plans **whose remaining tasks were explicitly transferred to item 5**. No unfinished P5/P6 check was falsely marked green by archiving.
+- P4.1 closed by the owner's **2026-10-16 explicit acceptance** of existing automated L3 plus partial packaged manual UI. The 30-minute idle-expiry/relogin observation was not completed, and its specific waiver does not close P5/P6. See [verification](../P4_1_VERIFICATION.md).
+- NET8-PAUSE is a **plan**, not a change already applied to `.csproj`. Until an implementation PR passes, existing both-TFM test requirements remain effective. Preserve `-Frameworks` / `--frameworks` on tooling, approved SQL instance controls, test inventory and release evidence.
+- Use [Development Plan](../DEVELOPMENT_PLAN.md), [Codex policy](../CODEX_TEST_EXECUTION_POLICY.md), [Test Gate Matrix](../TEST_GATE_MATRIX.md) and root [AGENTS.md](../../AGENTS.md). Task-scoped L1/L2 verification prevents per-edit full SQL reruns; a single final strict full gate still requires approved real SQL and an exact frozen revision.
 
-Apply [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md) to **P4.1, the two pending P5 GUI walkthroughs, pending P6 verification/release tasks and future P7**. The seven fully completed plans (P0, P1, P2, P3, P3.1, P4 and SQLPERF) are **not modified**. For partially completed P5/P6 plans, guidance applies only to their unchecked items, without revisiting historical completed results or checkboxes.
-
-## How to instruct Codex
-
-Example: "Read AGENTS.md and docs/plans/20261008-002-phase-0-foundation.md, implement P0 only, run available tests, report what passed and what requires Windows/SQL, and update checkboxes only for verified work."
-
-When Codex finishes a task, demand:
-1. Scope and changed files.
-2. Actual build/test commands, result summaries and unexecuted gates.
-3. Any deviation, compatibility issue or accepted ADR.
-4. Next task ID and blockers.
-
-P3.1 registry/sync/first-admin CLI is complete. Implement **P4.1 shared Login/session UI** as the next authenticated feature prerequisite. SQLPERF-T01–T06 are complete; do **not** restart them without an approved new task. For future feature PRs follow the progressive Codex test policy; separate any new performance A/B work from routine PR regression. The permission lifecycle must continue on every later feature release (new keys -> registration -> approval -> sync -> authorization tests); neither task may add production defaults or run DbUp/provisioning during desktop Login.
-
-Do not combine multiple phases into an unreviewable implementation change.
+When handing off a task, report completed scope, exact test commands/results, missing gates and next active task. Do not restart historical SQLPERF or P4.1 without a new approved change request.

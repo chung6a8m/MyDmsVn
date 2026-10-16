@@ -1,12 +1,12 @@
 # P4.1 — Desktop Login, authenticated session and logout
 
-Status: **In progress — automated L3 verified, packaged L4 partial** (2026-10-16; idle-expiry/relogin remains open). Follow-up to completed P4 shell/UI foundations, **not** evidence that P4 already shipped interactive Login. Depends on existing P3 Login/current-user contracts, P4 host/LocalApiClient wiring and **P3.1 verified first-administrator enrollment**. Must precede P5/P6 real-user interactive acceptance. See `docs/plans/20261013-001-initial-security-provisioning-permission-sync.md`.
+Status: **COMPLETE by explicit product-owner acceptance (2026-10-16)** with automated L3 and attended packaged manual UI evidence. The entire 30-minute idle-expiry/relogin observation was **not performed**; the project owner accepted that gap as a P4.1-specific evidence exception, not a passing test. Follow-up to completed P4 shell/UI foundations, **not** evidence that P4 already shipped interactive Login. Depends on existing P3 Login/current-user contracts, P4 host/LocalApiClient wiring and **P3.1 verified first-administrator enrollment**. Must precede P5/P6 real-user interactive acceptance. See historical `docs/plans/archive/20261013-001-initial-security-provisioning-permission-sync.md`.
 
-Read: `AGENTS.md`, `docs/CONTRACTS.md`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/TEST_STRATEGY.md`, `docs/P3_VERIFICATION.md`, `docs/plans/20261008-006-phase-4-desktop.md` and `docs/plans/20261008-007-phase-6-local-hardening.md`.
+Read: `AGENTS.md`, `docs/CONTRACTS.md`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/TEST_STRATEGY.md`, `docs/P3_VERIFICATION.md`, `docs/plans/archive/20261008-006-phase-4-desktop.md` and `docs/plans/archive/20261008-007-phase-6-local-hardening.md`.
 
 ## Test execution for P4.1 tasks (Codex policy, 2026-10-15)
 
-For **P4.1-T01–T05 and their still-open exit gates only**, follow [Codex Test Execution Policy](../CODEX_TEST_EXECUTION_POLICY.md). Actual implementation/test evidence is recorded in [P4.1 verification evidence](../P4_1_VERIFICATION.md):
+For **P4.1-T01–T05 and their still-open exit gates only**, follow [Codex Test Execution Policy](../../CODEX_TEST_EXECUTION_POLICY.md). Actual implementation/test evidence is recorded in [P4.1 verification evidence](../../P4_1_VERIFICATION.md):
 
 - **L1 — while editing:** run deterministic Application/session/ViewModel and request-actor tests nearest to the changed logic; pure session/fake-clock tests need no SQL.
 - **L2 — before completing a task:** run affected Desktop STA/UI tests on `net48` and `net8.0-windows`. For SQL identity, provisioning, authorization and account revalidation, use approved focused `SecurityProvisioning` and any other relevant SQL category, plus the plan's race/failure scenarios. Filtered SQL tests are not the final SQL gate.
@@ -15,7 +15,7 @@ For **P4.1-T01–T05 and their still-open exit gates only**, follow [Codex Test 
 
 ### Task-specific quality gates for future P4.1 changes (2026-10-16)
 
-This matrix applies **prospectively** to remaining P4.1 work or new gate-affecting changes. The project currently records completed automated L3 verification and partial packaged/manual L4 acceptance in `docs/P4_1_VERIFICATION.md`; these historical results and task checkboxes are not reset by this docs-only change. See [current gate matrix](../TEST_GATE_MATRIX.md) and [TESTGATE rollout](20261016-001-task-gates-and-modular-tests.md).
+This matrix applies **prospectively** to remaining P4.1 work or new gate-affecting changes. The project currently records completed automated L3 verification and partial packaged/manual L4 acceptance in `docs/P4_1_VERIFICATION.md`; these historical results and task checkboxes are not reset by this docs-only change. See [current gate matrix](../../TEST_GATE_MATRIX.md) and [TESTGATE rollout](../20261016-001-task-gates-and-modular-tests.md).
 
 | Task | L1/L2: minimum affected tests | SQL escalation (only where required) | Unfiltered SQL |
 |---|---|---|---|
@@ -75,16 +75,20 @@ P3 already contains `LoginCommandHandler`/BCrypt. P4 hosts currently render a sh
 - [x] Concurrency regression: pause a user-A request **before** Local dispatcher admission/authorization, log out A and log in B, then resume it; assert it is denied/canceled and **never authorized/audited as B**. Independently pause an already-authorized user-A write, switch sessions, and assert any permitted commit/audit retains A's user ID while its late response never updates B's UI. Run parallel Local requests and Login attempts to prove no cross-request/session identity bleed.
 - [x] Safe STA tests for `LoginForm` and shell on **both `net48` and `net8.0-windows`**: control handles, DPI, compact layout, keyboard access, theme, disposal and no `DataError`/`ThreadException`/UnhandledException default modal dialog. Tests must be bounded; never open an unhandled Login prompt in headless CI.
 - [ ] Manual smoke from packaged binaries: clean DB -> P3.1 CLI provisioning -> login -> catalog/receipt/stock permission checks -> logout -> another user -> expiry/relogin -> restart. Record environment, target TFM, pass/fail/blocked and screenshots without credentials.
-  - Partial evidence (2026-10-16): approved disposable DB and separate SQL identities; attended Administrator Login on both packaged TFMs; real receipt Post/read-only parity, stock balance/card, logout/Login return and restart; second zero-permission user authenticated and received server-side `The operation is not permitted`. Idle-expiry observation stopped at approximately 13.5/30 minutes for PR creation, so expiry/relogin remains unverified and this item stays open.
+  - Partial evidence (2026-10-16): approved disposable DB and separate SQL identities; attended Administrator Login on both packaged TFMs; real receipt Post/read-only parity, stock balance/card, logout/Login return and restart; second zero-permission user authenticated and received server-side `The operation is not permitted`. Idle-expiry observation stopped at approximately 13.5/30 minutes for PR creation, so expiry/relogin remains unverified and this *historical L4 test observation* remains unverified despite owner acceptance of the overall P4.1 feature.
 
 ## Exit / acceptance criteria
 
 - [x] Both production hosts display the actual Login UI and **cannot** reach business features before authenticated session creation; invalid credentials cannot create a session.
 - [x] Shared Login and session components are reusable across both TFMs; extend existing `LocalDesktopSession` and request-scoped Application actor resolution rather than adding a second identity owner. LocalApiClient calls Application, not direct SQL from UI; the new validation store lives behind Application/Infrastructure contracts. No privileges depend on a UI-only check.
 - [x] Logout and session expiry are explicit; SQL-backed account revalidation prevents disabled/deleted accounts from remaining authenticated, while role/permission-only revocations yield 403 for affected operations; no cross-user cache/UI leaks, mutable-actor reassignment or stale response reuse; no silent repeat of mutating requests.
-- [ ] With P3.1 Administrator fixture, authenticated P5.1/P5.4 walkthroughs and P6 packaged GUI smoke can run without a test-only production bypass.
+- [x] Production Login-first hosts and P3.1 Administrator fixture enable real authenticated P5/P6 walkthroughs without a test-only session bypass. **The P5/P6 walkthroughs themselves are not complete** and are tracked in the [active remainder plan](../20261016-004-remaining-p5-acceptance-and-p6-hardening.md).
 - [x] Update `docs/CONTRACTS.md`/`docs/SECURITY.md` if contract/policy changes, `docs/DEVELOPMENT_PLAN.md` and evidence files after **actual** tests; do not reopen or relabel historical P4 validation as if it covered Login.
 
 ## Out of scope
 
 New user/role management screens, password recovery email, "remember me", legacy hash guessing, HTTP Bearer token issuance/refresh/revocation (P7), automated database migrations/seeding on desktop startup, and new business modules.
+
+## Archival acceptance note — 2026-10-16
+
+This implementation plan is archived as **owner-accepted complete**. Historical checked `[x]` automated items remain supported by recorded evidence, while the original packaged idle-expiry/relogin observation was not completed and is **not falsely marked as passed**. The owner's explicit exception closes P4.1 only; all P5/P6 remaining gates have been carried into [the active remainder plan](../20261016-004-remaining-p5-acceptance-and-p6-hardening.md).

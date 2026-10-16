@@ -1,120 +1,45 @@
-﻿# Development Plan — MyDmsVn v1 → v2
+# Development Plan — MyDmsVn v1 → v2
 
-**Status:** P0 and P1 complete on 2026-10-08; P2, P3 and P4 complete on 2026-10-09; P5 implementation and automated gates are complete through P5.4 on 2026-10-12, with interactive P5.1/P5.4 walkthroughs still pending. **Codex must not skip prerequisites or mark unverified tests as passed.**
+**As of 2026-10-16:** P0–P4.1 foundational implementation is complete. **P4.1 is closed by explicit product-owner acceptance**, supported by automated L3 and attended packaged Login/manual UI evidence; the long idle-expiry/relogin observation was not completed and is recorded as an accepted *P4.1-only* evidence exception in [P4.1 verification](P4_1_VERIFICATION.md). P5 implementation/automated gates are complete, but its two interactive acceptance checks remain open; P6 release gates are open. TESTGATE-T01–T03 have been implemented. All target frameworks in the checked-in code remain unchanged until NET8-PAUSE is implemented.
 
-## Operating rules
+## Active roadmap — execute in this exact order
 
-- Execute P0 → P7 sequentially; P0–P6 produce Local Mode MVP; P7 enables Remote Mode. **Integration addenda P3.1 then P4.1 must pass before outstanding authenticated P5 GUI gates and P6 release**, despite historical P3/P4 foundation completion.
-- For each task, implement a small vertical change with tests, record results, and update checklist truthfully.
-- Exact targets/packages/user decisions: `docs/TECH_STACK.md`. Architecture and boundaries: `docs/ARCHITECTURE.md`.
-- Each phase exits only with measurable acceptance evidence. For user-visible scope changes, update PRD and record an ADR.
+| Order | Plan | Purpose / actual status |
+|---:|---|---|
+| 1 | [TESTGATE-T01–T03 — task gates](plans/20261016-001-task-gates-and-modular-tests.md) | **Verified/complete; retained ACTIVE for mandatory context and acceptance policy**, do not rerun T01–T03 by default |
+| 2 | [NET8-PAUSE — temporary second-TFM removal](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | **Proposed/not implemented**; pause `net8.0` / WinForms `net8.0-windows` in multi-target projects; preserve configurable TFM tooling and restore path |
+| 3 | [TESTGATE-T04/T05 — modular test projects](plans/20261016-002-modular-test-projects.md) | Proposed; execute only after verified task/final and TFM-scope transition |
+| 4 | [SEC-REBUILD — permission system](plans/20261016-003-permission-system-rebuild.md) | Proposed; replace legacy permission system only after T04/T05 verification |
+| 5 | [P5 GUI acceptance + P6 local hardening remainder](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | **Open**; remaining two P5 manual UI gates + P6 T01–T04 operational gaps and T05–T08 release checks |
+| 6 | [P7 — remote API](plans/20261008-008-phase-7-remote-api.md) | Not started; requires completed P6 and restored `net8.0` support (unless independently revised and approved) |
 
-## Roadmap
+The [active plan index](plans/README.md) is the canonical Codex starting point. The [historical plan archive](plans/archive/README.md) contains P0/P1/P2/P3/P3.1/P4/P4.1, SQLPERF, completed P5 implementation and the original full-scope P6 plan. **Archive relocation does not prove unfinished GUI/release tasks passed.**
 
-| Phase | Goal | Required output / exit gate | Status |
-|---|---|---|---|
-| **P0** | Repository and solution foundation | Dual-target solution, DI/smoke hosts, reference boundaries, test projects; both Windows hosts build | Complete (2026-10-08) |
-| **P1** | Persistence foundation | SQL connection, RepoDb maps, Dapper, DbUp migrator, explicit UoW; SQL commit/rollback tests | Complete (2026-10-08) |
-| **P2** | Application pipeline/contracts | MediatR, validation, ErrorOr, transport-neutral ApiResponse mapping, client APIs; error tests | Complete (2026-10-09) |
-| **P3** | Security foundation | Users/Roles/Permissions, auth, legacy hash migration abstractions, authorization behavior/tests | Complete (2026-10-09) |
-| **P3.1** | **First Administrator + continuous permission sync** | Permission registry, additive catalog migration, controlled deployment sync, first-admin CLI, tests | **Complete** (T01–T07 verified 2026-10-14) |
-| **P4** | Desktop foundation | WinForms shell, ViewModel binding, local client adapters, lookups/grid and error/busy states; STA UI smoke | Complete (2026-10-09) |
-| **P4.1** | **Interactive Login and session** | Shared dual-host LoginForm/ViewModel, current-user session, logout/expiry/relogin and STA tests | **In progress** (automated L3 verified; packaged L4 partial 2026-10-16; expiry/relogin open) |
-| **P5** | Sales & Inventory Foundation | 4 catalogs, goods receipts, posted ledger, balances and stock card; concurrency tests and UI | In progress (P5.4 implementation/automated gate complete 2026-10-12; authenticated interactive smoke pending) |
-| **P6** | Local v1 hardening | Deployment/migration instructions, logging, secure configuration, two desktop host smoke, release checklist | In progress (detailed P6-T01/T02 complete 2026-10-12; P6-T03/T04 implementation and developer-workstation automated/package gates complete 2026-10-13; VM/operational gates pending) |
-| **P7** | HTTP API v2 & parity | ASP.NET Core 8 API + HTTP adapter, auth and contract parity; no shared DB credentials on remote desktop | Not started |
+## Operating and verification rules
 
-## P0 — Detailed tasks
+- Read `AGENTS.md`, this roadmap and the active task plan before editing; do not start a later numbered plan if earlier implementation/gates are blocked.
+- Inner-loop L1/L2 checks are task-focused; use only the relevant project/selector and genuinely needed real-SQL categories. No routine full-solution SQL testing after each edit.
+- Run manifest-owned final acceptance **once after inputs freeze**, subject to rerun when gate-affecting inputs change. Use strict unfiltered real SQL, complete logical-case inventory/discovery/TRX reconciliation, watchdog, explicit instance approval, owned-db cleanup and zero mandatory skips.
+- Today the repository still targets both SQL TFMs. The NET8-PAUSE plan **does not change that fact**: after its implementation is accepted, run the explicit approved *active* framework matrix, retaining historical dual-target evidence and reactivation procedure.
+- Do not mark blocked/manual/unperformed tests green. P4.1's specific owner acceptance does not waive P5/P6 conditions; P7 is a separate future scope with an independently enforceable HTTP boundary.
+- Leave SQLPERF's completed benchmarking and fixture safety decision in the archive. DbUp, RepoDb, Dapper, UnitOfWork, platform security constraints and package pins are unchanged by this documentation PR.
 
-See dedicated [P0 implementation plan](plans/20261008-002-phase-0-foundation.md).
-- [x] P0-T01 scaffold `MyDmsVn.sln` and approved multi-target projects.
-- [x] P0-T02 create central package props and compatibility-tested references.
-- [x] P0-T03 implement empty DI composition roots and startup smoke.
-- [x] P0-T04 create test harness/architecture checks; prove dual-target build.
-- [x] P0-T05 document validated restore/build results and open constraints.
+## Historical phase completion record
 
-## P1 — Persistence foundation
+| Phase | Scope and historical status | Source / remaining work |
+|---|---|---|
+| P0 | Foundation **complete**, 2026-10-08 | [Archive](plans/archive/20261008-002-phase-0-foundation.md) |
+| P1 | Persistence **complete**, 2026-10-08 | [Archive](plans/archive/20261008-003-phase-1-persistence.md) |
+| P2 | Application pipeline **complete**, 2026-10-09 | [Archive](plans/archive/20261008-004-phase-2-application-pipeline.md) |
+| P3 | Security foundation **complete**, 2026-10-09 | [Archive](plans/archive/20261008-005-phase-3-security.md) |
+| P3.1 | Initial security provisioning and sync **complete**, 2026-10-14 | [Archive](plans/archive/20261013-001-initial-security-provisioning-permission-sync.md); supersession planned by SEC-REBUILD, not yet implemented |
+| P4 | Desktop shell foundation **complete**, 2026-10-09 | [Archive](plans/archive/20261008-006-phase-4-desktop.md) |
+| P4.1 | Real Login/session **owner-accepted complete**, 2026-10-16 | [Archive](plans/archive/20261013-002-desktop-login-session.md); long idle-expiry UI observation unverified/accepted exception |
+| P5 | Business features/automated gates implemented; **interactive acceptance open** | [Archived implementation plan](plans/archive/20261008-001-sales-inventory-foundation.md); [active remaining P5 GUI checks](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) |
+| P6 | Detailed T01–T04 implementation/automated checks completed; **operational and release validation open** | [Archived original](plans/archive/20261008-007-phase-6-local-hardening.md); [active remaining P6 work](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) |
+| SQLPERF | T01–T06 **complete**, 2026-10-15 | [Archive](plans/archive/20261014-001-sql-integration-test-performance-optimization.md) |
+| P7 | Not started | [Active P7](plans/20261008-008-phase-7-remote-api.md) |
 
-- [x] P1-T01 select disposable SQL test database naming/configuration and implement safe test provisioning.
-- [x] P1-T02 create `IDbConnectionFactory` returning fresh open connection and SQL Server implementation.
-- [x] P1-T03 implement Explicit UoW state machine + repository creation and deterministic disposal.
-- [x] P1-T04 establish RepoDb 1.16.x mappings and Dapper query executor sharing explicit UoW.
-- [x] P1-T05 DbUp migrator skeleton and migration-history verification; test rerun/no-op.
-- [x] P1-T06 SQL integration tests for nested guard, commit, rollback, disposal, cancellation, concurrent separate UoWs.
-**Exit:** P1 tests in `docs/TEST_STRATEGY.md` green on SQL Server; no static AsyncLocal transaction.
+## Work item completion report
 
-## P2 — Application pipeline + contracts
-
-- [x] P2-T01 define transport-neutral `ApiResponse<T>` and common error types.
-- [x] P2-T02 wire MediatR registration/pipeline order, async FluentValidation + typed ErrorOr results.
-- [x] P2-T03 define status/error/field naming mapper without ASP.NET references.
-- [x] P2-T04 define DTOs + `IxxxApiClient`, local adapter seam and basic test handler.
-- [x] P2-T05 golden JSON/semantic fixture tests; ensure none/both success-error disallowed.
-**Exit:** no dynamic conversion, no HTTP dependency in Application, robust validation tests.
-
-## P3 — Security foundation
-
-- [x] P3-T01 DbUp Users/Roles/UserRoles/RolePermissions/UserPermissions + uniqueness/indexes.
-- [x] P3-T02 `IPasswordHasher` and pluggable legacy password verifier (do not guess legacy algorithm).
-- [x] P3-T03 login/current-user abstractions; fail-closed authorization behavior.
-- [x] P3-T04 direct permission precedence and role union, optional cache invalidation if introduced.
-- [x] P3-T05 tests for deactivation, overrides, privilege denial, password migration fixtures. (Legacy algorithm fixture remains an explicit external prerequisite; unknown algorithms deny.)
-**Exit:** unauthorized commands cannot write; compatibility preserved for PasswordSalt.
-
-## P3.1 — Initial security provisioning and continuous permission synchronization (new)
-
-See [P3.1 detailed plan](plans/20261013-001-initial-security-provisioning-permission-sync.md) and [P3.1 verification evidence](P3_1_VERIFICATION.md). T01–T07 are implemented and verified; P4.1 interactive desktop Login/session remains the next prerequisite.
-- [x] P3.1-T01/T02 version-controlled per-module registry and additive `dbo.Permissions` migration with preservation of historical assignments.
-- [x] P3.1-T03/T04 deterministic dry-run/apply sync for every new module release; reviewed Administrator auto-grant policy; existing roles and direct denies unchanged.
-- [x] P3.1-T05/T06 guarded first-admin creation via separate privileged CLI with operator-supplied password, secure input and operational runbook; no desktop/installer seed.
-- [x] P3.1-T07 SQL integration/CLI tests for first install, upgrade, idempotency, concurrency, revocation and new-key lifecycle.
-**Exit:** application Administrator can be safely enrolled on clean SQL and future permissions are continuously synchronized through reviewed deployment, not one-time seed.
-
-## P4 — WinForms desktop foundation
-
-- [x] P4-T01 create shell, bootstrap theme/grid integration validation for both runtimes.
-- [x] P4-T02 standard bindable VM, async commands, cancellation, busy/error/field messages.
-- [x] P4-T03 implement LocalApiClient DI wiring and session information.
-- [x] P4-T04 generic master list + edit form + reusable lookup/grid pattern.
-- [x] P4-T05 deterministic STA UI test harness without modal dialogs.
-**Exit:** two WinForms hosts open same shell and use same desktop abstractions; no direct server infrastructure references from views.
-
-## P4.1 — Interactive desktop Login and session (new)
-
-See [P4.1 detailed plan](plans/20261013-002-desktop-login-session.md) and [current verification evidence](P4_1_VERIFICATION.md). **In progress**; implementation and final automated L3 (dual-runtime Desktop/Application plus strict unfiltered dual-TFM SQL) are verified. Packaged Administrator/second-user, P5 walkthrough, logout and restart evidence exists on both hosts, while attended idle-expiry/relogin remains open.
-- [x] P4.1-T01 shared fail-closed session state/current-user accessor and auth contract integration.
-- [x] P4.1-T02/T03 shared LoginForm/LoginViewModel and production Login-first bootstrap in both desktop hosts; no fake authenticated startup.
-- [x] P4.1-T04 explicit logout, expiration/relogin, cross-user cache teardown and stale-result cancellation.
-- [ ] P4.1-T05 dual-runtime STA, application/SQL and packaged interactive smoke tests. (Automated dual-runtime/Application/strict SQL coverage complete; packaged attended smoke partial 2026-10-16; idle-expiry/relogin remains open.)
-**Exit:** both hosts block business access until a real login and can run authenticated P5 walkthroughs.
-
-## P5 — Sales & Inventory Foundation
-
-See dedicated [P5 detailed plan](plans/20261008-001-sales-inventory-foundation.md).
-- [ ] P5.1 Products/Warehouses/Employees/Customers + lookups, guards and UI. (Implementation and automated gate complete 2026-10-10; interactive manual smoke pending.)
-- [x] P5.2 GoodsReceipt Draft header/lines with validation and permissions.
-- [x] P5.3 Post command with atomic ledger/balance updates, idempotency and reconciliation.
-- [ ] P5.4 Stock Balance/Card Dapper queries, desktop UI, concurrency/GUI regression suite. (Implementation and automated coverage complete 2026-10-12; authenticated interactive walkthrough pending.)
-**Exit:** all P5 acceptance cases and SQL integration tests pass; pending authenticated interactive checks require **P3.1 + P4.1**, not only P3/P4 foundation checks.
-
-## P6 — v1 hardening
-
-- [ ] P6-T01 documented migration and client/schema version compatibility. (Detailed P6-T02 compatibility implementation/automated gate complete 2026-10-12; P6-T06 recovery evidence pending.)
-- [ ] P6-T02 installer/deployment paths, configuration and safe updater decision. (Detailed P6-T01 secure configuration/principal implementation complete 2026-10-12; P6-T04 packaging/updater evidence pending.)
-- [ ] P6-T03 structured logs, correlation IDs, authentication/audit log redaction. (Detailed P6-T03 implementation and automated evidence complete 2026-10-13; full-disk/installed-host operations evidence pending.)
-- [ ] P6-T04 dual-target smoke/install/upgrade, backup/recovery exercise. (Detailed P6-T04 reproducible publish artifacts and content/hash gates complete 2026-10-13; VM smoke/install/upgrade and P6-T06 recovery evidence pending.)
-- [ ] P6-T05 release checklist and known limitations (including 2-tier SQL security).
-**Exit:** repeatable deployment (including reviewed permission sync and safe first-user provisioning), real Login/logout/expiry on both hosts, support diagnostics, no untested hidden modal-dialog blocker.
-
-## P7 — HTTP v2
-
-- [ ] P7-T01 implement `Server.Api` host, routes, auth middleware, exception/error mapping.
-- [ ] P7-T02 implement `Desktop.Infrastructure.Http` and session/token lifecycle.
-- [ ] P7-T03 map local feature interfaces to HTTP and OpenAPI contracts.
-- [ ] P7-T04 contract parity tests on JSON, status codes, validations, permissions and ledger posting.
-- [ ] P7-T05 verify remote desktop artifacts have **no SQL connection strings** or server infra dependencies.
-**Exit:** feature-complete adapter parity for P5 and independently enforceable Server.Api boundary.
-
-## Work item completion template
-
-For each task record: scope, files added/modified, architectural decision (if any), automated test command + result, environment-dependent checks, remaining risks, follow-up. Status must be a verifiable fact, not an aspiration.
+For each implementation task record the changed scope/files, selected task gate with actual commands, supported TFMs and executed/discovered/passed/failed/skipped counts, SQL ownership/watchdog/approval outcome (sanitized), manual/operational results, blockers and the next task ID. Historical evidence stays attached to its original revision. Changes to supported runtime/release targets require explicit product-owner decision and a reversible migration path.
