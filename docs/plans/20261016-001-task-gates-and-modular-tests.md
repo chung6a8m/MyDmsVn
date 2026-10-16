@@ -59,7 +59,7 @@ Project/assembly name and framework-generated VSTest/TRX GUID are **physical exe
 
 ## TESTGATE's own task-level L2 gate matrix (T02–T03)
 
-**Status: prospective contract, not execution evidence.** This matrix applies to **TESTGATE-T02/T03** themselves, unlike the P4.1 worked example above; T04/T05 use their [separate matrix](20261016-002-modular-test-projects.md). Command IDs R/H/D/S below refer only to tools and projects verified in the current repository. Their selectors must be rechecked against the actual source/discovery **at the task's revision**; add tests as the corresponding functionality is implemented and fail the task gate if required negative coverage is absent. The proposed `Invoke-TestGate.ps1`, `pr-acceptance` mode and new module/desktop test projects are **not** runnable yet.
+**Status: prospective contract, not execution evidence.** This matrix applies to **TESTGATE-T02/T03** themselves, unlike the P4.1 worked example above; T04/T05 use their [separate matrix](20261016-002-modular-test-projects.md). Command IDs R/H/S below refer only to tools and projects verified in the current repository. Their selectors must be rechecked against the actual source/discovery **at the task's revision**; add tests as the corresponding functionality is implemented and fail the task gate if required negative coverage is absent. The proposed `Invoke-TestGate.ps1`, `pr-acceptance` mode and new module/desktop test projects are **not** runnable yet.
 
 | Task | Affected projects, TFMs and L2 selection | Real SQL trigger, required adverse cases and gate | Exit / evidence |
 |---|---|---|---|
