@@ -19,4 +19,6 @@ public sealed record BenchmarkRunOptions(
     public string Mode { get; init; } = "baseline";
 
     public string Revision { get; init; } = string.Empty;
+
+    internal bool ManifestAuthorizedActiveFrameworkProfile { get; init; }
 }

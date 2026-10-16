@@ -56,7 +56,7 @@ public sealed class PrAcceptanceRunTests
     }
 
     [Fact]
-    public async Task Profile_runs_one_unfiltered_pass_for_the_active_net48_framework()
+    public async Task Direct_profile_rejects_the_single_framework_candidate_exception()
     {
         using var fixture = new Fixture();
         var process = new RecordingProcessRunner();
@@ -73,19 +73,9 @@ public sealed class PrAcceptanceRunTests
             fixture.Options with { TargetFrameworks = new[] { "net48" } },
             CancellationToken.None);
 
-        Assert.True(result.IsComplete);
-        Assert.Collection(
-            process.Commands,
-            command => Assert.Contains("--list-tests", command.Arguments),
-            command =>
-            {
-                Assert.Contains("-f net48", command.Arguments);
-                Assert.DoesNotContain("--filter", command.Arguments);
-            });
-        var run = Assert.Single(result.Runs);
-        Assert.Equal("net48", run.Tfm);
-        Assert.Equal(BenchmarkPassKind.Acceptance, run.Kind);
-        Assert.Equal(new[] { "net48" }, Assert.Single(exporter.Evidence).TargetFrameworks);
+        Assert.False(result.IsComplete);
+        Assert.Empty(process.Commands);
+        Assert.Empty(exporter.Evidence);
     }
 
     [Theory]

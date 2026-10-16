@@ -464,6 +464,7 @@ public sealed class TestGateCoordinator
                 {
                     Mode = "pr-acceptance",
                     Revision = options.Revision,
+                    ManifestAuthorizedActiveFrameworkProfile = true,
                 },
                 cancellationToken).ConfigureAwait(false);
             if (!benchmark.RecoveryRequired)
