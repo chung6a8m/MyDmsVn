@@ -230,7 +230,8 @@ public sealed class BenchmarkRunCoordinator
                                 options.RepositoryRoot,
                                 "tests",
                                 "tools",
-                                "sqlperf-t01-migration-invocations.json"))))
+                                "sqlperf-t01-migration-invocations.json"),
+                            options.TestProject)))
                 {
                     return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
                 }
@@ -392,7 +393,8 @@ public sealed class TrxBenchmarkResultGate : IBenchmarkResultGate
                 evidence.RepositoryRoot,
                 evidence.RunId,
                 evidence.Tfm,
-                trx.Results)
+                trx.Results,
+                evidence.TestProjectPath)
             .IsComplete;
     }
 }
@@ -440,9 +442,15 @@ public sealed class SourceSqlTestClassificationGate : IBenchmarkClassificationGa
             "sql-test-nonsql-exemptions.json");
         try
         {
+            var methods = TestMethodInventory.Read(assemblyPath);
+            var methodNames = methods.Select(method => method.FullyQualifiedName)
+                .ToHashSet(StringComparer.Ordinal);
+            var projectExemptions = NonSqlExemptionManifest.Read(manifestPath)
+                .Where(exemption => methodNames.Contains(exemption.MethodName))
+                .ToArray();
             return SqlTestClassificationVerifier.Verify(
-                    TestMethodInventory.Read(assemblyPath),
-                    NonSqlExemptionManifest.Read(manifestPath))
+                    methods,
+                    projectExemptions)
                 .IsComplete;
         }
         catch (Exception exception) when (
@@ -469,7 +477,8 @@ public sealed record BenchmarkResultEvidence(
     string Tfm,
     int RunnerExitCode,
     string RepositoryRoot = "",
-    string MigrationManifestPath = "");
+    string MigrationManifestPath = "",
+    string TestProjectPath = "");
 
 public enum BenchmarkPassKind
 {

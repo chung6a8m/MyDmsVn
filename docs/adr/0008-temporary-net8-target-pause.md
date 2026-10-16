@@ -1,12 +1,12 @@
 # ADR 0008 — Temporary .NET 8 application and test target pause
 
-**Status:** Accepted for the NET8-PAUSE implementation candidate  
+**Status:** Accepted and merged as PR #32 (`8e310778`)
 **Date:** 2026-10-16  
 **Implementation:** [NET8-PAUSE](../plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md)
 
 ## Context
 
-The application and SQL test graph currently repeats compatible work on `net48` and `net8.0`, while shared WinForms code and tests repeat on `net48` and `net8.0-windows`. The strict SQL acceptance path correctly runs each active SQL TFM sequentially, but that makes ordinary Codex feedback expensive. The owner approved the named NET8-PAUSE plan and its candidate-only Stage B transition on 2026-10-16. This decision does not retroactively change `main` or unrelated PRs.
+The application and SQL test graph currently repeats compatible work on `net48` and `net8.0`, while shared WinForms code and tests repeat on `net48` and `net8.0-windows`. The strict SQL acceptance path correctly runs each active SQL TFM sequentially, but that makes ordinary Codex feedback expensive. The owner approved the named NET8-PAUSE plan and its candidate-only Stage B transition on 2026-10-16. T01–T05 acceptance passed and PR #32 merged into `main` at `8e310778`; its active `net48` matrix is now the normal matrix on current `main`. Branches created before that merge retain their checked-in target declarations.
 
 The baseline is commit `62a92cf66cc94c71cd0506ad454bb4c8140b49c5`. The detailed project, logical-case and discovery inventory is recorded in [the T01 baseline](../NET8_PAUSE_T01_BASELINE.md).
 
@@ -24,7 +24,7 @@ Temporarily make `net48` the only active application, SQL-test and WinForms targ
 - Publish only the `net48` desktop and a `net48` admin migrator during the pause. A modern desktop package is `PARKED / NOT RUN`, never passed.
 - Store the reviewed active and historical framework profiles separately. Strict Task/Final validation compares requested execution frameworks to the active profile and preserves historical logical-case identities without executing or counting them as passed.
 
-The Stage B exception is bound only to this plan and implementation candidate. It becomes the normal active matrix only after T01–T05 acceptance and merge. It cannot authorize unrelated business, schema, security or concurrency changes.
+The Stage B exception was bound only to this plan and implementation candidate. After T01–T05 acceptance and merge, its `net48` matrix became the normal active matrix on current `main`. The owner waived the comparable-duration measurement in `09d00bfa` because no matching dual-TFM baseline exists; it remains unmeasured, and no speedup is claimed. The waiver does not authorize skipped functional, SQL, GUI, packaging or restoration gates, nor unrelated business, schema, security or concurrency changes.
 
 ## Re-enable and rollback
 

@@ -77,6 +77,49 @@ public sealed class MigrationTimingArtifactReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_ignores_manifest_entries_owned_by_other_test_projects()
+    {
+        using var fixture = new Fixture(
+            Entry("ExampleTests.Case.migrate", "Case"),
+            Entry(
+                "CatalogTests.CatalogCase.migrate",
+                "CatalogCase",
+                sourceFile: "tests/CatalogTests/CatalogTests.cs",
+                className: "CatalogTests"));
+        fixture.WriteArtifact(
+            Invocation("Case", "net8.0", "ExampleTests.Case.migrate"),
+            Timing("Case", "net8.0", "ExampleTests.Case.migrate"));
+
+        var result = fixture.Reconcile(
+            "net8.0",
+            Executed("Namespace.ExampleTests.Case", "net8.0"),
+            "tests/ExampleTests/ExampleTests.csproj");
+
+        Assert.True(result.IsComplete);
+        Assert.Equal(1, result.ExpectedCount);
+
+        using var emptyScope = new Fixture();
+        emptyScope.WriteArtifact();
+        var emptyResult = emptyScope.Reconcile(
+            "net8.0",
+            Executed("Namespace.ExampleTests.Case", "net8.0"),
+            "tests/ExampleTests/ExampleTests.csproj");
+        Assert.True(emptyResult.IsComplete);
+        Assert.Equal(0, emptyResult.ExpectedCount);
+
+        using var unreviewedScope = new Fixture();
+        unreviewedScope.WriteArtifact(
+            Invocation("Case", "net8.0", "ExampleTests.Case.unreviewed"),
+            Timing("Case", "net8.0", "ExampleTests.Case.unreviewed"));
+        var unreviewedResult = unreviewedScope.Reconcile(
+            "net8.0",
+            Executed("Namespace.ExampleTests.Case", "net8.0"),
+            "tests/ExampleTests/ExampleTests.csproj");
+        Assert.False(unreviewedResult.IsComplete);
+        Assert.NotEmpty(unreviewedResult.UnexpectedKeys);
+    }
+
+    [Fact]
     public void Reconcile_rejects_complete_pairs_from_a_different_run()
     {
         using var fixture = new Fixture(Entry("ExampleTests.Case.migrate", "Case"));
@@ -148,15 +191,20 @@ public sealed class MigrationTimingArtifactReconcilerTests
         Assert.Contains(swapped.UnexpectedKeys, key => key.StartsWith("row-a|", StringComparison.Ordinal));
     }
 
-    private static string Entry(string invocationId, string method, int count = 1) =>
-        "{\"invocationId\":\"" + invocationId + "\",\"class\":\"ExampleTests\"," +
-        "\"method\":\"" + method + "\",\"sourceFile\":\"tests/ExampleTests.cs\"," +
+    private static string Entry(
+        string invocationId,
+        string method,
+        int count = 1,
+        string sourceFile = "tests/ExampleTests/ExampleTests.cs",
+        string className = "ExampleTests") =>
+        "{\"invocationId\":\"" + invocationId + "\",\"class\":\"" + className + "\"," +
+        "\"method\":\"" + method + "\",\"sourceFile\":\"" + sourceFile + "\"," +
         "\"tfms\":[\"net48\",\"net8.0\"],\"expectedInvocationRule\":\"once-per-test-execution\"," +
         "\"expectedInvocations\":[{\"testMethod\":\"Case\",\"count\":" + count + "}]}";
 
     private static string HelperEntry(string invocationId) =>
         "{\"invocationId\":\"" + invocationId + "\",\"class\":\"ExampleTests\"," +
-        "\"method\":\"CreateDatabase\",\"sourceFile\":\"tests/ExampleTests.cs\"," +
+        "\"method\":\"CreateDatabase\",\"sourceFile\":\"tests/ExampleTests/ExampleTests.cs\"," +
         "\"tfms\":[\"net8.0\"],\"expectedInvocationRule\":\"once-per-caller-execution\"}";
 
     private static TrxTestResult[] Executed(string method, string tfm) =>
@@ -203,21 +251,23 @@ public sealed class MigrationTimingArtifactReconcilerTests
 
         public void WriteSource(string source)
         {
-            var sourcePath = Path.Combine(_root, "tests", "ExampleTests.cs");
+            var sourcePath = Path.Combine(_root, "tests", "ExampleTests", "ExampleTests.cs");
             Directory.CreateDirectory(Path.GetDirectoryName(sourcePath)!);
             File.WriteAllText(sourcePath, source);
         }
 
         public MigrationTimingArtifactReconciliation Reconcile(
             string tfm,
-            TrxTestResult[] executed) =>
+            TrxTestResult[] executed,
+            string ownerProject = "tests/ExampleTests/ExampleTests.csproj") =>
             MigrationTimingArtifactReconciler.Reconcile(
                 ArtifactPath,
                 ManifestPath,
                 _root,
                 "run-1",
                 tfm,
-                executed);
+                executed,
+                ownerProject);
 
         public void Dispose() => Directory.Delete(_root, true);
     }

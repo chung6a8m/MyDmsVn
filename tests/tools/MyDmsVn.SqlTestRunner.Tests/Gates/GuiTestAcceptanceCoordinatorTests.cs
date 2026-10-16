@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Gates;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Processes;
+using MyDmsVn.SqlTestRunner.Trx;
 using Xunit;
 
 namespace MyDmsVn.SqlTestRunner.Tests.Gates;
@@ -127,6 +129,37 @@ public sealed class GuiTestAcceptanceCoordinatorTests
     }
 
     [Fact]
+    public async Task Successful_run_retains_case_level_source_discovery_and_execution_evidence()
+    {
+        using var fixture = new GuiFixture();
+        var process = new GuiProcessRunner(fixture, string.Empty);
+        var source = new StubGuiInventory();
+        var coordinator = new GuiTestAcceptanceCoordinator(
+            process, source, new StubSafetyProbe(false, false), new StubGuiLease(true));
+
+        var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
+
+        Assert.True(result.IsComplete);
+        Assert.Single(result.SourceMethodEvidence);
+        Assert.Single(result.DiscoveredCaseEvidence);
+        Assert.Single(result.ExecutedCaseEvidence);
+        Assert.Equal("Example.Gui.Case", result.SourceMethodEvidence[0].FullyQualifiedName);
+        Assert.Equal("Example.Gui.Case", result.DiscoveredCaseEvidence[0].MethodName);
+        Assert.Equal("Example.Gui.Case", result.ExecutedCaseEvidence[0].MethodName);
+        Assert.Equal(TestOutcome.Passed, result.ExecutedCaseEvidence[0].Outcome);
+
+        await GuiTestAcceptanceEvidenceWriter.WriteAsync(fixture.Options, result, CancellationToken.None);
+
+        var evidencePath = Path.Combine(fixture.Options.ArtifactRoot, "desktop-d2.inventory.json");
+        Assert.True(File.Exists(evidencePath));
+        using var evidence = JsonDocument.Parse(File.ReadAllText(evidencePath));
+        Assert.Equal(new string('a', 40), evidence.RootElement.GetProperty("revision").GetString());
+        Assert.Equal(1, evidence.RootElement.GetProperty("sourceMethods").GetArrayLength());
+        Assert.Equal(1, evidence.RootElement.GetProperty("discoveredCases").GetArrayLength());
+        Assert.Equal(1, evidence.RootElement.GetProperty("executedCases").GetArrayLength());
+    }
+
+    [Fact]
     public async Task Duplicate_theory_locators_must_match_as_a_multiset()
     {
         using var fixture = new GuiFixture();
@@ -166,7 +199,8 @@ public sealed class GuiTestAcceptanceCoordinatorTests
             Directory.CreateDirectory(Root);
             Project = Path.Combine(Root, "Desktop.Tests.csproj");
             File.WriteAllText(Project, "<Project />");
-            Options = new GuiTestAcceptanceOptions(Root, Project, "net48", Path.Combine(Root, "artifacts"), TimeSpan.FromSeconds(5))
+            Options = new GuiTestAcceptanceOptions(Root, Project, "net48", Path.Combine(Root, "artifacts"),
+                TimeSpan.FromSeconds(5), new string('a', 40))
             {
                 ApprovedProjectPath = Project,
                 ApprovedFrameworks = new[] { "net48" },

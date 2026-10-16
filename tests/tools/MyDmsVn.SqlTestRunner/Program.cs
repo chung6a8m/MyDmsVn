@@ -230,6 +230,7 @@ internal static class Program
             .RunAsync(options, cancellationToken).ConfigureAwait(false);
         if (!result.IsComplete) return 3;
 
+        await GuiTestAcceptanceEvidenceWriter.WriteAsync(options, result, cancellationToken).ConfigureAwait(false);
         var report = JsonSerializer.Serialize(new
         {
             schemaVersion = 1,

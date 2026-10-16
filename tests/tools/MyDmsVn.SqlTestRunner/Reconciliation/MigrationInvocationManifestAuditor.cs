@@ -72,7 +72,12 @@ public static class MigrationInvocationManifestAuditor
                 var measuredMigrationCalls = Regex.Matches(
                     source,
                     "\\bMeasuredDatabaseMigrationRunner\\s*\\.\\s*Migrate\\s*\\(").Count;
-                if (directCalls != directEntries || migrationCalls != measuredMigrationCalls)
+                var wrappedMigrationCalls = Regex.Matches(
+                    source,
+                    "\\bTestDatabaseMigrationRunner\\s*\\.\\s*Migrate\\s*\\(").Count;
+                if (directCalls != directEntries ||
+                    migrationCalls != measuredMigrationCalls + wrappedMigrationCalls ||
+                    (wrappedMigrationCalls > 0 && !IsMeasuredTestDatabaseMigrationRunner(root)))
                 {
                     return false;
                 }
@@ -88,5 +93,23 @@ public static class MigrationInvocationManifestAuditor
         {
             return false;
         }
+    }
+
+    private static bool IsMeasuredTestDatabaseMigrationRunner(string repositoryRoot)
+    {
+        var helperPath = Path.Combine(
+            repositoryRoot,
+            "tests",
+            "MyDmsVn.Server.Infrastructure.IntegrationTests",
+            "TestDatabaseMigrationRunner.cs");
+        if (!File.Exists(helperPath))
+        {
+            return false;
+        }
+
+        var helper = File.ReadAllText(helperPath);
+        return Regex.IsMatch(
+            helper,
+            "\\bMeasuredDatabaseMigrationRunner\\s*\\.\\s*Execute\\s*\\(");
     }
 }

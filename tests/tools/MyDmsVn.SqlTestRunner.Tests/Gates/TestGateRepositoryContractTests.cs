@@ -102,7 +102,7 @@ public sealed class TestGateRepositoryContractTests
 
         var missingProject = manifest with
         {
-            Gates = manifest.Gates.Select((gate, index) => index == 0
+            Gates = manifest.Gates.Select(gate => gate.GateId == "net8-pause-t01-audit"
                     ? gate with { Project = "tests/Missing.Tests/Missing.Tests.csproj" }
                     : gate)
                 .ToArray(),
@@ -111,7 +111,7 @@ public sealed class TestGateRepositoryContractTests
 
         var missingTfm = manifest with
         {
-            Gates = manifest.Gates.Select((gate, index) => index == 0
+            Gates = manifest.Gates.Select(gate => gate.GateId == "net8-pause-t01-audit"
                     ? gate with { Frameworks = new[] { "net48" } }
                     : gate)
                 .ToArray(),
@@ -156,9 +156,9 @@ public sealed class TestGateRepositoryContractTests
                 .SelectMany(item => item.Frameworks)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            var frameworks = manifest.FrameworkProfile is { } profile &&
-                string.Equals(owner, profile.SqlProject, StringComparison.OrdinalIgnoreCase)
-                    ? historicalFrameworks.Intersect(profile.ActiveSqlFrameworks, StringComparer.OrdinalIgnoreCase).ToArray()
+            var isSqlOwner = IsSqlOwner(manifest, owner);
+            var frameworks = manifest.FrameworkProfile is { } activeProfile && isSqlOwner
+                ? historicalFrameworks.Intersect(activeProfile.ActiveSqlFrameworks, StringComparer.OrdinalIgnoreCase).ToArray()
                     : historicalFrameworks;
             foreach (var tfm in frameworks)
             {
@@ -245,10 +245,9 @@ public sealed class TestGateRepositoryContractTests
         {
             var historical = manifest.LogicalCases.Where(item => string.Equals(item.OwnerProject, owner, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(item => item.Frameworks).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            var frameworks = manifest.FrameworkProfile is { } profile &&
-                string.Equals(owner, profile.SqlProject, StringComparison.OrdinalIgnoreCase)
-                    ? profile.ActiveSqlFrameworks
-                    : historical;
+            var frameworks = IsSqlOwner(manifest, owner) && manifest.FrameworkProfile is { } profile
+                ? profile.ActiveSqlFrameworks
+                : historical;
             var assembly = Path.Combine(root, Path.GetDirectoryName(owner)!, "bin", "Release", frameworks[0],
                 Path.GetFileNameWithoutExtension(owner) + ".dll");
             source[owner] = TestMethodInventory.Read(assembly);
@@ -260,6 +259,16 @@ public sealed class TestGateRepositoryContractTests
 
         return new RepositoryEvidence(source, discovery);
     }
+
+    private static bool IsSqlOwner(TestGateManifest manifest, string owner) =>
+        manifest.FrameworkProfile is { } profile &&
+        (string.Equals(owner, profile.SqlProject, StringComparison.OrdinalIgnoreCase) ||
+         manifest.LogicalCases.Where(item => string.Equals(
+                 item.OwnerProject,
+                 owner,
+                 StringComparison.OrdinalIgnoreCase))
+             .SelectMany(item => item.Classification)
+             .Any(category => category is "FastSQL" or "MigrationSchema" or "SecurityProvisioning" or "SqlConcurrency"));
 
     private static IReadOnlyList<DiscoveredTestCase> Discover(
         string root,

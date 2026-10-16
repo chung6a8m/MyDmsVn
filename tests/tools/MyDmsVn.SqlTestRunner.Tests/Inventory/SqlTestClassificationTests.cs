@@ -63,22 +63,56 @@ public sealed class SqlTestClassificationTests
 
     [Theory]
     [InlineData("net48")]
-    [InlineData("net8.0")]
     public void Integration_inventory_is_fully_classified_from_the_reviewed_manifest(string tfm)
     {
         var root = FindRepositoryRoot();
-        var assemblyPath = Path.Combine(
-            root,
-            "tests",
-            "MyDmsVn.Server.Infrastructure.IntegrationTests",
-            "bin",
-            "Release",
-            tfm,
-            "MyDmsVn.Server.Infrastructure.IntegrationTests.dll");
+        var assemblyPaths = new[]
+        {
+            Path.Combine(
+                root,
+                "tests",
+                "MyDmsVn.Server.Infrastructure.IntegrationTests",
+                "bin",
+                "Release",
+                tfm,
+                "MyDmsVn.Server.Infrastructure.IntegrationTests.dll"),
+            Path.Combine(
+                root,
+                "tests",
+                "MyDmsVn.Server.Infrastructure.Catalog.Tests",
+                "bin",
+                "Release",
+                tfm,
+                "MyDmsVn.Server.Infrastructure.Catalog.Tests.dll"),
+            Path.Combine(
+                root,
+                "tests",
+                "MyDmsVn.Server.Infrastructure.Foundation.Tests",
+                "bin",
+                "Release",
+                tfm,
+                "MyDmsVn.Server.Infrastructure.Foundation.Tests.dll"),
+            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", "bin", "Release", tfm,
+                "MyDmsVn.Server.Infrastructure.Security.Tests.dll"),
+            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Inventory.Tests", "bin", "Release", tfm,
+                "MyDmsVn.Server.Infrastructure.Inventory.Tests.dll"),
+            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Migrations.Tests", "bin", "Release", tfm,
+                "MyDmsVn.Server.Infrastructure.Migrations.Tests.dll"),
+        };
         var manifestPath = Path.Combine(root, "tests", "tools", "sql-test-nonsql-exemptions.json");
 
-        var methods = TestMethodInventory.Read(assemblyPath);
+        var methodsByProject = assemblyPaths.Select(path => TestMethodInventory.Read(path)).ToArray();
+        var methods = methodsByProject.SelectMany(projectMethods => projectMethods).ToArray();
         var exemptions = NonSqlExemptionManifest.Read(manifestPath);
+        foreach (var projectMethods in methodsByProject)
+        {
+            var projectNames = projectMethods.Select(method => method.FullyQualifiedName)
+                .ToHashSet(StringComparer.Ordinal);
+            var projectExemptions = exemptions.Where(exemption => projectNames.Contains(exemption.MethodName)).ToArray();
+            var projectResult = SqlTestClassificationVerifier.Verify(projectMethods, projectExemptions);
+            Assert.True(projectResult.IsComplete, string.Join(", ", projectResult.Failures));
+        }
+
         var result = SqlTestClassificationVerifier.Verify(methods, exemptions);
         var invalidExemptions = exemptions
             .Select(exemption => new

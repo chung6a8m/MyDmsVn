@@ -1,14 +1,14 @@
 # Development Plan — MyDmsVn v1 → v2
 
-**As of 2026-10-16:** P0–P4.1 foundational implementation is complete. **P4.1 is closed by explicit product-owner acceptance**, with its recorded idle-expiry exception. P5 interactive acceptance and P6 release gates remain open. TESTGATE-T01–T03 is verified; NET8-PAUSE T01–T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`. Same-protocol duration comparison and merge remain open. Historical net8 is PARKED/NOT RUN and the runner remains tool-only `net8.0`.
+**As of 2026-10-16:** P0–P4.1 foundational implementation is complete. **P4.1 is closed by explicit product-owner acceptance**, with its recorded idle-expiry exception. P5 interactive acceptance and P6 release gates remain open. TESTGATE-T01–T03 is verified; NET8-PAUSE T01–T05 runtime/build/package/GUI/restoration gates pass and PR #32 merged at `8e310778`. The owner waived the duration comparison at `09d00bfa` because no comparable baseline exists; no speedup is claimed. Historical net8 is PARKED/NOT RUN and the runner remains tool-only `net8.0`.
 
 ## Active roadmap — execute in this exact order
 
 | Order | Plan | Purpose / actual status |
 |---:|---|---|
 | 1 | [TESTGATE-T01–T03 — task gates](plans/20261016-001-task-gates-and-modular-tests.md) | **Verified/complete; retained ACTIVE for mandatory context and acceptance policy**, do not rerun T01–T03 by default |
-| 2 | [NET8-PAUSE — temporary second-TFM removal](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | T01–T05 runtime gates pass; duration comparison and merge remain open |
-| 3 | [TESTGATE-T04/T05 — modular test projects](plans/20261016-002-modular-test-projects.md) | Proposed; execute only after verified task/final and TFM-scope transition |
+| 2 | [NET8-PAUSE — temporary second-TFM removal](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | Accepted and merged as PR #32; duration comparison waived, not measured |
+| 3 | [TESTGATE-T04/T05 — modular test projects](plans/20261016-002-modular-test-projects.md) | Complete at frozen code revision `973109f`; active SQL `net48` Final passed, historical `net8.0` remains parked/not run |
 | 4 | [SEC-REBUILD — permission system](plans/20261016-003-permission-system-rebuild.md) | Proposed; replace legacy permission system only after T04/T05 verification |
 | 5 | [P5 GUI acceptance + P6 local hardening remainder](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | **Open**; remaining two P5 manual UI gates + P6 T01–T04 operational gaps and T05–T08 release checks |
 | 6 | [P7 — remote API](plans/20261008-008-phase-7-remote-api.md) | Not started; requires completed P6 and restored `net8.0` support (unless independently revised and approved) |
@@ -20,7 +20,7 @@ The [active plan index](plans/README.md) is the canonical Codex starting point. 
 - Read `AGENTS.md`, this roadmap and the active task plan before editing; do not start a later numbered plan if earlier implementation/gates are blocked.
 - Inner-loop L1/L2 checks are task-focused; use only the relevant project/selector and genuinely needed real-SQL categories. No routine full-solution SQL testing after each edit.
 - Run manifest-owned final acceptance **once after inputs freeze**, subject to rerun when gate-affecting inputs change. Use strict unfiltered real SQL, complete logical-case inventory/discovery/TRX reconciliation, watchdog, explicit instance approval, owned-db cleanup and zero mandatory skips.
-- This authorized candidate has transitioned declarations and tooling to reviewed Stage B. T05 active `net48` Final, bounded GUI D2, builds/packages and restore drill pass at `6b0ce337`; same-protocol duration comparison and merge remain open. Other branches follow their checked-in matrix. Restoring net8 requires the complete [reactivation procedure](REACTIVATE_NET8.md), not an isolated project edit.
+- The accepted main checkout has transitioned declarations and tooling to the NET8-PAUSE active `net48` matrix. T05 active `net48` Final, bounded GUI D2, builds/packages and restore drill pass at `6b0ce337`, with reviewer gate fixes re-verified at `6b2ff49`; PR #32 merged at `8e310778`. The duration comparison was waived, not measured, at `09d00bfa`. Branches created before the merge follow their checked-in matrix. Restoring net8 requires the complete [reactivation procedure](REACTIVATE_NET8.md), not an isolated project edit.
 - Do not mark blocked/manual/unperformed tests green. P4.1's specific owner acceptance does not waive P5/P6 conditions; P7 is a separate future scope with an independently enforceable HTTP boundary.
 - Leave SQLPERF's completed benchmarking and fixture safety decision in the archive. DbUp, RepoDb, Dapper, UnitOfWork, platform security constraints and package pins are unchanged by this documentation PR.
 

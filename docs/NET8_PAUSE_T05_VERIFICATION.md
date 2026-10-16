@@ -1,6 +1,6 @@
 # NET8-PAUSE T05 candidate verification
 
-**Status:** Runtime, build/package, GUI and restoration gates passed; same-protocol duration comparison remains open.
+**Status:** Runtime, build/package, GUI and restoration gates passed. NET8-PAUSE merged as PR #32 at `8e310778`. The owner waived the same-protocol duration comparison in `09d00bfa` because the T01 baseline has no comparable dual-TFM Final timing; it was not measured, and no speedup is claimed.
 **Frozen candidate revision:** `6b0ce337978809cefa7ddaf54d74940fef062e49`
 **Plan:** [NET8-PAUSE T05](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md)
 
@@ -36,6 +36,6 @@ The reportable aggregate results are above. Raw TRX, SQL timing records, approva
 
 ## Duration comparison and remaining item
 
-Candidate SQL Final duration was 534.6 seconds and GUI D2 was 17.7 seconds. The T01 baseline does not contain a comparable dual-TFM Final measurement under the same protocol and environment. Historical SQLPERF benchmark durations are a different protocol and are not a valid comparison. Therefore no speedup claim is made, and the plan's same-protocol comparison checkbox remains open pending comparable baseline evidence.
+Candidate SQL Final duration was 534.6 seconds and GUI D2 was 17.7 seconds. The T01 baseline does not contain a comparable dual-TFM Final measurement under the same protocol and environment. Historical SQLPERF benchmark durations are a different protocol and are not a valid comparison. The owner waived the comparison as a prerequisite in `09d00bfa`; it was not measured, and no speedup claim is made.
 
 The earlier candidate envelope at `78e5dbc8bd26823b3f43c73daf68d49a1d025182` is superseded: review found that the single-framework `net48` exception was too broad for direct runner callers. Commit `5b1813cedeba41331d9dac13e52f57978fd0e3de` restricts the exception to manifest-authorized Final execution. The fresh envelope recorded here includes that fix.

@@ -24,7 +24,10 @@ public sealed class CatalogMappingIntegrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "CatalogMappingIntegrationTests.Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time.migration-01",
+                database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             var services = new ServiceCollection();
@@ -104,7 +107,10 @@ public sealed class CatalogMappingIntegrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "CatalogMappingIntegrationTests.Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings.migration-01",
+                database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             var services = new ServiceCollection();
