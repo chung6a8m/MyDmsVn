@@ -10,7 +10,11 @@ param(
     [string] $ArtifactRoot,
 
     [Parameter(Mandatory = $true)]
-    [string] $ApprovalFile
+    [string] $ApprovalFile,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string[]] $Frameworks
 )
 
 $runnerProject = Join-Path $PSScriptRoot 'MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj'
@@ -19,5 +23,6 @@ $runnerProject = Join-Path $PSScriptRoot 'MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestR
     --repo $RepositoryRoot `
     --project $TestProject `
     --artifacts $ArtifactRoot `
-    --approval $ApprovalFile
+    --approval $ApprovalFile `
+    --frameworks ($Frameworks -join ',')
 exit $LASTEXITCODE

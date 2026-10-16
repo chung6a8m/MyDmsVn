@@ -42,7 +42,24 @@ public sealed record TestGateManifest(
     IReadOnlyList<TestGateDefinition> Gates,
     IReadOnlyList<LogicalCaseDefinition> LogicalCases,
     IReadOnlyList<IdentityMappingDefinition> IdentityMappings,
-    IReadOnlyList<TestGateExemptionDefinition> Exemptions);
+    IReadOnlyList<TestGateExemptionDefinition> Exemptions)
+{
+    public TestFrameworkProfile? FrameworkProfile { get; init; }
+}
+
+public sealed record TestFrameworkProfile(
+    string ProfileId,
+    string PlanId,
+    string SqlProject,
+    IReadOnlyList<string> ActiveSqlFrameworks,
+    IReadOnlyList<string> HistoricalSqlFrameworks,
+    string GuiProject,
+    IReadOnlyList<string> ActiveGuiFrameworks,
+    IReadOnlyList<string> HistoricalGuiFrameworks,
+    IReadOnlyList<TestFrameworkProject> ToolOnlyProjects,
+    int MinimumHistoricalSqlLogicalCases);
+
+public sealed record TestFrameworkProject(string Project, IReadOnlyList<string> Frameworks);
 
 public sealed record TestGateDefinition(
     string GateId,

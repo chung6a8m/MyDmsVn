@@ -455,7 +455,7 @@ public static class TestMethodInventory
             ".cs", ".csproj", ".json", ".props", ".resx", ".sql", ".targets",
         };
         return Directory.GetFiles(repositoryRoot, "*", SearchOption.AllDirectories)
-            .Where(path => !HasBuildOutputSegment(repositoryRoot, path))
+            .Where(path => IsReviewedRepositoryPath(Path.GetRelativePath(repositoryRoot, path)))
             .Where(path => extensions.Contains(Path.GetExtension(path)))
             .ToDictionary(
                 path => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
@@ -483,6 +483,13 @@ public static class TestMethodInventory
             .Any(segment =>
                 string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
+    }
+
+    internal static bool IsReviewedRepositoryPath(string relativePath)
+    {
+        var excluded = new[] { "bin", "obj", ".git", ".superpowers", ".sqlperf", "artifacts", ".artifacts" };
+        return !relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Any(segment => excluded.Contains(segment, StringComparer.OrdinalIgnoreCase));
     }
 
     private sealed class ReviewedSourceIndex

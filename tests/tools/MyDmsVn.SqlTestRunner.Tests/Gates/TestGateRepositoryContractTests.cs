@@ -28,6 +28,18 @@ public sealed class TestGateRepositoryContractTests
             manifest.LogicalCases.SelectMany(item => item.Frameworks)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal));
+        var plan = "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8";
+        foreach (var task in Enumerable.Range(1, 5).Select(index => $"NET8-PAUSE-T0{index}"))
+        {
+            Assert.NotEmpty(TestGateManifestValidator.Select(
+                manifest, RepositoryRoot(), TestGateMode.Task, plan, task).Gates);
+        }
+
+        var final = TestGateManifestValidator.Select(
+            manifest, RepositoryRoot(), TestGateMode.Final, plan, "NET8-PAUSE-T05");
+        var sql = Assert.Single(final.Gates, gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance);
+        Assert.Equal(new[] { "net48" }, sql.Frameworks);
+        Assert.Equal(manifest.FrameworkProfile!.SqlProject, sql.Project);
     }
 
     [Fact]
@@ -105,8 +117,8 @@ public sealed class TestGateRepositoryContractTests
             manifest,
             RepositoryRoot(),
             TestGateMode.Task,
-            "20261016-001",
-            "TESTGATE-T03");
+            "20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8",
+            "NET8-PAUSE-T01");
 
     private static bool Audit(TestGateManifest manifest, RepositoryEvidence evidence)
     {
@@ -120,13 +132,17 @@ public sealed class TestGateRepositoryContractTests
                 return false;
             }
 
-            var frameworks = manifest.LogicalCases.Where(item => string.Equals(
+            var historicalFrameworks = manifest.LogicalCases.Where(item => string.Equals(
                     item.OwnerProject,
                     owner,
                     StringComparison.OrdinalIgnoreCase))
                 .SelectMany(item => item.Frameworks)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            var frameworks = manifest.FrameworkProfile is { } profile &&
+                string.Equals(owner, profile.SqlProject, StringComparison.OrdinalIgnoreCase)
+                    ? historicalFrameworks.Intersect(profile.ActiveSqlFrameworks, StringComparer.OrdinalIgnoreCase).ToArray()
+                    : historicalFrameworks;
             foreach (var tfm in frameworks)
             {
                 if (!evidence.Discovery.TryGetValue((owner, tfm), out var discovered))
@@ -215,14 +231,13 @@ public sealed class TestGateRepositoryContractTests
                 "MyDmsVn.Server.Infrastructure.IntegrationTests",
                 "bin",
                 "Release",
-                "net8.0",
+                "net48",
                 "MyDmsVn.Server.Infrastructure.IntegrationTests.dll")),
         };
         var discovery = new Dictionary<(string Owner, string Tfm), IReadOnlyList<DiscoveredTestCase>>
         {
             [(runner, "net8.0")] = Discover(root, runner, "net8.0"),
             [(integration, "net48")] = Discover(root, integration, "net48"),
-            [(integration, "net8.0")] = Discover(root, integration, "net8.0"),
         };
         return new RepositoryEvidence(source, discovery);
     }

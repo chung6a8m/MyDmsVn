@@ -61,6 +61,25 @@ internal sealed class WindowsJobObject : IDisposable
         }
     }
 
+    public bool ContainsProcess(int processId)
+    {
+        const uint queryLimitedInformation = 0x1000;
+        var process = OpenProcess(queryLimitedInformation, false, processId);
+        if (process == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            return IsProcessInJob(process, _handle, out var contained) && contained;
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -81,6 +100,12 @@ internal sealed class WindowsJobObject : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool TerminateJobObject(IntPtr job, uint exitCode);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint desiredAccess, bool inheritHandle, int processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool IsProcessInJob(IntPtr processHandle, IntPtr jobHandle, out bool result);
 
     [DllImport("kernel32.dll")]
     private static extern bool CloseHandle(IntPtr handle);

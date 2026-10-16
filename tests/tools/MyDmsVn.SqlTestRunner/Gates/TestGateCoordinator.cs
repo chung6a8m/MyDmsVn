@@ -421,7 +421,7 @@ public sealed class TestGateCoordinator
         if (options.Mode != TestGateMode.Final ||
             string.IsNullOrWhiteSpace(options.ApprovalFile) ||
             string.IsNullOrWhiteSpace(options.Revision) ||
-            !gate.Frameworks.SequenceEqual(new[] { "net48", "net8.0" }, StringComparer.Ordinal) ||
+            gate.Frameworks.Count == 0 ||
             !_approval.TryLoad(options.ApprovalFile, out var instanceFingerprint))
         {
             return TestGateRunStatus.ResourceDenied;

@@ -71,6 +71,45 @@ public sealed class TestGateManifestTests
     }
 
     [Fact]
+    public void Net8_pause_final_uses_reviewed_active_sql_profile_and_rejects_tool_only_runner_coverage()
+    {
+        using var repository = new TestRepository();
+        var profile = new TestFrameworkProfile(
+            "net8-pause-stage-b", "NET8-PLAN", "sql-net48.csproj", new[] { "net48" },
+            new[] { "net48", "net8.0" }, "desktop-net48.csproj", new[] { "net48" },
+            new[] { "net48", "net8.0-windows" },
+            new[] { new TestFrameworkProject("tests.csproj", new[] { "net8.0" }) }, 1);
+        var sql = Gate("final-sql", taskId: "NET8-PAUSE-T05", mode: TestGateMode.Final,
+            project: "sql-net48.csproj", frameworks: new[] { "net48" }) with
+        {
+            PlanId = "NET8-PLAN",
+            StrictMode = TestGateStrictMode.SqlPrAcceptance,
+            Resources = new TestGateResources(TestGateResourceRequirement.RequiredExclusive, TestGateResourceRequirement.None),
+            Evidence = new[] { TestGateEvidenceKind.Source, TestGateEvidenceKind.Discovery, TestGateEvidenceKind.Trx,
+                TestGateEvidenceKind.SanitizedReport, TestGateEvidenceKind.Ownership },
+        };
+        var manifest = Manifest(sql) with
+        {
+            FrameworkProfile = profile,
+            LogicalCases = new[] { new LogicalCaseDefinition("case", "sql-net48.csproj",
+                new[] { "net48", "net8.0" }, "Example.Sql.Case()", new string('a', 64),
+                new[] { "SqlIntegration" }, new[] { new TheoryRowDefinition("fact", null) }) },
+        };
+
+        var selected = TestGateManifestValidator.Select(manifest, repository.Root, TestGateMode.Final,
+            "NET8-PLAN", "NET8-PAUSE-T05");
+        Assert.Single(selected.Gates);
+
+        var disguisedRunner = sql with { Project = "tests.csproj", Frameworks = new[] { "net8.0" } };
+        Assert.Throws<InvalidDataException>(() => TestGateManifestValidator.Select(
+            manifest with { Gates = new[] { disguisedRunner } }, repository.Root, TestGateMode.Final,
+            "NET8-PLAN", "NET8-PAUSE-T05"));
+        Assert.Throws<InvalidDataException>(() => TestGateManifestValidator.Select(
+            manifest with { Gates = new[] { sql with { Frameworks = new[] { "net8.0" } } } },
+            repository.Root, TestGateMode.Final, "NET8-PLAN", "NET8-PAUSE-T05"));
+    }
+
+    [Fact]
     public void Select_rejects_unknown_or_omitted_plan_task_and_empty_gate_set()
     {
         using var repository = new TestRepository();
@@ -386,6 +425,10 @@ public sealed class TestGateManifestTests
             File.WriteAllText(
                 Path.Combine(Root, "sql-tests.csproj"),
                 Net8Project.Replace("<TargetFramework>net8.0</TargetFramework>", "<TargetFrameworks>net48;net8.0</TargetFrameworks>", StringComparison.Ordinal));
+            File.WriteAllText(Path.Combine(Root, "sql-net48.csproj"),
+                Net8Project.Replace("net8.0", "net48", StringComparison.Ordinal));
+            File.WriteAllText(Path.Combine(Root, "desktop-net48.csproj"),
+                Net8Project.Replace("net8.0", "net48", StringComparison.Ordinal));
         }
 
         public string Root { get; }
