@@ -24,4 +24,13 @@
       Targets="Build"
       Properties="Configuration=$(Configuration);TargetFramework=net48" />
   </Target>
+  <Target Name="BuildGuiInventoryFixture" BeforeTargets="Build">
+    <Exec
+      Command="dotnet restore &quot;..\..\MyDmsVn.Desktop.Tests\MyDmsVn.Desktop.Tests.csproj&quot;"
+      WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <MSBuild
+      Projects="..\..\MyDmsVn.Desktop.Tests\MyDmsVn.Desktop.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
 </Project>

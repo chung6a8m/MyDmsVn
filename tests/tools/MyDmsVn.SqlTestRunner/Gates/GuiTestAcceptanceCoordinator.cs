@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Inventory;
@@ -35,7 +38,57 @@ public interface IGuiTestSourceInventory
 
 public sealed class GuiTestSourceInventory : IGuiTestSourceInventory
 {
-    public IReadOnlyList<TestMethodDescriptor> Read(string assemblyPath) => TestMethodInventory.Read(assemblyPath);
+    public IReadOnlyList<TestMethodDescriptor> Read(string assemblyPath)
+    {
+        using var stream = File.OpenRead(assemblyPath);
+        using var pe = new PEReader(stream);
+        if (!pe.HasMetadata) throw new InvalidDataException("GUI test assembly has no managed metadata.");
+
+        var reader = pe.GetMetadataReader();
+        var fingerprint = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assemblyPath))).ToLowerInvariant();
+        var methods = new List<TestMethodDescriptor>();
+        foreach (var handle in reader.MethodDefinitions)
+        {
+            var method = reader.GetMethodDefinition(handle);
+            var attributes = method.GetCustomAttributes()
+                .Select(attribute => AttributeTypeName(reader, attribute))
+                .ToArray();
+            var isTheory = attributes.Contains("TheoryAttribute", StringComparer.Ordinal);
+            if (!isTheory && !attributes.Contains("FactAttribute", StringComparer.Ordinal)) continue;
+
+            var type = reader.GetTypeDefinition(method.GetDeclaringType());
+            var typeName = reader.GetString(type.Name);
+            var typeNamespace = reader.GetString(type.Namespace);
+            var methodName = reader.GetString(method.Name);
+            var fullyQualifiedName = string.IsNullOrEmpty(typeNamespace)
+                ? typeName + "." + methodName
+                : typeNamespace + "." + typeName + "." + methodName;
+            methods.Add(new TestMethodDescriptor(
+                fullyQualifiedName, isTheory, fingerprint, new[] { "NonSql" }, true)
+            {
+                NormalizedSignature = fullyQualifiedName + "()",
+            });
+        }
+
+        return methods.OrderBy(method => method.FullyQualifiedName, StringComparer.Ordinal).ToArray();
+    }
+
+    private static string AttributeTypeName(MetadataReader reader, CustomAttributeHandle handle)
+    {
+        var constructor = reader.GetCustomAttribute(handle).Constructor;
+        EntityHandle type = constructor.Kind switch
+        {
+            HandleKind.MemberReference => reader.GetMemberReference((MemberReferenceHandle)constructor).Parent,
+            HandleKind.MethodDefinition => reader.GetMethodDefinition((MethodDefinitionHandle)constructor).GetDeclaringType(),
+            _ => default,
+        };
+        return type.Kind switch
+        {
+            HandleKind.TypeReference => reader.GetString(reader.GetTypeReference((TypeReferenceHandle)type).Name),
+            HandleKind.TypeDefinition => reader.GetString(reader.GetTypeDefinition((TypeDefinitionHandle)type).Name),
+            _ => string.Empty,
+        };
+    }
 }
 
 public sealed record GuiProcessSafetyResult(bool NoUnexpectedDialog, IReadOnlyList<int> OrphanProcessIds);

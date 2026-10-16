@@ -13,6 +13,20 @@ namespace MyDmsVn.SqlTestRunner.Tests.Gates;
 public sealed class GuiTestAcceptanceCoordinatorTests
 {
     [Fact]
+    public void Source_inventory_reads_net48_WinForms_tests_without_loading_framework_assemblies()
+    {
+        var root = FindRepositoryRoot();
+        var assembly = Path.Combine(root, "tests", "MyDmsVn.Desktop.Tests", "bin", "Release", "net48",
+            "MyDmsVn.Desktop.Tests.dll");
+
+        var methods = new GuiTestSourceInventory().Read(assembly);
+
+        Assert.Contains(methods, method => method.FullyQualifiedName ==
+            "MyDmsVn.Desktop.Tests.MasterDetailPrototypeControlTests.SetRows_projects_master_rows_into_the_source_grid");
+        Assert.All(methods, method => Assert.True(method.IsBodyFingerprintComplete));
+    }
+
+    [Fact]
     public void Reviewed_entry_point_binds_clean_HEAD_net48_and_bounded_runner()
     {
         var root = FindRepositoryRoot();
