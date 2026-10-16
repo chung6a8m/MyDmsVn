@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Inventory;
@@ -35,6 +36,33 @@ public sealed record GuiTestAcceptanceResult(
 {
     public string Project { get; init; } = string.Empty;
     public string Framework { get; init; } = string.Empty;
+    public IReadOnlyList<TestMethodDescriptor> SourceMethodEvidence { get; init; } = Array.Empty<TestMethodDescriptor>();
+    public IReadOnlyList<DiscoveredTestCase> DiscoveredCaseEvidence { get; init; } = Array.Empty<DiscoveredTestCase>();
+    public IReadOnlyList<TrxTestResult> ExecutedCaseEvidence { get; init; } = Array.Empty<TrxTestResult>();
+}
+
+public static class GuiTestAcceptanceEvidenceWriter
+{
+    public static Task WriteAsync(
+        GuiTestAcceptanceOptions options,
+        GuiTestAcceptanceResult result,
+        CancellationToken cancellationToken)
+    {
+        if (!result.IsComplete)
+            throw new InvalidOperationException("Incomplete GUI acceptance cannot produce a passing evidence artifact.");
+
+        var evidence = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            revision = options.Revision,
+            framework = result.Framework,
+            project = result.Project,
+            sourceMethods = result.SourceMethodEvidence,
+            discoveredCases = result.DiscoveredCaseEvidence,
+            executedCases = result.ExecutedCaseEvidence,
+        }, new JsonSerializerOptions { WriteIndented = true });
+        return File.WriteAllTextAsync(Path.Combine(options.ArtifactRoot, "desktop-d2.inventory.json"), evidence, cancellationToken);
+    }
 }
 
 public interface IGuiTestSourceInventory
@@ -220,6 +248,9 @@ public sealed class GuiTestAcceptanceCoordinator
         {
             Project = project,
             Framework = options.Framework,
+            SourceMethodEvidence = source,
+            DiscoveredCaseEvidence = discovered,
+            ExecutedCaseEvidence = trx.Results,
         };
     }
 
