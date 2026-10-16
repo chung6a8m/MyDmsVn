@@ -1,6 +1,6 @@
 # Test Gate Matrix — current tooling and P4.1 example
 
-**Status:** Human-readable guidance only, 2026-10-16. The proposed gate manifest and `Invoke-TestGate.ps1` DO NOT EXIST yet. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [TESTGATE T04/T05 modular task gates](plans/20261016-002-modular-test-projects.md), [Codex policy](CODEX_TEST_EXECUTION_POLICY.md), and [P4.1](plans/20261013-002-desktop-login-session.md). This document does not re-open any already verified P4.1 gate.
+**Status:** Human-readable guidance, 2026-10-16. The v1 manifest and local `Invoke-TestGate.ps1` Task/Final runner are implemented; TESTGATE-T03 L3 evidence remains pending until the frozen Final invocation succeeds. T04/T05 split projects remain proposed. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [T04/T05](plans/20261016-002-modular-test-projects.md), and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
 
 ## Tool inventory (actually available)
 
@@ -11,7 +11,7 @@
 | SQL category | `tests/tools/Invoke-FocusedSqlIntegrationTests.ps1` with all mandatory parameters; use the runnable PowerShell example below and a reviewed category | Focused L1/L2 only; full category may still be broad |
 | SQL PR acceptance | `tests/tools/Invoke-SqlPrAcceptance.ps1` (`pr-acceptance`) | Strict one-pass sequential unfiltered L3 gate on both SQL TFMs |
 | SQL performance baseline | `tests/tools/Invoke-SqlIntegrationBenchmark.ps1` (`baseline`) | Specialized multi-pass L4 measurement path |
-| Future task runner | `Invoke-TestGate.ps1` and manifest | **Proposed, not executable** |
+| Manifest task/final runner | `tests/tools/Invoke-TestGate.ps1` + `tests/test-gates.v1.json` | Exact local Task selection; Final clean-revision runner with serialized strict dual-TFM SQL and sanitized aggregate evidence |
 
 ### Existing, runnable SQL L2 example (PowerShell from repository root)
 
@@ -30,6 +30,16 @@ tests/tools/Invoke-FocusedSqlIntegrationTests.ps1 `
 ```
 
 This is a **category-filtered L1/L2 check only**, not L3 acceptance. Verify current selectors/category against source and discovery; choose a different unique artifact directory for each invocation. Do not use `--no-build` after changing runner code without rebuilding it. Raw generated artifacts remain local; publish only the sanitized summary described in [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
+
+### Manifest-owned TESTGATE commands
+
+Build the runner/tests for the exact revision first. Task mode needs no SQL approval and accepts no project/TFM/filter override:
+
+```powershell
+tests/tools/Invoke-TestGate.ps1 -Mode Task -PlanId '20261016-001' -TaskId 'TESTGATE-T03' -ArtifactRoot '.sqlperf/testgate-t03-task'
+```
+
+Final mode additionally requires `-ApprovalFile`; the wrapper rejects a dirty tree, binds evidence to `HEAD`, serializes access to the approved instance, then runs the manifest order. Exit codes are `0` complete, `2` resource/preflight denied, `3` incomplete, and `64` usage error.
 
 Replace `<reviewed type>` with a type actually verified in the current source. Never copy a placeholder into an acceptance report as an executed command. Always build/restore the exact applicable revision/config/TFM before using `--no-build` or `--no-restore`.
 

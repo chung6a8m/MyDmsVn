@@ -2,7 +2,7 @@
 
 **TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
 
-**Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. Schedule the complete unfiltered SQL acceptance at the final gate-affecting revision. `Invoke-SqlPrAcceptance.ps1` runs one strict pass per TFM; the multi-pass `baseline` remains a performance tool. The proposed `Invoke-TestGate.ps1` is **not implemented**. See [Codex policy](../docs/CODEX_TEST_EXECUTION_POLICY.md), [current task matrix](../docs/TEST_GATE_MATRIX.md), [TESTGATE-T01–T03](../docs/plans/20261016-001-task-gates-and-modular-tests.md) and [the separate T04/T05 modular test-project plan](../docs/plans/20261016-002-modular-test-projects.md).
+**Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. `Invoke-TestGate.ps1` now reads the checked-in v1 manifest: Task mode cannot accept project/TFM/filter overrides, while Final binds a clean revision to one strict unfiltered pass per SQL TFM. The multi-pass `baseline` remains a performance tool; T04/T05 split projects remain proposed.
 
 P0 tests require Windows, the .NET 8 SDK selected by `global.json`, and the .NET Framework 4.8 targeting pack/runtime. Run from the repository root:
 
@@ -87,6 +87,15 @@ tests\tools\Invoke-SqlPrAcceptance.ps1 `
 ```
 
 The wrapper rejects a dirty tree, resolves the exact commit, and runs `net48` then `net8.0` without a filter, warm-up or measured repetition. It reuses the strict classification, discovery/theory-row, TRX, timing, process watchdog, preflight and ownership gates and writes a sanitized aggregate JSON report per TFM. Any missing/failed/skipped case, timeout, nonzero exit, incomplete journal, ambiguous/leaked owned database or missing report fails the command.
+
+For the manifest-owned TESTGATE-T03 Final contract, use a fresh ignored artifact root from a clean committed revision:
+
+```powershell
+$artifactRoot = '.sqlperf/testgate-t03-final-' + [guid]::NewGuid().ToString('N')
+tests/tools/Invoke-TestGate.ps1 -Mode Final -PlanId '20261016-001' -TaskId 'TESTGATE-T03' -ArtifactRoot $artifactRoot -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
+```
+
+The wrapper defaults to the current repository and `tests/test-gates.v1.json`. Exit codes are `0` complete, `2` approval/resource/preflight denial, `3` incomplete execution/reconciliation/report, and `64` invalid CLI usage. Raw TRX, timing, ownership journals and lease state stay local; publish only the reviewed sanitized aggregate JSON.
 
 Raw TRX, journals and timing JSONL stay ignored/local. Timing is off by default; the runner sets `MYDMSVN_SQL_TEST_TIMINGS=1`, a unique run ID and a local output path. A timeout, missing/corrupt TRX, nonzero exit, failed/skipped mandatory case, inventory mismatch, ownership ambiguity or approval failure makes the run incomplete.
 

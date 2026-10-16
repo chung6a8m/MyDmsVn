@@ -16,7 +16,7 @@ After all focused L2 gates are green and all gate-affecting edits are frozen, sc
 
 **Current rollout is local-only:** For TESTGATE-T01–T05, perform L1/L2 and mandatory final L3 on the approved local developer/Codex environment. Publish only a separately prepared, reviewed, sanitized evidence summary in the PR; keep raw test artifacts local. Do not add CI triggers, CI test-gate enforcement or a second CI full SQL suite. Existing unrelated CI configuration is outside this plan; any CI rollout must be separately requested. Local L3 is still mandatory for code-bearing PRs and cannot be replaced by focused tests.
 
-**Implemented-tool boundary:** `Invoke-SqlPrAcceptance.ps1` invokes the strict single-pass `pr-acceptance` mode: one unfiltered sequential pass on `net48` and `net8.0`, reusing classification, discovery/TRX, timing, watchdog, approval and ownership gates. The separate `baseline` mode remains one warm-up plus three measured passes per TFM. The proposed `Invoke-TestGate.ps1` and module-scoped project runner do NOT exist. Never fabricate those tools or downgrade L3 to plain `dotnet test`. L4 benchmark repetition is not routine feature validation. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [T04/T05 modularization and task gates](plans/20261016-002-modular-test-projects.md), and [proposed ADR 0006](adr/0006-task-scoped-test-execution-and-module-projects.md), which do not replace ADR 0005 isolation policy.
+**Implemented-tool boundary:** `Invoke-TestGate.ps1` now reads `tests/test-gates.v1.json`. `Task` executes only the exact manifest-owned project/TFM/selection; `Final` requires a clean exact revision plus approved SQL and reuses the strict single-pass `pr-acceptance` path on `net48` then `net8.0`. Exit `0` means complete, `2` means resource/preflight denial, `3` means a valid but incomplete gate, and `64` means invalid CLI usage. Raw TRX, timing, ownership and lease data stay local; only the sanitized aggregate report is reviewable. The separate `baseline` remains one warm-up plus three measured passes per TFM, and no module+category selector or T04/T05 split project exists. Never fabricate broader commands or downgrade L3 to plain `dotnet test`.
 
 ## Evidence publication boundary (mandatory)
 
@@ -54,7 +54,7 @@ After all focused L2 gates are green and all gate-affecting edits are frozen, sc
 - Both SQL environment variables are mandatory before any SQL DDL: `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` (effective database `master`) and `MYDMSVN_SQL_TEST_APPROVAL_FILE` (operator-maintained, instance-bound approval). A missing/expired approval, unavailable SQL or blocked DMV check is **blocked**, not an SQL success. Never create/reuse/drop production or unknown databases, print secrets, bypass ownership evidence or interpret a passed process exit code alone as the SQL gate.
 - Neither xUnit collection serialization nor the current SQL/WinForms assembly guards coordinate separate processes/TFMs. Do not run multiple SQL full suites against the same constrained host simultaneously without a separately proven orchestration policy. The accepted SQLPERF benchmark sequence remains sequential.
 
-The single-pass mode does not implement task manifests, module selectors or cross-project orchestration; those remain TESTGATE-T03/T05 work.
+The manifest runner implements exact task/final orchestration and durable logical-case reconciliation for the current projects. Module-specific split projects and a module+category selector remain T04/T05 work.
 
 ## PR Test Execution Report (required)
 

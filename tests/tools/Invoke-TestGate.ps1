@@ -1,10 +1,8 @@
 ﻿[CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
-    [string] $RepositoryRoot,
+    [string] $RepositoryRoot = (Get-Location).Path,
 
-    [Parameter(Mandatory = $true)]
-    [string] $ManifestPath,
+    [string] $ManifestPath = 'tests/test-gates.v1.json',
 
     [Parameter(Mandatory = $true)]
     [ValidateSet('Task', 'Final')]

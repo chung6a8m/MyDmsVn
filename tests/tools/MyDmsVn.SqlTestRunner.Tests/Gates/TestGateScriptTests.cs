@@ -12,6 +12,8 @@ public sealed class TestGateScriptTests
         var script = File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "tools", "Invoke-TestGate.ps1"));
 
         Assert.Contains("test-gate", script, StringComparison.Ordinal);
+        Assert.Contains("$RepositoryRoot = (Get-Location).Path", script, StringComparison.Ordinal);
+        Assert.Contains("$ManifestPath = 'tests/test-gates.v1.json'", script, StringComparison.Ordinal);
         Assert.Contains("git -C $RepositoryRoot status --porcelain", script, StringComparison.Ordinal);
         Assert.Contains("git -C $RepositoryRoot rev-parse HEAD", script, StringComparison.Ordinal);
         Assert.Contains("$Revision", script, StringComparison.Ordinal);

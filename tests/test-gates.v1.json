@@ -1180,7 +1180,7 @@
         "net8.0"
       ],
       "normalizedMethodSignature": "MyDmsVn.SqlTestRunner.Tests.Gates.TestGateScriptTests.Wrapper_exposes_only_manifest_identity_and_private_inputs()",
-      "reviewedCodeFingerprint": "4b875c923cbe093518501a67346bfd576e61d7067e901c16b693fc65f7b52b1f",
+      "reviewedCodeFingerprint": "1b37d7230a413b63e5231fda180f57d1b26bee7c78b7885ef001491c51f24446",
       "classification": [
         "NonSql"
       ],
