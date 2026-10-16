@@ -122,6 +122,8 @@ public sealed class GuiTestAcceptanceCoordinatorTests
         Assert.True(result.IsComplete);
         Assert.True(inventory.ReadAfterBuild);
         Assert.Equal("Desktop.Tests.csproj", result.Project);
+        Assert.Contains(process.Commands, command => command.StartsWith("build ", StringComparison.Ordinal) &&
+            command.Contains("--disable-build-servers", StringComparison.Ordinal) && command.Contains("-m:1", StringComparison.Ordinal));
     }
 
     [Fact]

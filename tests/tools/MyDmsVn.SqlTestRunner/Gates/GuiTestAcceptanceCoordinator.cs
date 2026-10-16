@@ -252,9 +252,10 @@ public sealed class GuiTestAcceptanceCoordinator
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["MYDMSVN_GUI_ACCEPTANCE"] = "1",
+            ["MSBUILDDISABLENODEREUSE"] = "1",
         };
         return await _processes.RunAsync(new CommandSpec("dotnet",
-            "build \"" + options.ProjectPath + "\" -c Release -f " + options.Framework + " --no-restore",
+            "build \"" + options.ProjectPath + "\" -c Release -f " + options.Framework + " --no-restore --disable-build-servers -m:1",
             options.RepositoryRoot, options.Timeout, environment), cancellationToken).ConfigureAwait(false);
     }
 
