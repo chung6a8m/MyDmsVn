@@ -100,6 +100,20 @@ public sealed class TestGateManifestTests
             "NET8-PLAN", "NET8-PAUSE-T05");
         Assert.Single(selected.Gates);
 
+        var modularSql = sql with
+        {
+            GateId = "modular-final-sql",
+            PlanId = "20261016-002-modular-test-projects",
+            TaskId = "TESTGATE-T04-D",
+        };
+        var modularFinal = TestGateManifestValidator.Select(
+            Manifest(modularSql) with { FrameworkProfile = profile },
+            repository.Root,
+            TestGateMode.Final,
+            "20261016-002-modular-test-projects",
+            "TESTGATE-T04-D");
+        Assert.Single(modularFinal.Gates);
+
         var disguisedRunner = sql with { Project = "tests.csproj", Frameworks = new[] { "net8.0" } };
         Assert.Throws<InvalidDataException>(() => TestGateManifestValidator.Select(
             manifest with { Gates = new[] { disguisedRunner } }, repository.Root, TestGateMode.Final,

@@ -84,8 +84,7 @@ public static class TestGateManifestValidator
             TestGateEvidenceKind.Ownership,
         };
         var expectedFrameworks = (IReadOnlyList<string>)new[] { "net48", "net8.0" };
-        if (manifest.FrameworkProfile is { } profile &&
-            string.Equals(profile.PlanId, planId, StringComparison.Ordinal))
+        if (manifest.FrameworkProfile is { } profile)
         {
             expectedFrameworks = profile.ActiveSqlFrameworks;
         }
@@ -93,7 +92,6 @@ public static class TestGateManifestValidator
         if (sqlGates.Length != 1 ||
             !sqlGates[0].Frameworks.SequenceEqual(expectedFrameworks, StringComparer.Ordinal) ||
             (manifest.FrameworkProfile is { } activeProfile &&
-             string.Equals(activeProfile.PlanId, planId, StringComparison.Ordinal) &&
              !string.Equals(sqlGates[0].Project, activeProfile.SqlProject, StringComparison.Ordinal)) ||
             sqlGates[0].Selection.Kind != TestGateSelectionKind.UnfilteredProject ||
             sqlGates[0].Selection.Patterns.Count != 0 ||
