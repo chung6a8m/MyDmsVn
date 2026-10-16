@@ -43,11 +43,6 @@ public static class LogicalCaseBinder
             }
 
             var match = matches[0];
-            if (!match.IsBodyFingerprintComplete)
-            {
-                failures.Add(LogicalCaseBindingFailure.IncompleteFingerprint);
-            }
-
             if (!string.Equals(
                     match.BodyFingerprint,
                     definition.ReviewedCodeFingerprint,

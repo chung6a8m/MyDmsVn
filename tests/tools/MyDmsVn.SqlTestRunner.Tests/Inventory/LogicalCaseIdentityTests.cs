@@ -255,9 +255,15 @@ public sealed class LogicalCaseIdentityTests
             new[] { definition },
             Project,
             "net8.0");
+        var matchingPartialGraph = LogicalCaseBinder.BindSource(
+            new[] { valid with { IsBodyFingerprintComplete = false } },
+            new[] { definition },
+            Project,
+            "net8.0");
 
         Assert.True(complete.IsComplete);
         Assert.Single(complete.Cases);
+        Assert.True(matchingPartialGraph.IsComplete);
         Assert.Contains(LogicalCaseBindingFailure.FingerprintMismatch, stale.Failures);
     }
 
