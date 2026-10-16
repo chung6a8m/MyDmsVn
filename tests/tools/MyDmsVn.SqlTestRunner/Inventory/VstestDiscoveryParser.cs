@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -46,11 +46,17 @@ public static class VstestDiscoveryParser
             methodName,
             tfm,
             rowOrdinal,
-            TheoryRowIdentity.Create(methodName, tfm, displayName));
+            TheoryRowIdentity.Create(methodName, tfm, displayName))
+        {
+            PhysicalRowLocator = LogicalCaseIdentity.CreatePhysicalRowLocator(methodName, displayName),
+        };
 }
 
 public sealed record DiscoveredTestCase(
     string MethodName,
     string Tfm,
     int RowOrdinal,
-    string StableCaseId);
+    string StableCaseId)
+{
+    public string PhysicalRowLocator { get; init; } = string.Empty;
+}

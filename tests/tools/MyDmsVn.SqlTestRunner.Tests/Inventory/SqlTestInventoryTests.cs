@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -350,6 +350,19 @@ public sealed class SqlTestInventoryTests
 
         Assert.NotEmpty(expected);
         Assert.DoesNotContain(expected, method => !actual.Contains(method));
+    }
+
+    [Fact]
+    public void Inventory_exposes_the_normalized_method_signature()
+    {
+        var methodName = typeof(SqlTestInventoryTests).FullName + "." +
+            nameof(Inventory_exposes_the_normalized_method_signature);
+
+        var descriptor = Assert.Single(TestMethodInventory.Read(
+            typeof(SqlTestInventoryTests).Assembly.Location),
+            method => string.Equals(method.FullyQualifiedName, methodName, StringComparison.Ordinal));
+
+        Assert.Equal(methodName + "()", descriptor.NormalizedSignature);
     }
 
     private static string FindRepositoryRoot()

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -49,7 +49,10 @@ public static class TestMethodInventory
                             IsAttributeOrDerived(attribute.AttributeType, "Xunit.TheoryAttribute")),
                         fingerprint.Fingerprint,
                         ReadCategories(item.Method),
-                        fingerprint.IsComplete);
+                        fingerprint.IsComplete)
+                    {
+                        NormalizedSignature = LogicalCaseIdentity.NormalizeSignature(item.Method),
+                    };
                 })
                 .OrderBy(item => item.FullyQualifiedName, StringComparer.Ordinal)
                 .ToArray();
@@ -1507,6 +1510,8 @@ public sealed record TestMethodDescriptor(
     IReadOnlyList<string> Categories,
     bool IsBodyFingerprintComplete = true)
 {
+    public string NormalizedSignature { get; init; } = FullyQualifiedName + "()";
+
     public TestMethodDescriptor(
         string FullyQualifiedName,
         bool IsTheory,

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -49,7 +49,10 @@ public static class TrxResultParser
                         method,
                         tfm,
                         outcome,
-                        duration);
+                        duration)
+                    {
+                        PhysicalRowLocator = LogicalCaseIdentity.CreatePhysicalRowLocator(method, display),
+                    };
                 })
                 .ToArray();
             return new TrxParseResult(true, TrxIncompleteReason.None, results);
@@ -89,6 +92,8 @@ public sealed record TrxTestResult(
     TestOutcome Outcome,
     TimeSpan Duration)
 {
+    public string PhysicalRowLocator { get; init; } = string.Empty;
+
     public static TrxTestResult Passed(
         string stableCaseId,
         string methodName,
