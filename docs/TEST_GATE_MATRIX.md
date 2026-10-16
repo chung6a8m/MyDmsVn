@@ -2,7 +2,7 @@
 
 **Status:** Human-readable guidance, 2026-10-16. The v1 manifest and local `Invoke-TestGate.ps1` Task/Final runner are implemented and TESTGATE-T03 Final L3 is verified at its recorded frozen revision. T04/T05 split projects remain proposed. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [T04/T05](plans/20261016-002-modular-test-projects.md), and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
 
-**Upcoming (not yet implemented):** [NET8-PAUSE](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) requires adding explicit `-Frameworks`/`--frameworks` selection to strict SQL acceptance and benchmark tooling without removing the existing focused `-Frameworks` parameter. None of these **new strict parameters** exists yet. The actual current dual-TFM commands below remain accurate until a verified implementation changes project targets/manifests. An indispensable net8-only runner's own TFM must never be mistaken for a second SQL test pass.
+**Upcoming (not yet implemented):** [NET8-PAUSE](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) requires adding explicit `-Frameworks`/`--frameworks` selection to strict SQL acceptance and benchmark tooling without removing the existing focused `-Frameworks` parameter. None of these **new strict parameters** exists yet. **The tool inventory and runnable commands below describe the current pre-pause dual-TFM repository only.** `main`/unrelated PRs keep that dual matrix until the dedicated NET8-PAUSE implementation merges; only its owner-approved **Stage B candidate**, after T01/T02/T03, may use the verified full **active `net48` Final** plus bounded GUI/Release gates. Later work binds to the merged active project × TFM manifest (net8 PARKED/NOT RUN until restored). A net8-only runner's own TFM must never count as a second SQL test pass.
 
 ## Tool inventory (actually available)
 
@@ -47,13 +47,15 @@ Replace `<reviewed type>` with a type actually verified in the current source. N
 
 ## Task-scoped guidance for future P4.1 changes
 
+**Historical worked example only:** P4.1 was owner-accepted and is not being reopened. For a future change to that feature, resolve the **actual approved active project × TFM** first; the original two-target evidence and example commands are historical, not instructions to run a target removed by NET8-PAUSE. The current dual-target matrix remains mandatory on `main`/unrelated PRs until the pause implementation merges; only its authorized Stage B candidate uses active `net48`, with restored modern-target tests required when net8 is reactivated.
+
 | Task | First run / task L2 | Explicit SQL escalation | Full suite |
 |---|---|---|---|
 | T01 | Application request actor + pure session state tests | SecurityProvisioning if SQL validator touched; add affected category for actual change | Never at task boundary |
-| T02 | Login VM deterministic tests + affected Desktop STA across both GUI TFMs | None if only UI/VM behavior changed | Never at task boundary |
+| T02 | Login VM deterministic tests + affected Desktop STA on **all approved active GUI TFMs** (pre-pause `net48` + `net8.0-windows`; Stage B/paused `net48`) | None if only UI/VM behavior changed | Never at task boundary |
 | T03 | Host startup/fail-closed/permission UI + STA | SecurityProvisioning for SQL-backed account validation/auth admission | Never at task boundary |
 | T04 | Fake-clock expiry, pending/admitted actor races, logout/relogin, stale UI | SecurityProvisioning; SqlConcurrency only if real SQL session locking exercised | Never at task boundary |
-| T05 | Missing focused checks + packaged/manual walkthroughs | Final **unfiltered** approved SQL suite, both TFMs, only after code/tests frozen | L3 once planned; repeat only when invalidated |
+| T05 | Missing focused checks + packaged/manual walkthroughs for shipped hosts | Final **unfiltered SQL on all approved active TFMs** (pre-pause dual; authorized Stage B/paused `net48`) only after gate inputs freeze; require guarded GUI/Release evidence for active hosts | L3 once planned; repeat only when invalidated |
 
 A SQL category is broader than the future requested `module + category` selector; do not pretend the current focused tool supports that combination. When a task requires genuinely cross-module validation, add those categories/checks rather than narrowing the gate merely to save time.
 

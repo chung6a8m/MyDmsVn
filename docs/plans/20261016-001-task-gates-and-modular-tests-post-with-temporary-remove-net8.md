@@ -79,22 +79,43 @@ Preserve all historical net8 logical identities in an explicitly versioned **his
 
 **Required adversarial tests:** no matching `planId/taskId`, missing Task/Final entry, duplicate SQL owner, duplicate/empty/unsupported/out-of-order TFM, project graph incompatible with requested TFM, unregistered current logical case, parked case accidentally counted active, stale/inexact inventory or evidence SHA, runner tool TFM counted as SQL TFM, CLI/manifest disagreement, missing approved instance, timed-out/orphaned testhost, partial TRX, missing GUI proof and failed/ambiguous database cleanup. Preserve exact failure statuses and prevent a green report from a shorter-than-expected gate list.
 
-**After implementation, illustrative focused command (exists today):**
+**Existing focused SQL L2 command — runnable with the current wrapper (not L3):**
+
+Run on Windows **from the repository root**. Prerequisites: a disposable non-production SQL Server explicitly approved for testing, `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` with effective database `master`, a valid local `MYDMSVN_SQL_TEST_APPROVAL_FILE`, and the installed SDK/framework targeting packs. Do **not** print either secret/approval file. The focused wrapper invokes the net8-only *tool-host* runner with `--no-build`, so build both the runner and the **SQL test fixture for the selected `net48` TFM** first. The existing `-Frameworks` parameter already supports this explicit selection; it does **not** alter the repository's current dual-TFM Final obligations.
 
 ```powershell
-tests/tools/Invoke-FocusedSqlIntegrationTests.ps1 `
-  -TestProject tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
-  -ArtifactRoot .sqlperf/focused-net48 `
+$repoRoot = (Get-Location).Path
+$sqlProject = 'tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj'
+$runnerProject = 'tests/tools/MyDmsVn.SqlTestRunner/MyDmsVn.SqlTestRunner.csproj'
+if (-not $env:MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING -or
+    -not $env:MYDMSVN_SQL_TEST_APPROVAL_FILE) {
+  throw 'An approved non-production SQL connection and approval file are required.'
+}
+dotnet build $runnerProject -c Release -f net8.0
+if ($LASTEXITCODE -ne 0) { throw 'SQL test runner build failed.' }
+dotnet build $sqlProject -c Release -f net48
+if ($LASTEXITCODE -ne 0) { throw 'SQL test fixture build failed.' }
+& ./tests/tools/Invoke-FocusedSqlIntegrationTests.ps1 `
+  -RepositoryRoot $repoRoot `
+  -TestProject $sqlProject `
+  -ArtifactRoot (Join-Path $repoRoot ('.sqlperf/focused-net48-' + [guid]::NewGuid().ToString('N'))) `
   -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
-  -Category SecurityProvisioning -Frameworks @('net48')
+  -Category SecurityProvisioning `
+  -Frameworks @('net48')
+if ($LASTEXITCODE -ne 0) { throw 'Focused SQL L2 failed.' }
 ```
 
-**Proposed future strict command (NOT runnable until corresponding code/task passes):**
+**Proposed future strict command (NOT runnable until NET8-PAUSE-T03 implements and verifies the parameterized strict wrapper):**
+
+Invoke from a **clean, committed, frozen candidate revision** after locked restore and Release build of its **actual verified** SQL test project and runner host; the strict wrapper also invokes the runner with `--no-build`. Use a unique artifact root and the same approved-instance safeguards. This command is a **lower-level example only**, not a substitute for manifest-owned NET8-PAUSE-T05 Final + external GUI D2/Release evidence.
 
 ```powershell
-tests/tools/Invoke-SqlPrAcceptance.ps1 `
-  -TestProject tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
-  -ArtifactRoot .sqlperf/pr-net48 `
+$repoRoot = (Get-Location).Path
+$sqlProject = 'tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj'
+& ./tests/tools/Invoke-SqlPrAcceptance.ps1 `
+  -RepositoryRoot $repoRoot `
+  -TestProject $sqlProject `
+  -ArtifactRoot (Join-Path $repoRoot ('.sqlperf/pr-net48-' + [guid]::NewGuid().ToString('N'))) `
   -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
   -Frameworks @('net48')
 ```
