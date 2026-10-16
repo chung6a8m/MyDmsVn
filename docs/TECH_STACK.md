@@ -2,6 +2,10 @@
 
 Status: decisions approved by project owner on 2026-10-08.
 
+## Runtime lifecycle note (2026-10-16)
+
+The checked-in projects are **still dual-target** where currently declared. The active [NET8-PAUSE implementation plan](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) proposes *temporarily* dropping the second `net8.0` / `net8.0-windows` TFM from multi-target projects to reduce Codex test latency. **The plan has not been executed**: do not report .NET 8 removed, ignore the modern host/tool-only dependencies, or skip today's dual-TFM strict tests. A separate verified implementation PR must determine compatibility exceptions and preserve TFM-selectable test tools. Re-enable net8 for P7 Server.Api and modern desktop parity unless a separate runtime change is approved.
+
 ## Runtimes
 
 - Desktop legacy host: `net48` (WinForms / Windows, .NET Framework 4.8).

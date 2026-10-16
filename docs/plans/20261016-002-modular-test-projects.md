@@ -2,6 +2,10 @@
 
 **Status:** Proposed / NOT IMPLEMENTED · **Date:** 2026-10-16 · **Scope:** cross-phase test project partitioning; local-only execution. This plan owns **TESTGATE-T04** and **TESTGATE-T05**, extracted without renumbering from [TESTGATE T01–T03](20261016-001-task-gates-and-modular-tests.md). Neither extraction nor green gates are claimed by creating this document.
 
+## Roadmap dependency: temporary second-TFM pause first
+
+This proposed T04/T05 implementation follows [NET8-PAUSE](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) in the ordered active roadmap. NET8-PAUSE has **not yet run**, so today's checked-in dual-TFM prerequisites still stand. At actual T04/T05 execution, first bind the reviewed **active project × TFM** inventory/Task/Final manifest; if NET8-PAUSE was accepted, run `net48` for active SQL/WinForms paths and explicitly classify parked `net8.0` / `net8.0-windows` cases as historical/temporarily out of release scope, **never as PASS or deleted logical cases**. The pre-move two-TFM baseline language below describes the historical original project and becomes a restoration requirement when both targets return; do not run a TFM not declared by the implementation revision. Update T04-A/T05-A pre-move inventories and exact pass gates by a reviewed baseline transition before moving any cases, preserving source/discovery/TRX bijection, SQL instance approval, watchdog and owned-DB cleanup. If baseline provenance cannot be established, mark BLOCKED, not green.
+
 ## Authority and prerequisites
 
 Read `AGENTS.md`, [Codex test policy](../CODEX_TEST_EXECUTION_POLICY.md), [test gate matrix](../TEST_GATE_MATRIX.md), [test strategy](../TEST_STRATEGY.md), [tests README](../../tests/README.md), [proposed ADR 0006](../adr/0006-task-scoped-test-execution-and-module-projects.md), and accepted [ADR 0005](../adr/0005-test-isolation-and-bounded-parallelism.md).
