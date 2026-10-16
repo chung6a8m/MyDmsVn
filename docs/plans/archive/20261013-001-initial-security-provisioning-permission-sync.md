@@ -2,7 +2,7 @@
 
 Status: **Complete — P3.1-T01 through T07 implemented and verified** (2026-10-14). Follow-up to completed P3, **not** retroactive completion evidence for P3. Depends on P1–P3 identity, password, schema and authorization foundations. P4.1 authenticated desktop login walkthroughs, P5 interactive acceptance and remaining P6 operational gates remain separate follow-up work.
 
-Read: `AGENTS.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/CONFIGURATION_AND_SQL_SECURITY.md`, `docs/P3_VERIFICATION.md`, `docs/P3_1_VERIFICATION.md`, `docs/TEST_STRATEGY.md`, `docs/plans/20261008-007-phase-6-local-hardening.md`.
+Read: `AGENTS.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/CONFIGURATION_AND_SQL_SECURITY.md`, `docs/P3_VERIFICATION.md`, `docs/P3_1_VERIFICATION.md`, `docs/TEST_STRATEGY.md`, `docs/plans/archive/20261008-007-phase-6-local-hardening.md`.
 
 ## Objective
 
