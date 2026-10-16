@@ -61,6 +61,10 @@ public sealed class BenchmarkRunCoordinator
         {
             return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }
+        catch (Exception) when (!recovery.RecoveryRequired)
+        {
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
+        }
     }
 
     private async Task<BenchmarkRunResult> RunCoreAsync(

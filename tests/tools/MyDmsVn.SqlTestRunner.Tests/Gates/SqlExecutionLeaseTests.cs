@@ -177,6 +177,24 @@ public sealed class SqlExecutionLeaseTests
     }
 
     [Fact]
+    public async Task Inaccessible_existing_record_blocks_instead_of_being_treated_as_missing()
+    {
+        using var store = new TemporaryLeaseStore();
+        const string fingerprint = "inaccessible-existing-record";
+        WritePriorLease(store, fingerprint);
+        var deniedStore = new FileSqlExecutionLeaseStore(
+            store.Root,
+            _ => throw new UnauthorizedAccessException("denied"));
+
+        var result = await new SqlExecutionLeaseFactory(deniedStore).AcquireAsync(
+            Request(store, fingerprint),
+            CancellationToken.None);
+
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.BlockedRecovery, result.Status);
+        Assert.Null(result.Lease);
+    }
+
+    [Fact]
     public void Lease_namespace_is_machine_wide()
     {
         Assert.StartsWith("Global\\", SqlExecutionLeaseFactory.MutexName("instance-a"), StringComparison.Ordinal);
@@ -263,6 +281,49 @@ public sealed class SqlExecutionLeaseTests
 
         Assert.Equal(SqlExecutionLeaseAcquireStatus.BlockedRecovery, timedOut.Status);
         Assert.True(stalledRecovery.ReceivedCancellation);
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.Recovered, retry.Status);
+        retry.Lease!.Complete();
+        await retry.Lease.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Non_cooperative_recovery_times_out_but_keeps_the_mutex_until_it_finishes()
+    {
+        using var store = new TemporaryLeaseStore();
+        const string fingerprint = "non-cooperative-recovery";
+        WritePriorLease(store, fingerprint);
+        using var abandoned = Abandon(fingerprint);
+        var stalledRecovery = new NonCooperativeRecovery();
+        var factory = new SqlExecutionLeaseFactory(
+            new FileSqlExecutionLeaseStore(store.Root),
+            new FixedProcessProbe(isLive: false));
+
+        try
+        {
+            var timedOut = await factory.AcquireAsync(
+                    Request(
+                        store,
+                        fingerprint,
+                        recovery: stalledRecovery,
+                        recoveryTimeout: TimeSpan.FromMilliseconds(50)),
+                    CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(1));
+            var contended = await factory.AcquireAsync(
+                Request(store, fingerprint, timeout: TimeSpan.FromMilliseconds(100)),
+                CancellationToken.None);
+
+            Assert.Equal(SqlExecutionLeaseAcquireStatus.BlockedRecovery, timedOut.Status);
+            Assert.Equal(SqlExecutionLeaseAcquireStatus.TimedOut, contended.Status);
+        }
+        finally
+        {
+            stalledRecovery.Complete(false);
+        }
+
+        var retry = await factory.AcquireAsync(
+            Request(store, fingerprint, recovery: new SuccessfulRecovery()),
+            CancellationToken.None);
+
         Assert.Equal(SqlExecutionLeaseAcquireStatus.Recovered, retry.Status);
         retry.Lease!.Complete();
         await retry.Lease.DisposeAsync();
@@ -376,6 +437,44 @@ public sealed class SqlExecutionLeaseTests
         Assert.False(cancelled.Result.IsComplete);
         Assert.False(cancelled.Result.RecoveryRequired);
         Assert.True(second.Acquired);
+    }
+
+    [Fact]
+    public async Task Approval_expiry_exception_before_execution_does_not_poison_the_next_guarded_run()
+    {
+        using var store = new TemporaryLeaseStore();
+        var coordinator = new BenchmarkRunCoordinator(
+            new ExpiredApprovalPreflightGate(),
+            new NoProcessRunner(),
+            new UnusedResultGate(),
+            new UnusedOwnershipGate(),
+            new UnusedReportExporter(),
+            new AcceptingClassificationGate());
+        var guard = new SqlExecutionLeaseGuard(
+            new FixedApproval("expired-during-wait-instance"),
+            Factory(store));
+
+        var expired = await guard.RunAsync(
+            "approval.json",
+            "legacy/pr-acceptance",
+            Path.Combine(store.Root, "expired-preflight"),
+            TimeSpan.FromSeconds(2),
+            token => coordinator.RunAsync(BenchmarkOptions(store), token),
+            result => !result.RecoveryRequired,
+            CancellationToken.None);
+        var retry = await guard.RunAsync(
+            "approval.json",
+            "legacy/pr-acceptance",
+            Path.Combine(store.Root, "retry"),
+            TimeSpan.FromSeconds(2),
+            _ => Task.FromResult(new BenchmarkRunResult(false, Array.Empty<BenchmarkFrameworkRun>())),
+            result => !result.RecoveryRequired,
+            CancellationToken.None);
+
+        Assert.True(expired.Acquired);
+        Assert.False(expired.Result.IsComplete);
+        Assert.False(expired.Result.RecoveryRequired);
+        Assert.True(retry.Acquired);
     }
 
     private static BenchmarkRunOptions BenchmarkOptions(TemporaryLeaseStore store) =>
@@ -537,6 +636,18 @@ public sealed class SqlExecutionLeaseTests
         }
     }
 
+    private sealed class NonCooperativeRecovery : IAbandonedSqlRunRecovery
+    {
+        private readonly TaskCompletionSource<bool> _completion =
+            new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<bool> ReconcileAsync(
+            AbandonedSqlRun lease,
+            CancellationToken cancellationToken) => _completion.Task;
+
+        public void Complete(bool result) => _completion.TrySetResult(result);
+    }
+
     private sealed class FixedProcessProbe : IProcessLivenessProbe
     {
         private readonly bool _isLive;
@@ -575,6 +686,12 @@ public sealed class SqlExecutionLeaseTests
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return true;
         }
+    }
+
+    private sealed class ExpiredApprovalPreflightGate : IBenchmarkPreflightGate
+    {
+        public Task<bool> ValidateAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("The SQL instance approval has expired.");
     }
 
     private sealed class AcceptingClassificationGate : IBenchmarkClassificationGate

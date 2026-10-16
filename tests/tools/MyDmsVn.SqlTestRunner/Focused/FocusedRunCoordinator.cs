@@ -219,6 +219,10 @@ public sealed class FocusedRunCoordinator
         {
             return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
         }
+        catch (Exception) when (!recovery.RecoveryRequired)
+        {
+            return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
+        }
     }
 
     private static string ResolveAssemblyPath(string projectPath, string tfm)

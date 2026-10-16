@@ -36,6 +36,21 @@ public sealed class FocusedRunCoordinatorTests
     }
 
     [Fact]
+    public async Task Preflight_exception_before_execution_returns_incomplete_without_recovery()
+    {
+        using var fixture = new Fixture();
+        var coordinator = new FocusedRunCoordinator(
+            new ThrowingPreflightGate(),
+            new RecordingProcessRunner(_ => Success()),
+            new StubClassificationGate(true));
+
+        var result = await coordinator.RunAsync(fixture.Options, CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        Assert.False(result.RecoveryRequired);
+    }
+
+    [Fact]
     public async Task Timed_out_execution_still_uses_bounded_ownership_reconciliation()
     {
         using var fixture = new Fixture();
@@ -157,6 +172,12 @@ public sealed class FocusedRunCoordinatorTests
     private sealed class StubPreflightGate : IBenchmarkPreflightGate
     {
         public Task<bool> ValidateAsync(CancellationToken cancellationToken) => Task.FromResult(true);
+    }
+
+    private sealed class ThrowingPreflightGate : IBenchmarkPreflightGate
+    {
+        public Task<bool> ValidateAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("The SQL instance approval has expired.");
     }
 
     private sealed class StubClassificationGate : IBenchmarkClassificationGate
