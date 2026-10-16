@@ -209,7 +209,7 @@ public sealed class FocusedRunCoordinatorTests
         Directory.CreateDirectory(journal);
         File.WriteAllText(
             Path.Combine(runRoot, "strict-final.trx"),
-            "<TestRun><ResultSummary outcome=\"Failed\"><Counters total=\"1\" executed=\"1\" passed=\"0\" failed=\"1\" error=\"0\" timeout=\"0\" aborted=\"0\" inconclusive=\"0\" notExecuted=\"0\" /></ResultSummary><Results><UnitTestResult outcome=\"Failed\"><Output><ErrorInfo><Message>System.IO.DirectoryNotFoundException: " + journal + "</Message><StackTrace>FileDatabaseOwnershipJournal.WriteAtomically SqlTestDatabase.CreateAsync</StackTrace></ErrorInfo></Output></UnitTestResult></Results></TestRun>");
+            "<TestRun><ResultSummary outcome=\"Failed\"><Counters total=\"23\" executed=\"23\" passed=\"22\" failed=\"1\" error=\"0\" timeout=\"0\" aborted=\"0\" inconclusive=\"0\" notExecuted=\"0\" /></ResultSummary><Results><UnitTestResult outcome=\"Failed\"><Output><ErrorInfo><Message>System.IO.DirectoryNotFoundException: " + journal + "</Message><StackTrace>FileDatabaseOwnershipJournal.WriteAtomically SqlTestDatabase.&lt;CreateAsync&gt;d__23.MoveNext</StackTrace></ErrorInfo></Output></UnitTestResult></Results></TestRun>");
 
         var ownership = new RecordingOwnershipGate(isComplete: false);
         var recovery = new BenchmarkAbandonedSqlRunRecovery(

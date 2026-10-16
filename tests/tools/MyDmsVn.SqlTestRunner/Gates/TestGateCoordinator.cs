@@ -834,6 +834,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
 
     private static bool IsVerifiedJournalPathFailure(string artifactRoot, string journal)
     {
+        journal = Path.GetFullPath(journal);
         var runRoot = Path.Combine(artifactRoot, Path.GetFileName(journal));
         if (Directory.Exists(runRoot))
         {
@@ -862,11 +863,14 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
             if (counters is null || summary is null || failed.Length == 0 ||
                 !string.Equals((string?)summary.Attribute("outcome"), "Failed", StringComparison.Ordinal) ||
                 (string?)counters.Attribute("executed") != (string?)counters.Attribute("total") ||
+                (string?)counters.Attribute("total") is not { } total ||
                 (string?)counters.Attribute("passed") is not { } passed ||
                 (string?)counters.Attribute("failed") is not { } failures ||
+                !int.TryParse(total, out var totalCount) ||
                 !int.TryParse(passed, out var passedCount) ||
                 !int.TryParse(failures, out var failedCount) ||
-                passedCount + failedCount != failed.Length ||
+                passedCount + failedCount != totalCount ||
+                failedCount != failed.Length ||
                 new[] { "error", "timeout", "aborted", "inconclusive", "notExecuted" }
                     .Any(name => (string?)counters.Attribute(name) != "0"))
             {
@@ -882,7 +886,8 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
                     message.Contains(journal, StringComparison.OrdinalIgnoreCase) &&
                     stack is not null &&
                     stack.Contains("FileDatabaseOwnershipJournal.WriteAtomically", StringComparison.Ordinal) &&
-                    stack.Contains("SqlTestDatabase.CreateAsync", StringComparison.Ordinal);
+                    (stack.Contains("SqlTestDatabase.CreateAsync", StringComparison.Ordinal) ||
+                     stack.Contains("SqlTestDatabase.<CreateAsync>", StringComparison.Ordinal));
             });
         }
         catch (System.Xml.XmlException)
