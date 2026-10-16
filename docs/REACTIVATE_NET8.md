@@ -1,6 +1,6 @@
 # Reactivate .NET 8 product targets
 
-**Status:** required reviewed procedure; not authorized or executed by NET8-PAUSE. The current candidate keeps .NET 8 product/GUI coverage `PARKED / NOT RUN`. This is not a one-line TFM toggle.
+**Status:** required reviewed procedure; NET8-PAUSE PR #32 merged at `8e310778` without reactivating product .NET 8. Current `main` keeps .NET 8 product/GUI coverage `PARKED / NOT RUN`; reactivation has not been authorized or executed. This is not a one-line TFM toggle.
 
 ## Entry conditions
 

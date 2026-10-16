@@ -2,7 +2,7 @@
 
 **Status:** Human-readable guidance, 2026-10-16. The v1 manifest and local `Invoke-TestGate.ps1` Task/Final runner are implemented and TESTGATE-T03 Final L3 is verified at its recorded frozen revision. T04/T05 split projects remain proposed. See [TESTGATE T01–T03](plans/20261016-001-task-gates-and-modular-tests.md), [T04/T05](plans/20261016-002-modular-test-projects.md), and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
 
-**NET8-PAUSE candidate tooling:** explicit `-Frameworks`/`--frameworks` selection is implemented for focused, strict PR and benchmark paths. The reviewed profile binds SQL and Desktop owners to active `net48`, preserves historical net8 inventory, and records runner projects as tool-only `net8.0`. T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; same-protocol duration comparison remains open. A net8-only runner never counts as SQL/product coverage.
+**NET8-PAUSE accepted matrix:** explicit `-Frameworks`/`--frameworks` selection is implemented for focused, strict PR and benchmark paths. PR #32 merged at `8e310778`; current `main` binds SQL and Desktop owners to active `net48`, preserves historical net8 inventory, and records runner projects as tool-only `net8.0`. The owner waived the same-protocol duration comparison at `09d00bfa` because no comparable baseline exists; it remains unmeasured and no speedup is claimed. A net8-only runner never counts as SQL/product coverage.
 
 ## Tool inventory (actually available)
 
@@ -50,15 +50,15 @@ Replace `<reviewed type>` with a type actually verified in the current source. N
 
 ## Task-scoped guidance for future P4.1 changes
 
-**Historical worked example only:** P4.1 was owner-accepted and is not being reopened. For a future change to that feature, resolve the **actual approved active project × TFM** first; the original two-target evidence and example commands are historical, not instructions to run a target removed by NET8-PAUSE. The current dual-target matrix remains mandatory on `main`/unrelated PRs until the pause implementation merges; only its authorized Stage B candidate uses active `net48`, with restored modern-target tests required when net8 is reactivated.
+**Historical worked example only:** P4.1 was owner-accepted and is not being reopened. For a future change to that feature, resolve the **actual approved active project × TFM** first; the original two-target evidence and example commands are historical, not instructions to run a target removed by NET8-PAUSE. Current `main` uses the accepted active `net48` matrix; branches created before PR #32 merged follow their checked-in targets until reviewed reactivation. Restored modern-target tests are required when net8 is reactivated.
 
 | Task | First run / task L2 | Explicit SQL escalation | Full suite |
 |---|---|---|---|
 | T01 | Application request actor + pure session state tests | SecurityProvisioning if SQL validator touched; add affected category for actual change | Never at task boundary |
-| T02 | Login VM deterministic tests + affected Desktop STA on **all approved active GUI TFMs** (pre-pause `net48` + `net8.0-windows`; Stage B/paused `net48`) | None if only UI/VM behavior changed | Never at task boundary |
+| T02 | Login VM deterministic tests + affected Desktop STA on **all approved active GUI TFMs** (`net48` on current `main`; checked-in targets on pre-merge branches) | None if only UI/VM behavior changed | Never at task boundary |
 | T03 | Host startup/fail-closed/permission UI + STA | SecurityProvisioning for SQL-backed account validation/auth admission | Never at task boundary |
 | T04 | Fake-clock expiry, pending/admitted actor races, logout/relogin, stale UI | SecurityProvisioning; SqlConcurrency only if real SQL session locking exercised | Never at task boundary |
-| T05 | Missing focused checks + packaged/manual walkthroughs for shipped hosts | Final **unfiltered SQL on all approved active TFMs** (pre-pause dual; authorized Stage B/paused `net48`) only after gate inputs freeze; require guarded GUI/Release evidence for active hosts | L3 once planned; repeat only when invalidated |
+| T05 | Missing focused checks + packaged/manual walkthroughs for shipped hosts | Final **unfiltered SQL on all approved active TFMs** (`net48` on current `main`; checked-in targets on pre-merge branches) only after gate inputs freeze; require guarded GUI/Release evidence for active hosts | L3 once planned; repeat only when invalidated |
 
 A SQL category is broader than the future requested `module + category` selector; do not pretend the current focused tool supports that combination. When a task requires genuinely cross-module validation, add those categories/checks rather than narrowing the gate merely to save time.
 

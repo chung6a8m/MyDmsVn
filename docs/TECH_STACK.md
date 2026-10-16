@@ -4,7 +4,7 @@ Status: decisions approved by project owner on 2026-10-08.
 
 ## Runtime lifecycle note (2026-10-16)
 
-The NET8-PAUSE candidate actively declares `net48` for product, SQL and Desktop projects. Historical `net8.0` / `net8.0-windows` logical cases remain in the reviewed manifest as `PARKED / NOT RUN`; AppCore source is retained but excluded from the solution/release. The strict/focused runner remains tool-only `net8.0` with explicit framework selection. T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; same-protocol duration comparison and merge remain open. Restore .NET 8 through [the reviewed procedure](REACTIVATE_NET8.md) before P7 Server.Api or modern desktop parity unless a separate runtime plan is approved.
+NET8-PAUSE PR #32 merged at `8e310778`; current `main` actively declares `net48` for product, SQL and Desktop projects. Historical `net8.0` / `net8.0-windows` logical cases remain in the reviewed manifest as `PARKED / NOT RUN`; AppCore source is retained but excluded from the solution/release. The strict/focused runner remains tool-only `net8.0` with explicit framework selection. T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with reviewer gate fixes re-verified at `6b2ff49`. The owner waived the duration comparison at `09d00bfa`; it remains unmeasured, with no speedup claim. Restore .NET 8 through [the reviewed procedure](REACTIVATE_NET8.md) before P7 Server.Api or modern desktop parity unless a separate runtime plan is approved.
 
 ## Runtimes
 
