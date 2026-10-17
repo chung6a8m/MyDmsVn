@@ -456,7 +456,11 @@ public sealed class TestGateCoordinator
             Environment.SetEnvironmentVariable(
                 SqlTestHarnessEnvironment.ApprovalFileVariable,
                 options.ApprovalFile);
-            var recoveryRequired = acquired.Status == SqlExecutionLeaseAcquireStatus.Recovered;
+            // Recovery of a prior invocation is historical evidence, not an unresolved
+            // resource owned by the current invocation. Only the latter may keep
+            // the current lease in RecoveryRequired when it is disposed.
+            var priorLeaseRecovered = acquired.Status == SqlExecutionLeaseAcquireStatus.Recovered;
+            var currentRunNeedsRecovery = false;
             foreach (var gate in gates)
             {
                 var benchmarkArtifactRoot = Path.Combine(options.ArtifactRoot, gate.GateId);
@@ -477,12 +481,12 @@ public sealed class TestGateCoordinator
                         Revision = options.Revision,
                         ManifestAuthorizedActiveFrameworkProfile = true,
                     }, cancellationToken).ConfigureAwait(false);
-                recoveryRequired |= benchmark.RecoveryRequired;
+                currentRunNeedsRecovery |= benchmark.RecoveryRequired;
 
-                if (!benchmark.IsComplete || benchmark.Runs.Count != gate.Frameworks.Count ||
+                if (!benchmark.IsComplete || currentRunNeedsRecovery || benchmark.Runs.Count != gate.Frameworks.Count ||
                     !benchmark.Runs.Select(run => run.Tfm).SequenceEqual(gate.Frameworks, StringComparer.Ordinal))
                 {
-                    if (!recoveryRequired)
+                    if (!currentRunNeedsRecovery)
                     {
                         acquired.Lease.Complete();
                     }
@@ -578,7 +582,7 @@ public sealed class TestGateCoordinator
                         TimeSpan.FromTicks(benchmark.Runs.Sum(run => run.Command.Duration.Ticks)),
                         TimedOut: benchmark.Runs.Any(run => run.Command.TimedOut),
                         ResourceDenied: false,
-                        RecoveryRequired: recoveryRequired,
+                        RecoveryRequired: priorLeaseRecovered || currentRunNeedsRecovery,
                         WatchdogClean: benchmark.Runs.All(run => !run.Command.TimedOut),
                         OwnershipClean: benchmark.IsComplete,
                         InventoryComplete: true,
@@ -595,7 +599,7 @@ public sealed class TestGateCoordinator
                 }
             }
 
-            if (!recoveryRequired)
+            if (!currentRunNeedsRecovery)
             {
                 acquired.Lease.Complete();
             }
