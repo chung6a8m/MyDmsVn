@@ -199,6 +199,51 @@ public sealed class FocusedRunCoordinatorTests
         }
     }
 
+    [Fact]
+    public async Task Recovery_accepts_new_layout_metadata_journal_when_discovery_and_trx_prove_zero_execution()
+    {
+        foreach (var hasIncompleteWrite in new[] { false, true })
+        {
+            var artifactRoot = Path.Combine(
+                Path.GetTempPath(), "mdv-zero-execution-new-" + Guid.NewGuid().ToString("N"));
+            var runId = "focused-fastsql-net48-zero";
+            var physicalId = "r-0123456789abcdef";
+            var runRoot = Path.Combine(artifactRoot, physicalId);
+            var journal = Path.Combine(runRoot, "ownership", physicalId);
+            Directory.CreateDirectory(journal);
+            TestGateArtifactPathPlanner.WriteLogicalRunId(journal, runId);
+            if (hasIncompleteWrite)
+            {
+                File.WriteAllText(Path.Combine(journal, "execution-id.txt.tmp-incomplete"), runId);
+            }
+            File.WriteAllText(
+                Path.Combine(runRoot, "discovery.txt"),
+                "No test matches the given testcase filter `Category=FastSQL`.\r\n");
+            File.WriteAllText(
+                Path.Combine(runRoot, "t-" + physicalId + ".trx"),
+                "<TestRun><ResultSummary outcome=\"Completed\"><Counters total=\"0\" executed=\"0\" passed=\"0\" failed=\"0\" error=\"0\" timeout=\"0\" aborted=\"0\" inconclusive=\"0\" notExecuted=\"0\" /></ResultSummary></TestRun>");
+            var ownership = new RecordingOwnershipGate(isComplete: false);
+            var recovery = new BenchmarkAbandonedSqlRunRecovery("unused-approval", ownership);
+            var abandoned = new AbandonedSqlRun(
+                "resource",
+                123,
+                "invocation",
+                DateTimeOffset.UtcNow,
+                artifactRoot,
+                "legacy/focused-run/FastSQL");
+
+            try
+            {
+                Assert.Equal(!hasIncompleteWrite, await recovery.ReconcileAsync(abandoned, CancellationToken.None));
+                Assert.Equal(hasIncompleteWrite ? 1 : 0, ownership.Evidence.Count);
+            }
+            finally
+            {
+                Directory.Delete(artifactRoot, recursive: true);
+            }
+        }
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -243,6 +288,65 @@ public sealed class FocusedRunCoordinatorTests
         finally
         {
             Directory.Delete(artifactRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task New_layout_journal_path_failure_requires_positive_database_absence_proof()
+    {
+        var scenarios = new[]
+        {
+            (NoOwnedDatabases: true, HasIncompleteWrite: false),
+            (NoOwnedDatabases: false, HasIncompleteWrite: false),
+            (NoOwnedDatabases: true, HasIncompleteWrite: true),
+            (NoOwnedDatabases: false, HasIncompleteWrite: true),
+        };
+        foreach (var scenario in scenarios)
+        {
+            var artifactRoot = Path.Combine(
+                Path.GetTempPath(), "mdv-journal-path-new-" + Guid.NewGuid().ToString("N"));
+            var runId = "strict-final-net48-journal-path";
+            var physicalId = "r-0123456789abcdef";
+            var journal = Path.Combine(artifactRoot, "ownership", physicalId);
+            Directory.CreateDirectory(journal);
+            TestGateArtifactPathPlanner.WriteLogicalRunId(journal, runId);
+            if (scenario.HasIncompleteWrite)
+            {
+                File.WriteAllText(Path.Combine(journal, "execution-id.txt.tmp-incomplete"), runId);
+            }
+            File.WriteAllText(
+                Path.Combine(artifactRoot, "t-" + physicalId + ".trx"),
+                "<TestRun><ResultSummary outcome=\"Failed\"><Counters total=\"23\" executed=\"23\" passed=\"22\" failed=\"1\" error=\"0\" timeout=\"0\" aborted=\"0\" inconclusive=\"0\" notExecuted=\"0\" /></ResultSummary><Results><UnitTestResult outcome=\"Failed\"><Output><ErrorInfo><Message>System.IO.DirectoryNotFoundException: " + journal + "</Message><StackTrace>FileDatabaseOwnershipJournal.WriteAtomically SqlTestDatabase.&lt;CreateAsync&gt;d__23.MoveNext</StackTrace></ErrorInfo></Output></UnitTestResult></Results></TestRun>");
+
+            var ownership = new RecordingOwnershipGate(isComplete: false);
+            var absenceProofCalls = 0;
+            var recovery = new BenchmarkAbandonedSqlRunRecovery(
+                "unused-approval",
+                ownership,
+                (_, _, _) =>
+                {
+                    absenceProofCalls++;
+                    return Task.FromResult(scenario.NoOwnedDatabases);
+                });
+            var abandoned = new AbandonedSqlRun(
+                "resource",
+                123,
+                "invocation",
+                DateTimeOffset.UtcNow,
+                artifactRoot,
+                "strict-final");
+
+            try
+            {
+                var expectedComplete = scenario.NoOwnedDatabases && !scenario.HasIncompleteWrite;
+                Assert.Equal(expectedComplete, await recovery.ReconcileAsync(abandoned, CancellationToken.None));
+                Assert.Equal(expectedComplete ? 0 : 1, ownership.Evidence.Count);
+                Assert.Equal(scenario.HasIncompleteWrite ? 0 : 1, absenceProofCalls);
+            }
+            finally
+            {
+                Directory.Delete(artifactRoot, recursive: true);
+            }
         }
     }
 

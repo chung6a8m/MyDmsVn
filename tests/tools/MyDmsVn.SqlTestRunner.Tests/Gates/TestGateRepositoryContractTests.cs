@@ -270,6 +270,8 @@ public sealed class TestGateRepositoryContractTests
     private static RepositoryEvidence LoadEvidence()
     {
         var root = RepositoryRoot();
+        var isolatedOutputRoot = Environment.GetEnvironmentVariable("MYDMSVN_TESTGATE_INVENTORY_ROOT");
+        var isolatedBuildProps = Environment.GetEnvironmentVariable("MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS");
         var manifest = LoadManifest();
         var source = new Dictionary<string, IReadOnlyList<TestMethodDescriptor>>(StringComparer.OrdinalIgnoreCase);
         var discovery = new Dictionary<(string Owner, string Tfm), IReadOnlyList<DiscoveredTestCase>>();
@@ -284,12 +286,23 @@ public sealed class TestGateRepositoryContractTests
                 owner,
                 historical,
                 IsSqlOwner(manifest, owner));
-            var assembly = Path.Combine(root, Path.GetDirectoryName(owner)!, "bin", "Release", frameworks[0],
-                Path.GetFileNameWithoutExtension(owner) + ".dll");
+            var assembly = IsolatedAssemblyPath(isolatedOutputRoot, owner, frameworks[0]);
+            if (!File.Exists(assembly))
+            {
+                assembly = Path.Combine(root, Path.GetDirectoryName(owner)!, "bin", "Release", frameworks[0],
+                    Path.GetFileNameWithoutExtension(owner) + ".dll");
+            }
             source[owner] = TestMethodInventory.Read(assembly);
             foreach (var framework in frameworks)
             {
-                discovery[(owner, framework)] = Discover(root, owner, framework);
+                var isolatedAssembly = IsolatedAssemblyPath(isolatedOutputRoot, owner, framework);
+                discovery[(owner, framework)] = Discover(
+                    root,
+                    owner,
+                    framework,
+                    File.Exists(isolatedAssembly),
+                    isolatedOutputRoot,
+                    isolatedBuildProps);
             }
         }
 
@@ -375,13 +388,26 @@ public sealed class TestGateRepositoryContractTests
     private static IReadOnlyList<DiscoveredTestCase> Discover(
         string root,
         string project,
-        string tfm)
+        string tfm,
+        bool useIsolatedOutput,
+        string? isolatedOutputRoot,
+        string? isolatedBuildProps)
     {
+        var adapterPath = TestAdapterPathResolver.Resolve(root, project, tfm);
+        var arguments = $"test \"{project}\" -c Release -f {tfm} --no-build --no-restore " +
+                        "--list-tests --test-adapter-path=\"" + adapterPath + "\"";
+        if (useIsolatedOutput && !string.IsNullOrWhiteSpace(isolatedOutputRoot) &&
+            !string.IsNullOrWhiteSpace(isolatedBuildProps))
+        {
+            arguments += " -p:PreflightOutputRoot=\"" + isolatedOutputRoot.Replace('\\', '/') + "\"" +
+                         " -p:CustomBeforeDirectoryBuildProps=\"" + isolatedBuildProps.Replace('\\', '/') + "\"";
+        }
+
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo(
                 "dotnet",
-                $"test \"{project}\" -c Release -f {tfm} --no-build --list-tests")
+                arguments)
             {
                 WorkingDirectory = root,
                 UseShellExecute = false,
@@ -403,11 +429,24 @@ public sealed class TestGateRepositoryContractTests
 
         if (process.ExitCode != 0)
         {
-            throw new InvalidOperationException("Bounded test discovery failed: " + error);
+            var outputTail = output.Length <= 400 ? output : output.Substring(output.Length - 400);
+            throw new InvalidOperationException(
+                $"Bounded test discovery failed for {project} {tfm} (exit {process.ExitCode}): " +
+                error + outputTail);
         }
 
         return VstestDiscoveryParser.Parse(output, tfm);
     }
+
+    private static string IsolatedAssemblyPath(string? isolatedOutputRoot, string owner, string framework) =>
+        string.IsNullOrWhiteSpace(isolatedOutputRoot)
+            ? string.Empty
+            : Path.Combine(
+                isolatedOutputRoot,
+                Path.GetFileNameWithoutExtension(owner),
+                "Release",
+                framework,
+                Path.GetFileNameWithoutExtension(owner) + ".dll");
 
     private static TestGateManifest LoadManifest() => TestGateManifestLoader.Load(
         Path.Combine(RepositoryRoot(), "tests", "test-gates.v1.json"));

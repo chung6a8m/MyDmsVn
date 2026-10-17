@@ -31,7 +31,7 @@
   <Target Name="BuildRepositoryInventoryFixtures">
     <MSBuild
       Projects="@(RepositoryInventoryFixture)"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+      Targets="Restore;Build"
+      Properties="Configuration=$(Configuration);PreflightOutputRoot=$(PreflightOutputRoot);CustomBeforeDirectoryBuildProps=$(CustomBeforeDirectoryBuildProps)" />
   </Target>
 </Project>

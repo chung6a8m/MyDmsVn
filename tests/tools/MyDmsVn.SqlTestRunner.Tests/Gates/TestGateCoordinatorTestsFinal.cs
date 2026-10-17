@@ -228,8 +228,19 @@ public sealed class TestGateCoordinatorTestsFinal
             .ToArray();
         Assert.Equal(4, discoveryOutputs.Length);
         Assert.All(discoveryOutputs, output => Assert.Contains(output, buildOutputs));
+        Assert.All(processes.Commands.Where(command => command.Arguments.Contains(
+                "--list-tests", StringComparison.Ordinal)), command =>
+        {
+            Assert.Contains("--no-build", command.Arguments, StringComparison.Ordinal);
+            Assert.Contains("--no-restore", command.Arguments, StringComparison.Ordinal);
+            Assert.Contains("--test-adapter-path=\"", command.Arguments, StringComparison.Ordinal);
+        });
         Assert.All(processes.Commands, command => Assert.Contains(
-            "-p:DirectoryBuildPropsPath=\"", command.Arguments, StringComparison.Ordinal));
+            "-p:CustomBeforeDirectoryBuildProps=\"", command.Arguments, StringComparison.Ordinal));
+        var isolatedProps = File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "tests", "tools", "TestGate.IsolatedBuild.props"));
+        Assert.Contains("<BaseIntermediateOutputPath>$(PreflightOutputRoot)", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("<MSBuildProjectExtensionsPath>$(PreflightOutputRoot)", isolatedProps, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -254,7 +265,8 @@ public sealed class TestGateCoordinatorTestsFinal
         Assert.DoesNotContain(processes.Commands, command =>
             command.Arguments.Contains("--logger", StringComparison.Ordinal));
         Assert.All(processes.Commands, command =>
-            Assert.True(command.Arguments.StartsWith("build ", StringComparison.Ordinal) ||
+            Assert.True(command.Arguments.StartsWith("restore ", StringComparison.Ordinal) ||
+                command.Arguments.StartsWith("build ", StringComparison.Ordinal) ||
                 command.Arguments.Contains("--list-tests", StringComparison.Ordinal)));
     }
 
@@ -270,9 +282,11 @@ public sealed class TestGateCoordinatorTestsFinal
                 repository.Options(), manifest, manifest.Gates, CancellationToken.None);
 
         Assert.True(result.IsComplete, string.Join(",", result.Issues));
-        Assert.Equal(4, processes.Commands.Count);
+        Assert.Equal(5, processes.Commands.Count);
         Assert.DoesNotContain(processes.Commands, command =>
             command.Arguments.Contains("--logger", StringComparison.Ordinal));
+        Assert.All(processes.Commands, command =>
+            Assert.Contains("CustomBeforeDirectoryBuildProps=", command.Arguments, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -326,6 +340,17 @@ public sealed class TestGateCoordinatorTestsFinal
         new FinalSqlRunner(repository, events, failure),
         new NoRecovery(),
         new AcceptSqlManifestPreflight());
+
+    private static string RepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null && !File.Exists(Path.Combine(current.FullName, "MyDmsVn.sln")))
+        {
+            current = current.Parent;
+        }
+
+        return current?.FullName ?? throw new DirectoryNotFoundException();
+    }
 
     public enum FinalFailure
     {
@@ -624,6 +649,11 @@ public sealed class TestGateCoordinatorTestsFinal
             File.WriteAllText(
                 Path.Combine(Root, "tests", "Sql.Tests", "Sql.Tests.csproj"),
                 "<Project><PropertyGroup><TargetFrameworks>net48;net8.0</TargetFrameworks></PropertyGroup></Project>");
+            WriteTestAdapterLock(Path.Combine(Root, "tests", "Sql.Tests", "packages.lock.json"));
+            if (multiProject)
+            {
+                WriteTestAdapterLock(Path.Combine(Root, "tests", "Sql.Module.Tests", "packages.lock.json"));
+            }
             Manifest = Path.Combine(Root, "manifest.json");
             File.WriteAllText(Manifest, multiProject ? MultiProjectJson() : Json());
             Approval = Path.Combine(Root, "approval.json");
@@ -640,6 +670,10 @@ public sealed class TestGateCoordinatorTestsFinal
             "0123456789abcdef0123456789abcdef01234567");
 
         public void Dispose() => Directory.Delete(Root, recursive: true);
+
+        private static void WriteTestAdapterLock(string path) => File.WriteAllText(
+            path,
+            "{\"dependencies\":{\"net48\":{\"xunit.runner.visualstudio\":{\"resolved\":\"3.1.5\"}}}} ");
 
         private static string Json() => $$"""
         {

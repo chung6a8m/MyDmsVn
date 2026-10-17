@@ -211,37 +211,37 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SqlTestDatabaseLifecycleTests.Create_rejects_an_admin_connection_targeting_a_non_system_database",
-    "MethodBodyFingerprint": "8f142401aeed3c4678ba05420714f7b4129afaac9cb863a28c7af1e3c5141f5a",
+    "MethodBodyFingerprint": "8f142401aeed3c4678ba05420714f7b4129afaac9cb863a28c7af1e3c5141f5a|4b9487d107b7e8696e00ad328298538297523ca365c0bdb9d03d1d0c9f518681",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SqlTestDatabaseMutationTests.Database_helper_forwards_the_public_test_identity_to_measurement_context",
-    "MethodBodyFingerprint": "bcd5a52b44313c1f99901de861ea501f02acc4822b47e055d7f0ef11918378f2",
+    "MethodBodyFingerprint": "bcd5a52b44313c1f99901de861ea501f02acc4822b47e055d7f0ef11918378f2|deb320a81c579188bd068837f0582a9b18cf3f62dca0782847a838f3a3a9c628",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SqlTestDatabaseMutationTests.Direct_create_with_expired_approval_issues_no_destructive_sql",
-    "MethodBodyFingerprint": "5757618bb1e332aab29f2e10214e60e540f12a4806f1b7693e345f54aaf3c81e",
+    "MethodBodyFingerprint": "5757618bb1e332aab29f2e10214e60e540f12a4806f1b7693e345f54aaf3c81e|b9b568e858b967bbefb4fcfdedde6cbf342d2247959724aa3aa8d7f94a6ccf9c",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SqlTestDatabaseMutationTests.Direct_create_with_live_identity_mismatch_issues_no_destructive_sql",
-    "MethodBodyFingerprint": "0296c98654cf5a1edb2c81b3b17353d887780bbb99d10bb06697ac0035ce1106",
+    "MethodBodyFingerprint": "0296c98654cf5a1edb2c81b3b17353d887780bbb99d10bb06697ac0035ce1106|8903d27fc6478768f4e2da64d456f4ebdb890f4c9dd7d0b843efba64d710fd35",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SqlTestDatabaseMutationTests.Direct_create_with_missing_approval_issues_no_destructive_sql",
-    "MethodBodyFingerprint": "2859b7a3c5f7fe3024c45fd23b410215b89f7f685c11e6969d6b2b52eb675b69",
+    "MethodBodyFingerprint": "2859b7a3c5f7fe3024c45fd23b410215b89f7f685c11e6969d6b2b52eb675b69|5969af38a498c345341f186eeab9f1bfa52f2a44064f250a613ce3f674b6def4",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SqlTestDatabaseMutationTests.Disposal_on_a_changed_server_issues_no_cleanup_ddl",
-    "MethodBodyFingerprint": "df47de9bf55d6eee9ecf257f08bc4789a4a9848250a2e8cd8e30bb10eae34e31",
+    "MethodBodyFingerprint": "df47de9bf55d6eee9ecf257f08bc4789a4a9848250a2e8cd8e30bb10eae34e31|3302106cab768b4977dd60013d0440a5249b79bcad112da6d2bb05bc95c1c2fe",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML."
   },

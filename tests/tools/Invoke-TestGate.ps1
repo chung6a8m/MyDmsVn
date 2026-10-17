@@ -22,7 +22,23 @@ param(
     [switch] $PreflightOnly
 )
 
+function Remove-IsolatedInventoryOutput([string] $Path) {
+    $repositoryPath = [System.IO.Path]::GetFullPath($RepositoryRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $targetPath = [System.IO.Path]::GetFullPath($Path).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $repositoryPrefix = $repositoryPath + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $targetPath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Refusing to remove isolated inventory output outside the repository.'
+    }
+
+    if (Test-Path -LiteralPath $targetPath) {
+        Remove-Item -LiteralPath $targetPath -Recurse -Force
+    }
+}
+
 $Revision = $null
+$inventoryOutputRoot = $null
+$previousInventoryOutputRoot = $env:MYDMSVN_TESTGATE_INVENTORY_ROOT
+$previousIsolatedBuildProps = $env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS
 if ($PreflightOnly -and $Mode -ne 'Final') {
     throw 'Manifest preflight is supported for reviewed Final SQL gates only.'
 }
@@ -63,14 +79,26 @@ if ($runnerDll.Length -gt 240) {
 
 if ($Mode -eq 'Final' -and -not $PreflightOnly) {
     $runnerTestsProject = Join-Path $PSScriptRoot 'MyDmsVn.SqlTestRunner.Tests\MyDmsVn.SqlTestRunner.Tests.csproj'
-    & dotnet msbuild $runnerTestsProject -target:BuildRepositoryInventoryFixtures -property:Configuration=Release
+    $inventoryOutputRoot = Join-Path $RepositoryRoot ('artifacts\testgate-inventory-' + [guid]::NewGuid().ToString('N'))
+    $isolatedBuildProps = Join-Path $PSScriptRoot 'TestGate.IsolatedBuild.props'
+    New-Item -ItemType Directory -Path $inventoryOutputRoot -Force | Out-Null
+    & dotnet msbuild $runnerTestsProject -target:BuildRepositoryInventoryFixtures `
+        -property:"Configuration=Release;PreflightOutputRoot=$inventoryOutputRoot;CustomBeforeDirectoryBuildProps=$isolatedBuildProps"
     if ($LASTEXITCODE -ne 0) {
+        Remove-IsolatedInventoryOutput $inventoryOutputRoot
         exit 3
     }
+    $env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $inventoryOutputRoot
+    $env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS = $isolatedBuildProps
 }
 
 & dotnet build $runnerProject -c Release -f net8.0 --no-restore
 if ($LASTEXITCODE -ne 0) {
+    if ($inventoryOutputRoot) {
+        Remove-IsolatedInventoryOutput $inventoryOutputRoot
+        $env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $previousInventoryOutputRoot
+        $env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS = $previousIsolatedBuildProps
+    }
     exit 3
 }
 
@@ -85,6 +113,11 @@ if ($overBudgetShadowFiles) {
 
 Get-ChildItem -LiteralPath $runnerOutput | Copy-Item -Destination $shadowRoot -Recurse -Force
 if (-not (Test-Path -LiteralPath $runnerDll -PathType Leaf)) {
+    if ($inventoryOutputRoot) {
+        Remove-IsolatedInventoryOutput $inventoryOutputRoot
+        $env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $previousInventoryOutputRoot
+        $env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS = $previousIsolatedBuildProps
+    }
     exit 3
 }
 
@@ -101,4 +134,10 @@ if ($Revision) {
 }
 
 & dotnet @arguments
-exit $LASTEXITCODE
+$runnerExitCode = $LASTEXITCODE
+if ($inventoryOutputRoot) {
+    Remove-IsolatedInventoryOutput $inventoryOutputRoot
+    $env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $previousInventoryOutputRoot
+    $env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS = $previousIsolatedBuildProps
+}
+exit $runnerExitCode

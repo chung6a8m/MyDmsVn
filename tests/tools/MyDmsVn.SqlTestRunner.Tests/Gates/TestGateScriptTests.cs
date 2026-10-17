@@ -18,6 +18,13 @@ public sealed class TestGateScriptTests
         Assert.Contains("MyDmsVn\\TestGate", script, StringComparison.Ordinal);
         Assert.Contains("$runnerDll.Length -gt 240", script, StringComparison.Ordinal);
         Assert.Contains("BuildRepositoryInventoryFixtures", script, StringComparison.Ordinal);
+        Assert.Contains("testgate-inventory-", script, StringComparison.Ordinal);
+        Assert.Contains("TestGate.IsolatedBuild.props", script, StringComparison.Ordinal);
+        Assert.Contains("PreflightOutputRoot=$inventoryOutputRoot", script, StringComparison.Ordinal);
+        Assert.Contains("MYDMSVN_TESTGATE_INVENTORY_ROOT", script, StringComparison.Ordinal);
+        Assert.Contains("MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS", script, StringComparison.Ordinal);
+        Assert.Contains("Remove-IsolatedInventoryOutput $inventoryOutputRoot", script, StringComparison.Ordinal);
+        Assert.Contains("Refusing to remove isolated inventory output outside the repository.", script, StringComparison.Ordinal);
         Assert.Contains("MyDmsVn.SqlTestRunner.dll", script, StringComparison.Ordinal);
         Assert.DoesNotContain("'run', '--project'", script, StringComparison.Ordinal);
         Assert.Contains("git -C $RepositoryRoot status --porcelain", script, StringComparison.Ordinal);

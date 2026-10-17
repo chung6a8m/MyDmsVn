@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Inventory;
@@ -65,17 +64,13 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
         Directory.CreateDirectory(isolatedOutputRoot);
         try
         {
-            var buildPropsPath = Path.Combine(
-                isolatedOutputRoot, "Preflight.Directory.Build.props");
-            var repositoryPropsPath = Path.Combine(
-                Path.GetFullPath(options.RepositoryRoot), "Directory.Build.props");
-            var buildProps = "<Project><Import Project=\"" +
-                SecurityElement.Escape(repositoryPropsPath) +
-                "\" /><PropertyGroup><BaseOutputPath>$(PreflightOutputRoot)/" +
-                "$(MSBuildProjectName)/</BaseOutputPath></PropertyGroup></Project>";
-            File.WriteAllText(buildPropsPath, buildProps);
             return await VerifyWithIsolatedOutputAsync(
-                options, manifest, gates, isolatedOutputRoot, buildPropsPath, cancellationToken).ConfigureAwait(false);
+                options,
+                manifest,
+                gates,
+                isolatedOutputRoot,
+                Path.Combine(options.RepositoryRoot, "tests", "tools", "TestGate.IsolatedBuild.props"),
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -107,6 +102,7 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
     {
         var issues = new List<SqlGateManifestPreflightIssue>();
         var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var restoredProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (gates.Count == 0 ||
             gates.Any(gate => gate.StrictMode != TestGateStrictMode.SqlPrAcceptance))
         {
@@ -130,7 +126,20 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
                 var isolatedOutput = isolatedOutputRoot.TrimEnd('\\', '/').Replace('\\', '/');
                 var isolatedBuildProperties =
                     "-p:PreflightOutputRoot=\"" + isolatedOutput + "\" " +
-                    "-p:DirectoryBuildPropsPath=\"" + buildPropsPath.Replace('\\', '/') + "\"";
+                    "-p:CustomBeforeDirectoryBuildProps=\"" + buildPropsPath.Replace('\\', '/') + "\"";
+                if (restoredProjects.Add(gate.Project))
+                {
+                    var restore = await ExecuteAsync(
+                        "restore \"" + project + "\" " + isolatedBuildProperties,
+                        options, gate.CommandTimeoutSeconds, cancellationToken).ConfigureAwait(false);
+                    if (restore.ExitCode != 0 || restore.TimedOut)
+                    {
+                        issues.Add(new SqlGateManifestPreflightIssue(
+                            gate.GateId, tfm, "Isolated intermediate restore failed before SQL manifest verification."));
+                        continue;
+                    }
+                }
+
                 var build = await ExecuteAsync(
                     "build \"" + project + "\" -c Release -f " + tfm +
                     " --no-restore " + isolatedBuildProperties,
@@ -200,7 +209,9 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
 
                     var discovery = await ExecuteAsync(
                         "test \"" + project + "\" -c Release -f " + tfm +
-                        " --no-build --no-restore " + isolatedBuildProperties + " --list-tests",
+                        " --no-build --no-restore --list-tests --test-adapter-path=\"" +
+                        TestAdapterPathResolver.Resolve(options.RepositoryRoot, gate.Project, tfm) + "\" " +
+                        isolatedBuildProperties,
                         options, gate.CommandTimeoutSeconds, cancellationToken).ConfigureAwait(false);
                     if (discovery.ExitCode != 0 || discovery.TimedOut)
                     {

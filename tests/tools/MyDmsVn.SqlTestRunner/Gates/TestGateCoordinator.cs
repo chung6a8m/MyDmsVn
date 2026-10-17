@@ -831,12 +831,12 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         {
             var runId = TestGateArtifactPathPlanner.ReadLogicalRunId(journal);
             var artifactRoot = Directory.GetParent(journal)!.Parent!.FullName;
-            if (IsVerifiedZeroExecution(artifactRoot, journal))
+            if (IsVerifiedZeroExecution(artifactRoot, journal, runId))
             {
                 continue;
             }
 
-            if (IsVerifiedJournalPathFailure(artifactRoot, journal) &&
+            if (IsVerifiedJournalPathFailure(artifactRoot, journal, runId) &&
                 await _emptyJournalPathFailureVerifier(artifactRoot, journal, cancellationToken)
                     .ConfigureAwait(false))
             {
@@ -922,7 +922,10 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         }
     }
 
-    private static bool IsVerifiedJournalPathFailure(string artifactRoot, string journal)
+    private static bool IsVerifiedJournalPathFailure(
+        string artifactRoot,
+        string journal,
+        string logicalRunId)
     {
         journal = Path.GetFullPath(journal);
         var runRoot = Path.Combine(artifactRoot, Path.GetFileName(journal));
@@ -931,7 +934,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
             artifactRoot = runRoot;
         }
 
-        if (Directory.EnumerateFileSystemEntries(journal).Any())
+        if (!TestGateArtifactPathPlanner.IsEmptyOrMetadataOnlyJournal(journal, logicalRunId))
         {
             return false;
         }
@@ -986,7 +989,10 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         }
     }
 
-    private static bool IsVerifiedZeroExecution(string artifactRoot, string journal)
+    private static bool IsVerifiedZeroExecution(
+        string artifactRoot,
+        string journal,
+        string logicalRunId)
     {
         var runRoot = Path.Combine(artifactRoot, Path.GetFileName(journal));
         if (Directory.Exists(runRoot))
@@ -994,7 +1000,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
             artifactRoot = runRoot;
         }
 
-        if (Directory.EnumerateFileSystemEntries(journal).Any())
+        if (!TestGateArtifactPathPlanner.IsEmptyOrMetadataOnlyJournal(journal, logicalRunId))
         {
             return false;
         }

@@ -293,7 +293,10 @@ public sealed class TestGateCoordinatorTests
             TestGateStrictMode strictMode = TestGateStrictMode.DotnetTest,
             bool duplicateProject = false)
         {
-            Root = Path.Combine(Path.GetTempPath(), "mydms-test-gate-" + Guid.NewGuid().ToString("N"));
+            var shortRoot = OperatingSystem.IsWindows()
+                ? Path.GetPathRoot(Path.GetTempPath())!
+                : Path.GetTempPath();
+            Root = Path.Combine(shortRoot, "t35g-" + Guid.NewGuid().ToString("N"));
             Project = Path.Combine(Root, "tests", "Example.Tests", "Example.Tests.csproj");
             Directory.CreateDirectory(Path.GetDirectoryName(Project)!);
             File.WriteAllText(Project, "<Project><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>");
