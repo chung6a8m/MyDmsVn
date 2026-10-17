@@ -73,6 +73,18 @@ internal static class Program
             return await RunGuiAcceptanceAsync(ParseOptions(args), cancellationToken).ConfigureAwait(false);
         }
 
+        if (string.Equals(args[0], "test-gate-preflight", StringComparison.Ordinal))
+        {
+            if (!TryParseTestGateOptions(args, out var preflightOptions, requireFinalApproval: false) ||
+                preflightOptions.Mode != TestGateMode.Final)
+            {
+                return 64;
+            }
+
+            return await RunSqlManifestPreflightAsync(preflightOptions, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         if (string.Equals(args[0], "test-gate", StringComparison.Ordinal))
         {
             if (!TryParseTestGateOptions(args, out var testGateOptions))
@@ -290,6 +302,50 @@ internal static class Program
             : new BenchmarkRunResult(false, Array.Empty<BenchmarkFrameworkRun>());
     }
 
+    private static async Task<int> RunSqlManifestPreflightAsync(
+        TestGateRunOptions options,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var manifest = TestGateManifestLoader.Load(options.ManifestPath);
+            var selection = TestGateManifestValidator.Select(
+                manifest, options.RepositoryRoot, options.Mode, options.PlanId, options.TaskId);
+            var sqlGates = selection.Gates
+                .Where(gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
+                .ToArray();
+            using var runner = new OwnedProcessRunner();
+            var result = await new SqlGateManifestPreflight(
+                    runner, new TestGateSourceInventory())
+                .VerifyAsync(options, manifest, sqlGates, cancellationToken)
+                .ConfigureAwait(false);
+            if (!result.IsComplete)
+            {
+                foreach (var issue in result.Issues.Take(40))
+                {
+                    Console.Error.WriteLine(
+                        issue.GateId + "/" + issue.Framework + ": " + issue.Reason);
+                }
+
+                Console.Error.WriteLine(
+                    "SQL manifest preflight failed (" + result.Issues.Count + " findings).");
+                return 3;
+            }
+
+            Console.WriteLine(
+                "SQL manifest preflight passed: " + sqlGates.Length +
+                " reviewed project gates; no SQL tests or database DDL executed.");
+            return 0;
+        }
+        catch (Exception exception) when (
+            exception is IOException or InvalidDataException or ArgumentException
+                or InvalidOperationException)
+        {
+            Console.Error.WriteLine("SQL manifest preflight failed: invalid gate or inventory.");
+            return 3;
+        }
+    }
+
     private static async Task<TestGateRunResult> RunTestGateAsync(
         TestGateRunOptions options,
         CancellationToken cancellationToken)
@@ -307,7 +363,8 @@ internal static class Program
             .ConfigureAwait(false);
     }
 
-    private static bool TryParseTestGateOptions(string[] args, out TestGateRunOptions options)
+    private static bool TryParseTestGateOptions(
+        string[] args, out TestGateRunOptions options, bool requireFinalApproval = true)
     {
         options = null!;
         var allowed = new HashSet<string>(
@@ -343,7 +400,7 @@ internal static class Program
             !Enum.TryParse<TestGateMode>(values["mode"], ignoreCase: false, out var mode) ||
             (values.TryGetValue("revision", out var suppliedRevision) &&
              !RevisionPattern.IsMatch(suppliedRevision)) ||
-            (mode == TestGateMode.Final &&
+            (mode == TestGateMode.Final && requireFinalApproval &&
              (!values.ContainsKey("approval") || !values.ContainsKey("revision"))))
         {
             return false;
