@@ -18,7 +18,8 @@ public static class LogicalCaseBinder
         IReadOnlyCollection<LogicalCaseDefinition> expected,
         string ownerProject,
         string tfm,
-        IReadOnlyCollection<TestGateExemptionDefinition>? exemptions = null)
+        IReadOnlyCollection<TestGateExemptionDefinition>? exemptions = null,
+        IReadOnlyCollection<string>? fingerprintRequiredSignatures = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         var context = Prepare(expected, ownerProject, tfm);
@@ -44,7 +45,13 @@ public static class LogicalCaseBinder
             }
 
             var match = matches[0];
-            if (!match.IsBodyFingerprintComplete && !HasReviewedIncompleteFingerprintExemption(
+            // A focused Task gate still checks all project method identities,
+            // classifications and row shapes. Fingerprint drift outside its
+            // reviewed selection is deferred to the complete Final gate.
+            var requireFingerprint = fingerprintRequiredSignatures is null ||
+                fingerprintRequiredSignatures.Contains(
+                    definition.NormalizedMethodSignature, StringComparer.Ordinal);
+            if (requireFingerprint && !match.IsBodyFingerprintComplete && !HasReviewedIncompleteFingerprintExemption(
                     match,
                     definition,
                     exemptions ?? Array.Empty<TestGateExemptionDefinition>()))
@@ -52,7 +59,7 @@ public static class LogicalCaseBinder
                 failures.Add(LogicalCaseBindingFailure.IncompleteFingerprint);
             }
 
-            if (!string.Equals(
+            if (requireFingerprint && !string.Equals(
                     match.BodyFingerprint,
                     definition.ReviewedCodeFingerprint,
                     StringComparison.Ordinal))
