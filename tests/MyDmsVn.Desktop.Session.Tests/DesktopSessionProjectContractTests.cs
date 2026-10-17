@@ -24,6 +24,7 @@ namespace MyDmsVn.Desktop.Tests
             "LocalInventoryApiClientTests.cs",
             "LocalPermissionApiClientTests.cs",
             "LoginViewModelTests.cs",
+            "PermissionImportViewModelTests.cs",
             "SecurityAdministrationViewModelTests.cs",
             "UiDispatcherTests.cs",
         };

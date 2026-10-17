@@ -40,6 +40,7 @@ namespace MyDmsVn.Server.Application
             services.TryAddScoped<IPermissionStore, DenyAllPermissionStore>();
             services.TryAddSingleton<IPermissionRegistry>(
                 PermissionRegistryComposition.CreateDefault());
+            services.TryAddSingleton<PermissionAssignmentImportParser>();
             services.TryAddScoped<IPermissionAuthorizationService, PermissionAuthorizationService>();
             return services;
         }

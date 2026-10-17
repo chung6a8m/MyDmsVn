@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "targetType": "Role",
+  "targetId": 123,
+  "entries": [
+    {
+      "permissionKey": "Catalog.Products.Read",
+      "decision": "Allow"
+    }
+  ]
+}

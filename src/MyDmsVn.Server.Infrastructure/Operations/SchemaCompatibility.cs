@@ -53,6 +53,7 @@ public static class SchemaCompatibilityPolicy
         "006_GoodsReceipt_Number_Sequence.sql",
         "007_Inventory_Stock.sql",
         "008_Security_Administration.sql",
+        "009_Security_Permission_Import.sql",
     };
 
     private static readonly SchemaArtifact[] KnownArtifacts =
@@ -68,6 +69,8 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Table:SecurityAuditEvents", 8),
         new SchemaArtifact("Invariant:SecurityAdministration", 8),
         new SchemaArtifact("Procedure:ApplySecurityAdministration", 8),
+        new SchemaArtifact("Procedure:ReadSecurityPermissionImportTarget", 9),
+        new SchemaArtifact("Procedure:ApplySecurityPermissionImport", 9),
         new SchemaArtifact("Invariant:IdentityColumns", 2),
         new SchemaArtifact("Invariant:IdentityChecks", 2),
         new SchemaArtifact("Invariant:IdentityPrimaryKeys", 2),

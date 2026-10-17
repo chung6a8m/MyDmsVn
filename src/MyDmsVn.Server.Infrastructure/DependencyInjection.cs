@@ -36,7 +36,11 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.TryAddScoped<SqlIdentityStore>();
-            services.TryAddScoped<ISecurityAdministrationStore, SqlSecurityAdministrationStore>();
+            services.TryAddScoped<SqlSecurityAdministrationStore>();
+            services.TryAddScoped<ISecurityAdministrationStore>(
+                serviceProvider => serviceProvider.GetRequiredService<SqlSecurityAdministrationStore>());
+            services.TryAddScoped<IPermissionAssignmentImportStore>(
+                serviceProvider => serviceProvider.GetRequiredService<SqlSecurityAdministrationStore>());
             services.TryAddScoped<IProductQueryService, SqlProductQueryService>();
             services.TryAddScoped<IWarehouseQueryService, SqlWarehouseQueryService>();
             services.TryAddScoped<IEmployeeQueryService, SqlEmployeeQueryService>();
@@ -74,7 +78,8 @@ namespace MyDmsVn.Server.Infrastructure
             return new SqlPersistenceBuilder(services)
                 .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>()
                 .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>()
-                .AddRepository<ISecurityAdministrationRepository, SqlSecurityAdministrationRepository>();
+                .AddRepository<ISecurityAdministrationRepository, SqlSecurityAdministrationRepository>()
+                .AddRepository<IPermissionAssignmentImportRepository, SqlSecurityAdministrationRepository>();
         }
     }
 }

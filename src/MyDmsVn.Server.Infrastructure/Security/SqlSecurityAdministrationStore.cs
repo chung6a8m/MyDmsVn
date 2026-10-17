@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Dapper;
 using ErrorOr;
 using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
 using MyDmsVn.Contracts.Security;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Security;
@@ -24,7 +25,23 @@ public interface ISecurityAdministrationRepository
         CancellationToken cancellationToken);
 }
 
-public sealed class SqlSecurityAdministrationStore : ISecurityAdministrationStore
+public interface IPermissionAssignmentImportRepository
+{
+    Task<PermissionAssignmentImportTargetState> ReadTargetAsync(
+        PermissionImportTargetTypeDto targetType,
+        int targetId,
+        int actorUserId,
+        CancellationToken cancellationToken);
+
+    Task<PermissionAssignmentImportResultDto> ApplyAsync(
+        ParsedPermissionAssignmentImportDto import,
+        int actorUserId,
+        long expectedTargetRevision,
+        Guid correlationId,
+        CancellationToken cancellationToken);
+}
+
+public sealed class SqlSecurityAdministrationStore : ISecurityAdministrationStore, IPermissionAssignmentImportStore
 {
     private readonly IUnitOfWorkFactory _unitOfWorkFactory;
 
@@ -82,6 +99,87 @@ public sealed class SqlSecurityAdministrationStore : ISecurityAdministrationStor
         }
     }
 
+    public async Task<ErrorOr<PermissionAssignmentImportTargetState>> ReadTargetAsync(
+        PermissionImportTargetTypeDto targetType,
+        int targetId,
+        int actorUserId,
+        CancellationToken cancellationToken)
+    {
+        using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var result = await unitOfWork.Repository<IPermissionAssignmentImportRepository>()
+                .ReadTargetAsync(targetType, targetId, actorUserId, cancellationToken)
+                .ConfigureAwait(false);
+            return result;
+        }
+        catch (SqlException exception) when (TryMapImport(exception, out var error))
+        {
+            return error;
+        }
+    }
+
+    public async Task<ErrorOr<PermissionAssignmentImportResultDto>> ApplyAsync(
+        ParsedPermissionAssignmentImportDto import,
+        int actorUserId,
+        long expectedTargetRevision,
+        Guid correlationId,
+        CancellationToken cancellationToken)
+    {
+        using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
+        unitOfWork.BeginTransaction();
+        try
+        {
+            var result = await unitOfWork.Repository<IPermissionAssignmentImportRepository>()
+                .ApplyAsync(import, actorUserId, expectedTargetRevision, correlationId, cancellationToken)
+                .ConfigureAwait(false);
+            unitOfWork.Commit();
+            return result;
+        }
+        catch (SqlException exception) when (TryMapImport(exception, out var error))
+        {
+            unitOfWork.Rollback();
+            return error;
+        }
+        catch
+        {
+            if (unitOfWork.State == UnitOfWorkState.ActiveTransaction)
+            {
+                unitOfWork.Rollback();
+            }
+
+            throw;
+        }
+    }
+
+    private static bool TryMapImport(SqlException exception, out Error error)
+    {
+        switch (exception.Number)
+        {
+            case 51030:
+                error = Error.Conflict("Security.RevisionConflict", "The security assignment changed. Preview the import again.");
+                return true;
+            case 51031:
+                error = Error.NotFound("Security.TargetNotFound", "The requested security target no longer exists.");
+                return true;
+            case 51035:
+                error = Error.Forbidden("Auth.Forbidden", "The security actor is no longer authorized for this operation.");
+                return true;
+            case 51036:
+                error = Error.Conflict("Security.ImportDecisionConflict", "An existing decision conflicts with the import.");
+                return true;
+            case 51037:
+                error = Error.Conflict("Security.ImportTargetUnavailable", "The selected target is inactive or protected.");
+                return true;
+            case 51038:
+                error = Error.Validation("Security.ImportInvalid", "The permission import request is invalid.");
+                return true;
+            default:
+                error = default;
+                return false;
+        }
+    }
+
     private static bool TryMap(SqlException exception, out Error error)
     {
         switch (exception.Number)
@@ -125,7 +223,7 @@ public sealed class SqlSecurityAdministrationStore : ISecurityAdministrationStor
     }
 }
 
-public sealed class SqlSecurityAdministrationRepository : ISecurityAdministrationRepository
+public sealed class SqlSecurityAdministrationRepository : ISecurityAdministrationRepository, IPermissionAssignmentImportRepository
 {
     private readonly ISqlExecutionContext _context;
 
@@ -229,6 +327,63 @@ public sealed class SqlSecurityAdministrationRepository : ISecurityAdministratio
                 cancellationToken: cancellationToken));
     }
 
+    public async Task<PermissionAssignmentImportTargetState> ReadTargetAsync(
+        PermissionImportTargetTypeDto targetType,
+        int targetId,
+        int actorUserId,
+        CancellationToken cancellationToken)
+    {
+        using var results = await _context.Connection.QueryMultipleAsync(new Dapper.CommandDefinition(
+            "dbo.ReadSecurityPermissionImportTarget",
+            new
+            {
+                TargetType = targetType == PermissionImportTargetTypeDto.User ? "User" : "Role",
+                TargetId = targetId,
+                ActorUserId = actorUserId,
+            },
+            _context.Transaction,
+            commandType: System.Data.CommandType.StoredProcedure,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var target = await results.ReadSingleAsync<ImportTargetRow>().ConfigureAwait(false);
+        var decisions = (await results.ReadAsync<ImportDecisionRow>().ConfigureAwait(false))
+            .ToDictionary(row => row.PermissionKey, row => row.Granted, StringComparer.Ordinal);
+        return new PermissionAssignmentImportTargetState(
+            target.TargetName,
+            target.IsActive,
+            target.IsProtected,
+            target.AssignmentRevision,
+            decisions);
+    }
+
+    public Task<PermissionAssignmentImportResultDto> ApplyAsync(
+        ParsedPermissionAssignmentImportDto import,
+        int actorUserId,
+        long expectedTargetRevision,
+        Guid correlationId,
+        CancellationToken cancellationToken)
+    {
+        var entriesJson = JsonConvert.SerializeObject(import.Entries.Select(entry => new
+        {
+            PermissionKey = entry.PermissionKey,
+            entry.Granted,
+        }));
+        return _context.Connection.QuerySingleAsync<PermissionAssignmentImportResultDto>(
+            new Dapper.CommandDefinition(
+                "dbo.ApplySecurityPermissionImport",
+                new
+                {
+                    TargetType = import.TargetType == PermissionImportTargetTypeDto.User ? "User" : "Role",
+                    TargetId = import.TargetId,
+                    ActorUserId = actorUserId,
+                    ExpectedRevision = expectedTargetRevision,
+                    EntriesJson = entriesJson,
+                    CorrelationId = correlationId,
+                },
+                _context.Transaction,
+                commandType: System.Data.CommandType.StoredProcedure,
+                cancellationToken: cancellationToken));
+    }
+
     private sealed class UserRow
     {
         public int UserId { get; set; }
@@ -265,5 +420,19 @@ public sealed class SqlSecurityAdministrationRepository : ISecurityAdministratio
     {
         public int RoleId { get; set; }
         public string PermissionKey { get; set; } = string.Empty;
+    }
+
+    private sealed class ImportTargetRow
+    {
+        public string TargetName { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public bool IsProtected { get; set; }
+        public long AssignmentRevision { get; set; }
+    }
+
+    private sealed class ImportDecisionRow
+    {
+        public string PermissionKey { get; set; } = string.Empty;
+        public bool Granted { get; set; }
     }
 }

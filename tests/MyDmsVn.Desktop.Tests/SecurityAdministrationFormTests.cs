@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,7 +35,9 @@ public sealed class SecurityAdministrationFormTests
                     Assert.NotNull(control.UsersGrid);
                     Assert.NotNull(control.RolesGrid);
                     Assert.NotNull(control.PermissionsGrid);
+                    Assert.Equal("Import JSON…", control.ImportPermissionButton.Text);
                     Assert.True(control.IsPasswordMasked);
+                    Assert.True(control.ImportPermissionButton.Enabled);
                     Assert.True(guard.FatalErrorDialogsSuppressed);
                     guard.Attach(control.PermissionsGrid);
                     var expected = new InvalidOperationException("invalid permission row");
@@ -104,6 +106,22 @@ public sealed class SecurityAdministrationFormTests
             CancellationToken cancellationToken) =>
             Task.FromResult(ApiResponse<SecurityAdministrationResultDto>.Success(
                 new SecurityAdministrationResultDto(request.ExpectedRevision ?? 1, true)));
+
+        public Task<ApiResponse<PermissionAssignmentImportPreviewDto>> PreviewPermissionImportAsync(
+            PermissionImportTargetTypeDto targetType,
+            int targetId,
+            string json,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApiResponse<PermissionAssignmentImportPreviewDto>.Failure(
+                new ApiError(ApiStatusCode.BadRequest, "Import.Unexpected", "Import UI is not exercised here.")));
+
+        public Task<ApiResponse<PermissionAssignmentImportResultDto>> ApplyPermissionImportAsync(
+            PermissionImportTargetTypeDto targetType,
+            int targetId,
+            PermissionAssignmentImportRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApiResponse<PermissionAssignmentImportResultDto>.Failure(
+                new ApiError(ApiStatusCode.BadRequest, "Import.Unexpected", "Import UI is not exercised here.")));
     }
 
     private sealed class FakeCatalogClient : IPermissionCatalogApiClient

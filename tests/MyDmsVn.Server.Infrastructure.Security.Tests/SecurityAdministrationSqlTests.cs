@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -7,6 +7,7 @@ using Dapper;
 using MediatR;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
+using MyDmsVn.Contracts.Security;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Security;
@@ -18,6 +19,337 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class SecurityAdministrationSqlTests
 {
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Permission_import_previews_without_writes_then_adds_user_and_role_decisions_atomically()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            int actorId;
+            int userId;
+            int roleId;
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                actorId = await CreateManagerAsync(connection);
+                userId = await InsertUserAsync(connection, "import.target", "IMPORT.TARGET");
+                roleId = await connection.QuerySingleAsync<int>(
+                    "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
+                    "OUTPUT INSERTED.RoleId VALUES (N'Import target role', N'IMPORT TARGET ROLE');");
+            }
+
+            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var sender = provider.GetRequiredService<ISender>();
+            var roleJson = ImportJson("Role", roleId,
+                "Catalog.Products.Read", "Allow", "Catalog.Products.Write", "Allow");
+            var preview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.Role,
+                roleId,
+                roleJson));
+            Assert.False(preview.IsError);
+            Assert.Equal(2, preview.Value.Additions.Count);
+            Assert.Equal(0, preview.Value.TargetRevision);
+            using (var verification = new SqlConnection(database.ConnectionString))
+            {
+                Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                    "SELECT COUNT(*) FROM dbo.RolePermissions WHERE RoleId = @roleId;", new { roleId }));
+                Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                    "SELECT COUNT(*) FROM dbo.SecurityAuditEvents WHERE TargetId = @roleId;", new { roleId }));
+            }
+
+            var roleApply = await sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.Role,
+                roleId,
+                roleJson,
+                preview.Value.TargetRevision,
+                preview.Value.CatalogDigest));
+            Assert.False(roleApply.IsError);
+            Assert.Equal(2, roleApply.Value.AddedCount);
+            Assert.Equal(1, roleApply.Value.TargetRevision);
+            Assert.True(roleApply.Value.Changed);
+
+            var repeated = await sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.Role,
+                roleId,
+                roleJson,
+                roleApply.Value.TargetRevision,
+                preview.Value.CatalogDigest));
+            Assert.False(repeated.IsError);
+            Assert.Equal(0, repeated.Value.AddedCount);
+            Assert.False(repeated.Value.Changed);
+            Assert.Equal(1, repeated.Value.TargetRevision);
+
+            var userJson = ImportJson("User", userId,
+                "Catalog.Products.Read", "Deny");
+            var userPreview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.User,
+                userId,
+                userJson));
+            Assert.False(userPreview.IsError);
+            var userApply = await sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.User,
+                userId,
+                userJson,
+                userPreview.Value.TargetRevision,
+                userPreview.Value.CatalogDigest));
+            Assert.False(userApply.IsError);
+            Assert.Equal(1, userApply.Value.AddedCount);
+
+            using var finalCheck = new SqlConnection(database.ConnectionString);
+            Assert.Equal(2, await finalCheck.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.RolePermissions WHERE RoleId = @roleId;", new { roleId }));
+            Assert.False(await finalCheck.QuerySingleAsync<bool>(
+                "SELECT Granted FROM dbo.UserPermissions WHERE UserId = @userId " +
+                "AND PermissionKey = N'Catalog.Products.Read';", new { userId }));
+            Assert.Equal(2, await finalCheck.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SecurityAuditEvents WHERE TargetType = N'Role' AND TargetId = @roleId;",
+                new { roleId }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Permission_import_rejects_stale_catalog_revision_conflicts_and_audit_failure()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            int actorId;
+            int userId;
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                actorId = await CreateManagerAsync(connection);
+                userId = await InsertUserAsync(connection, "import.target", "IMPORT.TARGET");
+                await connection.ExecuteAsync(
+                    "INSERT dbo.UserPermissions (UserId, PermissionKey, Granted) " +
+                    "VALUES (@userId, N'Catalog.Products.Read', 0);",
+                    new { userId });
+            }
+
+            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var sender = provider.GetRequiredService<ISender>();
+            var conflictingJson = ImportJson("User", userId, "Catalog.Products.Read", "Allow");
+            var previewConflict = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.User, userId, conflictingJson));
+            Assert.True(previewConflict.IsError);
+            Assert.Equal("Security.ImportDecisionConflict", previewConflict.FirstError.Code);
+
+            var malformed = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.User,
+                userId,
+                "{\"schemaVersion\":1,\"targetType\":\"User\",\"targetId\":" + userId +
+                ",\"entries\":[{\"permissionKey\":\"Catalog.Products.Write\"}]}"));
+            Assert.True(malformed.IsError);
+
+            var validJson = ImportJson("User", userId, "Catalog.Products.Write", "Allow");
+            var preview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.User, userId, validJson));
+            Assert.False(preview.IsError);
+
+            var changedDigest = await sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.User, userId, validJson, 0, new string('0', 64)));
+            Assert.True(changedDigest.IsError);
+            Assert.Equal("Security.ImportCatalogChanged", changedDigest.FirstError.Code);
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.OpenAsync();
+                await connection.ExecuteAsync(
+                    "CREATE TRIGGER dbo.TR_TestRejectPermissionImportAudit ON dbo.SecurityAuditEvents " +
+                    "AFTER INSERT AS BEGIN SET NOCOUNT ON; " +
+                    "THROW 51101, 'Injected import audit failure.', 1; END;");
+            }
+
+            var auditFailure = await sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.User,
+                userId,
+                validJson,
+                preview.Value.TargetRevision,
+                preview.Value.CatalogDigest));
+            Assert.True(auditFailure.IsError);
+
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.UserPermissions WHERE UserId = @userId " +
+                "AND PermissionKey = N'Catalog.Products.Write';", new { userId }));
+            Assert.Equal(0, await verification.QuerySingleAsync<long>(
+                "SELECT AssignmentRevision FROM dbo.Users WHERE UserId = @userId;", new { userId }));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SecurityAuditEvents;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Permission_import_rechecks_actor_permission_after_preview()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            int actorId;
+            int targetId;
+            int managerRoleId;
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                actorId = await CreateManagerAsync(connection);
+                targetId = await InsertUserAsync(connection, "import.target", "IMPORT.TARGET");
+                managerRoleId = await connection.QuerySingleAsync<int>(
+                    "SELECT RoleId FROM dbo.UserRoles WHERE UserId = @actorId;", new { actorId });
+            }
+
+            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var sender = provider.GetRequiredService<ISender>();
+            var json = ImportJson("User", targetId, "Catalog.Products.Write", "Allow");
+            var preview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.User, targetId, json));
+            Assert.False(preview.IsError);
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "DELETE dbo.RolePermissions WHERE RoleId = @managerRoleId " +
+                    "AND PermissionKey = N'Security.Users.Manage';",
+                    new { managerRoleId });
+            }
+
+            var apply = await sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.User, targetId, json,
+                preview.Value.TargetRevision, preview.Value.CatalogDigest));
+            Assert.True(apply.IsError);
+            Assert.Equal("Auth.Forbidden", apply.FirstError.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.UserPermissions WHERE UserId = @targetId " +
+                "AND PermissionKey = N'Catalog.Products.Write';", new { targetId }));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SecurityAuditEvents WHERE TargetId = @targetId;", new { targetId }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Permission_import_rejects_inactive_targets_and_stale_preview_revisions()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            int actorId;
+            int targetId;
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                actorId = await CreateManagerAsync(connection);
+                targetId = await InsertUserAsync(connection, "import.target", "IMPORT.TARGET");
+            }
+
+            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var sender = provider.GetRequiredService<ISender>();
+            var json = ImportJson("User", targetId, "Catalog.Products.Write", "Allow");
+            var preview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.User, targetId, json));
+            Assert.False(preview.IsError);
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE dbo.Users SET IsActive = 0 WHERE UserId = @targetId;", new { targetId });
+            }
+
+            var inactive = await sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.User, targetId, json,
+                preview.Value.TargetRevision, preview.Value.CatalogDigest));
+            Assert.True(inactive.IsError);
+            Assert.Equal("Security.ImportTargetUnavailable", inactive.FirstError.Code);
+
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE dbo.Users SET IsActive = 1, AssignmentRevision = AssignmentRevision + 1 " +
+                    "WHERE UserId = @targetId;", new { targetId });
+            }
+
+            var currentPreview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.User, targetId, json));
+            Assert.False(currentPreview.IsError);
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                await connection.ExecuteAsync(
+                    "UPDATE dbo.Users SET AssignmentRevision = AssignmentRevision + 1 WHERE UserId = @targetId;",
+                    new { targetId });
+            }
+
+            var stale = await sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.User, targetId, json,
+                currentPreview.Value.TargetRevision, currentPreview.Value.CatalogDigest));
+            Assert.True(stale.IsError);
+            Assert.Equal("Security.RevisionConflict", stale.FirstError.Code);
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.UserPermissions WHERE UserId = @targetId " +
+                "AND PermissionKey = N'Catalog.Products.Write';", new { targetId }));
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SecurityAuditEvents WHERE TargetId = @targetId;", new { targetId }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning, SqlTestCategory.SqlConcurrency)]
+    public async Task Concurrent_permission_imports_on_one_preview_commit_at_most_once()
+    {
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            int actorId;
+            int roleId;
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                actorId = await CreateManagerAsync(connection);
+                roleId = await connection.QuerySingleAsync<int>(
+                    "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
+                    "OUTPUT INSERTED.RoleId VALUES (N'Concurrent import role', N'CONCURRENT IMPORT ROLE');");
+            }
+
+            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var sender = provider.GetRequiredService<ISender>();
+            var firstJson = ImportJson("Role", roleId, "Catalog.Products.Read", "Allow");
+            var secondJson = ImportJson("Role", roleId, "Catalog.Products.Write", "Allow");
+            var preview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
+                PermissionImportTargetTypeDto.Role, roleId, firstJson));
+            Assert.False(preview.IsError);
+
+            var first = sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.Role, roleId, firstJson, 0, preview.Value.CatalogDigest));
+            var second = sender.Send(new ApplyPermissionAssignmentImportCommand(
+                PermissionImportTargetTypeDto.Role, roleId, secondJson, 0, preview.Value.CatalogDigest));
+            var results = await Task.WhenAll(first, second);
+
+            Assert.Single(results, result => !result.IsError);
+            Assert.Single(results, result => result.IsError && result.FirstError.Code == "Security.RevisionConflict");
+            using var verification = new SqlConnection(database.ConnectionString);
+            Assert.Equal(1, await verification.QuerySingleAsync<long>(
+                "SELECT AssignmentRevision FROM dbo.Roles WHERE RoleId = @roleId;", new { roleId }));
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.RolePermissions WHERE RoleId = @roleId;", new { roleId }));
+            Assert.Equal(1, await verification.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SecurityAuditEvents WHERE TargetType = N'Role' AND TargetId = @roleId;",
+                new { roleId }));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Administration_is_revisioned_audited_and_preserves_direct_decision_precedence()
     {
@@ -358,6 +690,15 @@ public sealed class SecurityAdministrationSqlTests
         services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor(actorId));
         services.AddSqlPersistence(connectionString);
         return services.BuildServiceProvider();
+    }
+
+    private static string ImportJson(string targetType, int targetId, params string[] keyAndDecisionPairs)
+    {
+        var entries = Enumerable.Range(0, keyAndDecisionPairs.Length / 2)
+            .Select(index => "{\"permissionKey\":\"" + keyAndDecisionPairs[index * 2] + "\",\"decision\":\"" +
+                             keyAndDecisionPairs[(index * 2) + 1] + "\"}");
+        return "{\"schemaVersion\":1,\"targetType\":\"" + targetType + "\",\"targetId\":" +
+               targetId + ",\"entries\":[" + string.Join(",", entries) + "]}";
     }
 
     private static async Task<int> CreateManagerAsync(SqlConnection connection)

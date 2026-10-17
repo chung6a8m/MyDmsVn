@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
 using MyDmsVn.Contracts.Security;
@@ -40,6 +40,31 @@ internal sealed class LocalSecurityAdministrationApiClient : ISecurityAdministra
                 request.ExpectedRevision,
                 request.ExpectedRelatedRevision,
                 request.CorrelationId),
+            null,
+            cancellationToken);
+
+    public Task<ApiResponse<PermissionAssignmentImportPreviewDto>> PreviewPermissionImportAsync(
+        PermissionImportTargetTypeDto targetType,
+        int targetId,
+        string json,
+        CancellationToken cancellationToken) =>
+        _dispatcher.SendAsync(
+            new PreviewPermissionAssignmentImportQuery(targetType, targetId, json),
+            null,
+            cancellationToken);
+
+    public Task<ApiResponse<PermissionAssignmentImportResultDto>> ApplyPermissionImportAsync(
+        PermissionImportTargetTypeDto targetType,
+        int targetId,
+        PermissionAssignmentImportRequest request,
+        CancellationToken cancellationToken) =>
+        _dispatcher.SendAsync(
+            new ApplyPermissionAssignmentImportCommand(
+                targetType,
+                targetId,
+                request.Json,
+                request.ExpectedTargetRevision,
+                request.ExpectedCatalogDigest),
             null,
             cancellationToken);
 }

@@ -161,12 +161,21 @@ public sealed class SqlPrincipalProvisioningTests
             await connection.ExecuteAsync("EXECUTE AS USER = N'P6AdministrationRuntime';");
             try
             {
-                var access = await connection.QuerySingleAsync<(int CanExecute, int CanInsertRole, int CanReadAudit)>(
+                var access = await connection.QuerySingleAsync<(
+                    int CanExecute,
+                    int CanExecuteImportRead,
+                    int CanExecuteImportApply,
+                    int CanInsertRole,
+                    int CanReadAudit)>(
                     "SELECT " +
                     "HAS_PERMS_BY_NAME(N'dbo.ApplySecurityAdministration', N'OBJECT', N'EXECUTE') AS CanExecute, " +
+                    "HAS_PERMS_BY_NAME(N'dbo.ReadSecurityPermissionImportTarget', N'OBJECT', N'EXECUTE') AS CanExecuteImportRead, " +
+                    "HAS_PERMS_BY_NAME(N'dbo.ApplySecurityPermissionImport', N'OBJECT', N'EXECUTE') AS CanExecuteImportApply, " +
                     "HAS_PERMS_BY_NAME(N'dbo.Roles', N'OBJECT', N'INSERT') AS CanInsertRole, " +
                     "HAS_PERMS_BY_NAME(N'dbo.SecurityAuditEvents', N'OBJECT', N'SELECT') AS CanReadAudit;");
                 Assert.Equal(1, access.CanExecute);
+                Assert.Equal(1, access.CanExecuteImportRead);
+                Assert.Equal(1, access.CanExecuteImportApply);
                 Assert.Equal(0, access.CanInsertRole);
                 Assert.Equal(0, access.CanReadAudit);
                 await Assert.ThrowsAsync<SqlException>(() => connection.ExecuteAsync(

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -284,6 +284,11 @@ public sealed class SecurityAdministrationViewModelTests
         public SecurityAdministrationMutationRequest? LastMutation { get; private set; }
         public bool HoldMutation { get; set; }
         public int MutationCount { get; private set; }
+        public string? LastPreviewJson { get; private set; }
+        public PermissionAssignmentImportPreviewDto? ImportPreview { get; set; }
+        public PermissionAssignmentImportRequest? LastApplyRequest { get; private set; }
+        public int LastApplyTargetId { get; private set; }
+        public PermissionImportTargetTypeDto LastApplyTargetType { get; private set; }
         public Func<SecurityAdministrationMutationRequest, ApiResponse<SecurityAdministrationResultDto>>? MutationHandler { get; set; }
         private readonly TaskCompletionSource<ApiResponse<SecurityAdministrationResultDto>> _pendingMutation = new();
 
@@ -311,6 +316,32 @@ public sealed class SecurityAdministrationViewModelTests
 
             return Task.FromResult(ApiResponse<SecurityAdministrationResultDto>.Success(
                 new SecurityAdministrationResultDto(request.ExpectedRevision ?? 0, true)));
+        }
+
+        public Task<ApiResponse<PermissionAssignmentImportPreviewDto>> PreviewPermissionImportAsync(
+            PermissionImportTargetTypeDto targetType,
+            int targetId,
+            string json,
+            CancellationToken cancellationToken)
+        {
+            LastPreviewJson = json;
+            return Task.FromResult(ImportPreview == null
+                ? ApiResponse<PermissionAssignmentImportPreviewDto>.Failure(
+                    new ApiError(ApiStatusCode.BadRequest, "Import.Missing", "No preview configured."))
+                : ApiResponse<PermissionAssignmentImportPreviewDto>.Success(ImportPreview));
+        }
+
+        public Task<ApiResponse<PermissionAssignmentImportResultDto>> ApplyPermissionImportAsync(
+            PermissionImportTargetTypeDto targetType,
+            int targetId,
+            PermissionAssignmentImportRequest request,
+            CancellationToken cancellationToken)
+        {
+            LastApplyRequest = request;
+            LastApplyTargetId = targetId;
+            LastApplyTargetType = targetType;
+            return Task.FromResult(ApiResponse<PermissionAssignmentImportResultDto>.Success(
+                new PermissionAssignmentImportResultDto(request.ExpectedTargetRevision + 1, 1, true)));
         }
 
         public void ReleaseMutation() => _pendingMutation.TrySetResult(

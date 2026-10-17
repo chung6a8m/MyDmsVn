@@ -216,6 +216,8 @@ GRANT VIEW DEFINITION ON OBJECT::dbo.UserPermissions TO [MyDmsVnRuntimeRole];
 GRANT SELECT ON OBJECT::dbo.SystemSecuritySettings TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.SystemSecuritySettings TO [MyDmsVnRuntimeRole];
 GRANT EXECUTE ON OBJECT::dbo.ApplySecurityAdministration TO [MyDmsVnRuntimeRole];
+GRANT EXECUTE ON OBJECT::dbo.ReadSecurityPermissionImportTarget TO [MyDmsVnRuntimeRole];
+GRANT EXECUTE ON OBJECT::dbo.ApplySecurityPermissionImport TO [MyDmsVnRuntimeRole];
 
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.Products TO [MyDmsVnRuntimeRole];

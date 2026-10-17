@@ -456,7 +456,8 @@
           "MediatR": "[12.5.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.2, )",
           "MyDmsVn.Contracts": "[1.0.0, )",
-          "MyDmsVn.Server.Domain": "[1.0.0, )"
+          "MyDmsVn.Server.Domain": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
         }
       },
       "mydmsvn.server.domain": {

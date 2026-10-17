@@ -1,7 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -37,6 +39,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
     private readonly ComboBox _decision = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _target = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Label _status = new() { AutoSize = true };
+    private readonly Button _importButton = new() { Text = "Import JSON…", AutoSize = true };
     private readonly int _uiThreadId;
     private bool _applying;
     private bool _disposed;
@@ -83,6 +86,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         {
             UpdateDecisionOptions(string.Equals(_target.SelectedItem as string, "Role", StringComparison.Ordinal));
             RefreshPermissionRows();
+            ApplyState();
         };
         _viewModel.SelectUser(null);
         ApplyState();
@@ -91,6 +95,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
     public DataGridView UsersGrid => _usersGrid;
     public DataGridView RolesGrid => _rolesGrid;
     public DataGridView PermissionsGrid => _permissionsGrid;
+    public Button ImportPermissionButton => _importButton;
     public string StatusText => _status.Text;
     public bool IsPasswordMasked => _password.UseSystemPasswordChar;
     public Task LastOperation { get; private set; } = Task.CompletedTask;
@@ -214,6 +219,8 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         toolbar.Controls.Add(_search);
         toolbar.Controls.Add(_decision);
         toolbar.Controls.Add(CreateButton("Apply assignment", (_, _) => ApplyPermissionSelection()));
+        _importButton.Click += async (_, _) => await ImportPermissionFileAsync();
+        toolbar.Controls.Add(_importButton);
         var footer = new Panel { Dock = DockStyle.Bottom, Height = 56, Padding = new Padding(8) };
         var explanation = new Label { Dock = DockStyle.Fill, AutoSize = false, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
         explanation.Name = "PermissionExplanation";
@@ -262,6 +269,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
             _email.Enabled = !protectedUser;
             _password.Enabled = !protectedUser;
             _decision.Enabled = _viewModel.CanReadPermissionCatalog && !protectedUser;
+            _importButton.Enabled = CanImportSelectedTarget();
             foreach (Control control in Descendants(_tabs.TabPages[0]))
             {
                 if (control is Button button && button.Text is "Save changes" or "Activate" or "Deactivate" or "Reset password")
@@ -348,6 +356,97 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
             _ => null,
         };
         BeginOperation(_viewModel.SetDirectDecisionAsync(row.Key, decision, CancellationToken.None));
+    }
+
+    private bool CanImportSelectedTarget()
+    {
+        if (string.Equals(_target.SelectedItem as string, "User", StringComparison.Ordinal))
+        {
+            return _viewModel.CanManageUsers && _viewModel.SelectedUser != null &&
+                   _viewModel.SelectedUser.IsActive && !_viewModel.SelectedUser.IsProtectedAccount;
+        }
+
+        return _viewModel.CanManageRoles && _viewModel.SelectedRole != null && _viewModel.SelectedRole.IsActive;
+    }
+
+    private async Task ImportPermissionFileAsync()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            CheckFileExists = true,
+            Multiselect = false,
+            Filter = "Permission assignment JSON (*.json)|*.json|All files (*.*)|*.*",
+            Title = "Select a permission assignment import",
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            var json = ReadBoundedUtf8File(dialog.FileName);
+            var targetType = string.Equals(_target.SelectedItem as string, "Role", StringComparison.Ordinal)
+                ? PermissionImportTargetTypeDto.Role
+                : PermissionImportTargetTypeDto.User;
+            var targetId = targetType == PermissionImportTargetTypeDto.User
+                ? _viewModel.SelectedUser?.UserId
+                : _viewModel.SelectedRole?.RoleId;
+            if (!targetId.HasValue)
+            {
+                return;
+            }
+
+            await _viewModel.PreviewPermissionImportAsync(targetType, targetId.Value, json, CancellationToken.None);
+            var preview = _viewModel.ImportPreview;
+            if (preview == null || _disposed || IsDisposed) return;
+
+            var summary = new StringBuilder()
+                .Append("Target: ").Append(preview.Import.TargetType).Append(" ")
+                .Append(preview.TargetName).Append(" (#").Append(preview.Import.TargetId).AppendLine(")")
+                .Append("New assignments: ").Append(preview.Additions.Count).AppendLine()
+                .Append("Current revision: ").Append(preview.TargetRevision).AppendLine()
+                .AppendLine()
+                .AppendLine("Only these additive decisions will be applied:");
+            foreach (var entry in preview.Additions.Take(20))
+            {
+                summary.Append("• ").Append(entry.PermissionKey).Append(" — ")
+                    .AppendLine(entry.Granted ? "Allow" : "Deny");
+            }
+
+            if (preview.Additions.Count > 20)
+                summary.Append("… and ").Append(preview.Additions.Count - 20).AppendLine(" more");
+            if (preview.Additions.Count == 0)
+                summary.AppendLine("No new assignments; applying will be a no-op.");
+            summary.AppendLine().Append("Continue with this exact preview?");
+            if (MessageBox.Show(this, summary.ToString(), "Confirm permission import",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+            {
+                await _viewModel.ApplyPermissionImportAsync(json, CancellationToken.None);
+            }
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException ||
+                                         exception is DecoderFallbackException || exception is InvalidDataException)
+        {
+            _status.Text = exception is InvalidDataException
+                ? exception.Message
+                : "The import file could not be read.";
+        }
+    }
+
+    private static string ReadBoundedUtf8File(string path)
+    {
+        const int limit = PermissionAssignmentImportLimits.MaximumUtf8Bytes;
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var buffer = new byte[limit + 1];
+        var count = 0;
+        while (count < buffer.Length)
+        {
+            var read = stream.Read(buffer, count, buffer.Length - count);
+            if (read == 0) break;
+            count += read;
+        }
+
+        if (count > limit)
+            throw new InvalidDataException("The import file exceeds the 1 MiB limit.");
+        return new UTF8Encoding(false, true).GetString(buffer, 0, count);
     }
 
     private void UpdateDecisionOptions(bool isRoleTarget)

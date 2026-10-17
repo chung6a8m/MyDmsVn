@@ -76,6 +76,8 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "SELECT N'Table:SystemSecuritySettings', OBJECT_ID(N'dbo.SystemSecuritySettings', N'U') UNION ALL " +
         "SELECT N'Table:SecurityAuditEvents', OBJECT_ID(N'dbo.SecurityAuditEvents', N'U') UNION ALL " +
         "SELECT N'Procedure:ApplySecurityAdministration', OBJECT_ID(N'dbo.ApplySecurityAdministration', N'P') UNION ALL " +
+        "SELECT N'Procedure:ReadSecurityPermissionImportTarget', OBJECT_ID(N'dbo.ReadSecurityPermissionImportTarget', N'P') UNION ALL " +
+        "SELECT N'Procedure:ApplySecurityPermissionImport', OBJECT_ID(N'dbo.ApplySecurityPermissionImport', N'P') UNION ALL " +
         "SELECT N'Invariant:SystemSecuritySettings', CASE WHEN " +
         "(SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.SystemSecuritySettings', N'U') " +
         "AND name IN (N'CK_SystemSecuritySettings_Singleton', N'CK_SystemSecuritySettings_Username_NotBlank') " +
@@ -498,7 +500,8 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "N'Products', N'Warehouses', N'Employees', N'Customers', " +
         "N'GoodsReceipts', N'GoodsReceiptLines', N'StockLedger', N'StockBalances', " +
         "N'SystemSecuritySettings', N'SecurityAuditEvents')) OR " +
-        "(candidate.type = N'P' AND candidate.name = N'ApplySecurityAdministration') OR " +
+        "(candidate.type = N'P' AND candidate.name IN (N'ApplySecurityAdministration', " +
+        "N'ReadSecurityPermissionImportTarget', N'ApplySecurityPermissionImport')) OR " +
         "(candidate.type = N'FN' AND candidate.name = N'CatalogTextContainsNul') OR " +
         "(candidate.type = N'SO' AND candidate.name = N'GoodsReceiptNumberSequence') OR " +
         "(candidate.type = N'TR' AND candidate.name = N'TR_StockLedger_AppendOnly' " +

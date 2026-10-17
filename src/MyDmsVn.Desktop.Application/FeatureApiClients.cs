@@ -86,5 +86,15 @@ namespace MyDmsVn.Desktop.Application
         Task<ApiResponse<SecurityAdministrationResultDto>> MutateAsync(
             SecurityAdministrationMutationRequest request,
             CancellationToken cancellationToken);
+        Task<ApiResponse<PermissionAssignmentImportPreviewDto>> PreviewPermissionImportAsync(
+            PermissionImportTargetTypeDto targetType,
+            int targetId,
+            string json,
+            CancellationToken cancellationToken);
+        Task<ApiResponse<PermissionAssignmentImportResultDto>> ApplyPermissionImportAsync(
+            PermissionImportTargetTypeDto targetType,
+            int targetId,
+            PermissionAssignmentImportRequest request,
+            CancellationToken cancellationToken);
     }
 }

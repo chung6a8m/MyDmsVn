@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -52,6 +52,7 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
     private bool _canManageUsers;
     private bool _canManageRoles;
     private bool _canReadPermissionCatalog;
+    private PermissionAssignmentImportPreviewDto? _importPreview;
 
     public SecurityAdministrationViewModel(
         ISecurityAdministrationApiClient administration,
@@ -132,6 +133,11 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
     public bool CanManageUsers { get => _canManageUsers; private set => SetProperty(ref _canManageUsers, value); }
     public bool CanManageRoles { get => _canManageRoles; private set => SetProperty(ref _canManageRoles, value); }
     public bool CanReadPermissionCatalog { get => _canReadPermissionCatalog; private set => SetProperty(ref _canReadPermissionCatalog, value); }
+    public PermissionAssignmentImportPreviewDto? ImportPreview
+    {
+        get => _importPreview;
+        private set => SetProperty(ref _importPreview, value);
+    }
     public IAsyncRelayCommand LoadCommand { get; }
     public IAsyncRelayCommand CreateUserCommand { get; }
     public IAsyncRelayCommand CreateRoleCommand { get; }
@@ -145,6 +151,7 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
 
     public void SelectUser(int? userId)
     {
+        ImportPreview = null;
         SelectedRoleId = null;
         SelectedUserId = userId;
         if (SelectedUser != null)
@@ -158,12 +165,109 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
 
     public void SelectRole(int? roleId)
     {
+        ImportPreview = null;
         SelectedUserId = null;
         SelectedRoleId = roleId;
         if (SelectedRole != null)
         {
             RoleName = SelectedRole.Name;
         }
+    }
+
+    public async Task PreviewPermissionImportAsync(
+        PermissionImportTargetTypeDto targetType,
+        int targetId,
+        string json,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ImportPreview = null;
+        if (!TryCaptureSession(out var sessionVersion))
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async token =>
+        {
+            try
+            {
+                var response = await _administration.PreviewPermissionImportAsync(
+                    targetType, targetId, json, token).ConfigureAwait(false);
+                if (!IsCurrentSession(sessionVersion, token)) return;
+                if (!response.IsSuccess)
+                {
+                    ApplyApiError(response.Error!);
+                    return;
+                }
+
+                ImportPreview = response.Data!;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                if (IsCurrentSession(sessionVersion, token))
+                    ApplyUnexpectedError(exception, "Permission import preview failed.");
+            }
+        }, cancellationToken, () => IsCurrentSession(sessionVersion, CancellationToken.None)).ConfigureAwait(false);
+    }
+
+    public async Task ApplyPermissionImportAsync(string json, CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        var preview = ImportPreview;
+        if (preview == null || !TryCaptureSession(out var sessionVersion)) return;
+        var targetType = preview.Import.TargetType;
+        var targetId = preview.Import.TargetId;
+        if ((targetType == PermissionImportTargetTypeDto.User && SelectedUserId != targetId) ||
+            (targetType == PermissionImportTargetTypeDto.Role && SelectedRoleId != targetId))
+        {
+            ImportPreview = null;
+            return;
+        }
+
+        await ExecuteBusyAsync(async token =>
+        {
+            try
+            {
+                var request = new PermissionAssignmentImportRequest(
+                    json,
+                    preview.TargetRevision,
+                    preview.CatalogDigest);
+                var response = await _administration.ApplyPermissionImportAsync(
+                    targetType, targetId, request, token).ConfigureAwait(false);
+                if (!IsCurrentSession(sessionVersion, token)) return;
+                if (!response.IsSuccess)
+                {
+                    ApplyApiError(response.Error!);
+                    if (response.Error!.Status == ApiStatusCode.Conflict)
+                    {
+                        ImportPreview = null;
+                        await RefreshDataAsync(token, sessionVersion).ConfigureAwait(false);
+                    }
+
+                    return;
+                }
+
+                ImportPreview = null;
+                PublishNotification(DesktopNotificationKind.Success,
+                    response.Data!.Changed
+                        ? "Permission import added " + response.Data.AddedCount + " assignment(s)."
+                        : "The import contains no new assignments.");
+                await RefreshDataAsync(token, sessionVersion).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                if (IsCurrentSession(sessionVersion, token))
+                    ApplyUnexpectedError(exception, "Permission import could not be applied.");
+            }
+        }, cancellationToken, () => IsCurrentSession(sessionVersion, CancellationToken.None)).ConfigureAwait(false);
     }
 
     public async Task LoadAsync(CancellationToken cancellationToken)
@@ -654,6 +758,7 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
         SelectedUserId = null;
         SelectedRoleId = null;
         Password = string.Empty;
+        ImportPreview = null;
         OnPropertyChanged(nameof(Users));
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(CatalogItems));
