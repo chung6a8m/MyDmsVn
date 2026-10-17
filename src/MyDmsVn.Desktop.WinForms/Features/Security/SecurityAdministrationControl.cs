@@ -165,7 +165,8 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         AddField(fields, "Actions", buttons);
         AddField(fields, "Role membership", _memberships);
 
-        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 470, FixedPanel = FixedPanel.Panel2 };
+        var split = new SplitContainer { Dock = DockStyle.Fill };
+        split.SizeChanged += (_, _) => SetUserEditorSplitDistance(split);
         split.Panel1.Controls.Add(_usersGrid);
         split.Panel2.Controls.Add(fields);
         var top = CreateSearchBar("Filter users");
@@ -173,6 +174,24 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         layout.Controls.Add(split);
         layout.Controls.Add(top);
         return layout;
+    }
+
+    private static void SetUserEditorSplitDistance(SplitContainer split)
+    {
+        var availableWidth = split.ClientSize.Width - split.SplitterWidth;
+        var minimumDistance = split.Panel1MinSize;
+        var maximumDistance = availableWidth - split.Panel2MinSize;
+        if (maximumDistance < minimumDistance)
+        {
+            return;
+        }
+
+        var distance = (int)Math.Round(availableWidth * 0.55d);
+        distance = Math.Max(minimumDistance, Math.Min(distance, maximumDistance));
+        if (split.SplitterDistance != distance)
+        {
+            split.SplitterDistance = distance;
+        }
     }
 
     private Control CreateRolesPage()
