@@ -125,10 +125,16 @@ public sealed class SqlTestClassificationTests
             })
             .Where(item => item.Match is not null && !item.Match.IsMatch)
             .Select(item => item.MethodName + ":" + item.Match!.Failure);
+        var unclassifiedMethods = methods
+            .Where(method => method.Categories.Count == 0 && exemptions.All(exemption =>
+                !string.Equals(exemption.MethodName, method.FullyQualifiedName, StringComparison.Ordinal)))
+            .Select(method => method.FullyQualifiedName);
 
         Assert.True(
             result.IsComplete,
-            string.Join(", ", result.Failures) + Environment.NewLine + string.Join(Environment.NewLine, invalidExemptions));
+            string.Join(", ", result.Failures) + Environment.NewLine +
+            string.Join(Environment.NewLine, invalidExemptions) + Environment.NewLine +
+            string.Join(Environment.NewLine, unclassifiedMethods));
         Assert.All(SqlTestCategories.All, category => Assert.True(result.CategoryCounts[category] > 0));
     }
 

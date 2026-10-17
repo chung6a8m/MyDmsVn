@@ -57,9 +57,27 @@
       Targets="Build"
       Properties="Configuration=$(Configuration);TargetFramework=net48" />
   </Target>
+  <Target Name="BuildSqlTestHarnessInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.SqlTestHarness.Tests\MyDmsVn.SqlTestHarness.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
   <Target Name="BuildDesktopSessionInventoryFixture" BeforeTargets="Build">
     <MSBuild
       Projects="..\..\MyDmsVn.Desktop.Session.Tests\MyDmsVn.Desktop.Session.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
+  <Target Name="BuildApplicationInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.Server.Application.Tests\MyDmsVn.Server.Application.Tests.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);TargetFramework=net48" />
+  </Target>
+  <Target Name="BuildArchitectureInventoryFixture" BeforeTargets="Build">
+    <MSBuild
+      Projects="..\..\MyDmsVn.Architecture.Tests\MyDmsVn.Architecture.Tests.csproj"
       Targets="Build"
       Properties="Configuration=$(Configuration);TargetFramework=net48" />
   </Target>

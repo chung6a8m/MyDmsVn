@@ -161,12 +161,14 @@ public sealed class TestGateRepositoryContractTests
         var root = RepositoryRoot();
         var sourceCases = new List<BoundLogicalCase>();
         var discoveryCases = new List<BoundLogicalCase>();
+        var auditFailures = new List<string>();
         foreach (var owner in manifest.LogicalCases.Select(item => item.OwnerProject)
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!evidence.Source.TryGetValue(owner, out var source))
             {
-                return false;
+                auditFailures.Add(owner + "|source inventory missing");
+                continue;
             }
 
             var historicalFrameworks = manifest.LogicalCases.Where(item => string.Equals(
@@ -182,7 +184,8 @@ public sealed class TestGateRepositoryContractTests
             {
                 if (!evidence.Discovery.TryGetValue((owner, tfm), out var discovered))
                 {
-                    return false;
+                    auditFailures.Add(owner + "|" + tfm + "|discovery inventory missing");
+                    continue;
                 }
 
                 var sourceBinding = LogicalCaseBinder.BindSource(
@@ -199,24 +202,36 @@ public sealed class TestGateRepositoryContractTests
                 if (!sourceBinding.IsComplete || !discoveryBinding.IsComplete)
                 {
                     var expectedLocators = manifest.LogicalCases
-                        .Where(item => string.Equals(item.OwnerProject, owner, StringComparison.OrdinalIgnoreCase))
+                        .Where(item => string.Equals(item.OwnerProject, owner, StringComparison.OrdinalIgnoreCase) &&
+                            item.Frameworks.Contains(tfm, StringComparer.Ordinal))
                         .SelectMany(item => item.Rows)
                         .Where(row => row.LocatorSha256 is not null)
                         .Select(row => row.LocatorSha256!)
                         .ToHashSet(StringComparer.Ordinal);
-                    var actualLocators = discovered.Select(item => item.PhysicalRowLocator)
+                    var theoryMethods = source.Where(method => method.IsTheory)
+                        .Select(method => method.NormalizedSignature.IndexOf('(') is var index && index >= 0
+                            ? method.NormalizedSignature.Substring(0, index)
+                            : method.NormalizedSignature)
                         .ToHashSet(StringComparer.Ordinal);
-                    _lastAuditFailure = owner + "|" + tfm + "|" + string.Join(
-                        ",",
-                        sourceBinding.Failures.Concat(discoveryBinding.Failures)) +
-                        $"|discovered={discovered.Count}|missingLocators={expectedLocators.Except(actualLocators).Count()}" +
-                        $"|extraLocators={actualLocators.Except(expectedLocators).Count()}";
-                    return false;
+                    var actualLocators = discovered.Where(item => theoryMethods.Contains(item.MethodName))
+                        .Select(item => item.PhysicalRowLocator)
+                        .ToHashSet(StringComparer.Ordinal);
+                    auditFailures.Add(owner + "|" + tfm + "|" + string.Join(
+                        ",", sourceBinding.Failures.Concat(discoveryBinding.Failures)) +
+                        $"|discovered={discovered.Count}|missingTheoryRows={expectedLocators.Except(actualLocators).Count()}" +
+                        $"|extraTheoryRows={actualLocators.Except(expectedLocators).Count()}");
+                    continue;
                 }
 
                 sourceCases.AddRange(sourceBinding.Cases);
                 discoveryCases.AddRange(discoveryBinding.Cases);
             }
+        }
+
+        if (auditFailures.Count > 0)
+        {
+            _lastAuditFailure = string.Join(Environment.NewLine, auditFailures);
+            return false;
         }
 
         var expected = sourceCases.Select(item => new ExpectedLogicalCase(

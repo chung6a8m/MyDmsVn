@@ -1,6 +1,6 @@
 # TESTGATE stabilization — SQL lease lifecycle, early manifest validation, and reduced fingerprint churn
 
-**Status:** Implementation under review; no local Windows/.NET/SQL execution evidence has been obtained for this change. Do not mark any acceptance box complete from static inspection alone.
+**Status (2026-10-17):** L2 runner verification and SQL manifest preflight pass on Windows. The clean-commit strict L3 Final has not yet run; keep PR #35 Draft and do not treat preflight as SQL acceptance.
 
 **Base:** SEC-REBUILD accepted at `0303a91111a514276aa02c6664c25dc0caf58d9e`, merged as PR #34 / `4520c494ce6e48e2b0e2c6e0a1f43cfb337d5033`. The accepted baseline was 11/11 Final gates and 775/775 cases, active SQL `net48`; historical `net8.0` remains parked. The current manifest contains 673 logical cases, 52 gates and 195 exemptions. In SEC-REBUILD, 525 surviving case IDs changed reviewed fingerprints. Those are baseline observations, not pass/fail thresholds for this plan.
 
@@ -89,3 +89,12 @@ $root = '.sqlperf/stab-preflight-' + [guid]::NewGuid().ToString('N').Substring(0
 The preflight is metadata-only and **not** an SQL acceptance certificate. After all gate-affecting edits and manifest review are committed, obtain the ordinary approved Final under a clean exact revision with the operator-managed `-ApprovalFile`; include all non-SQL and unfiltered SQL gates on active `net48`, and required GUI-specific gates if affected. Record real source/discovery/TRX totals, missing/extra identities, previous/current lease status, ownership disposal and watchdog outcomes. No CI job, network test run or actual SQL execution is claimed by this document.
 
 **Review blockers at authoring time:** refresh/review fingerprints and new logical test IDs, compile and run unit/negative tests on Windows, run SQL preflight, and complete the frozen-revision strict Final. Until these are green, the implementation PR should remain **Draft / NOT VERIFIED**.
+
+## Verification update (2026-10-17)
+
+- Restored `MyDmsVn.sln` in locked mode after initializing the repository's pinned vendor submodules. The restore exposed six stale lock files for the `Server.Application` Newtonsoft.Json dependency; those lock changes are included with this stabilization update.
+- Built the runner test project and its inventory fixtures on active `net48` plus tool-only `net8.0`. The fixture build contract now includes all 11 projects represented by the reviewed inventory.
+- Independently reconciled compiled source inventory against v1: **8 Added** runner Fact methods; **0 Removed, SignatureChanged, ClassificationChanged, OwnershipChanged or TheoryRowChanged**; **605 FingerprintChanged**. Existing logical IDs, classifications, framework history and theory-row locators were retained. The fingerprint changes trace to the already merged source-index boundary change that excludes repository metadata/artifact folders; test source methods were unchanged since the prior manifest snapshot. Updated the 195 existing incomplete-closure fingerprints, appended the current reviewed hashes to 42 complete non-SQL exemption entries while retaining their historical hashes, and added one narrowly scoped incomplete-closure exemption for a fake-only stale-fingerprint test. No automated manifest generator was added.
+- `dotnet test tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj -c Release -f net8.0 --no-restore`: **244 passed, 0 failed, 0 skipped** (1m 19s). This includes lease lifecycle, Task/Final, manifest contract and runner negative tests.
+- `Invoke-TestGate.ps1 -Mode Final -PlanId '20261016-003-permission-system-rebuild' -TaskId 'SEC-REBUILD-T06' -ArtifactRoot <fresh-local-root> -PreflightOnly`: **passed for 6 reviewed project gates**; no SQL tests or database DDL executed.
+- The strict clean-revision Final, SQL approval/ownership reconciliation, and lease outcome remain pending. Run them only after committing this exact gate-affecting revision; leave this plan and PR open until those outcomes are recorded.
