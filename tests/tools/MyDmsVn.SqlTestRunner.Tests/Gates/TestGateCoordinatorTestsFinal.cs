@@ -40,6 +40,52 @@ public sealed class TestGateCoordinatorTestsFinal
     }
 
     [Fact]
+    public async Task Recovered_prior_lease_is_completed_when_current_Final_run_is_clean()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.PriorLeaseRecovered);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.PriorLeaseRecovered),
+            new NoRecovery());
+
+        var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Succeeded, result.Status);
+        Assert.NotNull(leases.LastLease);
+        Assert.True(leases.LastLease.IsCompleted);
+        Assert.Contains("release", events);
+    }
+
+    [Fact]
+    public async Task Unreconciled_current_SQL_execution_does_not_complete_its_lease()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.UnreconciledOwnership);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.UnreconciledOwnership),
+            new NoRecovery());
+
+        var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.NotNull(leases.LastLease);
+        Assert.False(leases.LastLease.IsCompleted);
+        Assert.Contains("release", events);
+    }
+
+    [Fact]
     public async Task Modular_Final_runs_every_SQL_project_under_one_global_lease()
     {
         using var repository = new FinalRepository(multiProject: true);
@@ -151,6 +197,8 @@ public sealed class TestGateCoordinatorTestsFinal
         Report,
         Cancelled,
         PreflightRejected,
+        PriorLeaseRecovered,
+        UnreconciledOwnership,
     }
 
     private sealed class FinalApproval : ITestGateApprovalReader
@@ -208,7 +256,9 @@ public sealed class TestGateCoordinatorTestsFinal
             });
             LastLease = new SqlExecutionLease(release, completion);
             return Task.FromResult(new SqlExecutionLeaseAcquireResult(
-                SqlExecutionLeaseAcquireStatus.Acquired,
+                _failure == FinalFailure.PriorLeaseRecovered
+                    ? SqlExecutionLeaseAcquireStatus.Recovered
+                    : SqlExecutionLeaseAcquireStatus.Acquired,
                 LastLease));
         }
     }
@@ -273,7 +323,10 @@ public sealed class TestGateCoordinatorTestsFinal
             }
 
             _events.Add("ownership");
-            return Task.FromResult(new BenchmarkRunResult(_failure != FinalFailure.SqlIncomplete, runs));
+            return Task.FromResult(new BenchmarkRunResult(
+                _failure != FinalFailure.SqlIncomplete,
+                runs,
+                _failure == FinalFailure.UnreconciledOwnership));
         }
     }
 
