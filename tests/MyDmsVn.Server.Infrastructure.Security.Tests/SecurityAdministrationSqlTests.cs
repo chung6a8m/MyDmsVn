@@ -563,6 +563,15 @@ public sealed class SecurityAdministrationSqlTests
                 isActive: true,
                 expectedRevision: 0));
 
+            using var directProcedure = new SqlConnection(database.ConnectionString);
+            await Assert.ThrowsAsync<SqlException>(() => directProcedure.ExecuteAsync(
+                "EXEC dbo.ApplySecurityAdministration " +
+                "@Target = N'User', @Operation = N'Update', @ActorUserId = @actorId, " +
+                "@TargetId = @boundUserId, @Name = N'root.admin', @NormalizedName = N'ROOT.ADMIN', " +
+                "@DisplayName = N'Changed protected display name', @Email = N'changed@example.test', " +
+                "@ExpectedRevision = 0, @CorrelationId = @correlationId;",
+                new { actorId, boundUserId, correlationId = Guid.NewGuid() }));
+
             Assert.True(rename.IsError);
             Assert.Equal("Security.ReservedSuperuser", rename.FirstError.Code);
             Assert.True(reactivate.IsError);
@@ -575,11 +584,16 @@ public sealed class SecurityAdministrationSqlTests
             Assert.Contains(listed.Value, user => user.UserId == boundUserId && user.IsProtectedAccount);
 
             using var verification = new SqlConnection(database.ConnectionString);
-            var bound = await verification.QuerySingleAsync<(string NormalizedUsername, bool IsActive, long Revision)>(
-                "SELECT NormalizedUsername, IsActive, AssignmentRevision AS Revision " +
+            var bound = await verification.QuerySingleAsync<(
+                string Username, string NormalizedUsername, string DisplayName, string? Email, bool IsActive, long Revision)>(
+                "SELECT Username, NormalizedUsername, DisplayName, Email, IsActive, " +
+                "AssignmentRevision AS Revision " +
                 "FROM dbo.Users WHERE UserId = @boundUserId;",
                 new { boundUserId });
+            Assert.Equal("root.admin", bound.Username);
             Assert.Equal("ROOT.ADMIN", bound.NormalizedUsername);
+            Assert.Equal("Operator", bound.DisplayName);
+            Assert.Null(bound.Email);
             Assert.False(bound.IsActive);
             Assert.Equal(0, bound.Revision);
             Assert.Equal(0, await verification.QuerySingleAsync<int>(

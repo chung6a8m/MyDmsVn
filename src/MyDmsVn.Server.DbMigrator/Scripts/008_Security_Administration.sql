@@ -176,7 +176,7 @@ BEGIN
                 THROW 51030, 'Security user revision changed.', 1;
             SET @NewRevision = @CurrentRevision;
 
-            IF @Operation IN (N'SetActive', N'SetPassword') AND @BoundUserId = @TargetId
+            IF @Operation IN (N'Update', N'SetActive', N'SetPassword') AND @BoundUserId = @TargetId
                 THROW 51033, 'The bound superuser requires maintenance operations.', 1;
 
             IF @Operation = N'Update'
