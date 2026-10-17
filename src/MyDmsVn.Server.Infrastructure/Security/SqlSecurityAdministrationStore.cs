@@ -136,8 +136,10 @@ public sealed class SqlSecurityAdministrationRepository : ISecurityAdministratio
     {
         var users = (await _context.Connection.QueryAsync<UserRow>(
             new Dapper.CommandDefinition(
-                "SELECT UserId, Username, DisplayName, Email, IsActive, AssignmentRevision " +
-                "FROM dbo.Users ORDER BY NormalizedUsername COLLATE Latin1_General_100_BIN2;",
+                "SELECT users.UserId, users.Username, users.DisplayName, users.Email, users.IsActive, " +
+                "users.AssignmentRevision, CONVERT(bit, CASE WHEN settings.SuperuserUserId = users.UserId THEN 1 ELSE 0 END) AS IsProtectedAccount " +
+                "FROM dbo.Users AS users LEFT JOIN dbo.SystemSecuritySettings AS settings ON settings.Id = 1 " +
+                "ORDER BY users.NormalizedUsername COLLATE Latin1_General_100_BIN2;",
                 transaction: _context.Transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
         var memberships = (await _context.Connection.QueryAsync<MembershipRow>(
@@ -161,7 +163,8 @@ public sealed class SqlSecurityAdministrationRepository : ISecurityAdministratio
                 Array.AsReadOnly(memberships[user.UserId].Select(row => row.RoleId).ToArray()),
                 Array.AsReadOnly(decisions[user.UserId]
                     .Select(row => new SecurityDecisionDto(row.PermissionKey, row.Granted))
-                    .ToArray())))
+                    .ToArray()),
+                user.IsProtectedAccount))
             .ToArray();
     }
 
@@ -234,6 +237,7 @@ public sealed class SqlSecurityAdministrationRepository : ISecurityAdministratio
         public string? Email { get; set; }
         public bool IsActive { get; set; }
         public long AssignmentRevision { get; set; }
+        public bool IsProtectedAccount { get; set; }
     }
 
     private sealed class RoleRow
