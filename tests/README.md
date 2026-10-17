@@ -4,7 +4,7 @@
 
 **TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
 
-**Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. `Invoke-TestGate.ps1` now reads the checked-in v1 manifest: Task mode cannot accept project/TFM/filter overrides, while Final binds a clean revision to one strict unfiltered pass per SQL TFM. The multi-pass `baseline` remains a performance tool; T04/T05 split projects remain proposed.
+**Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. `Invoke-TestGate.ps1` now reads the checked-in v1 manifest: Task mode cannot accept project/TFM/filter overrides, while Final binds a clean revision to one strict unfiltered pass per SQL TFM. The multi-pass `baseline` remains a performance tool; T04/T05 split projects are implemented. The in-progress [stabilization plan](../docs/plans/20261017-001-testgate-stabilization.md) adds a source/discovery-only SQL manifest preflight.
 
 P0 tests require Windows, the .NET 8 SDK selected by `global.json`, and the .NET Framework 4.8 targeting pack/runtime. Run from the repository root:
 
@@ -90,6 +90,19 @@ tests\tools\Invoke-SqlPrAcceptance.ps1 `
 ```
 
 The wrapper rejects a dirty tree, resolves the exact commit, and runs each reviewed selected TFM without a filter, warm-up or measured repetition. It reuses strict classification, discovery/theory-row, TRX, timing, watchdog, preflight and ownership gates.
+
+### SQL manifest preflight (no SQL test execution)
+
+After restoring dependencies, run this *before* an expensive strict Final to check the active SQL projects' compiled source identities, fingerprints, logical ownership and expanded discovery. The `-PreflightOnly` switch allows a dirty development tree and does not require SQL approval because it does not execute SQL tests or create/drop test databases:
+
+```powershell
+$artifactRoot = '.sqlperf/manifest-preflight-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
+& ./tests/tools/Invoke-TestGate.ps1 -Mode Final `
+  -PlanId '20261016-003-permission-system-rebuild' -TaskId 'SEC-REBUILD-T06' `
+  -ArtifactRoot $artifactRoot -PreflightOnly
+```
+
+This checks the reviewed SEC-REBUILD Final SQL project matrix; future plans must bind their own exact Final gate identities. An exit code 0 proves **metadata preflight only**, not executed cases/TRX, SQL approval, owned cleanup or Final acceptance. The full Final command remains clean-revision, SQL-approved and unfiltered. During a filtered Task, only *selected* test fingerprints are required to match, but full physical test-method inventory, category and Fact/Theory shape are still checked. Do not bulk-refresh unrelated fingerprints after each edit; freeze, review the manifest delta, and run full final verification.
 
 For the manifest-owned NET8-PAUSE-T05 Final contract, use a fresh ignored artifact root from a clean committed revision:
 
