@@ -283,6 +283,40 @@ public sealed class TestGateCoordinator
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
+                    var definitions = manifest.LogicalCases;
+                    var selectedDefinitions = SelectDefinitions(definitions, gate, tfm);
+                    if (selectedDefinitions.Count == 0)
+                    {
+                        return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
+                    }
+
+                    var source = _sourceInventory.Read(AssemblyPath(project, tfm));
+                    var discovered = VstestDiscoveryParser.Parse(discovery.StandardOutput, tfm);
+                    var taskFingerprints = options.Mode == TestGateMode.Task
+                        ? selectedDefinitions.Select(item => item.NormalizedMethodSignature)
+                            .ToHashSet(StringComparer.Ordinal)
+                        : null;
+                    var fullSourceBinding = LogicalCaseBinder.BindSource(
+                        source,
+                        definitions,
+                        gate.Project,
+                        tfm,
+                        manifest.Exemptions,
+                        taskFingerprints);
+                    var selectedIds = selectedDefinitions.Select(item => item.LogicalCaseId)
+                        .ToHashSet(StringComparer.Ordinal);
+                    var selectedSource = fullSourceBinding.Cases
+                        .Where(item => selectedIds.Contains(item.LogicalCaseId))
+                        .ToArray();
+                    var discoveryBinding = LogicalCaseBinder.BindDiscovery(
+                        discovered, selectedDefinitions, gate.Project, tfm);
+                    if (!fullSourceBinding.IsComplete || !discoveryBinding.IsComplete ||
+                        selectedSource.Length == 0)
+                    {
+                        // Manifest errors fail before executing any selected test.
+                        return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
+                    }
+
                     var runId = gate.GateId + "-" + tfm.Replace('.', '-') + "-" + Guid.NewGuid().ToString("N");
                     var runRoot = Path.Combine(options.ArtifactRoot, runId);
                     Directory.CreateDirectory(runRoot);
@@ -298,30 +332,15 @@ public sealed class TestGateCoordinator
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
-                    var definitions = manifest.LogicalCases;
-                    var selectedDefinitions = SelectDefinitions(definitions, gate, tfm);
-                    var source = _sourceInventory.Read(AssemblyPath(project, tfm));
-                    var discovered = VstestDiscoveryParser.Parse(discovery.StandardOutput, tfm);
                     var trx = TrxResultParser.TryParse(Path.Combine(runRoot, trxName), tfm);
                     if (!trx.IsComplete)
                     {
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
-                    var fullSourceBinding = LogicalCaseBinder.BindSource(
-                        source,
-                        definitions,
-                        gate.Project,
-                        tfm,
-                        manifest.Exemptions);
-                    var selectedIds = selectedDefinitions.Select(item => item.LogicalCaseId)
-                        .ToHashSet(StringComparer.Ordinal);
-                    var selectedSource = fullSourceBinding.Cases
-                        .Where(item => selectedIds.Contains(item.LogicalCaseId))
-                        .ToArray();
-                    var discoveryBinding = LogicalCaseBinder.BindDiscovery(discovered, selectedDefinitions, gate.Project, tfm);
-                    var executionBinding = LogicalCaseBinder.BindExecution(trx.Results, selectedDefinitions, gate.Project, tfm);
-                    if (!fullSourceBinding.IsComplete || !discoveryBinding.IsComplete || !executionBinding.IsComplete)
+                    var executionBinding = LogicalCaseBinder.BindExecution(
+                        trx.Results, selectedDefinitions, gate.Project, tfm);
+                    if (!executionBinding.IsComplete)
                     {
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
