@@ -9,6 +9,7 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.Infrastructure.Local;
 using MyDmsVn.Desktop.WinForms;
+using MyDmsVn.Desktop.WinForms.Features.Security;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Identity;
@@ -214,9 +215,11 @@ namespace MyDmsVn.Desktop.Tests
 
                     using (var provider = services.BuildServiceProvider())
                     using (var control = provider.GetRequiredService<IGoodsReceiptControlFactory>().Create())
+                    using (var security = provider.GetRequiredService<ISecurityAdministrationControlFactory>().Create())
                     using (var shell = provider.GetRequiredService<FoundationShellForm>())
                     {
                         Assert.IsType<GoodsReceiptControl>(control);
+                        Assert.IsType<SecurityAdministrationControl>(security);
                         Assert.NotNull(shell);
                     }
                 },

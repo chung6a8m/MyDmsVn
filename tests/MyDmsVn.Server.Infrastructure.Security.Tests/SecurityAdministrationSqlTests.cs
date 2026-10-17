@@ -145,6 +145,7 @@ public sealed class SecurityAdministrationSqlTests
             var listedUsers = await sender.Send(new ListSecurityUsersQuery());
             var listedRoles = await sender.Send(new ListSecurityRolesQuery());
             Assert.Contains(listedUsers.Value, user => user.UserId == userId);
+            Assert.DoesNotContain(listedUsers.Value, user => user.IsProtectedAccount);
             Assert.Contains(listedRoles.Value, role => role.RoleId == roleId);
 
             using var verification = new SqlConnection(database.ConnectionString);
@@ -237,6 +238,8 @@ public sealed class SecurityAdministrationSqlTests
             Assert.Equal("Security.ReservedSuperuser", resetPassword.FirstError.Code);
             Assert.True(missing.IsError);
             Assert.Equal("Security.TargetNotFound", missing.FirstError.Code);
+            var listed = await sender.Send(new ListSecurityUsersQuery());
+            Assert.Contains(listed.Value, user => user.UserId == boundUserId && user.IsProtectedAccount);
 
             using var verification = new SqlConnection(database.ConnectionString);
             var bound = await verification.QuerySingleAsync<(string NormalizedUsername, bool IsActive, long Revision)>(

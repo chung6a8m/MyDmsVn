@@ -12,7 +12,8 @@ public sealed class SecurityUserDto
         bool isActive,
         long assignmentRevision,
         IReadOnlyList<int> roleIds,
-        IReadOnlyList<SecurityDecisionDto> directDecisions)
+        IReadOnlyList<SecurityDecisionDto> directDecisions,
+        bool isProtectedAccount = false)
     {
         UserId = userId;
         Username = username;
@@ -22,6 +23,7 @@ public sealed class SecurityUserDto
         AssignmentRevision = assignmentRevision;
         RoleIds = roleIds;
         DirectDecisions = directDecisions;
+        IsProtectedAccount = isProtectedAccount;
     }
 
     public int UserId { get; }
@@ -32,6 +34,7 @@ public sealed class SecurityUserDto
     public long AssignmentRevision { get; }
     public IReadOnlyList<int> RoleIds { get; }
     public IReadOnlyList<SecurityDecisionDto> DirectDecisions { get; }
+    public bool IsProtectedAccount { get; }
 }
 
 public sealed class SecurityRoleDto

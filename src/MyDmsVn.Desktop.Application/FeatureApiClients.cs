@@ -78,4 +78,13 @@ namespace MyDmsVn.Desktop.Application
     {
         Task<ApiResponse<PermissionCatalogDto>> GetCatalogAsync(CancellationToken cancellationToken);
     }
+
+    public interface ISecurityAdministrationApiClient
+    {
+        Task<ApiResponse<IReadOnlyList<SecurityUserDto>>> ListUsersAsync(CancellationToken cancellationToken);
+        Task<ApiResponse<IReadOnlyList<SecurityRoleDto>>> ListRolesAsync(CancellationToken cancellationToken);
+        Task<ApiResponse<SecurityAdministrationResultDto>> MutateAsync(
+            SecurityAdministrationMutationRequest request,
+            CancellationToken cancellationToken);
+    }
 }

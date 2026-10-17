@@ -30,6 +30,7 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             services.AddTransient<IIdentityApiClient, LocalIdentityApiClient>();
             services.AddTransient<IPermissionApiClient, LocalPermissionApiClient>();
             services.AddTransient<IPermissionCatalogApiClient, LocalPermissionCatalogApiClient>();
+            services.AddTransient<ISecurityAdministrationApiClient, LocalSecurityAdministrationApiClient>();
             services.AddTransient<IProductApiClient, LocalProductApiClient>();
             services.AddTransient<IWarehouseApiClient, LocalWarehouseApiClient>();
             services.AddTransient<IEmployeeApiClient, LocalEmployeeApiClient>();
