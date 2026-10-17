@@ -140,6 +140,7 @@ public sealed class TestGateCoordinator
     private readonly ISqlExecutionLeaseFactory _leases;
     private readonly ITestGateSqlAcceptanceRunner _sqlAcceptance;
     private readonly IAbandonedSqlRunRecovery? _recovery;
+    private readonly ISqlGateManifestPreflight _sqlManifestPreflight;
 
     public TestGateCoordinator(
         IProcessRunner processes,
@@ -148,7 +149,8 @@ public sealed class TestGateCoordinator
         ITestGateApprovalReader? approval = null,
         ISqlExecutionLeaseFactory? leases = null,
         ITestGateSqlAcceptanceRunner? sqlAcceptance = null,
-        IAbandonedSqlRunRecovery? recovery = null)
+        IAbandonedSqlRunRecovery? recovery = null,
+        ISqlGateManifestPreflight? sqlManifestPreflight = null)
     {
         _processes = processes;
         _sourceInventory = sourceInventory;
@@ -157,6 +159,8 @@ public sealed class TestGateCoordinator
         _leases = leases ?? new SqlExecutionLeaseFactory();
         _sqlAcceptance = sqlAcceptance ?? new TestGateSqlAcceptanceRunner(processes);
         _recovery = recovery;
+        _sqlManifestPreflight = sqlManifestPreflight ??
+            new SqlGateManifestPreflight(processes, sourceInventory);
     }
 
     public async Task<TestGateRunResult> RunAsync(
@@ -177,6 +181,12 @@ public sealed class TestGateCoordinator
                 options.TaskId);
         }
         catch (InvalidDataException)
+        {
+            return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
+        }
+
+        if (TestGateArtifactPathPlanner.FindOverBudgetPaths(
+                options.ArtifactRoot, selection.Gates, options.RepositoryRoot).Count != 0)
         {
             return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
         }
@@ -283,10 +293,69 @@ public sealed class TestGateCoordinator
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
+                    var definitions = manifest.LogicalCases;
+                    var selectedDefinitions = SelectDefinitions(definitions, gate, tfm);
+                    if (selectedDefinitions.Count == 0)
+                    {
+                        return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
+                    }
+
+                    var source = _sourceInventory.Read(AssemblyPath(project, tfm));
+                    var discovered = VstestDiscoveryParser.Parse(discovery.StandardOutput, tfm);
+                    var taskFingerprints = options.Mode == TestGateMode.Task
+                        ? selectedDefinitions.Select(item => item.NormalizedMethodSignature)
+                            .ToHashSet(StringComparer.Ordinal)
+                        : null;
+                    var fullSourceBinding = LogicalCaseBinder.BindSource(
+                        source,
+                        definitions,
+                        gate.Project,
+                        tfm,
+                        manifest.Exemptions,
+                        taskFingerprints);
+                    var selectedIds = selectedDefinitions.Select(item => item.LogicalCaseId)
+                        .ToHashSet(StringComparer.Ordinal);
+                    var selectedSource = fullSourceBinding.Cases
+                        .Where(item => selectedIds.Contains(item.LogicalCaseId))
+                        .ToArray();
+                    var discoveryBinding = LogicalCaseBinder.BindDiscovery(
+                        discovered, selectedDefinitions, gate.Project, tfm);
+                    if (!fullSourceBinding.IsComplete || !discoveryBinding.IsComplete ||
+                        selectedSource.Length == 0)
+                    {
+                        // Report safe identities, never raw Theory arguments or environment data.
+                        // Manifest errors fail before executing any selected test.
+                        Console.Error.WriteLine(
+                            "Task/Final manifest preflight: " + gate.GateId + "/" + tfm +
+                            ": source=" + string.Join(",", fullSourceBinding.Failures) +
+                            "; discovery=" + string.Join(",", discoveryBinding.Failures));
+                        foreach (var expectedMethod in selectedDefinitions.Take(20))
+                        {
+                            var methods = source.Where(item => string.Equals(
+                                item.NormalizedSignature, expectedMethod.NormalizedMethodSignature,
+                                StringComparison.Ordinal)).ToArray();
+                            if (methods.Length == 0)
+                            {
+                                Console.Error.WriteLine(
+                                    "MissingMethod: " + expectedMethod.NormalizedMethodSignature);
+                            }
+                            else if (methods.Length == 1 &&
+                                !string.Equals(methods[0].BodyFingerprint,
+                                    expectedMethod.ReviewedCodeFingerprint, StringComparison.Ordinal))
+                            {
+                                Console.Error.WriteLine(
+                                    "FingerprintMismatch: " + expectedMethod.NormalizedMethodSignature);
+                            }
+                        }
+
+                        return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
+                    }
+
                     var runId = gate.GateId + "-" + tfm.Replace('.', '-') + "-" + Guid.NewGuid().ToString("N");
-                    var runRoot = Path.Combine(options.ArtifactRoot, runId);
+                    var runRoot = Path.Combine(options.ArtifactRoot, TestGateArtifactPathPlanner.NewPhysicalId());
                     Directory.CreateDirectory(runRoot);
-                    var trxName = runId + ".trx";
+                    TestGateArtifactPathPlanner.WriteLogicalRunId(runRoot, runId);
+                    var trxName = "result.trx";
                     var execution = await RunCommand(
                         testArguments + " --logger \"trx;LogFileName=" + trxName +
                         "\" --results-directory \"" + runRoot + "\"",
@@ -298,30 +367,15 @@ public sealed class TestGateCoordinator
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
-                    var definitions = manifest.LogicalCases;
-                    var selectedDefinitions = SelectDefinitions(definitions, gate, tfm);
-                    var source = _sourceInventory.Read(AssemblyPath(project, tfm));
-                    var discovered = VstestDiscoveryParser.Parse(discovery.StandardOutput, tfm);
                     var trx = TrxResultParser.TryParse(Path.Combine(runRoot, trxName), tfm);
                     if (!trx.IsComplete)
                     {
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
-                    var fullSourceBinding = LogicalCaseBinder.BindSource(
-                        source,
-                        definitions,
-                        gate.Project,
-                        tfm,
-                        manifest.Exemptions);
-                    var selectedIds = selectedDefinitions.Select(item => item.LogicalCaseId)
-                        .ToHashSet(StringComparer.Ordinal);
-                    var selectedSource = fullSourceBinding.Cases
-                        .Where(item => selectedIds.Contains(item.LogicalCaseId))
-                        .ToArray();
-                    var discoveryBinding = LogicalCaseBinder.BindDiscovery(discovered, selectedDefinitions, gate.Project, tfm);
-                    var executionBinding = LogicalCaseBinder.BindExecution(trx.Results, selectedDefinitions, gate.Project, tfm);
-                    if (!fullSourceBinding.IsComplete || !discoveryBinding.IsComplete || !executionBinding.IsComplete)
+                    var executionBinding = LogicalCaseBinder.BindExecution(
+                        trx.Results, selectedDefinitions, gate.Project, tfm);
+                    if (!executionBinding.IsComplete)
                     {
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
@@ -432,6 +486,29 @@ public sealed class TestGateCoordinator
             return TestGateRunStatus.ResourceDenied;
         }
 
+        // Do not acquire the SQL lease or launch any SQL acceptance process
+        // until source, fingerprints, ownership and expanded discovery agree.
+        var preflight = await _sqlManifestPreflight.VerifyAsync(
+            options, manifest, gates, cancellationToken).ConfigureAwait(false);
+        if (!preflight.IsComplete)
+        {
+            foreach (var issue in preflight.Issues.Take(40))
+            {
+                Console.Error.WriteLine(
+                    "SQL manifest preflight: " + issue.GateId + "/" + issue.Framework +
+                    ": " + issue.Reason);
+            }
+
+            if (preflight.Issues.Count > 40)
+            {
+                Console.Error.WriteLine(
+                    "SQL manifest preflight: " + (preflight.Issues.Count - 40) +
+                    " further issues omitted.");
+            }
+
+            return TestGateRunStatus.Incomplete;
+        }
+
         var recovery = _recovery ?? new BenchmarkAbandonedSqlRunRecovery(options.ApprovalFile);
         var leaseTimeout = TestGateTimeoutBudget.Calculate(gates.Select(gate => gate.OverallTimeoutSeconds));
         var acquired = await _leases.AcquireAsync(
@@ -456,7 +533,11 @@ public sealed class TestGateCoordinator
             Environment.SetEnvironmentVariable(
                 SqlTestHarnessEnvironment.ApprovalFileVariable,
                 options.ApprovalFile);
-            var recoveryRequired = acquired.Status == SqlExecutionLeaseAcquireStatus.Recovered;
+            // Recovery of a prior invocation is historical evidence, not an unresolved
+            // resource owned by the current invocation. Only the latter may keep
+            // the current lease in RecoveryRequired when it is disposed.
+            var priorLeaseRecovered = acquired.Status == SqlExecutionLeaseAcquireStatus.Recovered;
+            var currentRunNeedsRecovery = false;
             foreach (var gate in gates)
             {
                 var benchmarkArtifactRoot = Path.Combine(options.ArtifactRoot, gate.GateId);
@@ -477,12 +558,12 @@ public sealed class TestGateCoordinator
                         Revision = options.Revision,
                         ManifestAuthorizedActiveFrameworkProfile = true,
                     }, cancellationToken).ConfigureAwait(false);
-                recoveryRequired |= benchmark.RecoveryRequired;
+                currentRunNeedsRecovery |= benchmark.RecoveryRequired;
 
-                if (!benchmark.IsComplete || benchmark.Runs.Count != gate.Frameworks.Count ||
+                if (!benchmark.IsComplete || currentRunNeedsRecovery || benchmark.Runs.Count != gate.Frameworks.Count ||
                     !benchmark.Runs.Select(run => run.Tfm).SequenceEqual(gate.Frameworks, StringComparer.Ordinal))
                 {
-                    if (!recoveryRequired)
+                    if (!currentRunNeedsRecovery)
                     {
                         acquired.Lease.Complete();
                     }
@@ -578,7 +659,7 @@ public sealed class TestGateCoordinator
                         TimeSpan.FromTicks(benchmark.Runs.Sum(run => run.Command.Duration.Ticks)),
                         TimedOut: benchmark.Runs.Any(run => run.Command.TimedOut),
                         ResourceDenied: false,
-                        RecoveryRequired: recoveryRequired,
+                        RecoveryRequired: priorLeaseRecovered || currentRunNeedsRecovery,
                         WatchdogClean: benchmark.Runs.All(run => !run.Command.TimedOut),
                         OwnershipClean: benchmark.IsComplete,
                         InventoryComplete: true,
@@ -595,7 +676,7 @@ public sealed class TestGateCoordinator
                 }
             }
 
-            if (!recoveryRequired)
+            if (!currentRunNeedsRecovery)
             {
                 acquired.Lease.Complete();
             }
@@ -748,14 +829,14 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
 
         foreach (var journal in journals)
         {
-            var runId = Path.GetFileName(journal);
+            var runId = TestGateArtifactPathPlanner.ReadLogicalRunId(journal);
             var artifactRoot = Directory.GetParent(journal)!.Parent!.FullName;
-            if (IsVerifiedZeroExecution(artifactRoot, journal))
+            if (IsVerifiedZeroExecution(artifactRoot, journal, runId))
             {
                 continue;
             }
 
-            if (IsVerifiedJournalPathFailure(artifactRoot, journal) &&
+            if (IsVerifiedJournalPathFailure(artifactRoot, journal, runId) &&
                 await _emptyJournalPathFailureVerifier(artifactRoot, journal, cancellationToken)
                     .ConfigureAwait(false))
             {
@@ -766,7 +847,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
                 new BenchmarkOwnershipEvidence(
                     runId,
                     journal,
-                    Path.Combine(artifactRoot, "ownership-recovery-" + runId + ".json"),
+                    RecoveryPath(artifactRoot, journal, runId),
                     _approvalFile,
                     ProcessSucceeded: false),
                 cancellationToken).ConfigureAwait(false);
@@ -777,6 +858,15 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         }
 
         return true;
+    }
+
+    private static string RecoveryPath(string artifactRoot, string journal, string logicalRunId)
+    {
+        var hasPhysicalMapping = File.Exists(Path.Combine(
+            journal, TestGateArtifactPathPlanner.LogicalRunIdFileName));
+        return hasPhysicalMapping
+            ? Path.Combine(artifactRoot, "recovery-" + Path.GetFileName(journal) + ".json")
+            : Path.Combine(artifactRoot, "ownership-recovery-" + logicalRunId + ".json");
     }
 
     private async Task<bool> VerifyNoOwnedDatabasesAsync(
@@ -832,7 +922,10 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         }
     }
 
-    private static bool IsVerifiedJournalPathFailure(string artifactRoot, string journal)
+    private static bool IsVerifiedJournalPathFailure(
+        string artifactRoot,
+        string journal,
+        string logicalRunId)
     {
         journal = Path.GetFullPath(journal);
         var runRoot = Path.Combine(artifactRoot, Path.GetFileName(journal));
@@ -841,7 +934,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
             artifactRoot = runRoot;
         }
 
-        if (Directory.EnumerateFileSystemEntries(journal).Any())
+        if (!TestGateArtifactPathPlanner.IsEmptyOrMetadataOnlyJournal(journal, logicalRunId))
         {
             return false;
         }
@@ -896,7 +989,10 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         }
     }
 
-    private static bool IsVerifiedZeroExecution(string artifactRoot, string journal)
+    private static bool IsVerifiedZeroExecution(
+        string artifactRoot,
+        string journal,
+        string logicalRunId)
     {
         var runRoot = Path.Combine(artifactRoot, Path.GetFileName(journal));
         if (Directory.Exists(runRoot))
@@ -904,7 +1000,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
             artifactRoot = runRoot;
         }
 
-        if (Directory.EnumerateFileSystemEntries(journal).Any())
+        if (!TestGateArtifactPathPlanner.IsEmptyOrMetadataOnlyJournal(journal, logicalRunId))
         {
             return false;
         }

@@ -9,6 +9,7 @@ using MyDmsVn.SqlTestRunner.Benchmark;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Processes;
 using MyDmsVn.SqlTestRunner.Reconciliation;
+using MyDmsVn.SqlTestRunner.Gates;
 
 namespace MyDmsVn.SqlTestRunner.Focused;
 
@@ -92,6 +93,11 @@ public sealed class FocusedRunCoordinator
             deadline.Token);
         try
         {
+            if (TestGateArtifactPathPlanner.FindOverBudgetPaths(options.ArtifactRoot).Count != 0)
+            {
+                return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
+            }
+
             if (!await _preflight.ValidateAsync(linked.Token).ConfigureAwait(false))
             {
                 return new FocusedRunResult(false, runs, recovery.RecoveryRequired);
@@ -122,17 +128,19 @@ public sealed class FocusedRunCoordinator
 
                 var runId = "focused-" + options.Category.ToLowerInvariant() + "-" +
                     tfm.Replace('.', '-') + "-" + Guid.NewGuid().ToString("N");
-                var runRoot = Path.Combine(options.ArtifactRoot, runId);
-                var journal = Path.Combine(options.ArtifactRoot, "ownership", runId);
+                var physicalId = TestGateArtifactPathPlanner.NewPhysicalId();
+                var runRoot = Path.Combine(options.ArtifactRoot, physicalId);
+                var journal = Path.Combine(options.ArtifactRoot, "ownership", physicalId);
                 var discoveryPath = Path.Combine(runRoot, "discovery.txt");
-                var trxName = runId + ".trx";
+                var trxName = "result.trx";
                 var trxPath = Path.Combine(runRoot, trxName);
-                var timingPath = Path.Combine(runRoot, "timing.jsonl");
+                var timingPath = Path.Combine(runRoot, "m.jsonl");
                 var recoveryPath = Path.Combine(
                     options.ArtifactRoot,
-                    "ownership-recovery-" + runId + ".json");
+                    "recovery-" + physicalId + ".json");
                 Directory.CreateDirectory(runRoot);
                 Directory.CreateDirectory(journal);
+                TestGateArtifactPathPlanner.WriteLogicalRunId(journal, runId);
                 File.WriteAllText(discoveryPath, discovery.StandardOutput);
 
                 var environment = new Dictionary<string, string>(StringComparer.Ordinal)

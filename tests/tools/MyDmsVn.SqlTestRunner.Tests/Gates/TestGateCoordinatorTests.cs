@@ -31,6 +31,17 @@ public sealed class TestGateCoordinatorTests
         Assert.All(processes.Commands, command => Assert.DoesNotContain(".sln", command.Arguments, StringComparison.OrdinalIgnoreCase));
         Assert.Contains("--list-tests", processes.Commands[1].Arguments, StringComparison.Ordinal);
         Assert.Contains("--logger \"trx;LogFileName=", processes.Commands[2].Arguments, StringComparison.Ordinal);
+        var runRoot = Regex.Match(
+            processes.Commands[2].Arguments,
+            "--results-directory \\\"([^\\\"]+)\\\"").Groups[1].Value;
+        var trxName = Regex.Match(
+            processes.Commands[2].Arguments,
+            "LogFileName=([^\\\"]+)\\\"").Groups[1].Value;
+        Assert.Equal("result.trx", trxName);
+        var logicalRunId = File.ReadAllText(Path.Combine(
+            runRoot, TestGateArtifactPathPlanner.LogicalRunIdFileName));
+        Assert.StartsWith("task-example-net8-", logicalRunId, StringComparison.Ordinal);
+        Assert.NotEqual(Path.GetFileName(runRoot), logicalRunId);
         Assert.Single(
             processes.Commands.Select(command => command.Arguments),
             arguments => arguments.Contains("--logger", StringComparison.Ordinal));
@@ -53,6 +64,42 @@ public sealed class TestGateCoordinatorTests
         Assert.All(
             processes.Commands.Where(command => command.Arguments.Contains("test ", StringComparison.Ordinal)),
             command => Assert.Contains("--filter \"FullyQualifiedName~Example.Tests.Case\"", command.Arguments));
+    }
+
+    [Fact]
+    public async Task Task_fingerprint_scope_allows_unrelated_drift_in_the_same_project()
+    {
+        using var repository = new GateRepository(TestGateSelectionKind.FullyQualifiedName);
+        var events = new List<string>();
+        var processes = new GateProcessRunner(repository, events);
+
+        var result = await new TestGateCoordinator(
+            processes,
+            new TwoMethodInventory(staleUnselected: true),
+            new RecordingReportExporter(events)).RunAsync(
+                repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Succeeded, result.Status);
+        Assert.Equal(new[] { "build", "discover", "execute", "report" }, events);
+    }
+
+    [Fact]
+    public async Task Task_rejects_selected_fingerprint_drift_before_execution()
+    {
+        using var repository = new GateRepository(TestGateSelectionKind.FullyQualifiedName);
+        var events = new List<string>();
+        var processes = new GateProcessRunner(repository, events);
+
+        var result = await new TestGateCoordinator(
+            processes,
+            new TwoMethodInventory(staleSelected: true),
+            new RecordingReportExporter(events)).RunAsync(
+                repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.Equal(new[] { "build", "discover" }, events);
+        Assert.DoesNotContain(processes.Commands,
+            command => command.Arguments.Contains("--logger", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -133,13 +180,24 @@ public sealed class TestGateCoordinatorTests
 
     private sealed class TwoMethodInventory : ITestGateSourceInventory
     {
+        private readonly bool _staleSelected;
+        private readonly bool _staleUnselected;
+
+        public TwoMethodInventory(bool staleSelected = false, bool staleUnselected = false)
+        {
+            _staleSelected = staleSelected;
+            _staleUnselected = staleUnselected;
+        }
+
         public IReadOnlyList<TestMethodDescriptor> Read(string assemblyPath) => new[]
         {
-            new TestMethodDescriptor("Example.Tests.Case", false, GateRepository.Fingerprint)
+            new TestMethodDescriptor("Example.Tests.Case", false,
+                _staleSelected ? new string('f', 64) : GateRepository.Fingerprint)
             {
                 NormalizedSignature = "Example.Tests.Case()",
             },
-            new TestMethodDescriptor("Example.Tests.Other", false, GateRepository.OtherFingerprint)
+            new TestMethodDescriptor("Example.Tests.Other", false,
+                _staleUnselected ? new string('e', 64) : GateRepository.OtherFingerprint)
             {
                 NormalizedSignature = "Example.Tests.Other()",
             },
@@ -235,7 +293,10 @@ public sealed class TestGateCoordinatorTests
             TestGateStrictMode strictMode = TestGateStrictMode.DotnetTest,
             bool duplicateProject = false)
         {
-            Root = Path.Combine(Path.GetTempPath(), "mydms-test-gate-" + Guid.NewGuid().ToString("N"));
+            var shortRoot = OperatingSystem.IsWindows()
+                ? Path.GetPathRoot(Path.GetTempPath())!
+                : Path.GetTempPath();
+            Root = Path.Combine(shortRoot, "t35g-" + Guid.NewGuid().ToString("N"));
             Project = Path.Combine(Root, "tests", "Example.Tests", "Example.Tests.csproj");
             Directory.CreateDirectory(Path.GetDirectoryName(Project)!);
             File.WriteAllText(Project, "<Project><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>");

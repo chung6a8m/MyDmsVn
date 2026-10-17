@@ -227,6 +227,36 @@ public sealed class SqlExecutionLeaseTests
     }
 
     [Fact]
+    public async Task Completed_run_after_recovering_an_abandoned_lease_does_not_recover_again()
+    {
+        using var store = new TemporaryLeaseStore();
+        const string fingerprint = "recovery-followed-by-completion";
+        WritePriorLease(store, fingerprint);
+        using var abandoned = Abandon(fingerprint);
+        var events = new List<string>();
+        var factory = new SqlExecutionLeaseFactory(
+            new FileSqlExecutionLeaseStore(store.Root),
+            new FixedProcessProbe(isLive: false));
+
+        var first = await factory.AcquireAsync(
+            Request(store, fingerprint, recovery: new RecordingRecovery(events, succeeds: true)),
+            CancellationToken.None);
+
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.Recovered, first.Status);
+        first.Lease!.Complete();
+        await first.Lease.DisposeAsync();
+
+        var second = await factory.AcquireAsync(
+            Request(store, fingerprint, recovery: new RecordingRecovery(events, succeeds: false)),
+            CancellationToken.None);
+
+        Assert.Equal(SqlExecutionLeaseAcquireStatus.Acquired, second.Status);
+        Assert.Equal(new[] { "recover" }, events);
+        second.Lease!.Complete();
+        await second.Lease.DisposeAsync();
+    }
+
+    [Fact]
     public async Task Missing_corrupt_mismatched_live_or_unresolved_recovery_is_blocked()
     {
         await AssertBlockedRecovery(LeaseDamage.Missing, isLive: false, recoverySucceeds: true);

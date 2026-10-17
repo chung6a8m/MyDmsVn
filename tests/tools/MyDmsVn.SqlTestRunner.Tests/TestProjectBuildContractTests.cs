@@ -23,12 +23,26 @@ public sealed class TestProjectBuildContractTests
 
         Assert.DoesNotContain(document.Descendants("Exec"), element =>
             ((string?)element.Attribute("Command"))?.Contains("dotnet restore", StringComparison.Ordinal) == true);
+        Assert.Single(invocations);
+        Assert.Contains(document.Descendants("Target"), element =>
+            (string?)element.Attribute("Name") == "BuildRepositoryInventoryFixtures");
         Assert.Contains(invocations, element =>
-            ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
-            ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true);
-        Assert.Equal(8, invocations.Count(element =>
-            ((string?)element.Attribute("Targets"))?.Contains("Build", StringComparison.Ordinal) == true &&
-            ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net48", StringComparison.Ordinal) == true));
+            ((string?)element.Attribute("Targets")) == "Restore;Build" &&
+            ((string?)element.Attribute("Properties"))?.Contains("PreflightOutputRoot=$(PreflightOutputRoot)", StringComparison.Ordinal) == true &&
+            ((string?)element.Attribute("Properties"))?.Contains("CustomBeforeDirectoryBuildProps=$(CustomBeforeDirectoryBuildProps)", StringComparison.Ordinal) == true);
+        var isolatedProps = File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "tests", "tools", "TestGate.IsolatedBuild.props"));
+        Assert.Contains("<BaseOutputPath>$(PreflightOutputRoot)", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("<BaseIntermediateOutputPath>$(PreflightOutputRoot)", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("<MSBuildProjectExtensionsPath>$(PreflightOutputRoot)", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("<NuGetLockFilePath>$(PreflightOutputRoot)", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("<RestoreLockedMode Condition=\"Exists(", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("Name=\"TestGateCopyLockedPackageFile\"", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("SourceFiles=\"$(MSBuildProjectDirectory)\\packages.lock.json\"", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("obj/**;bin/**", isolatedProps, StringComparison.Ordinal);
+        Assert.Equal(11, document.Descendants("RepositoryInventoryFixture").Count());
+        Assert.DoesNotContain(document.Descendants("Target"), element =>
+            ((string?)element.Attribute("BeforeTargets"))?.Contains("Build", StringComparison.Ordinal) == true);
         Assert.DoesNotContain(invocations, element =>
             ((string?)element.Attribute("Properties"))?.Contains("TargetFramework=net8.0", StringComparison.Ordinal) == true);
     }
