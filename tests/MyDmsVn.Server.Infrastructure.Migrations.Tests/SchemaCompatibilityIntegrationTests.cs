@@ -34,7 +34,8 @@ public sealed class SchemaCompatibilityIntegrationTests
                     resourceName =>
                         resourceName.Contains(".Scripts.") &&
                         !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal) &&
-                        !resourceName.EndsWith("008_Security_Administration.sql", StringComparison.Ordinal))
+                        !resourceName.EndsWith("008_Security_Administration.sql", StringComparison.Ordinal) &&
+                        !resourceName.EndsWith("009_Security_Permission_Import.sql", StringComparison.Ordinal))
                 .JournalToSqlTable("dbo", "SchemaVersions")
                 .WithTransactionPerScript()
                 .LogToNowhere()
@@ -105,7 +106,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             Assert.True(first.IsCompatible);
             Assert.True(second.IsCompatible);
             using var connection = new SqlConnection(database.ConnectionString);
-            Assert.Equal(8, await connection.QuerySingleAsync<int>(
+            Assert.Equal(9, await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
         }
         finally
@@ -629,16 +630,9 @@ public sealed class SchemaCompatibilityIntegrationTests
             using (var connection = new SqlConnection(database.ConnectionString))
             {
                 await connection.ExecuteAsync(
-                    "DROP PROCEDURE dbo.ApplySecurityAdministration; " +
-                    "DROP TABLE dbo.SecurityAuditEvents; " +
-                    "ALTER TABLE dbo.Users DROP CONSTRAINT DF_Users_AssignmentRevision; " +
-                    "ALTER TABLE dbo.Users DROP COLUMN AssignmentRevision; " +
-                    "ALTER TABLE dbo.Roles DROP CONSTRAINT DF_Roles_AssignmentRevision; " +
-                    "ALTER TABLE dbo.Roles DROP COLUMN AssignmentRevision; " +
-                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%008_Security_Administration.sql'; " +
-                    "DROP TRIGGER dbo.TR_StockLedger_AppendOnly; " +
-                    "DROP TABLE dbo.StockBalances; DROP TABLE dbo.StockLedger; " +
-                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%007_Inventory_Stock.sql';");
+                    "DROP PROCEDURE dbo.ApplySecurityPermissionImport; " +
+                    "DROP PROCEDURE dbo.ReadSecurityPermissionImportTarget; " +
+                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%009_Security_Permission_Import.sql';");
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
@@ -25,15 +25,26 @@ public sealed class SecurityBaselineMigrationTests
                 "CAST(CASE WHEN OBJECT_ID(N'dbo.SystemSecuritySettings', N'U') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasBindingTable, " +
                 "CAST(CASE WHEN OBJECT_ID(N'dbo.RolePermissions', N'U') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasRoleAssignments, " +
                 "CAST(CASE WHEN OBJECT_ID(N'dbo.UserPermissions', N'U') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasUserAssignments, " +
-                "(SELECT COUNT_BIG(*) FROM sys.tables WHERE schema_id = SCHEMA_ID(N'dbo') AND name IN " +
+                "(SELECT COUNT_BIG(*) FROM sys.objects AS obsolete " +
+                "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = obsolete.schema_id " +
+                "WHERE ownerSchema.name = N'dbo' AND obsolete.name IN " +
                 "(N'Permissions', N'PermissionLegacyAssignmentDrift', N'PermissionSynchronizationState', " +
                 "N'SystemManagedRoles', N'PermissionGrantApprovals', N'ManagedRolePermissionGrants', " +
-                "N'SecurityBootstrapState', N'PermissionSecurityAudit')) AS ObsoleteTableCount");
+                "N'SecurityBootstrapState', N'PermissionSecurityAudit')) AS ObsoleteObjectCount, " +
+                "CAST(CASE WHEN EXISTS (SELECT 1 FROM sys.database_permissions AS permissionRow " +
+                "INNER JOIN sys.objects AS obsolete ON obsolete.object_id = permissionRow.major_id " +
+                "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = obsolete.schema_id " +
+                "WHERE ownerSchema.name = N'dbo' AND obsolete.name IN " +
+                "(N'Permissions', N'PermissionLegacyAssignmentDrift', N'PermissionSynchronizationState', " +
+                "N'SystemManagedRoles', N'PermissionGrantApprovals', N'ManagedRolePermissionGrants', " +
+                "N'SecurityBootstrapState', N'PermissionSecurityAudit')) THEN 1 ELSE 0 END AS bit) " +
+                "AS HasObsoleteObjectPermissions");
 
             Assert.True(state.HasBindingTable);
             Assert.True(state.HasRoleAssignments);
             Assert.True(state.HasUserAssignments);
-            Assert.Equal(0, state.ObsoleteTableCount);
+            Assert.Equal(0, state.ObsoleteObjectCount);
+            Assert.False(state.HasObsoleteObjectPermissions);
             Assert.Equal(0, await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SystemSecuritySettings;"));
             Assert.Equal(0, await connection.QuerySingleAsync<int>(
@@ -91,6 +102,7 @@ public sealed class SecurityBaselineMigrationTests
         public bool HasBindingTable { get; set; }
         public bool HasRoleAssignments { get; set; }
         public bool HasUserAssignments { get; set; }
-        public long ObsoleteTableCount { get; set; }
+        public long ObsoleteObjectCount { get; set; }
+        public bool HasObsoleteObjectPermissions { get; set; }
     }
 }

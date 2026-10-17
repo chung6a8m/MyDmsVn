@@ -49,13 +49,13 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.DatabaseMigratorCommandTests.Missing_migration_configuration_returns_safe_actionable_error",
-    "MethodBodyFingerprint": "07a576768ec3598b5040cff26a2c4b83fad84172a328628088866cbb85b835c2",
+    "MethodBodyFingerprint": "7868fea354842859374c945af81c7c14bd8d64bb61f1e50a1d929f4790bf5586",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.DatabaseMigratorCommandTests.Runtime_setting_is_never_used_as_migration_fallback",
-    "MethodBodyFingerprint": "3d95dc908df89ca81f882ef1b143bbe464a2a24101e82e4612e08c08ffe1cc48",
+    "MethodBodyFingerprint": "263ebc5659362d1965cb6c827c8b6e36836d7c8b4d409c5e604a897e9a85d899",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
@@ -73,9 +73,9 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.GoodsReceiptModelRegistrationTests.Sql_persistence_registers_goods_receipt_models_and_mapping",
-    "MethodBodyFingerprint": "2a5c8060819262df9e2e5994d3a4dc80ef21f3acc0a1d48291bfda3fc537664e",
+    "MethodBodyFingerprint": "2a5c8060819262df9e2e5994d3a4dc80ef21f3acc0a1d48291bfda3fc537664e|51e81a03c5b33ade00467bd69fc51d4a6fe833a8fd5cf8e1e6ba9d69a42da944",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.LegacyPasswordVerifierTests.Sql_persistence_registers_fail_closed_legacy_verifier",
@@ -109,85 +109,85 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.OperationalConfigurationTests.Invalid_target_is_rejected_without_echoing_secret",
-    "MethodBodyFingerprint": "af5d7724bb9ba84c71bcdb54c29889d2dae3d696459232a1cb7ce4ea56ec09fd",
+    "MethodBodyFingerprint": "af5d7724bb9ba84c71bcdb54c29889d2dae3d696459232a1cb7ce4ea56ec09fd|a90ab292c0e4494e6dec9b1a97f1bb0c509c09aef511449a64f855aac3383817",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.OperationalConfigurationTests.Missing_runtime_configuration_fails_closed_with_safe_code",
-    "MethodBodyFingerprint": "d3e8f235728da7ca62819874f7ecfab5f5bb9a8c78988f0d8bf9cbdf4b9a0ab7",
+    "MethodBodyFingerprint": "d3e8f235728da7ca62819874f7ecfab5f5bb9a8c78988f0d8bf9cbdf4b9a0ab7|33274dd14295c071d8563741ca112fcfc56c1dedd66f5c57804e502cb9a559c1",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.OperationalConfigurationTests.Purpose_specific_environment_value_overrides_file_without_cross_purpose_fallback",
-    "MethodBodyFingerprint": "35be917a10d57e1e4de790c582f0186990d1fde6394d12c20001212a52a1cce4",
+    "MethodBodyFingerprint": "35be917a10d57e1e4de790c582f0186990d1fde6394d12c20001212a52a1cce4|1075ba666820807a8209da02efa841439e27ac6d91f59d236e7620974953b5df",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.OperationalConfigurationTests.Purpose_specific_file_precedes_default_installation_file",
-    "MethodBodyFingerprint": "957d762bd206ea295f54c33853670a3c2b0f329d2478f152ec363223a403ac60",
+    "MethodBodyFingerprint": "957d762bd206ea295f54c33853670a3c2b0f329d2478f152ec363223a403ac60|1244c158f520655d9f7d77de30668ebe8ecd99f88f5b2b692f62f24a5ea50363",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.OperationalConfigurationTests.Unreadable_explicit_file_maps_security_failures_without_exposing_path",
-    "MethodBodyFingerprint": "7b79fa0ea52d1939b0d29b706aa11a6a1031c6f5d5b9569f92459dbc41bcfad6",
+    "MethodBodyFingerprint": "7b79fa0ea52d1939b0d29b706aa11a6a1031c6f5d5b9569f92459dbc41bcfad6|24744c1c1bd2a7336dc4fb2b88713a8cba5515cccb75151429bb8b85a5479b83",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.RepositoryAndQueryIntegrationTests.RepoDb_mapping_initialization_is_thread_safe_and_retries_after_failure",
-    "MethodBodyFingerprint": "a1b161504d16b3cde39f095419f6aac451c17d408ee6f3c0d1b44d8598311a86",
+    "MethodBodyFingerprint": "a1b161504d16b3cde39f095419f6aac451c17d408ee6f3c0d1b44d8598311a86|8f0ee9bba63a82677bcd4a2fe68f1b57b324f51ae165ce697e000b405b21b969",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-17 on active net48 after moving to Foundation.Tests: the method uses pure RepoDb mapping initialization with a fail-once fake; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-17 on active net48 after moving to Foundation.Tests: the method uses pure RepoDb mapping initialization with a fail-once fake; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SchemaCompatibilityPolicyTests.Appended_script_with_future_artifact_is_too_new",
-    "MethodBodyFingerprint": "1312260ff804c858b418dca51fe8dbc11cdbd399b35d6ef2f027a36adf2fcbcf",
+    "MethodBodyFingerprint": "c33f5db037b19a4ef577b982a2d9a1296ca203fc9c47f2829399e42642f6743a",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SchemaCompatibilityPolicyTests.Appended_unknown_script_is_too_new",
-    "MethodBodyFingerprint": "9a3e98360c6e464adaa962d2423a460f3d9f54d757ad124c627d49dd2b8bf6bd",
+    "MethodBodyFingerprint": "5d464e1e7e2bfe2a368e4700ee57fd76d0ec4955815b97153e8e388eeee2b649",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SchemaCompatibilityPolicyTests.Current_history_missing_required_artifact_is_partial",
-    "MethodBodyFingerprint": "4e7c8b94c509c069ed3b5b6d0490ad10386e6790bde04be29580f8d17f4270d4",
+    "MethodBodyFingerprint": "c28e6cee9b910f9e7db40b120dfdbb935a28b1d1d1832c70d9d2f8e96f6ee683",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SchemaCompatibilityPolicyTests.Exact_history_and_artifacts_are_compatible",
-    "MethodBodyFingerprint": "3fc255b5f568fdd1ce55f203dd66247bbf8aa9e60aefe2970f37740bb7b6aa21",
+    "MethodBodyFingerprint": "d1d3d1db643a7c9b1a22f943265173e2b3ae0a9608f213887c9a5877c1a71fce",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SchemaCompatibilityPolicyTests.Known_future_artifact_without_its_journal_entry_is_partial",
-    "MethodBodyFingerprint": "0aa4f20e1ae91d1e901d00db8f9795be79d8249af63c0ad3a6ec21149ffebb36",
+    "MethodBodyFingerprint": "cf6ef0f91e293ceef23b80e65a182bac434af24646e5a26048ea0f67ddff65ae",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SchemaCompatibilityPolicyTests.Missing_journal_is_empty_and_fails_closed",
-    "MethodBodyFingerprint": "48b4632a92ba863a40246c5e5436d2f14151b2d24e61bf15a7261a8cc32313f7",
+    "MethodBodyFingerprint": "75433d13f67f3da4792ec92d9e5c41ac9497cc810485024b899f794912db7c0d",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SchemaCompatibilityPolicyTests.Reordered_or_missing_middle_history_is_unknown",
-    "MethodBodyFingerprint": "f9f1cec06a554d2c66dc1adfe6c964fdbed990629312cfd53e95e94b7cf07040",
+    "MethodBodyFingerprint": "874f366994f8b288d8b9c664ce5d1b7b90f6d62ca69240dcaa31eaa9ae36ad94",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SchemaCompatibilityPolicyTests.Valid_prefix_without_future_artifacts_is_too_old",
-    "MethodBodyFingerprint": "87afd56d5b955d1a02ce3800e3c4f8ab58d9a86b57df66ea18013edf47dc6d98",
+    "MethodBodyFingerprint": "6ab143521c6a7e8dbd40d5a335d287616973f8b78dcad53bd650cf9c8b198ac2",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
@@ -265,21 +265,21 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.UnitOfWorkExceptionalCleanupTests.Commit_records_terminal_state_before_transaction_disposal_throws",
-    "MethodBodyFingerprint": "324d93b7cec57013159ad3ecc645541b62faf1ff7151f9d7b0e2e9e873750f36",
+    "MethodBodyFingerprint": "324d93b7cec57013159ad3ecc645541b62faf1ff7151f9d7b0e2e9e873750f36|130d0f9b30f274f7b2ac98f0dab91304c3040f9330cec34f3940d88f236b407e",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.UnitOfWorkExceptionalCleanupTests.Dispose_closes_connection_and_records_terminal_state_when_transaction_cleanup_throws",
-    "MethodBodyFingerprint": "475f2c4c2e278265021010529532d8354606e8a80d277af344be44e76aa02eb9",
+    "MethodBodyFingerprint": "475f2c4c2e278265021010529532d8354606e8a80d277af344be44e76aa02eb9|5ae8711d02e8a83c7959e59ad338c64d7743ca3ea875913fa276138cdce7d41d",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.UnitOfWorkExceptionalCleanupTests.Rollback_records_terminal_state_before_transaction_disposal_throws",
-    "MethodBodyFingerprint": "3179507caa9b786018d44984fda2c9aa2e87579fff8b13b932f471105504a763",
+    "MethodBodyFingerprint": "3179507caa9b786018d44984fda2c9aa2e87579fff8b13b932f471105504a763|fa29852e59c271339aed70838062eeaf9e8815900c2a718a1ae98ac5fe543223",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
-    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
+    "Evidence": "Reviewed 2026-10-15 on net48 and net8.0: the method uses pure logic, dependency injection/fakes, or rejects before opening a live SQL connection; it issues no database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML. Re-reviewed 2026-10-17 for active net48: the current method remains pure or fails closed before live SQL/DDL/DML; the prior fingerprint is retained for the parked net8 inventory."
   },
   {
     "MethodName": "MyDmsVn.Desktop.Tests.DesktopDatabaseStartupCoordinatorTests.Compatible_runtime_configuration_is_returned_for_host_composition",
@@ -307,25 +307,25 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.DatabaseMigratorCommandTests.Superuser_bootstrap_rejects_command_line_password_without_loading_configuration",
-    "MethodBodyFingerprint": "6bd7b6c801aee3e60f5391a2b2d2956c236485af87f1e7aa3fab26c2ddefed39",
+    "MethodBodyFingerprint": "0db64652af1bf91b599ba98674f0d077f2d4705748adf62924d470ca1de196bb",
     "Rationale": "Pure bootstrap CLI validation test; no live SQL connection is opened.",
     "Evidence": "Reviewed 2026-10-17 on net48: rejects a password argument before loading configuration or opening SQL. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SuperuserMaintenanceCommandTests.Recovery_rejects_password_argument_before_loading_maintenance_configuration",
-    "MethodBodyFingerprint": "886c2557e79697c1a24ce82c232f7dc0e4cbc5d8850d131eee5a67c9e572ffc3",
+    "MethodBodyFingerprint": "4b636db71d6e28dcfba4e7ee91540cc5c5b324eb08c49092f867085370f397e4",
     "Rationale": "Pure maintenance CLI validation test; no live SQL connection is opened.",
     "Evidence": "Reviewed 2026-10-17 on net48: rejects a password argument before configuration or secret input, with no SQL access. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SuperuserMaintenanceCommandTests.Rename_rejects_unknown_options_before_loading_maintenance_configuration",
-    "MethodBodyFingerprint": "d9a79ac3b031893738dbec9000b1b55d52a9bb307e0239d3b0346c9934ca697f",
+    "MethodBodyFingerprint": "2b9e8bf6253f9a52f502a6236b8d478e9e6c980dbed0d82ba56b112f5027820d",
     "Rationale": "Pure maintenance CLI validation test; no live SQL connection is opened.",
     "Evidence": "Reviewed 2026-10-17 on net48: rejects unknown arguments before configuration or secret input, with no SQL access. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.PermissionCatalogCommandTests.Offline_json_command_exports_the_runtime_registry_without_database_configuration",
-    "MethodBodyFingerprint": "92d87001bc55465416ef7015c3f79b8d37b195eeefcd2a395d18d870246aa471",
+    "MethodBodyFingerprint": "6fa4c228ab287473ad47c215085685e20de11b2e22ae66c47cb61f2952993e0f",
     "Rationale": "Offline permission catalog command only reads the static runtime registry and serializes JSON; no SQL connection or database DDL/DML is used.",
     "Evidence": "Reviewed 2026-10-17: the command runs without database configuration and exercises registry export only. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
