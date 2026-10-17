@@ -46,7 +46,7 @@ Runtime role còn có `VIEW DEFINITION` ở database scope để schema prefligh
 
 Mọi object mới phải được xem xét và thêm rõ ràng vào script; không cấp `SELECT/EXECUTE` toàn schema. Runtime không được đọc object chưa liệt kê, `ALTER/DROP`, tự cấp quyền, hoặc thay đổi migration history.
 
-Bootstrap superuser chỉ dùng migration principal qua admin package. Lệnh `security bootstrap-superuser --target <application-database>` xác nhận đúng target bằng prompt và đọc password qua prompt masked; không nhận password ở command line. Runtime principal chỉ được đọc `SystemSecuritySettings`; mọi thay đổi binding cần maintenance review. Xem [security provisioning runbook](SECURITY_PROVISIONING_RUNBOOK.md).
+Bootstrap superuser chỉ dùng migration principal qua admin package. Lệnh `security bootstrap-superuser --target <application-database>` xác nhận đúng target bằng prompt và đọc password qua prompt masked; không nhận password ở command line. Runtime principal chỉ được đọc `SystemSecuritySettings`; mọi thay đổi binding cần maintenance review. Xem [security administration runbook](SECURITY_ADMINISTRATION_RUNBOOK.md).
 
 ## 3. Nguồn cấu hình và precedence
 

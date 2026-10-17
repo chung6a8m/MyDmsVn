@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -683,15 +684,104 @@ public sealed class SecurityAdministrationSqlTests
         }
     }
 
-    private static ServiceProvider CreateProvider(string connectionString, int actorId)
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Catalog_only_release_adds_a_registered_key_without_rewriting_assignments()
+    {
+        const string newKey = "Catalog.ReleaseScenario.Access";
+        var database = await CreateMigratedDatabaseAsync();
+        try
+        {
+            int superuserId;
+            int ordinaryUserId;
+            using (var connection = new SqlConnection(database.ConnectionString))
+            {
+                superuserId = await InsertUserAsync(connection, "root.admin", "ROOT.ADMIN");
+                ordinaryUserId = await InsertUserAsync(connection, "ordinary", "ORDINARY");
+                await connection.ExecuteAsync(
+                    "INSERT dbo.SystemSecuritySettings (Id, SuperuserUserId, BoundNormalizedUsername) " +
+                    "VALUES (1, @superuserId, N'ROOT.ADMIN');",
+                    new { superuserId });
+            }
+
+            var registry = PermissionRegistry.Create(
+                PermissionRegistryComposition.CreateDefault().Definitions.Concat(new[]
+                {
+                    new PermissionDefinition(newKey, "Catalog", "Release scenario permission."),
+                }));
+            var assignmentsBefore = await ReadAssignmentSnapshotAsync(database.ConnectionString);
+            using var superuserProvider = CreateProvider(database.ConnectionString, superuserId, registry);
+            var sender = superuserProvider.GetRequiredService<ISender>();
+            var catalog = await sender.Send(new ListPermissionCatalogQuery());
+            Assert.False(catalog.IsError);
+            Assert.Contains(catalog.Value.Items, item => item.Key == newKey && item.Status == "Active");
+
+            using var exported = new StringWriter();
+            using var errors = new StringWriter();
+            var exitCode = PermissionCatalogCommand.Run(
+                new[] { "list", "--format", "json" }, exported, errors, registry);
+            Assert.Equal(0, exitCode);
+            Assert.Contains(newKey, exported.ToString(), StringComparison.Ordinal);
+            Assert.Equal(string.Empty, errors.ToString());
+
+            var superuserAuthorization = superuserProvider
+                .GetRequiredService<IPermissionAuthorizationService>();
+            Assert.True(await superuserAuthorization.IsAllowedAsync(newKey, CancellationToken.None));
+
+            using var ordinaryProvider = CreateProvider(database.ConnectionString, ordinaryUserId, registry);
+            var ordinaryAuthorization = ordinaryProvider
+                .GetRequiredService<IPermissionAuthorizationService>();
+            Assert.False(await ordinaryAuthorization.IsAllowedAsync(newKey, CancellationToken.None));
+
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            Assert.Equal(assignmentsBefore, await ReadAssignmentSnapshotAsync(database.ConnectionString));
+
+            var grant = await sender.Send(new MutateSecurityAdministrationCommand(
+                SecurityAdministrationTarget.User,
+                SecurityAdministrationOperation.SetPermission,
+                targetId: ordinaryUserId,
+                permissionKey: newKey,
+                decision: true,
+                expectedRevision: 0));
+            Assert.False(grant.IsError);
+            Assert.Equal(1, grant.Value.AssignmentRevision);
+            Assert.True(await ordinaryAuthorization.IsAllowedAsync(newKey, CancellationToken.None));
+            var assignmentsAfterGrant = await ReadAssignmentSnapshotAsync(database.ConnectionString);
+            Assert.NotEqual(assignmentsBefore, assignmentsAfterGrant);
+            Assert.Single(assignmentsAfterGrant,
+                assignment => assignment == "U|" + ordinaryUserId + "|" + newKey + "|1");
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+    private static ServiceProvider CreateProvider(string connectionString, int actorId, IPermissionRegistry? registry = null)
     {
         var services = new ServiceCollection();
+        if (registry != null)
+        {
+            services.AddSingleton(registry);
+        }
         services.AddServerApplication("ROOT.ADMIN");
         services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor(actorId));
         services.AddSqlPersistence(connectionString);
         return services.BuildServiceProvider();
     }
 
+    private static async Task<string[]> ReadAssignmentSnapshotAsync(string connectionString)
+    {
+        using var connection = new SqlConnection(connectionString);
+        var rows = await connection.QueryAsync<string>(
+            "SELECT Entry FROM (" +
+            "SELECT N'U|' + CONVERT(nvarchar(20), UserId) + N'|' + PermissionKey + N'|' + " +
+            "CASE WHEN Granted = 1 THEN N'1' ELSE N'0' END AS Entry FROM dbo.UserPermissions " +
+            "UNION ALL SELECT N'R|' + CONVERT(nvarchar(20), RoleId) + N'|' + PermissionKey + N'|1' " +
+            "FROM dbo.RolePermissions " +
+            "UNION ALL SELECT N'M|' + CONVERT(nvarchar(20), UserId) + N'|' + " +
+            "CONVERT(nvarchar(20), RoleId) + N'|1' FROM dbo.UserRoles) assignments ORDER BY Entry;");
+        return rows.ToArray();
+    }
     private static string ImportJson(string targetType, int targetId, params string[] keyAndDecisionPairs)
     {
         var entries = Enumerable.Range(0, keyAndDecisionPairs.Length / 2)

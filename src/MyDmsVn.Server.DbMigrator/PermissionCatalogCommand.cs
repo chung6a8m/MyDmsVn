@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using Newtonsoft.Json;
@@ -10,6 +10,15 @@ namespace MyDmsVn.Server.DbMigrator;
 public static class PermissionCatalogCommand
 {
     public static int Run(string[] args, TextWriter output, TextWriter error)
+    {
+        return Run(args, output, error, PermissionRegistryComposition.CreateDefault());
+    }
+
+    public static int Run(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        IPermissionRegistry registry)
     {
         if (args == null)
         {
@@ -26,6 +35,11 @@ public static class PermissionCatalogCommand
             throw new ArgumentNullException(nameof(error));
         }
 
+        if (registry == null)
+        {
+            throw new ArgumentNullException(nameof(registry));
+        }
+
         if (args.Length != 3 ||
             !string.Equals(args[0], "list", StringComparison.Ordinal) ||
             !string.Equals(args[1], "--format", StringComparison.Ordinal) ||
@@ -36,7 +50,7 @@ public static class PermissionCatalogCommand
         }
 
         output.WriteLine(JsonConvert.SerializeObject(
-            PermissionCatalogFactory.CreateDefault(),
+            PermissionCatalogFactory.Create(registry, PermissionCatalogFactory.GetApplicationVersion()),
             Formatting.Indented,
             new JsonSerializerSettings
             {

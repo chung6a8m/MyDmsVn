@@ -26,7 +26,7 @@ Cả hai host chạy cùng `DesktopDatabaseStartupCoordinator` trước khi đă
 |---|---|---|---|
 | Không journal, không artifact | `Schema.Empty` | Chặn | Chạy clean install bằng migrator |
 | Prefix hợp lệ nhưng thiếu script hiện tại | `Schema.TooOld` | Chặn | Backup/maintenance window, chạy migrator, preflight lại |
-| Đúng 001–007, đủ artifact bao gồm `SystemSecuritySettings` | `Schema.Compatible` | Cho phép preflight tiếp | Kiểm tra superuser binding/configuration kế tiếp |
+| Đúng manifest 001–009 và đủ artifact, bao gồm `SystemSecuritySettings` và security administration/import procedures | `Schema.Compatible` | Cho phép preflight tiếp | Kiểm tra superuser binding/configuration kế tiếp |
 | Thiếu script/artifact hoặc có prefix migration chưa hoàn tất | `Schema.TooOld` / `Schema.PartialMigration` | Chặn | Chạy migrator đã review rồi preflight lại |
 | Có script sau 007 | `Schema.TooNew` | Chặn | Cài client tương thích; không downgrade schema |
 | Sai/thừa/thiếu giữa chuỗi | `Schema.UnknownHistory` | Chặn | Dừng rollout, điều tra provenance; không sửa journal thủ công |
@@ -82,8 +82,8 @@ Baseline này yêu cầu downtime:
 2. Backup và kiểm tra preflight quản trị.
 3. Chạy migration bằng admin package.
 4. Xác nhận journal/artifact và migrator no-op.
-5. Với fresh install có user store trống, cấu hình `Security__SuperuserUsername` và chạy `security bootstrap-superuser` theo [security provisioning runbook](SECURITY_PROVISIONING_RUNBOOK.md). Không chạy bootstrap trên database đã có user.
-6. Triển khai host phù hợp manifest 001–007 và cùng cấu hình superuser đã được review.
+5. Với fresh install có user store trống, cấu hình `Security__SuperuserUsername` và chạy `security bootstrap-superuser` theo [security administration runbook](SECURITY_ADMINISTRATION_RUNBOOK.md). Không chạy bootstrap trên database đã có user.
+6. Triển khai host phù hợp manifest 001–009 và cùng cấu hình superuser đã được review.
 7. Chạy schema preflight, xác nhận binding/configuration, functional smoke và reconciliation.
 8. Mở lại truy cập.
 
