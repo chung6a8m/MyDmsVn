@@ -317,7 +317,31 @@ public sealed class TestGateCoordinator
                     if (!fullSourceBinding.IsComplete || !discoveryBinding.IsComplete ||
                         selectedSource.Length == 0)
                     {
+                        // Report safe identities, never raw Theory arguments or environment data.
                         // Manifest errors fail before executing any selected test.
+                        Console.Error.WriteLine(
+                            "Task/Final manifest preflight: " + gate.GateId + "/" + tfm +
+                            ": source=" + string.Join(",", fullSourceBinding.Failures) +
+                            "; discovery=" + string.Join(",", discoveryBinding.Failures));
+                        foreach (var expectedMethod in selectedDefinitions.Take(20))
+                        {
+                            var methods = source.Where(item => string.Equals(
+                                item.NormalizedSignature, expectedMethod.NormalizedMethodSignature,
+                                StringComparison.Ordinal)).ToArray();
+                            if (methods.Length == 0)
+                            {
+                                Console.Error.WriteLine(
+                                    "MissingMethod: " + expectedMethod.NormalizedMethodSignature);
+                            }
+                            else if (methods.Length == 1 &&
+                                !string.Equals(methods[0].BodyFingerprint,
+                                    expectedMethod.ReviewedCodeFingerprint, StringComparison.Ordinal))
+                            {
+                                Console.Error.WriteLine(
+                                    "FingerprintMismatch: " + expectedMethod.NormalizedMethodSignature);
+                            }
+                        }
+
                         return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
                     }
 
