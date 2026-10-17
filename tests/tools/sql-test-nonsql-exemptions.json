@@ -49,13 +49,13 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.DatabaseMigratorCommandTests.Missing_migration_configuration_returns_safe_actionable_error",
-    "MethodBodyFingerprint": "7868fea354842859374c945af81c7c14bd8d64bb61f1e50a1d929f4790bf5586",
+    "MethodBodyFingerprint": "a65dd24aa7542c9d7255fb5fb19a5262276e2a1656ba2a062a4c776cbf9b9320",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.DatabaseMigratorCommandTests.Runtime_setting_is_never_used_as_migration_fallback",
-    "MethodBodyFingerprint": "263ebc5659362d1965cb6c827c8b6e36836d7c8b4d409c5e604a897e9a85d899",
+    "MethodBodyFingerprint": "4b0eef9bc5c30864e059d6112e015ad68a71d418474add6ac53e725c4282a11b",
     "Rationale": "Pure or fail-closed harness test; no approved live SQL instance is required.",
     "Evidence": "Reviewed 2026-10-17 on net48: source reviewed as pure policy/configuration behavior; performs no live SQL or database DDL/DML. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
@@ -307,25 +307,25 @@
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.DatabaseMigratorCommandTests.Superuser_bootstrap_rejects_command_line_password_without_loading_configuration",
-    "MethodBodyFingerprint": "0db64652af1bf91b599ba98674f0d077f2d4705748adf62924d470ca1de196bb",
+    "MethodBodyFingerprint": "a9cadac16605db015dd56560535acf5476192ff423fa46967c85336f69cda3fe",
     "Rationale": "Pure bootstrap CLI validation test; no live SQL connection is opened.",
     "Evidence": "Reviewed 2026-10-17 on net48: rejects a password argument before loading configuration or opening SQL. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SuperuserMaintenanceCommandTests.Recovery_rejects_password_argument_before_loading_maintenance_configuration",
-    "MethodBodyFingerprint": "4b636db71d6e28dcfba4e7ee91540cc5c5b324eb08c49092f867085370f397e4",
+    "MethodBodyFingerprint": "bfa9a0349176bec7d738f6ef1820d1f9728522ff8c1ba03468f8e826aa154c8c",
     "Rationale": "Pure maintenance CLI validation test; no live SQL connection is opened.",
     "Evidence": "Reviewed 2026-10-17 on net48: rejects a password argument before configuration or secret input, with no SQL access. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.SuperuserMaintenanceCommandTests.Rename_rejects_unknown_options_before_loading_maintenance_configuration",
-    "MethodBodyFingerprint": "2b9e8bf6253f9a52f502a6236b8d478e9e6c980dbed0d82ba56b112f5027820d",
+    "MethodBodyFingerprint": "1d10b3c19d6fa43a25182705cf61ef7f45f5251977d8c7506013ad6fde8f296f",
     "Rationale": "Pure maintenance CLI validation test; no live SQL connection is opened.",
     "Evidence": "Reviewed 2026-10-17 on net48: rejects unknown arguments before configuration or secret input, with no SQL access. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
   {
     "MethodName": "MyDmsVn.Server.Infrastructure.IntegrationTests.PermissionCatalogCommandTests.Offline_json_command_exports_the_runtime_registry_without_database_configuration",
-    "MethodBodyFingerprint": "6fa4c228ab287473ad47c215085685e20de11b2e22ae66c47cb61f2952993e0f",
+    "MethodBodyFingerprint": "d09208705afe1101e599a6200a10cedab3147f24f6f27e6ed4f92cbf75f30dde",
     "Rationale": "Offline permission catalog command only reads the static runtime registry and serializes JSON; no SQL connection or database DDL/DML is used.",
     "Evidence": "Reviewed 2026-10-17: the command runs without database configuration and exercises registry export only. Re-reviewed 2026-10-17: current linked test and referenced source reviewed; behavior remains pure or rejects before live SQL and issues no database DDL/DML."
   },
