@@ -52,7 +52,8 @@ public sealed class TestGateCoordinatorTestsFinal
             new FinalApproval(events, valid: true),
             leases,
             new FinalSqlRunner(repository, events, FinalFailure.PriorLeaseRecovered),
-            new NoRecovery());
+            new NoRecovery(),
+            new AcceptSqlManifestPreflight());
 
         var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
 
@@ -75,7 +76,8 @@ public sealed class TestGateCoordinatorTestsFinal
             new FinalApproval(events, valid: true),
             leases,
             new FinalSqlRunner(repository, events, FinalFailure.UnreconciledOwnership),
-            new NoRecovery());
+            new NoRecovery(),
+            new AcceptSqlManifestPreflight());
 
         var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
 
@@ -137,6 +139,72 @@ public sealed class TestGateCoordinatorTestsFinal
     }
 
     [Fact]
+    public async Task SQL_manifest_preflight_failure_never_acquires_a_lease()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.None);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.None),
+            new NoRecovery(),
+            new RejectSqlManifestPreflight());
+
+        var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.Equal(new[] { "approval" }, events);
+        Assert.Null(leases.LastLease);
+    }
+
+    [Fact]
+    public async Task SQL_manifest_preflight_detects_stale_fingerprint_without_running_a_test()
+    {
+        using var repository = new FinalRepository();
+        var processes = new ManifestDiscoveryProcessRunner();
+        var manifest = TestGateManifestLoader.Load(repository.Manifest);
+        var drifted = manifest with
+        {
+            LogicalCases = manifest.LogicalCases.Select(item =>
+                item with { ReviewedCodeFingerprint = new string('f', 64) }).ToArray(),
+        };
+
+        var result = await new SqlGateManifestPreflight(
+            processes, new FinalInventory(new List<string>())).VerifyAsync(
+                repository.Options(), drifted, drifted.Gates, CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        Assert.Contains(result.Issues, issue => issue.Reason.Contains(
+            "FingerprintMismatch", StringComparison.Ordinal));
+        Assert.DoesNotContain(processes.Commands, command =>
+            command.Arguments.Contains("--logger", StringComparison.Ordinal));
+        Assert.All(processes.Commands, command =>
+            Assert.True(command.Arguments.StartsWith("build ", StringComparison.Ordinal) ||
+                command.Arguments.Contains("--list-tests", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task SQL_manifest_preflight_accepts_complete_source_and_discovery_without_running_SQL()
+    {
+        using var repository = new FinalRepository();
+        var processes = new ManifestDiscoveryProcessRunner();
+        var manifest = TestGateManifestLoader.Load(repository.Manifest);
+
+        var result = await new SqlGateManifestPreflight(
+            processes, new FinalInventory(new List<string>())).VerifyAsync(
+                repository.Options(), manifest, manifest.Gates, CancellationToken.None);
+
+        Assert.True(result.IsComplete, string.Join(",", result.Issues));
+        Assert.Equal(4, processes.Commands.Count);
+        Assert.DoesNotContain(processes.Commands, command =>
+            command.Arguments.Contains("--logger", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Cancellation_releases_lease_only_after_SQL_cleanup()
     {
         using var repository = new FinalRepository();
@@ -164,7 +232,8 @@ public sealed class TestGateCoordinatorTestsFinal
             new FinalApproval(events, valid: true),
             leases,
             new FinalSqlRunner(repository, events, FinalFailure.PreflightRejected),
-            new NoRecovery());
+            new NoRecovery(),
+            new AcceptSqlManifestPreflight());
 
         var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
 
@@ -184,7 +253,8 @@ public sealed class TestGateCoordinatorTestsFinal
         new FinalApproval(events, failure != FinalFailure.Approval),
         new FinalLeaseFactory(events, failure),
         new FinalSqlRunner(repository, events, failure),
-        new NoRecovery());
+        new NoRecovery(),
+        new AcceptSqlManifestPreflight());
 
     public enum FinalFailure
     {
@@ -373,6 +443,48 @@ public sealed class TestGateCoordinatorTestsFinal
         {
             _events.Add("report");
             return Task.FromResult(new TestGateReportExportResult(_complete, "report.json"));
+        }
+    }
+
+    private sealed class AcceptSqlManifestPreflight : ISqlGateManifestPreflight
+    {
+        public Task<SqlGateManifestPreflightResult> VerifyAsync(
+            TestGateRunOptions options,
+            TestGateManifest manifest,
+            IReadOnlyList<TestGateDefinition> gates,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new SqlGateManifestPreflightResult(
+                Array.Empty<SqlGateManifestPreflightIssue>()));
+    }
+
+    private sealed class RejectSqlManifestPreflight : ISqlGateManifestPreflight
+    {
+        public Task<SqlGateManifestPreflightResult> VerifyAsync(
+            TestGateRunOptions options,
+            TestGateManifest manifest,
+            IReadOnlyList<TestGateDefinition> gates,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new SqlGateManifestPreflightResult(new[]
+            {
+                new SqlGateManifestPreflightIssue("final-sql", "net48", "FingerprintMismatch"),
+            }));
+    }
+
+    private sealed class ManifestDiscoveryProcessRunner : IProcessRunner
+    {
+        public List<CommandSpec> Commands { get; } = new();
+
+        public Task<CommandResult> RunAsync(CommandSpec command, CancellationToken cancellationToken)
+        {
+            Commands.Add(command);
+            var name = command.Arguments.Contains("Sql.Module.Tests", StringComparison.Ordinal)
+                ? "Sql.Module.Tests.Case"
+                : "Sql.Tests.Case";
+            var output = command.Arguments.Contains("--list-tests", StringComparison.Ordinal)
+                ? "The following Tests are available:\n    " + name + "\n"
+                : string.Empty;
+            return Task.FromResult(new CommandResult(
+                0, false, 1, output, string.Empty, Array.Empty<int>(), TimeSpan.Zero));
         }
     }
 
