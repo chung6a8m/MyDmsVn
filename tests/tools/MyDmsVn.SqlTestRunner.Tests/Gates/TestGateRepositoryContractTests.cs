@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 using MyDmsVn.SqlTestRunner.Gates;
 using MyDmsVn.SqlTestRunner.Inventory;
 using MyDmsVn.SqlTestRunner.Reconciliation;
@@ -139,6 +140,7 @@ public sealed class TestGateRepositoryContractTests
 
     private static bool Audit(TestGateManifest manifest, RepositoryEvidence evidence)
     {
+        var root = RepositoryRoot();
         var sourceCases = new List<BoundLogicalCase>();
         var discoveryCases = new List<BoundLogicalCase>();
         foreach (var owner in manifest.LogicalCases.Select(item => item.OwnerProject)
@@ -157,9 +159,7 @@ public sealed class TestGateRepositoryContractTests
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             var isSqlOwner = IsSqlOwner(manifest, owner);
-            var frameworks = manifest.FrameworkProfile is { } activeProfile && isSqlOwner
-                ? historicalFrameworks.Intersect(activeProfile.ActiveSqlFrameworks, StringComparer.OrdinalIgnoreCase).ToArray()
-                    : historicalFrameworks;
+            var frameworks = GetAuditedFrameworks(manifest, root, owner, historicalFrameworks, isSqlOwner);
             foreach (var tfm in frameworks)
             {
                 if (!evidence.Discovery.TryGetValue((owner, tfm), out var discovered))
@@ -245,9 +245,12 @@ public sealed class TestGateRepositoryContractTests
         {
             var historical = manifest.LogicalCases.Where(item => string.Equals(item.OwnerProject, owner, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(item => item.Frameworks).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            var frameworks = IsSqlOwner(manifest, owner) && manifest.FrameworkProfile is { } profile
-                ? profile.ActiveSqlFrameworks
-                : historical;
+            var frameworks = GetAuditedFrameworks(
+                manifest,
+                root,
+                owner,
+                historical,
+                IsSqlOwner(manifest, owner));
             var assembly = Path.Combine(root, Path.GetDirectoryName(owner)!, "bin", "Release", frameworks[0],
                 Path.GetFileNameWithoutExtension(owner) + ".dll");
             source[owner] = TestMethodInventory.Read(assembly);
@@ -269,6 +272,72 @@ public sealed class TestGateRepositoryContractTests
                  StringComparison.OrdinalIgnoreCase))
              .SelectMany(item => item.Classification)
              .Any(category => category is "FastSQL" or "MigrationSchema" or "SecurityProvisioning" or "SqlConcurrency"));
+
+    private static string[] GetAuditedFrameworks(
+        TestGateManifest manifest,
+        string repositoryRoot,
+        string owner,
+        IReadOnlyList<string> historicalFrameworks,
+        bool isSqlOwner)
+    {
+        IEnumerable<string> activeFrameworks = ReadDeclaredFrameworks(repositoryRoot, owner);
+        if (manifest.FrameworkProfile is { } profile)
+        {
+            if (isSqlOwner)
+            {
+                activeFrameworks = activeFrameworks.Intersect(
+                    profile.ActiveSqlFrameworks,
+                    StringComparer.OrdinalIgnoreCase);
+            }
+            else if (string.Equals(owner, profile.GuiProject, StringComparison.OrdinalIgnoreCase))
+            {
+                activeFrameworks = activeFrameworks.Intersect(
+                    profile.ActiveGuiFrameworks,
+                    StringComparer.OrdinalIgnoreCase);
+            }
+            else
+            {
+                var toolOnly = profile.ToolOnlyProjects.FirstOrDefault(project =>
+                    string.Equals(project.Project, owner, StringComparison.OrdinalIgnoreCase));
+                if (toolOnly is not null)
+                {
+                    activeFrameworks = activeFrameworks.Intersect(
+                        toolOnly.Frameworks,
+                        StringComparer.OrdinalIgnoreCase);
+                }
+            }
+        }
+
+        var frameworks = historicalFrameworks
+            .Intersect(activeFrameworks, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (frameworks.Length == 0)
+        {
+            throw new InvalidDataException(
+                $"Project '{owner}' has no framework shared by its declared targets and reviewed manifest inventory.");
+        }
+
+        return frameworks;
+    }
+
+    private static string[] ReadDeclaredFrameworks(string repositoryRoot, string project)
+    {
+        var projectPath = Path.Combine(repositoryRoot, project.Replace('/', Path.DirectorySeparatorChar));
+        var document = XDocument.Load(projectPath);
+        var frameworks = document.Descendants()
+            .Where(element => element.Name.LocalName is "TargetFramework" or "TargetFrameworks")
+            .SelectMany(element => element.Value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            .Select(value => value.Trim())
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (frameworks.Length == 0)
+        {
+            throw new InvalidDataException($"Project '{project}' has no declared target framework.");
+        }
+
+        return frameworks;
+    }
 
     private static IReadOnlyList<DiscoveredTestCase> Discover(
         string root,
