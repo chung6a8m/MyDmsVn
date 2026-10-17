@@ -47,7 +47,8 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "WHERE ownerSchema.name = N'dbo' AND ownerTable.name IN (" +
         "N'SchemaVersions', N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', N'GoodsReceiptLines', " +
-        "N'StockLedger', N'StockBalances')), " +
+        "N'StockLedger', N'StockBalances') " +
+        "AND NOT (ownerTable.name IN (N'Users', N'Roles') AND candidate.name = N'AssignmentRevision')), " +
         "ManagedColumnFingerprints AS (SELECT GroupName, CONVERT(varchar(64), " +
         "HASHBYTES('SHA2_256', STRING_AGG(CAST(Signature AS nvarchar(max)), N';') " +
         "WITHIN GROUP (ORDER BY TableName, column_id)), 2) AS DefinitionHash " +
@@ -73,6 +74,8 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "SELECT N'Table:RolePermissions', OBJECT_ID(N'dbo.RolePermissions', N'U') UNION ALL " +
         "SELECT N'Table:UserPermissions', OBJECT_ID(N'dbo.UserPermissions', N'U') UNION ALL " +
         "SELECT N'Table:SystemSecuritySettings', OBJECT_ID(N'dbo.SystemSecuritySettings', N'U') UNION ALL " +
+        "SELECT N'Table:SecurityAuditEvents', OBJECT_ID(N'dbo.SecurityAuditEvents', N'U') UNION ALL " +
+        "SELECT N'Procedure:ApplySecurityAdministration', OBJECT_ID(N'dbo.ApplySecurityAdministration', N'P') UNION ALL " +
         "SELECT N'Invariant:SystemSecuritySettings', CASE WHEN " +
         "(SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.SystemSecuritySettings', N'U') " +
         "AND name IN (N'CK_SystemSecuritySettings_Singleton', N'CK_SystemSecuritySettings_Username_NotBlank') " +
@@ -82,6 +85,37 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "AND delete_referential_action = 0 AND update_referential_action = 0 AND is_disabled = 0 AND is_not_trusted = 0) = 1 AND " +
         "(SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.SystemSecuritySettings', N'U') " +
         "AND name = N'UX_SystemSecuritySettings_SuperuserUserId' AND is_unique = 1 AND is_disabled = 0) = 1 " +
+        "THEN 1 END UNION ALL " +
+        "SELECT N'Invariant:SecurityAdministration', CASE WHEN " +
+        "(SELECT COUNT(*) FROM sys.columns AS candidate " +
+        "INNER JOIN sys.tables AS ownerTable ON ownerTable.object_id = candidate.object_id " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = ownerTable.schema_id " +
+        "WHERE ownerSchema.name = N'dbo' AND " +
+        "((ownerTable.name = N'Users' AND candidate.name = N'AssignmentRevision' " +
+        "AND candidate.system_type_id = TYPE_ID(N'bigint') AND candidate.is_nullable = 0 AND candidate.is_identity = 0) OR " +
+        "(ownerTable.name = N'Roles' AND candidate.name = N'AssignmentRevision' " +
+        "AND candidate.system_type_id = TYPE_ID(N'bigint') AND candidate.is_nullable = 0 AND candidate.is_identity = 0))) = 2 AND " +
+        "(SELECT COUNT(*) FROM sys.default_constraints AS candidate " +
+        "INNER JOIN sys.columns AS ownerColumn ON ownerColumn.object_id = candidate.parent_object_id " +
+        "AND ownerColumn.column_id = candidate.parent_column_id " +
+        "INNER JOIN sys.tables AS ownerTable ON ownerTable.object_id = candidate.parent_object_id " +
+        "WHERE ownerTable.name IN (N'Users', N'Roles') AND ownerColumn.name = N'AssignmentRevision' " +
+        "AND candidate.definition IN (N'(0)', N'((0))')) = 2 AND " +
+        "(SELECT COUNT(*) FROM sys.columns AS candidate " +
+        "INNER JOIN sys.tables AS ownerTable ON ownerTable.object_id = candidate.object_id " +
+        "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = ownerTable.schema_id " +
+        "WHERE ownerSchema.name = N'dbo' AND ownerTable.name = N'SecurityAuditEvents' " +
+        "AND candidate.name IN (N'AuditEventId', N'ActorUserId', N'TargetType', N'TargetId', " +
+        "N'Operation', N'BeforeState', N'AfterState', N'OccurredAtUtc', N'CorrelationId')) = 9 AND " +
+        "(SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.SecurityAuditEvents', N'U')) = 9 AND " +
+        "(SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.SecurityAuditEvents', N'U') " +
+        "AND name IN (N'CK_SecurityAuditEvents_TargetType', N'CK_SecurityAuditEvents_TargetId', N'CK_SecurityAuditEvents_Operation_NotBlank') " +
+        "AND is_disabled = 0 AND is_not_trusted = 0) = 3 AND " +
+        "(SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'dbo.SecurityAuditEvents', N'U') " +
+        "AND name = N'FK_SecurityAuditEvents_Actor' AND referenced_object_id = OBJECT_ID(N'dbo.Users', N'U') " +
+        "AND delete_referential_action = 0 AND update_referential_action = 0 AND is_disabled = 0 AND is_not_trusted = 0) = 1 AND " +
+        "(SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.SecurityAuditEvents', N'U') " +
+        "AND name = N'IX_SecurityAuditEvents_Target' AND is_disabled = 0) = 1 " +
         "THEN 1 END UNION ALL " +
         "SELECT N'Invariant:IdentityChecks', CASE WHEN (SELECT COUNT(*) FROM (VALUES " +
         "(N'Users', N'CK_Users_Username_NotBlank', N'2872BEB326EEDB8889356C7EC712C93948FF90A980039E0F32DD5FCC6D41B640'), " +
@@ -463,7 +497,8 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         "N'SchemaVersions', N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
         "N'Products', N'Warehouses', N'Employees', N'Customers', " +
         "N'GoodsReceipts', N'GoodsReceiptLines', N'StockLedger', N'StockBalances', " +
-        "N'SystemSecuritySettings')) OR " +
+        "N'SystemSecuritySettings', N'SecurityAuditEvents')) OR " +
+        "(candidate.type = N'P' AND candidate.name = N'ApplySecurityAdministration') OR " +
         "(candidate.type = N'FN' AND candidate.name = N'CatalogTextContainsNul') OR " +
         "(candidate.type = N'SO' AND candidate.name = N'GoodsReceiptNumberSequence') OR " +
         "(candidate.type = N'TR' AND candidate.name = N'TR_StockLedger_AppendOnly' " +

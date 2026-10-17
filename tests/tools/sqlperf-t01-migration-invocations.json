@@ -60,6 +60,18 @@
     "expectedInvocationRule": "once-per-test-execution"
   },
   {
+    "invocationId": "SqlPrincipalProvisioningTests.Runtime_can_execute_only_the_allowlisted_administration_procedure.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Runtime_can_execute_only_the_allowlisted_administration_procedure",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Security.Tests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 137,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
     "invocationId": "SqlPrincipalProvisioningTests.Provisioning_rejects_direct_user_impersonation_permission.migration-01",
     "class": "SqlPrincipalProvisioningTests",
     "method": "Provisioning_rejects_direct_user_impersonation_permission",

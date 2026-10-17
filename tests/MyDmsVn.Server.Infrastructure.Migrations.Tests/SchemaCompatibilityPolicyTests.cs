@@ -15,6 +15,7 @@ public sealed class SchemaCompatibilityPolicyTests
         "005_GoodsReceipt.sql",
         "006_GoodsReceipt_Number_Sequence.sql",
         "007_Inventory_Stock.sql",
+        "008_Security_Administration.sql",
     };
 
     private static readonly string[] CurrentArtifacts =
@@ -27,6 +28,9 @@ public sealed class SchemaCompatibilityPolicyTests
         "Table:UserPermissions",
         "Table:SystemSecuritySettings",
         "Invariant:SystemSecuritySettings",
+        "Table:SecurityAuditEvents",
+        "Invariant:SecurityAdministration",
+        "Procedure:ApplySecurityAdministration",
         "Invariant:IdentityColumns",
         "Invariant:IdentityChecks",
         "Invariant:IdentityPrimaryKeys",

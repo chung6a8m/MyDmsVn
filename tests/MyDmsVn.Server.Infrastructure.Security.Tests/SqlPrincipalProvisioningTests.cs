@@ -126,6 +126,92 @@ public sealed class SqlPrincipalProvisioningTests
     }
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Runtime_can_execute_only_the_allowlisted_administration_procedure()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "SqlPrincipalProvisioningTests.Runtime_can_execute_only_the_allowlisted_administration_procedure.migration-01",
+                database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6AdministrationRuntime] WITHOUT LOGIN; " +
+                "CREATE USER [P6AdministrationMigration] WITHOUT LOGIN;");
+            await connection.ExecuteAsync(
+                ReadProvisioningScript("P6AdministrationRuntime", "P6AdministrationMigration"));
+
+            var actorId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Users " +
+                "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm) " +
+                "OUTPUT INSERTED.UserId VALUES (N'operator', N'OPERATOR', N'Operator', N'Local', N'hash', N'', N'BCrypt');");
+            var managerRoleId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
+                "OUTPUT INSERTED.RoleId VALUES (N'Security managers', N'SECURITY MANAGERS');");
+            await connection.ExecuteAsync(
+                "INSERT dbo.UserRoles (UserId, RoleId) VALUES (@actorId, @managerRoleId); " +
+                "INSERT dbo.RolePermissions (RoleId, PermissionKey) " +
+                "VALUES (@managerRoleId, N'Security.Roles.Manage');",
+                new { actorId, managerRoleId });
+
+            await connection.ExecuteAsync("EXECUTE AS USER = N'P6AdministrationRuntime';");
+            try
+            {
+                var access = await connection.QuerySingleAsync<(int CanExecute, int CanInsertRole, int CanReadAudit)>(
+                    "SELECT " +
+                    "HAS_PERMS_BY_NAME(N'dbo.ApplySecurityAdministration', N'OBJECT', N'EXECUTE') AS CanExecute, " +
+                    "HAS_PERMS_BY_NAME(N'dbo.Roles', N'OBJECT', N'INSERT') AS CanInsertRole, " +
+                    "HAS_PERMS_BY_NAME(N'dbo.SecurityAuditEvents', N'OBJECT', N'SELECT') AS CanReadAudit;");
+                Assert.Equal(1, access.CanExecute);
+                Assert.Equal(0, access.CanInsertRole);
+                Assert.Equal(0, access.CanReadAudit);
+                await Assert.ThrowsAsync<SqlException>(() => connection.ExecuteAsync(
+                    "INSERT dbo.Roles (RoleName, NormalizedRoleName) VALUES (N'Bypass', N'BYPASS');"));
+
+                var result = await connection.QuerySingleAsync<(long AssignmentRevision, bool Changed)>(
+                    "dbo.ApplySecurityAdministration",
+                    new
+                    {
+                        Target = "Role",
+                        Operation = "Create",
+                        ActorUserId = actorId,
+                        TargetId = 0,
+                        RelatedId = 0,
+                        Name = "Runtime-created",
+                        NormalizedName = "RUNTIME-CREATED",
+                        DisplayName = (string?)null,
+                        Email = (string?)null,
+                        IsActive = true,
+                        PasswordHash = (string?)null,
+                        PasswordAlgorithm = (string?)null,
+                        PermissionKey = (string?)null,
+                        Decision = (bool?)null,
+                        ExpectedRevision = (long?)null,
+                        ExpectedRelatedRevision = (long?)null,
+                        CorrelationId = Guid.NewGuid(),
+                    },
+                    commandType: System.Data.CommandType.StoredProcedure);
+                Assert.Equal(0, result.AssignmentRevision);
+                Assert.True(result.Changed);
+                await new SqlRuntimePrincipalValidator()
+                    .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_rejects_direct_user_impersonation_permission()
     {
         var database = await SqlTestDatabase.CreateAsync(

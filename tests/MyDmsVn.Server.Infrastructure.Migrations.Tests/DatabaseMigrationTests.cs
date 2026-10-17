@@ -221,7 +221,7 @@ public sealed class DatabaseMigrationTests
             using var verification = new SqlConnection(database.ConnectionString);
             Assert.Equal(1, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.Products WHERE Code = N'P6-FUTURE' AND Name = N'Preserved';"));
-            Assert.Equal(8, await verification.QuerySingleAsync<int>(
+            Assert.Equal(9, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
         }
         finally
@@ -242,7 +242,7 @@ public sealed class DatabaseMigrationTests
             using (var connection = new SqlConnection(database.ConnectionString))
             {
                 await connection.ExecuteAsync(
-                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%007_Inventory_Stock.sql';");
+                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%008_Security_Administration.sql';");
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
@@ -250,7 +250,7 @@ public sealed class DatabaseMigrationTests
 
             Assert.Equal("Migration.PartialSchema", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
-            Assert.Equal(6, await verification.QuerySingleAsync<int>(
+            Assert.Equal(7, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
             Assert.Equal(0, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM sys.tables WHERE name IN " +
@@ -292,7 +292,7 @@ public sealed class DatabaseMigrationTests
 
             var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Competing_migrator_is_rejected_until_the_deployment_lock_is_released.migration-02", database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
-            Assert.Equal(7, result.Scripts.Count());
+            Assert.Equal(8, result.Scripts.Count());
         }
         finally
         {
@@ -355,7 +355,8 @@ public sealed class DatabaseMigrationTests
                     assembly,
                     resourceName =>
                         resourceName.Contains(".Scripts.") &&
-                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal))
+                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal) &&
+                        !resourceName.EndsWith("008_Security_Administration.sql", StringComparison.Ordinal))
                 .JournalToSqlTable("dbo", "SchemaVersions")
                 .WithTransactionPerScript()
                 .LogToNowhere()
@@ -497,7 +498,7 @@ public sealed class DatabaseMigrationTests
                 database.ConnectionString);
 
             Assert.True(first.Successful, first.Error?.ToString());
-            Assert.Equal(7, first.Scripts.Count());
+            Assert.Equal(8, first.Scripts.Count());
             Assert.Collection(
                 first.Scripts.OrderBy(script => script.Name, StringComparer.Ordinal),
                 script => Assert.EndsWith("001_PersistenceFoundation.sql", script.Name, StringComparison.Ordinal),
@@ -506,7 +507,8 @@ public sealed class DatabaseMigrationTests
                 script => Assert.EndsWith("004_Catalog_Nul_Constraints.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("005_GoodsReceipt.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("006_GoodsReceipt_Number_Sequence.sql", script.Name, StringComparison.Ordinal),
-                script => Assert.EndsWith("007_Inventory_Stock.sql", script.Name, StringComparison.Ordinal));
+                script => Assert.EndsWith("007_Inventory_Stock.sql", script.Name, StringComparison.Ordinal),
+                script => Assert.EndsWith("008_Security_Administration.sql", script.Name, StringComparison.Ordinal));
             Assert.True(second.Successful, second.Error?.ToString());
             Assert.Empty(second.Scripts);
 
@@ -516,7 +518,7 @@ public sealed class DatabaseMigrationTests
             var historyCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;");
             Assert.Equal(0, tableCount);
-            Assert.Equal(7, historyCount);
+            Assert.Equal(8, historyCount);
 
             var receiptNumberSequenceCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM sys.sequences WHERE object_id = " +

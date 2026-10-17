@@ -52,7 +52,7 @@ public sealed class DatabaseMigratorCommandTests
             var error = await standardError;
             Assert.Equal(2, process.ExitCode);
             Assert.Equal(string.Empty, output);
-            Assert.Contains("DbMigrator.InvalidArguments", error, StringComparison.Ordinal);
+            Assert.Contains("PermissionCatalog.InvalidArguments", error, StringComparison.Ordinal);
 
             using var connection = new SqlConnection(database.ConnectionString);
             Assert.Null(await connection.ExecuteScalarAsync<int?>(

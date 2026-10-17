@@ -33,7 +33,8 @@ public sealed class SchemaCompatibilityIntegrationTests
                     assembly,
                     resourceName =>
                         resourceName.Contains(".Scripts.") &&
-                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal))
+                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal) &&
+                        !resourceName.EndsWith("008_Security_Administration.sql", StringComparison.Ordinal))
                 .JournalToSqlTable("dbo", "SchemaVersions")
                 .WithTransactionPerScript()
                 .LogToNowhere()
@@ -104,7 +105,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             Assert.True(first.IsCompatible);
             Assert.True(second.IsCompatible);
             using var connection = new SqlConnection(database.ConnectionString);
-            Assert.Equal(7, await connection.QuerySingleAsync<int>(
+            Assert.Equal(8, await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
         }
         finally
@@ -628,6 +629,13 @@ public sealed class SchemaCompatibilityIntegrationTests
             using (var connection = new SqlConnection(database.ConnectionString))
             {
                 await connection.ExecuteAsync(
+                    "DROP PROCEDURE dbo.ApplySecurityAdministration; " +
+                    "DROP TABLE dbo.SecurityAuditEvents; " +
+                    "ALTER TABLE dbo.Users DROP CONSTRAINT DF_Users_AssignmentRevision; " +
+                    "ALTER TABLE dbo.Users DROP COLUMN AssignmentRevision; " +
+                    "ALTER TABLE dbo.Roles DROP CONSTRAINT DF_Roles_AssignmentRevision; " +
+                    "ALTER TABLE dbo.Roles DROP COLUMN AssignmentRevision; " +
+                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%008_Security_Administration.sql'; " +
                     "DROP TRIGGER dbo.TR_StockLedger_AppendOnly; " +
                     "DROP TABLE dbo.StockBalances; DROP TABLE dbo.StockLedger; " +
                     "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%007_Inventory_Stock.sql';");
@@ -694,8 +702,27 @@ public sealed class SchemaCompatibilityIntegrationTests
         var database = await SqlTestDatabase.CreateAsync(
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
             measurement);
-        var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SchemaCompatibilityIntegrationTests.CreateMigratedDatabaseAsync.migration-01", database.ConnectionString);
-        Assert.True(migration.Successful, migration.Error?.ToString());
-        return database;
+        try
+        {
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "SchemaCompatibilityIntegrationTests.CreateMigratedDatabaseAsync.migration-01",
+                database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            return database;
+        }
+        catch
+        {
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch
+            {
+                // Preserve the migration failure; the ownership journal records any failed cleanup.
+            }
+
+            throw;
+        }
     }
 }

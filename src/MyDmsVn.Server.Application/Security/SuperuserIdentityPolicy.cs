@@ -17,6 +17,8 @@ namespace MyDmsVn.Server.Application.Security
             _configuredNormalizedUsername = UsernameNormalizer.Normalize(configuredUsername!);
         }
 
+        public string ConfiguredNormalizedUsername => _configuredNormalizedUsername;
+
         public bool Matches(
             int currentUserId,
             string? currentNormalizedUsername,

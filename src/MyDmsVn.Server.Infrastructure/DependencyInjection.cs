@@ -12,6 +12,7 @@ using MyDmsVn.Server.Infrastructure.Catalog;
 using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
+using MyDmsVn.Server.Infrastructure.Security;
 
 namespace MyDmsVn.Server.Infrastructure
 {
@@ -35,6 +36,7 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.TryAddScoped<SqlIdentityStore>();
+            services.TryAddScoped<ISecurityAdministrationStore, SqlSecurityAdministrationStore>();
             services.TryAddScoped<IProductQueryService, SqlProductQueryService>();
             services.TryAddScoped<IWarehouseQueryService, SqlWarehouseQueryService>();
             services.TryAddScoped<IEmployeeQueryService, SqlEmployeeQueryService>();
@@ -71,7 +73,8 @@ namespace MyDmsVn.Server.Infrastructure
             });
             return new SqlPersistenceBuilder(services)
                 .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>()
-                .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>();
+                .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>()
+                .AddRepository<ISecurityAdministrationRepository, SqlSecurityAdministrationRepository>();
         }
     }
 }
