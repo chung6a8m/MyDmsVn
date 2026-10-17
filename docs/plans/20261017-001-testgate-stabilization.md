@@ -1,6 +1,6 @@
 ﻿# TESTGATE stabilization — SQL lease lifecycle, early manifest validation, and reduced fingerprint churn
 
-**Status (2026-10-17):** The earlier L2/L3 evidence at `00e374b386c949917cce996d99b60a85cc2e29d3` is historical and was invalidated by the code-bearing reviewer fixes described below. The fixes are implemented and focused runner tests plus manifest reconciliation pass; a fresh clean-commit L3 Final is required before this PR can be called verified. Keep PR #35 Draft until the owner reviews the refreshed evidence.
+**Status (2026-10-17):** The earlier L2/L3 evidence at `00e374b386c949917cce996d99b60a85cc2e29d3` is historical and was invalidated by the code-bearing reviewer fixes described below. The final reviewer follow-up passed strict clean-commit L3 at `6231ef9402333174bce4f792ebf2d3473107ce6c`: 11/11 gates, 786/786 source/discovered/executed/passed, zero failures/skips, and clean watchdog/ownership. Keep PR #35 Draft for the owner's review.
 
 **Base:** SEC-REBUILD accepted at `0303a91111a514276aa02c6664c25dc0caf58d9e`, merged as PR #34 / `4520c494ce6e48e2b0e2c6e0a1f43cfb337d5033`. The accepted baseline was 11/11 Final gates and 775/775 cases, active SQL `net48`; historical `net8.0` remains parked. The current manifest contains 673 logical cases, 52 gates and 195 exemptions. In SEC-REBUILD, 525 surviving case IDs changed reviewed fingerprints. Those are baseline observations, not pass/fail thresholds for this plan.
 
@@ -114,3 +114,10 @@ The following earlier evidence describes the pre-review revision and is supersed
 - Reran strict Final on the same committed revision with a fresh short local artifact root (maximum sampled ownership path: 237 characters). All **11 gates** passed: **783 source / 783 discovered / 783 executed / 783 passed**, zero failed and zero skipped. All sanitized per-gate reports show complete inventory, clean watchdog and ownership. The local SQL lease record is `Completed`; SQL reports' compatibility `recoveryRequired` flag reflects the recovered prior lease. Raw TRX, timing and ownership artifacts remain local.
 - The complete runner suite includes the regression proving that after a recovered prior lease and clean current run, the current lease completes and the next acquisition does not recover it again. Strict L3 completed at the exact committed revision above; leave the PR Draft for the owner's final review.
 - The earlier full runner test result (244 tests) predates the review fixes and is retained only as historical context; the updated suite and manifest evidence are recorded in the reviewer follow-up section once the final clean-revision gates complete.
+
+### Reviewer follow-up L3 rerun (2026-10-17, commit `6231ef9402333174bce4f792ebf2d3473107ce6c`)
+
+- Focused path and concurrency regressions passed **7/7**. The runner test gate passed **247/247** on tool-only `net8.0`; the repository source/discovery contract passed within that run.
+- Metadata-only `PreflightOnly` passed all **6 reviewed SQL project gates** without executing SQL tests or DDL; strict Final repeated the automatic source/discovery preflight on the exact clean commit before launching SQL.
+- The clean-commit strict Final passed all **11 gates**: **786 source / 786 discovered / 786 executed / 786 passed**, with **0 failures and 0 skips**. Each sanitized report records complete inventory, no timeout/resource denial/recovery requirement, and clean watchdog and ownership reconciliation.
+- SQL Final ran sequentially on active `net48` under the approved local resource. Raw TRX, timing and ownership journals remain local under `C:\t35-6231ef9`; no CI or parked application `net8.0` execution is claimed. The PR remains Draft for owner review.
