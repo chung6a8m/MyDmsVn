@@ -92,7 +92,8 @@ public static class TestGateManifestValidator
             TestGateEvidenceKind.SanitizedReport,
             TestGateEvidenceKind.Ownership,
         };
-        var modularTask = taskId is "TESTGATE-T05-B" or "TESTGATE-T05-C" or "TESTGATE-T05-D";
+        var modularTask = sqlGates.Length > 1 ||
+            taskId is "TESTGATE-T05-B" or "TESTGATE-T05-C" or "TESTGATE-T05-D";
         var activeProfile = manifest.FrameworkProfile is { } profile &&
             (!modularTask || string.Equals(profile.PlanId, planId, StringComparison.Ordinal))
                 ? profile

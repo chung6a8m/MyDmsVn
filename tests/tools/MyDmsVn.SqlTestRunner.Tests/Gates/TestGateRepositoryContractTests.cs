@@ -41,6 +41,24 @@ public sealed class TestGateRepositoryContractTests
         var sql = Assert.Single(final.Gates, gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance);
         Assert.Equal(new[] { "net48" }, sql.Frameworks);
         Assert.Equal(manifest.FrameworkProfile!.SqlProject, sql.Project);
+
+        var secRebuildFinal = TestGateManifestValidator.Select(
+            manifest, RepositoryRoot(), TestGateMode.Final,
+            "20261016-003-permission-system-rebuild", "SEC-REBUILD-T06");
+        var secRebuildSql = secRebuildFinal.Gates
+            .Where(gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
+            .ToArray();
+        Assert.Equal(6, secRebuildSql.Length);
+        Assert.All(secRebuildSql, gate => Assert.Equal(new[] { "net48" }, gate.Frameworks));
+        Assert.Equal(new[]
+        {
+            "tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj",
+        }, secRebuildSql.Select(gate => gate.Project).OrderBy(value => value, StringComparer.Ordinal));
     }
 
     [Fact]
