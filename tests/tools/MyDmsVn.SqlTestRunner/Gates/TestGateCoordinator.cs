@@ -185,6 +185,11 @@ public sealed class TestGateCoordinator
             return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
         }
 
+        if (TestGateArtifactPathPlanner.FindOverBudgetPaths(options.ArtifactRoot, selection.Gates).Count != 0)
+        {
+            return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
+        }
+
         if (options.Mode == TestGateMode.Task && selection.Gates.Any(gate =>
                 gate.StrictMode != TestGateStrictMode.DotnetTest ||
                 gate.Resources.Sql != TestGateResourceRequirement.None ||
@@ -346,9 +351,10 @@ public sealed class TestGateCoordinator
                     }
 
                     var runId = gate.GateId + "-" + tfm.Replace('.', '-') + "-" + Guid.NewGuid().ToString("N");
-                    var runRoot = Path.Combine(options.ArtifactRoot, runId);
+                    var runRoot = Path.Combine(options.ArtifactRoot, TestGateArtifactPathPlanner.NewPhysicalId());
                     Directory.CreateDirectory(runRoot);
-                    var trxName = runId + ".trx";
+                    TestGateArtifactPathPlanner.WriteLogicalRunId(runRoot, runId);
+                    var trxName = "result.trx";
                     var execution = await RunCommand(
                         testArguments + " --logger \"trx;LogFileName=" + trxName +
                         "\" --results-directory \"" + runRoot + "\"",
@@ -822,7 +828,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
 
         foreach (var journal in journals)
         {
-            var runId = Path.GetFileName(journal);
+            var runId = TestGateArtifactPathPlanner.ReadLogicalRunId(journal);
             var artifactRoot = Directory.GetParent(journal)!.Parent!.FullName;
             if (IsVerifiedZeroExecution(artifactRoot, journal))
             {
@@ -840,7 +846,7 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
                 new BenchmarkOwnershipEvidence(
                     runId,
                     journal,
-                    Path.Combine(artifactRoot, "ownership-recovery-" + runId + ".json"),
+                    RecoveryPath(artifactRoot, journal, runId),
                     _approvalFile,
                     ProcessSucceeded: false),
                 cancellationToken).ConfigureAwait(false);
@@ -851,6 +857,15 @@ internal sealed class BenchmarkAbandonedSqlRunRecovery : IAbandonedSqlRunRecover
         }
 
         return true;
+    }
+
+    private static string RecoveryPath(string artifactRoot, string journal, string logicalRunId)
+    {
+        var hasPhysicalMapping = File.Exists(Path.Combine(
+            journal, TestGateArtifactPathPlanner.LogicalRunIdFileName));
+        return hasPhysicalMapping
+            ? Path.Combine(artifactRoot, "recovery-" + Path.GetFileName(journal) + ".json")
+            : Path.Combine(artifactRoot, "ownership-recovery-" + logicalRunId + ".json");
     }
 
     private async Task<bool> VerifyNoOwnedDatabasesAsync(

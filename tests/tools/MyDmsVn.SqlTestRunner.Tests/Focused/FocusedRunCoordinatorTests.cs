@@ -150,12 +150,16 @@ public sealed class FocusedRunCoordinatorTests
         Assert.True(focusedResult.RecoveryRequired);
         Assert.Equal(SqlExecutionLeaseAcquireStatus.Recovered, second.Status);
         var evidence = Assert.Single(recoveryOwnership.Evidence);
+        Assert.Equal(failedOwnership.Evidence[0].ExecutionId, evidence.ExecutionId);
         Assert.Equal(
-            Path.Combine(fixture.Options.ArtifactRoot, "ownership", evidence.ExecutionId),
+            Path.Combine(fixture.Options.ArtifactRoot, "ownership", Path.GetFileName(evidence.JournalDirectory)),
             evidence.JournalDirectory);
         Assert.Equal(
-            Path.Combine(fixture.Options.ArtifactRoot, "ownership-recovery-" + evidence.ExecutionId + ".json"),
+            Path.Combine(fixture.Options.ArtifactRoot, "recovery-" + Path.GetFileName(evidence.JournalDirectory) + ".json"),
             evidence.RecoveryArtifactPath);
+        Assert.Equal(
+            evidence.ExecutionId,
+            File.ReadAllText(Path.Combine(evidence.JournalDirectory, "execution-id.txt")));
         second.Lease!.Complete();
         await second.Lease.DisposeAsync();
     }

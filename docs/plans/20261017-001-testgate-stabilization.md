@@ -1,6 +1,6 @@
-# TESTGATE stabilization — SQL lease lifecycle, early manifest validation, and reduced fingerprint churn
+﻿# TESTGATE stabilization — SQL lease lifecycle, early manifest validation, and reduced fingerprint churn
 
-**Status (2026-10-17):** L2 runner verification, SQL manifest preflight and strict clean-commit L3 Final pass on Windows at `00e374b386c949917cce996d99b60a85cc2e29d3`. PR #35 remains Draft pending the owner's final review; metadata preflight is recorded separately from SQL acceptance.
+**Status (2026-10-17):** The earlier L2/L3 evidence at `00e374b386c949917cce996d99b60a85cc2e29d3` is historical and was invalidated by the code-bearing reviewer fixes described below. The fixes are implemented and focused runner tests plus manifest reconciliation pass; a fresh clean-commit L3 Final is required before this PR can be called verified. Keep PR #35 Draft until the owner reviews the refreshed evidence.
 
 **Base:** SEC-REBUILD accepted at `0303a91111a514276aa02c6664c25dc0caf58d9e`, merged as PR #34 / `4520c494ce6e48e2b0e2c6e0a1f43cfb337d5033`. The accepted baseline was 11/11 Final gates and 775/775 cases, active SQL `net48`; historical `net8.0` remains parked. The current manifest contains 673 logical cases, 52 gates and 195 exemptions. In SEC-REBUILD, 525 surviving case IDs changed reviewed fingerprints. Those are baseline observations, not pass/fail thresholds for this plan.
 
@@ -90,7 +90,18 @@ The preflight is metadata-only and **not** an SQL acceptance certificate. After 
 
 **Review blockers at authoring time:** refresh/review fingerprints and new logical test IDs, compile and run unit/negative tests on Windows, run SQL preflight, and complete the frozen-revision strict Final. Until these are green, the implementation PR should remain **Draft / NOT VERIFIED**.
 
+## Reviewer follow-up (2026-10-17)
+
+- Added a shared 240-character Windows compatibility budget covering runner shadow dependencies, preflight output, Task/Focused/SQL TRX, timing, ownership journal temporary files, recovery artifacts, and reports. Final and focused SQL paths are rejected before lease acquisition or SQL/ownership creation when the budget is exceeded.
+- Kept logical execution IDs in the SQL environment and ownership records while moving journal, TRX, timing, and recovery files to short physical IDs. `execution-id.txt` maps new physical journal folders back to their logical IDs; recovery falls back to the prior folder-name/recovery-file layout for existing artifacts.
+- Task TRX folders also retain their original logical run ID in `execution-id.txt`, while their physical directory and TRX filename stay short.
+- SQL manifest preflight builds and discovers from a unique temporary `BaseOutputPath` per invocation. A concurrent-preflight regression holds both builds at the same time and verifies distinct output roots and matching discovery roots.
+- Replaced the runner test project's unconditional 11-project `BeforeTargets="Build"` hooks with an explicit `BuildRepositoryInventoryFixtures` audit target. `Invoke-TestGate.ps1 -Mode Final` runs the target; ordinary filtered runner tests do not.
+- Added three runner logical cases and refreshed runner method fingerprints plus the 54 matching incomplete-closure exemptions for the frozen source. The old manifest and all earlier L3 evidence are not accepted for these changes.
+
 ## Verification update (2026-10-17)
+
+The following earlier evidence describes the pre-review revision and is superseded where the reviewer fixes above affect the gate inputs:
 
 - Restored `MyDmsVn.sln` in locked mode after initializing the repository's pinned vendor submodules. The restore exposed six stale lock files for the `Server.Application` Newtonsoft.Json dependency; those lock changes are included with this stabilization update.
 - Built the runner test project and its inventory fixtures on active `net48` plus tool-only `net8.0`. The fixture build contract now includes all 11 projects represented by the reviewed inventory.
@@ -100,3 +111,4 @@ The preflight is metadata-only and **not** an SQL acceptance certificate. After 
 - The first strict Final attempt used a long artifact path and failed 12 Foundation tests before database creation: the ownership-journal temporary filename exceeded Windows `MAX_PATH` by one character. The ownership journal stayed empty. The next lease acquisition used the runner's guarded path-failure recovery, validated the approved instance, and confirmed there were no owned test databases; no lease, journal or database was manually removed or altered.
 - Reran strict Final on the same committed revision with a fresh short local artifact root (maximum sampled ownership path: 237 characters). All **11 gates** passed: **783 source / 783 discovered / 783 executed / 783 passed**, zero failed and zero skipped. All sanitized per-gate reports show complete inventory, clean watchdog and ownership. The local SQL lease record is `Completed`; SQL reports' compatibility `recoveryRequired` flag reflects the recovered prior lease. Raw TRX, timing and ownership artifacts remain local.
 - The complete runner suite includes the regression proving that after a recovered prior lease and clean current run, the current lease completes and the next acquisition does not recover it again. Strict L3 completed at the exact committed revision above; leave the PR Draft for the owner's final review.
+- The earlier full runner test result (244 tests) predates the review fixes and is retained only as historical context; the updated suite and manifest evidence are recorded in the reviewer follow-up section once the final clean-revision gates complete.

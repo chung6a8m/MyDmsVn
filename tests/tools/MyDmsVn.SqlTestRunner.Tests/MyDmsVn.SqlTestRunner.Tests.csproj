@@ -15,69 +15,22 @@
   <ItemGroup>
     <ProjectReference Include="..\MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj" />
   </ItemGroup>
-  <Target Name="BuildIntegrationInventoryFixture" BeforeTargets="Build">
+  <ItemGroup>
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Server.Infrastructure.Catalog.Tests\MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Server.Infrastructure.Foundation.Tests\MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Server.Infrastructure.Security.Tests\MyDmsVn.Server.Infrastructure.Security.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Server.Infrastructure.Inventory.Tests\MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Server.Infrastructure.Migrations.Tests\MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Desktop.Tests\MyDmsVn.Desktop.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.SqlTestHarness.Tests\MyDmsVn.SqlTestHarness.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Desktop.Session.Tests\MyDmsVn.Desktop.Session.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Server.Application.Tests\MyDmsVn.Server.Application.Tests.csproj" />
+    <RepositoryInventoryFixture Include="..\..\MyDmsVn.Architecture.Tests\MyDmsVn.Architecture.Tests.csproj" />
+  </ItemGroup>
+  <Target Name="BuildRepositoryInventoryFixtures">
     <MSBuild
-      Projects="..\..\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildCatalogInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Server.Infrastructure.Catalog.Tests\MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildFoundationInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Server.Infrastructure.Foundation.Tests\MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildSecurityInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Server.Infrastructure.Security.Tests\MyDmsVn.Server.Infrastructure.Security.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildInventoryInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Server.Infrastructure.Inventory.Tests\MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildMigrationsInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Server.Infrastructure.Migrations.Tests\MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildGuiInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Desktop.Tests\MyDmsVn.Desktop.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildSqlTestHarnessInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.SqlTestHarness.Tests\MyDmsVn.SqlTestHarness.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildDesktopSessionInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Desktop.Session.Tests\MyDmsVn.Desktop.Session.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildApplicationInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Server.Application.Tests\MyDmsVn.Server.Application.Tests.csproj"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);TargetFramework=net48" />
-  </Target>
-  <Target Name="BuildArchitectureInventoryFixture" BeforeTargets="Build">
-    <MSBuild
-      Projects="..\..\MyDmsVn.Architecture.Tests\MyDmsVn.Architecture.Tests.csproj"
+      Projects="@(RepositoryInventoryFixture)"
       Targets="Build"
       Properties="Configuration=$(Configuration);TargetFramework=net48" />
   </Target>

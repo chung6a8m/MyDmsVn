@@ -31,6 +31,17 @@ public sealed class TestGateCoordinatorTests
         Assert.All(processes.Commands, command => Assert.DoesNotContain(".sln", command.Arguments, StringComparison.OrdinalIgnoreCase));
         Assert.Contains("--list-tests", processes.Commands[1].Arguments, StringComparison.Ordinal);
         Assert.Contains("--logger \"trx;LogFileName=", processes.Commands[2].Arguments, StringComparison.Ordinal);
+        var runRoot = Regex.Match(
+            processes.Commands[2].Arguments,
+            "--results-directory \\\"([^\\\"]+)\\\"").Groups[1].Value;
+        var trxName = Regex.Match(
+            processes.Commands[2].Arguments,
+            "LogFileName=([^\\\"]+)\\\"").Groups[1].Value;
+        Assert.Equal("result.trx", trxName);
+        var logicalRunId = File.ReadAllText(Path.Combine(
+            runRoot, TestGateArtifactPathPlanner.LogicalRunIdFileName));
+        Assert.StartsWith("task-example-net8-", logicalRunId, StringComparison.Ordinal);
+        Assert.NotEqual(Path.GetFileName(runRoot), logicalRunId);
         Assert.Single(
             processes.Commands.Select(command => command.Arguments),
             arguments => arguments.Contains("--logger", StringComparison.Ordinal));

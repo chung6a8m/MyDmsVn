@@ -55,7 +55,19 @@ $artifactRootFull = if ([IO.Path]::IsPathRooted($ArtifactRoot)) {
 } else {
     [IO.Path]::GetFullPath((Join-Path $RepositoryRoot $ArtifactRoot))
 }
-$shadowRoot = Join-Path $artifactRootFull '.runner'
+$shadowRoot = Join-Path ([IO.Path]::GetTempPath()) (Join-Path 'MyDmsVn\TestGate' ('runner-' + $PID.ToString('D10')))
+$runnerDll = Join-Path $shadowRoot 'MyDmsVn.SqlTestRunner.dll'
+if ($runnerDll.Length -gt 240) {
+    throw 'The runner shadow path exceeds the Windows compatibility budget.'
+}
+
+if ($Mode -eq 'Final' -and -not $PreflightOnly) {
+    $runnerTestsProject = Join-Path $PSScriptRoot 'MyDmsVn.SqlTestRunner.Tests\MyDmsVn.SqlTestRunner.Tests.csproj'
+    & dotnet msbuild $runnerTestsProject -target:BuildRepositoryInventoryFixtures -property:Configuration=Release
+    if ($LASTEXITCODE -ne 0) {
+        exit 3
+    }
+}
 
 & dotnet build $runnerProject -c Release -f net8.0 --no-restore
 if ($LASTEXITCODE -ne 0) {
@@ -63,8 +75,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 New-Item -ItemType Directory -Path $shadowRoot -Force | Out-Null
+$overBudgetShadowFiles = Get-ChildItem -LiteralPath $runnerOutput -File -Recurse | Where-Object {
+    $relativePath = $_.FullName.Substring($runnerOutput.Length).TrimStart('\')
+    (Join-Path $shadowRoot $relativePath).Length -gt 240
+}
+if ($overBudgetShadowFiles) {
+    throw 'A runner shadow dependency path exceeds the Windows compatibility budget.'
+}
+
 Get-ChildItem -LiteralPath $runnerOutput | Copy-Item -Destination $shadowRoot -Recurse -Force
-$runnerDll = Join-Path $shadowRoot 'MyDmsVn.SqlTestRunner.dll'
 if (-not (Test-Path -LiteralPath $runnerDll -PathType Leaf)) {
     exit 3
 }

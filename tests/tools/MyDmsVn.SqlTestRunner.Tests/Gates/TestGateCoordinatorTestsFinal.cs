@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -159,6 +160,70 @@ public sealed class TestGateCoordinatorTestsFinal
         Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
         Assert.Equal(new[] { "approval" }, events);
         Assert.Null(leases.LastLease);
+    }
+
+    [Fact]
+    public async Task Long_artifact_root_is_rejected_before_SQL_preflight_or_lease()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.None);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.None),
+            new NoRecovery(),
+            new SqlGateManifestPreflight(new NoProcessRunner(), new FinalInventory(events)));
+        var longArtifactRoot = Path.Combine(Path.GetTempPath(), new string('a', 230));
+
+        var result = await coordinator.RunAsync(
+            repository.Options() with { ArtifactRoot = longArtifactRoot },
+            CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.Empty(events);
+        Assert.Null(leases.LastLease);
+    }
+
+    [Fact]
+    public async Task SQL_manifest_preflight_uses_a_unique_output_root_for_each_invocation()
+    {
+        using var repository = new FinalRepository();
+        var processes = new OverlappingManifestDiscoveryProcessRunner();
+        var manifest = TestGateManifestLoader.Load(repository.Manifest);
+
+        var first = new SqlGateManifestPreflight(
+            processes, new FinalInventory(new List<string>())).VerifyAsync(
+                repository.Options(), manifest, manifest.Gates, CancellationToken.None);
+        var second = new SqlGateManifestPreflight(
+            processes, new FinalInventory(new List<string>())).VerifyAsync(
+                repository.Options(), manifest, manifest.Gates, CancellationToken.None);
+        var bothBuilds = await Task.WhenAny(
+            processes.BothBuildsStarted.Task,
+            Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Same(processes.BothBuildsStarted.Task, bothBuilds);
+        processes.ReleaseBuilds.TrySetResult(true);
+        var results = await Task.WhenAll(first, second);
+
+        Assert.All(results, result => Assert.True(result.IsComplete, string.Join(",", result.Issues)));
+        var buildOutputs = processes.Commands
+            .Where(command => command.Arguments.StartsWith("build ", StringComparison.Ordinal))
+            .Select(command => command.Arguments
+                .Split(new[] { "-p:BaseOutputPath=\"" }, StringSplitOptions.None)[1]
+                .Split('"')[0])
+            .ToArray();
+        Assert.Equal(2, buildOutputs.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        var discoveryOutputs = processes.Commands
+            .Where(command => command.Arguments.Contains("--list-tests", StringComparison.Ordinal))
+            .Select(command => command.Arguments
+                .Split(new[] { "-p:BaseOutputPath=\"" }, StringSplitOptions.None)[1]
+                .Split('"')[0])
+            .ToArray();
+        Assert.Equal(4, discoveryOutputs.Length);
+        Assert.All(discoveryOutputs, output => Assert.Contains(output, buildOutputs));
     }
 
     [Fact]
@@ -485,6 +550,39 @@ public sealed class TestGateCoordinatorTestsFinal
                 : string.Empty;
             return Task.FromResult(new CommandResult(
                 0, false, 1, output, string.Empty, Array.Empty<int>(), TimeSpan.Zero));
+        }
+    }
+
+    private sealed class OverlappingManifestDiscoveryProcessRunner : IProcessRunner
+    {
+        private int _buildCalls;
+
+        public ConcurrentBag<CommandSpec> Commands { get; } = new();
+
+        public TaskCompletionSource<bool> BothBuildsStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> ReleaseBuilds { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<CommandResult> RunAsync(CommandSpec command, CancellationToken cancellationToken)
+        {
+            Commands.Add(command);
+            if (command.Arguments.StartsWith("build ", StringComparison.Ordinal))
+            {
+                if (Interlocked.Increment(ref _buildCalls) == 2)
+                {
+                    BothBuildsStarted.TrySetResult(true);
+                }
+
+                await ReleaseBuilds.Task.WaitAsync(cancellationToken);
+                return new CommandResult(
+                    0, false, 1, string.Empty, string.Empty, Array.Empty<int>(), TimeSpan.Zero);
+            }
+
+            return new CommandResult(
+                0, false, 1, "The following Tests are available:\n    Sql.Tests.Case\n",
+                string.Empty, Array.Empty<int>(), TimeSpan.Zero);
         }
     }
 

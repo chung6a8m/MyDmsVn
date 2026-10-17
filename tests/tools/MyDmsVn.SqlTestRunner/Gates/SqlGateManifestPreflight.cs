@@ -48,6 +48,50 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
         IReadOnlyList<TestGateDefinition> gates,
         CancellationToken cancellationToken)
     {
+        var overBudget = TestGateArtifactPathPlanner.FindOverBudgetPaths(options.ArtifactRoot, gates);
+        if (overBudget.Count != 0)
+        {
+            return new SqlGateManifestPreflightResult(overBudget.Select(kind =>
+                new SqlGateManifestPreflightIssue(
+                    "SQL", "all", "Artifact path exceeds the Windows compatibility budget: " + kind + "."))
+                .ToArray());
+        }
+
+        var isolatedOutputRoot = Path.Combine(
+            Path.GetTempPath(), "MyDmsVn", "TestGate", "preflight-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(isolatedOutputRoot);
+        try
+        {
+            return await VerifyWithIsolatedOutputAsync(
+                options, manifest, gates, isolatedOutputRoot, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(isolatedOutputRoot))
+                {
+                    Directory.Delete(isolatedOutputRoot, recursive: true);
+                }
+            }
+            catch (IOException)
+            {
+                // Isolated preflight outputs are disposable; cleanup is best effort.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Isolated preflight outputs are disposable; cleanup is best effort.
+            }
+        }
+    }
+
+    private async Task<SqlGateManifestPreflightResult> VerifyWithIsolatedOutputAsync(
+        TestGateRunOptions options,
+        TestGateManifest manifest,
+        IReadOnlyList<TestGateDefinition> gates,
+        string isolatedOutputRoot,
+        CancellationToken cancellationToken)
+    {
         var issues = new List<SqlGateManifestPreflightIssue>();
         var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (gates.Count == 0 ||
@@ -70,8 +114,10 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
                 }
 
                 var project = Path.GetFullPath(Path.Combine(options.RepositoryRoot, gate.Project));
+                var isolatedOutput = isolatedOutputRoot.TrimEnd('\\', '/') + "/";
                 var build = await ExecuteAsync(
-                    "build \"" + project + "\" -c Release -f " + tfm + " --no-restore",
+                    "build \"" + project + "\" -c Release -f " + tfm +
+                    " --no-restore -p:BaseOutputPath=\"" + isolatedOutput.Replace('\\', '/') + "\"",
                     options, gate.CommandTimeoutSeconds, cancellationToken).ConfigureAwait(false);
                 if (build.ExitCode != 0 || build.TimedOut)
                 {
@@ -93,7 +139,7 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
                     }
 
                     var assemblyPath = Path.Combine(
-                        Path.GetDirectoryName(project)!, "bin", "Release", tfm,
+                        isolatedOutputRoot, "Release", tfm,
                         Path.GetFileNameWithoutExtension(project) + ".dll");
                     var source = _inventory.Read(assemblyPath);
                     var sourceBinding = LogicalCaseBinder.BindSource(
@@ -110,7 +156,8 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
 
                     var discovery = await ExecuteAsync(
                         "test \"" + project + "\" -c Release -f " + tfm +
-                        " --no-build --no-restore --list-tests",
+                        " --no-build --no-restore -p:BaseOutputPath=\"" +
+                        isolatedOutput.Replace('\\', '/') + "\" --list-tests",
                         options, gate.CommandTimeoutSeconds, cancellationToken).ConfigureAwait(false);
                     if (discovery.ExitCode != 0 || discovery.TimedOut)
                     {
