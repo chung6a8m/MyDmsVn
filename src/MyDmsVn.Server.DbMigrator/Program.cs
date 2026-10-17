@@ -9,6 +9,15 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length >= 1 &&
+            string.Equals(args[0], "permissions", StringComparison.Ordinal))
+        {
+            return PermissionCatalogCommand.Run(
+                args.Skip(1).ToArray(),
+                Console.Out,
+                Console.Error);
+        }
+
         if (args.Length == 0)
         {
             return DatabaseMigratorCommand.Run(
@@ -18,22 +27,10 @@ internal static class Program
         }
 
         if (args.Length >= 2 &&
-            string.Equals(args[0], "permissions", StringComparison.Ordinal) &&
-            string.Equals(args[1], "sync", StringComparison.Ordinal))
-        {
-            return PermissionSyncCommand.Run(
-                args.Skip(2).ToArray(),
-                new SqlConnectionConfigurationLoader(),
-                Console.Out,
-                Console.Error,
-                DateTime.UtcNow);
-        }
-
-        if (args.Length >= 2 &&
             string.Equals(args[0], "security", StringComparison.Ordinal) &&
-            string.Equals(args[1], "bootstrap-admin", StringComparison.Ordinal))
+            string.Equals(args[1], "bootstrap-superuser", StringComparison.Ordinal))
         {
-            return InitialAdministratorProvisioningCommand.Run(
+            return SuperuserBootstrapCommand.Run(
                 args.Skip(2).ToArray(),
                 new SqlConnectionConfigurationLoader(),
                 new ConsoleProvisioningSecretReader(),
@@ -43,20 +40,36 @@ internal static class Program
         }
 
         if (args.Length >= 2 &&
-            string.Equals(args[0], "permissions", StringComparison.Ordinal) &&
-            string.Equals(args[1], "administrator-grant", StringComparison.Ordinal))
+            string.Equals(args[0], "security", StringComparison.Ordinal) &&
+            string.Equals(args[1], "recover-superuser", StringComparison.Ordinal))
         {
-            return AdministratorGrantCommand.Run(
+            return SuperuserMaintenanceCommand.RunRecovery(
                 args.Skip(2).ToArray(),
                 new SqlConnectionConfigurationLoader(),
+                new ConsoleProvisioningSecretReader(),
+                Console.In,
+                Console.Out,
+                Console.Error,
+                DateTime.UtcNow);
+        }
+
+        if (args.Length >= 2 &&
+            string.Equals(args[0], "security", StringComparison.Ordinal) &&
+            string.Equals(args[1], "rename-superuser", StringComparison.Ordinal))
+        {
+            return SuperuserMaintenanceCommand.RunRename(
+                args.Skip(2).ToArray(),
+                new SqlConnectionConfigurationLoader(),
+                new ConsoleProvisioningSecretReader(),
+                Console.In,
                 Console.Out,
                 Console.Error,
                 DateTime.UtcNow);
         }
 
         Console.Error.WriteLine(
-            "DbMigrator.InvalidArguments: Unknown command. " +
-            "Use no arguments to migrate, or use a documented permissions/security command.");
+            "DbMigrator.InvalidArguments: Unknown command. Use no arguments to migrate, " +
+            "or use security bootstrap-superuser, recover-superuser or rename-superuser.");
         return 2;
     }
 }

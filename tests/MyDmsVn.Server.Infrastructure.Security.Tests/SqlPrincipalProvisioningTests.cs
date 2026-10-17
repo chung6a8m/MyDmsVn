@@ -126,6 +126,101 @@ public sealed class SqlPrincipalProvisioningTests
     }
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Runtime_can_execute_only_the_allowlisted_administration_procedure()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = MeasuredDatabaseMigrationRunner.Migrate(
+                database.MeasurementContext,
+                "SqlPrincipalProvisioningTests.Runtime_can_execute_only_the_allowlisted_administration_procedure.migration-01",
+                database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [P6AdministrationRuntime] WITHOUT LOGIN; " +
+                "CREATE USER [P6AdministrationMigration] WITHOUT LOGIN;");
+            await connection.ExecuteAsync(
+                ReadProvisioningScript("P6AdministrationRuntime", "P6AdministrationMigration"));
+
+            var actorId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Users " +
+                "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm) " +
+                "OUTPUT INSERTED.UserId VALUES (N'operator', N'OPERATOR', N'Operator', N'Local', N'hash', N'', N'BCrypt');");
+            var managerRoleId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
+                "OUTPUT INSERTED.RoleId VALUES (N'Security managers', N'SECURITY MANAGERS');");
+            await connection.ExecuteAsync(
+                "INSERT dbo.UserRoles (UserId, RoleId) VALUES (@actorId, @managerRoleId); " +
+                "INSERT dbo.RolePermissions (RoleId, PermissionKey) " +
+                "VALUES (@managerRoleId, N'Security.Roles.Manage');",
+                new { actorId, managerRoleId });
+
+            await connection.ExecuteAsync("EXECUTE AS USER = N'P6AdministrationRuntime';");
+            try
+            {
+                var access = await connection.QuerySingleAsync<(
+                    int CanExecute,
+                    int CanExecuteImportRead,
+                    int CanExecuteImportApply,
+                    int CanInsertRole,
+                    int CanReadAudit)>(
+                    "SELECT " +
+                    "HAS_PERMS_BY_NAME(N'dbo.ApplySecurityAdministration', N'OBJECT', N'EXECUTE') AS CanExecute, " +
+                    "HAS_PERMS_BY_NAME(N'dbo.ReadSecurityPermissionImportTarget', N'OBJECT', N'EXECUTE') AS CanExecuteImportRead, " +
+                    "HAS_PERMS_BY_NAME(N'dbo.ApplySecurityPermissionImport', N'OBJECT', N'EXECUTE') AS CanExecuteImportApply, " +
+                    "HAS_PERMS_BY_NAME(N'dbo.Roles', N'OBJECT', N'INSERT') AS CanInsertRole, " +
+                    "HAS_PERMS_BY_NAME(N'dbo.SecurityAuditEvents', N'OBJECT', N'SELECT') AS CanReadAudit;");
+                Assert.Equal(1, access.CanExecute);
+                Assert.Equal(1, access.CanExecuteImportRead);
+                Assert.Equal(1, access.CanExecuteImportApply);
+                Assert.Equal(0, access.CanInsertRole);
+                Assert.Equal(0, access.CanReadAudit);
+                await Assert.ThrowsAsync<SqlException>(() => connection.ExecuteAsync(
+                    "INSERT dbo.Roles (RoleName, NormalizedRoleName) VALUES (N'Bypass', N'BYPASS');"));
+
+                var result = await connection.QuerySingleAsync<(long AssignmentRevision, bool Changed)>(
+                    "dbo.ApplySecurityAdministration",
+                    new
+                    {
+                        Target = "Role",
+                        Operation = "Create",
+                        ActorUserId = actorId,
+                        TargetId = 0,
+                        RelatedId = 0,
+                        Name = "Runtime-created",
+                        NormalizedName = "RUNTIME-CREATED",
+                        DisplayName = (string?)null,
+                        Email = (string?)null,
+                        IsActive = true,
+                        PasswordHash = (string?)null,
+                        PasswordAlgorithm = (string?)null,
+                        PermissionKey = (string?)null,
+                        Decision = (bool?)null,
+                        ExpectedRevision = (long?)null,
+                        ExpectedRelatedRevision = (long?)null,
+                        CorrelationId = Guid.NewGuid(),
+                    },
+                    commandType: System.Data.CommandType.StoredProcedure);
+                Assert.Equal(0, result.AssignmentRevision);
+                Assert.True(result.Changed);
+                await new SqlRuntimePrincipalValidator()
+                    .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None);
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_rejects_direct_user_impersonation_permission()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -348,53 +443,6 @@ public sealed class SqlPrincipalProvisioningTests
     }
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-    public async Task Provisioning_and_startup_reject_full_permission_sync_state_read()
-    {
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        try
-        {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_full_permission_sync_state_read.migration-01", database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
-            using var connection = new SqlConnection(database.ConnectionString);
-            await connection.OpenAsync();
-            await connection.ExecuteAsync(
-                "CREATE USER [P6SyncStateRuntimeProbe] WITHOUT LOGIN; " +
-                "CREATE USER [P6SyncStateMigrationProbe] WITHOUT LOGIN;");
-            var script = ReadProvisioningScript(
-                "P6SyncStateRuntimeProbe",
-                "P6SyncStateMigrationProbe");
-            await connection.ExecuteAsync(script);
-            await connection.ExecuteAsync(
-                "GRANT SELECT ON OBJECT::dbo.PermissionSynchronizationState TO [P6SyncStateRuntimeProbe]; " +
-                "EXECUTE AS USER = N'P6SyncStateRuntimeProbe';");
-            try
-            {
-                Assert.Equal(1, await connection.QuerySingleAsync<int>(
-                    "SELECT HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', " +
-                    "N'OBJECT', N'SELECT', N'DatabaseIdentity', N'COLUMN');"));
-                var startupException = await Assert.ThrowsAsync<DesktopStartupException>(
-                    () => new SqlRuntimePrincipalValidator()
-                        .ValidateConnectionAsync(connection, System.Threading.CancellationToken.None));
-                Assert.Equal("Security.RuntimePrincipalOverprivileged", startupException.Code);
-            }
-            finally
-            {
-                await connection.ExecuteAsync("REVERT;");
-            }
-
-            var provisioningException = await Assert.ThrowsAsync<SqlException>(
-                () => connection.ExecuteAsync(script));
-
-            Assert.Contains("elevated", provisioningException.Message, StringComparison.OrdinalIgnoreCase);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
-
-    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation()
     {
         var database = await SqlTestDatabase.CreateAsync(
@@ -415,11 +463,6 @@ public sealed class SqlPrincipalProvisioningTests
             await connection.ExecuteAsync(
                 "GRANT INSERT, UPDATE ON OBJECT::dbo.Users TO [MyDmsVnRuntimeRole];");
             await connection.ExecuteAsync(script);
-            await connection.ExecuteAsync(
-                "UPDATE dbo.PermissionSynchronizationState SET LastAppliedReleaseId = @releaseId " +
-                "WHERE StateId = 1;",
-                new { releaseId = PermissionReleaseManifest.CurrentReleaseId });
-
             var permissions = await connection.QuerySingleAsync<PermissionProbe>(
                 "EXECUTE AS USER = N'P6RuntimeProbe'; " +
                 "SELECT " +
@@ -429,14 +472,8 @@ public sealed class SqlPrincipalProvisioningTests
                 "HAS_PERMS_BY_NAME(N'dbo.GoodsReceiptLines', N'OBJECT', N'DELETE') AS CanDeleteReceiptLines, " +
                 "HAS_PERMS_BY_NAME(N'dbo.StockLedger', N'OBJECT', N'INSERT') AS CanInsertLedger, " +
                 "HAS_PERMS_BY_NAME(N'dbo.StockBalances', N'OBJECT', N'UPDATE') AS CanUpdateBalances, " +
-                "HAS_PERMS_BY_NAME(N'dbo.Permissions', N'OBJECT', N'SELECT') AS CanReadPermissions, " +
-                "HAS_PERMS_BY_NAME(N'dbo.Permissions', N'OBJECT', N'UPDATE') AS CanUpdatePermissions, " +
-                "HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', N'OBJECT', N'SELECT') AS CanReadSyncState, " +
-                "HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', N'OBJECT', N'SELECT', " +
-                "N'LastAppliedReleaseId', N'COLUMN') AS CanReadSyncRelease, " +
-                "HAS_PERMS_BY_NAME(N'dbo.PermissionSynchronizationState', N'OBJECT', N'SELECT', " +
-                "N'DatabaseIdentity', N'COLUMN') AS CanReadSyncDatabaseIdentity, " +
-                "HAS_PERMS_BY_NAME(N'dbo.SecurityBootstrapState', N'OBJECT', N'INSERT') AS CanInsertBootstrapState, " +
+                "HAS_PERMS_BY_NAME(N'dbo.SystemSecuritySettings', N'OBJECT', N'SELECT') AS CanReadSettings, " +
+                "HAS_PERMS_BY_NAME(N'dbo.SystemSecuritySettings', N'OBJECT', N'UPDATE') AS CanUpdateSettings, " +
                 "HAS_PERMS_BY_NAME(N'dbo.GoodsReceiptNumberSequence', N'OBJECT', N'UPDATE') AS CanUseReceiptSequence, " +
                 "HAS_PERMS_BY_NAME(N'dbo.CatalogTextContainsNul', N'OBJECT', N'VIEW DEFINITION') AS CanInspectManifestFunction, " +
                 "HAS_PERMS_BY_NAME(N'dbo.Employees', N'OBJECT', N'VIEW DEFINITION') AS CanInspectEmployeeIndexDefinition, " +
@@ -452,12 +489,8 @@ public sealed class SqlPrincipalProvisioningTests
             Assert.Equal(1, permissions.CanDeleteReceiptLines);
             Assert.Equal(1, permissions.CanInsertLedger);
             Assert.Equal(1, permissions.CanUpdateBalances);
-            Assert.Equal(1, permissions.CanReadPermissions);
-            Assert.Equal(0, permissions.CanUpdatePermissions);
-            Assert.Equal(0, permissions.CanReadSyncState);
-            Assert.Equal(1, permissions.CanReadSyncRelease);
-            Assert.Equal(0, permissions.CanReadSyncDatabaseIdentity);
-            Assert.Equal(0, permissions.CanInsertBootstrapState);
+            Assert.Equal(1, permissions.CanReadSettings);
+            Assert.Equal(0, permissions.CanUpdateSettings);
             Assert.Equal(1, permissions.CanUseReceiptSequence);
             Assert.Equal(1, permissions.CanInspectManifestFunction);
             Assert.Equal(1, permissions.CanInspectEmployeeIndexDefinition);
@@ -689,17 +722,9 @@ public sealed class SqlPrincipalProvisioningTests
 
         public int CanUseReceiptSequence { get; set; }
 
-        public int CanReadPermissions { get; set; }
+        public int CanReadSettings { get; set; }
 
-        public int CanUpdatePermissions { get; set; }
-
-        public int CanReadSyncState { get; set; }
-
-        public int CanReadSyncRelease { get; set; }
-
-        public int CanReadSyncDatabaseIdentity { get; set; }
-
-        public int CanInsertBootstrapState { get; set; }
+        public int CanUpdateSettings { get; set; }
 
         public int CanInspectManifestFunction { get; set; }
 

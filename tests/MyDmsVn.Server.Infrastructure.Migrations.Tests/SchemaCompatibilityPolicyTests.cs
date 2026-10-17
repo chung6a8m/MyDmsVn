@@ -15,7 +15,8 @@ public sealed class SchemaCompatibilityPolicyTests
         "005_GoodsReceipt.sql",
         "006_GoodsReceipt_Number_Sequence.sql",
         "007_Inventory_Stock.sql",
-        "008_Permission_Provisioning.sql",
+        "008_Security_Administration.sql",
+        "009_Security_Permission_Import.sql",
     };
 
     private static readonly string[] CurrentArtifacts =
@@ -26,6 +27,13 @@ public sealed class SchemaCompatibilityPolicyTests
         "Table:UserRoles",
         "Table:RolePermissions",
         "Table:UserPermissions",
+        "Table:SystemSecuritySettings",
+        "Invariant:SystemSecuritySettings",
+        "Table:SecurityAuditEvents",
+        "Invariant:SecurityAdministration",
+        "Procedure:ApplySecurityAdministration",
+        "Procedure:ReadSecurityPermissionImportTarget",
+        "Procedure:ApplySecurityPermissionImport",
         "Invariant:IdentityColumns",
         "Invariant:IdentityChecks",
         "Invariant:IdentityPrimaryKeys",
@@ -58,19 +66,6 @@ public sealed class SchemaCompatibilityPolicyTests
         "Invariant:InventoryUniqueIndexes",
         "Invariant:InventoryForeignKeys",
         "Trigger:TR_StockLedger_AppendOnly",
-        "Table:Permissions",
-        "Table:PermissionLegacyAssignmentDrift",
-        "Table:PermissionSynchronizationState",
-        "Table:SystemManagedRoles",
-        "Table:PermissionGrantApprovals",
-        "Table:ManagedRolePermissionGrants",
-        "Table:SecurityBootstrapState",
-        "Table:PermissionSecurityAudit",
-        "Invariant:PermissionProvisioningColumns",
-        "Invariant:PermissionProvisioningChecks",
-        "Invariant:PermissionProvisioningPrimaryKeys",
-        "Invariant:PermissionProvisioningUniqueIndexes",
-        "Invariant:PermissionProvisioningForeignKeys",
     };
 
     [Fact]
@@ -117,6 +112,8 @@ public sealed class SchemaCompatibilityPolicyTests
                 "Table:UserRoles",
                 "Table:RolePermissions",
                 "Table:UserPermissions",
+                "Table:SystemSecuritySettings",
+                "Invariant:SystemSecuritySettings",
                 "Invariant:IdentityColumns",
                 "Table:Products",
                 "Table:Warehouses",

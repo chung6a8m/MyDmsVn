@@ -26,18 +26,30 @@ namespace MyDmsVn.Server.Application.Security
         public PermissionSnapshot(
             bool? directDecision,
             bool hasRoleGrant,
-            bool isCatalogActive = true)
+            bool isAccountActive = true,
+            string? databaseUsername = null,
+            int? boundSuperuserUserId = null,
+            string? boundNormalizedUsername = null)
         {
             DirectDecision = directDecision;
             HasRoleGrant = hasRoleGrant;
-            IsCatalogActive = isCatalogActive;
+            IsAccountActive = isAccountActive;
+            DatabaseUsername = databaseUsername;
+            BoundSuperuserUserId = boundSuperuserUserId;
+            BoundNormalizedUsername = boundNormalizedUsername;
         }
 
         public bool? DirectDecision { get; }
 
         public bool HasRoleGrant { get; }
 
-        public bool IsCatalogActive { get; }
+        public bool IsAccountActive { get; }
+
+        public string? DatabaseUsername { get; }
+
+        public int? BoundSuperuserUserId { get; }
+
+        public string? BoundNormalizedUsername { get; }
     }
 
     public interface IPermissionAuthorizationService

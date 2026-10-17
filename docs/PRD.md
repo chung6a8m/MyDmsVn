@@ -22,7 +22,7 @@ A person may carry more than one role; direct user permission exceptions overrid
 ### v1 (P0–P6)
 - Dual runtime desktop hosts: .NET Framework 4.8 and .NET 8 Windows.
 - SQL Server local/intranet deployment; in-process Application execution via LocalApiClient.
-- Login, authorization, safe legacy-password transition, **guarded first Administrator enrollment** and **continuous permission registration/synchronization on later feature releases**.
+- Login, authorization, safe legacy-password transition, guarded bootstrap of one configured superuser, code-defined permission catalog and deliberate user/role assignments.
 - P5 catalog: Products, Warehouses, Employees, Customers.
 - Goods Receipt with header, lines, Draft/Posted lifecycle.
 - Ledger-backed stock balance and stock card, concurrency-safe posting.
@@ -77,7 +77,7 @@ Sales orders, sales invoices, stock issues, purchase ordering, payment, receivab
 ## 8. Release gates
 
 - P0–P4 foundational gates documented in `docs/DEVELOPMENT_PLAN.md`.
-- First-install Administrator enrollment/permission sync (P3.1) and real dual-host Login/logout/session UX (P4.1) must be verified **before authenticated P5 GUI acceptance and P6 release**. Historical P3/P4 foundation acceptance did not cover these flows.
+- The current configured-superuser bootstrap and deliberate permission administration workflow, plus real Login/logout/session behavior, must be verified **before authenticated P5 GUI acceptance and P6 release**. Historical P3.1 sync evidence does not validate the replacement workflow.
 - P5 complete only when all scenarios above have automated evidence plus GUI smoke checks.
 - P6 complete when scripted clean-install/upgrade/rollback-operational guidance exists and both desktop hosts are verified.
 - P7 complete when local and HTTP adapter contract parity tests pass.

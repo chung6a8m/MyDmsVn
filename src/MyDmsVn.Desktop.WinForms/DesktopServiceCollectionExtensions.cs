@@ -5,6 +5,8 @@ using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyDmsVn.Desktop.Application;
+using MyDmsVn.Desktop.Application.Security;
+using MyDmsVn.Desktop.WinForms.Features.Security;
 
 namespace MyDmsVn.Desktop.WinForms
 {
@@ -33,9 +35,41 @@ namespace MyDmsVn.Desktop.WinForms
             services.AddTransient<ICatalogControlFactory, CatalogControlFactory>();
             services.AddTransient<IGoodsReceiptControlFactory, GoodsReceiptControlFactory>();
             services.AddTransient<IInventoryControlFactory, InventoryControlFactory>();
+            services.AddTransient<ISecurityAdministrationControlFactory, SecurityAdministrationControlFactory>();
             services.AddTransient<FoundationShellForm>();
             return services;
         }
+    }
+
+    internal sealed class SecurityAdministrationControlFactory : ISecurityAdministrationControlFactory
+    {
+        private readonly ISecurityAdministrationApiClient _administration;
+        private readonly IPermissionCatalogApiClient _catalog;
+        private readonly IDesktopSession _session;
+        private readonly IDesktopNotificationService _notifications;
+        private readonly IDesktopExceptionReporter? _exceptionReporter;
+
+        public SecurityAdministrationControlFactory(
+            ISecurityAdministrationApiClient administration,
+            IPermissionCatalogApiClient catalog,
+            IDesktopSession session,
+            IDesktopNotificationService notifications,
+            IDesktopExceptionReporter? exceptionReporter = null)
+        {
+            _administration = administration;
+            _catalog = catalog;
+            _session = session;
+            _notifications = notifications;
+            _exceptionReporter = exceptionReporter;
+        }
+
+        public Control Create() => new SecurityAdministrationControl(
+            new SecurityAdministrationViewModel(
+                _administration,
+                _catalog,
+                _session,
+                _notifications,
+                _exceptionReporter));
     }
 
     internal sealed class CatalogControlFactory : ICatalogControlFactory

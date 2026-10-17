@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using MyDmsVn.Contracts;
+using MyDmsVn.Contracts.Security;
 
 namespace MyDmsVn.Desktop.Application
 {
@@ -70,6 +71,30 @@ namespace MyDmsVn.Desktop.Application
     {
         Task<ApiResponse<PermissionDecisionDto>> CheckAsync(
             string permissionKey,
+            CancellationToken cancellationToken);
+    }
+
+    public interface IPermissionCatalogApiClient
+    {
+        Task<ApiResponse<PermissionCatalogDto>> GetCatalogAsync(CancellationToken cancellationToken);
+    }
+
+    public interface ISecurityAdministrationApiClient
+    {
+        Task<ApiResponse<IReadOnlyList<SecurityUserDto>>> ListUsersAsync(CancellationToken cancellationToken);
+        Task<ApiResponse<IReadOnlyList<SecurityRoleDto>>> ListRolesAsync(CancellationToken cancellationToken);
+        Task<ApiResponse<SecurityAdministrationResultDto>> MutateAsync(
+            SecurityAdministrationMutationRequest request,
+            CancellationToken cancellationToken);
+        Task<ApiResponse<PermissionAssignmentImportPreviewDto>> PreviewPermissionImportAsync(
+            PermissionImportTargetTypeDto targetType,
+            int targetId,
+            string json,
+            CancellationToken cancellationToken);
+        Task<ApiResponse<PermissionAssignmentImportResultDto>> ApplyPermissionImportAsync(
+            PermissionImportTargetTypeDto targetType,
+            int targetId,
+            PermissionAssignmentImportRequest request,
             CancellationToken cancellationToken);
     }
 }

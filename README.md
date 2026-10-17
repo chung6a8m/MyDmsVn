@@ -14,7 +14,7 @@ P0/P1/P2/P3/P3.1/P4 implementation is complete. P4.1 Login/session is **closed b
 - Clean Architecture/modular monolith, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork.
 - RepoDb for write-side storage, Dapper for read models, SQL Server and versioned DbUp migrations.
 - Shared WinForms/CommunityToolkit.Mvvm views, Bootstrap5WinFormUI and BootstrapSourceGrid; LocalApiClient for v1, HttpApiClient planned for v2.
-- Security enforcement is mandatory in Application, not just desktop UI. The current permission implementation exists but [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md) is a **proposed replacement**, not current product behavior.
+- Security enforcement is mandatory in Application, not just desktop UI. The current permission implementation follows [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md): code-defined catalog, explicit assignments, and one configured superuser. T06 and final SQL/GUI acceptance remain open.
 - Historical legacy password columns remain for safe migration evaluation.
 
 ## How to work in this repository

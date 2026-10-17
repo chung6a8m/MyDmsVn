@@ -19,11 +19,13 @@ namespace MyDmsVn.Desktop.App
             System.Windows.Forms.Application.EnableVisualStyles();
             System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
             var smokeTest = IsSmokeTest(args);
+            string superuserUsername;
             SqlConnectionConfiguration databaseConfiguration;
             try
             {
+                superuserUsername = new SuperuserConfigurationLoader().Load();
                 databaseConfiguration = new DesktopDatabaseStartupCoordinator()
-                    .PrepareAsync(CancellationToken.None)
+                    .PrepareAsync(superuserUsername, CancellationToken.None)
                     .GetAwaiter()
                     .GetResult();
             }
@@ -41,7 +43,8 @@ namespace MyDmsVn.Desktop.App
             SynchronizationContext.SetSynchronizationContext(uiContext);
             using (var provider = CreateServiceProvider(
                 uiContext,
-                databaseConfiguration.ConnectionString))
+                databaseConfiguration.ConnectionString,
+                superuserUsername))
             {
                 return DesktopHostRunner.Run(
                     provider.GetRequiredService<IServiceScopeFactory>(),
@@ -59,10 +62,11 @@ namespace MyDmsVn.Desktop.App
 
         private static ServiceProvider CreateServiceProvider(
             SynchronizationContext uiContext,
-            string connectionString)
+            string connectionString,
+            string superuserUsername)
         {
             var services = new ServiceCollection();
-            services.AddServerApplication();
+            services.AddServerApplication(superuserUsername);
             services.AddServerInfrastructure();
             services.AddSqlPersistence(connectionString);
             services.AddLocalDesktopAdapter();

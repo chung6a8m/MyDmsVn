@@ -51,18 +51,19 @@ public sealed class DatabaseMigrationRunner
         string connectionString,
         SqlConnection connection)
     {
-        var compatibility = new SqlSchemaCompatibilityChecker(
-                connectionString,
-                requireCurrentPermissionRelease: false)
+        var compatibility = new SqlSchemaCompatibilityChecker(connectionString)
             .CheckConnectionAsync(connection, System.Threading.CancellationToken.None)
             .GetAwaiter()
             .GetResult();
         switch (compatibility.Status)
         {
             case SchemaCompatibilityStatus.Empty:
-            case SchemaCompatibilityStatus.TooOld:
             case SchemaCompatibilityStatus.Compatible:
                 return;
+            case SchemaCompatibilityStatus.TooOld:
+                throw new DatabaseMigrationPreflightException(
+                    "Migration.UnsupportedExistingDatabase",
+                    "Cơ sở dữ liệu hiện có không được hỗ trợ sau khi thay security baseline. Hãy reset rõ ràng một database disposable trước khi cài đặt mới.");
             case SchemaCompatibilityStatus.TooNew:
                 throw new DatabaseMigrationPreflightException(
                     "Migration.SchemaTooNew",
@@ -74,10 +75,6 @@ public sealed class DatabaseMigrationRunner
             case SchemaCompatibilityStatus.Partial:
                 throw new DatabaseMigrationPreflightException(
                     "Migration.PartialSchema",
-                    compatibility.SafeMessage);
-            case SchemaCompatibilityStatus.PermissionSynchronizationRequired:
-                throw new DatabaseMigrationPreflightException(
-                    "Migration.PermissionSynchronizationRequired",
                     compatibility.SafeMessage);
             default:
                 throw new DatabaseMigrationPreflightException(
@@ -242,11 +239,14 @@ internal sealed class DatabaseMigrationLock : IDisposable
 
         try
         {
-            using var command = _connection.CreateCommand();
-            command.CommandText =
-                "EXEC sys.sp_releaseapplock @Resource = @Resource, @LockOwner = N'Session';";
-            command.Parameters.AddWithValue("@Resource", DatabaseMigrationRunner.MigrationLockResource);
-            command.ExecuteNonQuery();
+            if (_connection.State == System.Data.ConnectionState.Open)
+            {
+                using var command = _connection.CreateCommand();
+                command.CommandText =
+                    "EXEC sys.sp_releaseapplock @Resource = @Resource, @LockOwner = N'Session';";
+                command.Parameters.AddWithValue("@Resource", DatabaseMigrationRunner.MigrationLockResource);
+                command.ExecuteNonQuery();
+            }
         }
         finally
         {

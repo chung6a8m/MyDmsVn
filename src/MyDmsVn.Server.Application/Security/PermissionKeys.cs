@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Inventory;
 
@@ -23,36 +20,6 @@ namespace MyDmsVn.Server.Application.Security
         public const string InventoryStockCardRead = InventoryPermissionKeys.StockCardRead;
         public const string SecurityUsersManage = SecurityPermissionKeys.UsersManage;
         public const string SecurityRolesManage = SecurityPermissionKeys.RolesManage;
-
-        private static readonly string[] DeclaredKeys =
-        {
-                CatalogProductsRead,
-                CatalogProductsWrite,
-                CatalogWarehousesRead,
-                CatalogWarehousesWrite,
-                CatalogEmployeesRead,
-                CatalogEmployeesWrite,
-                CatalogCustomersRead,
-                CatalogCustomersWrite,
-                InventoryGoodsReceiptsRead,
-                InventoryGoodsReceiptsWrite,
-                InventoryGoodsReceiptsPost,
-                InventoryBalancesRead,
-                InventoryStockCardRead,
-                SecurityUsersManage,
-                SecurityRolesManage,
-        };
-
-        private static readonly HashSet<string> Declared = new HashSet<string>(
-            DeclaredKeys,
-            StringComparer.Ordinal);
-
-        public static IReadOnlyList<string> All { get; } =
-            new ReadOnlyCollection<string>(DeclaredKeys);
-
-        public static bool IsDeclared(string permissionKey)
-        {
-            return permissionKey != null && Declared.Contains(permissionKey);
-        }
+        public const string SecurityPermissionsRead = SecurityPermissionKeys.PermissionsRead;
     }
 }

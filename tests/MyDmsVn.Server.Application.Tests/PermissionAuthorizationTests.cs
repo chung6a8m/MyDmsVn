@@ -42,11 +42,11 @@ namespace MyDmsVn.Server.Application.Tests
         }
 
         [Fact]
-        public async Task Inactive_catalog_key_denies_even_when_a_direct_or_role_grant_exists()
+        public async Task Inactive_database_account_denies_even_when_a_direct_or_role_grant_exists()
         {
             var store = new FakePermissionStore
             {
-                CatalogActive = false,
+                AccountActive = false,
                 DirectDecision = true,
                 RoleGrant = true,
             };
@@ -57,27 +57,23 @@ namespace MyDmsVn.Server.Application.Tests
                 CancellationToken.None));
         }
 
-        [Theory]
-        [InlineData(PermissionLifecycleStatus.PendingActivation)]
-        [InlineData(PermissionLifecycleStatus.Deprecated)]
+        [Fact]
         public async Task Inactive_code_lifecycle_denies_both_authorization_overloads_before_querying_sql(
-            PermissionLifecycleStatus lifecycleStatus)
+            )
         {
             var key = PermissionKeys.CatalogProductsRead;
             var registry = PermissionRegistry.Create(
-                "review-inactive-lifecycle",
                 new[]
                 {
                     new PermissionDefinition(
                         key,
                         "Catalog",
                         "Inactive in the running application release.",
-                        lifecycleStatus,
-                        AdministratorGrantPolicy.Eligible),
+                        PermissionLifecycleStatus.Deprecated),
                 });
             var store = new FakePermissionStore
             {
-                CatalogActive = true,
+                AccountActive = true,
                 DirectDecision = true,
                 RoleGrant = true,
             };
@@ -184,7 +180,7 @@ namespace MyDmsVn.Server.Application.Tests
         {
             public bool? DirectDecision { get; set; }
             public bool RoleGrant { get; set; }
-            public bool CatalogActive { get; set; } = true;
+            public bool AccountActive { get; set; } = true;
             public int QueryCount { get; private set; }
 
             public Task<PermissionSnapshot> GetSnapshotAsync(
@@ -194,7 +190,7 @@ namespace MyDmsVn.Server.Application.Tests
             {
                 QueryCount++;
                 return Task.FromResult(
-                    new PermissionSnapshot(DirectDecision, RoleGrant, CatalogActive));
+                    new PermissionSnapshot(DirectDecision, RoleGrant, AccountActive));
             }
         }
 

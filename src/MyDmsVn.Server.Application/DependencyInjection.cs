@@ -9,8 +9,15 @@ namespace MyDmsVn.Server.Application
 {
     public static class DependencyInjection
     {
-        public static IServiceCollection AddServerApplication(this IServiceCollection services)
+        public static IServiceCollection AddServerApplication(
+            this IServiceCollection services,
+            string? configuredSuperuserUsername = null)
         {
+            if (!string.IsNullOrWhiteSpace(configuredSuperuserUsername))
+            {
+                services.TryAddSingleton(
+                    new SuperuserIdentityPolicy(configuredSuperuserUsername));
+            }
             services.AddMediatR(
                 configuration =>
                 {
@@ -33,6 +40,7 @@ namespace MyDmsVn.Server.Application
             services.TryAddScoped<IPermissionStore, DenyAllPermissionStore>();
             services.TryAddSingleton<IPermissionRegistry>(
                 PermissionRegistryComposition.CreateDefault());
+            services.TryAddSingleton<PermissionAssignmentImportParser>();
             services.TryAddScoped<IPermissionAuthorizationService, PermissionAuthorizationService>();
             return services;
         }

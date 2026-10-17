@@ -7,7 +7,7 @@
 | 1 | [20261016-001-task-gates-and-modular-tests.md](20261016-001-task-gates-and-modular-tests.md) | TESTGATE-T01–T03 **verified complete**, retained for reference |
 | 2 | [20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | Accepted and merged as PR #32 at `8e310778`; duration comparison waived, not measured |
 | 3 | [20261016-002-modular-test-projects.md](20261016-002-modular-test-projects.md) | TESTGATE-T04/T05 complete at `973109f`; next: SEC-REBUILD |
-| 4 | [20261016-003-permission-system-rebuild.md](20261016-003-permission-system-rebuild.md) | Proposed, dependent on modularized tests |
+| 4 | [20261016-003-permission-system-rebuild.md](20261016-003-permission-system-rebuild.md) | T00–T05 accepted; T06 inventory review, focused L2, Final L3 (775/775), and packaged GUI D2 (138/138) pass at `894ed73`. Packaged manual walkthrough remains blocked/open |
 | 5 | [20261016-004-remaining-p5-acceptance-and-p6-hardening.md](20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | Outstanding P5.1/P5.4 interactive checks, P6 T01–T04 operational gaps, P6 T05–T08 and G1–G5 |
 | 6 | [20261008-008-phase-7-remote-api.md](20261008-008-phase-7-remote-api.md) | Future P7 API/HTTP parity; re-enable `net8.0` before implementing the net8 host |
 

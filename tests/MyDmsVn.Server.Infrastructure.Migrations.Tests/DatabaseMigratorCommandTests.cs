@@ -52,7 +52,7 @@ public sealed class DatabaseMigratorCommandTests
             var error = await standardError;
             Assert.Equal(2, process.ExitCode);
             Assert.Equal(string.Empty, output);
-            Assert.Contains("DbMigrator.InvalidArguments", error, StringComparison.Ordinal);
+            Assert.Contains("PermissionCatalog.InvalidArguments", error, StringComparison.Ordinal);
 
             using var connection = new SqlConnection(database.ConnectionString);
             Assert.Null(await connection.ExecuteScalarAsync<int?>(
@@ -65,30 +65,7 @@ public sealed class DatabaseMigratorCommandTests
     }
 
     [Fact]
-    public void Permission_sync_apply_requires_exact_plan_id_before_loading_configuration()
-    {
-        var loader = new SqlConnectionConfigurationLoader(
-            _ => "Server=secret-host;Database=secret-db;User ID=secret;Password=secret-password",
-            _ => throw new InvalidOperationException(),
-            _ => "unused");
-        using var output = new StringWriter();
-        using var error = new StringWriter();
-
-        var exitCode = PermissionSyncCommand.Run(
-            new[] { "--apply", "--approvals", "approval.json" },
-            loader,
-            output,
-            error,
-            new DateTime(2026, 10, 14, 1, 0, 0, DateTimeKind.Utc));
-
-        Assert.Equal(2, exitCode);
-        Assert.Contains("PermissionSync.InvalidArguments", error.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("secret", error.ToString(), StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(string.Empty, output.ToString());
-    }
-
-    [Fact]
-    public void Bootstrap_rejects_password_command_line_argument_without_echoing_it()
+    public void Superuser_bootstrap_rejects_command_line_password_without_loading_configuration()
     {
         var loader = new SqlConnectionConfigurationLoader(
             _ => throw new InvalidOperationException("configuration must not be loaded"),
@@ -97,8 +74,8 @@ public sealed class DatabaseMigratorCommandTests
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exitCode = InitialAdministratorProvisioningCommand.Run(
-            new[] { "--apply", "--password", "DoNotEcho!456" },
+        var exitCode = SuperuserBootstrapCommand.Run(
+            new[] { "--target", "MyDmsVn", "--password", "DoNotEcho!456" },
             loader,
             new NonInteractiveSecretReader(),
             output,
@@ -106,30 +83,8 @@ public sealed class DatabaseMigratorCommandTests
             new DateTime(2026, 10, 14, 3, 0, 0, DateTimeKind.Utc));
 
         Assert.Equal(2, exitCode);
-        Assert.Contains("SecurityBootstrap.InvalidArguments", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("SecurityBootstrap.Failed", error.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("DoNotEcho", error.ToString(), StringComparison.Ordinal);
-        Assert.Equal(string.Empty, output.ToString());
-    }
-
-    [Fact]
-    public void Administrator_grant_change_requires_exact_operation_and_target_before_configuration()
-    {
-        var loader = new SqlConnectionConfigurationLoader(
-            _ => throw new InvalidOperationException("configuration must not be loaded"),
-            _ => throw new InvalidOperationException(),
-            _ => "unused");
-        using var output = new StringWriter();
-        using var error = new StringWriter();
-
-        var exitCode = AdministratorGrantCommand.Run(
-            new[] { "--revoke", "--restore" },
-            loader,
-            output,
-            error,
-            new DateTime(2026, 10, 14, 3, 0, 0, DateTimeKind.Utc));
-
-        Assert.Equal(2, exitCode);
-        Assert.Contains("PermissionSync.InvalidArguments", error.ToString(), StringComparison.Ordinal);
         Assert.Equal(string.Empty, output.ToString());
     }
 

@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Desktop.Application;
+using MyDmsVn.Desktop.WinForms.Features.Security;
 
 namespace MyDmsVn.Desktop.WinForms
 {
@@ -23,12 +24,13 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ICatalogControlFactory? _catalogControlFactory;
         private readonly IGoodsReceiptControlFactory? _goodsReceiptControlFactory;
         private readonly IInventoryControlFactory? _inventoryControlFactory;
+        private readonly ISecurityAdministrationControlFactory? _securityAdministrationControlFactory;
         private readonly int _uiThreadId;
         private long? _workspaceSessionVersion;
         private bool _openingWorkspace;
 
         public FoundationShellForm(FoundationViewModel viewModel)
-            : this(viewModel, null, null, null, null, null, true)
+            : this(viewModel, null, null, null, null, null, null, true)
         {
         }
 
@@ -40,6 +42,7 @@ namespace MyDmsVn.Desktop.WinForms
                 viewModel,
                 session ?? throw new ArgumentNullException(nameof(session)),
                 notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                null,
                 null,
                 null,
                 null,
@@ -59,6 +62,27 @@ namespace MyDmsVn.Desktop.WinForms
                 catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
                 null,
                 null,
+                null,
+                true)
+        {
+        }
+
+        public FoundationShellForm(
+            FoundationViewModel viewModel,
+            IDesktopSession session,
+            IDesktopNotificationService notifications,
+            ICatalogControlFactory catalogControlFactory,
+            IGoodsReceiptControlFactory goodsReceiptControlFactory,
+            IInventoryControlFactory inventoryControlFactory,
+            ISecurityAdministrationControlFactory securityAdministrationControlFactory)
+            : this(
+                viewModel,
+                session ?? throw new ArgumentNullException(nameof(session)),
+                notifications ?? throw new ArgumentNullException(nameof(notifications)),
+                catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
+                goodsReceiptControlFactory ?? throw new ArgumentNullException(nameof(goodsReceiptControlFactory)),
+                inventoryControlFactory ?? throw new ArgumentNullException(nameof(inventoryControlFactory)),
+                securityAdministrationControlFactory ?? throw new ArgumentNullException(nameof(securityAdministrationControlFactory)),
                 true)
         {
         }
@@ -75,6 +99,7 @@ namespace MyDmsVn.Desktop.WinForms
                 notifications ?? throw new ArgumentNullException(nameof(notifications)),
                 catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
                 goodsReceiptControlFactory ?? throw new ArgumentNullException(nameof(goodsReceiptControlFactory)),
+                null,
                 null,
                 true)
         {
@@ -94,6 +119,7 @@ namespace MyDmsVn.Desktop.WinForms
                 catalogControlFactory ?? throw new ArgumentNullException(nameof(catalogControlFactory)),
                 goodsReceiptControlFactory ?? throw new ArgumentNullException(nameof(goodsReceiptControlFactory)),
                 inventoryControlFactory ?? throw new ArgumentNullException(nameof(inventoryControlFactory)),
+                null,
                 true)
         {
         }
@@ -105,6 +131,7 @@ namespace MyDmsVn.Desktop.WinForms
             ICatalogControlFactory? catalogControlFactory,
             IGoodsReceiptControlFactory? goodsReceiptControlFactory,
             IInventoryControlFactory? inventoryControlFactory,
+            ISecurityAdministrationControlFactory? securityAdministrationControlFactory,
             bool initialize)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
@@ -113,6 +140,7 @@ namespace MyDmsVn.Desktop.WinForms
             _catalogControlFactory = catalogControlFactory;
             _goodsReceiptControlFactory = goodsReceiptControlFactory;
             _inventoryControlFactory = inventoryControlFactory;
+            _securityAdministrationControlFactory = securityAdministrationControlFactory;
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
 
             Text = "MyDmsVn";
@@ -261,6 +289,38 @@ namespace MyDmsVn.Desktop.WinForms
                 "stock-card",
                 "Thẻ kho",
                 () => _inventoryControlFactory!.CreateStockCard());
+
+        public TabPage? OpenSecurityAdministration()
+        {
+            if (_securityAdministrationControlFactory == null || _session?.IsAuthenticated != true)
+            {
+                return null;
+            }
+
+            const string key = "security-administration";
+            _openingWorkspace = true;
+            try
+            {
+                if (_documents.TryGetValue(key, out var existing))
+                {
+                    Workspace.SelectedTab = existing;
+                    ActivateWorkspace(existing);
+                    return existing;
+                }
+
+                var page = OpenWorkspace(
+                    key,
+                    "Security administration",
+                    _securityAdministrationControlFactory.Create(),
+                    WorkspaceSessionVersion);
+                ActivateWorkspace(page);
+                return page;
+            }
+            finally
+            {
+                _openingWorkspace = false;
+            }
+        }
 
         public TabPage? OpenWorkspace(
             string key,
@@ -424,6 +484,13 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 OpenStockCard();
             }
+            else if (string.Equals(
+                Navigation.SelectedItem?.Tag as string,
+                "security-administration",
+                StringComparison.Ordinal))
+            {
+                OpenSecurityAdministration();
+            }
         }
 
         private void OnWorkspaceSelectedIndexChanged(object? sender, EventArgs eventArgs)
@@ -450,6 +517,11 @@ namespace MyDmsVn.Desktop.WinForms
             if (page?.Controls.Count > 0 && page.Controls[0] is StockCardControl card)
             {
                 _ = card.ActivateAsync(CancellationToken.None);
+            }
+
+            if (page?.Controls.Count > 0 && page.Controls[0] is IActivatableDesktopControl activatable)
+            {
+                _ = activatable.ActivateAsync(CancellationToken.None);
             }
         }
 
@@ -601,6 +673,12 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     Text = "Thẻ kho",
                     Tag = "stock-card",
+                });
+            navigation.Items.Add(
+                new BootstrapSidebarItem
+                {
+                    Text = "Security administration",
+                    Tag = "security-administration",
                 });
             return navigation;
         }

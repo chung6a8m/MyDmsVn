@@ -108,21 +108,29 @@ namespace MyDmsVn.Server.Infrastructure.Identity
                 var row = await connection.QuerySingleOrDefaultAsync<PermissionSnapshotRow>(
                     new CommandDefinition(
                         "SELECT " +
-                        "CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.Permissions AS permission " +
-                        "WHERE permission.PermissionKey = @permissionKey " +
-                        "AND permission.CatalogStatus = N'Active') THEN 1 ELSE 0 END AS bit) " +
-                        "AS IsCatalogActive, " +
+                        "CAST(CASE WHEN u.IsActive = 1 THEN 1 ELSE 0 END AS bit) AS IsAccountActive, " +
+                        "u.NormalizedUsername AS DatabaseUsername, " +
+                        "settings.SuperuserUserId AS BoundSuperuserUserId, " +
+                        "settings.BoundNormalizedUsername AS BoundNormalizedUsername, " +
                         "CASE WHEN u.IsActive = 1 THEN (" +
                         "SELECT TOP (1) up.Granted FROM dbo.UserPermissions AS up " +
-                        "WHERE up.UserId = u.UserId AND up.PermissionKey = @permissionKey" +
+                        "WHERE up.UserId = u.UserId AND up.PermissionKey = @permissionKey " +
+                        "AND NOT EXISTS (SELECT 1 FROM dbo.SystemSecuritySettings AS bound " +
+                        "WHERE bound.Id = 1 AND bound.SuperuserUserId = u.UserId " +
+                        "AND bound.BoundNormalizedUsername = u.NormalizedUsername)" +
                         ") ELSE NULL END AS DirectDecision, " +
                         "CAST(CASE WHEN u.IsActive = 1 AND EXISTS (" +
                         "SELECT 1 FROM dbo.UserRoles AS ur " +
                         "INNER JOIN dbo.Roles AS r ON r.RoleId = ur.RoleId AND r.IsActive = 1 " +
                         "INNER JOIN dbo.RolePermissions AS rp ON rp.RoleId = ur.RoleId " +
                         "WHERE ur.UserId = u.UserId AND rp.PermissionKey = @permissionKey" +
+                        " AND NOT EXISTS (SELECT 1 FROM dbo.SystemSecuritySettings AS bound " +
+                        "WHERE bound.Id = 1 AND bound.SuperuserUserId = u.UserId " +
+                        "AND bound.BoundNormalizedUsername = u.NormalizedUsername)" +
                         ") THEN 1 ELSE 0 END AS bit) AS HasRoleGrant " +
-                        "FROM dbo.Users AS u WHERE u.UserId = @userId;",
+                        "FROM dbo.Users AS u " +
+                        "LEFT JOIN dbo.SystemSecuritySettings AS settings ON settings.Id = 1 " +
+                        "WHERE u.UserId = @userId;",
                         new { userId, permissionKey },
                         transaction,
                         cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -132,7 +140,10 @@ namespace MyDmsVn.Server.Infrastructure.Identity
                     : new PermissionSnapshot(
                         row.DirectDecision,
                         row.HasRoleGrant,
-                        row.IsCatalogActive);
+                        row.IsAccountActive,
+                        row.DatabaseUsername,
+                        row.BoundSuperuserUserId,
+                        row.BoundNormalizedUsername);
             }
             catch
             {
@@ -155,7 +166,13 @@ namespace MyDmsVn.Server.Infrastructure.Identity
 
         private sealed class PermissionSnapshotRow
         {
-            public bool IsCatalogActive { get; set; }
+            public bool IsAccountActive { get; set; }
+
+            public string? DatabaseUsername { get; set; }
+
+            public int? BoundSuperuserUserId { get; set; }
+
+            public string? BoundNormalizedUsername { get; set; }
 
             public bool? DirectDecision { get; set; }
 

@@ -35,9 +35,7 @@ namespace MyDmsVn.Server.Application.Catalog
             return new PermissionDefinition(
                 key,
                 "Catalog",
-                description,
-                PermissionLifecycleStatus.Active,
-                AdministratorGrantPolicy.Eligible);
+                description);
         }
     }
 }

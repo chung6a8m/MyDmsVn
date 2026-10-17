@@ -9,7 +9,7 @@
 | 1 | [TESTGATE-T01–T03 — task gates](plans/20261016-001-task-gates-and-modular-tests.md) | **Verified/complete; retained ACTIVE for mandatory context and acceptance policy**, do not rerun T01–T03 by default |
 | 2 | [NET8-PAUSE — temporary second-TFM removal](plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | Accepted and merged as PR #32; duration comparison waived, not measured |
 | 3 | [TESTGATE-T04/T05 — modular test projects](plans/20261016-002-modular-test-projects.md) | Complete at frozen code revision `973109f`; active SQL `net48` Final passed, historical `net8.0` remains parked/not run |
-| 4 | [SEC-REBUILD — permission system](plans/20261016-003-permission-system-rebuild.md) | Proposed; replace legacy permission system only after T04/T05 verification |
+| 4 | [SEC-REBUILD — permission system](plans/20261016-003-permission-system-rebuild.md) | T00–T06 accepted at `0303a91`: strict Final 11/11 gates, 775/775, zero failures/skips; packaged GUI D2 138/138; owner-confirmed T06 walkthrough complete. Six SQL reports record recovered-lease status with clean inventory/ownership; remaining P5/P6 gates stay open |
 | 5 | [P5 GUI acceptance + P6 local hardening remainder](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | **Open**; remaining two P5 manual UI gates + P6 T01–T04 operational gaps and T05–T08 release checks |
 | 6 | [P7 — remote API](plans/20261008-008-phase-7-remote-api.md) | Not started; requires completed P6 and restored `net8.0` support (unless independently revised and approved) |
 
@@ -32,7 +32,7 @@ The [active plan index](plans/README.md) is the canonical Codex starting point. 
 | P1 | Persistence **complete**, 2026-10-08 | [Archive](plans/archive/20261008-003-phase-1-persistence.md) |
 | P2 | Application pipeline **complete**, 2026-10-09 | [Archive](plans/archive/20261008-004-phase-2-application-pipeline.md) |
 | P3 | Security foundation **complete**, 2026-10-09 | [Archive](plans/archive/20261008-005-phase-3-security.md) |
-| P3.1 | Initial security provisioning and sync **complete**, 2026-10-14 | [Archive](plans/archive/20261013-001-initial-security-provisioning-permission-sync.md); supersession planned by SEC-REBUILD, not yet implemented |
+| P3.1 | Initial security provisioning and sync **historically complete**, 2026-10-14 | [Archive](plans/archive/20261013-001-initial-security-provisioning-permission-sync.md); its permission implementation is superseded by SEC-REBUILD, whose T06/final gates are accepted at `0303a91` |
 | P4 | Desktop shell foundation **complete**, 2026-10-09 | [Archive](plans/archive/20261008-006-phase-4-desktop.md) |
 | P4.1 | Real Login/session **owner-accepted complete**, 2026-10-16 | [Archive](plans/archive/20261013-002-desktop-login-session.md); long idle-expiry UI observation unverified/accepted exception |
 | P5 | Business features/automated gates implemented; **interactive acceptance open** | [Archived implementation plan](plans/archive/20261008-001-sales-inventory-foundation.md); [active remaining P5 GUI checks](plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) |

@@ -221,7 +221,7 @@ public sealed class DatabaseMigrationTests
             using var verification = new SqlConnection(database.ConnectionString);
             Assert.Equal(1, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.Products WHERE Code = N'P6-FUTURE' AND Name = N'Preserved';"));
-            Assert.Equal(9, await verification.QuerySingleAsync<int>(
+            Assert.Equal(10, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
         }
         finally
@@ -242,7 +242,7 @@ public sealed class DatabaseMigrationTests
             using (var connection = new SqlConnection(database.ConnectionString))
             {
                 await connection.ExecuteAsync(
-                    "DELETE dbo.SchemaVersions WHERE ScriptName LIKE N'%008_Permission_Provisioning.sql';");
+                    "DROP TABLE dbo.SecurityAuditEvents;");
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
@@ -250,9 +250,9 @@ public sealed class DatabaseMigrationTests
 
             Assert.Equal("Migration.PartialSchema", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
-            Assert.Equal(7, await verification.QuerySingleAsync<int>(
+            Assert.Equal(9, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
-            Assert.Equal(8, await verification.QuerySingleAsync<int>(
+            Assert.Equal(0, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM sys.tables WHERE name IN " +
                 "(N'Permissions', N'PermissionLegacyAssignmentDrift', N'PermissionSynchronizationState', " +
                 "N'SystemManagedRoles', N'PermissionGrantApprovals', N'ManagedRolePermissionGrants', " +
@@ -292,7 +292,7 @@ public sealed class DatabaseMigrationTests
 
             var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Competing_migrator_is_rejected_until_the_deployment_lock_is_released.migration-02", database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
-            Assert.Equal(8, result.Scripts.Count());
+            Assert.Equal(9, result.Scripts.Count());
         }
         finally
         {
@@ -339,7 +339,7 @@ public sealed class DatabaseMigrationTests
     }
 
     [SqlServerFact(SqlTestCategory.MigrationSchema)]
-    public async Task Losing_the_migration_lock_session_stops_the_active_DbUp_script()
+    public async Task Losing_the_migration_lock_session_stops_schema_preflight()
     {
         var database = await SqlTestDatabase.CreateAsync(
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
@@ -348,14 +348,16 @@ public sealed class DatabaseMigrationTests
             var assembly = typeof(DatabaseMigrationRunner).Assembly;
             var prefix = MeasuredDatabaseMigrationRunner.Execute(
                 database.MeasurementContext,
-                "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.direct-prefix",
+                "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.direct-prefix",
                 () => DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScriptsEmbeddedInAssembly(
                     assembly,
                     resourceName =>
                         resourceName.Contains(".Scripts.") &&
-                        !resourceName.EndsWith("008_Permission_Provisioning.sql", StringComparison.Ordinal))
+                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal) &&
+                        !resourceName.EndsWith("008_Security_Administration.sql", StringComparison.Ordinal) &&
+                        !resourceName.EndsWith("009_Security_Permission_Import.sql", StringComparison.Ordinal))
                 .JournalToSqlTable("dbo", "SchemaVersions")
                 .WithTransactionPerScript()
                 .LogToNowhere()
@@ -372,14 +374,14 @@ public sealed class DatabaseMigrationTests
             var blockerSessionId = await blocker.QuerySingleAsync<int>("SELECT @@SPID;");
             using var blockerTransaction = blocker.BeginTransaction();
             await blocker.ExecuteAsync(
-                "SELECT COUNT(*) FROM dbo.RolePermissions WITH (TABLOCKX, HOLDLOCK);",
+                "SELECT COUNT(*) FROM dbo.SchemaVersions WITH (TABLOCKX, HOLDLOCK);",
                 transaction: blockerTransaction);
 
             var migrationTask = Task.Run(() =>
             {
                 try
                 {
-                    return MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.migration-01", runnerConnectionString).Successful;
+                    return MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.migration-01", runnerConnectionString).Successful;
                 }
                 catch (SqlException)
                 {
@@ -407,15 +409,14 @@ public sealed class DatabaseMigrationTests
 
             var migrationSucceeded = await migrationTask;
             Assert.False(migrationSucceeded);
-            Assert.Equal(0, await observer.QuerySingleAsync<int>(
-                "SELECT COUNT(*) FROM dbo.SchemaVersions " +
-                "WHERE ScriptName LIKE N'%008_Permission_Provisioning.sql';"));
+            Assert.Equal(6, await observer.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
             Assert.Null(await observer.ExecuteScalarAsync<int?>(
-                "SELECT OBJECT_ID(N'dbo.Permissions', N'U');"));
+                "SELECT OBJECT_ID(N'dbo.StockLedger', N'U');"));
 
-            var recovery = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.migration-02", database.ConnectionString);
-            Assert.True(recovery.Successful, recovery.Error?.ToString());
-            Assert.Single(recovery.Scripts);
+            var recovery = Assert.Throws<DatabaseMigrationPreflightException>(
+                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.migration-02", database.ConnectionString));
+            Assert.Equal("Migration.UnsupportedExistingDatabase", recovery.Code);
         }
         finally
         {
@@ -498,7 +499,7 @@ public sealed class DatabaseMigrationTests
                 database.ConnectionString);
 
             Assert.True(first.Successful, first.Error?.ToString());
-            Assert.Equal(8, first.Scripts.Count());
+            Assert.Equal(9, first.Scripts.Count());
             Assert.Collection(
                 first.Scripts.OrderBy(script => script.Name, StringComparer.Ordinal),
                 script => Assert.EndsWith("001_PersistenceFoundation.sql", script.Name, StringComparison.Ordinal),
@@ -508,7 +509,8 @@ public sealed class DatabaseMigrationTests
                 script => Assert.EndsWith("005_GoodsReceipt.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("006_GoodsReceipt_Number_Sequence.sql", script.Name, StringComparison.Ordinal),
                 script => Assert.EndsWith("007_Inventory_Stock.sql", script.Name, StringComparison.Ordinal),
-                script => Assert.EndsWith("008_Permission_Provisioning.sql", script.Name, StringComparison.Ordinal));
+                script => Assert.EndsWith("008_Security_Administration.sql", script.Name, StringComparison.Ordinal),
+                script => Assert.EndsWith("009_Security_Permission_Import.sql", script.Name, StringComparison.Ordinal));
             Assert.True(second.Successful, second.Error?.ToString());
             Assert.Empty(second.Scripts);
 
@@ -518,7 +520,7 @@ public sealed class DatabaseMigrationTests
             var historyCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;");
             Assert.Equal(0, tableCount);
-            Assert.Equal(8, historyCount);
+            Assert.Equal(9, historyCount);
 
             var receiptNumberSequenceCount = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM sys.sequences WHERE object_id = " +

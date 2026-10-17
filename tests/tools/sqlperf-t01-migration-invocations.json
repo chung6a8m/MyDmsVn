@@ -60,6 +60,18 @@
     "expectedInvocationRule": "once-per-test-execution"
   },
   {
+    "invocationId": "SqlPrincipalProvisioningTests.Runtime_can_execute_only_the_allowlisted_administration_procedure.migration-01",
+    "class": "SqlPrincipalProvisioningTests",
+    "method": "Runtime_can_execute_only_the_allowlisted_administration_procedure",
+    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Security.Tests/SqlPrincipalProvisioningTests.cs",
+    "sourceLine": 137,
+    "tfms": [
+      "net48",
+      "net8.0"
+    ],
+    "expectedInvocationRule": "once-per-test-execution"
+  },
+  {
     "invocationId": "SqlPrincipalProvisioningTests.Provisioning_rejects_direct_user_impersonation_permission.migration-01",
     "class": "SqlPrincipalProvisioningTests",
     "method": "Provisioning_rejects_direct_user_impersonation_permission",
@@ -113,18 +125,6 @@
     "method": "Provisioning_and_startup_reject_schema_dml_permission",
     "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Security.Tests/SqlPrincipalProvisioningTests.cs",
     "sourceLine": 308,
-    "tfms": [
-      "net48",
-      "net8.0"
-    ],
-    "expectedInvocationRule": "once-per-test-execution"
-  },
-  {
-    "invocationId": "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_full_permission_sync_state_read.migration-01",
-    "class": "SqlPrincipalProvisioningTests",
-    "method": "Provisioning_and_startup_reject_full_permission_sync_state_read",
-    "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Security.Tests/SqlPrincipalProvisioningTests.cs",
-    "sourceLine": 357,
     "tfms": [
       "net48",
       "net8.0"
@@ -324,9 +324,9 @@
     "expectedInvocationRule": "once-per-test-execution"
   },
   {
-    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.direct-prefix",
+    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.direct-prefix",
     "class": "DatabaseMigrationTests",
-    "method": "Losing_the_migration_lock_session_stops_the_active_DbUp_script",
+    "method": "Losing_the_migration_lock_session_stops_schema_preflight",
     "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/DatabaseMigrationTests.cs",
     "sourceLine": 350,
     "tfms": [
@@ -336,9 +336,9 @@
     "expectedInvocationRule": "once-per-test-execution"
   },
   {
-    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.migration-01",
+    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.migration-01",
     "class": "DatabaseMigrationTests",
-    "method": "Losing_the_migration_lock_session_stops_the_active_DbUp_script",
+    "method": "Losing_the_migration_lock_session_stops_schema_preflight",
     "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/DatabaseMigrationTests.cs",
     "sourceLine": 381,
     "tfms": [
@@ -348,9 +348,9 @@
     "expectedInvocationRule": "once-per-test-execution"
   },
   {
-    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_the_active_DbUp_script.migration-02",
+    "invocationId": "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.migration-02",
     "class": "DatabaseMigrationTests",
-    "method": "Losing_the_migration_lock_session_stops_the_active_DbUp_script",
+    "method": "Losing_the_migration_lock_session_stops_schema_preflight",
     "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/DatabaseMigrationTests.cs",
     "sourceLine": 415,
     "tfms": [
@@ -468,9 +468,9 @@
     "expectedInvocationRule": "once-per-caller-execution"
   },
   {
-    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.direct-prefix",
+    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.direct-prefix",
     "class": "SchemaCompatibilityIntegrationTests",
-    "method": "Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data",
+    "method": "Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data",
     "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/SchemaCompatibilityIntegrationTests.cs",
     "sourceLine": 29,
     "tfms": [
@@ -480,9 +480,9 @@
     "expectedInvocationRule": "once-per-test-execution"
   },
   {
-    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.direct-failure",
+    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.direct-failure",
     "class": "SchemaCompatibilityIntegrationTests",
-    "method": "Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data",
+    "method": "Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data",
     "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/SchemaCompatibilityIntegrationTests.cs",
     "sourceLine": 47,
     "tfms": [
@@ -492,9 +492,9 @@
     "expectedInvocationRule": "once-per-test-execution"
   },
   {
-    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data.migration-01",
+    "invocationId": "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.migration-01",
     "class": "SchemaCompatibilityIntegrationTests",
-    "method": "Interrupted_upgrade_prefix_blocks_client_and_forward_fix_preserves_existing_data",
+    "method": "Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data",
     "sourceFile": "tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/SchemaCompatibilityIntegrationTests.cs",
     "sourceLine": 75,
     "tfms": [

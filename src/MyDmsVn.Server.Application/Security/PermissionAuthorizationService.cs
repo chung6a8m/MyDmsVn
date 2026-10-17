@@ -9,15 +9,18 @@ namespace MyDmsVn.Server.Application.Security
         private readonly ICurrentUserAccessor _currentUserAccessor;
         private readonly IPermissionStore _permissionStore;
         private readonly IPermissionRegistry _permissionRegistry;
+        private readonly SuperuserIdentityPolicy? _superuserIdentityPolicy;
 
         public PermissionAuthorizationService(
             ICurrentUserAccessor currentUserAccessor,
             IPermissionStore permissionStore,
-            IPermissionRegistry permissionRegistry)
+            IPermissionRegistry permissionRegistry,
+            SuperuserIdentityPolicy? superuserIdentityPolicy = null)
         {
             _currentUserAccessor = currentUserAccessor;
             _permissionStore = permissionStore;
             _permissionRegistry = permissionRegistry;
+            _superuserIdentityPolicy = superuserIdentityPolicy;
         }
 
         public async Task<bool> IsAllowedAsync(
@@ -48,7 +51,12 @@ namespace MyDmsVn.Server.Application.Security
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var currentUser = _currentUserAccessor.Current;
             if (userId <= 0 ||
+                !currentUser.IsAuthenticated ||
+                !currentUser.IsActive ||
+                !currentUser.UserId.HasValue ||
+                currentUser.UserId.Value != userId ||
                 !_permissionRegistry.TryGet(permissionKey, out var definition) ||
                 definition.LifecycleStatus != PermissionLifecycleStatus.Active)
             {
@@ -61,9 +69,19 @@ namespace MyDmsVn.Server.Application.Security
                     permissionKey,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (!snapshot.IsCatalogActive)
+            if (!snapshot.IsAccountActive)
             {
                 return false;
+            }
+
+            if (_superuserIdentityPolicy != null &&
+                _superuserIdentityPolicy.Matches(
+                    userId,
+                    snapshot.DatabaseUsername,
+                    snapshot.BoundSuperuserUserId,
+                    snapshot.BoundNormalizedUsername))
+            {
+                return true;
             }
 
             if (snapshot.DirectDecision.HasValue)

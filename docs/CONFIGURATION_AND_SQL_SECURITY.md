@@ -33,6 +33,7 @@ Khi nâng cấp từ bản provisioning cũ, chạy lại script hiện tại b�
 |---|---:|---:|---:|---:|
 | `Users` | Có | Không | Chỉ `PasswordHash`, `PasswordSalt`, `PasswordAlgorithm`, `UpdatedAtUtc`, `UpdatedByUserId` | Không |
 | `Roles`, `UserRoles`, `RolePermissions`, `UserPermissions` | Có | Không | Không | Không |
+| `SystemSecuritySettings` | Có | Không | Không | Không |
 | `Products`, `Warehouses`, `Employees`, `Customers` | Có | Có | Có | Không |
 | `GoodsReceipts` | Có | Có | Có | Không |
 | `GoodsReceiptLines` | Có | Có | Có | Có |
@@ -40,15 +41,12 @@ Khi nâng cấp từ bản provisioning cũ, chạy lại script hiện tại b�
 | `StockLedger` | Có | Có | Không | Không |
 | `StockBalances` | Có | Có | Có | Không |
 | `SchemaVersions` | Có | Không | Không | Không |
-| `Permissions` | Có | Không | Không | Không |
-| `PermissionSynchronizationState.LastAppliedReleaseId` | Chỉ cột này | Không | Không | Không |
-| `PermissionLegacyAssignmentDrift`, các cột khác của `PermissionSynchronizationState`, `SystemManagedRoles`, `PermissionGrantApprovals`, `ManagedRolePermissionGrants`, `SecurityBootstrapState`, `PermissionSecurityAudit` | Không | Không | Không | Không |
 
 Runtime role còn có `VIEW DEFINITION` ở database scope để schema preflight kiểm kê nhất quán mọi user object, kể cả object unmanaged chưa được cấp quyền dữ liệu, đồng thời xác nhận function, constraint, index và trigger trong manifest. Đây là quyền chỉ đọc metadata/định nghĩa; nó không cấp `SELECT`, `EXECUTE`, DML hay DDL trên các object đó. Runtime validator chỉ allowlist quyền database read-only này và vẫn từ chối các quyền quản trị, bảo mật hoặc thay đổi schema.
 
 Mọi object mới phải được xem xét và thêm rõ ràng vào script; không cấp `SELECT/EXECUTE` toàn schema. Runtime không được đọc object chưa liệt kê, `ALTER/DROP`, tự cấp quyền, hoặc thay đổi migration history.
 
-Permission sync, managed Administrator grant revoke/restore và first-admin bootstrap chỉ dùng migration principal qua admin package. Chúng dùng cùng secure migration configuration, xác nhận `DatabaseIdentity`/plan ID trước mutation và không tồn tại trong desktop/Login/background process. Xem [security provisioning runbook](SECURITY_PROVISIONING_RUNBOOK.md).
+Bootstrap superuser chỉ dùng migration principal qua admin package. Lệnh `security bootstrap-superuser --target <application-database>` xác nhận đúng target bằng prompt và đọc password qua prompt masked; không nhận password ở command line. Runtime principal chỉ được đọc `SystemSecuritySettings`; mọi thay đổi binding cần maintenance review. Xem [security administration runbook](SECURITY_ADMINISTRATION_RUNBOOK.md).
 
 ## 3. Nguồn cấu hình và precedence
 
@@ -69,6 +67,10 @@ Theo thứ tự ưu tiên:
 1. `MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING`.
 2. File được chỉ bởi `MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING_FILE`.
 3. `%ProgramData%\MyDmsVn\migration.connection`.
+
+### Desktop identity configuration
+
+`Security__SuperuserUsername` là cấu hình bắt buộc ở mỗi desktop deployment. Startup chuẩn hóa giá trị và kiểm tra nó khớp với singleton binding và tên account hiện tại trong database. Không đưa setting này vào migrator command line hoặc lưu trong SQL; khi đổi username, phải xử lý binding và cấu hình trong maintenance procedure đã review.
 
 Không có fallback giữa hai nhóm. Desktop không đọc migration setting và migrator không đọc runtime setting. Cấu hình thiếu, không đọc được, sai cú pháp, thiếu database hoặc trỏ vào `master`, `model`, `msdb`, `tempdb` đều fail closed bằng mã an toàn; connection string không xuất hiện trong thông báo.
 
