@@ -17,11 +17,17 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $ArtifactRoot,
 
-    [string] $ApprovalFile
+    [string] $ApprovalFile,
+
+    [switch] $PreflightOnly
 )
 
 $Revision = $null
-if ($Mode -eq 'Final') {
+if ($PreflightOnly -and $Mode -ne 'Final') {
+    throw 'Manifest preflight is supported for reviewed Final SQL gates only.'
+}
+
+if ($Mode -eq 'Final' -and -not $PreflightOnly) {
     if (-not $ApprovalFile) {
         throw 'Final test gate requires an approved SQL environment file.'
     }
@@ -65,7 +71,7 @@ if (-not (Test-Path -LiteralPath $runnerDll -PathType Leaf)) {
 
 $arguments = @(
     $runnerDll,
-    'test-gate', '--repo', $RepositoryRoot, '--manifest', $ManifestPath,
+    $(if ($PreflightOnly) { 'test-gate-preflight' } else { 'test-gate' }), '--repo', $RepositoryRoot, '--manifest', $ManifestPath,
     '--mode', $Mode, '--plan', $PlanId, '--task', $TaskId, '--artifacts', $ArtifactRoot
 )
 if ($ApprovalFile) {
