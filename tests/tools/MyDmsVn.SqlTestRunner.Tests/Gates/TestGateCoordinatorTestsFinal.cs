@@ -212,18 +212,24 @@ public sealed class TestGateCoordinatorTestsFinal
         var buildOutputs = processes.Commands
             .Where(command => command.Arguments.StartsWith("build ", StringComparison.Ordinal))
             .Select(command => command.Arguments
-                .Split(new[] { "-p:BaseOutputPath=\"" }, StringSplitOptions.None)[1]
+                .Split(new[] { "-p:PreflightOutputRoot=\"" }, StringSplitOptions.None)[1]
                 .Split('"')[0])
             .ToArray();
         Assert.Equal(2, buildOutputs.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        var expectedOutputRoot = Path.Combine(
+            repository.Root, "artifacts", "testgate-preflight-").Replace('\\', '/');
+        Assert.All(buildOutputs, output => Assert.StartsWith(
+            expectedOutputRoot, output, StringComparison.OrdinalIgnoreCase));
         var discoveryOutputs = processes.Commands
             .Where(command => command.Arguments.Contains("--list-tests", StringComparison.Ordinal))
             .Select(command => command.Arguments
-                .Split(new[] { "-p:BaseOutputPath=\"" }, StringSplitOptions.None)[1]
+                .Split(new[] { "-p:PreflightOutputRoot=\"" }, StringSplitOptions.None)[1]
                 .Split('"')[0])
             .ToArray();
         Assert.Equal(4, discoveryOutputs.Length);
         Assert.All(discoveryOutputs, output => Assert.Contains(output, buildOutputs));
+        Assert.All(processes.Commands, command => Assert.Contains(
+            "-p:DirectoryBuildPropsPath=\"", command.Arguments, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -604,7 +610,9 @@ public sealed class TestGateCoordinatorTestsFinal
 
         public FinalRepository(bool multiProject = false)
         {
-            Root = Path.Combine(Path.GetTempPath(), "mydms-final-gate-" + Guid.NewGuid().ToString("N"));
+            Root = Path.Combine(
+                Path.GetPathRoot(Path.GetTempPath())!,
+                "t35-final-" + Guid.NewGuid().ToString("N").Substring(0, 12));
             Directory.CreateDirectory(Path.Combine(Root, "tests", "Sql.Tests"));
             if (multiProject)
             {

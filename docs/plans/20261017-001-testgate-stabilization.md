@@ -96,8 +96,10 @@ The preflight is metadata-only and **not** an SQL acceptance certificate. After 
 - Kept logical execution IDs in the SQL environment and ownership records while moving journal, TRX, timing, and recovery files to short physical IDs. `execution-id.txt` maps new physical journal folders back to their logical IDs; recovery falls back to the prior folder-name/recovery-file layout for existing artifacts.
 - Task TRX folders also retain their original logical run ID in `execution-id.txt`, while their physical directory and TRX filename stay short.
 - SQL manifest preflight builds and discovers from a unique temporary `BaseOutputPath` per invocation. A concurrent-preflight regression holds both builds at the same time and verifies distinct output roots and matching discovery roots.
+- SQL preflight outputs now live under the repository's ignored `artifacts` directory so compiled inventory can resolve the repository source root. A temporary `Directory.Build.props` imports the repository's normal props and gives every project in the build graph its own output directory, avoiding package-copy collisions while keeping each invocation isolated. Build failures report the exit/timeout status and at most 240 characters of bounded error details.
 - Replaced the runner test project's unconditional 11-project `BeforeTargets="Build"` hooks with an explicit `BuildRepositoryInventoryFixtures` audit target. `Invoke-TestGate.ps1 -Mode Final` runs the target; ordinary filtered runner tests do not.
 - Added three runner logical cases and refreshed runner method fingerprints plus the 54 matching incomplete-closure exemptions for the frozen source. The old manifest and all earlier L3 evidence are not accepted for these changes.
+- After the reviewer follow-up code freeze, refreshed **191** existing runner logical-case fingerprints and **54** matching incomplete-closure exemptions from the compiled inventory. No logical case was added or removed by this follow-up; owner, TFM, classification, signature, and theory-row identities were retained.
 
 ## Verification update (2026-10-17)
 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Inventory;
@@ -48,7 +49,8 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
         IReadOnlyList<TestGateDefinition> gates,
         CancellationToken cancellationToken)
     {
-        var overBudget = TestGateArtifactPathPlanner.FindOverBudgetPaths(options.ArtifactRoot, gates);
+        var overBudget = TestGateArtifactPathPlanner.FindOverBudgetPaths(
+            options.ArtifactRoot, gates, options.RepositoryRoot);
         if (overBudget.Count != 0)
         {
             return new SqlGateManifestPreflightResult(overBudget.Select(kind =>
@@ -58,12 +60,22 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
         }
 
         var isolatedOutputRoot = Path.Combine(
-            Path.GetTempPath(), "MyDmsVn", "TestGate", "preflight-" + Guid.NewGuid().ToString("N"));
+            Path.GetFullPath(options.RepositoryRoot), "artifacts",
+            "testgate-preflight-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(isolatedOutputRoot);
         try
         {
+            var buildPropsPath = Path.Combine(
+                isolatedOutputRoot, "Preflight.Directory.Build.props");
+            var repositoryPropsPath = Path.Combine(
+                Path.GetFullPath(options.RepositoryRoot), "Directory.Build.props");
+            var buildProps = "<Project><Import Project=\"" +
+                SecurityElement.Escape(repositoryPropsPath) +
+                "\" /><PropertyGroup><BaseOutputPath>$(PreflightOutputRoot)/" +
+                "$(MSBuildProjectName)/</BaseOutputPath></PropertyGroup></Project>";
+            File.WriteAllText(buildPropsPath, buildProps);
             return await VerifyWithIsolatedOutputAsync(
-                options, manifest, gates, isolatedOutputRoot, cancellationToken).ConfigureAwait(false);
+                options, manifest, gates, isolatedOutputRoot, buildPropsPath, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -90,6 +102,7 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
         TestGateManifest manifest,
         IReadOnlyList<TestGateDefinition> gates,
         string isolatedOutputRoot,
+        string buildPropsPath,
         CancellationToken cancellationToken)
     {
         var issues = new List<SqlGateManifestPreflightIssue>();
@@ -114,15 +127,46 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
                 }
 
                 var project = Path.GetFullPath(Path.Combine(options.RepositoryRoot, gate.Project));
-                var isolatedOutput = isolatedOutputRoot.TrimEnd('\\', '/') + "/";
+                var isolatedOutput = isolatedOutputRoot.TrimEnd('\\', '/').Replace('\\', '/');
+                var isolatedBuildProperties =
+                    "-p:PreflightOutputRoot=\"" + isolatedOutput + "\" " +
+                    "-p:DirectoryBuildPropsPath=\"" + buildPropsPath.Replace('\\', '/') + "\"";
                 var build = await ExecuteAsync(
                     "build \"" + project + "\" -c Release -f " + tfm +
-                    " --no-restore -p:BaseOutputPath=\"" + isolatedOutput.Replace('\\', '/') + "\"",
+                    " --no-restore " + isolatedBuildProperties,
                     options, gate.CommandTimeoutSeconds, cancellationToken).ConfigureAwait(false);
                 if (build.ExitCode != 0 || build.TimedOut)
                 {
+                    var buildOutput = string.IsNullOrWhiteSpace(build.StandardError)
+                        ? build.StandardOutput
+                        : build.StandardError;
+                    var buildLines = buildOutput
+                        .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(line => line.Trim())
+                        .Where(line => line.Length != 0)
+                        .ToArray();
+                    var buildDetail = buildLines
+                        .Where(line => line.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0)
+                        .TakeLast(3)
+                        .ToArray();
+                    if (buildDetail.Length == 0)
+                    {
+                        buildDetail = buildLines.TakeLast(3).ToArray();
+                    }
+                    var buildSummary = buildDetail.Length == 0
+                        ? null
+                        : string.Join(" | ", buildDetail);
+                    if (buildSummary is not null && buildSummary.Length > 240)
+                    {
+                        buildSummary = buildSummary.Substring(0, 240);
+                    }
+
                     issues.Add(new SqlGateManifestPreflightIssue(
-                        gate.GateId, tfm, "Build failed before SQL manifest verification."));
+                        gate.GateId,
+                        tfm,
+                        "Build failed before SQL manifest verification (exit code " +
+                        build.ExitCode + ", timed out " + build.TimedOut + ")." +
+                        (buildSummary is null ? string.Empty : " " + buildSummary)));
                     continue;
                 }
 
@@ -139,7 +183,7 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
                     }
 
                     var assemblyPath = Path.Combine(
-                        isolatedOutputRoot, "Release", tfm,
+                        isolatedOutputRoot, Path.GetFileNameWithoutExtension(project), "Release", tfm,
                         Path.GetFileNameWithoutExtension(project) + ".dll");
                     var source = _inventory.Read(assemblyPath);
                     var sourceBinding = LogicalCaseBinder.BindSource(
@@ -156,8 +200,7 @@ public sealed class SqlGateManifestPreflight : ISqlGateManifestPreflight
 
                     var discovery = await ExecuteAsync(
                         "test \"" + project + "\" -c Release -f " + tfm +
-                        " --no-build --no-restore -p:BaseOutputPath=\"" +
-                        isolatedOutput.Replace('\\', '/') + "\" --list-tests",
+                        " --no-build --no-restore " + isolatedBuildProperties + " --list-tests",
                         options, gate.CommandTimeoutSeconds, cancellationToken).ConfigureAwait(false);
                     if (discovery.ExitCode != 0 || discovery.TimedOut)
                     {

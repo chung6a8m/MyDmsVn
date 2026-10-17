@@ -19,12 +19,18 @@ public static class TestGateArtifactPathPlanner
 
     public static IReadOnlyList<string> FindOverBudgetPaths(
         string artifactRoot,
-        IReadOnlyList<TestGateDefinition> gates)
+        IReadOnlyList<TestGateDefinition> gates,
+        string? repositoryRoot = null)
     {
         var root = Path.GetFullPath(artifactRoot);
+        repositoryRoot ??= root;
         var overBudget = FindOverBudgetPaths(root).ToList();
         var shadowRoot = Path.Combine(
             Path.GetTempPath(), "MyDmsVn", "TestGate", "runner-12345678901234567890");
+        var hasSqlPreflight = gates.Any(gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance);
+        var preflightRoot = Path.Combine(
+            Path.GetFullPath(repositoryRoot), "artifacts",
+            "testgate-preflight-0123456789abcdef0123456789abcdef");
         var candidates = new List<(string Kind, string Path)>
         {
             ("runner shadow assembly", Path.Combine(shadowRoot, "MyDmsVn.SqlTestRunner.dll")),
@@ -32,11 +38,20 @@ public static class TestGateArtifactPathPlanner
                 shadowRoot, "Microsoft.Extensions.DependencyInjection.Abstractions.dll")),
             ("runner shadow runtime configuration", Path.Combine(
                 shadowRoot, "MyDmsVn.SqlTestRunner.runtimeconfig.json")),
-            ("preflight build output", Path.Combine(
-                Path.GetTempPath(), "MyDmsVn", "TestGate",
-                "preflight-0123456789abcdef0123456789abcdef", "Release", "net48",
-                "MyDmsVn.Server.Infrastructure.Foundation.Tests.dll")),
         };
+
+        if (hasSqlPreflight)
+        {
+            candidates.Add(("preflight build properties", Path.Combine(
+                preflightRoot, "Preflight.Directory.Build.props")));
+            foreach (var projectName in gates
+                         .Where(gate => gate.StrictMode == TestGateStrictMode.SqlPrAcceptance)
+                         .Select(gate => Path.GetFileNameWithoutExtension(gate.Project)))
+            {
+                candidates.Add(("preflight build output", Path.Combine(
+                    preflightRoot, projectName, "Release", "net48", projectName + ".dll")));
+            }
+        }
 
         foreach (var gate in gates)
         {
@@ -83,10 +98,6 @@ public static class TestGateArtifactPathPlanner
                 shadowRoot, "Microsoft.Extensions.DependencyInjection.Abstractions.dll")),
             ("runner shadow runtime configuration", Path.Combine(
                 shadowRoot, "MyDmsVn.SqlTestRunner.runtimeconfig.json")),
-            ("preflight build output", Path.Combine(
-                Path.GetTempPath(), "MyDmsVn", "TestGate",
-                "preflight-0123456789abcdef0123456789abcdef", "Release", "net48",
-                "MyDmsVn.Server.Infrastructure.Foundation.Tests.dll")),
             ("task result", Path.Combine(root, "r-0123456789abcdef", "result.trx")),
             ("focused result", Path.Combine(root, "r-0123456789abcdef", "result.trx")),
             ("timing", Path.Combine(root, "m-0123456789abcdef.jsonl")),

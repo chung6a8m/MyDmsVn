@@ -185,7 +185,8 @@ public sealed class TestGateCoordinator
             return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
         }
 
-        if (TestGateArtifactPathPlanner.FindOverBudgetPaths(options.ArtifactRoot, selection.Gates).Count != 0)
+        if (TestGateArtifactPathPlanner.FindOverBudgetPaths(
+                options.ArtifactRoot, selection.Gates, options.RepositoryRoot).Count != 0)
         {
             return new TestGateRunResult(TestGateRunStatus.Incomplete, runs);
         }
