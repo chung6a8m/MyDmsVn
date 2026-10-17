@@ -140,6 +140,7 @@ public sealed class TestGateCoordinator
     private readonly ISqlExecutionLeaseFactory _leases;
     private readonly ITestGateSqlAcceptanceRunner _sqlAcceptance;
     private readonly IAbandonedSqlRunRecovery? _recovery;
+    private readonly ISqlGateManifestPreflight _sqlManifestPreflight;
 
     public TestGateCoordinator(
         IProcessRunner processes,
@@ -148,7 +149,8 @@ public sealed class TestGateCoordinator
         ITestGateApprovalReader? approval = null,
         ISqlExecutionLeaseFactory? leases = null,
         ITestGateSqlAcceptanceRunner? sqlAcceptance = null,
-        IAbandonedSqlRunRecovery? recovery = null)
+        IAbandonedSqlRunRecovery? recovery = null,
+        ISqlGateManifestPreflight? sqlManifestPreflight = null)
     {
         _processes = processes;
         _sourceInventory = sourceInventory;
@@ -157,6 +159,8 @@ public sealed class TestGateCoordinator
         _leases = leases ?? new SqlExecutionLeaseFactory();
         _sqlAcceptance = sqlAcceptance ?? new TestGateSqlAcceptanceRunner(processes);
         _recovery = recovery;
+        _sqlManifestPreflight = sqlManifestPreflight ??
+            new SqlGateManifestPreflight(processes, sourceInventory);
     }
 
     public async Task<TestGateRunResult> RunAsync(
@@ -449,6 +453,29 @@ public sealed class TestGateCoordinator
             !_approval.TryLoad(options.ApprovalFile, out var instanceFingerprint))
         {
             return TestGateRunStatus.ResourceDenied;
+        }
+
+        // Do not acquire the SQL lease or launch any SQL acceptance process
+        // until source, fingerprints, ownership and expanded discovery agree.
+        var preflight = await _sqlManifestPreflight.VerifyAsync(
+            options, manifest, gates, cancellationToken).ConfigureAwait(false);
+        if (!preflight.IsComplete)
+        {
+            foreach (var issue in preflight.Issues.Take(40))
+            {
+                Console.Error.WriteLine(
+                    "SQL manifest preflight: " + issue.GateId + "/" + issue.Framework +
+                    ": " + issue.Reason);
+            }
+
+            if (preflight.Issues.Count > 40)
+            {
+                Console.Error.WriteLine(
+                    "SQL manifest preflight: " + (preflight.Issues.Count - 40) +
+                    " further issues omitted.");
+            }
+
+            return TestGateRunStatus.Incomplete;
         }
 
         var recovery = _recovery ?? new BenchmarkAbandonedSqlRunRecovery(options.ApprovalFile);
