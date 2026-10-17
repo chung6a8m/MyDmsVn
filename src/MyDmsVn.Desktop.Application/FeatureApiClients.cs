@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using MyDmsVn.Contracts;
+using MyDmsVn.Contracts.Security;
 
 namespace MyDmsVn.Desktop.Application
 {
@@ -71,5 +72,10 @@ namespace MyDmsVn.Desktop.Application
         Task<ApiResponse<PermissionDecisionDto>> CheckAsync(
             string permissionKey,
             CancellationToken cancellationToken);
+    }
+
+    public interface IPermissionCatalogApiClient
+    {
+        Task<ApiResponse<PermissionCatalogDto>> GetCatalogAsync(CancellationToken cancellationToken);
     }
 }

@@ -1,6 +1,6 @@
-﻿# SEC-REBUILD verification and gate bindings
+# SEC-REBUILD verification and gate bindings
 
-**Status (2026-10-17):** T00 and T01 accepted. T01 L2 gates pass: non-SQL Task 29/29; guarded SQL SecurityProvisioning 18/18, SqlConcurrency 2/2, MigrationSchema 60/60, all zero skips with cleanup evidence. T01 was code-reviewed and committed. T02 is next; T02–T06 product gates NOT RUN. The earlier abandoned-lease block was cleared by the user-provided fresh approved disposable instance; the preserved prior lease was not deleted or bypassed.
+**Status (2026-10-17):** T00–T02 accepted. T01 L2 gates pass: non-SQL Task 29/29; guarded SQL SecurityProvisioning 18/18, SqlConcurrency 2/2, MigrationSchema 60/60, all zero skips with cleanup evidence. T02 L2 Task gate passes 10/10 across Application, Architecture, Migrator and Desktop Session; zero skips and clean inventory/watchdog/ownership. T01 was committed after self-review. The earlier abandoned-lease block was cleared by the user-provided fresh approved disposable instance; the preserved prior lease was not deleted or bypassed. T03–T06 product gates, packaged GUI acceptance, and final unfiltered SQL/GUI L3 remain NOT RUN.
 
 ## Prerequisite evidence (reviewed in this workspace)
 
@@ -18,7 +18,8 @@ A broader attempt including `TestGateRepositoryContractTests` failed in this loc
 - T01 Task `Invoke-TestGate.ps1 -Mode Task -PlanId '20261016-003-permission-system-rebuild' -TaskId 'SEC-REBUILD-T01'`: Application 17/17, Security configuration/startup 6/6, maintenance command 2/2, Desktop session 4/4; zero failed/skipped, no timeout, clean watchdog/ownership. Current method inventory reconciles Application 107/107, Security 36/36, Migrations 70/70, and Desktop Session 92/92.
 - Guarded SQL Task categories, sequentially on active `net48`: Security `SecurityProvisioning` 18/18, Security `SqlConcurrency` 2/2, Migrations `MigrationSchema` 60/60; all passed with zero skips and owned-database cleanup. The final MigrationSchema run includes refusal of the unsupported interrupted baseline before mutation, unknown-history classification for a missing middle journal entry, seven-script baseline expectations, and loss of the migration-lock session during schema preflight.
 - During the lock-loss test, SQL `KILL` closed the migration connection. `DatabaseMigrationLock.Dispose()` then attempted `sp_releaseapplock` on that closed connection and masked the original SQL failure. The cleanup now releases only on an open connection; the guarded regression passed. Earlier MigrationSchema attempts (6 failures, then 1 failure) are repair evidence, not PASS; only the final 60/60 run counts.
-- Focused builds succeeded for Migrations.Tests `net48` and SQL runner `net8.0` with zero warnings/errors. Other T01 layer builds are recorded in the implementation task artifacts. T02–T06, packaged GUI acceptance, and final unfiltered SQL/GUI L3 remain NOT RUN.
+- T02 `Invoke-TestGate.ps1 -Mode Task -PlanId '20261016-003-permission-system-rebuild' -TaskId 'SEC-REBUILD-T02'`: Application 4/4, Architecture 2/2, Migrator 1/1, Desktop Session 3/3; zero failed/skipped cases, complete inventory and clean watchdog/ownership. Sanitized reports are local under `%TEMP%\sec-rebuild-t02-task-final3`. No SQL or GUI gate applies to catalog composition/export.
+- Focused builds succeeded for Migrations.Tests `net48` and SQL runner `net8.0` with zero warnings/errors. Other T01 layer builds are recorded in the implementation task artifacts. T03–T06, packaged GUI acceptance, and final unfiltered SQL/GUI L3 remain NOT RUN.
 
 ## Project and category map
 

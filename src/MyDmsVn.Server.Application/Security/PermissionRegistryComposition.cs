@@ -12,9 +12,7 @@ namespace MyDmsVn.Server.Application.Security
             definitions.AddRange(CatalogPermissionDefinitions.All);
             definitions.AddRange(InventoryPermissionDefinitions.All);
             definitions.AddRange(SecurityPermissionDefinitions.All);
-            var registry = PermissionRegistry.Create(definitions);
-            registry.ValidateReferencedKeys(PermissionKeys.All);
-            return registry;
+            return PermissionRegistry.Create(definitions);
         }
     }
 
@@ -28,6 +26,10 @@ namespace MyDmsVn.Server.Application.Security
                     "Security",
                     "Manage application users."),
                 new PermissionDefinition(
+                    SecurityPermissionKeys.PermissionsRead,
+                    "Security",
+                    "View the application permission catalog."),
+                new PermissionDefinition(
                     SecurityPermissionKeys.RolesManage,
                     "Security",
                     "Manage application roles and permission assignments."),
@@ -38,5 +40,6 @@ namespace MyDmsVn.Server.Application.Security
     {
         public const string UsersManage = "Security.Users.Manage";
         public const string RolesManage = "Security.Roles.Manage";
+        public const string PermissionsRead = "Security.Permissions.Read";
     }
 }

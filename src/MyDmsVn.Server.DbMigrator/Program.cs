@@ -9,6 +9,15 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length >= 1 &&
+            string.Equals(args[0], "permissions", StringComparison.Ordinal))
+        {
+            return PermissionCatalogCommand.Run(
+                args.Skip(1).ToArray(),
+                Console.Out,
+                Console.Error);
+        }
+
         if (args.Length == 0)
         {
             return DatabaseMigratorCommand.Run(

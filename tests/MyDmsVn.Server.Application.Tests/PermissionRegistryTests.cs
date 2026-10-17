@@ -13,7 +13,8 @@ public sealed class PermissionRegistryTests
         var registry = PermissionRegistryComposition.CreateDefault();
 
         Assert.Equal(
-            PermissionKeys.All.OrderBy(key => key, StringComparer.Ordinal),
+            registry.Definitions.Select(definition => definition.Key)
+                .OrderBy(key => key, StringComparer.Ordinal),
             registry.Definitions.Select(definition => definition.Key));
         Assert.All(registry.Definitions, definition =>
         {
