@@ -55,6 +55,42 @@ public sealed class TestGateCoordinatorTests
             command => Assert.Contains("--filter \"FullyQualifiedName~Example.Tests.Case\"", command.Arguments));
     }
 
+    [Fact]
+    public async Task Task_fingerprint_scope_allows_unrelated_drift_in_the_same_project()
+    {
+        using var repository = new GateRepository(TestGateSelectionKind.FullyQualifiedName);
+        var events = new List<string>();
+        var processes = new GateProcessRunner(repository, events);
+
+        var result = await new TestGateCoordinator(
+            processes,
+            new TwoMethodInventory(staleUnselected: true),
+            new RecordingReportExporter(events)).RunAsync(
+                repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Succeeded, result.Status);
+        Assert.Equal(new[] { "build", "discover", "execute", "report" }, events);
+    }
+
+    [Fact]
+    public async Task Task_rejects_selected_fingerprint_drift_before_execution()
+    {
+        using var repository = new GateRepository(TestGateSelectionKind.FullyQualifiedName);
+        var events = new List<string>();
+        var processes = new GateProcessRunner(repository, events);
+
+        var result = await new TestGateCoordinator(
+            processes,
+            new TwoMethodInventory(staleSelected: true),
+            new RecordingReportExporter(events)).RunAsync(
+                repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.Equal(new[] { "build", "discover" }, events);
+        Assert.DoesNotContain(processes.Commands,
+            command => command.Arguments.Contains("--logger", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData(GateFailure.EmptyDiscovery)]
     [InlineData(GateFailure.UnexpectedDiscovery)]
@@ -133,13 +169,24 @@ public sealed class TestGateCoordinatorTests
 
     private sealed class TwoMethodInventory : ITestGateSourceInventory
     {
+        private readonly bool _staleSelected;
+        private readonly bool _staleUnselected;
+
+        public TwoMethodInventory(bool staleSelected = false, bool staleUnselected = false)
+        {
+            _staleSelected = staleSelected;
+            _staleUnselected = staleUnselected;
+        }
+
         public IReadOnlyList<TestMethodDescriptor> Read(string assemblyPath) => new[]
         {
-            new TestMethodDescriptor("Example.Tests.Case", false, GateRepository.Fingerprint)
+            new TestMethodDescriptor("Example.Tests.Case", false,
+                _staleSelected ? new string('f', 64) : GateRepository.Fingerprint)
             {
                 NormalizedSignature = "Example.Tests.Case()",
             },
-            new TestMethodDescriptor("Example.Tests.Other", false, GateRepository.OtherFingerprint)
+            new TestMethodDescriptor("Example.Tests.Other", false,
+                _staleUnselected ? new string('e', 64) : GateRepository.OtherFingerprint)
             {
                 NormalizedSignature = "Example.Tests.Other()",
             },
