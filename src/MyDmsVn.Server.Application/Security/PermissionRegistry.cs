@@ -7,16 +7,8 @@ namespace MyDmsVn.Server.Application.Security
 {
     public enum PermissionLifecycleStatus
     {
-        PendingActivation = 0,
-        Active = 1,
-        Deprecated = 2,
-    }
-
-    public enum AdministratorGrantPolicy
-    {
-        NotEligible = 0,
-        Eligible = 1,
-        Sensitive = 2,
+        Active = 0,
+        Deprecated = 1,
     }
 
     public sealed class PermissionDefinition
@@ -29,8 +21,7 @@ namespace MyDmsVn.Server.Application.Security
             string key,
             string module,
             string description,
-            PermissionLifecycleStatus lifecycleStatus,
-            AdministratorGrantPolicy administratorGrantPolicy)
+            PermissionLifecycleStatus lifecycleStatus = PermissionLifecycleStatus.Active)
         {
             Key = ValidateKey(key);
             Module = ValidateText(module, nameof(module), MaximumModuleLength);
@@ -40,20 +31,13 @@ namespace MyDmsVn.Server.Application.Security
                 throw new ArgumentOutOfRangeException(nameof(lifecycleStatus));
             }
 
-            if (!Enum.IsDefined(typeof(AdministratorGrantPolicy), administratorGrantPolicy))
-            {
-                throw new ArgumentOutOfRangeException(nameof(administratorGrantPolicy));
-            }
-
             LifecycleStatus = lifecycleStatus;
-            AdministratorGrantPolicy = administratorGrantPolicy;
         }
 
         public string Key { get; }
         public string Module { get; }
         public string Description { get; }
         public PermissionLifecycleStatus LifecycleStatus { get; }
-        public AdministratorGrantPolicy AdministratorGrantPolicy { get; }
 
         private static string ValidateKey(string key)
         {
@@ -116,7 +100,6 @@ namespace MyDmsVn.Server.Application.Security
 
     public interface IPermissionRegistry
     {
-        string ReleaseId { get; }
         IReadOnlyList<PermissionDefinition> Definitions { get; }
         bool TryGet(string permissionKey, out PermissionDefinition definition);
         void ValidateReferencedKeys(IEnumerable<string> referencedKeys);
@@ -126,26 +109,18 @@ namespace MyDmsVn.Server.Application.Security
     {
         private readonly IReadOnlyDictionary<string, PermissionDefinition> _byKey;
 
-        private PermissionRegistry(string releaseId, IReadOnlyList<PermissionDefinition> definitions)
+        private PermissionRegistry(IReadOnlyList<PermissionDefinition> definitions)
         {
-            ReleaseId = releaseId;
             Definitions = definitions;
             _byKey = new ReadOnlyDictionary<string, PermissionDefinition>(
                 definitions.ToDictionary(definition => definition.Key, StringComparer.Ordinal));
         }
 
-        public string ReleaseId { get; }
         public IReadOnlyList<PermissionDefinition> Definitions { get; }
 
         public static PermissionRegistry Create(
-            string releaseId,
             IEnumerable<PermissionDefinition> definitions)
         {
-            if (string.IsNullOrWhiteSpace(releaseId))
-            {
-                throw new ArgumentException("A release identifier is required.", nameof(releaseId));
-            }
-
             if (definitions == null)
             {
                 throw new ArgumentNullException(nameof(definitions));
@@ -167,9 +142,7 @@ namespace MyDmsVn.Server.Application.Security
                 }
             }
 
-            return new PermissionRegistry(
-                releaseId,
-                new ReadOnlyCollection<PermissionDefinition>(ordered));
+            return new PermissionRegistry(new ReadOnlyCollection<PermissionDefinition>(ordered));
         }
 
         public bool TryGet(string permissionKey, out PermissionDefinition definition)

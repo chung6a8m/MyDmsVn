@@ -1,6 +1,6 @@
 # Schema compatibility và migration runbook
 
-Status: P6-T02 + P3.1 schema baseline, 2026-10-14. Migrator là gói admin độc lập; desktop không chứa hoặc tự chạy DbUp, permission sync hay bootstrap.
+Status: Current SEC-REBUILD T01 schema baseline. Migrator là gói admin độc lập; desktop không chứa hoặc tự chạy DbUp hay security bootstrap.
 
 ## 1. Manifest hiện tại
 
@@ -13,7 +13,6 @@ Client v1 hiện tại hỗ trợ đúng journal prefix sau, theo thứ tự b�
 5. `005_GoodsReceipt.sql`
 6. `006_GoodsReceipt_Number_Sequence.sql`
 7. `007_Inventory_Stock.sql`
-8. `008_Permission_Provisioning.sql`
 
 Journal giữ nguyên `dbo.SchemaVersions` từ P1. Script đã phát hành là immutable; sửa nội dung hoặc đổi tên script cũ tạo fork không được hỗ trợ. Manifest kiểm tra cả history, table/function/sequence, toàn bộ nhóm CHECK constraints của 002/003/004/005/007 ở trạng thái enabled/trusted, primary key theo đúng bảng/tên/thứ tự cột, unique index theo đúng key/filter, foreign key theo đúng bảng/cột/action ở trạng thái enabled/trusted và trigger append-only đang enabled, vì chỉ thấy entry `007` không chứng minh schema hoàn chỉnh. Sequence cấp số phiếu phải giữ đúng `bigint`, start/increment/min bằng 1, max bằng 9999999999 và `NO CYCLE`; preflight không so `current_value`, `last_used_value`, cache hoặc exhaustion state vì chúng thay đổi hợp lệ khi vận hành. Preflight kiểm kê đầy đủ user-defined schema-scoped object cấp cao nhất, DML trigger trên mọi schema, synonym, database-scoped DDL trigger và user-defined type trong `sys.types`; allowlist khớp đồng thời schema, tên, object type và parent của trigger. P6-T01/T02 chưa có managed user-defined type, nên alias/table type bất kỳ đều làm database bị coi là unmanaged. Object ngoài manifest hoặc object trùng tên nhưng sai type khiến database bị coi là unmanaged thay vì “empty”. Constraint/index con được kiểm tra bằng các invariant riêng thay vì coi là object độc lập trong inventory.
 
@@ -27,9 +26,9 @@ Cả hai host chạy cùng `DesktopDatabaseStartupCoordinator` trước khi đă
 |---|---|---|---|
 | Không journal, không artifact | `Schema.Empty` | Chặn | Chạy clean install bằng migrator |
 | Prefix hợp lệ nhưng thiếu script hiện tại | `Schema.TooOld` | Chặn | Backup/maintenance window, chạy migrator, preflight lại |
-| Đúng 001–008, đủ artifact và đã sync đúng permission release hiện tại | `Schema.Compatible` | Cho phép | Tiếp tục startup |
-| Đúng 001–008 nhưng chưa sync hoặc sync permission release cũ | `Security.PermissionSynchronizationRequired` | Chặn | Chạy permission sync đã review bằng migration principal, rồi preflight lại |
-| Có script sau 008 | `Schema.TooNew` | Chặn | Cài client tương thích; không downgrade schema |
+| Đúng 001–007, đủ artifact bao gồm `SystemSecuritySettings` | `Schema.Compatible` | Cho phép preflight tiếp | Kiểm tra superuser binding/configuration kế tiếp |
+| Thiếu script/artifact hoặc có prefix migration chưa hoàn tất | `Schema.TooOld` / `Schema.PartialMigration` | Chặn | Chạy migrator đã review rồi preflight lại |
+| Có script sau 007 | `Schema.TooNew` | Chặn | Cài client tương thích; không downgrade schema |
 | Sai/thừa/thiếu giữa chuỗi | `Schema.UnknownHistory` | Chặn | Dừng rollout, điều tra provenance; không sửa journal thủ công |
 | Journal và artifact không khớp | `Schema.PartialMigration` | Chặn | Giữ client đóng; chọn forward-fix hoặc restore đã kiểm chứng |
 
@@ -83,11 +82,10 @@ Baseline này yêu cầu downtime:
 2. Backup và kiểm tra preflight quản trị.
 3. Chạy migration bằng admin package.
 4. Xác nhận journal/artifact và migrator no-op.
-5. Chạy permission sync dry-run/review/apply theo [security provisioning runbook](SECURITY_PROVISIONING_RUNBOOK.md).
-6. Với fresh install duy nhất, chạy first-admin dry-run/apply; upgrade không chạy bootstrap.
-7. Triển khai cả hai host phù hợp manifest 001–008.
-8. Chạy schema preflight, functional smoke và reconciliation.
-9. Mở lại truy cập.
+5. Với fresh install có user store trống, cấu hình `Security__SuperuserUsername` và chạy `security bootstrap-superuser` theo [security provisioning runbook](SECURITY_PROVISIONING_RUNBOOK.md). Không chạy bootstrap trên database đã có user.
+6. Triển khai host phù hợp manifest 001–007 và cùng cấu hình superuser đã được review.
+7. Chạy schema preflight, xác nhận binding/configuration, functional smoke và reconciliation.
+8. Mở lại truy cập.
 
 Không chạy client cũ sau khi schema vượt manifest của nó; không chạy client mới khi DB còn prefix cũ/partial. Downgrade client không đồng nghĩa downgrade database.
 

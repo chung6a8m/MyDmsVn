@@ -29,9 +29,7 @@ namespace MyDmsVn.Server.Application.Inventory
             return new PermissionDefinition(
                 key,
                 "Inventory",
-                description,
-                PermissionLifecycleStatus.Active,
-                AdministratorGrantPolicy.Eligible);
+                description);
         }
     }
 }

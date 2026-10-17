@@ -18,7 +18,6 @@ public enum SchemaCompatibilityStatus
     TooNew,
     UnknownHistory,
     Partial,
-    PermissionSynchronizationRequired,
 }
 
 public sealed class SchemaCompatibilityResult
@@ -53,7 +52,7 @@ public static class SchemaCompatibilityPolicy
         "005_GoodsReceipt.sql",
         "006_GoodsReceipt_Number_Sequence.sql",
         "007_Inventory_Stock.sql",
-        "008_Permission_Provisioning.sql",
+
     };
 
     private static readonly SchemaArtifact[] KnownArtifacts =
@@ -64,6 +63,8 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Table:UserRoles", 2),
         new SchemaArtifact("Table:RolePermissions", 2),
         new SchemaArtifact("Table:UserPermissions", 2),
+        new SchemaArtifact("Table:SystemSecuritySettings", 2),
+        new SchemaArtifact("Invariant:SystemSecuritySettings", 2),
         new SchemaArtifact("Invariant:IdentityColumns", 2),
         new SchemaArtifact("Invariant:IdentityChecks", 2),
         new SchemaArtifact("Invariant:IdentityPrimaryKeys", 2),
@@ -96,19 +97,6 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Invariant:InventoryUniqueIndexes", 7),
         new SchemaArtifact("Invariant:InventoryForeignKeys", 7),
         new SchemaArtifact("Trigger:TR_StockLedger_AppendOnly", 7),
-        new SchemaArtifact("Table:Permissions", 8),
-        new SchemaArtifact("Table:PermissionLegacyAssignmentDrift", 8),
-        new SchemaArtifact("Table:PermissionSynchronizationState", 8),
-        new SchemaArtifact("Table:SystemManagedRoles", 8),
-        new SchemaArtifact("Table:PermissionGrantApprovals", 8),
-        new SchemaArtifact("Table:ManagedRolePermissionGrants", 8),
-        new SchemaArtifact("Table:SecurityBootstrapState", 8),
-        new SchemaArtifact("Table:PermissionSecurityAudit", 8),
-        new SchemaArtifact("Invariant:PermissionProvisioningColumns", 8),
-        new SchemaArtifact("Invariant:PermissionProvisioningChecks", 8),
-        new SchemaArtifact("Invariant:PermissionProvisioningPrimaryKeys", 8),
-        new SchemaArtifact("Invariant:PermissionProvisioningUniqueIndexes", 8),
-        new SchemaArtifact("Invariant:PermissionProvisioningForeignKeys", 8),
     };
 
     public static SchemaCompatibilityResult Evaluate(

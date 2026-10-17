@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,7 +32,7 @@ public sealed class DesktopLoginSessionIntegrationTests
         try
         {
             var services = new ServiceCollection();
-            services.AddServerApplication();
+            services.AddServerApplication("first.admin");
             services.AddSqlPersistence(database.ConnectionString);
             services.AddLocalDesktopAdapter();
             using var provider = services.BuildServiceProvider();
@@ -80,11 +79,10 @@ public sealed class DesktopLoginSessionIntegrationTests
                     });
             }
 
-            var directlyDenied = await products.ListAsync(
+            var superuserDeniedGrant = await products.ListAsync(
                 new CatalogListRequest(null, 1, 20, false),
                 CancellationToken.None);
-            Assert.False(directlyDenied.IsSuccess);
-            Assert.Equal(ApiStatusCode.Forbidden, directlyDenied.Error!.Status);
+            Assert.True(superuserDeniedGrant.IsSuccess);
             Assert.True(session.IsAuthenticated);
 
             int operatorId;
@@ -106,6 +104,12 @@ public sealed class DesktopLoginSessionIntegrationTests
             Assert.True(operatorLogin.IsSuccess);
             Assert.Equal(operatorId, operatorLogin.Data!.UserId);
             Assert.Equal("operator", session.CurrentUser!.Username);
+
+            var unassignedOperator = await products.ListAsync(
+                new CatalogListRequest(null, 1, 20, false),
+                CancellationToken.None);
+            Assert.False(unassignedOperator.IsSuccess);
+            Assert.Equal(ApiStatusCode.Forbidden, unassignedOperator.Error!.Status);
 
             using (var connection = new SqlConnection(database.ConnectionString))
             {
@@ -138,44 +142,15 @@ public sealed class DesktopLoginSessionIntegrationTests
             var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
-            var registry = PermissionRegistryComposition.CreateDefault();
-            var approvals = new PermissionSyncApprovalSet(
-                registry.ReleaseId,
-                "release-operator",
-                UtcNow.AddHours(4),
-                registry.Definitions.Select(definition => new PermissionSyncApproval(
-                    definition.Key,
-                    PermissionCatalogDecision.Approved,
-                    AdministratorGrantDecision.Approved)));
-            var synchronization = new PermissionSynchronizationEngine();
-            var plan = await synchronization.CreatePlanAsync(
+            var engine = new SuperuserBootstrapEngine(new BcryptPasswordHasher(10));
+            var userId = await engine.BootstrapAsync(
                 database.ConnectionString,
-                registry,
-                approvals,
-                UtcNow.AddMinutes(-1),
-                CancellationToken.None);
-            await synchronization.ApplyAsync(
-                database.ConnectionString,
-                registry,
-                approvals,
-                plan,
-                UtcNow.AddMinutes(-1),
-                CancellationToken.None);
-
-            var engine = new InitialAdministratorProvisioningEngine(new BcryptPasswordHasher(10));
-            var inspection = await engine.InspectAsync(database.ConnectionString, CancellationToken.None);
-            var result = await engine.ProvisionAsync(
-                database.ConnectionString,
-                new InitialAdministratorProvisioningRequest(
-                    inspection.DatabaseIdentity,
-                    "first.admin",
-                    "First Administrator",
-                    AdministratorPassword,
-                    "deployment-operator",
-                    registry.ReleaseId),
+                "first.admin",
+                "First Administrator",
+                AdministratorPassword,
                 UtcNow,
                 CancellationToken.None);
-            Assert.Equal(InitialAdministratorProvisioningOutcome.Created, result.Outcome);
+            Assert.True(userId > 0);
             return database;
         }
         catch

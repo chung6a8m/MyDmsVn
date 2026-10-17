@@ -1,120 +1,43 @@
-# Security provisioning runbook
+﻿# Security provisioning runbook
 
-Status: P3.1 deployment workflow, 2026-10-14. Các lệnh trong tài liệu này chỉ chạy từ gói quản trị `MyDmsVn.Server.DbMigrator`; desktop startup và Login không chạy migration, permission sync hoặc bootstrap.
+Status: Current SEC-REBUILD T01 bootstrap and binding workflow. The historical P3.1 synchronization workflow is retained as evidence in `docs/P3_1_VERIFICATION.md`; it is not part of the current executable path.
 
-## 1. Điều kiện và danh tính
+## 1. Fresh installation
 
-- Dừng toàn bộ client trong maintenance window, xác nhận backup/restore point và artifact hash.
-- Dùng migration configuration và migration principal có `CONTROL` trên đúng application database. Không dùng runtime principal, `sa` trong desktop, hoặc đưa connection string lên command line.
-- `MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING[_FILE]` và `%ProgramData%\MyDmsVn\migration.connection` có precedence như tài liệu cấu hình SQL.
-- Mọi output chỉ chứa server/database đã sanitize, `DatabaseIdentity`, release/plan ID, key và mã kết quả. Không chứa connection string, password/hash/salt hoặc raw exception chain.
-
-## 2. Thứ tự fresh install
-
-1. Preflight, backup/restore evidence, dừng client.
-2. Chạy DbUp để áp dụng immutable scripts `001`–`008`; chạy lại migrator để xác nhận no-op.
-3. Tạo approval JSON được release owner và security owner review theo từng key.
-4. Chạy permission dry-run, lưu JSON output và duyệt đúng `planId`, target, changes/conflicts.
-5. Chạy apply với chính approval artifact và `planId` đã duyệt. Mọi drift/expiry/mismatch yêu cầu dry-run và review mới; không có `--force`.
-6. Chạy bootstrap dry-run. Chỉ khi status `Ready`, nhập `DatabaseIdentity` vào apply và nhập password qua prompt masked hai lần.
-7. Kiểm tra marker, role ownership, approved grants, Login Application và direct-deny behavior trước khi mở client.
+1. Confirm the approved server and application database, maintenance window, backup/recovery point and release artifact.
+2. Provision separate runtime and migration SQL principals as described in [configuration and SQL security](CONFIGURATION_AND_SQL_SECURITY.md).
+3. Set `Security__SuperuserUsername` in the protected deployment environment. Use the intended permanent account name; the value is normalized for binding.
+4. Run the migrator with its maintenance connection configuration. The active fresh schema is scripts `001`–`007`; migration `002_Identity.sql` creates the protected singleton binding table.
+5. Run the one-time bootstrap command. It prints the requested target database and configured username, then requires typing the exact database name. The password is read through a masked prompt and is never accepted as a command-line argument.
+6. Verify the user and singleton binding through a separately approved administrative procedure. Do not add a role or permission grants for the configured superuser.
+7. Start the desktop with the same `Security__SuperuserUsername` value and runtime SQL principal. Startup verifies that the configured name, bound normalized name and current database account name agree.
 
 ```powershell
+$env:Security__SuperuserUsername = '<configured-account-name>'
+$env:MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING_FILE = 'C:\ProgramData\MyDmsVn\migration.connection'
 dotnet MyDmsVn.Server.DbMigrator.dll
 
-dotnet MyDmsVn.Server.DbMigrator.dll permissions sync --dry-run `
-  --approvals C:\SecureDeployment\permission-approvals.json
-
-dotnet MyDmsVn.Server.DbMigrator.dll permissions sync --apply `
-  --approvals C:\SecureDeployment\permission-approvals.json `
-  --plan-id <64-character-plan-id>
-
-dotnet MyDmsVn.Server.DbMigrator.dll security bootstrap-admin --dry-run
-
-dotnet MyDmsVn.Server.DbMigrator.dll security bootstrap-admin --apply `
-  --confirm-database <database-identity-guid> `
-  --username <initial-admin-username> `
-  --display-name <display-name> `
-  --actor <deployment-operator-id> `
-  --release-id 2026.10.13-p3.1
+dotnet MyDmsVn.Server.DbMigrator.dll security bootstrap-superuser --target <application-database>
 ```
 
-`--non-interactive` có cùng tác dụng kiểm tra như bootstrap `--dry-run` và không tạo user. Bootstrap apply từ stdin redirected/noninteractive trả lỗi ngay; password không được truyền bằng argument, environment, file approval hoặc log. Marker `InitialAdministrator` làm mọi lần bootstrap sau thành report/no-op, kể cả user ban đầu đã bị disable hoặc xóa.
+The bootstrap command requires an empty `dbo.Users` table and an empty `dbo.SystemSecuritySettings` table. It inserts one active user and one binding in a serializable transaction protected by a SQL application lock. Any failure rolls back both inserts. The password is stored only as the current one-way hash; `PasswordSalt` remains for the legacy schema contract and is set to an empty value for this new hash format. The command requires the migration principal to have `CONTROL` in the application database.
 
-## 3. Approval artifact
+## 2. Runtime behavior
 
-Artifact là JSON admin-only, hết hạn, khớp chính xác release manifest và có đúng một entry cho mỗi key:
+- Runtime can `SELECT` the binding table and cannot insert, update or delete its rows.
+- Each authorization request reads current account activity and binding from SQL. A disabled or renamed bound account is denied until an approved maintenance operation updates the binding/configuration together.
+- `Administrator` is an ordinary role name. It does not receive the superuser bypass.
+- The configured active superuser bypasses role/direct-user permission decisions only for the exact bound database user id and normalized username.
+- Ordinary users use explicit direct decisions and active-role grants. Direct Deny overrides role grants; no matching grant means deny. Permission definitions are supplied by the running application composition, not synchronized into SQL.
 
-```json
-{
-  "releaseId": "2026.10.13-p3.1",
-  "approvedBy": "release-operator-id",
-  "expiresAtUtc": "2026-10-14T08:00:00Z",
-  "permissions": [
-    {
-      "permissionKey": "Catalog.Products.Read",
-      "catalogDecision": "Approved",
-      "administratorGrantDecision": "Approved"
-    },
-    {
-      "permissionKey": "Security.Users.Manage",
-      "catalogDecision": "Approved",
-      "administratorGrantDecision": "Pending"
-    }
-  ]
-}
-```
+## 3. Failure and recovery
 
-Ví dụ rút gọn trên phải được mở rộng đủ manifest thực tế. `CatalogDecision` và `AdministratorGrantDecision` là hai phê duyệt độc lập. `Eligible` chỉ cho phép đề xuất; vẫn cần decision `Approved`. `Sensitive` luôn review theo key. `NotEligible` không được auto-grant dù artifact ghi Approved. Approval hết hạn, thiếu/thừa key hoặc khác release bị từ chối.
+- A bootstrap attempt against a nonempty user store or existing binding fails without mutation. Do not delete users or binding rows to retry.
+- A configuration/binding mismatch blocks desktop startup with `Security.SuperuserBindingMismatch`. Confirm the deployment setting and database identity. If a bound account was intentionally renamed or disabled, use a separately reviewed maintenance procedure; do not run bootstrap again.
+- A failed insert rolls back the user and binding together. Review safe logs and the database state before a new approved attempt.
+- The runtime SQL principal cannot repair or replace the binding. Keep recovery limited to the maintenance principal, with a recorded owner, target database confirmation and post-change verification.
+- Never place a password in a command argument, environment variable, script, approval file, ticket, log or screenshot.
 
-Manifest hiện tại đặt toàn bộ `Catalog.*` và `Inventory.*` là `Eligible`; `Security.Users.Manage` và `Security.Roles.Manage` là `Sensitive`. Không key nào được grant chỉ vì policy này: release owner duyệt manifest/catalog, security owner duyệt Administrator decision theo từng key, và operator áp dụng đúng artifact/plan đã được hai vai trò phê duyệt. Trước approval, review user có role Administrator, mọi direct deny hiện hữu và blast radius của key; direct deny luôn giữ ưu tiên.
+## 4. Permission changes
 
-## 4. Upgrade và permission mới
-
-Upgrade bỏ qua bootstrap. Sau migration, thực hiện dry-run/review/apply cho manifest mới. Client `001`–`007` thấy DB `008` phải dừng với `Schema.TooNew`; client mới gặp DB thiếu `008` hoặc registry chưa sync phải fail closed. Không hỗ trợ rolling/mixed-version hay downgrade schema bằng cách hạ client.
-
-Checklist PR có permission mới:
-
-- thêm constant và `PermissionDefinition` tại module owner, rồi đăng ký qua composition deterministic;
-- chọn lifecycle và `AdministratorGrantPolicy` theo key, không chỉ theo module;
-- bump `PermissionReleaseManifest.CurrentReleaseId` và cập nhật fingerprint bất biến đi kèm; build/test phải fail nếu manifest đổi dưới cùng release ID;
-- dùng key trong server-side Application authorization; registry validation phải thấy mọi key được tham chiếu;
-- cập nhật fixtures/snapshot/schema/package docs nếu cần;
-- test undeclared/pending/unknown deny, activation độc lập với Administrator approval, direct deny vẫn thắng;
-- test Administrator chỉ nhận grant đã duyệt; ordinary/manual roles không đổi;
-- chuẩn bị approval artifact, dry-run diff và rollback/forward-fix note cho rollout.
-
-Rename key không phải edit metadata thông thường; cần mapping/ADR và migration riêng. Sync không xóa definition, manual assignment hoặc direct-user allow/deny.
-
-## 5. Revoke, restore và drift
-
-Lấy target identity từ bootstrap dry-run, sau đó dùng workflow riêng:
-
-```powershell
-dotnet MyDmsVn.Server.DbMigrator.dll permissions administrator-grant --revoke `
-  --confirm-database <database-identity-guid> `
-  --permission-key <exact-key> --release-id <release-id> `
-  --actor <security-operator-id> --reason "<reviewed change reference>"
-
-dotnet MyDmsVn.Server.DbMigrator.dll permissions administrator-grant --restore `
-  --confirm-database <database-identity-guid> `
-  --permission-key <exact-key> --release-id <release-id> `
-  --actor <security-operator-id> --reason "<reviewed restore reference>"
-```
-
-Revoke/restore cập nhật assignment và managed tombstone trong cùng serialized transaction và ghi audit. Restore chỉ thành công khi key active và có Administrator approval hiện hành, chưa hết hạn, đúng release. Routine sync không hồi sinh `Revoked`. Assignment bị xóa ngoài luồng được chuyển thành `Revoked`; assignment xuất hiện lại khi tombstone không Granted tạo conflict và phải điều tra.
-
-## 6. Lost-admin recovery
-
-Bootstrap không phải công cụ recovery và không có flag bỏ marker. Khi mất mọi application Administrator:
-
-1. Dừng client, mở incident/change được security owner và data owner phê duyệt; lưu backup identifier và audit ngoài hệ thống.
-2. Xác nhận marker, managed role/grants và nguyên nhân disable/delete. Không xóa/sửa marker hoặc gán first arbitrary user.
-3. Ưu tiên restore backup đã test nếu RPO được chấp nhận. Nếu cần forward recovery, tạo change riêng có peer review để khôi phục đúng identity đã được owner xác nhận và membership vào managed `Administrator`; dùng BCrypt/password policy qua tool recovery được release riêng, không dùng SQL plaintext/hash tự chế. Baseline này không cung cấp bypass forward-recovery chung.
-4. Ghi một audit maintenance đã redaction, chạy permission dry-run, Login smoke, least-privilege/direct-deny checks rồi mới mở client.
-
-Nếu chưa có tool recovery được duyệt và backup restore không được owner chấp nhận, dừng rollout và escalation; không biến bootstrap hoặc Login thành backdoor.
-
-## 7. Kết quả và recoverability
-
-Exit code chung: `0` thành công/no-op, `1` lỗi không phân loại an toàn, `2` argument/configuration, `3` conflict/stale/policy rejection, `4` thiếu privilege (migration thuần còn dùng các exit code chi tiết trong schema runbook). DbUp là transaction-per-script và chỉ forward-fix/restore; permission apply, grant change và bootstrap mỗi operation là transaction riêng, rollback toàn operation khi lỗi và audit attempt thất bại tách biệt.
+Permission keys are owned by modules and composed into an immutable code-defined registry. New keys begin active in application code but remain denied to ordinary users until an operator assigns an active role or direct-user grant through the security-administration workflow. Deprecated or unknown keys are denied. New catalog/import workflows are governed by the later SEC-REBUILD tasks; this runbook does not define permission synchronization or file import.

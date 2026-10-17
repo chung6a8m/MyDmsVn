@@ -28,9 +28,10 @@ namespace MyDmsVn.Desktop.Tests
                     Assert.Equal(RuntimeConnection, connectionString);
                     return checker;
                 },
-                new AllowingRuntimePrincipalValidator());
+                new AllowingRuntimePrincipalValidator(),
+                new AllowingSuperuserBindingValidator());
 
-            var result = await coordinator.PrepareAsync(CancellationToken.None);
+            var result = await coordinator.PrepareAsync("root.admin", CancellationToken.None);
 
             Assert.Equal(RuntimeConnection, result.ConnectionString);
             Assert.Equal(1, checker.CallCount);
@@ -46,10 +47,11 @@ namespace MyDmsVn.Desktop.Tests
                         SchemaCompatibilityStatus.Partial,
                         "Schema.PartialMigration",
                         "Cần quản trị viên xử lý phục hồi.")),
-                new AllowingRuntimePrincipalValidator());
+                new AllowingRuntimePrincipalValidator(),
+                new AllowingSuperuserBindingValidator());
 
             var exception = await Assert.ThrowsAsync<DesktopStartupException>(
-                () => coordinator.PrepareAsync(CancellationToken.None));
+                () => coordinator.PrepareAsync("root.admin", CancellationToken.None));
 
             Assert.Equal("Schema.PartialMigration", exception.Code);
             Assert.Contains("quản trị viên", exception.SafeMessage, StringComparison.OrdinalIgnoreCase);
@@ -62,10 +64,11 @@ namespace MyDmsVn.Desktop.Tests
             var coordinator = new DesktopDatabaseStartupCoordinator(
                 CreateLoader(SqlConnectionConfigurationPurpose.Migration, RuntimeConnection),
                 _ => throw new InvalidOperationException("Schema checker must not be created."),
-                new AllowingRuntimePrincipalValidator());
+                new AllowingRuntimePrincipalValidator(),
+                new AllowingSuperuserBindingValidator());
 
             var exception = await Assert.ThrowsAsync<OperationalConfigurationException>(
-                () => coordinator.PrepareAsync(CancellationToken.None));
+                () => coordinator.PrepareAsync("root.admin", CancellationToken.None));
 
             Assert.Equal("Startup.DatabaseConfigurationMissing", exception.Code);
         }
@@ -76,10 +79,11 @@ namespace MyDmsVn.Desktop.Tests
             var coordinator = new DesktopDatabaseStartupCoordinator(
                 CreateLoader(SqlConnectionConfigurationPurpose.Runtime, RuntimeConnection),
                 _ => throw new InvalidOperationException("Schema checker must not be created."),
-                new RejectingRuntimePrincipalValidator());
+                new RejectingRuntimePrincipalValidator(),
+                new AllowingSuperuserBindingValidator());
 
             var exception = await Assert.ThrowsAsync<DesktopStartupException>(
-                () => coordinator.PrepareAsync(CancellationToken.None));
+                () => coordinator.PrepareAsync("root.admin", CancellationToken.None));
 
             Assert.Equal("Security.RuntimePrincipalOverprivileged", exception.Code);
             Assert.DoesNotContain(RuntimeConnection, exception.SafeMessage, StringComparison.Ordinal);
@@ -138,6 +142,18 @@ namespace MyDmsVn.Desktop.Tests
                 string connectionString,
                 CancellationToken cancellationToken)
             {
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class AllowingSuperuserBindingValidator : ISuperuserBindingValidator
+        {
+            public Task ValidateAsync(
+                string connectionString,
+                string configuredUsername,
+                CancellationToken cancellationToken)
+            {
+                Assert.Equal("root.admin", configuredUsername);
                 return Task.CompletedTask;
             }
         }

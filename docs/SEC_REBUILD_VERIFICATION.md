@@ -1,6 +1,6 @@
-# SEC-REBUILD verification and gate bindings
+﻿# SEC-REBUILD verification and gate bindings
 
-**Status:** T00 parser/identity check PASS (33/33); T01–T06 product gates NOT RUN. This file binds the accepted active test matrix and exact executable gates; it does not claim SEC-REBUILD behavior exists.
+**Status (2026-10-17):** T00 and T01 accepted. T01 L2 gates pass: non-SQL Task 29/29; guarded SQL SecurityProvisioning 18/18, SqlConcurrency 2/2, MigrationSchema 60/60, all zero skips with cleanup evidence. T01 was code-reviewed and committed. T02 is next; T02–T06 product gates NOT RUN. The earlier abandoned-lease block was cleared by the user-provided fresh approved disposable instance; the preserved prior lease was not deleted or bypassed.
 
 ## Prerequisite evidence (reviewed in this workspace)
 
@@ -11,6 +11,14 @@
 These prerequisite results are historical evidence at their listed frozen revisions; no prerequisite suite was rerun for this mapping task. Current active targets are product/test `net48`, tool runner and runner tests `net8.0`. Application/GUI `net8.0` targets remain PARKED / NOT RUN.
 
 A broader attempt including `TestGateRepositoryContractTests` failed in this local run: `Security.Tests|net48|FingerprintMismatch,IncompleteFingerprint` (52 discovered cases). The same failure reproduces with the unchanged accepted manifest from `973109f`, so it is not caused by SEC-REBUILD gate additions. It is not counted as T00 parser evidence and remains an open runner/source-inventory discrepancy to resolve before final L3; no pass is claimed for it.
+
+## SEC-REBUILD implementation evidence
+
+- T00 `Invoke-TestGate.ps1 -Mode Task -PlanId '20261016-003-permission-system-rebuild' -TaskId 'SEC-REBUILD-T00'`: 33 source/discovery/execution cases, 33 passed, zero failed/skipped, watchdog/ownership clean. The focused runner parser/identity selector also passed 33/33 on tool-only `net8.0` after the logical-case inventory update.
+- T01 Task `Invoke-TestGate.ps1 -Mode Task -PlanId '20261016-003-permission-system-rebuild' -TaskId 'SEC-REBUILD-T01'`: Application 17/17, Security configuration/startup 6/6, maintenance command 2/2, Desktop session 4/4; zero failed/skipped, no timeout, clean watchdog/ownership. Current method inventory reconciles Application 107/107, Security 36/36, Migrations 70/70, and Desktop Session 92/92.
+- Guarded SQL Task categories, sequentially on active `net48`: Security `SecurityProvisioning` 18/18, Security `SqlConcurrency` 2/2, Migrations `MigrationSchema` 60/60; all passed with zero skips and owned-database cleanup. The final MigrationSchema run includes refusal of the unsupported interrupted baseline before mutation, unknown-history classification for a missing middle journal entry, seven-script baseline expectations, and loss of the migration-lock session during schema preflight.
+- During the lock-loss test, SQL `KILL` closed the migration connection. `DatabaseMigrationLock.Dispose()` then attempted `sp_releaseapplock` on that closed connection and masked the original SQL failure. The cleanup now releases only on an open connection; the guarded regression passed. Earlier MigrationSchema attempts (6 failures, then 1 failure) are repair evidence, not PASS; only the final 60/60 run counts.
+- Focused builds succeeded for Migrations.Tests `net48` and SQL runner `net8.0` with zero warnings/errors. Other T01 layer builds are recorded in the implementation task artifacts. T02–T06, packaged GUI acceptance, and final unfiltered SQL/GUI L3 remain NOT RUN.
 
 ## Project and category map
 
@@ -34,7 +42,7 @@ All SQL task runs use the existing `tests/tools/Invoke-FocusedSqlIntegrationTest
 | SEC task | Manifest-owned non-SQL Task gate | Guarded SQL category/project when required | GUI boundary |
 |---|---|---|---|
 | T00 | Runner `TestGateManifestTests`, `LogicalCaseIdentityTests` | None | None |
-| T01 | A `SuperuserAuthorizationTests` / `PermissionDecisionTests`; D `SuperuserSessionTests` | S `SecurityProvisioning`; M `MigrationSchema`; add S `SqlConcurrency` for concurrent bootstrap | None |
+| T01 | A `SuperuserAuthorizationTests`, `PermissionAuthorizationTests`, `PermissionRegistryTests`; S `SuperuserConfigurationTests`, `DesktopDatabaseStartupCoordinatorTests`; M `SuperuserMaintenanceCommandTests`; D `DesktopSessionExpiryTests` | S `SecurityProvisioning`; M `MigrationSchema`; add S `SqlConcurrency` for concurrent bootstrap | None |
 | T02 | A `PermissionCatalogTests`; X `PermissionRegistryCoverageTests`; D `PermissionCatalogClientTests` | None for code composition/export | None |
 | T03 | A `SecurityAdministrationTests` | S `SecurityProvisioning`; `SqlConcurrency` for contested writes; C/I `FastSQL` only when their persistence boundary changes | None |
 | T04 | D `SecurityAdministrationViewModelTests` | None for pure UI | W runs through the existing unfiltered GUI D2 watchdog once at T04 boundary; no focused GUI selector is supported by the current CLI |
@@ -62,4 +70,4 @@ Logical identity is `(active TFM, normalized fully qualified method signature, s
 
 ## Implementation gates
 
-The T00 manifest gate ran `TestGateManifestTests` and `LogicalCaseIdentityTests`: source/discovery/execution 33/33, 33 passed, 0 failed/skipped, no timeout, watchdog and ownership clean. The focused direct runner selection also passed 33/33. All T01–T06 product gates currently show NOT RUN. Planned test class selectors are manifest-owned and intentionally do not authorize an empty-selection pass. For each code task, update logical-case ownership from the actual test source and discovered Fact/Theory rows before running the task gate. SQL and GUI evidence remain separate from these non-SQL Task gates.
+The T00 manifest gate ran `TestGateManifestTests` and `LogicalCaseIdentityTests`: source/discovery/execution 33/33, 33 passed, 0 failed/skipped, no timeout, watchdog and ownership clean. The focused direct runner selection also passed 33/33. T01's manifest Task gate was rerun on 2026-10-17 and reconciled 29/29 source/discovery/execution cases across Application (17), security configuration/startup (6), maintenance command (2) and session (4); all passed, zero failed/skipped, timeout false, watchdog/ownership clean. The superuser bypass assertion iterates every Active definition in the composed runtime registry. Sanitized reports are local under `%TEMP%\\sec-rebuild-resume-t01-task`. Inventory reconciliation removed 16 retired Migrations test methods and their 13 associated fingerprint exemptions from the active manifest; historical behaviors remain in the 152-row replacement ledger. The former approved instance's abandoned `legacy/focused-run/SecurityProvisioning` lease was not removed or bypassed. After the owner supplied a fresh approved disposable instance, the guarded SQL categories completed on `net48`: SecurityProvisioning 18/18, SqlConcurrency 2/2, and MigrationSchema 60/60, each with zero skips and owned-database cleanup. The session was isolated through the approved wrapper and the former lease was left untouched. Planned test class selectors are manifest-owned and intentionally do not authorize an empty-selection pass. For each code task, update logical-case ownership from actual test source and discovered Fact/Theory rows before running the task gate. SQL and GUI evidence remain separate from non-SQL Task gates.

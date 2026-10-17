@@ -107,3 +107,22 @@ CREATE TABLE dbo.UserPermissions
 
 CREATE UNIQUE INDEX UX_UserPermissions_UserId_PermissionKey
     ON dbo.UserPermissions (UserId, PermissionKey);
+
+CREATE TABLE dbo.SystemSecuritySettings
+(
+    Id tinyint NOT NULL
+        CONSTRAINT PK_SystemSecuritySettings PRIMARY KEY,
+    SuperuserUserId int NOT NULL,
+    BoundNormalizedUsername nvarchar(100) COLLATE Latin1_General_100_CI_AI NOT NULL,
+    CreatedAtUtc datetime2(7) NOT NULL
+        CONSTRAINT DF_SystemSecuritySettings_CreatedAtUtc DEFAULT (SYSUTCDATETIME()),
+    UpdatedAtUtc datetime2(7) NULL,
+    CONSTRAINT CK_SystemSecuritySettings_Singleton CHECK (Id = 1),
+    CONSTRAINT CK_SystemSecuritySettings_Username_NotBlank
+        CHECK (LEN(LTRIM(RTRIM(BoundNormalizedUsername))) > 0),
+    CONSTRAINT FK_SystemSecuritySettings_Superuser FOREIGN KEY (SuperuserUserId)
+        REFERENCES dbo.Users (UserId)
+);
+
+CREATE UNIQUE INDEX UX_SystemSecuritySettings_SuperuserUserId
+    ON dbo.SystemSecuritySettings (SuperuserUserId);

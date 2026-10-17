@@ -23,19 +23,20 @@ Add:
 - Local Mode executes authentication in-process. Its SQL credentials are a security limitation; use least-privilege database principal and trusted installation controls.
 - Remote Mode adds HTTP auth (Bearer tokens), token expiry handling and transport security; cookies not required for desktop bearer scenario. Revocation/session model finalized in P7.
 
-## 2a. Safe first Administrator enrollment and Local desktop session (P3.1 verified; P4.1 owner-accepted complete)
+## 2a. Configured superuser enrollment and Local desktop session
 
-- **Current implementation (before proposed SEC-REBUILD):** Initial Administrator provisioning and production WinForms Login UI exist. A deployment-only operator command provisions the first Administrator after schema migration and approved permission synchronization, using an operator-provided secret and a separate privileged SQL principal. There is no default password/hash, implicit desktop-startup seed or re-enrollment on subsequent invocations. These behaviors are historical verified baseline; the active SEC-REBUILD plan proposes replacing the permission workflow later.
-- The Administrator is an ordinary **application role** with explicit `RolePermissions` assignments, **not SQL sysadmin**, not a wildcard permission and not a bypass of user direct-deny precedence. Recovering a lost administrator requires separately approved/audited maintenance, never an unguarded bootstrap replay.
+- The current SEC-REBUILD implementation replaces the historical first-Administrator/synchronization workflow. A single configured superuser is bound to one database user through the protected singleton `dbo.SystemSecuritySettings` row. The operator command `security bootstrap-superuser` is maintenance-only, accepts only an empty user store and unbound settings table, and creates no role or permission grants. There is no default password/hash, desktop-startup seed or automatic re-enrollment.
+- Runtime configuration `Security__SuperuserUsername` must match both the bound normalized username and the current database account name. Startup rejects a missing/mismatched binding. Each authorization check reads current account activity and the singleton binding from SQL; a disabled account is denied. The configured superuser bypasses application role/direct-user decisions only while that database identity is active and matches the binding. `Administrator` is an ordinary role name with no bypass.
 - Local desktop session belongs to the currently authenticated user in one host process. Login creates that state only after successful backend verification; logout/expiry clears it, cancels/invalidates old UI state and requires reauthentication. Local Mode does not issue or emulate P7 bearer tokens. Backend authorization must fail closed without an authenticated user and remains mandatory regardless of UI state.
 - P3.1 T01–T07 implementation and automated acceptance evidence are complete; see `docs/P3_1_VERIFICATION.md`. **P4.1 is owner-accepted complete (2026-10-16)** using automated L3 and attended packaged UI, with an explicit incomplete idle-expiry/relogin observation accepted as an exception, not a passed manual test. See `docs/P4_1_VERIFICATION.md`. Current behavior: Local dispatch captures one immutable actor/generation per request, production Login validates current SQL account state before publishing the session, and protected dispatch revalidates active-account status. The default Local idle timeout is 30 minutes, measured with a monotonic clock; keyboard/mouse input resets it, while API/background polling does not. Other P5/P6 GUI/operational gates remain open in `docs/plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md`. The [SEC-REBUILD plan](plans/20261016-003-permission-system-rebuild.md) proposes replacing this *current* permission system, but has not been implemented.
 
 ## 3. Authorization algorithm
 
-1. User must be authenticated and active.
-2. If `UserPermissions` row exists for (user, permission): `Granted=1` => allow; `Granted=0` => deny.
-3. Otherwise allow if any assigned role contains `RolePermissions` for the exact permission key.
-4. Otherwise deny.
+1. User must be authenticated and active in the current session and current database account.
+2. The configured superuser is allowed only when the current database user id and normalized username match the protected singleton binding and the account is active.
+3. For every other user, if a `UserPermissions` row exists for (user, permission), `Granted=1` allows and `Granted=0` denies.
+4. Otherwise allow if any assigned active role contains `RolePermissions` for the exact permission key.
+5. Otherwise deny.
 
 Unknown or undeclared keys default deny. Permission names are stable, namespaced keys, not UI captions. Explicit user deny always wins over all role grants.
 
@@ -52,14 +53,12 @@ Check authorization at each command/query use case in Application. The UI may hi
 
 Authorization snapshots the authenticated user identifier before its first asynchronous permission lookup and evaluates permissions for that exact user. Mutating requests carry the authorized actor snapshot into their handlers for audit fields. A later Local desktop sign-out or sign-in does not cancel or reattribute an already-authorized in-flight operation; explicit request cancellation remains the cancellation mechanism.
 
-## 3a. Continuously synchronized permission registry (P3.1 implementation)
+## 3a. Code-defined permission registry and deliberate RBAC
 
-- Each feature/module declares stable, exact permission keys in a version-controlled source registry with ownership/description/lifecycle and auto-grant eligibility metadata. Registry validation must reject collisions, undeclared handler keys and unsafe accidental renames. New feature changes include tests and deployment metadata; no manual one-off production seeds.
-- Additive migration `008_Permission_Provisioning.sql` introduces `dbo.Permissions` plus approval, managed-grant, drift, audit and bootstrap metadata. It backfills existing assignment keys as non-authorizing `Unregistered` drift; DbUp migrations remain immutable.
-- A separate privileged per-release sync operates through **dry-run -> review/approval -> transactional apply**, with plan ID bound to manifest, approvals, database identity and relevant state. New definitions are additive, repeatable and concurrency-safe; deprecated keys and existing role/direct-user assignment history are preserved. No automatic deletion, manual grant overwrite or regrant of an intentionally revoked Administrator permission.
-- `Administrator` receives newly introduced **eligible and explicitly approved** permission grants under a documented, auditable policy, but ordinary roles do not. Sensitive new permissions require explicit approval before assignment. A direct `UserPermissions.Granted = false` still denies every role, including Administrator.
-- First Administrator enrollment is an admin-package-only, one-time, masked-password workflow protected by durable marker and the same security-provisioning lock. Exact commands, target confirmation, recovery limits and feature checklist are in [SECURITY_PROVISIONING_RUNBOOK.md](SECURITY_PROVISIONING_RUNBOOK.md).
-- Permission synchronization is **not** executed from desktop startup, Login, business API calls or ordinary client installs. Schema compatibility and authorization default-deny behavior are retained across mixed-version clients.
+- `IPermissionRegistry` is composed deterministically from module-owned key definitions. A definition contains key, module, description and Active/Deprecated lifecycle. It rejects malformed keys and collisions and verifies that every referenced use-case key is composed. There is no synchronized SQL permission catalog, release manifest, `PendingActivation` state or automatic grant policy.
+- Migration `002_Identity.sql` creates `dbo.SystemSecuritySettings` with a singleton key, a noncascading FK to `Users`, a normalized bound username and a unique user binding. Runtime may read this row but cannot modify it. The maintenance-only bootstrap command creates exactly one active user and this binding in one transaction after validating an empty store; it stores only a one-way password hash and no role/grant rows.
+- Every ordinary user receives permissions only from explicit user or active-role assignments. New permission keys do not grant access until an operator assigns them through a reviewed security-administration workflow. Direct user Deny still overrides all role grants; unknown, deprecated and unassigned keys deny.
+- The historical P3.1 provisioning and permission-sync implementation remains documented as historical evidence in `docs/P3_1_VERIFICATION.md`; its old commands, SQL artifacts and execution path have been removed from the current application. Current operator steps are in [SECURITY_PROVISIONING_RUNBOOK.md](SECURITY_PROVISIONING_RUNBOOK.md).
 
 ## 4. Permission cache
 
