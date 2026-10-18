@@ -21,7 +21,7 @@ The current product and all ten active test projects target `net48`. Tests run d
 
 [DEFERRED_WORK.md](DEFERRED_WORK.md) preserves the unfinished P5 interactive checks, P6 operational/release requirements, P7 HTTP scope, and runtime reactivation. Deferral changes priority, not completion status. P4.1's accepted partial idle-expiry observation and NET8-PAUSE's waived duration comparison remain limited to their original decisions.
 
-RELEASE-MANIFEST-01's schema metadata discrepancy is now closed narrowly by L2DB-T02's source fix and clean-commit d8013030 artifact verification. Runtime startup still requires an explicitly authorized suitable identity; P5/P6 release readiness remains deferred.
+RELEASE-MANIFEST-01's schema metadata discrepancy is now closed narrowly by L2DB-T02's source fix and clean-commit d8013030 artifact verification. T02 now has final GO after owner-approved temporary-identity startup and guarded cleanup ([evidence](L2DB_VERIFICATION.md#l2db-t02-final-go--approved-runtime-startup)); next T03. P5/P6 release readiness remains deferred.
 
 ## Execution and evidence
 

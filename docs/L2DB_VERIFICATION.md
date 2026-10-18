@@ -498,3 +498,41 @@ Executed the actual release script, without SkipPublish, from clean source commi
 Only documentation changes follow this clean candidate, so the built code/script bytes remain identical. Historical package records with schema8 remain accurate for their predecessor commits. Existing SQL/application/architecture repair evidence remains scoped to its unchanged source; no SQL/GUI regression run was necessary for the metadata-only source change.
 
 **Current next action:** explicit owner decision on the prepared one-login test-instance exception (or provision of an existing suitable runtime identity), then bounded Desktop startup on a positively owned disposable database, drain and identity-checked cleanup. Contained authentication remains disabled; no server authentication setting, login, server role or server grant has been changed. T02 remains NO-GO pending that startup proof; T03–T06 are still blocked. Temporary source/compiled probe and credential-free resource plan are local/ignored, not an additional framework or committed secret.
+
+
+## L2DB-T02 final GO — approved runtime startup
+
+**Date:** 2026-10-18. **Evidence/documentation base:** `3243f267ba64315c5e9fc54a4055f86dddeef8ce`. **Package/code revision:** `d80130300f39ccbf716a1c5df627d3550e2bd0a5`; subsequent commits change documentation only. **Final decision: GO for the T02 pilot gate.** This supersedes the earlier NO-GO/pending-startup status, not its historical findings. Production still uses RepoDb/Dapper; no T03 conversion or release acceptance is claimed.
+
+### Explicit authorization and resource boundary
+
+The owner explicitly replied **Cho phép** to the concrete one-login test-instance exception prepared in the previous turn. That authorizes exactly the prepared random-name/SID SQL login and its guarded cleanup, not general server security changes. The probe rechecked the prepared identity/SID input before execution, refused pre-existing identity collisions, generated the password only in memory and granted no server role or additional server permission. No credential was printed, persisted or placed on a command line.
+
+The unchanged SqlTestDatabase helper allocated one positively owned fresh database on the explicitly designated non-production instance. Packaged DbMigrator migrated it. After ownership revalidation, setup created the runtime database user for the temporary login and a separate migration user WITHOUT LOGIN, then applied the unchanged deployment principal script. The existing administrator-only bootstrap engine enrolled/bound a test superuser only in this empty owned database. This is explicit test setup, not startup seeding or a product security change.
+
+Runtime used SQL authentication as that restricted login, Pooling=false and the helper-owned database. The probe independently verified USER_NAME / ORIGINAL_LOGIN and ran the unchanged SqlRuntimePrincipalValidator before starting Desktop. Child-only environment configuration supplied the runtime connection and configured superuser username. The actual package entry point retained all production principal/schema/binding validation and rendered Login through its existing --smoke-test path.
+
+### Actual outcomes
+
+Before SQL mutation, recomputed all224 package hashes/lengths and rechecked clean source revision, schema9/ordered001–009, x86 policy DLLs and manifest SHA256 `46aecdeaf0f09a0dc7dc997472cc7a1066d54456b7946dfed2943c8f06f7d3ce`. The package was unchanged from the accepted metadata candidate. Recompiled the prepared local .NET Framework probe and executed it once with its explicit --execute-approved switch, the exact package directory, repository directory and approved identity. No competing SQL/GUI project command ran.
+
+| Operation | Actual result |
+|---|---|
+| Packaged admin DbMigrator, no arguments, owned fresh database | **Exit0 / Migration.Completed** |
+| Restricted runtime identity + unchanged SqlRuntimePrincipalValidator | **Passed**, no impersonation or validator bypass |
+| Packaged Desktop.App.exe --smoke-test | **Exit0**, no stderr; principal/schema/binding checks and Login render completed |
+| Child/process/connection drain | Normal exit; no timeout/kill; finite 30-second subprocess waits were not exhausted |
+| Database cleanup | Unchanged helper guarded disposal completed normally |
+| Login cleanup after database disposal/drain | Exact server/name/SID/create_date and no-active-session checks passed; DROP LOGIN completed and absence was rechecked |
+
+The local sanitized probe log contains each success result; raw artifacts and allocation/login identifiers remain local/ignored. There is no unresolved owned allocation/login reported. No global leftover census, prefix cleanup, orphan adoption, server authentication toggle, unrelated identity change or caller-environment mutation was performed. The one-login exception is finished; the general database-only SQL-test rule remains intact.
+
+### Gate reconciliation and limits
+
+The accepted T02 evidence now consists of the original F49/C12/I24 filtered scopes (their code/fixtures are unchanged), repaired S33 strict parity scope, A8 import contract scope, X10 boundaries, W4 packaging rows, clean net48/x86 publication with matching schema metadata, and this successful real restricted-runtime package startup. Focused RED/GREEN runs overlap those scopes; startup is a separate subprocess scenario, not another xUnit Fact or an invented new pass total. No mandatory selected case was skipped. Source/ledger remains **637 logical method IDs**, with the original gap-detector ID explicitly mapped to its strict User/Role parity successor.
+
+L2DB-PILOT-01 is resolved; RELEASE-MANIFEST-01 is closed narrowly; Product batching/long offsets/native escape, receipt shared-session/commit/rollback and Security procedure/result/error/permission/outer-rollback evidence have no remaining T02 blocker. Existing Pkcs advisories remain recorded dependency risks, not a new clean-security claim. T07's unfiltered final matrix, attended login/business/maintenance workflows, signing and P5/P6 operational release acceptance remain **NOT RUN / OPEN** as applicable. A rendered Login form does not prove those attended workflows.
+
+**Next active task: L2DB-T03.** T03–T06 are no longer blocked by T02; each retains its own dependencies/tests. No T03 code was implemented in this approval turn. Keep the T06 pilot removal/native-oracle retention obligation; there is no production provider flag or permanent dual-provider fallback.
+
+Local probe source SHA256 (audit binding only; source contains no credentials): `b31e8557b4204c05a99b753a0a87d6067bb0c05123b877b25575358166cbf02b`.

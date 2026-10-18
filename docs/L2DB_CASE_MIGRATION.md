@@ -777,3 +777,8 @@ One new non-SQL packaging boundary; all previous logical IDs/rows remain. Curren
 | Logical ID / source | Row | Resource / category | Decision |
 |---|---|---|---|
 | `W:ReleasePackagingTests.Packages_without_runtime_schema_policy_are_rejected` ([source](../tests/MyDmsVn.Desktop.Tests/ReleasePackagingTests.cs)) | single | pure / - | Add; refuse manifest generation without authoritative shipped runtime policy |
+
+
+## T02 final GO and temporary startup identity
+
+[Final GO evidence](L2DB_VERIFICATION.md#l2db-t02-final-go--approved-runtime-startup) supersedes the historical NO-GO after the strict User/Role reader repair, schema9/x86 package validation and actual least-privileged Desktop --smoke-test exit0. The owner explicitly authorized one temporary SQL login on the designated test instance; the login and positively owned database were removed after drain and exact identity/ownership verification. This one-off startup scenario is not an xUnit Fact; no logical ID, Theory row or pass count is added. Current ledger retains637 method IDs. T03 is next; T06 pilot removal and independent oracle retention remain required. T07 attended workflows/release acceptance are not implied.
