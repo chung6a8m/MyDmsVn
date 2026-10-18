@@ -428,4 +428,28 @@ An independent read-only reviewer found no P1/P2 issue: the optional single-row 
 
 ### Remaining startup gate
 
-The process environment currently provides only the designated SQL-test administrative connection, not a least-privileged runtime connection. Package publication and bounded entry-point checks will be recorded against the clean repair commit. Do not grant GO using the test administrator as a runtime principal, bypass validation, create a server login or change server security to force startup. T03–T06 remain blocked until successful startup on an explicitly designated non-production database with a suitable runtime identity is evidenced. T07 attended business workflows and release acceptance remain separate obligations.
+The process environment currently provides only the designated SQL-test administrative connection, not a least-privileged runtime connection. The package and bounded entry-point checks below are bound to clean repair commit `56830332ee6a69e122835920734497180723870b`. Do not grant GO using the test administrator as a runtime principal, bypass validation, create a server login or change server security to force startup. T03–T06 remain blocked until successful startup on an explicitly designated non-production database with a suitable runtime identity is evidenced. T07 attended business workflows and release acceptance remain separate obligations.
+
+
+### Clean-commit validation package and bounded startup checks
+
+Executed the existing publication script after all test commands finished, with no SkipPublish and a new empty output directory:
+
+```powershell
+$version = '0.0.0-l2db.56830332'
+& ./deployment/release/Publish-LocalRelease.ps1 -Version $version -OutputRoot (Join-Path (Get-Location).Path ('artifacts/release/' + $version))
+```
+
+**PASS — publication/dependency validation:** script completed locked solution restore and net48/x86 Desktop/admin publish. Manifest sourceCommit is `56830332ee6a69e122835920734497180723870b`, sourceTreeDirty=false; all **224 file hashes/lengths** match (Desktop 142, admin 82). Both packages contain linq2db/SqlClient/native SNI assets and parseable executable configs. Manifest SHA256: `3f13c9d91245f9d6d547c36ec1c3efe22def55fb17d22bfd71009a88ca6d9b47`. These are local validation artifacts, not a published production release.
+
+A temporary local .NET Framework probe used reflection only to invoke the unchanged test SqlTestDatabase helper, allocate one positively owned database on the designated non-production instance, and await its normal guarded disposal. It launched the actual package executables with **child-only** environment settings; no parent environment/configuration, production database, server login or grants were changed. Subprocesses have a 30-second wait, termination/drain on timeout and refusal to drop over an undrained process. No timeout occurred. Probe source/executable/config/logs remain local/ignored; this does not add a test runner or restore the retired framework.
+
+| Actual package entry point | Observed outcome | Meaning |
+|---|---|---|
+| Admin DbMigrator, no arguments, child migration connection to the owned fresh database | Exit 0 / Migration.Completed | Packaged migration/native SQL dependencies work on the owned disposable database |
+| Desktop App --smoke-test, child runtime connection to that same database using the only available test administrator | Exit 2 / Security.RuntimePrincipalOverprivileged | Entry point and native SQL loaded; existing least-privilege guard correctly refuses admin runtime. This is **not successful Desktop startup** |
+| Existing SqlTestDatabase guarded disposal after both children exited | Completed normally | No unresolved allocation reported; no global leftover census/deletion performed |
+
+Initial local probe setup had a source-path compile failure before allocation; corrected the compiler path and ran the probe above. The static artifact checker initially expected architecture `x86`; the actual documented manifest value is `win-x86`, and the corrected check passed. Neither setup issue changed product code or acceptance assertions.
+
+**Remaining state:** L2DB-PILOT-01 is resolved by the committed baseline repair and strict parity. **T02 GO remains withheld / T03–T06 blocked** until Desktop startup succeeds on an explicitly designated disposable non-production database using a suitable least-privileged runtime identity. No such runtime configuration is currently provided. Do not count the expected privilege rejection as startup PASS. Attended login/catalog/receipt/import workflows are NOT RUN and remain T07 obligations. The package still emits schemaSupport 8 while runtime expects scripts 001–009; OPEN RELEASE-MANIFEST-01 remains an acknowledged release metadata blocker, not a waived or repaired result. Existing Pkcs advisory risk remains open.
