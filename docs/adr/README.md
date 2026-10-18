@@ -6,12 +6,15 @@ Accepted decisions supersede conflicting example snippets in historical `project
 |---|---|---|
 | [0001](0001-local-and-remote-adapters.md) | Local v1 / HTTP v2 with shared desktop API seam | Accepted |
 | [0002](0002-explicit-unit-of-work.md) | Explicit rather than ambient UnitOfWork | Accepted |
-| [0003](0003-compatibility-and-legacy-passwords.md) | Dual-runtime, RepoDb versions, legacy PasswordSalt | Accepted |
+| [0003](0003-compatibility-and-legacy-passwords.md) | Original runtime/package compatibility and legacy PasswordSalt | Accepted; runtime scope refined by 0008, DAL direction by 0009; password compatibility remains binding |
 | [0004](0004-p5-ledger-and-posting.md) | P5 transactionally posted stock ledger and balances | Accepted / proposed schema details |
 | [0005](0005-test-isolation-and-bounded-parallelism.md) | Test resource isolation and bounded SQL parallelism; keep GUI-interacting Desktop tests serialized | Accepted |
 | [0006](0006-task-scoped-test-execution-and-module-projects.md) | Task-level selection, final acceptance boundaries, and module-scoped test project target | **Proposed** |
-| [0007](0007-code-defined-permissions-and-single-superuser.md) | Code-defined permissions, deliberate RBAC administration, single configured superuser (SEC-REBUILD) | **Approved direction; implementation NOT STARTED** |
+| [0007](0007-code-defined-permissions-and-single-superuser.md) | Code-defined permissions, deliberate RBAC administration, single configured superuser (SEC-REBUILD) | **Implemented and accepted in PR #34**; latest evidence in [SEC-REBUILD verification](../SEC_REBUILD_VERIFICATION.md) supersedes stale status text |
 | [0008](0008-temporary-net8-target-pause.md) | Temporary net48-only application/test profile with retained net8 tool hosts and reversible restoration | **Accepted and merged as PR #32** |
+| [0009](0009-linq2db-local-net48-persistence.md) | LINQ to DB with explicit UoW/DbUp, Local v1, active net48 and unchanged post-rebuild security | **Owner-approved direction 1A + 2A + 3A; implementation design proposed / NOT IMPLEMENTED** |
+
+ADR 0009 changes the approved DAL direction, not the delivered binaries. RepoDb/Dapper remain the current implementation until the reviewed migration tasks and acceptance gates complete. It does not reinstate net8 product targets, replace the permission evaluator or weaken SQL/test safeguards. Historical verification remains tied to its original commits.
 
 ## New ADR template
 
