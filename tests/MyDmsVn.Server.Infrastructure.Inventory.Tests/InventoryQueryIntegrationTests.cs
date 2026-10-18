@@ -10,18 +10,26 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.DbMigrator;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(ApplicationSqlCollectionFixture.CollectionName)]
 public sealed class InventoryQueryIntegrationTests
 {
-    [SqlServerFact]
-    public async Task Stock_card_query_preserves_datetime2_boundaries()
+    private readonly ApplicationSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
+
+    public InventoryQueryIntegrationTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
     {
-        var database = await CreateDatabaseAsync();
-        try
+        _fixture = fixture;
+        _output = output;
+    }
+
+    [SqlServerFact]
+    public Task Stock_card_query_preserves_datetime2_boundaries() =>
+        _fixture.RunAsync(nameof(Stock_card_query_preserves_datetime2_boundaries), _output, test => SeedAsync(test.ConnectionString), async (test, seed) =>
         {
-            var seed = await SeedAsync(database.ConnectionString);
             var lastTickOfSecond = new DateTime(
                 2026,
                 10,
@@ -31,16 +39,16 @@ public sealed class InventoryQueryIntegrationTests
                 0,
                 DateTimeKind.Utc).AddSeconds(1).AddTicks(-1);
             await InsertBoundaryMovementsAsync(
-                database.ConnectionString,
+                test.ConnectionString,
                 seed.ArchivedWarehouseId,
                 seed.ArchivedProductId,
                 seed.UserId,
                 lastTickOfSecond);
 
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
-            using var scope = provider.CreateScope();
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
+            var scope = ApplicationSqlCollectionFixture.Track(test, provider.CreateScope());
             var queries = scope.ServiceProvider.GetRequiredService<IInventoryQueryService>();
 
             var result = await queries.GetStockCardAsync(
@@ -56,24 +64,16 @@ public sealed class InventoryQueryIntegrationTests
             var movement = Assert.Single(result.Items);
             Assert.Equal(lastTickOfSecond, movement.PostedAtUtc);
             Assert.Equal(1.0000m, movement.QuantityChange);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history()
-    {
-        var database = await CreateDatabaseAsync();
-        try
+    public Task Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history() =>
+        _fixture.RunAsync(nameof(Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history), _output, test => SeedAsync(test.ConnectionString), async (test, seed) =>
         {
-            var seed = await SeedAsync(database.ConnectionString);
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
-            using var scope = provider.CreateScope();
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
+            var scope = ApplicationSqlCollectionFixture.Track(test, provider.CreateScope());
             var queries = scope.ServiceProvider.GetRequiredService<IInventoryQueryService>();
 
             var firstBalancePage = await queries.GetStockBalancesAsync(
@@ -130,40 +130,7 @@ public sealed class InventoryQueryIntegrationTests
             Assert.False(firstMovement.ProductIsActive);
             Assert.Equal(new[] { 5.0000m, 7.5000m },
                 new[] { firstMovement.QuantityChange, secondMovement.QuantityChange });
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
-
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
-    {
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        try
-        {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
-            return database;
-        }
-        catch (Exception setupError)
-        {
-            try
-            {
-                await database.DisposeAsync();
-            }
-            catch (Exception cleanupError)
-            {
-                throw new AggregateException(
-                    "Test database setup and cleanup both failed.",
-                    setupError,
-                    cleanupError);
-            }
-
-            throw;
-        }
-    }
+        });
 
     private static async Task<SeedData> SeedAsync(string connectionString)
     {

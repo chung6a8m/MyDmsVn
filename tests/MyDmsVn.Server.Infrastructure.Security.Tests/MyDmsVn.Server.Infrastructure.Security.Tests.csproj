@@ -1,11 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Dapper" />
+    <PackageReference Include="Respawn" />
     <PackageReference Include="dbup-sqlserver" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
@@ -23,6 +27,11 @@
     <ProjectReference Include="..\..\src\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\Fixtures\ReusableSqlFixture.cs" Link="Fixtures\ReusableSqlFixture.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\Fixtures\SqlFixtureTestScope.cs" Link="Fixtures\SqlFixtureTestScope.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\Fixtures\SqlFixtureRunMode.cs" Link="Fixtures\SqlFixtureRunMode.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\Fixtures\RespawnResetProfile.cs" Link="Fixtures\RespawnResetProfile.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\Fixtures\ApplicationSqlCollectionFixture.cs" Link="Fixtures\ApplicationSqlCollectionFixture.cs" />
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlTestDatabase.cs" Link="SqlTestDatabase.cs" />
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlTestDatabaseName.cs" Link="SqlTestDatabaseName.cs" />
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\TestDatabaseMigrationRunner.cs" Link="TestDatabaseMigrationRunner.cs" />

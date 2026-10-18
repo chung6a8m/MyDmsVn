@@ -571,6 +571,7 @@
           "MyDmsVn.Desktop.Infrastructure.Local": "[1.0.0, )",
           "MyDmsVn.Server.DbMigrator": "[1.0.0, )",
           "MyDmsVn.Server.Infrastructure": "[1.0.0, )",
+          "Respawn": "[4.0.0, )",
           "dbup-sqlserver": "[7.2.0, )",
           "xunit": "[2.9.3, )"
         }
@@ -687,6 +688,15 @@
         "dependencies": {
           "Microsoft.Data.SqlClient": "7.0.2",
           "RepoDb": "1.16.0"
+        }
+      },
+      "Respawn": {
+        "type": "CentralTransitive",
+        "requested": "[4.0.0, )",
+        "resolved": "4.0.0",
+        "contentHash": "qJJ9vJ6BszgjrlAq/gA2NLDWd55LPb5OWcDPsdKTunIRZuJ9rdGvJ9mvvatXG9wL/ips4ml5BeMniosForCmSQ==",
+        "dependencies": {
+          "Microsoft.Data.SqlClient": "2.0.0"
         }
       },
       "Serilog": {

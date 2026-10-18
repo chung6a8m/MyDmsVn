@@ -9,20 +9,28 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.DbMigrator;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(ApplicationSqlCollectionFixture.CollectionName)]
 public sealed class GoodsReceiptQueryIntegrationTests
 {
-    [SqlServerFact]
-    public async Task Get_returns_complete_aggregate_version_and_inactive_historical_labels()
+    private readonly ApplicationSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
+
+    public GoodsReceiptQueryIntegrationTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
     {
-        var database = await CreateDatabaseAsync();
-        try
+        _fixture = fixture;
+        _output = output;
+    }
+
+    [SqlServerFact]
+    public Task Get_returns_complete_aggregate_version_and_inactive_historical_labels() =>
+        _fixture.RunAsync(nameof(Get_returns_complete_aggregate_version_and_inactive_historical_labels), _output, test => SeedAsync(test.ConnectionString), async (test, seed) =>
         {
-            var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString);
-            using var scope = provider.CreateScope();
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString));
+            var scope = ApplicationSqlCollectionFixture.Track(test, provider.CreateScope());
             var queries = scope.ServiceProvider.GetRequiredService<IGoodsReceiptQueryService>();
 
             var receipt = await queries.GetByIdAsync(seed.Receipt1Id, CancellationToken.None);
@@ -39,22 +47,14 @@ public sealed class GoodsReceiptQueryIntegrationTests
             Assert.Equal("P-QUERY-1 - Query product 1", receipt.Lines[0].ProductDisplayName);
             Assert.False(receipt.Lines[0].ProductIsActive);
             Assert.Null(missing);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task List_is_deterministic_set_based_and_applies_each_filter()
-    {
-        var database = await CreateDatabaseAsync();
-        try
+    public Task List_is_deterministic_set_based_and_applies_each_filter() =>
+        _fixture.RunAsync(nameof(List_is_deterministic_set_based_and_applies_each_filter), _output, test => SeedAsync(test.ConnectionString), async (test, seed) =>
         {
-            var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString);
-            using var scope = provider.CreateScope();
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString));
+            var scope = ApplicationSqlCollectionFixture.Track(test, provider.CreateScope());
             var queries = scope.ServiceProvider.GetRequiredService<IGoodsReceiptQueryService>();
 
             var firstPage = await queries.ListAsync(
@@ -90,12 +90,7 @@ public sealed class GoodsReceiptQueryIntegrationTests
             Assert.Equal(new[] { seed.Receipt2Id, seed.Receipt1Id }, productSearch.Items.Select(item => item.Id));
             Assert.Equal(3, empty.TotalCount);
             Assert.Empty(empty.Items);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
     public async Task Get_holds_one_revision_while_header_and_lines_are_read()

@@ -3,7 +3,7 @@
 > **For agentic workers:** Use `superpowers:executing-plans` or `superpowers:subagent-driven-development` to implement this plan task by task after review. Checkboxes describe work still required, not evidence of completion.
 
 **Date:** 2026-10-18
-**Status:** Owner-approved direction 1A + 2A + 3A; implementation proposed; all T00–T07 tasks NOT RUN. Execution is blocked until the preceding RESP plan has an accepted net48 baseline.
+**Status:** Owner-approved direction 1A + 2A + 3A; implementation proposed; all T00–T07 tasks NOT RUN. RESP-T05 has accepted the exact local net48 working-tree candidate in [verification](../RESPAWN_VERIFICATION.md#resp-t05-acceptance--matched-complete-owners). Next L2DB-T00 must bind those bytes to the actual commit/worktree; no L2DB implementation has run.
 **Goal:** Replace the active RepoDb/Dapper application DAL with LINQ to DB and a documented native-SqlClient escape surface, preserving Local v1, active net48, post-rebuild security, existing data and all correctness gates.
 **Architecture:** Existing Clean Architecture modular monolith and explicit UoW. Infrastructure-only mapping/connection adapters; unchanged Application/Contracts/Desktop boundaries; DbUp remains the sole schema owner.
 **Tech stack:** WinForms, CommunityToolkit.Mvvm, net48 product/SQL/Desktop and test projects, LINQ to DB (initial candidate 6.3.0), current Microsoft.Data.SqlClient, SQL Server, DbUp, MediatR, FluentValidation, ErrorOr, Serilog and xUnit.
@@ -20,7 +20,7 @@ The [active roadmap](README.md) contains exactly two plans: **RESP, then L2DB**.
 |---|---|---|
 | Runtime | Product/SQL/Desktop and all ten current test projects target net48. AppCore and historical modern product cases are parked; the .NET 8 SDK remains the build tool. | Preserve declarations, packaging boundaries and PARKED / NOT RUN identities. |
 | Security | The permission rebuild is implemented: code-defined catalog, protected configured/database-bound superuser, explicit assignments, current-subject checks and allowlisted procedures. | Reuse current behavior; no new security reset, synchronization or auto-grants. |
-| Test infrastructure | Six modular SQL owners run directly with dotnet test/Test Explorer and local fresh-database helpers. The former framework and manifests are removed; reuse remains proposed. | RESP establishes the accepted fixture baseline first. Preserve local ownership/cleanup, serialization and required case coverage during L2DB. |
+| Test infrastructure | Six modular SQL owners run directly with dotnet test/Test Explorer; RESP-T05 accepts default reusable data collections, explicit fresh and dedicated exceptions. The former framework and manifests are removed. | RESP establishes the accepted fixture baseline first. Preserve local ownership/cleanup, serialization and required case coverage during L2DB. |
 | DAL | Catalog/receipt RepoDb operations, Dapper queries/security consumers and native SqlClient SQL remain active. | Replace inventoried consumers while preserving native locking/procedure semantics where justified. |
 | UoW | SqlUnitOfWorkFactory owns an open connection and guarded current optional transaction; repository factories receive ISqlExecutionContext. | Borrow current resources per operation without taking ownership or caching a pre-begin transaction. |
 | Delivery backlog | Remaining P5 interactive/P6 operational acceptance, HTTP v2/P7, and modern product runtime are deferred. | These are not active prerequisites, completed gates or waived obligations. Re-plan them separately when requested. |

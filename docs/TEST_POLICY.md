@@ -6,7 +6,7 @@
 
 Run the existing test projects directly with `dotnet test` or Test Explorer. There are ten active test projects, all targeting `net48`; six own SQL integration scenarios. Use Windows, the SDK selected by `global.json`, and .NET Framework 4.8 targeting/runtime support. AppCore and modern product targets remain PARKED / NOT RUN.
 
-The shared SQL helper in the IntegrationTests project currently creates one fresh disposable database per call. It is linked into the other owners that need it. Respawn is not installed; reuse, reset profiles and an explicit fresh/reuse switch remain RESP implementation work. The removed gate manifest, standalone SQL support projects, command wrappers and their tests are historical context only. Neither active plan restores them.
+The shared SQL helper in the IntegrationTests project currently creates one fresh disposable database per call. It is linked into the other owners that need it. RESP-T01 adds Respawn 4.0.0 and a verified owned application-schema reset profile inside IntegrationTests, linked into Foundation probes. RESP-T02 adds exclusive collection scopes, tracked workers/cleanup, terminal poison and the explicit `MYDMSVN_SQL_TEST_FIXTURE_MODE=fresh|reuse` setting. RESP-T03–T04 adopt all 20 original data-only candidates across Catalog/Inventory/Security. Accepted profiles default to reuse for absent/blank settings; explicit fresh uses the same seeds/assertions on new owned allocations. Dedicated exceptions keep their existing fresh helper and ignore the fixture setting; lazy Inventory/Security collection setup allocates nothing when only exceptions are selected. RESP-T05 accepts the exact local working-tree candidate in [verification](RESPAWN_VERIFICATION.md#resp-t05-acceptance--matched-complete-owners); preserve its boundaries during L2DB. The removed gate manifest, standalone SQL support projects, command wrappers and their tests are historical context only. Neither active plan restores them.
 
 ## 2. Choose scope from the changed behavior
 
@@ -55,11 +55,11 @@ The local helper rejects attachment/user-instance options and restricts allocati
 
 Keep finite connection/SQL timeouts, deterministic disposal and drained concurrency workers. After a failed cleanup, preserve both the original and cleanup failures and report the unresolved allocation. A killed testhost can leave a database behind: there is no durable ownership journal, automatic orphan reconciliation or process-tree watchdog in the removed setup. An operator must review leftovers manually on the designated test instance; never use a prefix-only bulk-drop script or adopt a leftover as a new fixture.
 
-## 5. Planned reusable-database contract
+## 5. Reusable-database contract
 
-The [RESP plan](plans/20261018-002-respawn-fixture-reuse.md) owns implementation and [ADR 0010](adr/0010-respawn-fixture-reuse-and-test-policy.md) records the decision. The following is the required destination, not current delivered behavior:
+The [RESP plan](plans/20261018-002-respawn-fixture-reuse.md) owns implementation and [ADR 0010](adr/0010-respawn-fixture-reuse-and-test-policy.md) records the decision. T01–T04 implement the following contract for the reviewed Catalog/Inventory/Security data cases, with reuse as default and explicit fresh preserved. RESP-T05 has verified the full six-owner pair for the recorded candidate. Preserve this accepted contract:
 
-- One xUnit v2 collection owns one uniquely allocated database per assembly/process/TFM. Keep existing SQL assembly serialization. Catalog has no assembly guard today; its shared consumers must all join an explicit collection.
+- One xUnit v2 collection owns one uniquely allocated database per assembly/process/TFM. Keep existing SQL assembly serialization. Catalog retains no assembly guard; all of its current fixture consumers share the explicit Catalog SQL collection.
 - Allocate and migrate once per fixture; create its checkpoint after schema creation. Reset and seed before every Fact/Theory invocation, including the first, with explicit method/row labels for useful diagnostics. Every original behavior and Theory row remains covered.
 - Reset all mutable business, reference, assignment, binding and audit rows. Preserve the verified DbUp journal and ownership metadata. Review the complete schema boundary; do not ignore a difficult table to obtain a green reset.
 - The full schema includes an append-only StockLedger trigger. A narrowly owned test-only profile must restore and verify that exact trigger before any test body, even for an empty ledger. Production scripts and trigger behavior stay unchanged.

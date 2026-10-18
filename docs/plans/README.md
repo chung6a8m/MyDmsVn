@@ -1,11 +1,11 @@
 # Active roadmap — v1a
 
-**Owner decision:** 2026-10-18. Exactly two plans are active. Their direction is approved; implementation checkboxes start open. The documentation reset and removal of the former SQL test framework do not implement either plan or establish their acceptance.
+**Owner decision:** 2026-10-18. Exactly two plans are active. Their direction is approved; task evidence below records progress. The documentation reset and removal of the former SQL test framework do not implement either plan or establish their acceptance.
 
 | Execution order | Plan / ID | Entry condition | Current status |
 |---:|---|---|---|
-| 1 | [20261018-002-respawn-fixture-reuse.md](20261018-002-respawn-fixture-reuse.md) / `RESP` | Current net48 checkout and approved test resources for implementation | NOT IMPLEMENTED; start at RESP-T00 |
-| 2 | [20261018-001-linq2db-net48-persistence-migration.md](20261018-001-linq2db-net48-persistence-migration.md) / `L2DB` | RESP acceptance on current RepoDb/Dapper baseline | NOT IMPLEMENTED; do not start DAL cutover before RESP acceptance |
+| 1 | [20261018-002-respawn-fixture-reuse.md](20261018-002-respawn-fixture-reuse.md) / `RESP` | Current net48 checkout and approved test resources for implementation | RESP-T00–T05 accepted on exact local working-tree candidate; full fresh/reuse 257/257 each, cleanup and observed suite improvement; see [evidence](../RESPAWN_VERIFICATION.md#resp-t05-acceptance--matched-complete-owners) |
+| 2 | [20261018-001-linq2db-net48-persistence-migration.md](20261018-001-linq2db-net48-persistence-migration.md) / `L2DB` | RESP acceptance on current RepoDb/Dapper baseline | NOT IMPLEMENTED; next L2DB-T00 binds accepted RESP bytes to actual commit/worktree before DAL changes |
 
 Filename sequence reflects creation time. Follow the table, not filename sorting. RESP must produce a reusable-fixture baseline with verified reset/seed, ownership and case coverage. L2DB consumes that baseline and freezes fixture behavior while replacing DAL internals.
 

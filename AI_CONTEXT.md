@@ -8,8 +8,8 @@ Build a Windows desktop-first SME modular monolith. Local v1 is the current prod
 
 Exactly two plans are active:
 
-1. [RESP — reusable SQL fixtures with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md): next work, not implemented.
-2. [L2DB — persistence migration to LINQ to DB](docs/plans/20261018-001-linq2db-net48-persistence-migration.md): starts after RESP acceptance, not implemented.
+1. [RESP — reusable SQL fixtures with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md): RESP-T00–T05 accepted for the exact local working-tree baseline; full sequential fresh/reuse each 257 passed, zero failed/skipped, successful cleanup and observed suite improvement; default reuse and explicit fresh verified. Next L2DB-T00 binds the accepted bytes to actual commit/worktree.
+2. [L2DB — persistence migration to LINQ to DB](docs/plans/20261018-001-linq2db-net48-persistence-migration.md): next L2DB-T00 after accepted RESP, not implemented. Preserve uncommitted RESP work and freeze its fixture behavior.
 
 The file numbering is chronological; execution order is defined by [the active index](docs/plans/README.md), not lexical filename sorting. Keep the accepted fixture/reset baseline fixed during the DAL migration so failures and timings can be attributed.
 
@@ -18,7 +18,7 @@ The file numbering is chronological; execution order is defined by [the active i
 - Product, SQL, Desktop and all ten active test projects target `net48`. The .NET 8 SDK is a build dependency; no standalone SQL tool project remains.
 - AppCore (`net8.0-windows`) and historical product .NET 8 cases are parked, outside the active release. Do not reactivate them for Respawn or LINQ to DB.
 - Production persistence still uses RepoDb/Dapper with explicit UoW and DbUp. LINQ to DB is an approved destination, not installed implementation.
-- SQL tests run directly through `dotnet test`/Test Explorer and a local fresh-database helper in IntegrationTests. The old gate manifest, standalone SQL support/runner projects, their tests and wrappers are removed. Respawn is not installed. The Respawn plan selects a net48-compatible package/API and validates it before migration.
+- SQL tests run directly through `dotnet test`/Test Explorer and a local fresh-database helper in IntegrationTests. The old gate manifest, standalone SQL support/runner projects, their tests and wrappers are removed. RESP-T01 pins Respawn 4.0.0 in the test graph and verifies an owned full-schema reset profile with SqlClient 7.0.2 on net48. RESP-T02 adds exclusive collection scopes, tracked cleanup/poisoning and the test-only MYDMSVN_SQL_TEST_FIXTURE_MODE setting. T03–T04 adopt Catalog 5, Inventory 7 and Identity/Security 8 original data-only cases. Accepted profiles now default to reuse; explicit fresh remains supported. Schema/principal/bootstrap/trigger/contention exceptions keep independent fresh databases, including mixed classes through lazy collection initialization. RESP-T05 accepts the exact local candidate in docs/RESPAWN_VERIFICATION.md; no committed baseline or GUI/product release acceptance is implied.
 - Modular test projects, NET8-PAUSE and SEC-REBUILD are implemented. Do not redo those projects.
 - Permissions come from code-owned definitions, explicit user/role assignments and one configured database-bound superuser. Permission-sync and first-Administrator auto-grant flows are retired.
 - P5 catalogs, receipt Draft/Post and ledger/balance/card workflows exist. P5 interactive acceptance and P6 operational/release gates remain open and deferred.

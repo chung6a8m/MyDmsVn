@@ -12,11 +12,22 @@ using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(ApplicationSqlCollectionFixture.CollectionName)]
 public sealed class InventoryStorageIntegrationTests
 {
+    private readonly ApplicationSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
+
+    public InventoryStorageIntegrationTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
+    {
+        _fixture = fixture;
+        _output = output;
+    }
+
     [SqlServerFact]
     public async Task Inventory_migration_enforces_ledger_and_balance_storage_invariants()
     {
@@ -81,13 +92,11 @@ public sealed class InventoryStorageIntegrationTests
     }
 
     [SqlServerFact]
-    public async Task Reconciliation_flags_missing_keys_on_either_side_and_quantity_mismatch()
-    {
-        var database = await CreateDatabaseAsync();
-        try
+    public Task Reconciliation_flags_missing_keys_on_either_side_and_quantity_mismatch() =>
+        _fixture.RunAsync(nameof(Reconciliation_flags_missing_keys_on_either_side_and_quantity_mismatch), _output, async test =>
         {
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 await connection.OpenAsync();
                 var ids = await SeedReferencesAsync(connection);
                 await connection.ExecuteAsync(
@@ -111,8 +120,8 @@ public sealed class InventoryStorageIntegrationTests
             }
 
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
             var differences = await provider
                 .GetRequiredService<IStockReconciliationQueryService>()
                 .FindDifferencesAsync(CancellationToken.None);
@@ -127,24 +136,17 @@ public sealed class InventoryStorageIntegrationTests
             Assert.Contains(differences, difference =>
                 difference.HasLedger && difference.HasBalance &&
                 difference.LedgerQuantity == 7.0000m && difference.BalanceQuantity == 6.0000m);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task Reconciliation_executes_in_a_serializable_transaction()
-    {
-        var database = await CreateDatabaseAsync();
-        try
+    public Task Reconciliation_executes_in_a_serializable_transaction() =>
+        _fixture.RunAsync(nameof(Reconciliation_executes_in_a_serializable_transaction), _output, async test =>
         {
-            var recordingFactory = new RecordingConnectionFactory(database.ConnectionString);
+            var recordingFactory = new RecordingConnectionFactory(test.ConnectionString);
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
+            services.AddSqlPersistence(test.ConnectionString);
             services.Replace(ServiceDescriptor.Singleton<IDbConnectionFactory>(recordingFactory));
-            using var provider = services.BuildServiceProvider();
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
 
             var differences = await provider
                 .GetRequiredService<IStockReconciliationQueryService>()
@@ -152,12 +154,7 @@ public sealed class InventoryStorageIntegrationTests
 
             Assert.Empty(differences);
             Assert.Equal(IsolationLevel.Serializable, recordingFactory.LastIsolationLevel);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     private static async Task<SqlTestDatabase> CreateDatabaseAsync()
     {
