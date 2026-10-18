@@ -318,3 +318,83 @@ All commands completed normally. Existing per-case dedicated ownership/drop asse
 A read-only independent reviewer found no actionable issue in ownership/disposal/current-transaction handling, mutually exclusive provider options, mapping publication/retry/concurrency, tests/boundaries or the lock diff. Existing package versions/content hashes are unchanged; only linq2db is added. Root independently reconciled the runtime evidence and unchanged fixture/UoW/SQL bytes. Final static checks cover diff whitespace, BOM/CRLF, links, source/project/TFM/row inventory and the exact frozen code digest.
 
 **L2DB-T01 complete:** net48 package compatibility and borrowed/owned resource ownership are established for this scope. Production composition still uses RepoDb/Dapper; rollback belongs to the existing UoW. **Next task: L2DB-T02 three-slice pilot**, with no rollout before its explicit GO. Application/Session/GUI suites, release packaging and manual Local smoke were NOT RUN because T01 changed no application/UI behavior and requires host builds instead. Those remain scoped/final obligations; no T07, GUI, release or product-performance acceptance is implied. The existing Pkcs advisory risk above remains open.
+
+
+## L2DB-T02 — three-slice pilot NO-GO
+
+**Date:** 2026-10-18. **Base:** `e8ee6112b3bed98229a3e9b1d2f9b65e8403b77d`; same isolated `codex/l2db-t00` worktree. **Code/config candidate SHA256:** `46cec9a0d26fc20426fcaeb7e88e512ffd1cf12f831a8521ffbd5037f74c5d56` over eleven changed/new C#/csproj files, sorted path/NUL/raw CRLF bytes/NUL. The T02 commit binds this candidate and the decision below. **Decision: NO-GO.** Production RepoDb/Dapper composition remains unchanged; T03–T06 may not roll out until the observable error gap is explicitly resolved and the dependent pilot is rerun.
+
+### Decisive behavior gap (L2DB-PILOT-01)
+
+Current legacy `SqlSecurityAdministrationRepository.ReadTargetAsync` calls Dapper `ReadSingleAsync<ImportTargetRow>` for the first result. `009_Security_Permission_Import.sql` emits a target SELECT first and only then throws **51031** when no row exists (User and Role branches). On the real SQL Server/runtime-principal pilot, Dapper throws **InvalidOperationException: Sequence contains no elements** before consuming the subsequent SQL error. `SqlSecurityAdministrationStore.ReadTargetAsync` catches SqlException for the existing `Security.TargetNotFound` mapping, so that mapping is not reached. This is a **baseline reader/error-propagation defect**, not evidence of LINQ/net48 incompatibility.
+
+The native candidate drains an empty first result set and receives SqlException 51031; the unchanged production store maps that to `Security.TargetNotFound`. This preserves the intended error mapping but changes the legacy observable behavior. The dedicated gap detector executes both on separately migrated/seeded owned databases and asserts their distinct outcomes. **All pilot tests passing does not establish GO**: the gap test passes precisely when the unresolved difference is observed. No safety assertion was deleted, weakened to equality or skipped. Independent review confirmed the source/error chain and the NO-GO decision under T02 and plan section 8.
+
+**Ruling:** keep production baseline bytes and record NO-GO rather than silently fixing normal-path error semantics during a test-only pilot. The next action is an explicit decision on the intended missing-target result and a narrowly scoped baseline-reader repair (including deferred SQL-error propagation), followed by strict old/candidate parity and the dependent gate. Do not change SQL scripts/grants, package/runtime pins or swallow the error to obtain GO. This finding is recorded in the active L2DB work, not a third implementation plan or an authorized T05 rollout.
+
+### Product slice
+
+Temporary `ProductPilot` uses LINQ fluent mappings and explicit Value/Set allowlists for identity inserts and updates; created/audit/generated fields and IsActive cannot leak through generic updates. SetActive, missing-row behavior, duplicate code conflict, materialized Get/Lookup and inactive historical reads are tested against the existing repository/query service and independent parameterized native SQL. Inputs include literal `%`, `_`, `[`, Vietnamese text, null/empty/blank/trimmed search, stable order, page boundaries and PageNumber=int.MaxValue/PageSize=100 (**offset 214748364600**, Int64).
+
+The list escape is an explicit **single native COUNT_BIG + page batch** through an owned T01 session, with unchanged CHARINDEX filtering and Code/ProductId order. It avoids separate count/page requests and the Int32 Skip limit. Both old and candidate actually report **one ServerRoundtrips** per list call; SqlClient DiagnosticListener observes exactly one command containing COUNT_BIG and bigint offset. Observed parameters: old Search NVarChar(0) for null and NVarChar(4000) for non-null, candidate explicit NVarChar(4000); both Bit, BigInt, Int. The harmless null-string size difference is explicit, not hidden. No search/offset/paging or materialization regression was observed in the tested slice. LINQ Get/Lookup filter/order/Take before materializing; Product write string mappings are NVarChar(32/256/32), audit timestamps DateTime2 and actor IDs Int32. Only SQL/parameter metadata is observed; values/identifiers and raw diagnostics stay local.
+
+Old/candidate execute under separate unchanged Catalog reset/seed/pre/post-verification scopes. No fixture reset implementation or production SQL changes were needed. The pilot is deliberately a narrow Product adapter, not the T03 conversion of all catalog implementations.
+
+### Receipt slice
+
+LINQ writes receipt header/lines/ledger; the existing native lock-header/reference/post/atomic sorted-balance SQL remains in the production repository and is reused explicitly. Both providers run independently on dedicated fresh owned migrated databases (including the injected fault case). Assertions cover returned header/line IDs, generated eight-byte rowversion and server audit time, Decimal(18,4) quantity and Decimal(19,4) unit cost, sequence-generated receipt number, same SPID/current transaction, native visibility of uncommitted LINQ writes, committed Posted state/two ledger movements/two balances and exact quantities.
+
+The injected native THROW occurs after the first ledger append and first balance delta, with those partial rows proven present; explicit UoW rollback leaves **zero header, line, ledger and balance rows** while reference seeds remain. No shared/ambient transaction, second participating connection, trigger rewrite or new posting algorithm is introduced. Server-generated/audit/rowversion fields are excluded by typed insert Value lists. Receipt insert and ledger/balance ServerRoundtrips observations are retained in local TRX output and summarized with final results below; they are not a product/suite-speed claim.
+
+### Security slice
+
+Each old/candidate execution provisions **database users WITHOUT LOGIN** inside its dedicated owned database, using the unchanged deployment principal script. Connections execute as the real restricted database runtime user; USER_NAME and SqlRuntimePrincipalValidator verify the identity/authority. Candidate procedure calls borrow the current T01 connection/transaction and execute native typed SqlCommands for the existing allowlist. No new permission evaluator, generic RBAC DML or expanded grant is added. The existing production store supplies error translation for both adapters.
+
+ReadSecurityPermissionImportTarget materializes two result sets; ApplySecurityPermissionImport preserves TargetRevision/AddedCount/Changed, JSON and outer transaction ownership. Valid read/apply each require one observed ServerRoundtrips. Read parameters are NVarChar(8)/Int/Int; apply additionally uses BigInt expected revision, NVarChar(max) entries and UniqueIdentifier correlation. Before rollback, native administrative READUNCOMMITTED observation proves the audit row exists; after rollback there is no audit row, no added permission and revision returns to zero. Runtime generic Role/RolePermission writes and protected-binding UPDATE are rejected with **SQL 229**. Invalid request and revoked/missing actor translate to the same existing `Security.ImportInvalid` / `Auth.Forbidden`; missing-target differs as recorded above.
+
+### RED/GREEN, resources and scope
+
+Product first build exposed a linked-helper name conflict with IntegrationTests' friend-visible assembly; relocated only the new helper to `tests/Pilot`, without touching the accepted helper/fixtures. Executed Product RED **0/2/0** with nonworking pilot contract shells, then fixed the candidate identity API's nullable Int32 return at compile time; Product focused GREEN **2/0/0**. A later focused run adds actual command/parameter observations and again passes 2/0/0.
+
+Receipt initial attempts were harness failures, **not valid feature RED**: unquoted reserved LineNo and a native @@SPID SmallInt-to-Int32 cast. Repaired native oracle quoting/type, discarded the premature implementation and reran the nonworking shell: intended Receipt RED **0/2/0**, then GREEN **2/0/0** with real old/candidate commit and rollback assertions. No original production test or schema was edited to fix the harness.
+
+Security's first run **0/2/0** exposed the legacy missing-target gap as well as the unimplemented candidate. Split the gap into its explicit detector and retained ordinary invalid/actor translation assertions. Intended shell RED **0/3/0**, then focused GREEN **3/0/0**, with NO-GO still in force. Final scopes also include the strengthened pre-rollback audit observation, per-provider fresh allocations and command observations. Intermediate failures/build errors remain distinct from final outcomes.
+
+Explicit designated non-production master configuration is present; default fixture mode unset/blank reuse, adapter/application probes absent. Project SQL commands execute sequentially; no caller environment mutation or external runner/manifest/lease/watchdog is introduced. All old fixture/C# safety tests, UoW/provider seam and production schema/grants remain byte-equivalent. No package reference, pin, lock asset, TFM or vendor revision changes; the footprint is the existing T01 linq2db 6.3.0 graph. Production diff consists only of test-assembly InternalsVisibleTo grants. The temporary prototypes/oracles/observers are seven C# files plus three Compile links and are subject to the T06 removal/retention obligations in the case ledger.
+
+T02 final scopes are **F/FastSQL, C/FastSQL, I/FastSQL, S/SecurityProvisioning**, followed by unfiltered X. Expected current source rows: **49, 12, 24, 33** respectively = **118 SQL cases**, plus X **10**. The all-six/unfiltered T07 milestone and GUI/Application/Session suites are not inferred from this filtered matrix. No shared product provider/connection implementation changed, so M/O and unrelated GUI/repository suites are outside this task scope.
+
+Package publication/startup/manual Local smoke is **NOT RUN** in T02 because the demonstrated semantic blocker already forbids GO/rollout. Prior T01 host builds are not relabeled as T02 package-startup evidence. Package startup must still be proven before any subsequent GO; T07 packaged/manual workflows and OPEN RELEASE-MANIFEST-01 remain open. Existing Pkcs advisory risk from T01 is unchanged. No package, performance or release acceptance is claimed.
+
+### Direct commands and final outcomes
+
+Executed `dotnet restore MyDmsVn.sln --locked-mode`; focused RED/GREEN commands use each actual owner project with `--filter FullyQualifiedName~<Product|Receipt|Security>PilotParityTests`, Release/net48/no-restore and distinct `TestResults/l2db-t02-...` TRX folders. Final commands use the exact four project/category pairs above, sequentially:
+
+```powershell
+# Substitute each existing owner and category from the scope table; no empty/new proposed selector.
+dotnet test tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj -c Release -f net48 --no-restore --filter 'Category=FastSQL' --logger 'trx;LogFileName=cases.trx' --results-directory TestResults/l2db-t02-final-Foundation.Tests
+# C: Catalog.Tests / Category=FastSQL
+# I: Inventory.Tests / Category=FastSQL
+# S: Security.Tests / Category=SecurityProvisioning
+dotnet test tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj -c Release -f net48 --no-restore --logger 'trx;LogFileName=cases.trx' --results-directory TestResults/l2db-t02-final-Architecture.Tests
+```
+
+The final sequential scoped SQL run completed with **118/0/0**; unfiltered Architecture then completed with **10/0/0**. Final TRX elapsed seconds are host start-to-finish observations, not comparative performance evidence.
+
+| Owner / selected scope | Passed / failed / skipped | TRX elapsed seconds |
+|---|---:|---:|
+| F / Foundation.Tests | 49/0/0 | 298.33 |
+| C / Catalog.Tests | 12/0/0 | 27.99 |
+| I / Inventory.Tests | 24/0/0 | 106.93 |
+| S / Security.Tests | 33/0/0 | 140.24 |
+| X / Architecture.Tests | 10/0/0 | 4.42 |
+
+Reconciled all **116 SQL methods / 118 invocations** and **10 Architecture methods / 10 invocations** against the ledger, including exact Theory-row cardinalities and unique result names. All seven new pilot Facts ran; no mandatory omission, skip, abort or duplicate result. These scoped results do not claim the unexecuted remainder of the 287-case six-owner source inventory.
+
+Receipt observations: insert header/two lines/reload used **6 round trips old / 5 candidate**; each ledger append plus native balance delta used **2 old / 2 candidate**. Product list remained **1 / 1** and Security read/apply each **1 / 1**. The measurements cover only these calls, not application latency or suite speed.
+
+All final commands completed normally. Dedicated ownership/cleanup assertions and awaited disposal succeeded; Catalog/Inventory/Security reusable collection diagnostics reported successful guarded drops. No unresolved cleanup/quarantine allocation or killed host was reported. No global leftover census, orphan recovery or prefix deletion was performed. Accepted fixtures and all pre-existing safety cases remain unchanged.
+
+Independent source review found no new P1/P2 issue; its pre-rollback audit-observation improvement was implemented and passed. Review explicitly agreed NO-GO reflects a legacy observable error gap, not a LINQ compatibility rejection. Final static checks confirmed 636 unique ledger method IDs/source links, BOM/CRLF policy, unchanged pre-existing fixture/safety bytes, unchanged packages/locks/TFMs/production SQL and the frozen eleven-file code digest.
+
+**L2DB-T02 complete as a documented NO-GO decision.** No production provider switch or flag was added. **Next action:** explicitly resolve L2DB-PILOT-01, repair the baseline reader narrowly, then prove strict old/candidate parity and package startup before reconsidering GO. T03–T06 remain blocked. Package startup, publication and manual Local smoke remain NOT RUN; no release acceptance is implied.

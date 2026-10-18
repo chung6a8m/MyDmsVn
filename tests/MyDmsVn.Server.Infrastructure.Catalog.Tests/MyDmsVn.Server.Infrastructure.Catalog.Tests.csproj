@@ -27,4 +27,7 @@
     <ProjectReference Include="..\..\src\MyDmsVn.Server.DbMigrator\MyDmsVn.Server.DbMigrator.csproj" />
     <ProjectReference Include="..\..\src\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Pilot\PilotSql.cs" Link="Pilot\PilotSql.cs" />
+  </ItemGroup>
 </Project>
