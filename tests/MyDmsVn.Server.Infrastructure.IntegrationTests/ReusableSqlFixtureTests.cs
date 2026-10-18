@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -38,6 +40,62 @@ public sealed class ReusableSqlFixtureTests
         Assert.Contains(seedError.Message, error.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("worker")]
+    [InlineData("stop-throws")]
+    [InlineData("stop-blocks")]
+    [InlineData("async-resource")]
+    [InlineData("sync-resource")]
+    public async Task Cleanup_budget_bounds_uncooperative_workers_and_resources(string kind)
+    {
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var unblock = new ManualResetEventSlim();
+        var closed = false;
+        var laterCleanup = 0;
+        var scope = new SqlFixtureTestScope("bounded-cleanup", "owned-test-connection", clean =>
+        {
+            Assert.False(clean);
+            closed = true;
+            return Task.CompletedTask;
+        }, cleanupTimeout: TimeSpan.FromMilliseconds(150));
+        scope.RegisterCleanup(() => { laterCleanup++; return Task.CompletedTask; });
+        if (kind == "async-resource") { scope.RegisterCleanup(() => release.Task); }
+        else if (kind == "sync-resource")
+        {
+            scope.RegisterCleanup(() => { unblock.Wait(); return Task.CompletedTask; });
+        }
+        else
+        {
+            scope.RegisterWorker(kind == "stop-blocks" ? Task.CompletedTask : release.Task, () =>
+            {
+                if (kind == "stop-throws") { throw new InvalidOperationException("stop failure"); }
+                if (kind == "stop-blocks") { unblock.Wait(); }
+            });
+        }
+        // Keep the test itself bounded even against the original synchronous callback path.
+        var disposal = Task.Run(() => scope.DisposeAsync());
+        try
+        {
+            Assert.Same(disposal, await Task.WhenAny(disposal, Task.Delay(TimeSpan.FromSeconds(3))));
+            var error = await Record.ExceptionAsync(() => disposal);
+            Assert.NotNull(error);
+            var errors = error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions.ToArray() : new[] { error };
+            Assert.Contains(errors, e => e is TimeoutException);
+            if (kind == "stop-throws") { Assert.Contains(errors, e => e.Message == "stop failure"); }
+            Assert.True(closed);
+            Assert.Equal(0, laterCleanup);
+            Assert.Same(scope.DisposeAsync(), scope.DisposeAsync());
+        }
+        finally
+        {
+            release.TrySetResult(true);
+            unblock.Set();
+            await Task.WhenAny(disposal, Task.Delay(TimeSpan.FromSeconds(3)));
+            // Observe both the original and bounded implementation's final failure.
+            await Record.ExceptionAsync(() => disposal);
+        }
+    }
+
     [Fact]
     public async Task Scope_drains_workers_then_attempts_every_cleanup_before_releasing()
     {
@@ -50,8 +108,10 @@ public sealed class ReusableSqlFixtureTests
         });
         scope.RegisterCleanup(() => { calls.Add("resource"); return Task.CompletedTask; });
         scope.RegisterCleanup(() => { calls.Add("failing-resource"); throw new InvalidOperationException("cleanup"); });
-        scope.RegisterWorker(worker.Task, () => calls.Add("stop"));
+        var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        scope.RegisterWorker(worker.Task, () => { calls.Add("stop"); stopped.SetResult(true); });
         var disposal = scope.DisposeAsync();
+        Assert.Same(stopped.Task, await Task.WhenAny(stopped.Task, Task.Delay(TimeSpan.FromSeconds(3))));
         Assert.False(disposal.IsCompleted);
         Assert.Equal(new[] { "stop" }, calls);
         worker.SetResult(true);

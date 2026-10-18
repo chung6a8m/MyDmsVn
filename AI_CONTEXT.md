@@ -8,7 +8,7 @@ Build a Windows desktop-first SME modular monolith. Local v1 is the current prod
 
 Exactly two plans are active:
 
-1. [RESP — reusable SQL fixtures with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md): RESP-T00–T05 accepted for the exact local working-tree baseline; full sequential fresh/reuse each 257 passed, zero failed/skipped, successful cleanup and observed suite improvement; default reuse and explicit fresh verified. Next L2DB-T00 binds the accepted bytes to actual commit/worktree.
+1. [RESP — reusable SQL fixtures with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md): RESP-T00–T05 accepted for the exact local working-tree baseline; full sequential fresh/reuse each 265 passed, zero failed/skipped, successful cleanup and observed suite improvement; default reuse and explicit fresh verified. Next L2DB-T00 binds the accepted bytes to actual commit/worktree.
 2. [L2DB — persistence migration to LINQ to DB](docs/plans/20261018-001-linq2db-net48-persistence-migration.md): next L2DB-T00 after accepted RESP, not implemented. Preserve uncommitted RESP work and freeze its fixture behavior.
 
 The file numbering is chronological; execution order is defined by [the active index](docs/plans/README.md), not lexical filename sorting. Keep the accepted fixture/reset baseline fixed during the DAL migration so failures and timings can be attributed.

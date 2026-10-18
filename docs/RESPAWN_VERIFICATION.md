@@ -575,3 +575,61 @@ The fresh-context whole-branch read-only review found no Critical/Important/Mino
 ### Publication candidate
 
 Preparation for the owner's requested PR to `v1a` removes exactly one trailing empty line from `CatalogSqlCollectionFixture.cs`; no C# content or executable configuration changes. The runtime-tested digest above remains the historical T05 observation. The published code/config digest is **`fdcce9a0015eb449e5837b49dc4e20b7995f5210b2d36f747a104ec696760055`**, using the same path/NUL/byte algorithm. An exact byte comparison against the accepted file proves that this final CRLF removal is the only code/config difference. Staged whitespace/static checks cover all new files; the completed SQL pair remains applicable to this formatting-only change. The PR records the commit binding these bytes; preserve the same fixture boundaries during L2DB.
+
+
+## PR 36 review follow-up
+
+**Revision:** repairs on top of PR commit `6bb77f2e55567af603a228f2dace234b6d771c4f`, 2026-10-18, Windows / SDK 8.0.425 / net48 Release. Current code/config digest **`75f282bc99c0c5d8f5bc04bcd2fe4c75f9f0c650d2ecd2a53203e1c46a79165c`**, using the same sorted path/NUL/byte algorithm against RESP base 6383289. The subsequent PR commit binds these exact bytes. This section supersedes the earlier fixture acceptance for the repaired lifecycle; earlier 257-case observations remain historical. Product RepoDb/Dapper/DbUp, packages and dedicated exception boundaries are unchanged.
+
+Both owner review findings are fixed:
+
+- [Final-case boundary verification](https://github.com/chung6a8m/MyDmsVn/pull/36#discussion_r4306810826): after registered workers and resources drain, `verify-after` checks schema/journal/permissions/trigger/ownership while admission is held. Drift fails and poisons that same case, including the last/focused case. Ordinary body failures still permit a later reset only after successful drain and unchanged boundary. Body plus verification errors and verification plus guarded-drop errors are preserved. Failed admission skips the post-body check, preserving its original error.
+- [Finite cleanup and quarantine](https://github.com/chung6a8m/MyDmsVn/pull/36#discussion_r4306810832): one **two-minute cooperative budget** covers stop callbacks, actual worker Tasks and LIFO resource cleanup. Callback invocation runs off-thread so synchronous blocking is bounded too. Timeout fails the case, observes late faults and stops further cleanup. The fixture poisons and quarantines before waking waiters; they and teardown fail promptly without verification/reset/drop. The owned allocation remains identified for manual review even if work later completes. This is not cancellation, forced termination, an orphan-recovery service or automatic cleanup.
+
+The controlled SQL quarantine probe holds a real transaction in both modes, proves pending admission and teardown finish with quarantine errors while worker/database remain active, with no additional reset/drop, then explicitly releases/awaits its own worker and uses the original guarded allocator to clean up. This test-only known drain is not a general recovery path. Normal complete runs finish with no unresolved allocations.
+
+### Regression evidence
+
+Boundary RED 2 actual SQL failures → GREEN 2: both modes and four final-case mutations (table, append-only trigger, journal, ownership), including mutation by resource cleanup; body+boundary aggregation also checked. Cleanup RED 5 local failures (no-op worker stop, throwing stop, blocking stop, never-completing async cleanup and blocking synchronous cleanup) → GREEN 19 local checks. Live-SQL quarantine RED 1 → GREEN in the combined 3-case focused run.
+
+The first expanded full attempt stopped at Foundation 43 passed / 1 failed / 0 skipped: an existing worker probe asserted the stop callback ran synchronously. Off-thread invocation made that assertion race. The probe now awaits its explicit stop notification, retaining resource/disposal/nonoverlap assertions; focused GREEN 1. That failed attempt is not acceptance evidence. The final pair below uses new result paths and the frozen final digest; no failed row or cleanup requirement was waived.
+
+Current source: **234 methods / 265 cases (169 SQL / 96 non-SQL)**. All previous 257 case identities/rows and original 193 methods / 211 cases remain. Added regression methods: Foundation 3 SQL Facts, IntegrationTests 1 Theory with 5 rows. No business case/assertion or dedicated exception was removed.
+
+### Final complete pair
+
+Locked restore and Release net48 build passed for all six owners, zero warnings/errors. One unfiltered sequential fresh pass then one reuse pass used identical final source/builds/order and explicit non-production master configuration, with fault settings unset and caller environment restored.
+
+| Owner | Fresh passed / failed / skipped | Reuse passed / failed / skipped | Fresh wall seconds | Reuse wall seconds |
+|---|---:|---:|---:|---:|
+| Foundation.Tests | 44/0/0 | 44/0/0 | 310.56 | 298.68 |
+| Catalog.Tests | 10/0/0 | 10/0/0 | 155.28 | 26.28 |
+| Inventory.Tests | 36/0/0 | 36/0/0 | 282.15 | 136.70 |
+| Security.Tests | 53/0/0 | 53/0/0 | 282.87 | 118.95 |
+| Migrations.Tests | 65/0/0 | 65/0/0 | 181.31 | 183.47 |
+| IntegrationTests | 57/0/0 | 57/0/0 | 29.44 | 30.58 |
+| **Total** | **265/0/0** | **265/0/0** | **1241.61** | **794.65** |
+
+All exact full namespace/method/Theory-row sets match current source and each other, with unique display names and no mandatory skips. Both modes retain 75 participating scenario scopes (Catalog 22, Inventory 25, Security 28); fresh 75 vs reuse 3 allocate/migrate/initialize-reset/drop, each 75 reset/seed/verify/**verify-after**/cleanup and body entries, all successful. Other allocations belong to dedicated probes/exceptions and are not included in this adapter telemetry.
+
+| Participating phase | Fresh count | Reuse count | Fresh cumulative seconds | Reuse cumulative seconds |
+|---|---:|---:|---:|---:|
+| allocate | 75 | 3 | 27.759 | 2.023 |
+| migrate | 75 | 3 | 182.100 | 9.201 |
+| initialize-reset | 75 | 3 | 187.525 | 8.508 |
+| reset | 75 | 75 | 21.469 | 18.576 |
+| seed | 75 | 75 | 11.203 | 6.187 |
+| verify | 75 | 75 | 7.977 | 6.904 |
+| verify-after | 75 | 75 | 8.270 | 6.646 |
+| cleanup | 75 | 75 | 0.056 | 0.022 |
+| drop | 75 | 3 | 5.442 | 0.185 |
+
+Wall seconds sum the process Stopwatches, excluding restore/build/census. Reuse observed 446.96s lower wall time (36.0% reduction) in this single ordered local pair. Cache/SQL-host noise limits inference; no statistical/product/release performance claim. Phase totals overlap and do not sum to wall time. Case-level timing review found Migrations **2.16s slower** overall (largest dedicated interrupted-baseline case +6.48s) and IntegrationTests **1.14s slower** (largest missing-marker guard case +0.90s). Their unchanged source paths use the dedicated allocator/migrator, not the collection mode or repaired scope. No failure, timeout or cleanup difference appeared; the cause of latency variation cannot be inferred from this single pair, and neither owner is claimed faster.
+
+Inventory's largest individual increase was `Reconciliation_executes_in_a_serializable_transaction` (+1.34s), which is the first lazy reuse member and includes its collection allocation/migration/checkpoint preparation. Both modes' per-case telemetry contains those initialization phases; the added final verification itself measured 84.0ms fresh / 83.8ms reuse. Its query/Serializable assertions pass unchanged. Other dedicated-case variation was inspected through the exact TRX timings and allocation/mode paths; no percentage threshold or selected favorable rerun was used.
+
+Focused unset-mode checks on this final build: parser/scope 19/19, Catalog 3/3, Inventory 2/2, Security 2/2, all passed, zero skipped. Each SQL default selection uses reuse 1 allocation/drop and one reset/seed/verify/verify-after/cleanup per scenario. Read-only censuses before/after both full modes and after defaults find 0 matching test databases / 0 attached sessions. No host killed, unresolved cleanup or prefix-based deletion.
+
+Direct commands are the T05 reproduction commands above with separate `resp-review-final-<mode>-<owner>` TRX folders. Focused selectors are `FullyQualifiedName~Last_scope_rejects`, `FullyQualifiedName~Scenario_failure_preserves_post_body`, `FullyQualifiedName~Cleanup_timeout_quarantines`, `FullyQualifiedName~Cleanup_budget_bounds` and the existing worker probe; defaults use the earlier exact selections. Raw results and SQL allocation identifiers stay ignored/local.
+
+**Accepted repaired RESP baseline:** digest above plus the PR follow-up commit. Preserve pre/post-boundary checks, two-minute cleanup/quarantine behavior, local ownership guards, all case identities/assertions, fresh exceptions and serial net48 commands during L2DB. No L2DB/GUI/P5/P6/P7 implementation or release acceptance follows.

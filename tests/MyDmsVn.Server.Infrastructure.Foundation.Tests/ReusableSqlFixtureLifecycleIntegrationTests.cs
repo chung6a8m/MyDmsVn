@@ -15,6 +15,139 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class ReusableSqlFixtureLifecycleIntegrationTests
 {
     [SqlServerFact]
+    public async Task Last_scope_rejects_body_or_cleanup_boundary_drift_in_both_modes()
+    {
+        foreach (var mode in new[] { SqlFixtureRunMode.Fresh, SqlFixtureRunMode.Reuse })
+        foreach (var mutation in new[] { "schema", "trigger", "journal", "ownership" })
+        {
+            await WithFixtureAsync(async probe =>
+            {
+                string? connectionString = null;
+                string? owner = null;
+                try
+                {
+                    await Assert.ThrowsAnyAsync<Exception>(() => probe.Fixture.RunTestAsync("last-" + mutation,
+                        SeedUserAsync, async (scope, _) =>
+                        {
+                            connectionString = scope.ConnectionString;
+                            using var connection = new SqlConnection(connectionString);
+                            if (mutation == "ownership")
+                            {
+                                owner = await connection.QuerySingleAsync<string>(
+                                    "SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties WHERE class=0 AND name=N'MyDmsVn.TestOwnership';");
+                            }
+                            var sql = mutation == "schema" ? "ALTER TABLE dbo.Users ADD LastScopeDrift int NULL;" :
+                                mutation == "trigger" ? "DISABLE TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger;" :
+                                mutation == "journal" ? "DELETE dbo.SchemaVersions;" :
+                                "EXEC sys.sp_updateextendedproperty @name=N'MyDmsVn.TestOwnership',@value=N'changed';";
+                            if (mutation == "schema")
+                            {
+                                // The check must run after tracked resource cleanup, not just after the body.
+                                scope.RegisterCleanup(async () =>
+                                {
+                                    using var cleanup = new SqlConnection(connectionString);
+                                    await cleanup.ExecuteAsync(sql);
+                                });
+                            }
+                            else { await connection.ExecuteAsync(sql); }
+                        }));
+                    Assert.True(probe.Fixture.IsPoisoned);
+                    Assert.Single(probe.Fixture.Observations, o => o.Operation == "verify-after" && !o.Succeeded);
+                    await Assert.ThrowsAsync<InvalidOperationException>(() => probe.Fixture.BeginTestAsync("later", SeedUserAsync));
+                    Assert.Equal(1, Count(probe.Fixture, "reset"));
+                }
+                finally
+                {
+                    if (owner != null)
+                    {
+                        // Restore only this probe's marker so the original guarded allocator can drop it.
+                        using var restore = new SqlConnection(connectionString);
+                        await restore.ExecuteAsync("EXEC sys.sp_updateextendedproperty @name=N'MyDmsVn.TestOwnership',@value=@owner;", new { owner });
+                    }
+                }
+            }, mode);
+        }
+    }
+
+    [SqlServerFact]
+    public Task Scenario_failure_preserves_post_body_boundary_failure() => WithFixtureAsync(async probe =>
+    {
+        var error = await Assert.ThrowsAsync<AggregateException>(() => probe.Fixture.RunTestAsync("body-and-drift",
+            SeedUserAsync, async (scope, _) =>
+            {
+                using var connection = new SqlConnection(scope.ConnectionString);
+                await connection.ExecuteAsync("ALTER TABLE dbo.Users ADD BodyFailureDrift int NULL;");
+                throw new InvalidOperationException("Expected body failure.");
+            }));
+        Assert.Contains(error.Flatten().InnerExceptions, e => e.Message == "Expected body failure.");
+        Assert.Contains(error.Flatten().InnerExceptions, e => e.Message.Contains("boundary changed"));
+        Assert.True(probe.Fixture.IsPoisoned);
+    });
+
+    [SqlServerFact]
+    public async Task Cleanup_timeout_quarantines_active_sql_and_rejects_waiters_and_teardown()
+    {
+        foreach (var mode in new[] { SqlFixtureRunMode.Fresh, SqlFixtureRunMode.Reuse })
+        {
+            var probe = new Probe(mode, null, null, null, TimeSpan.FromMilliseconds(150));
+            var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            SqlFixtureTestScope? scope = null;
+            Task worker = Task.CompletedTask;
+            var cleanupRan = false;
+            try
+            {
+                scope = await probe.Fixture.BeginTestAsync("uncooperative-worker", SeedUserAsync);
+                var connectionString = scope.ConnectionString;
+                worker = Task.Run(async () =>
+                {
+                    using var connection = new SqlConnection(connectionString);
+                    await connection.OpenAsync();
+                    using var transaction = connection.BeginTransaction();
+                    await connection.ExecuteAsync("INSERT dbo.UserPermissions(UserId,PermissionKey,Granted) " +
+                        "SELECT UserId,N'Catalog.Products.Read',1 FROM dbo.Users;", transaction: transaction);
+                    ready.SetResult(true);
+                    try { await release.Task; }
+                    finally { transaction.Rollback(); }
+                });
+                Assert.Same(ready.Task, await Task.WhenAny(ready.Task, worker, Task.Delay(TimeSpan.FromSeconds(10))));
+                scope.RegisterWorker(worker, () => { });
+                scope.RegisterCleanup(() => { cleanupRan = true; return Task.CompletedTask; });
+                var later = probe.Fixture.BeginTestAsync("waiting", SeedUserAsync);
+                var teardown = probe.Fixture.DisposeAsync();
+                var disposal = scope.DisposeAsync();
+                Assert.Same(disposal, await Task.WhenAny(disposal, Task.Delay(TimeSpan.FromSeconds(3))));
+                var failure = await Assert.ThrowsAnyAsync<Exception>(() => disposal);
+                Assert.Contains("TimeoutException", failure.ToString(), StringComparison.Ordinal);
+                Assert.Same(later, await Task.WhenAny(later, Task.Delay(TimeSpan.FromSeconds(3))));
+                var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => later);
+                Assert.Contains("quarantined", rejected.Message, StringComparison.Ordinal);
+                Assert.Same(teardown, await Task.WhenAny(teardown, Task.Delay(TimeSpan.FromSeconds(3))));
+                var retained = await Assert.ThrowsAsync<InvalidOperationException>(() => teardown);
+                Assert.Contains(probe.Databases.Single().DatabaseName, retained.Message, StringComparison.Ordinal);
+                Assert.False(worker.IsCompleted);
+                Assert.False(cleanupRan);
+                Assert.True(probe.Fixture.IsPoisoned);
+                Assert.Equal(1, Count(probe.Fixture, "reset"));
+                Assert.Equal(0, Count(probe.Fixture, "drop"));
+                using var master = new SqlConnection(Admin);
+                Assert.Equal(1, await master.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.databases WHERE name=@name;",
+                    new { name = probe.Databases.Single().DatabaseName }));
+            }
+            finally
+            {
+                // Only this controlled probe releases/awaits the real transaction. The fixture never auto-drops quarantine.
+                release.TrySetResult(true);
+                await worker;
+                if (scope != null) { await Record.ExceptionAsync(() => scope.DisposeAsync()); }
+                await Record.ExceptionAsync(() => probe.Fixture.DisposeAsync());
+                foreach (var database in probe.Databases) { await database.DisposeAsync(); }
+                await probe.AssertAllAbsentAsync();
+            }
+        }
+    }
+
+    [SqlServerFact]
     public Task Second_scope_cannot_overlap() => WithFixtureAsync(async probe =>
     {
         await probe.Fixture.InitializeAsync();
@@ -142,7 +275,7 @@ public sealed class ReusableSqlFixtureLifecycleIntegrationTests
         var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var connectionString = scope.ConnectionString;
-        var stopped = false;
+        var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var resourcesDisposed = false;
         var worker = Task.Run(async () =>
         {
@@ -155,7 +288,7 @@ public sealed class ReusableSqlFixtureLifecycleIntegrationTests
             try { await release.Task; }
             finally { transaction.Rollback(); }
         });
-        scope.RegisterWorker(worker, () => stopped = true);
+        scope.RegisterWorker(worker, () => stopped.TrySetResult(true));
         scope.RegisterCleanup(() => { resourcesDisposed = true; return Task.CompletedTask; });
         Task<SqlFixtureTestScope>? pending = null;
         await RunProbeAndCleanupAsync(async () =>
@@ -167,7 +300,7 @@ public sealed class ReusableSqlFixtureLifecycleIntegrationTests
                 Assert.True(resourcesDisposed);
                 await SeedUserAsync(next, token);
             });
-            Assert.True(stopped);
+            Assert.Same(stopped.Task, await Task.WhenAny(stopped.Task, Task.Delay(TimeSpan.FromSeconds(3))));
             Assert.False(drain.IsCompleted);
             Assert.False(pending.IsCompleted);
             Assert.False(resourcesDisposed);
@@ -400,7 +533,7 @@ VALUES(N'fixture-user',N'FIXTURE-USER',N'Baseline',N'Local',N'hash',N'',N'BCrypt
     {
         public Probe(SqlFixtureRunMode mode, Func<string, CancellationToken, Task>? migrate,
             Func<SqlTestDatabase, CancellationToken, Task<RespawnResetProfile>>? prepare,
-            Func<CancellationToken, Task<SqlTestDatabase>>? allocate)
+            Func<CancellationToken, Task<SqlTestDatabase>>? allocate, TimeSpan? cleanupTimeout = null)
         {
             Fixture = new ReusableSqlFixture(mode, async token =>
             {
@@ -413,7 +546,7 @@ VALUES(N'fixture-user',N'FIXTURE-USER',N'Baseline',N'Local',N'hash',N'',N'BCrypt
                 var result = new DatabaseMigrationRunner().Migrate(connectionString);
                 if (!result.Successful) { throw result.Error ?? new InvalidOperationException("Migration failed."); }
                 return Task.CompletedTask;
-            }), prepare ?? ((database, token) => RespawnResetProfile.CreateAsync(database, cancellationToken: token)));
+            }), prepare ?? ((database, token) => RespawnResetProfile.CreateAsync(database, cancellationToken: token)), cleanupTimeout);
         }
         public ReusableSqlFixture Fixture { get; }
         public List<SqlTestDatabase> Databases { get; } = new List<SqlTestDatabase>();

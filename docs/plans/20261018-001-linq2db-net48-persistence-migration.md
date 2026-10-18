@@ -3,7 +3,7 @@
 > **For agentic workers:** Use `superpowers:executing-plans` or `superpowers:subagent-driven-development` to implement this plan task by task after review. Checkboxes describe work still required, not evidence of completion.
 
 **Date:** 2026-10-18
-**Status:** Owner-approved direction 1A + 2A + 3A; implementation proposed; all T00–T07 tasks NOT RUN. RESP-T05 has accepted the exact local net48 working-tree candidate in [verification](../RESPAWN_VERIFICATION.md#resp-t05-acceptance--matched-complete-owners). Next L2DB-T00 must bind those bytes to the actual commit/worktree; no L2DB implementation has run.
+**Status:** Owner-approved direction 1A + 2A + 3A; implementation proposed; all T00–T07 tasks NOT RUN. RESP-T05 has accepted the exact local net48 working-tree candidate in [verification](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up). Next L2DB-T00 must bind those bytes to the actual commit/worktree; no L2DB implementation has run.
 **Goal:** Replace the active RepoDb/Dapper application DAL with LINQ to DB and a documented native-SqlClient escape surface, preserving Local v1, active net48, post-rebuild security, existing data and all correctness gates.
 **Architecture:** Existing Clean Architecture modular monolith and explicit UoW. Infrastructure-only mapping/connection adapters; unchanged Application/Contracts/Desktop boundaries; DbUp remains the sole schema owner.
 **Tech stack:** WinForms, CommunityToolkit.Mvvm, net48 product/SQL/Desktop and test projects, LINQ to DB (initial candidate 6.3.0), current Microsoft.Data.SqlClient, SQL Server, DbUp, MediatR, FluentValidation, ErrorOr, Serilog and xUnit.

@@ -9,7 +9,7 @@ The owner reset the active roadmap on **2026-10-18**. There are exactly **two ac
 1. [RESP — Integration-test fixture reuse with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md).
 2. [L2DB — LINQ to DB persistence migration on net48](docs/plans/20261018-001-linq2db-net48-persistence-migration.md).
 
-RESP-T00–T05 are complete and accepted on the local net48 working-tree candidate recorded in [verification](docs/RESPAWN_VERIFICATION.md#resp-t05-acceptance--matched-complete-owners). Next is L2DB-T00; L2DB is not implemented. Bind the accepted fixture bytes to the actual commit/worktree before DAL changes, preserve uncommitted work, and keep fixture boundaries fixed. The prior removal of the old SQL test framework is a baseline simplification, not RESP implementation. Historical TESTGATE, completed modularization, NET8-PAUSE and SEC-REBUILD work is context, not an execution queue. Pending P5/P6/P7 work is in [Deferred work](docs/DEFERRED_WORK.md), not a third active plan.
+RESP-T00–T05 are complete and accepted on the local net48 working-tree candidate recorded in [verification](docs/RESPAWN_VERIFICATION.md#pr-36-review-follow-up). Next is L2DB-T00; L2DB is not implemented. Bind the accepted fixture bytes to the actual commit/worktree before DAL changes, preserve uncommitted work, and keep fixture boundaries fixed. The prior removal of the old SQL test framework is a baseline simplification, not RESP implementation. Historical TESTGATE, completed modularization, NET8-PAUSE and SEC-REBUILD work is context, not an execution queue. Pending P5/P6/P7 work is in [Deferred work](docs/DEFERRED_WORK.md), not a third active plan.
 
 ## Read order and authority
 
@@ -59,6 +59,6 @@ Explicit owner decisions supersede older documents. The active-plan index owns w
 - Compile against the actual target APIs, especially `net48`. Do not upgrade packages broadly, suppress warnings globally or introduce an additional ORM to avoid a compatibility problem.
 - Register implementations explicitly with Microsoft DI. Keep ErrorOr, MediatR, RepoDb/LINQ to DB and SQL objects out of transport DTOs.
 - Use parameterized SQL. Never commit secrets, production connection strings, local SQL configuration or raw test artifacts.
-- SQL tests mutate only positively owned disposable databases on the explicitly designated non-production test instance. Reset failure poisons a reused fixture; no subsequent test runs on uncertain state.
+- SQL tests mutate only positively owned disposable databases on the explicitly designated non-production test instance. Reset/boundary failure poisons reuse; cleanup timeout quarantines the allocation with no later reset/drop until manual review. Verify the boundary again after drained scenario cleanup, including final/focused cases.
 - GUI tests use STA, serialized UI resources, deterministic disposal, bounded waits and captured exceptions/DataGridView errors. Headless failures must not open blocking dialogs.
 - Missing Windows, targeting packs, SQL configuration or GUI access is `BLOCKED / NOT RUN`, never PASS. Use [tests/README.md](tests/README.md) for current commands and resource constraints.

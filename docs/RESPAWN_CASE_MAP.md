@@ -647,3 +647,14 @@ The unchanged T04 inventory is fully executed: **230 methods / 257 cases (166 SQ
 All 20 original candidates use the accepted APP boundary; dedicated exceptions and fresh safety probes keep their reviewed lifecycles. Mode unset defaults to reuse, explicit fresh remains proven. See [full results, phase counts/durations, cleanup and default checks](RESPAWN_VERIFICATION.md#resp-t05-acceptance--matched-complete-owners).
 
 Exact accepted local candidate: base/HEAD `6383289a2e43e2021abd65048a1e2f3f3838324e` plus uncommitted RESP code/config digest `0838ff87bcc0c1d8d815f5e09d94f3c9c951fd48b00105d9fd78f170f580f4fb`. No accepted commit is invented. L2DB-T00 must bind/preserve these bytes and freeze fixture/reset/seed/ownership/drain/exception/serialization boundaries and case assertions before provider changes. L2DB, GUI and release work remain unimplemented/unaccepted by RESP.
+
+
+## PR 36 lifecycle review regressions
+
+Current repaired source: 234 methods / 265 cases, 169 SQL / 96 non-SQL; all prior 257 cases/rows retained. Foundation 44, Catalog 10, Inventory 36, Security 53, Migrations 65, IntegrationTests 57. Full fresh/reuse each 265 passed / 0 failed / 0 skipped on the [repaired baseline](RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
+
+Foundation adds three dedicated SQL Facts in `ReusableSqlFixtureLifecycleIntegrationTests`: `Last_scope_rejects_body_or_cleanup_boundary_drift_in_both_modes` (both modes, four mutations, including resource-cleanup drift), `Scenario_failure_preserves_post_body_boundary_failure`, and `Cleanup_timeout_quarantines_active_sql_and_rejects_waiters_and_teardown` (both modes, real transaction, explicit guarded cleanup only after actual worker completion). They retain owned dedicated probe allocations; no new business case conversion.
+
+IntegrationTests adds `ReusableSqlFixtureTests.Cleanup_budget_bounds_uncooperative_workers_and_resources`, five local Theory rows: worker, stop-throws, stop-blocks, async-resource, sync-resource. Existing worker probes now await explicit stop notification instead of assuming synchronous invocation; all original drain/nonoverlap/resource assertions remain.
+
+Participating collections keep 75 scenario scopes in 27 TRX results, now with 75 successful `verify-after` checks per complete mode. APP reset boundary and dedicated exception classification are unchanged; the lifecycle now rejects final-case drift and terminally quarantines undrained work. Code/config digest 75f282bc99c0c5d8f5bc04bcd2fe4c75f9f0c650d2ecd2a53203e1c46a79165c is bound by the PR follow-up commit.

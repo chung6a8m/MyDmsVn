@@ -33,6 +33,8 @@ internal sealed class SqlFixtureObservation
 // One instance per xUnit collection. No static cache and no shared application connection/UoW.
 internal sealed class ReusableSqlFixture
 {
+    private readonly TimeSpan _cleanupTimeout;
+    private int _quarantined;
     private readonly SemaphoreSlim _admission = new SemaphoreSlim(1, 1);
     private readonly object _disposeSync = new object();
     private readonly List<SqlFixtureObservation> _observations = new List<SqlFixtureObservation>();
@@ -49,13 +51,14 @@ internal sealed class ReusableSqlFixture
     internal ReusableSqlFixture(SqlFixtureRunMode mode,
         Func<CancellationToken, Task<SqlTestDatabase>> allocate,
         Func<string, CancellationToken, Task> migrate,
-        Func<SqlTestDatabase, CancellationToken, Task<RespawnResetProfile>> prepare)
+        Func<SqlTestDatabase, CancellationToken, Task<RespawnResetProfile>> prepare, TimeSpan? cleanupTimeout = null)
     {
         if (mode != SqlFixtureRunMode.Fresh && mode != SqlFixtureRunMode.Reuse)
         {
             throw new ArgumentOutOfRangeException(nameof(mode));
         }
         Mode = mode;
+        _cleanupTimeout = SqlFixtureTestScope.ValidateCleanupTimeout(cleanupTimeout);
         _allocate = allocate ?? throw new ArgumentNullException(nameof(allocate));
         _migrate = migrate ?? throw new ArgumentNullException(nameof(migrate));
         _prepare = prepare ?? throw new ArgumentNullException(nameof(prepare));
@@ -138,15 +141,17 @@ internal sealed class ReusableSqlFixture
         try { ThrowIfUnavailable(); }
         catch { _admission.Release(); throw; }
         SqlFixtureTestScope? scope = null;
+        var admitted = false;
         try
         {
             await InitializeCoreAsync(token).ConfigureAwait(false);
             if (Mode == SqlFixtureRunMode.Fresh) { await AllocateAsync(token).ConfigureAwait(false); }
             scope = new SqlFixtureTestScope(label, _database!.ConnectionString,
-                clean => FinishScopeAsync(scope!, clean));
+                clean => FinishScopeAsync(scope!, clean, admitted), _cleanupTimeout);
             await MeasureAsync("reset", label, () => _profile!.ResetAsync(token)).ConfigureAwait(false);
             await MeasureAsync("seed", label, () => seed(scope, token)).ConfigureAwait(false);
             await MeasureAsync("verify", label, () => _profile!.VerifyAsync(token)).ConfigureAwait(false);
+            admitted = true;
             return scope; // The scope owns admission until workers and resources have drained.
         }
         catch (Exception error)
@@ -183,13 +188,36 @@ internal sealed class ReusableSqlFixture
         if (failure != null) { ExceptionDispatchInfo.Capture(failure).Throw(); }
     }
 
-    private async Task FinishScopeAsync(SqlFixtureTestScope scope, bool clean)
+    private async Task FinishScopeAsync(SqlFixtureTestScope scope, bool clean, bool admitted)
     {
         var succeeded = clean;
         if (!clean) { Poison(); }
         try
         {
-            if (Mode == SqlFixtureRunMode.Fresh) { await DropAsync().ConfigureAwait(false); }
+            if (!scope.IsDrained)
+            {
+                Interlocked.Exchange(ref _quarantined, 1);
+                Poison();
+                ThrowIfQuarantined(); // Never verify, reset or drop while work may still be active.
+            }
+            Exception? failure = null;
+            try
+            {
+                // Hold admission through worker/resource drain and the final boundary check.
+                // Failed admission has no body to check and may already have poisoned the profile.
+                if (admitted) { await MeasureAsync("verify-after", scope.CaseLabel, () => _profile!.VerifyAsync()).ConfigureAwait(false); }
+            }
+            catch (Exception error) { failure = error; Poison(); }
+            try
+            {
+                if (Mode == SqlFixtureRunMode.Fresh) { await DropAsync().ConfigureAwait(false); }
+            }
+            catch (Exception cleanup)
+            {
+                if (failure != null) { throw new AggregateException("Boundary verification and guarded cleanup failed.", failure, cleanup); }
+                throw;
+            }
+            if (failure != null) { ExceptionDispatchInfo.Capture(failure).Throw(); }
         }
         catch { succeeded = false; Poison(); throw; }
         finally
@@ -214,7 +242,7 @@ internal sealed class ReusableSqlFixture
     private async Task DisposeCoreAsync()
     {
         await _admission.WaitAsync().ConfigureAwait(false);
-        try { await DropAsync().ConfigureAwait(false); }
+        try { ThrowIfQuarantined(); await DropAsync().ConfigureAwait(false); }
         catch { Poison(); throw; }
         finally { _admission.Release(); }
     }
@@ -233,8 +261,18 @@ internal sealed class ReusableSqlFixture
         _profile = null;
     }
 
+    private void ThrowIfQuarantined()
+    {
+        if (Volatile.Read(ref _quarantined) != 0)
+        {
+            throw new InvalidOperationException("The SQL fixture is quarantined; outstanding work may remain active. " +
+                "No reset or drop is permitted. Manual review is required for owned allocation '" + _database?.DatabaseName + "'.");
+        }
+    }
+
     private void ThrowIfUnavailable()
     {
+        ThrowIfQuarantined();
         if (Volatile.Read(ref _closing) != 0) { throw new ObjectDisposedException(nameof(ReusableSqlFixture)); }
         if (IsPoisoned) { throw new InvalidOperationException("The SQL fixture is poisoned; no later body may run."); }
     }
