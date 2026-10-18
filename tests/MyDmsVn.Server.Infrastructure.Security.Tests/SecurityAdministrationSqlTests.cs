@@ -14,22 +14,31 @@ using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(ApplicationSqlCollectionFixture.CollectionName)]
 public sealed class SecurityAdministrationSqlTests
 {
-    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-    public async Task Permission_import_previews_without_writes_then_adds_user_and_role_decisions_atomically()
+    private readonly ApplicationSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
+
+    public SecurityAdministrationSqlTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
     {
-        var database = await CreateMigratedDatabaseAsync();
-        try
+        _fixture = fixture;
+        _output = output;
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Permission_import_previews_without_writes_then_adds_user_and_role_decisions_atomically() =>
+        _fixture.RunAsync(nameof(Permission_import_previews_without_writes_then_adds_user_and_role_decisions_atomically), _output, async test =>
         {
             int actorId;
             int userId;
             int roleId;
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 actorId = await CreateManagerAsync(connection);
                 userId = await InsertUserAsync(connection, "import.target", "IMPORT.TARGET");
                 roleId = await connection.QuerySingleAsync<int>(
@@ -37,7 +46,7 @@ public sealed class SecurityAdministrationSqlTests
                     "OUTPUT INSERTED.RoleId VALUES (N'Import target role', N'IMPORT TARGET ROLE');");
             }
 
-            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString, actorId));
             var sender = provider.GetRequiredService<ISender>();
             var roleJson = ImportJson("Role", roleId,
                 "Catalog.Products.Read", "Allow", "Catalog.Products.Write", "Allow");
@@ -48,8 +57,8 @@ public sealed class SecurityAdministrationSqlTests
             Assert.False(preview.IsError);
             Assert.Equal(2, preview.Value.Additions.Count);
             Assert.Equal(0, preview.Value.TargetRevision);
-            using (var verification = new SqlConnection(database.ConnectionString))
             {
+                var verification = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 Assert.Equal(0, await verification.QuerySingleAsync<int>(
                     "SELECT COUNT(*) FROM dbo.RolePermissions WHERE RoleId = @roleId;", new { roleId }));
                 Assert.Equal(0, await verification.QuerySingleAsync<int>(
@@ -94,7 +103,7 @@ public sealed class SecurityAdministrationSqlTests
             Assert.False(userApply.IsError);
             Assert.Equal(1, userApply.Value.AddedCount);
 
-            using var finalCheck = new SqlConnection(database.ConnectionString);
+            var finalCheck = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
             Assert.Equal(2, await finalCheck.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.RolePermissions WHERE RoleId = @roleId;", new { roleId }));
             Assert.False(await finalCheck.QuerySingleAsync<bool>(
@@ -103,12 +112,7 @@ public sealed class SecurityAdministrationSqlTests
             Assert.Equal(2, await finalCheck.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SecurityAuditEvents WHERE TargetType = N'Role' AND TargetId = @roleId;",
                 new { roleId }));
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Permission_import_rejects_stale_catalog_revision_conflicts_and_audit_failure()
@@ -186,31 +190,29 @@ public sealed class SecurityAdministrationSqlTests
     }
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-    public async Task Permission_import_rechecks_actor_permission_after_preview()
-    {
-        var database = await CreateMigratedDatabaseAsync();
-        try
+    public Task Permission_import_rechecks_actor_permission_after_preview() =>
+        _fixture.RunAsync(nameof(Permission_import_rechecks_actor_permission_after_preview), _output, async test =>
         {
             int actorId;
             int targetId;
             int managerRoleId;
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 actorId = await CreateManagerAsync(connection);
                 targetId = await InsertUserAsync(connection, "import.target", "IMPORT.TARGET");
                 managerRoleId = await connection.QuerySingleAsync<int>(
                     "SELECT RoleId FROM dbo.UserRoles WHERE UserId = @actorId;", new { actorId });
             }
 
-            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString, actorId));
             var sender = provider.GetRequiredService<ISender>();
             var json = ImportJson("User", targetId, "Catalog.Products.Write", "Allow");
             var preview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
                 PermissionImportTargetTypeDto.User, targetId, json));
             Assert.False(preview.IsError);
 
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 await connection.ExecuteAsync(
                     "DELETE dbo.RolePermissions WHERE RoleId = @managerRoleId " +
                     "AND PermissionKey = N'Security.Users.Manage';",
@@ -222,42 +224,35 @@ public sealed class SecurityAdministrationSqlTests
                 preview.Value.TargetRevision, preview.Value.CatalogDigest));
             Assert.True(apply.IsError);
             Assert.Equal("Auth.Forbidden", apply.FirstError.Code);
-            using var verification = new SqlConnection(database.ConnectionString);
+            var verification = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
             Assert.Equal(0, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.UserPermissions WHERE UserId = @targetId " +
                 "AND PermissionKey = N'Catalog.Products.Write';", new { targetId }));
             Assert.Equal(0, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SecurityAuditEvents WHERE TargetId = @targetId;", new { targetId }));
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-    public async Task Permission_import_rejects_inactive_targets_and_stale_preview_revisions()
-    {
-        var database = await CreateMigratedDatabaseAsync();
-        try
+    public Task Permission_import_rejects_inactive_targets_and_stale_preview_revisions() =>
+        _fixture.RunAsync(nameof(Permission_import_rejects_inactive_targets_and_stale_preview_revisions), _output, async test =>
         {
             int actorId;
             int targetId;
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 actorId = await CreateManagerAsync(connection);
                 targetId = await InsertUserAsync(connection, "import.target", "IMPORT.TARGET");
             }
 
-            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString, actorId));
             var sender = provider.GetRequiredService<ISender>();
             var json = ImportJson("User", targetId, "Catalog.Products.Write", "Allow");
             var preview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
                 PermissionImportTargetTypeDto.User, targetId, json));
             Assert.False(preview.IsError);
 
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 await connection.ExecuteAsync(
                     "UPDATE dbo.Users SET IsActive = 0 WHERE UserId = @targetId;", new { targetId });
             }
@@ -268,8 +263,8 @@ public sealed class SecurityAdministrationSqlTests
             Assert.True(inactive.IsError);
             Assert.Equal("Security.ImportTargetUnavailable", inactive.FirstError.Code);
 
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 await connection.ExecuteAsync(
                     "UPDATE dbo.Users SET IsActive = 1, AssignmentRevision = AssignmentRevision + 1 " +
                     "WHERE UserId = @targetId;", new { targetId });
@@ -278,8 +273,8 @@ public sealed class SecurityAdministrationSqlTests
             var currentPreview = await sender.Send(new PreviewPermissionAssignmentImportQuery(
                 PermissionImportTargetTypeDto.User, targetId, json));
             Assert.False(currentPreview.IsError);
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 await connection.ExecuteAsync(
                     "UPDATE dbo.Users SET AssignmentRevision = AssignmentRevision + 1 WHERE UserId = @targetId;",
                     new { targetId });
@@ -290,18 +285,13 @@ public sealed class SecurityAdministrationSqlTests
                 currentPreview.Value.TargetRevision, currentPreview.Value.CatalogDigest));
             Assert.True(stale.IsError);
             Assert.Equal("Security.RevisionConflict", stale.FirstError.Code);
-            using var verification = new SqlConnection(database.ConnectionString);
+            var verification = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
             Assert.Equal(0, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.UserPermissions WHERE UserId = @targetId " +
                 "AND PermissionKey = N'Catalog.Products.Write';", new { targetId }));
             Assert.Equal(0, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SecurityAuditEvents WHERE TargetId = @targetId;", new { targetId }));
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning, SqlTestCategory.SqlConcurrency)]
     public async Task Concurrent_permission_imports_on_one_preview_commit_at_most_once()
@@ -351,14 +341,12 @@ public sealed class SecurityAdministrationSqlTests
     }
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-    public async Task Administration_is_revisioned_audited_and_preserves_direct_decision_precedence()
-    {
-        var database = await CreateMigratedDatabaseAsync();
-        try
+    public Task Administration_is_revisioned_audited_and_preserves_direct_decision_precedence() =>
+        _fixture.RunAsync(nameof(Administration_is_revisioned_audited_and_preserves_direct_decision_precedence), _output, async test =>
         {
             int actorId;
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 actorId = await CreateManagerAsync(connection);
                 await connection.ExecuteAsync(
                     "INSERT dbo.UserPermissions (UserId, PermissionKey, Granted) " +
@@ -366,7 +354,7 @@ public sealed class SecurityAdministrationSqlTests
                     new { actorId });
             }
 
-            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString, actorId));
             var sender = provider.GetRequiredService<ISender>();
             var roleResult = await sender.Send(new MutateSecurityAdministrationCommand(
                 SecurityAdministrationTarget.Role,
@@ -376,7 +364,7 @@ public sealed class SecurityAdministrationSqlTests
             Assert.False(roleResult.IsError);
             Assert.Equal(0, roleResult.Value.AssignmentRevision);
 
-            var roleId = await QueryRoleIdAsync(database.ConnectionString, "WAREHOUSE");
+            var roleId = await QueryRoleIdAsync(test.ConnectionString, "WAREHOUSE");
             var userResult = await sender.Send(new MutateSecurityAdministrationCommand(
                 SecurityAdministrationTarget.User,
                 SecurityAdministrationOperation.Create,
@@ -386,7 +374,7 @@ public sealed class SecurityAdministrationSqlTests
                 password: "T3-Safe-Local-Password-47"));
             Assert.False(userResult.IsError);
             Assert.Equal(0, userResult.Value.AssignmentRevision);
-            var userId = await QueryUserIdAsync(database.ConnectionString, "OPERATOR");
+            var userId = await QueryUserIdAsync(test.ConnectionString, "OPERATOR");
 
             var roleGrant = await sender.Send(new MutateSecurityAdministrationCommand(
                 SecurityAdministrationTarget.Role,
@@ -480,7 +468,7 @@ public sealed class SecurityAdministrationSqlTests
             Assert.DoesNotContain(listedUsers.Value, user => user.IsProtectedAccount);
             Assert.Contains(listedRoles.Value, role => role.RoleId == roleId);
 
-            using var verification = new SqlConnection(database.ConnectionString);
+            var verification = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
             var userHash = await verification.QuerySingleAsync<string>(
                 "SELECT PasswordHash FROM dbo.Users WHERE UserId = @userId;",
                 new { userId });
@@ -508,23 +496,16 @@ public sealed class SecurityAdministrationSqlTests
             Assert.Equal(3, await verification.QuerySingleAsync<long>(
                 "SELECT AssignmentRevision FROM dbo.Users WHERE UserId = @userId;",
                 new { userId }));
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-    public async Task Missing_targets_and_bound_superuser_lifecycle_changes_are_rejected()
-    {
-        var database = await CreateMigratedDatabaseAsync();
-        try
+    public Task Missing_targets_and_bound_superuser_lifecycle_changes_are_rejected() =>
+        _fixture.RunAsync(nameof(Missing_targets_and_bound_superuser_lifecycle_changes_are_rejected), _output, async test =>
         {
             int actorId;
             int boundUserId;
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 actorId = await CreateManagerAsync(connection);
                 boundUserId = await InsertUserAsync(connection, "root.admin", "ROOT.ADMIN");
                 await connection.ExecuteAsync(
@@ -534,7 +515,7 @@ public sealed class SecurityAdministrationSqlTests
                     new { boundUserId });
             }
 
-            using var provider = CreateProvider(database.ConnectionString, actorId);
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString, actorId));
             var sender = provider.GetRequiredService<ISender>();
             var rename = await sender.Send(new MutateSecurityAdministrationCommand(
                 SecurityAdministrationTarget.User,
@@ -562,7 +543,7 @@ public sealed class SecurityAdministrationSqlTests
                 isActive: true,
                 expectedRevision: 0));
 
-            using var directProcedure = new SqlConnection(database.ConnectionString);
+            var directProcedure = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
             await Assert.ThrowsAsync<SqlException>(() => directProcedure.ExecuteAsync(
                 "EXEC dbo.ApplySecurityAdministration " +
                 "@Target = N'User', @Operation = N'Update', @ActorUserId = @actorId, " +
@@ -582,7 +563,7 @@ public sealed class SecurityAdministrationSqlTests
             var listed = await sender.Send(new ListSecurityUsersQuery());
             Assert.Contains(listed.Value, user => user.UserId == boundUserId && user.IsProtectedAccount);
 
-            using var verification = new SqlConnection(database.ConnectionString);
+            var verification = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
             var bound = await verification.QuerySingleAsync<(
                 string Username, string NormalizedUsername, string DisplayName, string? Email, bool IsActive, long Revision)>(
                 "SELECT Username, NormalizedUsername, DisplayName, Email, IsActive, " +
@@ -597,12 +578,7 @@ public sealed class SecurityAdministrationSqlTests
             Assert.Equal(0, bound.Revision);
             Assert.Equal(0, await verification.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SecurityAuditEvents;"));
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public async Task Audit_failure_rolls_back_the_security_mutation_and_revision()

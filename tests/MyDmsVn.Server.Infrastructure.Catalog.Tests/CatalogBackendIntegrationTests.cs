@@ -11,25 +11,29 @@ using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Security;
-using MyDmsVn.Server.DbMigrator;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(CatalogSqlCollectionFixture.CollectionName)]
 public sealed class CatalogBackendIntegrationTests
 {
-    [SqlServerFact]
-    public async Task Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups()
-    {
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        try
-        {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
+    private readonly CatalogSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
 
-            using var provider = CreateProvider(database.ConnectionString, new AllowAllPermissionStore());
-            using var scope = provider.CreateScope();
+    public CatalogBackendIntegrationTests(CatalogSqlCollectionFixture fixture, ITestOutputHelper output)
+    {
+        _fixture = fixture;
+        _output = output;
+    }
+
+    [SqlServerFact]
+    public Task Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups() =>
+        _fixture.RunAsync(nameof(Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups), _output, async (test, token) =>
+        {
+            var provider = CatalogSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString, new AllowAllPermissionStore()));
+            var scope = CatalogSqlCollectionFixture.Track(test, provider.CreateScope());
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
             var product = await sender.Send(
@@ -72,25 +76,14 @@ public sealed class CatalogBackendIntegrationTests
             Assert.Empty((await sender.Send(new LookupWarehousesQuery(lookupRequest), CancellationToken.None)).Value);
             Assert.Empty((await sender.Send(new LookupEmployeesQuery(lookupRequest), CancellationToken.None)).Value);
             Assert.Empty((await sender.Send(new LookupCustomersQuery(lookupRequest), CancellationToken.None)).Value);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task Explicitly_denied_catalog_write_leaves_business_tables_unchanged()
-    {
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        try
+    public Task Explicitly_denied_catalog_write_leaves_business_tables_unchanged() =>
+        _fixture.RunAsync(nameof(Explicitly_denied_catalog_write_leaves_business_tables_unchanged), _output, async (test, token) =>
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
-
-            using var provider = CreateProvider(database.ConnectionString, new ExplicitDenyPermissionStore());
-            using var scope = provider.CreateScope();
+            var provider = CatalogSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString, new ExplicitDenyPermissionStore()));
+            var scope = CatalogSqlCollectionFixture.Track(test, provider.CreateScope());
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
             var result = await sender.Send(
@@ -99,34 +92,23 @@ public sealed class CatalogBackendIntegrationTests
 
             Assert.True(result.IsError);
             Assert.Equal(ErrorOr.ErrorType.Forbidden, result.FirstError.Type);
-            using var connection = new Microsoft.Data.SqlClient.SqlConnection(database.ConnectionString);
+            var connection = CatalogSqlCollectionFixture.Track(test, new Microsoft.Data.SqlClient.SqlConnection(test.ConnectionString));
             Assert.Equal(0, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.Products;"));
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries()
-    {
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        try
+    public Task Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries() =>
+        _fixture.RunAsync(nameof(Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries), _output, async (test, token) =>
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
-
             var services = new ServiceCollection();
             services.AddServerApplication();
-            services.AddSqlPersistence(database.ConnectionString);
+            services.AddSqlPersistence(test.ConnectionString);
             services.Replace(ServiceDescriptor.Scoped<ICurrentUserAccessor>(
                 _ => new TestCurrentUserAccessor()));
             services.Replace(ServiceDescriptor.Scoped<IPermissionStore>(
                 _ => new AllowAllPermissionStore()));
-            using var provider = services.BuildServiceProvider();
-            using var scope = provider.CreateScope();
+            var provider = CatalogSqlCollectionFixture.Track(test, services.BuildServiceProvider());
+            var scope = CatalogSqlCollectionFixture.Track(test, provider.CreateScope());
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
             var productB = await sender.Send(
@@ -232,7 +214,7 @@ public sealed class CatalogBackendIntegrationTests
             Assert.Single(employeePage.Value.Items);
             Assert.False(customerGet.Value.IsActive);
 
-            using var setupConnection = new Microsoft.Data.SqlClient.SqlConnection(database.ConnectionString);
+            var setupConnection = CatalogSqlCollectionFixture.Track(test, new Microsoft.Data.SqlClient.SqlConnection(test.ConnectionString));
             var linkedUserId = await setupConnection.QuerySingleAsync<int>(
                 "INSERT dbo.Users (Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm, IsActive) " +
                 "OUTPUT INSERTED.UserId VALUES (N'linked', N'LINKED', N'Linked', N'Local', N'hash', N'', N'BCrypt', 1);");
@@ -249,19 +231,14 @@ public sealed class CatalogBackendIntegrationTests
             Assert.Equal("Employee.UserAlreadyLinked", duplicateLink.FirstError.Code);
             Assert.Equal("Employee.UserNotFound", missingUser.FirstError.Code);
 
-            using var connection = new Microsoft.Data.SqlClient.SqlConnection(database.ConnectionString);
+            var connection = CatalogSqlCollectionFixture.Track(test, new Microsoft.Data.SqlClient.SqlConnection(test.ConnectionString));
             var audit = await connection.QuerySingleAsync<CatalogAudit>(
                 "SELECT CreatedByUserId, UpdatedByUserId, UpdatedAtUtc FROM dbo.Products WHERE ProductId = @id;",
                 new { id = productA.Value.Id });
             Assert.Equal(42, audit.CreatedByUserId);
             Assert.Equal(42, audit.UpdatedByUserId);
             Assert.NotNull(audit.UpdatedAtUtc);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     private sealed class TestCurrentUserAccessor : ICurrentUserAccessor
     {

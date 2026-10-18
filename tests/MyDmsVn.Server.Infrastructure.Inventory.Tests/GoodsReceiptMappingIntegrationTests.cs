@@ -7,32 +7,36 @@ using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Persistence;
-using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Domain.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using RepoDb;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(ApplicationSqlCollectionFixture.CollectionName)]
 public sealed class GoodsReceiptMappingIntegrationTests
 {
-    [SqlServerFact]
-    public async Task Goods_receipt_entities_round_trip_through_registered_RepoDb_mappings()
-    {
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        try
-        {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
+    private readonly ApplicationSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
 
+    public GoodsReceiptMappingIntegrationTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
+    {
+        _fixture = fixture;
+        _output = output;
+    }
+
+    [SqlServerFact]
+    public Task Goods_receipt_entities_round_trip_through_registered_RepoDb_mappings() =>
+        _fixture.RunAsync(nameof(Goods_receipt_entities_round_trip_through_registered_RepoDb_mappings), _output, async test =>
+        {
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
-            using var unitOfWork = await provider
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
+            var unitOfWork = ApplicationSqlCollectionFixture.Track(test, await provider
                 .GetRequiredService<IUnitOfWorkFactory>()
-                .CreateAsync(CancellationToken.None);
+                .CreateAsync(CancellationToken.None));
             unitOfWork.BeginTransaction();
             var context = Assert.IsAssignableFrom<ISqlExecutionContext>(unitOfWork);
             var transaction = Assert.IsAssignableFrom<IDbTransaction>(context.Transaction);
@@ -136,12 +140,7 @@ public sealed class GoodsReceiptMappingIntegrationTests
             Assert.NotEqual(firstVersion, updatedReceipt.Version);
 
             unitOfWork.Rollback();
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     private static IEnumerable<Field> GetWriteFields(string fieldName)
     {

@@ -9,7 +9,7 @@ The owner reset the active roadmap on **2026-10-18**. There are exactly **two ac
 1. [RESP — Integration-test fixture reuse with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md).
 2. [L2DB — LINQ to DB persistence migration on net48](docs/plans/20261018-001-linq2db-net48-persistence-migration.md).
 
-Start at the first incomplete RESP task. L2DB starts after RESP acceptance, using the accepted fixture baseline. Neither plan has been implemented. The subsequent removal of the old SQL test framework is a baseline simplification, not RESP implementation. Historical TESTGATE, completed modularization, NET8-PAUSE and SEC-REBUILD work is context, not an execution queue. Pending P5/P6/P7 work is in [Deferred work](docs/DEFERRED_WORK.md), not a third active plan.
+RESP-T00–T05 are complete and accepted on the local net48 working-tree candidate recorded in [verification](docs/RESPAWN_VERIFICATION.md#pr-36-review-follow-up). Next is L2DB-T00; L2DB is not implemented. Bind the accepted fixture bytes to the actual commit/worktree before DAL changes, preserve uncommitted work, and keep fixture boundaries fixed. The prior removal of the old SQL test framework is a baseline simplification, not RESP implementation. Historical TESTGATE, completed modularization, NET8-PAUSE and SEC-REBUILD work is context, not an execution queue. Pending P5/P6/P7 work is in [Deferred work](docs/DEFERRED_WORK.md), not a third active plan.
 
 ## Read order and authority
 
@@ -26,10 +26,10 @@ Explicit owner decisions supersede older documents. The active-plan index owns w
 | Area | Current v1a code | Approved direction |
 |---|---|---|
 | Runtime | Product, SQL, Desktop and all ten active test projects target `net48` | Retain `net48`; no runtime upgrade in RESP/L2DB |
-| Test execution | Direct `dotnet test` / Test Explorer; local owned fresh-database helper in IntegrationTests | Add Respawn reuse inside existing SQL test owners; no external framework/manifest restoration |
+| Test execution | Direct `dotnet test` / Test Explorer; local owned helper and accepted test-only Respawn collections | Preserve accepted fixture baseline; no external framework/manifest restoration |
 | Modern product | AppCore source / historical .NET 8 cases parked; AppCore outside solution/release | Reactivation is deferred and separately scoped |
 | Persistence | RepoDb commands, Dapper queries, explicit UoW, SQL Server, DbUp | LINQ to DB behind existing contracts after RESP acceptance |
-| SQL fixtures | Fresh owned database per existing helper invocation; serial guards present | Reuse migrated collection fixtures with Respawn for eligible tests; dedicated databases for lifecycle/schema exceptions |
+| SQL fixtures | Default reusable collections for 20 original Catalog/Inventory/Identity/Security data cases; explicit fresh and dedicated exceptions; serial guards | Preserve accepted reset/seed/ownership/drain contract and dedicated lifecycle/schema/principal/trigger/contention databases during L2DB |
 | Permissions | Code-defined registry, explicit assignments, one configured database-bound superuser | Preserve current implementation and invariants |
 
 ## Architecture and business invariants
@@ -59,6 +59,6 @@ Explicit owner decisions supersede older documents. The active-plan index owns w
 - Compile against the actual target APIs, especially `net48`. Do not upgrade packages broadly, suppress warnings globally or introduce an additional ORM to avoid a compatibility problem.
 - Register implementations explicitly with Microsoft DI. Keep ErrorOr, MediatR, RepoDb/LINQ to DB and SQL objects out of transport DTOs.
 - Use parameterized SQL. Never commit secrets, production connection strings, local SQL configuration or raw test artifacts.
-- SQL tests mutate only positively owned disposable databases on the explicitly designated non-production test instance. Reset failure poisons a reused fixture; no subsequent test runs on uncertain state.
+- SQL tests mutate only positively owned disposable databases on the explicitly designated non-production test instance. Reset/boundary failure poisons reuse; cleanup timeout quarantines the allocation with no later reset/drop until manual review. Verify the boundary again after drained scenario cleanup, including final/focused cases.
 - GUI tests use STA, serialized UI resources, deterministic disposal, bounded waits and captured exceptions/DataGridView errors. Headless failures must not open blocking dialogs.
 - Missing Windows, targeting packs, SQL configuration or GUI access is `BLOCKED / NOT RUN`, never PASS. Use [tests/README.md](tests/README.md) for current commands and resource constraints.

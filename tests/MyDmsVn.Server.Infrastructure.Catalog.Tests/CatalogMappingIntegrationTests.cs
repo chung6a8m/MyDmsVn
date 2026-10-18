@@ -7,32 +7,36 @@ using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Persistence;
-using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Domain.Catalog;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using RepoDb;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(CatalogSqlCollectionFixture.CollectionName)]
 public sealed class CatalogMappingIntegrationTests
 {
-    [SqlServerFact]
-    public async Task Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time()
-    {
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        try
-        {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
+    private readonly CatalogSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
 
+    public CatalogMappingIntegrationTests(CatalogSqlCollectionFixture fixture, ITestOutputHelper output)
+    {
+        _fixture = fixture;
+        _output = output;
+    }
+
+    [SqlServerFact]
+    public Task Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time() =>
+        _fixture.RunAsync(nameof(Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time), _output, async (test, token) =>
+        {
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
-            using var unitOfWork = await provider
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = CatalogSqlCollectionFixture.Track(test, services.BuildServiceProvider());
+            var unitOfWork = CatalogSqlCollectionFixture.Track(test, await provider
                 .GetRequiredService<IUnitOfWorkFactory>()
-                .CreateAsync(CancellationToken.None);
+                .CreateAsync(CancellationToken.None));
             unitOfWork.BeginTransaction();
             var context = Assert.IsAssignableFrom<ISqlExecutionContext>(unitOfWork);
             var transaction = Assert.IsAssignableFrom<IDbTransaction>(context.Transaction);
@@ -90,29 +94,18 @@ public sealed class CatalogMappingIntegrationTests
                 Assert.InRange(row.CreatedAtUtc, beforeInsertUtc, afterInsertUtc);
             });
             unitOfWork.Rollback();
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings()
-    {
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
-        try
+    public Task Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings() =>
+        _fixture.RunAsync(nameof(Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings), _output, async (test, token) =>
         {
-            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(migration.Successful, migration.Error?.ToString());
-
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
-            using var unitOfWork = await provider
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = CatalogSqlCollectionFixture.Track(test, services.BuildServiceProvider());
+            var unitOfWork = CatalogSqlCollectionFixture.Track(test, await provider
                 .GetRequiredService<IUnitOfWorkFactory>()
-                .CreateAsync(CancellationToken.None);
+                .CreateAsync(CancellationToken.None));
             unitOfWork.BeginTransaction();
             var context = Assert.IsAssignableFrom<ISqlExecutionContext>(unitOfWork);
             var transaction = Assert.IsAssignableFrom<IDbTransaction>(context.Transaction);
@@ -205,12 +198,7 @@ public sealed class CatalogMappingIntegrationTests
                 Assert.Equal(updatedAtUtc, row.UpdatedAtUtc);
             });
             unitOfWork.Rollback();
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     private sealed class CatalogAuditRow
     {

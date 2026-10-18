@@ -149,6 +149,38 @@ internal sealed class SqlTestDatabase : IDisposable
         }
     }
 
+    // Validate the actual reset connection, not just a name or connection-string target.
+    internal async Task VerifyOwnershipAsync(SqlConnection connection, CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _disposeState) != 0)
+        {
+            throw new InvalidOperationException("The SQL test allocation is disposing or disposed.");
+        }
+
+        SqlTestDatabaseName.EnsureDisposable(DatabaseName);
+        if (connection.State != ConnectionState.Open)
+        {
+            throw new InvalidOperationException("Ownership verification requires an open connection.");
+        }
+
+        using var command = CreateCommand(connection,
+            "SELECT DB_NAME(), CONVERT(nvarchar(128), SERVERPROPERTY('ServerName')), " +
+            "database_id, create_date, " +
+            "(SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties " +
+            "WHERE class=0 AND name=N'MyDmsVn.TestOwnership') " +
+            "FROM sys.databases WHERE database_id=DB_ID();");
+        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ||
+            reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(4) ||
+            !string.Equals(reader.GetString(0), DatabaseName, StringComparison.Ordinal) ||
+            !string.Equals(reader.GetString(1), _serverName, StringComparison.OrdinalIgnoreCase) ||
+            reader.GetInt32(2) != _identity.Id || reader.GetDateTime(3) != _identity.CreateDate ||
+            !string.Equals(reader.GetString(4), _ownershipToken, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Refusing reset: the live SQL allocation ownership does not match.");
+        }
+    }
+
     public void Dispose() => DisposeAsync().GetAwaiter().GetResult();
 
     public async Task DisposeAsync()
