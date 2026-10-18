@@ -670,3 +670,84 @@ Fresh-context read-only review of the whole T04 change set found no Critical/Imp
 **Frozen code manifest SHA256:** `bdb258bf512cc1d9a9e35a5d038cb427fe3f4fbe58a7a3ca9b6f4a8b11035fc9`. Convention:15 changed/new/deleted .cs paths sorted repository-relative path/NUL/raw CRLF bytes/NUL; deleted paths contribute literal `<deleted>` (git diff --no-renames). Twelve files exist and three old mapping/write-field paths are deleted. The containing commit binds these bytes and the final evidence.
 
 M/O/S full suites, full GUI, release packaging and attended workflows were **NOT RUN**: no shared UoW/session/provider/fixture/security/schema/package contract changed. Their T05/T06/T07 milestone obligations remain. Prior T02 package/startup evidence is not relabeled as T04 host acceptance. Existing transitive Pkcs advisory risk remains unchanged. **L2DB-T04 complete; next L2DB-T05.**
+
+
+## L2DB-T05 — Identity Security and operations conversion
+
+**Base:** `c8a1fb0f670e52c53a6bc63c082ed31d531642db`; isolated `codex/l2db-t00` worktree. The containing commit binds the frozen code digest, final gate and documentation. **T05 complete** for the scope below. Original v1a is preserved; next T06 removes transitional hooks/packages/pilots and reconciles the graph. T07 final release/package/manual acceptance remains open.
+
+### Implementation and native surface
+
+Seven remaining business/operational Dapper consumers now use explicit SqlClient parameters and typed readers. Every concatenated SQL string in those files compares unchanged against the base, including lock batches, credential CAS, schema/principal diagnostics and maintenance binding predicates. Security store/evaluator and SQL-error mapper source is unchanged. No new generic RBAC DML, permission grant, automatic provisioning, schema edit, credential flow or connection path is introduced.
+
+| Native surface | Retention reason / ownership |
+|---|---|
+| Identity/SqlIdentityStore.FindByNormalizedUsernameAsync, TryReplacePasswordAsync, IsActiveAsync, GetSnapshotAsync | Existing account/credential/permission SQL, Unicode/hash/salt/algorithm/nullables and active-account CAS. One existing factory-owned connection per call; snapshot retains its SERIALIZABLE transaction and explicit binding/role/direct-decision SQL |
+| Security/SqlSecurityAdministrationRepository.ListUsersAsync/ListRolesAsync | Existing ordered user/role/membership/decision/grant projections, materialized on current UoW connection/optional transaction; no extra connection or arbitrary discovery |
+| Administration ApplyAsync | Same dbo.ApplySecurityAdministration allowlist, explicit nullable Bit/BigInt/Guid/text parameters, AssignmentRevision/Changed/nullable RelatedAssignmentRevision; current UoW |
+| Import ReadTargetAsync/ApplyAsync | Same two procedures, TargetName/IsActive/AssignmentRevision/IsProtected plus ordinal decision dictionary, JSON nvarchar(max), one round trip each. Current UoW and unchanged mapped SQL errors, including deferred missing-target errors |
+| Operations/SqlRuntimePrincipalValidator.ValidateConnectionAsync | Unchanged elevated-permission query and refusal; existing owned or borrowed startup connection |
+| Operations/SqlSchemaCompatibilityChecker.CheckConnectionAsync | Same journal, artifact/column queries and policy evaluation, including unsupported/future/forked/partial refusal. Existing owned or caller-owned open connection; no automatic migration |
+| Operations/SqlSuperuserBindingValidator.ValidateAsync | Exact configured/database-bound identity check; owns its existing startup connection |
+| DbMigrator/SuperuserBootstrapEngine.BootstrapAsync | Unchanged administrator principal validation, SERIALIZABLE transaction, bounded application lock, empty-store refusal, account/binding atomicity and no grants |
+| DbMigrator/SuperuserMaintenanceEngine.RecoverAsync/RenameAsync and lock/binding helpers | Same separate administrator authority, account/binding predicates and atomic update batches. Engines still own connections/transactions and validate principal before mutations |
+| Persistence/SqlRead and DbMigrator/SecurityProvisioning/MaintenanceSql | Small internal command/result adapters, timeout30, typed DBNull/text/scalar parameters and cancellation. They open no connection, own no transaction and drain trailing result sets before reporting success. No reflection mapper or new repository framework |
+
+Text bindings retain the prior Unicode4000/max behavior rather than silently truncating to a client-side schema length; import JSON is explicitly max. Nullable bits/revisions remain typed when DBNull. The existing sp_getapplock output variable is still consumed by the unchanged SELECT batch; no external output-parameter contract or binary-valued T05 result has been replaced. Existing Inventory rowversion/binary handling is untouched. Native-only consumers retain their existing factory/UoW connection paths; adding an unused LINQ wrapper would add no mapping guarantee.
+
+**Ruling:** audit precision — bind all four credential/bootstrap/recovery/rename DateTime values explicitly as DateTime2, matching the existing datetime2(7) columns. The new identity oracle exposed baseline Dapper DateTime rounding from .1234567 to .1233333; preserve full ticks rather than reproduce that mapping defect. Cost if wrong: audit timestamps would differ from legacy rounded values. The independent SQL oracle now verifies exact ticks and maintenance identity/atomicity; no authentication/provisioning decision or SQL predicate changes.
+
+**Ruling:** task boundary — T05's no-legacy-consumer exit applies to business/operational SQL execution. The empty RepoDb bootstrap/DI hooks, old package references, test-only independent oracles and T02 prototypes remain explicitly owned by T06. Removing them now would combine the separately planned dependency/test migration. Cost if wrong: claiming complete dependency cutover prematurely would hide old runtime assets; current guidance and the source boundary test make no such claim, and T06/T07 remain incomplete. No permanent fallback/provider switch exists.
+
+### Verification trajectory and review
+
+The new X source-consumer boundary first failed **0 passed/1 failed/0 skipped** on the seven legacy files, then passed **1/0/0** after conversion. The initial focused Security baseline (two new SQL cases plus three retained pilots) was **4/1/0**: only the exact DateTime2 audit assertion failed. The converted set passed **5/0/0**. Three initial new boundary cases then passed **3/0/0**, including bootstrap/recovery/rename precision and stable identity. Existing CLI maintenance cases were found to cover argument rejection, so a fourth SQL case adds wrong-bound-identity refusals, injected Users recovery failure and SystemSecuritySettings rename failure after the Users update, independent unchanged-state checks, and a successful subsequent rename. It uses a dedicated owned fresh trigger-fault database.
+
+The first unfiltered Security checkpoint was **59/0/0** before that last test addition; it is not the final acceptance scope. The complete Security project was rebuilt/rerun with that case in the final60 run below. No production change followed the initial gate; M/O/A/D/X/host evidence remains current. All original IDs/Theory rows remain, including the prior explicit missing-target successor mapping. SecurityPilot labels now identify production native versus the temporary T02 adapter, retaining all three native-oracle/runtime-denial/rollback cases until T06.
+
+Fresh-context read-only review found no Critical/Important/Minor finding; it checked the added maintenance-failure case separately as part of the same review. The reviewer ran no competing build/test/SQL. It left package/hook/pilot cleanup to the explicit T06 ruling above and execution/evidence acceptance to this executor; those are not silently accepted final-cutover or test claims.
+
+### Final gate and commands
+
+Windows / SDK8.0.425 / Release / net48; explicit designated non-production master configuration, default fixture mode unset (reuse). SQL projects ran sequentially using existing owned helpers/collections. No server login was created and the prior one-login T02 exception was not reused. Real restricted database principals in the existing Security cases verify runtime denials/allowlisted execution, not just administrative success.
+
+Each project was restored with locked mode and every restore/test exit checked. Actual template:
+
+```powershell
+dotnet restore <project.csproj> --locked-mode
+dotnet test <project.csproj> -c Release -f net48 --no-restore `
+  --filter '<selector>' --logger 'trx;LogFileName=cases.trx' `
+  --results-directory TestResults/l2db-t05-gate-<owner>
+```
+
+S/M/X omit --filter. Final S directory is `l2db-t05-gate-s-final`; the prior `l2db-t05-gate-s` is the59-case checkpoint. Other owner suffixes are m/o/a/d/x. Projects/selectors:
+
+| Owner | Project | Selector / scope |
+|---|---|---|
+| S | tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj | unfiltered; SecurityProvisioning + SqlConcurrency and pure startup/configuration/credential cases, all new native boundaries |
+| M | tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj | unfiltered; MigrationSchema plus pure CLI/maintenance configuration, supported-baseline and privilege regressions |
+| O | tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj | Category=SecurityProvisioning; actual Local login/wrong password/logout/relogin/live authorization/account-disable expiry |
+| A | tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj | FullyQualifiedName~AuthenticationTests\|FullyQualifiedName~PermissionAuthorizationTests\|FullyQualifiedName~PermissionCatalogTests\|FullyQualifiedName~PermissionImportValidationTests\|FullyQualifiedName~PermissionRegistryTests\|FullyQualifiedName~PermissionReleaseRegressionTests\|FullyQualifiedName~SecurityAdministrationTests\|FullyQualifiedName~SuperuserAuthorizationTests |
+| D | tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj | FullyQualifiedName~DesktopSessionExpiryTests\|FullyQualifiedName~DesktopSessionProjectContractTests\|FullyQualifiedName~LoginViewModelTests; deterministic idle expiry/relogin/session contract |
+| X | tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj | unfiltered; new consumer boundary plus inner/provider boundaries |
+
+| Owner | Pass/fail/skip invocations | Distinct methods | TRX wall seconds |
+|---|---:|---:|---:|
+| S | 60/0/0 | 56 | 158.56 |
+| M | 65/0/0 | 65 | 177.26 |
+| O | 1/0/0 | 1 | 11.89 |
+| A | 49/0/0 | 45 | 4.44 |
+| D | 14/0/0 | 14 | 4.53 |
+| X | 11/0/0 | 11 | 4.06 |
+
+Total **200 passed/0 failed/0 skipped**,192 distinct methods:85 SQL and115 pure invocations. Source ledger/actual TRX TestMethods match every selected logical successor and Theory cardinality; no duplicate result names, omissions, aborts or unexecuted cases. S60 includes38 SQL/22 pure; M65 includes46 SQL/19 pure; O1 is SQL. Source-wide653 logical IDs and271 methods/302 invocations across the six SQL owners (202 SQL/100 non-SQL) are inventories, not these task results.
+
+The required behavior cases retain current-account/binding validation; disabled/protected accounts; direct Deny/Allow/active-role precedence and unknown/deprecated key denial; next-request revocation; offline no-DB permission export; additive import identity/no-op/conflict, stale revision/digest/actor, limits and audit-failure rollback; credential/error redaction; real runtime-principal denial; migration/schema refusal; and current Local login/expiry. New native readers drain both empty and populated result sets before mapped success/commit. Maintenance fault probes verify no partial account/binding update.
+
+Locked restore and `dotnet build src/MyDmsVn.Desktop.App -c Release -f net48 --no-restore` passed; the SQL projects also built the changed DbMigrator. This is source-host build evidence, not a packaged startup acceptance. Existing transitive Pkcs advisory risk is unchanged.
+
+All final commands and guarded database disposal completed normally. Security collection diagnostics report successful owned drop; dedicated procedure/trigger/principal/schema/concurrency scenarios retain existing fresh ownership/drain boundaries. No cleanup failure, quarantine, killed testhost or unresolved allocation was reported. No prefix/orphan deletion or global census was attempted. Scripts/grants, RESP fixture/helpers/adapters, UoW/session/provider setup, package/lock/TFM and Domain/Application/Contracts source remain unchanged.
+
+**Frozen code manifest SHA256:** `ec075a71c862ccbb65b8192ca4e6a587787fc6ce6cac4cbbb140df18583f8b55`. Twelve changed/new .cs paths, sorted repository-relative path/NUL/raw CRLF bytes/NUL; no deletion. The containing commit binds these tested bytes. Static checks confirm exact SQL literal/store/error-map equality,653 unique ledger IDs, links/encoding/whitespace and no legacy ORM consumer in converted production folders. Remaining RepoDb references are the explicit T06 bootstrap/plumbing, not a second business implementation.
+
+Full F/C/I/O repository suites, GUI, package smoke and attended workflows were **NOT RUN** for T05: no Catalog/Inventory algorithms, shared connection/UoW/provider/fixture/schema/package contract changed. T06 dependency cleanup and T07 unfiltered six-owner/package/manual gates remain open. Prior package/login evidence remains bound to its older revision. **L2DB-T05 complete; next L2DB-T06.**

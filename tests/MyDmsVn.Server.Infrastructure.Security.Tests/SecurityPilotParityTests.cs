@@ -16,6 +16,7 @@ using Xunit;
 using Xunit.Abstractions;
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+// After T05, the production side is native; the T02 prototype remains until T06.
 public sealed class SecurityPilotParityTests(ITestOutputHelper output)
 {
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
@@ -63,7 +64,7 @@ public sealed class SecurityPilotParityTests(ITestOutputHelper output)
                     var denied = await Assert.ThrowsAsync<SqlException>(() => PilotSql.Execute(runtime, null, sql, PilotSql.P("@id", SqlDbType.Int, seed.Role))); Assert.Equal(229, denied.Number);
                 }
             }
-            output.WriteLine("Security pilot provider=" + (candidate ? "candidate" : "old") + " runtime principal verified; two result sets, import/audit rollback and RBAC/binding denials preserved.");
+            output.WriteLine("Security pilot provider=" + (candidate ? "candidate" : "production") + " runtime principal verified; two result sets, import/audit rollback and RBAC/binding denials preserved.");
         });
     }
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
@@ -108,7 +109,7 @@ public sealed class SecurityPilotParityTests(ITestOutputHelper output)
                 Assert.False(existing.IsError);
                 Assert.Equal("Pilot target", existing.Value.Name);
                 Assert.Single(existing.Value.ExistingDecisions);
-                output.WriteLine("Missing User/Role targets preserve Security.TargetNotFound for provider=" + (candidate ? "candidate" : "old"));
+                output.WriteLine("Missing User/Role targets preserve Security.TargetNotFound for provider=" + (candidate ? "candidate" : "production"));
             });
     }
 

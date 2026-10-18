@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Server.Infrastructure.Persistence;
 using Microsoft.Data.SqlClient;
 
 namespace MyDmsVn.Server.Infrastructure.Operations;
@@ -143,10 +143,8 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
             throw new ArgumentException("The SQL connection must be open.", nameof(connection));
         }
 
-        var hasElevatedPermissions = await connection.QuerySingleAsync<int>(
-            new CommandDefinition(
-                ElevatedPermissionSql,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        using var command = SqlRead.Command(connection, null, ElevatedPermissionSql);
+        var hasElevatedPermissions = await SqlRead.SingleAsync(command, reader => reader.GetInt32(0), cancellationToken).ConfigureAwait(false);
         if (hasElevatedPermissions == 1)
         {
             throw new DesktopStartupException(
