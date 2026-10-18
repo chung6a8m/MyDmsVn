@@ -5,7 +5,7 @@
 | Execution order | Plan / ID | Entry condition | Current status |
 |---:|---|---|---|
 | 1 | [20261018-002-respawn-fixture-reuse.md](20261018-002-respawn-fixture-reuse.md) / `RESP` | Current net48 checkout and approved test resources for implementation | RESP-T00–T05 accepted on exact local working-tree candidate; full fresh/reuse 265/265 each, cleanup and observed suite improvement; see [evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up) |
-| 2 | [20261018-001-linq2db-net48-persistence-migration.md](20261018-001-linq2db-net48-persistence-migration.md) / `L2DB` | RESP acceptance on current RepoDb/Dapper baseline | NOT IMPLEMENTED; next L2DB-T00 binds accepted RESP bytes to actual commit/worktree before DAL changes |
+| 2 | [20261018-001-linq2db-net48-persistence-migration.md](20261018-001-linq2db-net48-persistence-migration.md) / `L2DB` | RESP acceptance on current RepoDb/Dapper baseline | T00 complete: accepted RESP bound to PR #36 merge `1e24df4`; [inventory/evidence](../L2DB_VERIFICATION.md). Next T01; DAL conversion NOT IMPLEMENTED |
 
 Filename sequence reflects creation time. Follow the table, not filename sorting. RESP must produce a reusable-fixture baseline with verified reset/seed, ownership and case coverage. L2DB consumes that baseline and freezes fixture behavior while replacing DAL internals.
 

@@ -3,7 +3,7 @@
 > **For agentic workers:** Use `superpowers:executing-plans` or `superpowers:subagent-driven-development` to implement this plan task by task after review. Checkboxes describe work still required, not evidence of completion.
 
 **Date:** 2026-10-18
-**Status:** Owner-approved direction 1A + 2A + 3A; implementation proposed; all T00–T07 tasks NOT RUN. RESP-T05 has accepted the exact local net48 working-tree candidate in [verification](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up). Next L2DB-T00 must bind those bytes to the actual commit/worktree; no L2DB implementation has run.
+**Status:** Owner-approved direction 1A + 2A + 3A; L2DB-T00 source binding/inventory complete; T01–T07 NOT RUN. RESP-T05 has accepted the exact local net48 working-tree candidate in [verification](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up). T00 binds those bytes to PR #36 merge `1e24df4c4ad5243963da82d808da19f12278242b`; see [verification](../L2DB_VERIFICATION.md) and [case ledger](../L2DB_CASE_MIGRATION.md). Next is L2DB-T01; no DAL conversion has run.
 **Goal:** Replace the active RepoDb/Dapper application DAL with LINQ to DB and a documented native-SqlClient escape surface, preserving Local v1, active net48, post-rebuild security, existing data and all correctness gates.
 **Architecture:** Existing Clean Architecture modular monolith and explicit UoW. Infrastructure-only mapping/connection adapters; unchanged Application/Contracts/Desktop boundaries; DbUp remains the sole schema owner.
 **Tech stack:** WinForms, CommunityToolkit.Mvvm, net48 product/SQL/Desktop and test projects, LINQ to DB (initial candidate 6.3.0), current Microsoft.Data.SqlClient, SQL Server, DbUp, MediatR, FluentValidation, ErrorOr, Serilog and xUnit.
@@ -97,13 +97,13 @@ Use native parameterized SqlClient where necessary to preserve existing multi-re
 **Consumes:** accepted RESP net48 fixture baseline on current RepoDb/Dapper, ADR 0009, actual current declarations and direct test commands.
 **Produces:** reviewed source/package/native-SQL inventory, case ledger and concrete project/filter acceptance commands.
 
-- [ ] Verify the preceding RESP final milestone is accepted on net48 with the current RepoDb/Dapper product. Record its exact commit, fixture/reset/fresh-database boundaries, case identities and cleanup results. Missing or failed RESP evidence blocks T00; a documentation merge is not acceptance.
-- [ ] Record actual post-RESP implementation HEAD, clean/dirty state, submodule SHAs, active product/test targets and build tooling and changes since the refresh base. Resolve conflicts without discarding local work; freeze accepted fixture behavior and test commands for DAL attribution.
-- [ ] Inventory every RepoDb/Dapper usage in `src`, `tests`, deployment and active csproj/lock graphs. Classify production, test oracle, pilot, parked/history and unused central pin; identify the owning conversion task. Record immutable production SQL script/grant hashes and supported schema/journal baseline.
-- [ ] Record affected baseline assertions with durable logical IDs, owner, TFM, classification and theory-row identities. Classify retain/replace with explicit replacement assertions; never delete safety behavior merely because its name mentions an old library.
-- [ ] Map each task and T07 to the actual projects and source-verified filters in section 6. Add selectors for new tests only after those methods exist. An empty selection is NOT RUN; no external gate registration or framework restoration is required.
-- [ ] Review source/project/TFM mappings and inspect discovery where useful; record what was actually checked. Discovery is not test execution. T00's inventory work alone does not require rerunning historical full-suite acceptance.
-- [ ] Commit the reviewed binding and inventory. **Exit:** commands/owners resolve and evidence is explicit; missing prerequisites/resources block the dependent gate, not permission to guess.
+- [x] Verify the preceding RESP final milestone is accepted on net48 with the current RepoDb/Dapper product. Record its exact commit, fixture/reset/fresh-database boundaries, case identities and cleanup results. Missing or failed RESP evidence blocks T00; a documentation merge is not acceptance.
+- [x] Record actual post-RESP implementation HEAD, clean/dirty state, submodule SHAs, active product/test targets and build tooling and changes since the refresh base. Resolve conflicts without discarding local work; freeze accepted fixture behavior and test commands for DAL attribution.
+- [x] Inventory every RepoDb/Dapper usage in `src`, `tests`, deployment and active csproj/lock graphs. Classify production, test oracle, pilot, parked/history and unused central pin; identify the owning conversion task. Record immutable production SQL script/grant hashes and supported schema/journal baseline.
+- [x] Record affected baseline assertions with durable logical IDs, owner, TFM, classification and theory-row identities. Classify retain/replace with explicit replacement assertions; never delete safety behavior merely because its name mentions an old library.
+- [x] Map each task and T07 to the actual projects and source-verified filters in section 6. Add selectors for new tests only after those methods exist. An empty selection is NOT RUN; no external gate registration or framework restoration is required.
+- [x] Review source/project/TFM mappings and inspect discovery where useful; record what was actually checked. Discovery is not test execution. T00's inventory work alone does not require rerunning historical full-suite acceptance.
+- [x] Commit the reviewed binding and inventory. **Exit:** commands/owners resolve and evidence is explicit; missing prerequisites/resources block the dependent gate, not permission to guess.
 
 ### L2DB-T01 — Prove net48 package compatibility and resource ownership
 
@@ -220,7 +220,7 @@ A focused command is `dotnet test <project> -c Release -f net48 --filter <actual
 | T03 | A Catalog behavior and D affected lookup ViewModels | C/FastSQL; I/FastSQL for changed Catalog/reference dependencies | Four catalogs, employee linkage, search/field allowlists and mixed-provider transaction |
 | T04 | A receipt/posting/inquiry handlers and validators | I/FastSQL, I/SqlConcurrency, C/FastSQL | Concurrent/duplicate posting, locked references, decimal/rowversion and reconciliation |
 | T05 | A authorization/import; D expiry/relogin; pure S/M configuration/maintenance | S/SecurityProvisioning, S/SqlConcurrency, M/MigrationSchema, O/SecurityProvisioning | Real principal, stale actor/preview, protected account, procedure/audit; current Local login uses SecurityProvisioning |
-| T06 | X boundaries/dependencies and pure F lifetime/cleanup/init | F/FastSQL plus affected categories; all six for shared ownership/mapping changes | Package cleanup, retained/replaced case review and unchanged schema/grants |
+| T06 | X boundaries/dependencies and pure F cleanup/init (F lifetime is SQL/FastSQL) | F/FastSQL plus affected categories; all six for shared ownership/mapping changes | Package cleanup, retained/replaced case review and unchanged schema/grants |
 | T07 | Unfiltered A, X, D; required host/package build | Unfiltered F, C, I, S, M, O sequentially | Complete SQL correctness, package/manual Local smoke; W only when its documented GUI trigger applies |
 
 T00 corrects any source/category mismatch before execution. Never reclassify SQL as pure code to obtain a convenient selector. A filtered pass proves only its actual scope. Shared UoW, connection, mapping, fixture or migration changes require every affected SQL owner before dependent rollout; all six participate when the shared contract affects them. T07 remains the final milestone, while full suites are not defaults after each edit/task/PR.
@@ -318,6 +318,6 @@ The migration succeeds when DAL conventions are consolidated, all required invar
 
 If the pilot fails, stop rollout and leave production composition unchanged. A later conversion failure is reverted through its scoped code/package/registration changes on the unchanged supported schema. No database reset, old-security restoration or permanent dual-provider fallback is allowed. Scope-appropriate verification follows TEST_POLICY; T07's SQL/package/smoke breadth remains mandatory. Relevant later changes invalidate their affected evidence and require the applicable rerun after focused repair.
 
-All T00–T07 checkboxes remain open and require accepted RESP evidence before execution. The framework removal does not implement either migration or establish net48/SQL/package acceptance.
+T00 is complete with the accepted RESP commit binding, source inventory and static checks in [L2DB_VERIFICATION](../L2DB_VERIFICATION.md). T01–T07 checkboxes remain open; no provider compatibility or conversion acceptance is implied. The framework removal does not implement either migration or establish net48/SQL/package acceptance.
 
 **Candidate reference:** [official linq2db 6.3.0 package](https://www.nuget.org/packages/linq2db/6.3.0); [official ownership API](https://linq2db.github.io/api/linq2db/linq2db--LinqToDB.Data.ConnectionOptions.html). Published API/assets guide the pilot; they do not prove runtime compatibility or disposal correctness.
