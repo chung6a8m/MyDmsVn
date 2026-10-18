@@ -3,38 +3,33 @@
 > **For agentic workers:** Use `superpowers:executing-plans` or `superpowers:subagent-driven-development` to implement this plan task by task after review. Checkboxes describe work still required, not evidence of completion.
 
 **Date:** 2026-10-18
-**Status:** Owner-approved direction 1A + 2A + 3A; implementation plan proposed; all implementation tasks NOT RUN.
+**Status:** Owner-approved direction 1A + 2A + 3A; implementation proposed; all T00–T07 tasks NOT RUN. Execution is blocked until the preceding RESP plan has an accepted net48 baseline.
 **Goal:** Replace the active RepoDb/Dapper application DAL with LINQ to DB and a documented native-SqlClient escape surface, preserving Local v1, active net48, post-rebuild security, existing data and all correctness gates.
 **Architecture:** Existing Clean Architecture modular monolith and explicit UoW. Infrastructure-only mapping/connection adapters; unchanged Application/Contracts/Desktop boundaries; DbUp remains the sole schema owner.
 **Tech stack:** WinForms, CommunityToolkit.Mvvm, net48 product/SQL/Desktop, tool-only net8.0 runner, LINQ to DB (initial candidate 6.3.0), current Microsoft.Data.SqlClient, SQL Server, DbUp, MediatR, FluentValidation, ErrorOr, Serilog and xUnit.
 **Spec:** [ADR 0009](../adr/0009-linq2db-local-net48-persistence.md).
-**Pinned assessment base:** `8cfa25351338666b1a751ee516d5a479cdb37b7f`, `main`, PR #35 merge, 2026-10-18 09:23:30 +07:00.
-**Planning branch:** `plan/20261018-linq2db-net48-migration`, created directly from that SHA.
+**Original assessment:** `main` at `8cfa25351338666b1a751ee516d5a479cdb37b7f` after PR #35; historical source assessment only.
+**Documentation refresh base:** `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, 2026-10-18.
+**Predecessor:** [RESP — fixture reuse with Respawn](20261018-002-respawn-fixture-reuse.md), which must be verified on the current RepoDb/Dapper DAL before L2DB-T00.
 
-## 1. Reassessment of the actual latest main
+## 1. Current baseline, execution order and authority
 
-| Area | Observed at the pinned base | Consequence for this plan |
+The [active roadmap](README.md) contains exactly two plans: **RESP, then L2DB**. RESP first proves its package and reused-fixture/reset design on active net48 with the current RepoDb/Dapper product. L2DB-T00 consumes that accepted commit and evidence. During DAL migration, freeze the accepted fixture boundaries, reset semantics and runner protocol so persistence changes have a stable comparison base. A harness defect blocks the dependent DAL gate until fixed and accepted explicitly; do not silently combine another fixture redesign with a provider conversion.
+
+| Area | Current source at the refresh base | Treatment |
 |---|---|---|
-| Runtime | NET8-PAUSE PR #32 is merged. Product/SQL/Desktop are active net48. Runner and runner tests are tool-only net8.0; AppCore and historical modern cases are parked. Infrastructure csproj explicitly declares net48. | 3A means **keep this profile**, not dual-target restoration and not net10. |
-| Permissions | SEC-REBUILD PR #34 is merged; its latest verification records Final 775/775 and packaged GUI D2 138/138 at `0303a91111a514276aa02c6664c25dc0caf58d9e`. | Reuse implemented permissions, procedures, session guards and acceptance contracts; do not implement the rebuild again. |
-| Test runner | PR #35 is merged. Its final reviewer-round-3 entry records 11/11 gates and 793/793 at `6d71b711e5cafb38b9f1152efcb520b6c35472f4`, including tool-only runner tests; no GUI manual acceptance is claimed. | Use metadata preflight, workspace-output lease, isolated inventory builds and current lease recovery. Do not treat 793 as an SQL-only count or as a run performed for this plan. |
-| Remaining delivery | P5 interactive/P6 operational gates remain open; P7 is future and runtime-reactivation-gated. | This migration does not close, waive or silently absorb those gates. |
-| DAL | Catalog and receipt writes use RepoDb; read projections and security administration use Dapper; important inventory SQL already uses native SqlClient. | Consolidate deliberately; retain proven native locking/procedure paths rather than translate every SQL statement to LINQ. |
-| UoW | `SqlUnitOfWorkFactory.cs` owns an open IDbConnection; its nested UoW holds the optional current transaction and enforces completion/disposal states. Repository factories receive ISqlExecutionContext. | Borrow the current resources per operation, with non-owning LINQ wrappers and no transaction captured before BeginTransaction. |
-| Tests | Modular SQL owners exist. Foundation tests explicitly exercise RepoDb/Dapper sharing, mapping initialization and repository lifetime. | Preserve/replace assertions with a logical-case ledger; deleting library-specific test names is not permission to lose their invariants. |
-| Document drift | PRD/ARCHITECTURE still contain older dual-runtime text; ADR 0007/index and TEST_GATE_MATRIX contain stale SEC status; plan index still calls PR #35 under review. | Use AGENTS, actual declarations, merge SHA and latest evidence sections for status. Fix relevant current guidance at cutover; preserve historical evidence. |
+| Runtime | Product/SQL/Desktop actively target net48. Runner and runner tests execute on tool-only net8.0; shared SqlTestHarness is netstandard2.0. AppCore and historical modern product cases are parked. | Preserve declarations, packaging boundaries and PARKED / NOT RUN identities. |
+| Security | The permission rebuild is implemented: code-defined catalog, protected configured/database-bound superuser, explicit assignments, current-subject checks and allowlisted procedures. | Reuse current behavior; no new security reset, synchronization or auto-grants. |
+| Test infrastructure | Modular SQL owners, guarded runners, metadata preflight, source/discovery/TRX checks, ownership journals and workspace/resource leases exist. Fixture reuse is still proposed at this documentation base. | RESP establishes the accepted harness first. Preserve its supported executable checks during L2DB. |
+| DAL | Catalog/receipt RepoDb operations, Dapper queries/security consumers and native SqlClient SQL remain active. | Replace inventoried consumers while preserving native locking/procedure semantics where justified. |
+| UoW | SqlUnitOfWorkFactory owns an open connection and guarded current optional transaction; repository factories receive ISqlExecutionContext. | Borrow current resources per operation without taking ownership or caching a pre-begin transaction. |
+| Delivery backlog | Remaining P5 interactive/P6 operational acceptance, HTTP v2/P7, modern product runtime and unrelated runner redesign are deferred. | These are not active prerequisites, completed gates or waived obligations. Re-plan them separately when requested. |
 
-Read `AGENTS.md`, the ordered [plan index](README.md), ADR 0009, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`, `docs/PERSISTENCE.md`, ADRs 0002/0003/0004/0005/0007/0008, `docs/SEC_REBUILD_VERIFICATION.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md` and `docs/TEST_GATE_MATRIX.md` before implementation.
+Read AGENTS, this plan and [RESP](20261018-002-respawn-fixture-reuse.md), [ADR 0009](../adr/0009-linq2db-local-net48-persistence.md), current PRD/ARCHITECTURE/TECH_STACK/PERSISTENCE/SECURITY/CONTRACTS, [TEST_POLICY](../TEST_POLICY.md) and the accepted ownership/security/runtime ADRs. [TEST_STRATEGY](../TEST_STRATEGY.md) is a coverage reference. [HISTORY](../HISTORY.md) records completed/superseded work; it is not an execution queue.
 
-This is a source/document assessment, not a fresh build, dependency restore, benchmark or SQL/GUI acceptance. Earlier SQLPERF numbers and NET8-PAUSE's waived duration comparison cannot establish a LINQ-to-DB speedup.
+This is a documentation/source assessment, not fresh restore/build/SQL/GUI/benchmark acceptance. Historical pass counts, SQL timing and a waived duration comparison are not candidate evidence or proof of a LINQ-to-DB speedup. Existing old PlanId records in executable manifests remain transition tooling data; this docs refresh neither executes them nor changes tooling.
 
-### Execution order and authority
-
-Prerequisites already merged: NET8-PAUSE -> TESTGATE modular projects -> SEC-REBUILD -> PR #35 stabilization P0/P1. Their historical acceptance is context, not work to redo. STAB-T03/T04 manifest-v2 follow-ups remain separate; they are not a prerequisite for this v1-compatible migration.
-
-The new owner request schedules the reviewed L2DB work before final remaining P5/P6 acceptance, so those later checks exercise the resulting stack. No P5/P6 completion is implied. P7 stays future. T00 must re-resolve any newer implementation base and reconcile drift before code changes; never reset/stash/overwrite the owner's local workspace or claim uncommitted work was assessed.
-
-ADR 0009 overrides only the prior fixed DAL-library choice for this scope. All other current constraints remain. This planning change touches documentation only, not source, packages, migrations, test manifests, evidence or CI.
+ADR 0009 replaces only the fixed DAL-library choice for this scope. Keep Local v1, active net48, UoW ownership, DbUp/data safety, current security and observable business behavior. T00 re-resolves the actual post-RESP implementation HEAD and reconciles drift without discarding local work. The final L2DB milestone hands remaining delivery work back to deferred backlog, without scheduling or waiving it.
 
 ## 2. Global constraints
 
@@ -45,7 +40,8 @@ ADR 0009 overrides only the prior fixed DAL-library choice for this scope. All o
 - Preserve post-SEC-REBUILD authorization, maintenance/runtime separation, legacy password columns, import limits/revision/digest rules and atomic audit. Do not broaden SQL grants to accommodate an ORM.
 - Preserve the supported current schema, DbUp scripts/history and data. This plan does not authorize schema changes, reset, seed, destructive migration or replay of the pre-rebuild permission baseline.
 - Pin and verify `linq2db` 6.3.0 as an initial compatibility candidate; keep other package pins unless a reviewed compatibility blocker requires a separate decision. Do not claim the candidate is newest or already restored. Track all affected lock files, native dependencies and net48 binding redirects.
-- Keep current SQL isolation/serialization and TESTGATE v1. No Respawn, reuse/snapshot reset, parallelism change, container requirement, fingerprint-v2 rollout or CI expansion.
+- Require accepted RESP net48 evidence before T00. Freeze its fixture ownership boundaries, reset semantics, fresh-database exceptions, serialization and runner protocol during L2DB. Keep executable approval/manifest/identity/lease/watchdog checks; no additional reuse/reset redesign, runner fingerprint-v2 rollout, container requirement or CI expansion.
+- Follow [TEST_POLICY](../TEST_POLICY.md): focused affected tests per task, complete SQL coverage for shared UoW/harness/migration changes and the T07 milestone, and GUI only for changed UI behavior or this plan's packaged smoke. No automatic full repository/GUI gate for each code PR and no mandatory multi-pass benchmark.
 - Retain independent SQL test oracles and historical logical-case metadata. Do not bless changed fingerprints automatically or reduce floors/counts to make a gate pass.
 - Use UTF-8 Markdown, Git-normalized LF blobs and repository CRLF working-tree policy. Preserve existing C# BOM policy, vendor/submodule pins and secrets redaction.
 
@@ -98,14 +94,15 @@ Use native parameterized SqlClient where necessary to preserve existing multi-re
 ### L2DB-T00 — Bind the current workspace, evidence and executable gates
 
 **Files:** this plan; `tests/test-gates.v1.json`; new `docs/L2DB_VERIFICATION.md`, `docs/L2DB_CASE_MIGRATION.md`; relevant plan/status guidance only.
-**Consumes:** pinned assessment, ADR 0009, actual current declarations and PR #35 tooling.
+**Consumes:** accepted RESP net48 fixture baseline on current RepoDb/Dapper, ADR 0009, actual current declarations and supported guarded tooling.
 **Produces:** reviewed source/package/native-SQL inventory, logical-case ledger and executable Task/Final bindings.
 
-- [ ] Record actual implementation HEAD, clean/dirty state, submodule SHAs, active product/test/tool targets and changes since the assessment. Resolve conflicts without discarding local work; verify prerequisite evidence at its recorded revisions.
+- [ ] Verify the preceding RESP final milestone is accepted on net48 with the current RepoDb/Dapper product. Record its exact commit, fixture/reset/fresh-database boundaries, case identities and cleanup results. Missing or failed RESP evidence blocks T00; a documentation merge is not acceptance.
+- [ ] Record actual post-RESP implementation HEAD, clean/dirty state, submodule SHAs, active product/test/tool targets and changes since the refresh base. Resolve conflicts without discarding local work; freeze the accepted harness/runner behavior for DAL attribution.
 - [ ] Inventory every RepoDb/Dapper usage in `src`, `tests`, deployment and active csproj/lock graphs. Classify production, test oracle, pilot, parked/history and unused central pin; identify the owning conversion task. Record immutable production SQL script/grant hashes and supported schema/journal baseline.
 - [ ] Record affected baseline assertions with durable logical IDs, owner, TFM, classification and theory-row identities. Classify retain/replace with explicit replacement assertions; never delete safety behavior merely because its name mentions an old library.
 - [ ] Add the T00 gate selecting existing runner manifest/identity contract tests and define the new T07 Final using all current owners. Add later Task selectors only with their actual test methods in the corresponding task; planned empty selections are NOT RUN, not passing gates. Preserve parked history/exemptions and independent review.
-- [ ] Run the T00 commands in section 7, inspect exit/source/discovery/TRX and record results. Baseline metadata preflight is allowed; do not rerun the old unfiltered SEC-REBUILD envelope merely to establish this mapping.
+- [ ] Run the T00 commands in section 7, inspect exit/source/discovery/TRX and record results. Metadata preflight is allowed; do not rerun historical full-suite acceptance merely to establish this mapping.
 - [ ] Commit the reviewed binding and inventory. **Exit:** commands/owners resolve and evidence is explicit; missing prerequisites/resources block the dependent gate, not permission to guess.
 
 ### L2DB-T01 — Prove net48 package compatibility and resource ownership
@@ -128,9 +125,9 @@ Use native parameterized SqlClient where necessary to preserve existing multi-re
 **Produces:** a GO / NO-GO pilot record, not a silent production provider switch.
 
 - [ ] Write Product parity tests for CRUD/identity, audit allowlists, active-only lookups, literal `%`, `_`, `[`, Vietnamese text, null/blank search, stable ordering, not-found behavior and duplicate-code errors. Compare results against independent native-SQL assertions; capture current count/page round trips and long-offset semantics.
-- [ ] Write a receipt pilot combining LINQ writes with native SQL in one existing UoW, asserting same-session uncommitted visibility, returned IDs/rowversion, commit and injected mid-operation rollback of header/lines/ledger/balances. Use existing approved fixture ownership, not fixture reuse.
+- [ ] Write a receipt pilot combining LINQ writes with native SQL in one existing UoW, asserting same-session uncommitted visibility, returned IDs/rowversion, commit and injected mid-operation rollback of header/lines/ledger/balances. Use the accepted RESP fixture contract and preserve its fresh-database exceptions. Reset eligible fixtures between old/candidate executions; never compare against data left by the preceding provider run.
 - [ ] Write a security pilot that invokes an existing allowed procedure using the candidate adapter under a real runtime principal, exercises result sets/error translation and outer transaction rollback, and proves denied generic RBAC/binding writes remain denied.
-- [ ] Run focused L2 against deterministic disposable fixtures using the old and candidate code separately. Never shadow-write a real operation through both providers. Record SQL shape, commands/round trips, parameter types, dependency footprint and implementation complexity; timings are observations, not a suite-speedup claim.
+- [ ] Run focused L2 against deterministic, explicitly owned disposable fixtures using the old and candidate code separately under the frozen RESP harness. Never shadow-write a real operation through both providers. Record SQL shape, commands/round trips, parameter types, dependency footprint and implementation complexity; timings are observations, not a suite-speedup claim.
 - [ ] Record GO only if all three slices preserve behavior/ownership/security, package startup works and there is no unexplained round-trip or materialization regression. Resolve any query batching/offset gap using an explicitly justified native path before GO. A blocker yields NO-GO and stops T03–T06; amend the design rather than silently changing package/runtime/security scope.
 - [ ] Commit the pilot result and temporary-code removal obligation. **Exit:** documented, reviewable rollout decision with no new production provider flag.
 
@@ -152,7 +149,7 @@ Use native parameterized SqlClient where necessary to preserve existing multi-re
 
 - [ ] Write/retain failures for draft insert/edit with returned identity and fresh rowversion, stale-version rejection, duplicate products, decimal boundaries and sequence behavior. Check SQL-generated/audit fields are never overwritten by broad updates.
 - [ ] Replace RepoDb inserts/loads and Dapper projections only. Keep receipt header -> Warehouse -> Employee -> sorted Products -> sorted balances lock order, conditional Draft/rowversion update, ledger source uniqueness, atomic delta SQL and SERIALIZABLE reconciliation semantics. Do not introduce MERGE or C# read-modify-write balances.
-- [ ] Retain native multi-result/window/reconciliation SQL where needed; replace only its execution/mapping layer when justified. Preserve chronological stock-card tie-breakers, starting/running balances, filters and paging.
+- [ ] Retain native multi-result/window/reconciliation SQL where needed; replace only its execution/mapping layer when justified. Preserve stock-card movement rows, chronological `PostedAtUtc, LedgerId` ordering, quantity changes, UTC timestamps, filters and paging. Current `StockCardRow` has no starting/running balance contract; adding one is outside this migration.
 - [ ] Run duplicate/concurrent posting, concurrent catalog deactivation, missing-balance races, injected ledger/audit failure, cancellation and reconciliation-during-posting cases using separate sessions inside deliberately isolated tests. Do not confuse these with runner-level parallelism.
 - [ ] If T00 discovers a genuinely used bulk consumer, bind it to the same UoW and test constraint/identity/error/rollback semantics before conversion; otherwise keep row-wise inserts and add no speculative bulk feature.
 - [ ] Run T04 L2 and commit. **Exit:** identical receipt/status/ledger/balance outcomes and no remaining production Inventory RepoDb/Dapper calls.
@@ -178,22 +175,23 @@ Use native parameterized SqlClient where necessary to preserve existing multi-re
 - [ ] Replace library-specific test probes with LINQ plus independent native-SqlClient assertions, retaining all transaction/resolver/lifetime/failure guarantees. Map renamed/replaced logical cases and theory rows explicitly; parked history remains historical, not deleted coverage.
 - [ ] Remove obsolete RepoDb/Dapper package references from active code/test graphs and unused central pins, regenerate affected locks deliberately and verify locked restore. Audit parked AppCore/reactivation references without reactivating or falsely testing them; document required future lock refreshes.
 - [ ] Add boundary/dependency checks for provider leakage, zero active RepoDb/Dapper references, explicit registration, no IQueryable exposure and no newly introduced SQL grants/schema edits. Preserve native independent test setup rather than routing assertions through the new DAL.
-- [ ] Update current AGENTS/TECH_STACK/PERSISTENCE/ARCHITECTURE/PRD/DEVELOPMENT_PLAN and affected configuration/testing/release guidance to describe actual converted code and the active net48 profile. Correct stale SEC/PR #35 status by citing latest evidence, not rewriting past reports.
-- [ ] Review all selected fingerprint changes during L2 and reconcile **all** active owner/project/TFM/theory identities after code freeze. Never auto-approve digests or use the old 775/793 count as the required total. Run T06 L2 and metadata-only Final preflight; commit the frozen candidate.
+- [ ] Update current AGENTS/TECH_STACK/PERSISTENCE/ARCHITECTURE/PRD/DEVELOPMENT_PLAN and affected configuration/testing/release guidance only where code is now converted. Distinguish delivered LINQ/native persistence from proposed/unfinished work, preserve active net48 and keep historical evidence attached to the provider/revision that produced it.
+- [ ] Review all selected fingerprint changes during L2 and reconcile **all** active owner/project/TFM/theory identities after code freeze. Never auto-approve digests or use a historical count as the required total. Run T06 L2 and metadata-only Final preflight; commit the frozen candidate.
 - [ ] **Exit:** no production or active test old-ORM dependency, no unexplained lost assertion, no schema/grant drift; preflight succeeds without claiming SQL acceptance.
 
 ### L2DB-T07 — Frozen-revision acceptance, packaging and handoff
 
-**Files:** sanitized `docs/L2DB_VERIFICATION.md`, completed logical-case ledger and task/status checkboxes only after supporting evidence.
+**Files:** sanitized `docs/L2DB_VERIFICATION.md`, completed logical-case ledger and task/status checkboxes only after supporting evidence. This is a planned L2DB milestone, not an automatic final gate at every code-PR boundary.
 **Consumes:** frozen T06 commit, reviewed complete manifest, approved Windows/SQL environment.
-**Produces:** strict acceptance tied to an exact commit plus explicit remaining P5/P6 handoff.
+**Produces:** plan-specific final acceptance tied to an exact commit, packaged Local smoke and an accurate deferred-backlog handoff.
 
 - [ ] Build/restore locked dependencies for the exact mandatory project/TFM matrix and run metadata-only preflight. Confirm clean commit, short local artifact paths and approved resources. Preflight is not SQL/GUI execution.
 - [ ] Run one planned manifest-owned Final across the complete active matrix in section 6. Preserve strict unfiltered sequential SQL passes, source/discovery/TRX reconciliation, zero mandatory skips, workspace/global leases, path safeguards, watchdog and positive owned-database cleanup.
-- [ ] Run guarded net48 GUI D2 and existing release packaging command against that same revision. Exercise the packaged Local host: login, Product CRUD/lookup refresh, receipt draft/post/inquiry, permission deny, explicit assignment import and logout/relogin; run maintenance with separate authority. Verify native SqlClient assets/binding redirects and unchanged schema/history/assignments.
+- [ ] Run the existing net48 release packaging command against that same revision and perform this plan's packaged Local smoke: login, Product CRUD/lookup refresh, receipt draft/post/inquiry, permission deny, explicit assignment import and logout/relogin; run any maintenance smoke with separate authority. Verify native SqlClient assets/binding redirects and unchanged schema/history/assignments. Record manual observations independently of automated test totals.
+- [ ] Evaluate whether changed UI behavior or a packaged-smoke regression requires automated GUI D2. If applicable, use the existing guarded net48 wrapper and record the reason/result. Otherwise record D2 as NOT RUN with its scope rationale; it is not a default full GUI requirement for DAL-only task commits.
 - [ ] If a code/package/manifest fix follows a failed or green gate, repair with focused L2 then rerun the affected complete required final gate. Do not reuse stale acceptance to force a single execution.
 - [ ] Publish only sanitized aggregates with exact revisions/commands, pass/fail/skip/not-run counts, ownership/watchdog outcomes and unexecuted/manual gates. Keep raw TRX, journals, fingerprints, connection and approval data local.
-- [ ] Record operational rollback to the compatible post-SEC-REBUILD binary, mark only proven tasks complete and hand off to [remaining P5/P6](20261016-004-remaining-p5-acceptance-and-p6-hardening.md). **Exit:** correctness/package gates passed or explicit blockers; no claim of P5/P6 completion or measured performance improvement.
+- [ ] Record operational rollback to the compatible post-security-rebuild binary and mark only evidence-supported tasks complete. Record remaining P5/P6/HTTP/runtime work in [deferred backlog](../DEFERRED_WORK.md), without activating or waiving it. **Exit:** required correctness/package/smoke gates passed or explicit blockers; no claim of deferred delivery completion or measured performance improvement.
 
 ## 6. Per-task L2 gate matrix and final owners
 
@@ -219,17 +217,17 @@ Exact aliases below refer to current existing projects. All are `net48` except R
 | Task | Affected module/dependencies and non-SQL selector | Guarded SQL L2 | Adversarial obligations / command |
 |---|---|---|---|
 | T00 | R `TestGateManifestTests`, `LogicalCaseIdentityTests`, `TestGateRepositoryContractTests` | None; optional metadata-only SQL preflight | Source/ownership/TFM/exemption audit; `Task(T00)` once bound; bootstrap command below. |
-| T01 | X `LinqToDbBoundaryTests`; non-SQL mapping/cleanup cases in F; host/migrator builds | F/FastSQL | Borrowed ownership, late transaction, cancellation, bad provider, mapping failure; `Task(T01)` + `Sql(F,FastSQL)`. |
+| T01 | X `LinqToDbBoundaryTests`; non-SQL mapping/cleanup cases in F; host/migrator builds | F/FastSQL; complete active SQL checkpoint if shared UoW/connection/mapping behavior changes | Borrowed ownership, late transaction, cancellation, bad provider, mapping failure; `Task(T01)` + focused SQL, then the applicable shared-change checkpoint. |
 | T02 | X boundary cases; pure parity-fixture/DTO checks only where actually added | F/FastSQL; C/FastSQL; I/FastSQL; S/SecurityProvisioning | Three pilots, independent SQL oracle, injected rollback/denied generic writes; `Task(T02)` if nonempty plus listed Sql calls. |
 | T03 | A Catalog handlers/validators and D affected lookup ViewModels, exact reviewed methods | C/FastSQL; I/FastSQL for changed Catalog/reference cross-dependency | Four catalogs, employee linkage, search/field allowlists, mixed-phase transaction; `Task(T03)` + listed Sql calls. |
 | T04 | A receipt/posting/inquiry handlers/validators, exact reviewed methods | I/FastSQL; I/SqlConcurrency; C/FastSQL | Duplicate/concurrent posting, locked references, decimals/rowversions and reconciliation; `Task(T04)` + listed Sql calls. |
 | T05 | A `SuperuserAuthorizationTests`, `PermissionAuthorizationTests` and import tests; D current expiry/relogin cases; S/M pure config/maintenance tests | S/SecurityProvisioning; S/SqlConcurrency; M/MigrationSchema; O/SecurityProvisioning for current Local login cases | Real principal, stale actor/preview, protected account, procedure mapping/audit; `Task(T05)` + listed Sql calls; the current Local session case explicitly uses SecurityProvisioning; recheck if moved. |
-| T06 | X boundary/dependency checks; R repository/manifest contracts; F non-SQL lifetime/cleanup/init checks | F/FastSQL plus categories actually affected by final consumer removal | Package cleanup, test-ledger bijection, no schema/grant drift; `Task(T06)` + applicable Sql calls + Final preflight. |
-| T07 | All required non-SQL project owners | **Unfiltered F,C,I,S,M,O**, active net48 | `Final(T07)` across A,X,H,D,R and six SQL owners; separately guarded W GUI D2/package/manual checks. |
+| T06 | X boundary/dependency checks; R repository/manifest contracts; F non-SQL lifetime/cleanup/init checks | F/FastSQL plus affected categories; complete active SQL for shared ownership/mapping changes | Package cleanup, test-ledger bijection, no schema/grant drift; `Task(T06)` + applicable SQL/shared-change checkpoint + Final preflight. |
+| T07 | All required non-SQL project owners | **Unfiltered F,C,I,S,M,O**, active net48 | `Final(T07)` across A,X,H,D,R and six SQL owners; required package/manual smoke; W guarded GUI D2 only when its documented applicability trigger is met. |
 
-T00 must replace any category/selector mismatch with a source-reviewed binding and record the reason before execution. Unsupported/empty selection blocks that gate; do not reclassify a test just to fit a command. SQL wrappers filter one category in one project, not arbitrary module+method combinations. During L1 choose smaller correct non-SQL selectors; SQL L1 remains guarded. Full suites are not task-boundary defaults.
+T00 must replace any category/selector mismatch with a source-reviewed binding and record the reason before execution. Unsupported/empty selection blocks that gate; do not reclassify a test just to fit a command. SQL wrappers filter one category in one project, not arbitrary module+method combinations. During L1 choose smaller correct non-SQL selectors; SQL L1 remains guarded. Full suites are not task-boundary or code-PR defaults. Shared UoW/connection/mapping/harness/migration changes require the broader affected SQL matrix before dependent rollout, including all six owners when the shared contract affects them. T07 remains the complete planned final milestone; focused runs or an earlier checkpoint do not replace it.
 
-**Budgets/resources for every row:** non-SQL Task gates use `commandTimeoutSeconds=300`, `overallTimeoutSeconds=900` initially; R repository-contract/inventory checks may use the existing reviewed 900/3600 budget. Final SQL gates retain the existing reviewed 1200/7200 limits and runner-enforced timeouts; focused SQL uses its current bounded defaults, with no invented timeout CLI switch. Longer timeouts require a documented reviewed reason, not disabling a watchdog. Use a fresh short local artifact root per run, the existing 240-character path checks, valid approval, matching non-production instance and positive cleanup. No manual deletion of leases/journals or broad pool clearing.
+**Budgets/resources for every row:** non-SQL Task gates use `commandTimeoutSeconds=300`, `overallTimeoutSeconds=900` initially; R repository-contract/inventory checks may use the existing reviewed 900/3600 budget. At this source baseline, all six SEC-REBUILD Final SQL entries use `commandTimeoutSeconds=7200` and `overallTimeoutSeconds=7200` in `tests/test-gates.v1.json`. L2DB-T00 must inherit the accepted RESP budgets, or explicitly review a narrower budget against its measured evidence; do not present a reduction as an already accepted limit. Preserve runner-enforced timeouts; focused SQL uses its current bounded defaults, with no invented timeout CLI switch. Longer timeouts require a documented reviewed reason, not disabling a watchdog. Use a fresh short local artifact root per run, the existing 240-character path checks, valid approval, matching non-production instance and positive cleanup. No manual deletion of leases/journals or broad pool clearing.
 
 ## 7. Runnable command templates and binding rules
 
@@ -238,8 +236,8 @@ Run from a short-path Windows checkout with pinned submodules initialized, .NET 
 ### Bootstrap T00 before the new manifest entries exist
 
 ```powershell
-dotnet restore MyDmsVn.sln --locked-mode
-if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed.' }
+dotnet restore tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj --locked-mode
+if ($LASTEXITCODE -ne 0) { throw 'Runner-test locked restore failed.' }
 dotnet test tests/tools/MyDmsVn.SqlTestRunner.Tests/MyDmsVn.SqlTestRunner.Tests.csproj `
   -c Release -f net8.0 --no-restore `
   --filter 'FullyQualifiedName~TestGateManifestTests|FullyQualifiedName~LogicalCaseIdentityTests'
@@ -258,7 +256,7 @@ $root = '.sqlperf/l2-' + [guid]::NewGuid().ToString('N').Substring(0,8)
 if ($LASTEXITCODE -ne 0) { throw 'L2DB Task gate incomplete.' }
 ```
 
-Use the table's exact task ID for each row after adding its real reviewed selectors. Task mode is not an SQL invocation and accepts no ad-hoc project/TFM/filter override. PR #35 permits unselected fingerprint drift in Task only while complete method ownership/classification/shape stays valid; selected methods still require review. T06/Final reconciles all fingerprints, including transitive changes from new dependencies.
+Use the table's exact task ID for each row after adding its real reviewed selectors. Task mode is not an SQL invocation and accepts no ad-hoc project/TFM/filter override. Current Task tooling permits unselected fingerprint drift only while complete method ownership/classification/shape stays valid; selected methods still require review. Recheck this contract against the accepted RESP tooling; documentation does not bypass enforced checks. T06/Final reconciles all fingerprints, including transitive changes from new dependencies.
 
 ### Guarded SQL L2 (example Foundation/FastSQL)
 
@@ -280,9 +278,26 @@ if ($LASTEXITCODE -ne 0) { throw 'Focused SQL gate incomplete.' }
 
 For each `Sql(owner,category)` row, substitute the exact project from section 6 and the listed category, rebuild that owner and use a new artifact root. These are real existing wrapper parameters. Always pass `-Frameworks @('net48')`: the lower-level focused wrapper still defaults to both historical SQL TFMs.
 
+### Complete SQL checkpoint for a shared persistence change
+
+After focused repairs are green and shared-change inputs are committed/reviewed, use the existing strict SQL wrapper sequentially for every affected SQL owner. When the shared UoW/connection/mapping contract affects the entire matrix, run F, C, I, S, M and O from section 6. For each owner, build the current net48 project and use a fresh artifact root; build the tool-only runner first as in the focused example.
+
+```powershell
+$project = 'tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj'
+dotnet build $project -c Release -f net48 --no-restore
+if ($LASTEXITCODE -ne 0) { throw 'SQL owner build failed.' }
+$root = '.sqlperf/shared-' + [guid]::NewGuid().ToString('N').Substring(0,8)
+& ./tests/tools/Invoke-SqlPrAcceptance.ps1 `
+  -RepositoryRoot (Get-Location).Path -TestProject $project -ArtifactRoot $root `
+  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE -Frameworks @('net48')
+if ($LASTEXITCODE -ne 0) { throw 'Shared-change SQL checkpoint incomplete.' }
+```
+
+Repeat this exact owner substitution for the reviewed matrix. The wrapper requires a clean committed checkout and an already built runner. Its name does not make it mandatory for every PR; invoke it for the scope triggers in TEST_POLICY and this plan. It performs one unfiltered `pr-acceptance` pass per selected SQL owner/TFM, not the separate multi-pass benchmark. Preserve its full evidence/approval/ownership checks. A runner incompatibility with accepted RESP behavior is a blocker to resolve explicitly, not permission to use bare `dotnet test` as equivalent evidence.
+
 ### Metadata preflight and frozen Final
 
-T00/T06 must bind the new `L2DB-T07` Final to the current complete matrix. Before that binding exists, do not invoke a nonexistent new gate. A baseline metadata-only check can use the existing SEC-REBUILD-T06 binding, clearly labeled as baseline preflight, never as new-plan acceptance.
+T00/T06 bind the new `L2DB-T07` Final to the current complete matrix. Before that binding exists, do not invoke a nonexistent new gate. A baseline metadata-only check may use the accepted RESP Final binding exactly as recorded in its evidence; label it baseline preflight, never new-plan acceptance. Existing old manifest records are transition tooling, not additional active plans.
 
 ```powershell
 $plan = '20261018-001-linq2db-net48-persistence-migration'
@@ -301,9 +316,21 @@ if ($LASTEXITCODE -ne 0) { throw 'Final acceptance incomplete.' }
 
 Preflight runs bounded source/fingerprint/discovery checks without SQL test execution or DDL and needs no SQL approval; it cannot produce SQL/GUI/cleanup acceptance. Final requires clean revision and SQL approval, runs the current isolated fixture build path and preserves workspace/global leases. Exit 0 is accepted only with complete reconciled evidence; denied/incomplete/usage outcomes remain non-PASS.
 
-### Guarded net48 GUI and local package validation
+### Required local package smoke and conditional guarded net48 GUI
 
-Run after Final completes, not concurrently in the same checkout. The GUI wrapper pins net48 internally and requires the exact clean HEAD; its runner must already be built. Do not add a fictitious Frameworks parameter.
+Run package/smoke validation after Final, not concurrently in the same checkout. Packaging and the listed manual Local smoke are required by T07. Run the GUI D2 block only when the T07 applicability assessment requires it. The current wrapper runs its guarded GUI owner, pins net48 internally and requires exact clean HEAD plus an already built runner; it has no focused filter or Frameworks parameter.
+
+Required package command:
+
+```powershell
+[string] $revision = git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve package revision.' }
+$version = '0.0.0-l2db.' + $revision.Trim().Substring(0,8)
+$output = Join-Path (Get-Location).Path ('artifacts/release/' + $version)
+& ./deployment/release/Publish-LocalRelease.ps1 -Version $version -OutputRoot $output
+```
+
+This is a local validation package, not a production release/version assignment. Conditional automated GUI D2 command, when applicable to the reviewed scope:
 
 ```powershell
 [string] $revision = git rev-parse HEAD
@@ -314,14 +341,9 @@ $root = '.sqlperf/gui-' + [guid]::NewGuid().ToString('N').Substring(0,8)
   -TestProject 'tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj' `
   -ArtifactRoot $root -Revision $revision.Trim() -TimeoutSeconds 900
 if ($LASTEXITCODE -ne 0) { throw 'GUI D2 acceptance incomplete.' }
-
-# A local validation package, not a production release/version assignment.
-$version = '0.0.0-l2db.' + $revision.Trim().Substring(0,8)
-$output = Join-Path (Get-Location).Path ('artifacts/release/' + $version)
-& ./deployment/release/Publish-LocalRelease.ps1 -Version $version -OutputRoot $output
 ```
 
-Publish errors are terminating. Do not use SkipPublish for dependency validation or overwrite an existing release output. The current script emits separate net48/x86 Desktop and admin-migrator packages; verify their manifests, dependency/binding redirects and SqlClient native assets, then launch the packaged application on an approved environment. Packaging/GUI D2 alone does not prove the manual login/catalog/posting/security scenarios. Record those separately with artifact hashes, exact revision and outcomes. Do not run bootstrap/migration against an unapproved database as a package smoke check.
+Publish errors are terminating. Do not use SkipPublish for dependency validation or overwrite an existing release output. The current script emits separate net48/x86 Desktop and admin-migrator packages; verify their manifests, dependency/binding redirects and SqlClient native assets, then launch the packaged application on an approved environment. Packaging or automated GUI D2 alone does not prove the manual login/catalog/posting/security scenarios. Record those separately with artifact hashes, exact revision and outcomes. Do not run bootstrap/migration against an unapproved database as a package smoke check.
 
 ## 8. Evidence, success and rollback
 
@@ -329,6 +351,8 @@ L2DB_VERIFICATION must record per task: exact commit/worktree status, source/own
 
 The migration succeeds when application DAL conventions are consolidated, all invariant and packaging gates pass, current data/schema/grants remain intact, active net48 and parked history are preserved, and RepoDb/Dapper are absent from the active execution graph. No fixed percentage test-speed target is imposed and no historical baseline is relabeled as candidate evidence.
 
-If the pilot fails, stop rollout and leave production composition unchanged. If a later conversion fails, revert its scoped code/package/registration change on the unchanged supported schema. No database reset, old-security restoration or permanent dual-provider fallback is allowed. Separately mergeable implementation PRs each require their own final acceptance; the default plan is one staged code-bearing PR with focused task commits and a single planned final envelope.
+If the pilot fails, stop rollout and leave production composition unchanged. If a later conversion fails, revert its scoped code/package/registration change on the unchanged supported schema. No database reset, old-security restoration or permanent dual-provider fallback is allowed. Each implementation change records scope-appropriate evidence under TEST_POLICY. Splitting work into code PRs does not automatically add full repository or GUI runs; shared-change checkpoints and the planned T07 SQL/package/smoke milestone still apply. A later relevant change invalidates its affected prior evidence and requires rerunning that applicable gate after focused repair.
 
-**Planning verification:** source/docs and actual wrapper signatures were reviewed against the pinned SHA; no implementation package restore, build, SQL, GUI, benchmark or production mutation was performed. All T00–T07 checkboxes remain open. Review the plan before implementation.
+**Planning verification:** source/docs and existing wrapper signatures were reviewed at the refresh base. No package restore, build, SQL, GUI, benchmark, dependency/tooling change or production mutation was performed. All T00–T07 checkboxes remain open and require accepted RESP evidence before execution.
+
+**Candidate reference:** [official linq2db 6.3.0 package](https://www.nuget.org/packages/linq2db/6.3.0); [official ownership API](https://linq2db.github.io/api/linq2db/linq2db--LinqToDB.Data.ConnectionOptions.html). Published API/assets guide the pilot; they do not prove runtime compatibility or disposal correctness.

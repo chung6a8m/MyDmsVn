@@ -1,28 +1,23 @@
-# Reactivate .NET 8 product targets
+# Reactivate modern product targets — deferred procedure
 
-**Status:** required reviewed procedure; NET8-PAUSE PR #32 merged at `8e310778` without reactivating product .NET 8. Current `main` keeps .NET 8 product/GUI coverage `PARKED / NOT RUN`; reactivation has not been authorized or executed. This is not a one-line TFM toggle.
+**Status:** DEFERRED / NOT AUTHORIZED FOR EXECUTION by the current roadmap. The active product is net48. [ADR 0008](adr/0008-temporary-net8-target-pause.md) preserves modern source for a future coherent reactivation; RESP and L2DB do not reactivate it.
 
 ## Entry conditions
 
-- A product owner approves the release/runtime scope and confirms whether .NET 8 remains the intended P7/modern-desktop baseline or a separate framework plan supersedes it.
-- Start from an accepted, clean revision with the current active `net48` Final evidence, retained historical logical-case IDs/rows, and all required Windows/.NET Framework/.NET 8/SQL resources available.
-- Freeze the reactivation project matrix before editing. Do not infer product coverage from the tool-only `net8.0` runner.
+The owner first chooses the supported server/Desktop/runtime release scope, including whether .NET 8 remains appropriate at that future release date. Start from the accepted active-plan baseline and inventory the actual source, dependencies, tests, manifests and packages. Tool-only net8 execution is not product coverage.
 
-## Restore the graph atomically
+## Restore a coherent graph
 
-1. Restore `net8.0` to SharedKernel, Contracts, Domain, Application, Infrastructure, DbMigrator, Local adapter and applicable non-GUI tests; restore `net8.0-windows` to WinForms/Desktop tests.
-2. Re-add `src/MyDmsVn.Desktop.AppCore/MyDmsVn.Desktop.AppCore.csproj` to `MyDmsVn.sln`, repair its references, and restore the modern desktop release package. Keep the legacy `net48` desktop and administrator-only migrator packages.
-3. Regenerate lock files through a normal unlocked restore, review dependency differences, then prove `--locked-mode` restore. Do not remove the `net48` graph.
-4. Change the reviewed manifest profile's active SQL and GUI arrays only after every declared project supports the restored TFM. Preserve historical logical IDs, theory-row locators and fingerprints; inventory growth requires reviewed additions, while unexplained shrinkage blocks the change.
-5. Keep `-Frameworks` / `--frameworks` explicit. The approved order is `net48`, then `net8.0`; GUI uses `net48`, then `net8.0-windows`. Keep the global SQL and GUI leases and all approval/watchdog/ownership controls.
+1. Restore selected modern targets across SharedKernel, Contracts, Domain, Application, Infrastructure, DbMigrator, Local adapter and applicable tests, retaining net48 unless separately changed by the owner.
+2. Restore modern WinForms/Desktop targets and AppCore solution/composition/package entries only when included in the approved scope. Validate vendored UI references and native dependencies.
+3. Review lock-file/dependency changes and verify locked restore/build on all activated targets. Use the accepted post-L2DB provider and Respawn fixture contract; do not copy retired RepoDb/modern Respawn snippets blindly.
+4. Update actual active test project/TFM mappings, runner framework selections and fixture identities. Preserve historical parked case mappings without relabeling them as executed; account for new/moved/replaced Theory cases explicitly.
+5. Keep test databases separated across testhost processes/TFMs; resource leases and GUI serialization still apply. Reset/profile behavior must work in each activated host.
 
-## Progressive verification
+## Verification and release
 
-- Run focused unit/contract/build checks per changed project and framework. Include adapter parity, serialization/contracts, architecture boundaries, AppCore composition and release-manifest assertions.
-- Run the bounded GUI launcher independently for the complete `net48` Desktop inventory and the restored modern GUI inventory. Require STA/global serialization, expanded discovery-to-TRX bijection, zero skips, modal/unhandled/DataError capture and clean process-tree shutdown.
-- From one clean frozen revision, run the manifest-owned strict Final with one unfiltered sequential SQL pass on `net48` and `net8.0`, approved non-production SQL, source/discovery/TRX reconciliation, zero mandatory skips and owned-database cleanup.
-- Build/package every restored application project/TFM and inspect both desktop packages plus administrator migrator output. Run the plan-specific P7/HTTP or modern-host acceptance that motivated reactivation.
+Use [TEST_POLICY](TEST_POLICY.md) with a dedicated runtime-migration acceptance matrix: every activated project builds, all affected contracts/Application/SQL cases execute, each shipped GUI host has guarded and packaged evidence, and release manifests match runtime/schema/package contents. Execute legacy and modern SQL/GUI targets sequentially unless a separately verified resource policy permits concurrency.
 
-## Acceptance and rollback
+P7 also requires real HTTP/auth/adapter parity evidence. Missing targeting packs, dependency compatibility, SQL/GUI access, case identity, cleanup or package integrity remains BLOCKED. Until acceptance, do not advertise the modern host or API as supported.
 
-Record the exact revision, declared/active/historical matrix, commands, counts, package manifests and owner decision. Any missing targeting pack, SQL/GUI resource, stale inventory, failed restored TFM, cleanup ambiguity or package mismatch is `BLOCKED`, not a waiver. Until all restored gates pass, retain the pause release scope and do not advertise the modern host or P7 as supported. If reactivation is abandoned, revert the whole reviewed matrix/solution/package/manifest change together; never leave a partially restored graph.
+If reactivation fails, revert its coherent matrix/reference/solution/package/manifest changes together. Historical dual-target evidence cannot make a partial reactivation pass.

@@ -1,33 +1,20 @@
-# Architecture Decision Records (ADRs)
+# Architecture decision records
 
-Accepted decisions supersede conflicting example snippets in historical `project-idea.md`. An ADR should record context, decision, consequences and affected docs. Changes require user approval; do not silently revise decisions.
+Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. [Active work](../plans/README.md) consists only of RESP then L2DB; [TEST_POLICY](../TEST_POLICY.md) is the sole test-execution policy.
 
-| ADR | Decision | Status |
+| ADR | Decision | Current status |
 |---|---|---|
-| [0001](0001-local-and-remote-adapters.md) | Local v1 / HTTP v2 with shared desktop API seam | Accepted |
-| [0002](0002-explicit-unit-of-work.md) | Explicit rather than ambient UnitOfWork | Accepted |
-| [0003](0003-compatibility-and-legacy-passwords.md) | Original runtime/package compatibility and legacy PasswordSalt | Accepted; runtime scope refined by 0008, DAL direction by 0009; password compatibility remains binding |
-| [0004](0004-p5-ledger-and-posting.md) | P5 transactionally posted stock ledger and balances | Accepted / proposed schema details |
-| [0005](0005-test-isolation-and-bounded-parallelism.md) | Test resource isolation and bounded SQL parallelism; keep GUI-interacting Desktop tests serialized | Accepted |
-| [0006](0006-task-scoped-test-execution-and-module-projects.md) | Task-level selection, final acceptance boundaries, and module-scoped test project target | **Proposed** |
-| [0007](0007-code-defined-permissions-and-single-superuser.md) | Code-defined permissions, deliberate RBAC administration, single configured superuser (SEC-REBUILD) | **Implemented and accepted in PR #34**; latest evidence in [SEC-REBUILD verification](../SEC_REBUILD_VERIFICATION.md) supersedes stale status text |
-| [0008](0008-temporary-net8-target-pause.md) | Temporary net48-only application/test profile with retained net8 tool hosts and reversible restoration | **Accepted and merged as PR #32** |
-| [0009](0009-linq2db-local-net48-persistence.md) | LINQ to DB with explicit UoW/DbUp, Local v1, active net48 and unchanged post-rebuild security | **Owner-approved direction 1A + 2A + 3A; implementation design proposed / NOT IMPLEMENTED** |
+| [0001](0001-local-and-remote-adapters.md) | Local v1 and future HTTP v2 share contracts/handlers | Accepted; HTTP implementation deferred |
+| [0002](0002-explicit-unit-of-work.md) | Explicit connection/transaction ownership and UoW | Accepted; library-independent principle preserved by L2DB |
+| [0003](0003-compatibility-and-legacy-passwords.md) | Runtime/package history and legacy PasswordSalt | Password compatibility binding; runtime refined by 0008, DAL by 0009 |
+| [0004](0004-p5-ledger-and-posting.md) | Atomic idempotent posting, immutable ledger and derived balances | Accepted and implemented; preserve business semantics |
+| [0005](0005-test-isolation-and-bounded-parallelism.md) | Ownership/resource isolation | Accepted principle, fixture direction refined by 0010 |
+| [0006](0006-task-scoped-test-execution-and-module-projects.md) | Former gate policy and modular test extraction | Superseded policy; implemented module/tooling code remains |
+| [0007](0007-code-defined-permissions-and-single-superuser.md) | Code registry, explicit assignments and configured superuser | Implemented and accepted in PR #34 |
+| [0008](0008-temporary-net8-target-pause.md) | Active net48 product with parked modern targets | Implemented and accepted in PR #32 |
+| [0009](0009-linq2db-local-net48-persistence.md) | LINQ to DB with Local v1, net48, DbUp and explicit UoW | Owner-approved direction; NOT IMPLEMENTED; follows RESP |
+| [0010](0010-respawn-fixture-reuse-and-test-policy.md) | Respawn fixtures and rebuilt test policy | Owner-selected direction; fixture implementation pending; policy effective |
 
-ADR 0009 changes the approved DAL direction, not the delivered binaries. RepoDb/Dapper remain the current implementation until the reviewed migration tasks and acceptance gates complete. It does not reinstate net8 product targets, replace the permission evaluator or weaken SQL/test safeguards. Historical verification remains tied to its original commits.
+Historical approvals and measurements are indexed in [History](../HISTORY.md). Do not describe a documentation decision as delivered code, restore an obsolete policy from Git, or reopen a completed plan from its old task ID.
 
-## New ADR template
-
-```text
-# NNNN — Title
-Status: Proposed | Accepted | Superseded
-Date: YYYY-MM-DD
-Context:
-Decision:
-Alternatives considered:
-Consequences / tradeoffs:
-Required tests:
-Affected documents:
-```
-
-Do not mark a superseding ADR as accepted without clear approval.
+A new decision record should state date, owner decision/status, context, scope, consequences, verification and superseded documents. Record a real changed decision explicitly; routine implementation choices within an approved plan do not create a new approval gate.

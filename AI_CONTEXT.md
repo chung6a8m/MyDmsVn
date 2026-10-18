@@ -1,29 +1,36 @@
-# MyDmsVn — AI context
+# MyDmsVn — Current context for Codex
 
-## Purpose
-A modular, desktop-first SME business application, with a future transition from direct in-process services to ASP.NET Core HTTP APIs. Language for human-facing project discussions: Vietnamese. C# identifiers and core code documentation: English.
+**Branch:** `v1a` · **Context reset:** 2026-10-18 · **Source assessed:** `c7ad32a4b0040f87417973eabd6c12757c54f7d5`.
 
-## Current state
-**As of 2026-10-16:** P0/P1/P2/P3/P3.1/P4 implementation and automated verification are complete. P4.1 production Login/session is **accepted complete by the product owner** based on automated L3 and attended packaged UI, with the unfinished full idle-expiry/relogin observation explicitly recorded as a **P4.1-only evidence exception**, not a passed manual test. P5 Sales & Inventory functionality and automated gates exist (catalogs, Goods Receipt Draft/Post, ledger/balances/stock card), but **P5.1/P5.4 interactive UI acceptance remains open**; P6 operational/release G1–G5 gates remain open. SQLPERF-T01–T06 and TESTGATE-T01–T03 are verified complete; T01–T03's plan stays active for Codex context. The **next implementation work is NET8-PAUSE**, then modular test projects (T04/T05), SEC-REBUILD, remaining P5/P6 acceptance, and P7. This file is a quick orientation; the canonical status/order is [the active plans index](docs/plans/README.md) and [Development Plan](docs/DEVELOPMENT_PLAN.md). Do **not** restart P1 or assume future plans are implemented.
+## Goal and next work
 
-## Non-negotiable choices
-- **Current checked-in baseline** still declares `net48` and `net8.0` (`net8.0-windows` for modern WinForms); developer uses Visual Studio 2022. The [reversible NET8-PAUSE plan](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) is **proposed, not implemented**. `main` and unrelated PRs require the current dual-TFM gates until the dedicated implementation merges. **Only the T01-authorized NET8-PAUSE candidate code PR** may run its fully guarded Stage B active-`net48` Final after actual target/runner changes; historical net8 is `PARKED / NOT RUN`, not PASS. Tool-only `net8.0` may remain necessary for the SQL runner; restore application net8 before P7 unless explicitly redesigned.
-- Clean Architecture, feature-oriented modular monolith; MediatR + FluentValidation + ErrorOr.
-- Explicit UoW; RepoDb 1.16.0, SqlServer 1.16.1, BulkOperations 1.16.2; Dapper; DbUp.
-- Preserve `Users.PasswordSalt` during legacy migration.
-- WinForms + MVVM Toolkit + Bootstrap5WinFormUI + BootstrapSourceGrid.
-- Local adapter v1 / HTTP adapter v2; HTTP transport is postponed but contracts are designed now.
+Build a Windows desktop-first SME modular monolith. Local v1 is the current product architecture; HTTP v2 is deferred. Discussions with the owner are Vietnamese.
 
-## P5 scope
-`Products`, `Warehouses`, `Employees`, `Customers`, `GoodsReceipts` + `GoodsReceiptLines`, `StockLedger` and `StockBalances`. Core scenario: create draft receipt → post once atomically → ledger and current balances update → stock card reports. Customers remain standalone until sales orders are in a later phase.
+Exactly two plans are active:
 
-## Mandatory invariants
-- Domain/Application cannot depend on UI or SQL implementation.
-- Explicit UoW owns single connection/transaction; never leak connection, repository or ErrorOr over transport.
-- Posting must be all-or-nothing, idempotent against retries/concurrency, and immutable afterward.
-- No write API for balance/ledger; only posting creates inventory movements.
-- **Current implemented authorization (before SEC-REBUILD):** UserPermission overrides RolePermission and unknown keys deny. [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md) is a future **breaking proposed replacement**, not the current runtime; it introduces code-owned permission definitions and a single configured superuser with carefully scoped bypass.
-- Legacy hash migration is algorithm-aware, tested with fixtures, never guessed.
+1. [RESP — reusable SQL fixtures with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md): next work, not implemented.
+2. [L2DB — persistence migration to LINQ to DB](docs/plans/20261018-001-linq2db-net48-persistence-migration.md): starts after RESP acceptance, not implemented.
 
-## Navigation
-Read [AGENTS.md](AGENTS.md) first, then the [Development Plan](docs/DEVELOPMENT_PLAN.md) and the [six ordered active plans](docs/plans/README.md); [archived plans](docs/plans/archive/README.md) are historical, not new Codex tasks. The [first active TESTGATE plan](docs/plans/20261016-001-task-gates-and-modular-tests.md) stays as verified context; implement NET8-PAUSE next, not P1. See [README.md](README.md) for the documentation index.
+The file numbering is chronological; execution order is defined by [the active index](docs/plans/README.md), not lexical filename sorting. Keep the accepted fixture/reset baseline fixed during the DAL migration so failures and timings can be attributed.
+
+## Actual baseline
+
+- Application, SQL tests, Desktop and harness tests execute on `net48`. The shared harness is `netstandard2.0`; runner and runner tests alone execute on `net8.0`.
+- AppCore (`net8.0-windows`) and historical product .NET 8 cases are parked, outside the active release. Do not reactivate them for Respawn or LINQ to DB.
+- Production persistence still uses RepoDb/Dapper with explicit UoW and DbUp. LINQ to DB is an approved destination, not installed implementation.
+- SQL tests currently allocate fresh disposable databases; Respawn is not installed. The Respawn plan selects a net48-compatible package/API and validates it before migration.
+- Modular test projects, NET8-PAUSE and SEC-REBUILD are implemented. Do not redo those projects.
+- Permissions come from code-owned definitions, explicit user/role assignments and one configured database-bound superuser. Permission-sync and first-Administrator auto-grant flows are retired.
+- P5 catalogs, receipt Draft/Post and ledger/balance/card workflows exist. P5 interactive acceptance and P6 operational/release gates remain open and deferred.
+
+## Preserve
+
+Explicit connection/transaction ownership; Application authorization; unknown/deprecated-key denial; current superuser protection; legacy password compatibility; atomic and idempotent posting; immutable posted receipts/ledger; transport-neutral contracts; least-privilege runtime SQL and administrator-only migrations.
+
+[TEST_POLICY.md](docs/TEST_POLICY.md) is the new sole test-execution policy. Select focused tests by affected behavior; broaden for shared infrastructure and named acceptance milestones. Existing runners still enforce their checked-in manifests until RESP updates them. A new plan ID in Markdown does not create a runnable manifest task.
+
+## Known open issue
+
+The checked-in release script still emits schema support `8..8` while runtime `SchemaCompatibilityPolicy.CurrentScripts` includes `001–009`. [Deferred work](docs/DEFERRED_WORK.md) records this release-blocking discrepancy; this documentation reset does not fix the script.
+
+Read [AGENTS.md](AGENTS.md) first. [Documentation index](docs/README.md) links current references. [History](docs/HISTORY.md) is provenance only; historical totals and waivers do not prove either active plan has passed.

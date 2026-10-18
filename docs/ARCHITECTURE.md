@@ -1,124 +1,85 @@
 # Architecture — MyDmsVn
 
-Status: v1/v2 architecture baseline. Decision records: `docs/adr/`.
+**Status:** Current Local v1 architecture, refreshed against `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5` on 2026-10-18. Documentation changes do not implement either active plan.
 
-## 1. Design
+## 1. Current system and approved direction
 
-- **Modular monolith**, organized by feature areas (Identity, Catalog, Inventory) and Clean Architecture layers.
-- **v1 Local:** WinForms → `Desktop.Application` abstractions → LocalApiClient → Server.Application (MediatR) → Domain abstractions → Infrastructure → SQL Server.
-- **v2 Remote:** same WinForms/ViewModels and Desktop.Application → HttpApiClient → HTTP/JSON → ASP.NET Core 8 Server.Api → same Server.Application → Infrastructure → SQL Server.
+MyDmsVn is a Windows desktop modular monolith organized into Identity, Catalog and Inventory with Clean Architecture boundaries. The current product runs on `net48`: WinForms calls Desktop.Application API abstractions, the Local adapter dispatches in-process through Server.Application, and Infrastructure accesses SQL Server.
 
-v1 executes server logic inside the desktop process and therefore is a **2-tier deployment**, not an independent trusted application server. A malicious client or SQL credentials can bypass app checks; limit SQL privileges/deployment exposure. v2 creates a separately enforceable service boundary.
+The [two active plans](plans/README.md) execute in this order: [RESP fixture reuse](plans/20261018-002-respawn-fixture-reuse.md) establishes an accepted test baseline with the current RepoDb/Dapper DAL; [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) then replaces application persistence with LINQ to DB plus a bounded native SqlClient surface. DbUp remains the schema owner. Until verified cutover, RepoDb commands, Dapper projections/procedures and existing native SqlClient operations are the delivered implementation.
 
-```text
-WinForms Views + ViewModels
-        |
-Desktop.Application (IProductApiClient, IGoodsReceiptApiClient, ...)
-        |
-     Adapter
-     /     \
-LocalApiClient    HttpApiClient (v2)
-     |                  |
-     |              HTTP JSON
-     |                  |
-Server.Application   Server.Api (.NET 8)
-     |                  |
-     +------<-----------+
-     |
-Server.Domain + Repository/Query abstractions
-     |
-Server.Infrastructure (RepoDb / Dapper / SQL / DbUp integration)
-     |
-SQL Server
+HTTP v2 remains deferred backlog. Its design preserves the same ViewModels, feature API interfaces, DTOs and Application behavior, with an HTTP adapter and a separately trusted API host. It requires a separate runtime decision before implementation; neither active plan creates an HTTP host or restores a modern product target.
+
+```mermaid
+flowchart TD
+    UI["WinForms Views and ViewModels"] --> DA["Desktop.Application APIs"]
+    DA --> LOCAL["Local adapter"]
+    LOCAL --> APP["Server.Application"]
+    APP --> REPO["Business repository/query interfaces"]
+    REPO --> INFRA["Server.Infrastructure implementations"]
+    INFRA --> SQL["SQL Server"]
+    MIG["Controlled DbUp migrator"] --> SQL
 ```
+
+The diagram shows the current runtime call path; the host binds interfaces to implementations. Compile-time dependency rules are specified below. Local executes server logic inside the desktop process and is a two-tier deployment. Someone controlling the desktop process or runtime SQL credentials can bypass Application checks. Restricted SQL permissions reduce exposure, but a separately enforceable hostile-client boundary belongs to the deferred HTTP host. Keep maintenance credentials out of Desktop configuration.
 
 ## 2. Dependency rules
 
-Allowed dependency direction (compile-time):
-- Server.Domain: no dependency on Application, Infrastructure, HTTP, WinForms.
-- Server.Application → Domain, shared primitives as needed. May use Contracts for DTOs only when justified; avoid putting domain entities in Contracts.
-- Server.Infrastructure → Application and Domain interfaces.
-- Desktop.Application → Contracts (interface/API contract definitions).
-- Desktop.WinForms → Desktop.Application and Contracts; no direct SQL/Server.Infrastructure reference.
-- Local adapter composition → Desktop.Application, Server.Application, Server.Infrastructure. The composition root is a host, not a reusable UI assembly.
-- Server.Api → Server.Application and Infrastructure, and Contracts to format JSON.
-- HTTP adapter → Desktop.Application and Contracts only.
+| Component | Allowed dependencies and responsibility |
+|---|---|
+| Server.Domain | Shared primitives; no Application, Infrastructure, HTTP or WinForms dependency. |
+| Server.Application | Domain and justified Contracts DTOs; handlers, validation, authorization and inner repository/query interfaces. |
+| Server.Infrastructure | Application/Domain interfaces; SQL providers, explicit mappings, persistence, identity and operational adapters. |
+| Desktop.Application | Contracts; feature API interfaces and ViewModels. |
+| Desktop.WinForms | Desktop.Application and presentation controls; no direct SQL or Server.Infrastructure reference. |
+| Desktop.Infrastructure.Local | Desktop abstractions and Server.Application dispatch; Infrastructure is wired at the host composition root. |
+| Desktop.App | Current net48 host; composes UI, Local adapter, Application and SQL Infrastructure. |
+| Future HTTP components | The HTTP adapter depends on Desktop.Application/Contracts; the API host composes Application/Infrastructure. These components are deferred. |
 
-Prevent a single Desktop.Infrastructure assembly from pulling SQL and server assemblies into Remote Mode. Use `Desktop.Infrastructure.Local` / `Desktop.Infrastructure.Http` projects or strictly isolated assemblies.
+Public Contracts do not expose Domain entities, provider types, ADO.NET connections, transactions, MediatR requests, ErrorOr objects or UI classes. Application handlers do not return HTTP framework results. LINQ to DB types, mapping attributes and `IQueryable` must remain outside inner layers and public contracts when L2DB is implemented.
 
-Cross-layer constructs forbidden: UI classes in Contracts; ADO.NET connections in DTOs; MediatR IRequest/ErrorOr in public JSON; HTTP IResult in Application handlers.
+### Repository resolution and query ownership
 
+`IUnitOfWork.Repository<TRepository>()` is the established typed repository resolver. `IUnitOfWork`, its factory and business repository interfaces live in `Server.Application/Persistence` or the corresponding Application feature. Concrete repository factories and `ISqlExecutionContext` live in Infrastructure.
 
-### Repository resolution (command side)
+- Handlers resolve business repository interfaces from an explicitly owned UoW. They do not resolve concrete SQL repositories or arbitrary services.
+- Interface-to-implementation registration is explicit. Missing registrations fail clearly; arbitrary first-type assembly scanning is prohibited.
+- All participating repositories share the UoW-owned open connection and its current explicit transaction, including asynchronous operations.
+- Standalone read services return materialized DTOs and may own a separate connection. A read participating in a command transaction uses that command's connection and transaction.
+- Repository lifetime ends with the UoW. Preserve caller-scoped dependencies and the existing transaction/state protections; do not share a UoW across concurrent commands.
 
-`IUnitOfWork.Repository<TRepository>()` is an **allowed, UoW-scoped repository resolver**, not a general-purpose service locator. It is consistent with Clean Architecture **only when the dependency direction remains inward**:
+See [PERSISTENCE](PERSISTENCE.md) and [ADR 0002](adr/0002-explicit-unit-of-work.md). L2DB changes provider adapters while retaining this ownership model.
 
-- `IUnitOfWork`, `IUnitOfWorkFactory` and the business repository interfaces used by handlers (for example `IGoodsReceiptWriteRepository`) belong to `Server.Application` or another appropriate inner layer. Their concrete implementations, repository factories, and SQL execution context remain in `Server.Infrastructure`.
-- Command handlers may resolve **repository interfaces only** through an explicitly owned `IUnitOfWork`. Never request a concrete `Sql*Repository`, expose SQL/RepoDb/Dapper implementation details in Application or Domain, or turn `Repository<TRepository>()` into arbitrary `GetService<T>()` / `Resolve<T>()` dependency lookup.
-- All repositories resolved from one UoW use the **same UoW-owned connection** and, when a transaction is active, the **same explicit transaction** for every relevant database operation (including async operations). No repository may create an independent connection/transaction for work that belongs to that UoW.
-- Standalone CQRS reads use dedicated Application query-service interfaces (implemented with Dapper), without creating a UoW unnecessarily. Reads that must observe or participate in an active command transaction must share its connection and transaction through an explicit Infrastructure execution context.
-- Repository lookup inside a handler makes its repository dependencies less visible in the constructor. Keep those dependencies strongly typed, use explicit registrations, and cover missing registrations and cross-repository transaction behavior with tests. Do not replace the established UoW resolver solely for stylistic preference.
+## 3. Modules and request handling
 
-See `docs/PERSISTENCE.md` and accepted `docs/adr/0002-explicit-unit-of-work.md`. This rule **clarifies** the existing Explicit UoW decision; it does not change the transaction model.
+Identity owns account validation, code-defined permission evaluation and security administration. Catalog owns Products, Warehouses, Employees and Customers. Inventory owns goods receipt draft/posting, ledger and stock inquiries. Commands, queries, validators, handlers and DTO mapping remain near their feature. New sales, accounting or warehouse capabilities need a separately approved scope.
 
-## 3. Modules
+A request enters a Local adapter, receives an immutable request identity, passes through authentication/authorization and FluentValidation, and reaches an Application handler returning `ErrorOr<T>`. A transport-neutral mapper produces `ApiResponse<T>`. Preserve the current pipeline ordering, deterministic error mapping, field paths, cancellation and safe diagnostics. A future HTTP adapter must preserve the same behavior with meaningful HTTP statuses. See [CONTRACTS](CONTRACTS.md).
 
-Initial bounded modules:
-- **Identity:** users, roles, permissions, auth, employee-user linkage where required.
-- **Catalog:** products, warehouses, employees, customers.
-- **Inventory:** goods receipt, ledger, balance query.
+## 4. Transactions and inventory invariants
 
-Each feature keeps Command, Query, Validator, Handler and DTO mapping near each other. Avoid generic "service" layers that merely forward calls.
+Each explicit UoW owns one connection and at most one transaction. Participating database commands receive that transaction explicitly; ambient/static/AsyncLocal transactions and hidden fallback connections are prohibited. Preserve legal state transitions and cleanup on exceptions/cancellation.
 
-## 4. Request handling
+The goods receipt Post use case owns the transaction boundary. Receipt status/rowversion, ledger uniqueness and balance increments succeed or roll back together. Preserve deterministic locking, append-only ledger semantics, atomic increments and reconciliation's explicit `SERIALIZABLE` transaction. Provider replacement does not authorize a new posting algorithm. See [PERSISTENCE](PERSISTENCE.md), [DATA_MODEL](DATA_MODEL.md) and [ADR 0004](adr/0004-p5-ledger-and-posting.md).
 
-```text
-Client request DTO -> adapter -> Application Command/Query
-                  -> Authentication/Authorization
-                  -> FluentValidation pipeline
-                  -> Handler (ErrorOr<T>)
-                  -> transport-neutral result mapper (ApiResponse<T>)
-                  -> Local return OR HTTP status + JSON
-```
+## 5. Security
 
-Rules:
-- Domain/application never depend on ASP.NET Core.
-- FluentValidation, authorization and logging behaviors have stable pipeline ordering; do not assume generic exceptions are a business error.
-- For HTTP, map typed error codes to suitable HTTP statuses; Local Mode still uses the same `ApiResponse<T>` data/error envelope.
-- Share a common matrix of contracts and error fixtures for Local/HTTP parity tests.
+The current security model is implemented. Require a trusted authenticated active subject and a registered Active permission key before loading the current SQL account/binding snapshot; then require that account to remain active. A valid configured and database-bound superuser match bypasses ordinary grants; otherwise a direct-user Allow/Deny wins, followed by active-role grants, with default deny. Unknown/deprecated keys are denied for every account. Session expiry, current account validation and business validation still apply to the superuser.
 
-See `docs/CONTRACTS.md`.
+Code owns the immutable permission catalog; operators own assignments. Application upgrades do not synchronize permissions or auto-grant roles. The protected singleton binding is changed only through separate maintenance authority. Normal runtime SQL uses the allowlisted procedures and cannot perform generic restricted RBAC/binding writes. Retain legacy PasswordHash/PasswordSalt compatibility and atomic audit. See [SECURITY](SECURITY.md) and [ADR 0007](adr/0007-code-defined-permissions-and-single-superuser.md).
 
-## 5. Transaction ownership
+## 6. Desktop, runtime and startup
 
-Use **Explicit UnitOfWork (Option A)**. One instance owns one connection and optional transaction. It creates repositories and exposes a read-side query execution context as needed; all DB commands in the scope must receive the same transaction explicitly. Do not use static/AsyncLocal ambient transaction providers.
+The shared WinForms library and Desktop.App actively target `net48`. Desktop.AppCore still declares `net8.0-windows` in parked source and is excluded from the active solution/release. SQL runner and runner tests execute on tool-only `net8.0`; the shared SqlTestHarness library targets `netstandard2.0`. These tooling/library targets do not establish modern product coverage. See [TECH_STACK](TECH_STACK.md) and [PROJECT_STRUCTURE](PROJECT_STRUCTURE.md).
 
-The goods receipt Post command owns transaction boundaries; infrastructure implementation uses SQL constraints and locking to keep posting idempotent and balances correct. See `docs/PERSISTENCE.md`.
+Use thin WinForms views and CommunityToolkit.Mvvm ViewModels, asynchronous feature APIs, deterministic busy/error state and session-aware late-result guards. Desktop.WinForms references the pinned BootstrapSourceGrid project; check its actual source/API and target compatibility before changing presentation dependencies. Tests creating controls keep STA execution, deterministic disposal and serialized global UI interaction.
 
-## 6. Security
+Desktop.App configures Microsoft DI once. Local mode requires runtime database configuration and registers Application, SQL Infrastructure and Local dispatch. DbUp runs as a controlled migrator/deployment command, never automatically from client login. Startup validates supported schema and runtime authority without granting privileges or seeding data. A future Remote composition must exclude SQL credentials and server Infrastructure from its client dependency graph.
 
-UserPermission override precedence: if a direct record exists, its Granted value decides; else union of role permissions; missing/unknown permission = deny. Enforce in Application regardless of client mode, plus auth and input controls at the API host in v2. Keep PasswordSalt for imported legacy credentials. See `docs/SECURITY.md`.
+## 7. Validation and change control
 
-## 7. Client UI
+[Test policy](TEST_POLICY.md) owns execution scope. Use focused affected tests at task boundaries; broaden SQL coverage for shared harness/UoW/migration changes and at the RESP/L2DB final milestones. GUI execution is driven by changed UI behavior or a plan-specific packaged smoke. [TEST_STRATEGY](TEST_STRATEGY.md) describes required behavior coverage, not another execution queue.
 
-- Thin WinForms View plus bindable CommunityToolkit.Mvvm ViewModel.
-- One API interface per meaningful feature, async and CancellationToken-aware.
-- Shared shell, compact workspace, lookups, details editing with BootstrapSourceGrid, busy states, async form commands, error-to-field mapping.
-- Bootstrap5WinFormUI / BootstrapSourceGrid are optional source/project references depending on compatibility tests. Never silently substitute their APIs without checking actual versions.
-- Multi-target UI library `net48;net8.0-windows`; separate hosts for Windows target frameworks.
+Keep resource ownership, SQL approval, watchdogs, independent case evidence and owned cleanup. RESP may implement its reviewed fixture reuse design; L2DB consumes that accepted baseline and freezes fixture boundaries, reset behavior and runner protocol during DAL conversion. Historical acceptance is retained in [HISTORY](HISTORY.md), with unresolved delivery gates in deferred backlog rather than the active queue.
 
-## 8. Startup / composition
-
-Each desktop host configures DI once (separate composition roots). Local mode registers Server Application + SQL Infrastructure + Local adapter, and requires DB config. V2 Remote host registers HTTP adapter + token/session management and must **not** load SQL Server credentials / server infrastructure.
-
-DbUp runs through a controlled migrator/deployment step, not automatically from every desktop client login. DB schema version must be compatible with the deployed client/server.
-
-## 9. Cross-cutting
-
-Use correlation IDs, structured Serilog logging, UTC audit timestamps, cancellation, deterministic exceptions/failed results, careful connection disposal, and user-facing error localization at presentation layer rather than exposing SQL exceptions.
-
-Architecture validation: tests or dependency checks fail if Domain/Application reference Infrastructure/UI/HTTP libraries. SQL integration tests validate the most dangerous invariants.
-
-## 10. Architectural change process
-
-A change affecting target frameworks, transport contracts, permission precedence, transaction model, identity migration or ledger invariants requires a new ADR and updated relevant docs before implementation. `project-idea.md` remains historical input.
+Changes to runtime, transport contracts, authorization, transaction ownership, password migration or ledger semantics require an explicit decision and corresponding ADR. Both active plans preserve these architectural boundaries.

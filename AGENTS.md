@@ -1,96 +1,64 @@
-# Codex instructions — MyDmsVn
+# Codex instructions — MyDmsVn / v1a
 
-Applies to the entire repository. This file is authoritative for AI-assisted changes.
+Applies to the entire repository. Human-facing discussion is Vietnamese; identifiers and technical documentation are English unless an existing runbook uses Vietnamese.
 
-## Mission and status
+## Start here
 
-Develop MyDmsVn as a Windows desktop-first modular-monolith SME platform, starting with Sales & Inventory Foundation. **P0–P4 foundations and P5 implementation/automated gates exist; P5 authenticated interactive acceptance and P6 release gates remain open.** Consult `docs/DEVELOPMENT_PLAN.md` for the current evidence-based status. **P3.1 is historically verified; P4.1 is owner-accepted complete on 2026-10-16 (automated L3 + packaged manual UI evidence, with an explicit unobserved idle-expiry exception); remaining P5 GUI/P6 release gates are not waived**, despite historical P3/P4 completion. Implement in small, reviewable phase-scoped changes and do not claim later-phase capabilities exist.
+The owner reset the active roadmap on **2026-10-18**. There are exactly **two active implementation plans**, in this order:
 
-## Read-order and precedence
+1. [RESP — Integration-test fixture reuse with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md).
+2. [L2DB — LINQ to DB persistence migration on net48](docs/plans/20261018-001-linq2db-net48-persistence-migration.md).
 
-1. This `AGENTS.md`.
-2. `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/TECH_STACK.md`.
-3. `docs/DEVELOPMENT_PLAN.md`, [active plans](docs/plans/README.md) **in the recorded order**, and the specific active task; [archive](docs/plans/archive/README.md) is historical, not an execution queue.
-4. Applicable `docs/CONTRACTS.md`, `docs/PERSISTENCE.md`, `docs/SECURITY.md`, `docs/DATA_MODEL.md` and `docs/TEST_STRATEGY.md`.
-5. Accepted decisions in `docs/adr/`.
-6. `project-idea.md` is the raw idea; its examples may be incorrect and are **not implementation instructions**.
+Start at the first incomplete RESP task. L2DB starts after RESP acceptance, using the accepted fixture baseline. Neither plan has been implemented by this documentation reset. Completed TESTGATE, NET8-PAUSE and SEC-REBUILD work is context, not an execution queue. Pending P5/P6/P7 work is in [Deferred work](docs/DEFERRED_WORK.md), not a third active plan.
 
-If documents contradict each other, flag the issue in the change summary; do not silently substitute a different architecture. Explicit user decisions override prior plans.
+## Read order and authority
 
-## Fixed technical decisions
+1. This file and [AI_CONTEXT.md](AI_CONTEXT.md).
+2. [Active plans](docs/plans/README.md), the specific task, and [TEST_POLICY.md](docs/TEST_POLICY.md).
+3. Relevant contracts: [Architecture](docs/ARCHITECTURE.md), [Persistence](docs/PERSISTENCE.md), [Contracts](docs/CONTRACTS.md), [Security](docs/SECURITY.md), [Data model](docs/DATA_MODEL.md).
+4. [PRD](docs/PRD.md), [Tech stack](docs/TECH_STACK.md), and applicable [ADRs](docs/adr/README.md).
+5. [History](docs/HISTORY.md) only when a past decision or evidence is needed.
 
-- **NET8-PAUSE PR #32 is merged into `main`** at merge commit `8e310778`. The accepted `main` matrix actively targets `net48` for application, SQL and Desktop projects. Historical `net8.0` / `net8.0-windows` logical-case metadata remains `PARKED / NOT RUN`; `MyDmsVn.Desktop.AppCore` is parked outside the solution. The SQL runner and runner tests remain tool-only `net8.0` and do not count as application/SQL coverage. Branches created before the merge follow their checked-in matrix until updated through the reviewed reactivation procedure. See the [temporary .NET 8 pause plan](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md), ADR 0008 and [reactivation procedure](docs/REACTIVATE_NET8.md). No .NET 10 upgrade.
-- NET8-PAUSE T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`; the owner explicitly waived the comparable-duration measurement in `09d00bfa` because no matching dual-TFM baseline exists. No speedup is claimed. The waiver closes that comparison as a prerequisite; it does not represent a measured result.
-- RepoDb `1.16.0`; RepoDb.SqlServer `1.16.1`; RepoDb.SqlServer.BulkOperations `1.16.2`.
-- Explicit UnitOfWork only: scope owns a single open connection and optional transaction; repositories and Dapper queries within that scope share them explicitly. No ambient/static AsyncLocal transaction.
-- RepoDb for command-side storage, Dapper for query-side DTO projection; DbUp for versioned SQL migrations.
-- Server.Application / Domain must not know HTTP, WinForms or database implementation.
-- Desktop UI / ViewModels depend only on desktop abstractions and Contracts, never directly on Server.Infrastructure.
-- v1 Local uses in-process Application dispatch; v2 HTTP uses the **same DTO/API result semantics**.
-- Preserve legacy `PasswordHash` and `PasswordSalt` columns for migration; no new plaintext or reversible password storage.
-- Authorization is checked on server-side application use cases; UI gating alone is insufficient. Direct user decisions override active role grants; missing assignments default-deny.
-- Permission keys are code-defined, centrally composed and lifecycle-tested. Unknown and deprecated keys are denied. The approved [SEC-REBUILD plan](docs/plans/20261016-003-permission-system-rebuild.md) replaces catalog synchronization and Administrator auto-grants with one configured, database-bound superuser. Do not add permission-sync workflows, implicit grants, startup seeding or normal-path edits to the protected account. SEC-REBUILD T00–T06 is accepted in PR #34 (strict Final 775/775 at `0303a911` and packaged GUI D2 138/138); pending P5/P6 gates remain separate and open. The superseded provisioning design is retained only as [historical source](docs/plans/archive/20261013-001-initial-security-provisioning-permission-sync.md).
-- Do not add sales order, issue, returns, pricing, accounting or multi-warehouse receipt to P5 unless separately approved.
+Explicit owner decisions supersede older documents. The active-plan index owns work order; TEST_POLICY owns test execution; TEST_STRATEGY describes coverage; tests/README describes actual tools. Historical plans and old command examples in Git are not current instructions. Flag a real contradiction instead of silently changing architecture or claiming planned behavior already exists.
 
-## Coding conventions
+## Current implementation and approved destination
 
-- Follow the **existing** `.editorconfig` and `.gitattributes`: C#/Markdown CRLF; UTF-8 with BOM where specified; Node/web assets LF if introduced.
-- Prefer readable C# that compiles for **all current declared targets**, preserving restore-to-net8 compatibility when applicable. Do not use runtime APIs missing on `net48` simply because newer syntax parses.
-- Nullable annotations and target-specific code must be handled with explicit project settings. No suppressing warnings project-wide merely to get a green build.
-- Use Microsoft DI; register repository implementations explicitly (no arbitrary first-type assembly scanning).
-- Services return typed results. Keep cross-process DTOs independent from `ErrorOr`, MediatR, RepoDb and WinForms.
-- Centralize domain validation, authorization, logging and error mapping; avoid duplicated rules in forms.
-- SQL scripts are additive, repeatable in clean environments and never drop user data implicitly.
-- No secrets, real credentials or production connection strings in commits.
+| Area | Current v1a code | Approved direction |
+|---|---|---|
+| Runtime | Product, SQL tests, Desktop and harness tests execute on `net48` | Retain `net48`; no runtime upgrade in RESP/L2DB |
+| Tooling | SQL runner and runner tests execute on `net8.0`; shared SQL harness targets `netstandard2.0` | Tool targets do not count as product coverage |
+| Modern product | AppCore source / historical .NET 8 cases parked; AppCore outside solution/release | Reactivation is deferred and separately scoped |
+| Persistence | RepoDb commands, Dapper queries, explicit UoW, SQL Server, DbUp | LINQ to DB behind existing contracts after RESP acceptance |
+| SQL fixtures | Fresh owned database per existing helper invocation; serial guards present | Reuse migrated collection fixtures with Respawn for eligible tests; dedicated databases for lifecycle/schema exceptions |
+| Permissions | Code-defined registry, explicit assignments, one configured database-bound superuser | Preserve current implementation and invariants |
+
+## Architecture and business invariants
+
+- Local v1 dispatches Application in process; future HTTP uses the same transport-neutral DTO/result semantics.
+- Domain/Application do not depend on SQL-provider, HTTP or WinForms implementations. Desktop views/ViewModels depend on desktop abstractions and Contracts.
+- Explicit UoW owns one open connection and optional transaction. Scope-bound repositories and queries share them explicitly. No ambient/static/AsyncLocal transaction, implicit nested transaction, or hidden second connection for transactional work.
+- Repository resolution stays within the UoW scope and remains explicit; preserve the rule in PERSISTENCE and ARCHITECTURE.
+- Posting changes receipt, ledger and balances atomically; retries/concurrent requests cannot duplicate a movement. Posted receipts and the ledger remain immutable to business callers.
+- Preserve `PasswordHash` / `PasswordSalt` and algorithm-aware verification. Unknown/deprecated permissions deny before superuser evaluation; ordinary direct-user decisions override active-role grants. No permission synchronization, automatic grants, startup seeding or normal-path changes to the protected superuser.
+- Keep DbUp and administrator-only migration/maintenance operations. Production SQL scripts do not become test-reset scripts. Local desktop SQL access remains a documented trust limitation.
+- P5 contains catalogs, Goods Receipt Draft/Post, Stock Balance and Stock Card. New business modules and HTTP hosting remain deferred.
 
 ## Work protocol
 
-1. Inspect the repo and [ordered active roadmap](docs/plans/README.md); do the first unimplemented prerequisite in sequence. TESTGATE T01–T03 remains **verified context**, not a task to redo. Since NET8-PAUSE PR #32 merged, current `main` follows its accepted active `net48` application/SQL/Desktop matrix. Branches created before that merge follow their checked-in targets until updated through the reviewed reactivation procedure. The Stage B candidate-only exception is historical and must not be reused by later PRs.
-2. State the scope and affected layers before implementation; avoid changing unrelated modules.
-3. Make a minimal vertical change with automated tests.
-4. Build each **actually declared mandatory project × TFM** on Windows with its targeting packs. On current `main` that means active application/test `net48` plus verified tool-only runner `net8.0`; parked application/GUI TFMs are `NOT RUN`, never PASS. Branches created before the NET8-PAUSE merge follow their checked-in declarations.
-5. Run applicable tests. SQL Server integration tests must target an isolated disposable test database, **not production**.
-6. Summarize changed files, tests run and their actual results, remaining risks, and the next roadmap task. Only check off acceptance criteria supported by evidence.
-7. Update plan checkboxes/status when tasks are genuinely complete; record significant deviations in an ADR.
+1. State the active plan/task, affected behavior and smallest meaningful verification scope.
+2. Read the checked-in source and actual project targets before changing them. Use current task evidence, not old totals, to establish progress.
+3. Make small, reviewable changes; add tests for meaningful behavior or failure boundaries. Documentation-only changes need static documentation checks, not a product regression run.
+4. Follow [TEST_POLICY](docs/TEST_POLICY.md). Broaden tests for shared dependencies or an explicit milestone; do not run full SQL/GUI/repository suites after each edit or by default for every code PR.
+5. Preserve SQL instance approval, ownership, process watchdog and cleanup checks. Existing tools may still enforce legacy manifests; adapt those tools only in the owning RESP task, never bypass a failed check.
+6. Record commands, revision, scope, actual pass/fail/skip/not-run results and material limitations. Update checkboxes only when their evidence exists.
+7. Summarize what changed, why, verification and the next active task. P5/P6 release checks are still open; this roadmap reset grants no release acceptance.
 
-## Testing safeguards
+## Editing and resource rules
 
-- WinForms tests that create controls must run on an STA thread and close/dispose controls deterministically.
-- Ensure `Application.ThreadException`, `AppDomain.UnhandledException` and `DataGridView.DataError` do not trigger modal dialogs in headless tests. Capture/assert errors instead.
-- Use timeouts for UI/integration tests, keep background tasks cancellable, and avoid blocked Codex sessions.
-- Test transaction commit, rollback, parallel updates, duplicate posting, permissions and parity of Local/HTTP adapters as described in `docs/TEST_STRATEGY.md`.
-- If Windows GUI, SQL Server or targeting packs are unavailable, report the limitation honestly; do not mark their tests as passed.
-
-### Codex test execution policy
-
-**Task execution budget (mandatory for new implementation work):**
-
-- Codex MUST NOT automatically run `dotnet test MyDmsVn.sln`, an unfiltered SQL suite, the strict SQL benchmark, or any full repository regression during L1 edits/fixes or after each L2 task. Run only the smallest correct affected project/class/method and real SQL categories actually required by that task, recording selection and coverage rationale.
-- Every new implementation plan MUST provide an explicit **per-task L2 gate matrix**: affected module/dependencies, projects/TFMs, reviewed test selectors, needed SQL category and adversarial cases, actual runnable commands, timeout/approval/cleanup, and pass/fail/skip/blocked evidence. See [Test Gate Matrix](docs/TEST_GATE_MATRIX.md).
-- Schedule **one planned L3 acceptance envelope** after focused task gates are green and inputs freeze. Preserve unfiltered SQL for all **applicable reviewed project × TFM** targets (`net48` active on current `main`; branches created before the NET8-PAUSE merge follow their checked-in declarations). Preserve independent source/discovery/TRX, GUI watchdog, non-production approval, cross-process serialization and owned-database cleanup. A failed L3 gate or later relevant edit invalidates prior evidence: repair via focused tests, then rerun the affected complete mandatory gate. Never treat stale evidence as green to force exactly one execution.
-- **Current tooling:** `Invoke-TestGate.ps1` reads `tests/test-gates.v1.json` and provides manifest-owned `Task`/`Final` modes; Final reuses the strict single-pass `pr-acceptance` path (one unfiltered sequential pass per SQL TFM), requires a clean committed revision and approved SQL resources, and emits only sanitized aggregate evidence. The `-Mode Final -PreflightOnly` path checks all reviewed SQL project source/fingerprints/discovery without SQL test execution and without claiming L3 evidence. During a filtered Task, unselected fingerprint drift may be deferred but source method identity/classification/row-shape checks remain mandatory; Final still verifies everything. The focused SQL wrapper still selects one category rather than module+category. Do not invent broader selectors or downgrade L3 to plain `dotnet test`; use `baseline` only for plan-triggered measurements.
-- **Local-only TESTGATE acceptance:** execute focused Task checks and final **full unfiltered SQL on all currently mandatory TFMs** in the approved local environment (`net48` on current `main`; branches created before the NET8-PAUSE merge follow their checked-in declarations). Publish only separately reviewed sanitized aggregate results; keep raw TRX, timing and ownership/approval journals local. Do not add CI jobs or duplicate the full SQL suite there without an explicit separate request.
-- Performance benchmarks/stress repetitions belong to plan-triggered L4, not ordinary feature L1/L2. [Proposed ADR 0006](docs/adr/0006-task-scoped-test-execution-and-module-projects.md), the verified [TESTGATE T01–T03 plan](docs/plans/20261016-001-task-gates-and-modular-tests.md), and completed [T04/T05 modularization](docs/plans/20261016-002-modular-test-projects.md) define the current contract. Accepted ADR 0005 remains authoritative on isolation/parallelism.
-
-
-- Before running tests for a change, choose the smallest relevant *non-SQL or SQL* test scope and record its rationale. Use progressive validation: focused inner-loop tests, affected-project/task tests, then final unfiltered PR acceptance. Do not rerun the entire SQL suite after each local fix.
-- The authoritative level-by-level decision matrix, existing command capabilities, exceptions and evidence template are in `docs/CODEX_TEST_EXECUTION_POLICY.md`. Follow it alongside the existing isolation policy below and every explicit plan acceptance gate; a narrow inner-loop run never replaces a required final gate.
-- For SQL-backed focused development runs, prefer the existing guarded `tests/tools/Invoke-FocusedSqlIntegrationTests.ps1` by a verified SQL responsibility category. Its category filter is **not** a full-suite acceptance result. Preserve fail-closed SQL instance approval, process watchdog, ownership reconciliation, theory-row inventory and zero mandatory SQL skips.
-- For a code-bearing PR, perform final applicable Release tests on all **actually required TFMs** (`net48` on current `main`; branches created before the NET8-PAUSE merge follow their checked-in declarations), including unfiltered SQL acceptance and separately guarded GUI tests, **for the final gate-affecting revision** (including source, tests/theory rows, SQL/migrations, inventories/manifests, harness/runner, and build/CI inputs), not just the last application-behavior edit. If these inputs change after a green run, rerun the applicable complete L3 gates. A documentation-only PR may use documented static checks instead; never claim an unexecuted SQL/GUI gate passed. Missing Windows, SQL approval or test resources means `blocked/not run`, not `passed`.
-- The strict SQL runner exposes separate `pr-acceptance` (one unfiltered sequential pass per TFM) and multi-pass `baseline` (one warm-up and three measured passes per TFM) protocols. Do not treat bare `dotnet test` as equivalent to the strict discovery/TRX/ownership gate. Performance A/B comparisons and specialized stress tests remain conditional on the relevant plan.
-
-### Test parallelization and resource isolation
-
-- Decide parallel safety from **resource ownership and observable isolation**, not merely from the test-project name, SQL test trait, or test duration. Test classification (for example `FastSQL`, `MigrationSchema`, `SecurityProvisioning`, `SqlConcurrency`) is separate from execution/isolation policy.
-- For SQL integration tests, the existing `[assembly: CollectionBehavior(DisableTestParallelization = true)]` is a **transitional safety guard**, not the long-term architectural default. Aim for **bounded xUnit collection-level parallelism** between independently owned databases/resources only after adversarial isolation, cleanup, capacity, repeatability and both-TFM gates pass. Do not remove the current guard merely to improve a benchmark; retain a proven serial fallback.
-- A migrated database fixture may be reused only with explicit ownership, complete reset/teardown and no overlapping writes or unsafe shared state. Tests sharing mutable fixture state must be coordinated by the same collection or a separately proven equivalent mechanism. SQL migration/history, schema mutation, security provisioning and multi-session race tests require isolation appropriate to their behavior.
-- Continue to serialize Desktop tests that create/use WinForms controls, interact with global UI state, drive real mouse/keyboard/focus or rely on shared message-loop/process state. STA execution by itself does **not** make simulated GUI input parallel-safe. The present `Desktop.Tests` assembly-wide guard stays in place; pure ViewModel tests may be separated into independent parallel-compatible projects/collections only after proof.
-- Unit/architecture/contract tests without shared mutable resources should retain normal xUnit collection parallelism. A collection guard applies only within its test assembly/process; runner/CI coordination is required for shared SQL/UI resources across processes and target frameworks. Do not confuse deliberate multi-session concurrency **inside one test** with runner-level parallelism.
-- Keep SQLPERF acceptance measurements for `net48` and `net8.0` sequential unless the measurement protocol is explicitly revalidated. Preserve approval, ownership journaling, mandatory SQL-case inventory, watchdog, zero-skipped required tests and release gates. See `docs/adr/0005-test-isolation-and-bounded-parallelism.md` and `docs/TEST_STRATEGY.md`.
-
-## Useful starting prompts
-
-- "Follow [the ordered active roadmap](docs/plans/README.md); NET8-PAUSE and [TESTGATE-T04/T05 modular test projects](docs/plans/20261016-002-modular-test-projects.md) are complete. Do not rerun their full acceptance envelopes without a gate-affecting change."
-- "After modularization, implement [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md); then complete the [remaining P5 GUI/P6 operational gates](docs/plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md), then P7."
-
-Do not automatically implement all phases in a single unreviewable change.
+- Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM with CRLF; C# uses its declared BOM/CRLF policy. Preserve Vietnamese text.
+- Compile against the actual target APIs, especially `net48`. Do not upgrade packages broadly, suppress warnings globally or introduce an additional ORM to avoid a compatibility problem.
+- Register implementations explicitly with Microsoft DI. Keep ErrorOr, MediatR, RepoDb/LINQ to DB and SQL objects out of transport DTOs.
+- Use parameterized SQL. Never commit secrets, production connection strings, approval files or raw test artifacts.
+- SQL tests mutate only positively owned disposable databases on an approved test instance. Reset failure poisons a reused fixture; no subsequent test runs on uncertain state.
+- GUI tests use STA, serialized UI resources, deterministic disposal, bounded waits and captured exceptions/DataGridView errors. Headless failures must not open blocking dialogs.
+- Missing Windows, targeting packs, SQL approval or GUI access is `BLOCKED / NOT RUN`, never PASS. Use [tests/README.md](tests/README.md) for runnable tool constraints.

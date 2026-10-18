@@ -1,58 +1,31 @@
-﻿# Application / Desktop API contracts
+# Application / Desktop API contracts
+
+**Status:** Current Local v1 contracts on active net48, refreshed 2026-10-18. RESP changes test lifecycle and L2DB changes persistence adapters; both preserve these observable behaviors. HTTP v2 remains deferred and will need a separately approved implementation/runtime plan.
 
 ## Purpose
 
-All WinForms ViewModels talk to feature-specific `IxxxApiClient` abstractions returning the same transport-neutral result, whether the implementation invokes Server.Application directly (v1) or calls ASP.NET Core HTTP (v2). Public DTOs are contracts, not Domain entities.
+WinForms ViewModels use feature-specific API interfaces in `Desktop.Application/FeatureApiClients.cs`. Current Local adapters invoke Server.Application in-process and return transport-neutral `ApiResponse<T>` values. Future HTTP adapters must keep the same DTO/result semantics. Public DTOs are contracts, not Domain entities or provider objects.
 
-## Proposed result envelope
+## Implemented result envelope
 
-```csharp
-public sealed class ApiResponse<T>
-{
-    public T Data { get; set; }
-    public ApiError Error { get; set; }
-    // Factory methods enforce exactly one of Data or Error as a meaningful result.
-}
+The current [ApiResponse](../src/MyDmsVn.Contracts/ApiResponse.cs), [ApiError](../src/MyDmsVn.Contracts/ApiError.cs), [ApiErrorDetail](../src/MyDmsVn.Contracts/ApiErrorDetail.cs) and [ApiJson](../src/MyDmsVn.Contracts/ApiJson.cs) are source-owned contracts. Their properties are immutable; do not replace them with the earlier mutable blueprint.
 
-public sealed class ApiError
-{
-    public string Code { get; set; }
-    public string Message { get; set; }
-    public IReadOnlyCollection<ApiErrorDetail> Details { get; set; }
-}
+| Member or operation | Current contract |
+|---|---|
+| `ApiResponse<T>.Success(data)` | Requires non-null data and constructs a success. Use `UnitResponse.Value` for a no-content command. |
+| `ApiResponse<T>.Failure(error)` | Requires a non-null ApiError and constructs a failure. |
+| `Data` / `Error` | Read-only properties. JSON emits `data` on success or `error` on failure; ambiguous both-set/none-set input is rejected by the converter. |
+| `IsSuccess` | In-process status flag marked `JsonIgnore`. |
+| `ApiError.Status` | In-process `ApiStatusCode`, marked `JsonIgnore`; future HTTP deserialization supplies the actual response status. |
+| Error JSON | `code`, `message`, `details`, optional `correlationId`; each detail carries `code`, `message`, optional `field`. |
 
-public sealed class ApiErrorDetail
-{
-    public string Code { get; set; }
-    public string Message { get; set; }
-    public string Field { get; set; }
-}
-```
-
-This illustrates the *wire shape*, not compilable final implementation; enable nullable annotations appropriately for both target frameworks. Success can carry `Data = null` only for an explicitly documented no-content operation; prefer a typed `UnitResponse`. Reject ambiguous both-set/none-set states through factories and tests.
-
-JSON property names: `data`, `error`, `code`, `message`, `details`, `field`. Specify one serializer naming policy and verify it with golden fixtures. No serialized ErrorOr, SQL errors, stack traces, transactions or MediatR internals.
+`ApiJson` supplies the shared Newtonsoft.Json camel-case naming, invariant culture, ISO UTC date handling and null omission. `ApiJson.DeserializeResponse<T>(json, responseStatus)` requires a meaningful actual transport status and preserves parity with the Local error status. Keep correlation identifiers bounded and safe, and never serialize ErrorOr, SQL exceptions, stack traces, transactions or MediatR internals.
 
 ## Converting Application results
 
-```text
-ValidationBehavior / Application handler -> ErrorOr<T>
-                                     |
-                       transport-neutral mapper
-                                     |
-                               ApiResponse<T>
-                               /            \
-                       Local result       HTTP JSON
-                                              +
-                                      HTTP status code
-```
+Application handlers and pipeline behaviors return `ErrorOr<T>`. The transport-neutral `ApiResponseMapper` in Server.Application maps this to `ApiResponse<T>` without ASP.NET dependencies. Local adapters return that result directly. A future API host will add HTTP status/headers around the same envelope; handlers must not construct `IResult`, `Results.Ok`, `HttpResponse` or `JsonResult`.
 
-- The **transport-neutral** ErrorOr-to-ApiResponse mapping should be implemented in an application composition/adapter library without ASP.NET dependency.
-- `Server.Api` wraps the mapped response with HTTP status and headers.
-- HTTP clients deserialize envelopes through `ApiJson.DeserializeResponse<T>(json, responseStatus)`, passing the actual HTTP status so `ApiError.Status` has the same value as Local mode without duplicating status in the JSON body.
-- Application handlers never construct `IResult`, `Results.Ok`, `HttpResponse` or `JsonResult`.
-- Avoid `dynamic` for pipeline result conversion; use a strongly typed generic conversion strategy compatible with ErrorOr version pinned in the solution.
-- Validate handler exceptions as unexpected failures, and log them without exposing details to users.
+Preserve the existing strongly typed generic mapping and deterministic dominant error/status policy. Do not select error status from arbitrary enumeration order or use dynamic conversion. Unexpected failures are logged with safe diagnostics and mapped without exposing infrastructure details.
 
 ## Error taxonomy
 
@@ -72,42 +45,47 @@ For multiple failures, choose a deterministic aggregate code/status policy (all 
 
 ## Desktop client APIs
 
-Recommended initial interfaces:
+Current interfaces include:
+
 - `IProductApiClient`, `IWarehouseApiClient`, `IEmployeeApiClient`, `ICustomerApiClient`.
 - `IGoodsReceiptApiClient`: `CreateDraftAsync`, `UpdateDraftAsync`, `PostAsync`, `GetAsync`, `ListAsync`.
 - `IInventoryApiClient`: `GetStockBalancesAsync`, `GetStockCardAsync`.
-- `IIdentityApiClient`: `LoginAsync` / `GetCurrentUserAsync` for authenticated identity flow; P4.1 defines production UI/session bootstrap around these existing contracts, not a new direct-SQL login path.
+- `IIdentityApiClient`: `LoginAsync` / `GetCurrentUserAsync` for authenticated identity and the existing desktop session boundary.
+- `IPermissionApiClient` and `IPermissionCatalogApiClient`: current permission decisions and the code-defined catalog.
+- `ISecurityAdministrationApiClient`: user/role lists, authorized mutation and permission-import preview/apply; protected-account maintenance is outside the client API.
 
 Each call is async and accepts `CancellationToken`. Commands have DTO request and typed response; queries return paginated DTOs with total count and deterministic sort where appropriate.
 
-The P5.1 catalog clients expose Create, Update, SetActive, List, Get and Lookup operations. List queries accept `CatalogListRequest`, sort by Code then stable ID, and return total-count paging. Lookup queries accept `CatalogLookupRequest`, return the shared `CatalogLookupDto`, and include active rows only; Get/List may still return inactive rows when requested so historical selections can be displayed. List and Lookup search text is optional, limited to 256 characters and must not contain the NUL character; catalog Code and Name values (plus Product Unit) also reject NUL on Create and Update. Invalid input returns a validation response before database access. An Update response is loaded through the command repository inside the same transaction as the write and is materialized before commit, so it preserves the persisted `IsActive` value without a fallible post-commit read. Catalog adapters remove the internal MediatR `Request` wrapper segment when mapping validation details, so fields remain relative to the public DTO (`search`, `code`, and so on). Local adapters dispatch the matching Application request and map its typed result into `ApiResponse<T>` without exposing Domain entities, RepoDb objects or SQL exceptions.
+The current catalog clients expose Create, Update, SetActive, List, Get and Lookup operations. List queries accept `CatalogListRequest`, sort by Code then stable ID, and return total-count paging. Lookup queries accept `CatalogLookupRequest`, return the shared `CatalogLookupDto`, and include active rows only; Get/List may still return inactive rows when requested so historical selections can be displayed. List and Lookup search text is optional, limited to 256 characters and must not contain the NUL character; catalog Code and Name values (plus Product Unit) also reject NUL on Create and Update. Invalid input returns a validation response before database access. An Update response is loaded through the command repository inside the same transaction as the write and is materialized before commit, so it preserves the persisted `IsActive` value without a fallible post-commit read. Catalog adapters remove the internal MediatR `Request` wrapper segment when mapping validation details, so fields remain relative to the public DTO (`search`, `code`, and so on). Local adapters dispatch the matching Application request and map its typed result into `ApiResponse<T>` without exposing Domain entities, persistence-provider objects or SQL exceptions.
 
-The P5.4 inventory client is query-only. `GetStockBalancesAsync` accepts optional warehouse/product IDs, optional search text, and page number/size; it returns warehouse/product codes and names, active flags, quantity, and total-count paging in deterministic warehouse-code/product-code/ID order. Search is limited to 256 characters and rejects NUL. `GetStockCardAsync` requires positive warehouse/product IDs and accepts optional UTC from/to timestamps with `from <= to`; rows include posting timestamp, document type/ID/number, quantity delta, readable warehouse/product identity and active flags, ordered by `PostedAtUtc, LedgerId`. Application enforces `Inventory.Balances.Read` and `Inventory.StockCard.Read` respectively. No Create/Update/Delete client contract exists for `StockBalances` or `StockLedger`.
+The current inventory client is query-only. `GetStockBalancesAsync` accepts optional warehouse/product IDs, optional search text, and page number/size; it returns warehouse/product codes and names, active flags, quantity, and total-count paging in deterministic warehouse-code/product-code/ID order. Search is limited to 256 characters and rejects NUL. `GetStockCardAsync` requires positive warehouse/product IDs and accepts optional UTC from/to timestamps with `from <= to`; rows include posting timestamp, document type/ID/number, quantity delta, readable warehouse/product identity and active flags, ordered by `PostedAtUtc, LedgerId`. Application enforces `Inventory.Balances.Read` and `Inventory.StockCard.Read` respectively. No Create/Update/Delete client contract exists for `StockBalances` or `StockLedger`.
 
 Example command-level behavior:
-- `UpdateGoodsReceiptDraftRequest` and `PostGoodsReceiptRequest` identify the receipt and carry the required opaque Base64 `expectedVersion` token. `GoodsReceiptDto.version` returns the current token. Clients treat these strings as opaque; no raw UnitOfWork, ADO.NET value or EF/RepoDb entity crosses the contract boundary.
-- `SaveGoodsReceiptRequest` never accepts a receipt number. CreateDraft returns the server-issued number using the P5 format `GR` plus a zero-padded 10-digit non-cycling sequence value (for example `GR0000000001`). Clients display the returned value and must not generate or predict it; gaps are valid.
+
+- `UpdateGoodsReceiptDraftRequest` and `PostGoodsReceiptRequest` identify the receipt and carry the required opaque Base64 `expectedVersion` token. `GoodsReceiptDto.version` returns the current token. Clients treat these strings as opaque; no raw UnitOfWork, ADO.NET value or persistence-provider entity crosses the contract boundary.
+- `SaveGoodsReceiptRequest` never accepts a receipt number. CreateDraft returns the server-issued number using the current format `GR` plus a zero-padded 10-digit non-cycling sequence value (for example `GR0000000001`). Clients display the returned value and must not generate or predict it; gaps are valid.
 - CreateDraft and UpdateDraft accept 1–200 non-null lines. Each line must have a unique positive Product ID, Quantity fitting SQL `decimal(18,4)` and greater than zero, and UnitCost fitting SQL `decimal(19,4)` and greater than or equal to zero. Values with more than four effective fractional digits or precision outside those SQL types return field validation errors before database access.
 - `PostGoodsReceiptResponse` returns receipt identifier, status, posting timestamp; retry of an already posted receipt returns a documented conflict (or a stable idempotent success if an idempotency contract is added later). In either case, **no second stock posting** occurs.
 - Identifiers and date/time formats are consistent in Local/HTTP tests; transport changes cannot alter business semantics.
 
-## Local desktop session (P4.1)
+## Current Local desktop session
 
 Production WinForms hosts gate shell/business access on successful `IIdentityApiClient.LoginAsync`. The Local adapter owns one host-scoped `IDesktopSession`, but each dispatch creates an immutable request-scoped `ICurrentUserAccessor` snapshot containing the admitted identity and generation; it never reads a later mutable user after an asynchronous await. Login publishes a session only after `IUserAccountValidator` confirms the returned user is currently active in SQL. `GetCurrentUserAsync` and every protected Local dispatch revalidate current account state; disabled/deleted users receive `Auth.Unauthorized` and the desktop session is cleared, while live-user permission revocation remains `Auth.Forbidden` for the action and retains the session. SQL validation failure returns a fail-closed unavailable error rather than treating cached identity as trusted or reporting invalid credentials.
 
-The default Local idle timeout is 30 minutes and is configurable through `DesktopSessionOptions`. It uses `IMonotonicClock`; keyboard/mouse input records user activity, while background API calls and polls do not. Logout/expiry increments the generation, clears current-user UI state and forces reauthentication. Requests captured but not admitted under an old generation are rejected. An already-authorized in-flight use case retains its captured actor/audit identity and cannot be reassigned by logout or a later Login; late UI results remain guarded by the shell session version. No automatic re-execution of mutating commands occurs on expiry or SQL timeout. First Administrator provisioning and registry sync are separate privileged deployment commands (P3.1), **not client API operations**.
+The default Local idle timeout is 30 minutes and is configurable through `DesktopSessionOptions`. It uses `IMonotonicClock`; keyboard/mouse input records user activity, while background API calls and polls do not. Logout/expiry increments the generation, clears current-user UI state and forces reauthentication. Requests captured but not admitted under an old generation are rejected. An already-authorized in-flight use case retains its captured actor/audit identity and cannot be reassigned by logout or a later Login; late UI results remain guarded by the shell session version. No automatic re-execution of mutating commands occurs on expiry or SQL timeout. Bootstrap, recovery and rename of the configured database-bound superuser use separate maintenance authority and are outside client APIs. Permission catalog export is code-backed; upgrades do not synchronize permission records or auto-grant an Administrator role.
 
-## Auth and HTTP-specific behavior (P7)
+## Auth and HTTP-specific behavior (deferred)
 
-Use `Authorization: Bearer` for HTTP endpoint calls; Session/token lifecycle belongs to desktop HTTP infrastructure, not ViewModels. Security rules live on Application use cases and HTTP host authentication. HTTP response codes are meaningful, despite carrying a common JSON envelope.
+The retained HTTP design uses `Authorization: Bearer`; a separately approved HTTP implementation must define and verify its session/token lifecycle in desktop HTTP infrastructure, outside ViewModels. Security rules live on Application use cases and HTTP host authentication. HTTP response codes are meaningful, despite carrying a common JSON envelope.
 
 ## Compatibility tests
 
-Create golden JSON fixtures for:
+Preserve or extend source-owned golden JSON and behavior fixtures for:
+
 - success and validation failure with field detail,
 - 401/403/404/409,
 - pagination,
 - decimal quantities and UTC timestamps,
-- all planned P5 command DTOs.
+- current catalog, receipt, inventory and security/import DTOs.
 
-Run the **same behavior/response assertions** against LocalApiClient and HttpApiClient when P7 is added. Any contract breaking change requires versioning / ADR.
+The active plans preserve current Local behavior and contract assertions. A future approved HTTP adapter must run the same behavior/response assertions against Local and HTTP. A contract breaking change requires versioning or an ADR. [TEST_POLICY](TEST_POLICY.md) selects execution scope; this coverage reference does not require a full suite after every change.

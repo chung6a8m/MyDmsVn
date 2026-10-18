@@ -1,31 +1,35 @@
 # MyDmsVn
 
-Windows desktop-first SME business management, beginning with **Sales & Inventory Foundation** and designed to evolve from a local Application/SQL adapter to a remotely hosted HTTP API without duplicating business handlers.
+Windows desktop-first SME business software, beginning with **Sales & Inventory Foundation**. Local v1 runs shared Application handlers in process; a future HTTP adapter will reuse their contracts and semantics.
 
-## Current status — 2026-10-16
+## Active roadmap — v1a, 2026-10-18
 
-P0/P1/P2/P3/P3.1/P4 implementation is complete. P4.1 Login/session is **closed by explicit product-owner manual-UI acceptance**, with a documented incomplete packaged idle-expiry observation; the owner exception does not close remaining P5/P6 release gates. P5 business features and automated tests exist, but P5.1/P5.4 interactive acceptance remains open. P6 operational/release acceptance remains open. TESTGATE T01–T03 are verified; modularization, permission-system replacement and P7 are future work.
+There are exactly two active implementation plans:
 
-**Current accepted matrix:** [NET8-PAUSE](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) PR #32 merged at `8e310778`; T01–T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with reviewer fixes re-verified at `6b2ff49`. The owner waived the duration comparison at `09d00bfa` because no comparable baseline exists; it remains unmeasured and no speedup is claimed. Application, SQL and Desktop projects actively target `net48`; historical .NET 8 case metadata and the parked AppCore source remain for [reviewed reactivation](docs/REACTIVATE_NET8.md). The runner's tool-only `net8.0` target is not product coverage. Follow the [ordered active roadmap](docs/plans/README.md) and [Development Plan](docs/DEVELOPMENT_PLAN.md).
+| Order | Plan | Status |
+|---:|---|---|
+| 1 | [Respawn fixture reuse](docs/plans/20261018-002-respawn-fixture-reuse.md) | Owner-selected direction; implementation pending |
+| 2 | [LINQ to DB persistence migration](docs/plans/20261018-001-linq2db-net48-persistence-migration.md) | Owner-selected direction; starts after RESP acceptance |
 
-## Approved technology and boundaries
+Respawn first establishes reusable, isolated test fixtures on the current DAL. LINQ to DB then replaces production persistence behind the existing contracts while that fixture baseline stays stable. [The active plan index](docs/plans/README.md) owns execution order.
 
-- C#, active product/runtime target `.NET Framework 4.8`; `.NET 8` product targets are temporarily parked while the test runner remains tool-only `net8.0`. No unapproved move to .NET 10. See [Tech Stack](docs/TECH_STACK.md).
-- Clean Architecture/modular monolith, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork.
-- RepoDb for write-side storage, Dapper for read models, SQL Server and versioned DbUp migrations.
-- Shared WinForms/CommunityToolkit.Mvvm views, Bootstrap5WinFormUI and BootstrapSourceGrid; LocalApiClient for v1, HttpApiClient planned for v2.
-- Security enforcement is mandatory in Application, not just desktop UI. The current permission implementation follows [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md): code-defined catalog, explicit assignments, and one configured superuser. T06 and final SQL/GUI acceptance remain open.
-- Historical legacy password columns remain for safe migration evaluation.
+## Current implementation
 
-## How to work in this repository
+- Product, SQL tests and WinForms run on **.NET Framework 4.8**. The SQL runner's `net8.0` target is tooling; AppCore and modern product targets remain parked.
+- Clean Architecture, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork, SQL Server and DbUp.
+- **RepoDb/Dapper remain in production code** until the LINQ to DB migration is completed. Respawn is also planned, not yet installed.
+- WinForms with CommunityToolkit.Mvvm, Bootstrap5WinFormUI and BootstrapSourceGrid.
+- Code-defined permissions, deliberate assignments and one configured superuser are implemented; the previous permission synchronization workflow is retired.
+- Catalogs, Goods Receipt Draft/Post, stock ledger, balances and stock card exist. Remaining P5 interactive and P6 operational/release acceptance is [deferred work](docs/DEFERRED_WORK.md), still open.
 
-1. Read [AGENTS.md](AGENTS.md), [PRD](docs/PRD.md), [Architecture](docs/ARCHITECTURE.md) and [Tech Stack](docs/TECH_STACK.md).
-2. Follow the **exact order** of the [six active roadmap entries](docs/plans/README.md). Completed TESTGATE-T01–T03 stays active as context only.
-3. Run focused **Task** tests during implementation; use the guarded manifest-owned strict **Final** acceptance only after gate-affecting inputs are frozen. Never substitute unapproved SQL/GUI tests or run the full SQL suite after every edit.
-4. Publish reviewed sanitized results; do not commit SQL credentials, instance approval files, TRX, ownership journals or other raw diagnostics. Missing external environment means BLOCKED/NOT RUN, not PASSED.
+## Working with Codex
+
+Start with [AGENTS.md](AGENTS.md), [AI_CONTEXT.md](AI_CONTEXT.md), the active task, and [TEST_POLICY.md](docs/TEST_POLICY.md). The policy has been rewritten for this roadmap: focused affected tests during a task, broader SQL validation for shared infrastructure and the two acceptance milestones, and GUI checks when the change or milestone requires them.
+
+Completed and superseded plans, duplicate test policies and old verification narratives were removed from the working documentation. Their immutable Git sources are indexed in [History](docs/HISTORY.md). Old manifest IDs and runner behavior still exist in code; [tests/README.md](tests/README.md) explains the transition accurately.
 
 ## Documentation
 
-[Development Plan](docs/DEVELOPMENT_PLAN.md) · [Active plans](docs/plans/README.md) · [Archive](docs/plans/archive/README.md) · [Contracts](docs/CONTRACTS.md) · [Security](docs/SECURITY.md) · [Persistence](docs/PERSISTENCE.md) · [Test Strategy](docs/TEST_STRATEGY.md) · [Test Gate Matrix](docs/TEST_GATE_MATRIX.md) · [Codex policy](docs/CODEX_TEST_EXECUTION_POLICY.md) · [ADR index](docs/adr/README.md)
+[Documentation index](docs/README.md) · [Development plan](docs/DEVELOPMENT_PLAN.md) · [Architecture](docs/ARCHITECTURE.md) · [Persistence](docs/PERSISTENCE.md) · [Contracts](docs/CONTRACTS.md) · [Security](docs/SECURITY.md) · [Test policy](docs/TEST_POLICY.md) · [ADR index](docs/adr/README.md)
 
-Previous completed dual-framework build/test evidence is historical and is **not** proof that any future TFM reduction, restored net8 target or P7 API has already passed.
+This branch is not yet production-release accepted. In particular, release packaging still records schema `8..8` while runtime expects migrations `001–009`; the outstanding release checklist tracks that discrepancy.

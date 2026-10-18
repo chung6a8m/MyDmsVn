@@ -1,25 +1,26 @@
-# Active phase roadmap — Codex entry point
+# Active roadmap — v1a
 
-**Date:** 2026-10-18. Execute reviewed implementation work in the order below. Completed items remain context and must not be reimplemented. The L2DB direction is owner-approved; its detailed implementation plan is proposed and has not run. A planning document is not implementation or acceptance evidence.
+**Owner decision:** 2026-10-18. Exactly two plans are active. Their direction is approved; implementation checkboxes start open. A documentation commit is not runtime or acceptance evidence.
 
-| Order | Active plan | State |
-|---:|---|---|
-| 1 | [20261016-001-task-gates-and-modular-tests.md](20261016-001-task-gates-and-modular-tests.md) | TESTGATE-T01–T03 **verified complete**, retained for reference |
-| 2 | [20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | Accepted and merged as PR #32 at `8e310778`; duration comparison waived, not measured |
-| 3 | [20261016-002-modular-test-projects.md](20261016-002-modular-test-projects.md) | TESTGATE-T04/T05 complete at `973109f`; retained as prerequisite context |
-| 4 | [20261016-003-permission-system-rebuild.md](20261016-003-permission-system-rebuild.md) | SEC-REBUILD T00–T06 accepted; strict Final 775/775, packaged GUI D2 138/138 and owner walkthrough completed at `0303a911` (PR #34) |
-| 5 | [20261017-001-testgate-stabilization.md](20261017-001-testgate-stabilization.md) | P0/P1 and reviewer fixes merged in PR #35 at `8cfa2535`; latest recorded round-3 Final 11/11 gates, 793/793 at `6d71b711`. STAB-T03/T04 manifest-v2 work remains a separate follow-up, not a blocker for item 6 |
-| 6 | [20261018-001-linq2db-net48-persistence-migration.md](20261018-001-linq2db-net48-persistence-migration.md) | **Owner-approved direction 1A + 2A + 3A; detailed plan proposed / NOT IMPLEMENTED.** Retain Local v1 and active net48; pilot LINQ to DB, convert DAL behind existing contracts, retain DbUp/security/UoW and complete new acceptance before final P5/P6 checks |
-| 7 | [20261016-004-remaining-p5-acceptance-and-p6-hardening.md](20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | Outstanding P5.1/P5.4 interactive checks, P6 T01–T04 operational gaps, P6 T05–T08 and G1–G5; none waived by L2DB |
-| 8 | [20261008-008-phase-7-remote-api.md](20261008-008-phase-7-remote-api.md) | Future P7 API/HTTP parity; reviewed runtime reactivation or a separately approved runtime plan is required before the host |
+| Execution order | Plan / ID | Entry condition | Current status |
+|---:|---|---|---|
+| 1 | [20261018-002-respawn-fixture-reuse.md](20261018-002-respawn-fixture-reuse.md) / `RESP` | Current net48 checkout and approved test resources for implementation | NOT IMPLEMENTED; start at RESP-T00 |
+| 2 | [20261018-001-linq2db-net48-persistence-migration.md](20261018-001-linq2db-net48-persistence-migration.md) / `L2DB` | RESP acceptance on current RepoDb/Dapper baseline | NOT IMPLEMENTED; do not start DAL cutover before RESP acceptance |
 
-## Acceptance, archiving and current TFM scope
+Filename sequence reflects creation time. Follow the table, not filename sorting. RESP must produce a reusable-fixture baseline with verified reset/seed, ownership and case coverage. L2DB consumes that baseline and freezes fixture behavior while replacing DAL internals.
 
-- [Historical/superseded plans archive](archive/README.md) contains completed P0/P1/P2/P3/P3.1/P4, owner-accepted P4.1, completed SQLPERF, and the original P5/P6 plans whose remaining tasks were transferred to [the remaining P5/P6 plan](20261016-004-remaining-p5-acceptance-and-p6-hardening.md). No unfinished P5/P6 check was falsely marked green by archiving or this reorder.
-- P4.1 closed by the owner's **2026-10-16 explicit acceptance** of existing automated L3 plus partial packaged manual UI. The 30-minute idle-expiry/relogin observation was not completed, and its specific waiver does not close P5/P6. See [verification](../P4_1_VERIFICATION.md).
-- NET8-PAUSE T01–T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with reviewer gate fixes re-verified at `6b2ff49`; PR #32 merged at `8e310778`. The owner waived the duration comparison at `09d00bfa` because no matching baseline exists; it remains unmeasured and no speedup is claimed. Current `main` follows the accepted active matrix; branches created before the merge follow their checked-in declarations. Retired net8 tests are PARKED/NOT RUN, never PASS. Preserve explicit framework flags, SQL approval/inventory/ownership and the [full restoration procedure](../REACTIVATE_NET8.md).
-- The owner's 2026-10-18 clarification of **3A keeps product/SQL/Desktop net48 as in the repo**. Tool-only runner/test net8.0 remains tooling; AppCore remains outside solution/release. [ADR 0009](../adr/0009-linq2db-local-net48-persistence.md) does not reactivate modern product targets or authorize .NET 10.
-- SEC-REBUILD completion is recorded in the [latest verification](../SEC_REBUILD_VERIFICATION.md). PR #35 status uses the merged commit and its final reviewer-round-3 section, not its stale Draft/header text. The 775/793 totals describe their own revisions and are not new L2DB evidence or SQL-only totals. Manifest-v2 follow-ups need their own reviewed migration and do not silently replace TESTGATE v1.
-- Use [Development Plan](../DEVELOPMENT_PLAN.md), [Codex policy](../CODEX_TEST_EXECUTION_POLICY.md), [Test Gate Matrix](../TEST_GATE_MATRIX.md) and root [AGENTS.md](../../AGENTS.md). Task-scoped L1/L2 verification prevents per-edit full SQL reruns; a single planned strict final envelope still requires approved real SQL and an exact frozen revision. A later relevant edit invalidates affected evidence.
+## Execution contract
 
-Review the new L2DB plan before starting T00. When handing off a task, report completed scope, exact test commands/results, missing gates and next active task. Do not restart historical SQLPERF or P4.1, reset databases, rewrite permission behavior or add CI as part of a DAL-library change.
+Read [AGENTS](../../AGENTS.md), [current context](../../AI_CONTEXT.md), the task and [TEST_POLICY](../TEST_POLICY.md). Use [tests/README](../../tests/README.md) for actual commands. New Markdown task IDs are not automatically registered in `tests/test-gates.v1.json`; register and validate them in the owning implementation task before using manifest-owned commands.
+
+The active target is `net48` for product, SQL and Desktop. `netstandard2.0` is a shared harness library; `net8.0` is a tool host. Neither plan reactivates product .NET 8, changes permissions, replaces DbUp, enables test parallelism or starts HTTP work.
+
+## Outside this queue
+
+- Completed foundation, TESTGATE, NET8-PAUSE, modularization and SEC-REBUILD work is summarized in [History](../HISTORY.md). Do not reimplement it.
+- P5 GUI acceptance, P6 hardening/release, P7 HTTP, runtime reactivation and optional manifest-v2 simplification are [deferred](../DEFERRED_WORK.md). They are not active prerequisites except a narrowly identified issue that a current plan explicitly owns.
+- The earlier rejection of fixture reuse is superseded by the owner's Respawn decision and [ADR 0010](../adr/0010-respawn-fixture-reuse-and-test-policy.md). Its old benchmark results remain historical observations.
+
+## Handoff
+
+Report the active task, changed files/behavior, verification commands and actual outcomes, missing requirements, accepted implementation revision and next task. Move to the next plan only after the previous acceptance criteria have evidence. Do not turn a parked target, historical result, deferred gate or owner's unrelated waiver into a new PASS.

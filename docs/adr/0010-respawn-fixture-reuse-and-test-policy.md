@@ -1,0 +1,45 @@
+# ADR 0010 — Respawn fixture reuse and replacement test policy
+
+**Status:** Owner-selected direction, accepted 2026-10-18; implementation pending.
+**Scope:** `v1a`, active net48 integration tests.
+**Plan:** [RESP](../plans/20261018-002-respawn-fixture-reuse.md).
+**Execution policy:** [TEST_POLICY](../TEST_POLICY.md).
+
+## Context
+
+The owner chose fixture reuse with Respawn and the existing LINQ to DB migration as the two active roadmap plans. The prior fresh-database strategy and test execution rules accumulated duplicate, stale instructions. Current code still uses fresh allocations, RepoDb/Dapper and strict runner inventories; those are an implementation baseline, not a reason to restart completed work.
+
+## Decision
+
+1. Execute RESP first on the current DAL, then execute L2DB using the accepted fixture baseline. Separate reset/provider changes so failures and measurements remain attributable.
+2. Reuse one migrated, owned disposable database within a named xUnit v2 collection. Reset and deterministically seed before every test; dispose test-owned transactions/connections/workers before the next reset.
+3. Retain fresh allocations for schema/migration/history/principal/destructive-lifecycle tests and other cases without a proven complete reset. Reuse classification follows state mutations, not a category label alone.
+4. Preserve positive ownership, SQL approval, process watchdogs, cross-process resource coordination and quarantined cleanup. Current SQL serialization stays; this decision does not enable parallel SQL execution.
+5. Replace the previous duplicated test execution documents with one TEST_POLICY. Choose scope by affected behavior/dependencies. Full SQL is required at RESP and L2DB acceptance because they change shared infrastructure; it is not automatically required after every edit, task or code PR.
+6. Keep existing runner checks until deliberately adapted in RESP. Add fixture-level migration/timing/case ownership before moving test setup. General manifest-v2 work remains deferred.
+
+## Compatible package and API
+
+Respawn **4.0.0** is the explicit compatibility candidate: its [published package](https://www.nuget.org/packages/Respawn/4.0.0) contains net461/netstandard2.0 assets. The [maintainer's v5 migration guidance](https://github.com/jbogard/Respawn/releases) explains that .NET Framework consumers can remain on 4.0; later checked releases target netstandard2.1. Do not choose a newer incompatible package or reactivate net8 to accommodate it.
+
+Use v4 `Checkpoint.Reset(DbConnection)`, not modern `Respawner.CreateAsync/ResetAsync` examples. With the verified dbo schema, `SchemasToInclude = new[] { "dbo" }` and `TablesToIgnore = new[] { "SchemaVersions" }` preserve the journal: v4 filters table names, not schema-qualified names. [Pinned v4 source](https://github.com/jbogard/Respawn/blob/4788e2c51535919221de03edc90d354f4fd7d02f/Respawn/Checkpoint.cs), [SQL adapter](https://github.com/jbogard/Respawn/blob/4788e2c51535919221de03edc90d354f4fd7d02f/Respawn/SqlServerDbAdapter.cs).
+
+The actual net48 host must validate this package with the existing Microsoft.Data.SqlClient 7.0.2 central pin, including runtime dependencies/binding redirects. Framework asset compatibility is not proof that the combination has executed successfully. No floating versions or broad package upgrades.
+
+## Reset boundary
+
+Respawn caches schema-derived SQL in its checkpoint; checkpoint/database/schema ownership is immutable after initialization. Preserve the migration journal and allocation ownership metadata only; clear/reseed mutable business, reference, security assignment/binding and audit data.
+
+The current full schema has `TR_StockLedger_AppendOnly`, including in Catalog fixtures. A narrowly owned test-only reset profile must restore and verify that trigger before a test can run. An ignored ledger is not a complete reset. Sequence/identity contracts need explicit validation; rowversion is not rewound. Unreviewed schema drift, reset/seed failure or undrained workers poison the fixture and block subsequent test bodies.
+
+Use xUnit2 collection `IAsyncLifetime` for async allocation/migration/disposal. Each Fact/Theory invocation binds its reviewed method/row and unique execution identity explicitly before reset/seed through the adapter helper, which drains its test scope in `finally`. Parameterless lifecycle initialization does not provide Theory-row identity. [xUnit shared-context guidance](https://xunit.net/docs/shared-context) and [parallelism guidance](https://xunit.net/docs/running-tests-in-parallel) distinguish in-collection serialization from assembly/process concurrency.
+
+## Evidence and consequences
+
+RESP validates contamination, journal/seed/trigger integrity, ownership, failed reset/cleanup and retained case identity on net48. Compare explicit fresh/reuse modes on the same frozen candidate with the same cases and reported create/migrate/reset/seed/drop timings. Accepted eligible profiles default to reuse after RESP acceptance; fresh mode remains explicit and required for excluded cases. No automatic fallback and no speedup claim without measured improvement; a single pair is not a statistical benchmark.
+
+Reuse reduces repeated setup for eligible tests but introduces a larger failure boundary: a poisoned collection cannot safely continue. Fresh exception tests retain their existing isolation. The complexity is limited to shared test infrastructure; production migrations, schema, permissions, DTOs and UoW behavior are unchanged by RESP.
+
+## Supersession
+
+This decision supersedes the old rejection of fixture reuse and ADR 0006's execution-policy proposal. [ADR 0005](0005-test-isolation-and-bounded-parallelism.md) retains its resource-isolation principle as refined here. Existing measured results and owner exceptions remain in [History](../HISTORY.md). Deferred P5/P6/P7 requirements remain open.

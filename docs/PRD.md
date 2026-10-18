@@ -1,92 +1,65 @@
-# Product Requirements Document — MyDmsVn
+# Product requirements — MyDmsVn
 
-Status: **Approved direction / planning baseline**, 2026-10-08. Source: `project-idea.md` and follow-up decisions. Details labeled "proposed" may be refined through ADRs before coding.
+**Current scope:** Local v1 on net48 · **Updated:** 2026-10-18. The initial idea has been consolidated into this PRD and the current architecture/contracts. [Active implementation](plans/README.md) is limited to RESP and L2DB; these infrastructure plans preserve product behavior.
 
 ## 1. Product goal
 
-Deliver a practical, reliable Windows desktop SME platform that can grow by business module. Release **v1 Local Mode** first for rapid delivery; enable **v2 Remote HTTP API** later without rebuilding desktop views, workflows or core application handlers.
+Deliver a practical Windows desktop SME platform that grows by business module. Release Local Mode first, using in-process Application handlers and SQL Server. A future HTTP adapter will reuse business handlers and transport-neutral contracts.
 
-The architectural MVP proves: modularity, security boundaries, transactional consistency, shared contracts, reproducible migrations and a usable dense WinForms interface.
+The foundation proves modularity, authorization, transaction consistency, reproducible migrations and a responsive dense WinForms interface. Local direct SQL remains a trust limitation; it is not a trusted independent middle tier.
 
-## 2. Users and jobs to be done
+## 2. Users and supported workflows
 
-- **Administrator** maintains users, roles and permissions.
-- **Master-data operator** maintains products, warehouses, employees and customers.
-- **Warehouse operator** enters goods receipt drafts and submits postings.
-- **Manager / auditor** reads current stock and stock-card transaction history.
+| User/job | Workflow |
+|---|---|
+| Authorized security operator | Manage ordinary users, roles and explicit assignments; inspect the code-defined permission catalog |
+| Maintenance operator | Migrate schema and bootstrap/recover the configured superuser through the separate administrator package |
+| Master-data operator | List/filter/create/edit/activate/deactivate Products, Warehouses, Employees and Customers |
+| Warehouse operator | Create/edit receipt Drafts and post when authorized |
+| Manager/auditor | Inspect current Stock Balance, Stock Card and ledger/balance reconciliation |
 
-A person may carry more than one role; direct user permission exceptions override role grants.
+One account may hold several roles. For ordinary users, an explicit user decision overrides role grants. The configured database-bound superuser is a separately protected identity; Administrator is an ordinary role name.
 
-## 3. In scope by release
+## 3. Local v1 scope
 
-### v1 (P0–P6)
-- Dual runtime desktop hosts: .NET Framework 4.8 and .NET 8 Windows.
-- SQL Server local/intranet deployment; in-process Application execution via LocalApiClient.
-- Login, authorization, safe legacy-password transition, guarded bootstrap of one configured superuser, code-defined permission catalog and deliberate user/role assignments.
-- P5 catalog: Products, Warehouses, Employees, Customers.
-- Goods Receipt with header, lines, Draft/Posted lifecycle.
-- Ledger-backed stock balance and stock card, concurrency-safe posting.
-- Audit fields, log correlation, DbUp schema migration, deployment verification.
+- Active .NET Framework 4.8 desktop and separate net48 administrator migrator; AppCore/modern product targets remain parked under ADR 0008.
+- SQL Server local/intranet deployment, Local adapter, Application authorization, Login/logout/idle session handling, current configured-superuser bootstrap and deliberate security administration.
+- Four catalogs; Goods Receipt header/lines with Draft/Posted lifecycle; Stock Ledger, derived Stock Balances and Stock Card.
+- UTC audit fields, correlated/redacted diagnostics, DbUp migrations and explicit schema/deployment verification.
+- Existing password hash/salt columns and an algorithm-aware legacy boundary; legacy account support requires approved vectors or a separately accepted release exclusion.
 
-### v2 (P7)
-- ASP.NET Core 8 Web API with secured endpoints.
-- HttpApiClient corresponding to supported Desktop API interfaces.
-- Matching request/response semantics, errors and permission checks.
-- Contract and integration tests across Local and HTTP modes.
+Product persistence is currently RepoDb/Dapper; L2DB changes its implementation after RESP, preserving workflows and contracts. Respawn changes test infrastructure only.
 
-## 4. Explicitly out of scope for P5
-Sales orders, sales invoices, stock issues, purchase ordering, payment, receivables/payables, accounting, tax calculation, cost valuation/COGS, multiple UoM conversion, reservations, returns, serial/lot tracking, multi-tenant data isolation, offline synchronization, distributed transactions, and warehouse transfers. They need future approved plans.
+## 4. Acceptance behavior
 
-### Naming
-"Sales & Inventory Foundation" describes a foundation for later sales workflows. **P5 does not implement outbound sales.**
+**Catalogs:** enforce stable unique codes and server validation. New-document lookups show eligible active records; historical references remain readable. Filtering is debounced, cancellable and resistant to stale responses; explicit Refresh is immediate. Same-process catalog-change messages refresh already-open lookups without silently losing a historical selection.
 
-## 5. End-user scenarios / acceptance
+**Draft receipt:** one warehouse, an employee and at least one valid product line; positive quantity and nonnegative cost. Duplicate products are rejected by the implemented unique constraint. Save/edit validates the opaque expected-version token; stale edits fail without replacing accepted state.
 
-**Catalog CRUD:** operator can list/filter/create/edit/activate/deactivate each of the four catalogs (with stable unique codes, validation, permission checks); lookups exclude inactive items for new documents, without breaking historical references.
+**Posting:** authorized Post changes receipt status, writes each ledger movement and updates balances within one explicit transaction. Sequential/concurrent retries cannot duplicate posting. A failure rolls back all changes. Posted receipts are immutable; no reversal workflow is currently included.
 
-**Draft receipt:** operator creates a warehouse-specific receipt, sets employee and at least one product line, quantity > 0, nonnegative unit cost; can edit Draft. Server, not UI, validates constraints.
+**Stock inquiry:** balance/card queries apply authorization, filters, deterministic paging/order, UTC semantics and historical entity visibility. Users do not edit balances or ledger directly. Reconciliation compares them against one consistent SQL state.
 
-**Posting:** authorized user posts a Draft once. Posting atomically transitions document status, writes a ledger entry for each line and increments balances. Retries or simultaneous attempts create no duplicate postings. Posted documents are read-only in P5.
+**Security:** authenticated active account and Active registered permission are required. Unknown/deprecated keys deny, including for the superuser. Current binding protects superuser bypass; other users receive access only through explicit assignments. Unauthorized operations leave business data unchanged.
 
-**Stock inquiry:** current balance per warehouse/product and chronological stock card are queryable using Dapper DTOs. Queries respect permissions and produce deterministic sorting and paging.
+**Session:** real Login establishes the process-local session; logout/expiry requires reauthentication and prevents stale UI results from becoming another user's state. Actor snapshots preserve already admitted operation attribution. No P7 bearer session is emulated in Local Mode.
 
-**Security:** unknown permission denies; explicit user Granted=false overrides all role grants. Unauthorized commands do not mutate data.
+## 5. Business invariants
 
-**Consistency:** if any posting step fails, receipt stays Draft and ledger/balance are unchanged. Concurrent receipts to same warehouse/product preserve total quantity.
+Use the checked-in migrations and [Data model](DATA_MODEL.md) for exact types, constraints and indexes. Quantities use decimal(18,4), line unit costs decimal(19,4), and server UTC audit values. Receipt numbers are generated by the non-cycling SQL sequence; gaps are allowed, reuse is not.
 
-## 6. Core business rules
+Posting must be all-or-nothing and idempotent within its SQL boundary. Concurrency tests use independent sessions. Ledger is append-only and balances are derived. Deactivate referenced catalog records instead of deleting history.
 
-- Single warehouse per receipt; one product and quantity per detail line; different lines may refer to the same product only if business rules explicitly allow and aggregation is transactionally correct (default: reject duplicate product per receipt).
-- Code uniqueness case/collation behavior must be explicit in SQL and mirrored by validation; DB unique constraints are final arbiter.
-- Receipt numbers cannot be reused; initial strategy may use server-generated unique numbers (not UI-generated sequential numbers).
-- Quantities use `decimal(18,4)`; monetary unit costs `decimal(19,4)` (proposed baseline).
-- Creation/update audit fields are UTC; client UI converts for display.
-- Posted documents are immutable; reversal/cancellation will be a separate approved workflow.
-- Balances are derived materializations, never edited directly by users; ledger is an append-only audit source.
+## 6. Quality and release requirements
 
-## 7. Non-functional requirements / quality gates
+Keep DB work off the UI thread, with bounded timeouts/cancellation, loading/empty/error states and field validation. Headless GUI failures cannot leave modal dialogs blocking a process. Do not log passwords, hashes, salts, connection strings, raw SQL parameters or authentication material.
 
-- Runs on supported Windows environments with .NET 4.8 and .NET 8 desktop hosts.
-- No modal WinForms exception dialogs block CI/headless runs.
-- SQL Server integration tests cover transaction and concurrency; a clean database migrates reproducibly.
-- Keep UI responsive: no blocking DB work on UI thread; cancellation, loading/error states.
-- No hardcoded credentials or connection strings; logging avoids passwords, hashes and sensitive auth artifacts.
-- Permission checks exist in Application/backend paths (and in remote endpoints at HTTP boundary).
-- Avoid unstable "exactly-once" claims outside the database transaction; prove idempotent posting via unique constraints and conditional status transition.
+Product completion requires behavioral evidence under [TEST_POLICY](TEST_POLICY.md). P5 interactive checks and P6 clean-install/upgrade/recovery, principal/credential, diagnostics/audit, packaged GUI and release sign-off remain [OPEN / DEFERRED](DEFERRED_WORK.md). A successful developer build is not installed-host evidence. The current release schema-metadata discrepancy must be resolved before release acceptance.
 
-## 8. Release gates
+## 7. Deferred scope
 
-- P0–P4 foundational gates documented in `docs/DEVELOPMENT_PLAN.md`.
-- The current configured-superuser bootstrap and deliberate permission administration workflow, plus real Login/logout/session behavior, must be verified **before authenticated P5 GUI acceptance and P6 release**. Historical P3.1 sync evidence does not validate the replacement workflow.
-- P5 complete only when all scenarios above have automated evidence plus GUI smoke checks.
-- P6 complete when scripted clean-install/upgrade/rollback-operational guidance exists and both desktop hosts are verified.
-- P7 complete when local and HTTP adapter contract parity tests pass.
+HTTP Server.Api/HttpApiClient, bearer authentication and Local/HTTP parity are P7 work after an explicit runtime/release decision. Product .NET 8 reactivation is separate from the current net48 infrastructure roadmap.
 
-## 9. Open product decisions (not blockers for P0)
+Sales orders/invoices, outbound stock, returns/reversal, pricing, accounting/tax/valuation, transfers, reservations, lots/serials, multiple units, multi-tenancy, offline synchronization and distributed transactions require future approved scope. Customers remain a standalone catalog in this foundation.
 
-- Exact product/customer/employee names and nullable contact fields; ID type/seed policy.
-- Initial SQL Server version/editions and installation topology.
-- Whether users can select the warehouse after any lines exist (proposed: yes, before posting, with revalidation).
-- Long-term financial valuation, warehouse transfers and multi-tenant needs (future phase).
-
-Codex should not invent unapproved modules to resolve these; use narrow reversible defaults for P5 and record choices.
+The future SQL/Windows support topology, legacy-account support or exclusion, signing/distribution and runtime lifecycle decisions belong to release planning. Codex should use the implemented contracts now, rather than reopening resolved P0/P5 design questions.
