@@ -35,9 +35,11 @@ internal sealed class PilotConnections : IDbConnectionFactory, IDisposable, IObs
     public long RoundTrips => (long)(_last!.RetrieveStatistics()["ServerRoundtrips"]!);
     public IDbConnection OpenConnection() => OpenConnectionAsync(CancellationToken.None).GetAwaiter().GetResult();
     public async Task<IDbConnection> OpenConnectionAsync(CancellationToken token)
-    { _last = new SqlConnection(_connectionString);
+    {
+        _last = new SqlConnection(_connectionString);
         try { await _last.OpenAsync(token); _last.StatisticsEnabled = true; return _last; }
-        catch { _last.Dispose(); throw; } }
+        catch { _last.Dispose(); throw; }
+    }
 }
 
 // Temporary three-slice pilot. Never registered by production composition; remove in T06.
@@ -50,8 +52,10 @@ internal sealed class ProductPilot
     private readonly LinqToDbSessionFactory _sessions;
     public ProductPilot(ISqlExecutionContext context, IDbConnectionFactory connections, bool candidate)
     {
-        _context = context; _candidate = candidate; _oldWrites = new(context); _oldReads = new(connections);
+        _context = context; _candidate = candidate;
         _sessions = new(connections, new LinqToDbMappingSchemaProvider(new ILinqToDbMapping[] { new ProductMapping() }));
+        // After T03 the production side is LINQ too; retain the independent temporary pilot/native oracles until T06.
+        _oldWrites = new(context, _sessions); _oldReads = new(_sessions);
     }
     public async Task<int> Insert(Product p)
     {

@@ -35,6 +35,8 @@ namespace MyDmsVn.Server.Infrastructure
             services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
             services.TryAddSingleton<LinqToDbMappingSchemaProvider>();
             services.TryAddSingleton<ILinqToDbSessionFactory, LinqToDbSessionFactory>();
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<ILinqToDbMapping, CatalogLinqToDbMapping>());
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.TryAddScoped<SqlIdentityStore>();

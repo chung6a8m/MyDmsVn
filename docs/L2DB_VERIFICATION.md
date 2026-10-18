@@ -536,3 +536,65 @@ L2DB-PILOT-01 is resolved; RELEASE-MANIFEST-01 is closed narrowly; Product batch
 **Next active task: L2DB-T03.** T03–T06 are no longer blocked by T02; each retains its own dependencies/tests. No T03 code was implemented in this approval turn. Keep the T06 pilot removal/native-oracle retention obligation; there is no production provider flag or permanent dual-provider fallback.
 
 Local probe source SHA256 (audit binding only; source contains no credentials): `b31e8557b4204c05a99b753a0a87d6067bb0c05123b877b25575358166cbf02b`.
+
+
+## L2DB-T03 — Catalog conversion
+
+**Base:** `b6c38db6415b438320b8867cd4f8792c1d663862`, same isolated `codex/l2db-t00` worktree. **T03 complete** with the final scoped gate below. T02 final GO is the entry evidence; T03 does not redo the completed one-login startup exception or authorize another server login.
+
+### Implementation and rulings
+
+All four production Catalog write paths now use the internal T01 session factory, a per-operation borrowed wrapper and explicit typed Value/Set allowlists. Inserts return identities and exclude server creation time, identity and update audit; ordinary updates exclude creation audit and active state; SetActive touches only active/update audit. Missing updates remain null/false. Employee duplicate-code, unique UserId and SQL547 mappings retain the existing conflict categories. No catalog concurrency token or new business contract is introduced.
+
+CatalogLinqToDbMapping is explicitly registered with Microsoft DI and maps dbo table/key aliases, identity, Unicode lengths, nullable columns and DateTime2/Int32/Boolean metadata. Standalone typed GetById/Lookup own their T01 wrapper, filter/order/Take before materializing and return only DTO arrays/results. Four native paged-list calls use the documented T02 escape: one COUNT_BIG + page batch, typed Search/Bit/BigInt/Int parameters, CHARINDEX and unchanged Code/key ordering with long offsets. Request values are parameterized; identifiers/projections are private constants. SQL shape/round trips are asserted independently for all four catalogs.
+
+**Ruling:** retain the original RepoDb mapping Configure implementation under Persistence as a temporary bridge for unchanged Inventory reference reads, not as a Catalog command/query fallback. Inventory still loads Warehouse/Employee via RepoDb in the same UoW; removing those mappings before T04 would break uncommitted reference visibility. The bridge remains explicit in DI and is removed with its final consumers in T04/T06. Cost if wrong: reference loading during mixed-provider transactions would fail; the new interoperability/rollback case and I/FastSQL gate cover that risk. No UoW, session factory, Inventory algorithm, SQL/grant, schema, package pin/lock or TFM change is included.
+
+The historical Catalog mapping-case method ID/name is retained because the accepted reuse adapter invokes that method directly. Its provider-specific body now uses registered LINQ mapping writes and independent native SQL identity/field/DateTime2/audit assertions; original behavior/rows are retained, with audit-user checks strengthened. Fixture reset/seed/ownership/drain/poison/admission/adapter bytes remain unchanged. The first creation-default case still has its pre-existing independent Dapper oracle; fixture/test oracle dependency cleanup remains T06, not a product fallback.
+
+ProductPilot's constructor mechanically uses the new production signatures. After T03, its old/candidate labels mean production LINQ versus the temporary candidate prototype; they no longer represent a live RepoDb Product path. Its independently asserted native results, generated/audit/active/error/search/batch boundaries and logical IDs remain. T02's old-RepoDb comparison evidence stays historical. No permanent dual-provider production flag was added.
+
+### Verification trajectory and selected scope
+
+New migration cases cover typed mapping/native audit reads, Warehouse/Employee/Customer identity/nullables/create-update-active allowlists/errors, employee linkage insert/update/unlink, four-catalog literal Unicode/null/blank search/stable pages/lookup limits/Int64 offsets, late-Begin shared UoW with still-native/RepoDb receipt references and rollback, cancellation without write/transaction loss, and SQL rejection of overlong fields without silent truncation.
+
+The first attempt failed compilation because the test lacked the LinqToDB.Data namespace for ExecuteAsync; it is not feature RED. After that harness import fix, the six initial new cases produced **5 passed / 1 failed / 0 skipped** on the old DAL: the registered LINQ mapping was absent. The existing behavior/oracle cases passed on the baseline. Conversion then produced **6/0/0**; the additional SQL-overlength boundary separately passed **1/0/0**. An exploratory 4001-character search failed inside the native CHARINDEX oracle before any candidate call; it was removed from the supported-input parity matrix. Application's existing MaximumSearchLength is256 and validation is covered by A/CatalogApplicationTests. This harness failure is not a provider regression or a hidden passing test.
+
+An initial C/FastSQL checkpoint was18/1/0 solely because of that unsupported oracle input; after correcting the matrix, C passed19/0/0 and I/FastSQL passed24/0/0. These are intermediate results before the final mapping-metadata clarification. Independent read-only review found no P1/P2 behavior issue; extra EOF whitespace was removed and explicit nullability was checked against sys.columns before finalization. The nullability concern produced a real metadata RED (0/1/0 against sys.columns); explicit IsNullable(true)/IsNotNull annotations for every Catalog column resolved it. The final full required scopes below ran after that repair. No review finding remains deferred.
+
+Required T03 scopes are C/FastSQL, I/FastSQL, A/CatalogApplicationTests and D's CatalogViewModelTests/CatalogLookupViewModelTests/GoodsReceiptProductOptionsViewModelTests. Focused F LINQ-session/mapping cases and unfiltered X also cover the explicit mapping-registration/provider seam without changing common ownership implementation. M/O/S/GUI/full-repository and final package/manual release workflows are outside this local Catalog change; no historical run is relabeled as current. Projects execute sequentially under the explicit designated SQL master configuration, default fixture reuse and absent fault probes; no environment mutation or retired framework is introduced.
+
+Final source includes seven new single-row SQL Facts: all-owner IDs644; six SQL owners263 methods /294 invocations (194 SQL /100 non-SQL). These are source inventory totals, not this task's actual pass counts. Required methods/rows and final code are reconciled below before closing T03 checkboxes.
+
+
+### Final T03 gate and retained native SQL
+
+All commands used the actual net48 projects, Release, locked restore and no-restore test invocation. Each project completed before the next began; no SQL/GUI commands overlapped. Source-verified filters were C/I Category=FastSQL, F FullyQualifiedName~LinqToDb, unfiltered X, A FullyQualifiedName~CatalogApplicationTests and D the three ViewModel classes listed above. Results are in ignored/local `TestResults/l2db-t03-gate-<owner>/cases.trx` and corresponding local logs.
+
+| Owner / selected scope | Passed / failed / skipped | TRX elapsed seconds |
+|---|---:|---:|
+| C / Catalog.Tests | 19/0/0 | 34.76 |
+| I / Inventory.Tests | 24/0/0 | 105.83 |
+| F / Foundation.Tests | 15/0/0 | 11.04 |
+| X / Architecture.Tests | 10/0/0 | 4.30 |
+| A / Application.Tests | 14/0/0 | 4.94 |
+| D / Session.Tests | 43/0/0 | 3.77 |
+| **Total selected scopes** | **125/0/0** | - |
+
+Reconciled **123 methods /125 invocations** against the case ledger, including exact Theory-row cardinalities, unique test display names, no aborts and zero skipped mandatory cases. This is **54 SQL /71 non-SQL invocations**; F's15 includes four pure cases. Overlapping intermediate/RED/GREEN runs and nested reusable-fixture scenarios are not added to125. The original cases/rows remain, plus seven new Catalog Facts; the retained historical mapping Fact now proves LINQ/native boundaries rather than RepoDb adapter behavior.
+
+The final mapping/native oracle asserts sys.columns nullability matches every mapped Catalog column, exact server-generated audit timestamps and no invented version property. Its RED showed implicit metadata differed from schema; explicit metadata then passed as part of C19. The overlong Unit/Address/Phone/TaxCode SQL case proves no silent truncation. Product's existing native oracle and full Catalog CRUD/Local error tests still pass. Actual Product/Warehouse/Employee/Customer list calls each retain exactly one observed COUNT_BIG/BigInt-offset batch; typed Get/Lookup filter/order/limit before materialization. Reference reads see uncommitted new Catalog rows through the same UoW/SPID and rollback leaves no participating rows.
+
+| Retained native surface | Justification / ownership |
+|---|---|
+| SqlCatalogPageReader.ReadAsync, four Catalog ListAsync calls | T02-approved one COUNT_BIG+page batch; CHARINDEX literal search, long offsets and stable ordering. Owned standalone T01 wrapper; typed request parameters; no new grant/schema |
+| Existing Inventory lock/reference/post/balance SQL | Unchanged algorithm and explicit current UoW transaction. RepoDb Warehouse/Employee reference mapping bridge remains temporarily under Persistence; T04/T06 own final conversion/removal |
+| Temporary ProductPilot native list/oracles | Test-only prototype; T06 removal/independent-oracle retention obligations remain |
+
+All final commands and guarded cleanup completed normally. Catalog/Inventory collection diagnostics report successful owned drops; dedicated fresh exception disposal and Foundation ownership/session assertions passed. No killed testhost, unresolved quarantine/cleanup allocation or external recovery was reported. No global leftover census or prefix/orphan deletion was attempted. Fixtures/SQL helpers/accepted adapter bytes and all reset/seed/drain boundaries are unchanged; only the explicitly migrated Catalog mapping-test body replaces a provider-specific probe. M/O/S, I/SqlConcurrency, full GUI, release packaging and attended workflows were NOT RUN: no shared UoW/session/SQL/security/fixture implementation or dependency graph changed, and those wider task/milestone obligations remain T04/T05/T06/T07. T02 startup evidence remains tied to its older package revision, not relabeled as T03 package acceptance.
+
+The independent source reviewer found no P1/P2 business behavior issue. Both metadata/format notes were resolved; nullability is now independently schema-checked and passed final C19. The transitional bridge ruling is explicit above and its failure boundary is covered by the mixed-provider test plus I24. No unresolved review finding or unrecorded plan deviation remains.
+
+**Frozen code manifest SHA256:** `10d1760537505f1a7bd600471214dff91844e3d76a7f9ce9c38f2fa7b4718c74`. Convention: twelve changed/new/deleted .cs paths, sorted repository-relative path/NUL/raw CRLF bytes/NUL; deleted paths contribute literal `<deleted>` instead of bytes, using git diff --no-renames. Ten files exist and two old Catalog files are deleted (the mapping is relocated under Persistence with its Configure body unchanged). The containing commit binds these bytes, final tests and evidence. No package/pin/lock/TFM, Domain/Application/Contracts, Inventory/Security algorithm, production SQL/grant, UoW/session implementation or fixture/helper changes. Static checks verify644 unique logical IDs, links, BOM/CRLF, diff whitespace, explicit DI and zero RepoDb/Dapper references in production Catalog.
+
+**L2DB-T03 complete. Next active task: L2DB-T04.** Production Catalog commands and queries are now LINQ/native; Inventory, Identity/Security and operational consumers retain their previous implementations until their planned tasks. No permanent fallback/provider switch was added. T07's final unfiltered matrix, packaged/manual workflows and release acceptance remain open; existing Pkcs advisory risk is unchanged.

@@ -3,8 +3,9 @@ using MyDmsVn.Server.Domain.Catalog;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using RepoDb;
 
-namespace MyDmsVn.Server.Infrastructure.Catalog;
+namespace MyDmsVn.Server.Infrastructure.Persistence;
 
+// Transitional bridge for unchanged Inventory reference reads and retained adapter probes; remove in T06.
 internal sealed class CatalogRepoDbMapping : IRepoDbMapping
 {
     public void Configure()

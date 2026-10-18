@@ -1,12 +1,12 @@
 # Architecture — MyDmsVn
 
-**Status:** Current Local v1 architecture, refreshed against `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5` on 2026-10-18. The subsequent test-framework removal preserves this product baseline; neither active plan is implemented.
+**Status:** Current Local v1 architecture, refreshed against `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5` on 2026-10-18. RESP and L2DB-T00–T03 have since gained scoped evidence; Catalog now uses the new DAL, with remaining module conversion and release acceptance pending.
 
 ## 1. Current system and approved direction
 
 MyDmsVn is a Windows desktop modular monolith organized into Identity, Catalog and Inventory with Clean Architecture boundaries. The current product runs on `net48`: WinForms calls Desktop.Application API abstractions, the Local adapter dispatches in-process through Server.Application, and Infrastructure accesses SQL Server.
 
-The [two active plans](plans/README.md) execute in this order: [RESP fixture reuse](plans/20261018-002-respawn-fixture-reuse.md) establishes an accepted test baseline with the current RepoDb/Dapper DAL; [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) then replaces application persistence with LINQ to DB plus a bounded native SqlClient surface. DbUp remains the schema owner. Until verified cutover, RepoDb commands, Dapper projections/procedures and existing native SqlClient operations are the delivered implementation.
+The [two active plans](plans/README.md) execute in this order: [RESP fixture reuse](plans/20261018-002-respawn-fixture-reuse.md) establishes an accepted test baseline with the current RepoDb/Dapper DAL; [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) then replaces application persistence with LINQ to DB plus a bounded native SqlClient surface. DbUp remains the schema owner. [L2DB-T03](L2DB_VERIFICATION.md#l2db-t03--catalog-conversion) now delivers Catalog LINQ writes/typed queries and native paged lists. Remaining Inventory/Identity/Security consumers still use RepoDb/Dapper/native operations until their verified tasks; final cutover remains pending.
 
 HTTP v2 remains deferred backlog. Its design preserves the same ViewModels, feature API interfaces, DTOs and Application behavior, with an HTTP adapter and a separately trusted API host. It requires a separate runtime decision before implementation; neither active plan creates an HTTP host or restores a modern product target.
 
