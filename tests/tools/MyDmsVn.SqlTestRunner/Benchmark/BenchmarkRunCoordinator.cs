@@ -10,6 +10,7 @@ using MyDmsVn.SqlTestRunner.Processes;
 using MyDmsVn.SqlTestRunner.Reconciliation;
 using MyDmsVn.SqlTestRunner.Reporting;
 using MyDmsVn.SqlTestRunner.Trx;
+using MyDmsVn.SqlTestRunner.Gates;
 
 namespace MyDmsVn.SqlTestRunner.Benchmark;
 
@@ -87,6 +88,11 @@ public sealed class BenchmarkRunCoordinator
             return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
         }
 
+        if (TestGateArtifactPathPlanner.FindOverBudgetPaths(options.ArtifactRoot).Count != 0)
+        {
+            return new BenchmarkRunResult(false, runs, recovery.RecoveryRequired);
+        }
+
         foreach (var tfm in options.TargetFrameworks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -136,17 +142,19 @@ public sealed class BenchmarkRunCoordinator
 
                 var label = pass.Kind.ToString().ToLowerInvariant() + "-" + pass.Number.ToString("00");
                 var executionId = baselineId + "-" + label + "-" + tfm.Replace('.', '-');
-                var trxName = "sqlperf-" + executionId + ".trx";
-                var timingName = "timings-" + executionId + ".jsonl";
+                var physicalId = TestGateArtifactPathPlanner.NewPhysicalId();
+                var trxName = "t-" + physicalId + ".trx";
+                var timingName = "m-" + physicalId + ".jsonl";
                 var timingPath = Path.Combine(options.ArtifactRoot, timingName);
                 var journalDirectory = Path.Combine(
                     options.ArtifactRoot,
                     "ownership",
-                    executionId);
+                    physicalId);
                 var recoveryPath = Path.Combine(
                     options.ArtifactRoot,
-                    "ownership-recovery-" + executionId + ".json");
+                    "recovery-" + physicalId + ".json");
                 Directory.CreateDirectory(journalDirectory);
+                TestGateArtifactPathPlanner.WriteLogicalRunId(journalDirectory, executionId);
                 var arguments =
                     "test \"" + options.TestProject + "\" -c Release -f " + tfm +
                     " --no-build --no-restore --logger \"trx;LogFileName=" + trxName +

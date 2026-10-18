@@ -161,12 +161,14 @@ public sealed class TestGateRepositoryContractTests
         var root = RepositoryRoot();
         var sourceCases = new List<BoundLogicalCase>();
         var discoveryCases = new List<BoundLogicalCase>();
+        var auditFailures = new List<string>();
         foreach (var owner in manifest.LogicalCases.Select(item => item.OwnerProject)
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!evidence.Source.TryGetValue(owner, out var source))
             {
-                return false;
+                auditFailures.Add(owner + "|source inventory missing");
+                continue;
             }
 
             var historicalFrameworks = manifest.LogicalCases.Where(item => string.Equals(
@@ -182,7 +184,8 @@ public sealed class TestGateRepositoryContractTests
             {
                 if (!evidence.Discovery.TryGetValue((owner, tfm), out var discovered))
                 {
-                    return false;
+                    auditFailures.Add(owner + "|" + tfm + "|discovery inventory missing");
+                    continue;
                 }
 
                 var sourceBinding = LogicalCaseBinder.BindSource(
@@ -199,24 +202,36 @@ public sealed class TestGateRepositoryContractTests
                 if (!sourceBinding.IsComplete || !discoveryBinding.IsComplete)
                 {
                     var expectedLocators = manifest.LogicalCases
-                        .Where(item => string.Equals(item.OwnerProject, owner, StringComparison.OrdinalIgnoreCase))
+                        .Where(item => string.Equals(item.OwnerProject, owner, StringComparison.OrdinalIgnoreCase) &&
+                            item.Frameworks.Contains(tfm, StringComparer.Ordinal))
                         .SelectMany(item => item.Rows)
                         .Where(row => row.LocatorSha256 is not null)
                         .Select(row => row.LocatorSha256!)
                         .ToHashSet(StringComparer.Ordinal);
-                    var actualLocators = discovered.Select(item => item.PhysicalRowLocator)
+                    var theoryMethods = source.Where(method => method.IsTheory)
+                        .Select(method => method.NormalizedSignature.IndexOf('(') is var index && index >= 0
+                            ? method.NormalizedSignature.Substring(0, index)
+                            : method.NormalizedSignature)
                         .ToHashSet(StringComparer.Ordinal);
-                    _lastAuditFailure = owner + "|" + tfm + "|" + string.Join(
-                        ",",
-                        sourceBinding.Failures.Concat(discoveryBinding.Failures)) +
-                        $"|discovered={discovered.Count}|missingLocators={expectedLocators.Except(actualLocators).Count()}" +
-                        $"|extraLocators={actualLocators.Except(expectedLocators).Count()}";
-                    return false;
+                    var actualLocators = discovered.Where(item => theoryMethods.Contains(item.MethodName))
+                        .Select(item => item.PhysicalRowLocator)
+                        .ToHashSet(StringComparer.Ordinal);
+                    auditFailures.Add(owner + "|" + tfm + "|" + string.Join(
+                        ",", sourceBinding.Failures.Concat(discoveryBinding.Failures)) +
+                        $"|discovered={discovered.Count}|missingTheoryRows={expectedLocators.Except(actualLocators).Count()}" +
+                        $"|extraTheoryRows={actualLocators.Except(expectedLocators).Count()}");
+                    continue;
                 }
 
                 sourceCases.AddRange(sourceBinding.Cases);
                 discoveryCases.AddRange(discoveryBinding.Cases);
             }
+        }
+
+        if (auditFailures.Count > 0)
+        {
+            _lastAuditFailure = string.Join(Environment.NewLine, auditFailures);
+            return false;
         }
 
         var expected = sourceCases.Select(item => new ExpectedLogicalCase(
@@ -255,6 +270,8 @@ public sealed class TestGateRepositoryContractTests
     private static RepositoryEvidence LoadEvidence()
     {
         var root = RepositoryRoot();
+        var isolatedOutputRoot = Environment.GetEnvironmentVariable("MYDMSVN_TESTGATE_INVENTORY_ROOT");
+        var isolatedBuildProps = Environment.GetEnvironmentVariable("MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS");
         var manifest = LoadManifest();
         var source = new Dictionary<string, IReadOnlyList<TestMethodDescriptor>>(StringComparer.OrdinalIgnoreCase);
         var discovery = new Dictionary<(string Owner, string Tfm), IReadOnlyList<DiscoveredTestCase>>();
@@ -269,12 +286,23 @@ public sealed class TestGateRepositoryContractTests
                 owner,
                 historical,
                 IsSqlOwner(manifest, owner));
-            var assembly = Path.Combine(root, Path.GetDirectoryName(owner)!, "bin", "Release", frameworks[0],
-                Path.GetFileNameWithoutExtension(owner) + ".dll");
+            var assembly = IsolatedAssemblyPath(isolatedOutputRoot, owner, frameworks[0]);
+            if (!File.Exists(assembly))
+            {
+                assembly = Path.Combine(root, Path.GetDirectoryName(owner)!, "bin", "Release", frameworks[0],
+                    Path.GetFileNameWithoutExtension(owner) + ".dll");
+            }
             source[owner] = TestMethodInventory.Read(assembly);
             foreach (var framework in frameworks)
             {
-                discovery[(owner, framework)] = Discover(root, owner, framework);
+                var isolatedAssembly = IsolatedAssemblyPath(isolatedOutputRoot, owner, framework);
+                discovery[(owner, framework)] = Discover(
+                    root,
+                    owner,
+                    framework,
+                    File.Exists(isolatedAssembly),
+                    isolatedOutputRoot,
+                    isolatedBuildProps);
             }
         }
 
@@ -360,13 +388,26 @@ public sealed class TestGateRepositoryContractTests
     private static IReadOnlyList<DiscoveredTestCase> Discover(
         string root,
         string project,
-        string tfm)
+        string tfm,
+        bool useIsolatedOutput,
+        string? isolatedOutputRoot,
+        string? isolatedBuildProps)
     {
+        var adapterPath = TestAdapterPathResolver.Resolve(root, project, tfm);
+        var arguments = $"test \"{project}\" -c Release -f {tfm} --no-build --no-restore " +
+                        "--list-tests --test-adapter-path=\"" + adapterPath + "\"";
+        if (useIsolatedOutput && !string.IsNullOrWhiteSpace(isolatedOutputRoot) &&
+            !string.IsNullOrWhiteSpace(isolatedBuildProps))
+        {
+            arguments += " -p:PreflightOutputRoot=\"" + isolatedOutputRoot.Replace('\\', '/') + "\"" +
+                         " -p:CustomBeforeDirectoryBuildProps=\"" + isolatedBuildProps.Replace('\\', '/') + "\"";
+        }
+
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo(
                 "dotnet",
-                $"test \"{project}\" -c Release -f {tfm} --no-build --list-tests")
+                arguments)
             {
                 WorkingDirectory = root,
                 UseShellExecute = false,
@@ -388,11 +429,24 @@ public sealed class TestGateRepositoryContractTests
 
         if (process.ExitCode != 0)
         {
-            throw new InvalidOperationException("Bounded test discovery failed: " + error);
+            var outputTail = output.Length <= 400 ? output : output.Substring(output.Length - 400);
+            throw new InvalidOperationException(
+                $"Bounded test discovery failed for {project} {tfm} (exit {process.ExitCode}): " +
+                error + outputTail);
         }
 
         return VstestDiscoveryParser.Parse(output, tfm);
     }
+
+    private static string IsolatedAssemblyPath(string? isolatedOutputRoot, string owner, string framework) =>
+        string.IsNullOrWhiteSpace(isolatedOutputRoot)
+            ? string.Empty
+            : Path.Combine(
+                isolatedOutputRoot,
+                Path.GetFileNameWithoutExtension(owner),
+                "Release",
+                framework,
+                Path.GetFileNameWithoutExtension(owner) + ".dll");
 
     private static TestGateManifest LoadManifest() => TestGateManifestLoader.Load(
         Path.Combine(RepositoryRoot(), "tests", "test-gates.v1.json"));

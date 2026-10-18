@@ -121,6 +121,16 @@ SELECT
             DatabaseOwnershipMarker.TryParse(markerValue));
     }
 
+    public async Task<bool> HasOwnedTestDatabasesAsync(CancellationToken cancellationToken)
+    {
+        using var command = CreateCommand(
+            "SELECT COUNT(*) FROM sys.databases WHERE name LIKE N'MyDmsVn[_]Test[_]%';");
+        var count = Convert.ToInt32(
+            await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false),
+            CultureInfo.InvariantCulture);
+        return count != 0;
+    }
+
     public async Task ExecuteAsync(
         string sql,
         IReadOnlyDictionary<string, object?> parameters,

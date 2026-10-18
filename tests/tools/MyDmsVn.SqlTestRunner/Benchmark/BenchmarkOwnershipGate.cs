@@ -10,6 +10,7 @@ using MyDmsVn.SqlTestHarness;
 using MyDmsVn.SqlTestHarness.Approval;
 using MyDmsVn.SqlTestHarness.Ownership;
 using MyDmsVn.SqlTestHarness.Preflight;
+using MyDmsVn.SqlTestRunner.Gates;
 using Newtonsoft.Json;
 
 namespace MyDmsVn.SqlTestRunner.Benchmark;
@@ -30,6 +31,8 @@ public interface IBenchmarkLiveOwnershipReader : IDisposable
     Task<LiveDatabaseOwnership?> ReadAsync(
         string databaseName,
         CancellationToken cancellationToken);
+
+    Task<bool> HasOwnedTestDatabasesAsync(CancellationToken cancellationToken);
 }
 
 public sealed record BenchmarkOwnershipEvidence(
@@ -63,6 +66,12 @@ public sealed class BenchmarkOwnershipGate : IBenchmarkOwnershipGate
         try
         {
             var approval = SqlInstanceApprovalLoader.Load(evidence.ApprovalFile);
+            if (!TestGateArtifactPathPlanner.IsValidJournalLayout(
+                    evidence.JournalDirectory, evidence.ExecutionId))
+            {
+                throw new InvalidDataException("The ownership journal contains unexpected or incomplete files.");
+            }
+
             var journal = new FileDatabaseOwnershipJournal(evidence.JournalDirectory);
             var allRecords = (await journal.ReadAllAsync(cancellationToken).ConfigureAwait(false))
                 .ToArray();
@@ -85,7 +94,27 @@ public sealed class BenchmarkOwnershipGate : IBenchmarkOwnershipGate
                 .ToArray();
             if (allRecords.Length == 0)
             {
-                issues.Add(RecoveryEntry.EmptyJournal());
+                var hasValidatedMapping = File.Exists(Path.Combine(
+                    evidence.JournalDirectory, TestGateArtifactPathPlanner.LogicalRunIdFileName));
+                if (!hasValidatedMapping)
+                {
+                    issues.Add(RecoveryEntry.EmptyJournal());
+                }
+                else
+                {
+                    using var reader = _readerFactory();
+                    await reader.OpenAsync(cancellationToken).ConfigureAwait(false);
+                    var identity = await reader.ReadIdentityAsync(cancellationToken).ConfigureAwait(false);
+                    if (identity is null ||
+                        !string.Equals(
+                            SqlInstanceFingerprint.Create(identity),
+                            approval.FingerprintSha256,
+                            StringComparison.Ordinal) ||
+                        await reader.HasOwnedTestDatabasesAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        issues.Add(RecoveryEntry.EmptyJournal());
+                    }
+                }
             }
             else if (records.Length > 0)
             {
@@ -274,6 +303,9 @@ internal sealed class SqlBenchmarkLiveOwnershipReader : IBenchmarkLiveOwnershipR
         string databaseName,
         CancellationToken cancellationToken) =>
         _session.ReadDatabaseOwnershipAsync(databaseName, cancellationToken);
+
+    public Task<bool> HasOwnedTestDatabasesAsync(CancellationToken cancellationToken) =>
+        _session.HasOwnedTestDatabasesAsync(cancellationToken);
 
     public void Dispose() => _session.Dispose();
 }

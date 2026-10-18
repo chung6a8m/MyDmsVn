@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using MyDmsVn.SqlTestHarness.Approval;
 using MyDmsVn.SqlTestHarness.Ownership;
 using MyDmsVn.SqlTestRunner.Benchmark;
+using MyDmsVn.SqlTestRunner.Gates;
 using Xunit;
 
 namespace MyDmsVn.SqlTestRunner.Tests.Benchmark;
@@ -121,6 +122,36 @@ public sealed class BenchmarkOwnershipGateTests
         Assert.True(File.Exists(fixture.RecoveryPath));
     }
 
+    [Fact]
+    public async Task New_layout_metadata_only_journal_completes_after_approved_instance_has_no_test_databases()
+    {
+        using var fixture = new Fixture();
+        Directory.CreateDirectory(fixture.JournalDirectory);
+        TestGateArtifactPathPlanner.WriteLogicalRunId(fixture.JournalDirectory, "execution-1");
+        fixture.Reader.HasOwnedTestDatabases = false;
+
+        var result = await fixture.ValidateAsync();
+
+        Assert.True(result.IsComplete);
+        Assert.Null(result.RecoveryArtifactPath);
+        Assert.True(fixture.Reader.TestDatabaseAbsenceWasChecked);
+    }
+
+    [Fact]
+    public async Task New_layout_metadata_only_journal_stays_incomplete_when_test_database_is_present()
+    {
+        using var fixture = new Fixture();
+        Directory.CreateDirectory(fixture.JournalDirectory);
+        TestGateArtifactPathPlanner.WriteLogicalRunId(fixture.JournalDirectory, "execution-1");
+        fixture.Reader.HasOwnedTestDatabases = true;
+
+        var result = await fixture.ValidateAsync();
+
+        Assert.False(result.IsComplete);
+        Assert.True(fixture.Reader.TestDatabaseAbsenceWasChecked);
+        Assert.True(File.Exists(fixture.RecoveryPath));
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root = Path.Combine(
@@ -225,6 +256,16 @@ public sealed class BenchmarkOwnershipGateTests
             new Dictionary<string, LiveDatabaseOwnership?>(StringComparer.Ordinal);
 
         public List<string> ReadDatabaseNames { get; } = new List<string>();
+
+        public bool HasOwnedTestDatabases { get; set; }
+
+        public bool TestDatabaseAbsenceWasChecked { get; private set; }
+
+        public Task<bool> HasOwnedTestDatabasesAsync(CancellationToken cancellationToken)
+        {
+            TestDatabaseAbsenceWasChecked = true;
+            return Task.FromResult(HasOwnedTestDatabases);
+        }
 
         public Task OpenAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 

@@ -66,39 +66,16 @@ public sealed class SqlTestClassificationTests
     public void Integration_inventory_is_fully_classified_from_the_reviewed_manifest(string tfm)
     {
         var root = FindRepositoryRoot();
-        var assemblyPaths = new[]
+        var projects = new[]
         {
-            Path.Combine(
-                root,
-                "tests",
-                "MyDmsVn.Server.Infrastructure.IntegrationTests",
-                "bin",
-                "Release",
-                tfm,
-                "MyDmsVn.Server.Infrastructure.IntegrationTests.dll"),
-            Path.Combine(
-                root,
-                "tests",
-                "MyDmsVn.Server.Infrastructure.Catalog.Tests",
-                "bin",
-                "Release",
-                tfm,
-                "MyDmsVn.Server.Infrastructure.Catalog.Tests.dll"),
-            Path.Combine(
-                root,
-                "tests",
-                "MyDmsVn.Server.Infrastructure.Foundation.Tests",
-                "bin",
-                "Release",
-                tfm,
-                "MyDmsVn.Server.Infrastructure.Foundation.Tests.dll"),
-            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", "bin", "Release", tfm,
-                "MyDmsVn.Server.Infrastructure.Security.Tests.dll"),
-            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Inventory.Tests", "bin", "Release", tfm,
-                "MyDmsVn.Server.Infrastructure.Inventory.Tests.dll"),
-            Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Migrations.Tests", "bin", "Release", tfm,
-                "MyDmsVn.Server.Infrastructure.Migrations.Tests.dll"),
+            "tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj",
+            "tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj",
         };
+        var assemblyPaths = projects.Select(project => FixtureAssemblyPath(root, project, tfm)).ToArray();
         var manifestPath = Path.Combine(root, "tests", "tools", "sql-test-nonsql-exemptions.json");
 
         var methodsByProject = assemblyPaths.Select(path => TestMethodInventory.Read(path)).ToArray();
@@ -125,15 +102,42 @@ public sealed class SqlTestClassificationTests
             })
             .Where(item => item.Match is not null && !item.Match.IsMatch)
             .Select(item => item.MethodName + ":" + item.Match!.Failure);
+        var unclassifiedMethods = methods
+            .Where(method => method.Categories.Count == 0 && exemptions.All(exemption =>
+                !string.Equals(exemption.MethodName, method.FullyQualifiedName, StringComparison.Ordinal)))
+            .Select(method => method.FullyQualifiedName);
 
         Assert.True(
             result.IsComplete,
-            string.Join(", ", result.Failures) + Environment.NewLine + string.Join(Environment.NewLine, invalidExemptions));
+            string.Join(", ", result.Failures) + Environment.NewLine +
+            string.Join(Environment.NewLine, invalidExemptions) + Environment.NewLine +
+            string.Join(Environment.NewLine, unclassifiedMethods));
         Assert.All(SqlTestCategories.All, category => Assert.True(result.CategoryCounts[category] > 0));
     }
 
     private static TestMethodDescriptor Method(string name, IReadOnlyList<string> categories) =>
         new TestMethodDescriptor(name, IsTheory: false, "fingerprint", categories);
+
+    private static string FixtureAssemblyPath(string root, string project, string tfm)
+    {
+        var assemblyName = Path.GetFileNameWithoutExtension(project);
+        var isolatedOutputRoot = Environment.GetEnvironmentVariable("MYDMSVN_TESTGATE_INVENTORY_ROOT");
+        var isolatedPath = string.IsNullOrWhiteSpace(isolatedOutputRoot)
+            ? string.Empty
+            : Path.Combine(isolatedOutputRoot, assemblyName, "Release", tfm, assemblyName + ".dll");
+        if (!string.IsNullOrWhiteSpace(isolatedPath) && File.Exists(isolatedPath))
+        {
+            return isolatedPath;
+        }
+
+        return Path.Combine(
+            root,
+            Path.GetDirectoryName(project)!,
+            "bin",
+            "Release",
+            tfm,
+            assemblyName + ".dll");
+    }
 
     private static string FindRepositoryRoot()
     {

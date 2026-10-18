@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -37,6 +38,54 @@ public sealed class TestGateCoordinatorTestsFinal
             "ownership", "reconcile", "report", "release",
         }, events);
         Assert.Equal(new[] { "net48", "net8.0" }, result.Frameworks.Select(item => item.Tfm));
+    }
+
+    [Fact]
+    public async Task Recovered_prior_lease_is_completed_when_current_Final_run_is_clean()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.PriorLeaseRecovered);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.PriorLeaseRecovered),
+            new NoRecovery(),
+            new AcceptSqlManifestPreflight());
+
+        var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Succeeded, result.Status);
+        Assert.NotNull(leases.LastLease);
+        Assert.True(leases.LastLease.IsCompleted);
+        Assert.Contains("release", events);
+    }
+
+    [Fact]
+    public async Task Unreconciled_current_SQL_execution_does_not_complete_its_lease()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.UnreconciledOwnership);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.UnreconciledOwnership),
+            new NoRecovery(),
+            new AcceptSqlManifestPreflight());
+
+        var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.NotNull(leases.LastLease);
+        Assert.False(leases.LastLease.IsCompleted);
+        Assert.Contains("release", events);
     }
 
     [Fact]
@@ -91,6 +140,156 @@ public sealed class TestGateCoordinatorTestsFinal
     }
 
     [Fact]
+    public async Task SQL_manifest_preflight_failure_never_acquires_a_lease()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.None);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.None),
+            new NoRecovery(),
+            new RejectSqlManifestPreflight());
+
+        var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.Equal(new[] { "approval" }, events);
+        Assert.Null(leases.LastLease);
+    }
+
+    [Fact]
+    public async Task Long_artifact_root_is_rejected_before_SQL_preflight_or_lease()
+    {
+        using var repository = new FinalRepository();
+        var events = new List<string>();
+        var leases = new FinalLeaseFactory(events, FinalFailure.None);
+        var coordinator = new TestGateCoordinator(
+            new NoProcessRunner(),
+            new FinalInventory(events),
+            new FinalReport(events, complete: true),
+            new FinalApproval(events, valid: true),
+            leases,
+            new FinalSqlRunner(repository, events, FinalFailure.None),
+            new NoRecovery(),
+            new SqlGateManifestPreflight(new NoProcessRunner(), new FinalInventory(events)));
+        var longArtifactRoot = Path.Combine(Path.GetTempPath(), new string('a', 230));
+
+        var result = await coordinator.RunAsync(
+            repository.Options() with { ArtifactRoot = longArtifactRoot },
+            CancellationToken.None);
+
+        Assert.Equal(TestGateRunStatus.Incomplete, result.Status);
+        Assert.Empty(events);
+        Assert.Null(leases.LastLease);
+    }
+
+    [Fact]
+    public async Task SQL_manifest_preflight_uses_a_unique_output_root_for_each_invocation()
+    {
+        using var repository = new FinalRepository();
+        var processes = new OverlappingManifestDiscoveryProcessRunner();
+        var manifest = TestGateManifestLoader.Load(repository.Manifest);
+
+        var first = new SqlGateManifestPreflight(
+            processes, new FinalInventory(new List<string>())).VerifyAsync(
+                repository.Options(), manifest, manifest.Gates, CancellationToken.None);
+        var second = new SqlGateManifestPreflight(
+            processes, new FinalInventory(new List<string>())).VerifyAsync(
+                repository.Options(), manifest, manifest.Gates, CancellationToken.None);
+        var bothBuilds = await Task.WhenAny(
+            processes.BothBuildsStarted.Task,
+            Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Same(processes.BothBuildsStarted.Task, bothBuilds);
+        processes.ReleaseBuilds.TrySetResult(true);
+        var results = await Task.WhenAll(first, second);
+
+        Assert.All(results, result => Assert.True(result.IsComplete, string.Join(",", result.Issues)));
+        var buildOutputs = processes.Commands
+            .Where(command => command.Arguments.StartsWith("build ", StringComparison.Ordinal))
+            .Select(command => command.Arguments
+                .Split(new[] { "-p:PreflightOutputRoot=\"" }, StringSplitOptions.None)[1]
+                .Split('"')[0])
+            .ToArray();
+        Assert.Equal(2, buildOutputs.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        var expectedOutputRoot = Path.Combine(
+            repository.Root, "artifacts", "testgate-preflight-").Replace('\\', '/');
+        Assert.All(buildOutputs, output => Assert.StartsWith(
+            expectedOutputRoot, output, StringComparison.OrdinalIgnoreCase));
+        var discoveryOutputs = processes.Commands
+            .Where(command => command.Arguments.Contains("--list-tests", StringComparison.Ordinal))
+            .Select(command => command.Arguments
+                .Split(new[] { "-p:PreflightOutputRoot=\"" }, StringSplitOptions.None)[1]
+                .Split('"')[0])
+            .ToArray();
+        Assert.Equal(4, discoveryOutputs.Length);
+        Assert.All(discoveryOutputs, output => Assert.Contains(output, buildOutputs));
+        Assert.All(processes.Commands.Where(command => command.Arguments.Contains(
+                "--list-tests", StringComparison.Ordinal)), command =>
+        {
+            Assert.Contains("--no-build", command.Arguments, StringComparison.Ordinal);
+            Assert.Contains("--no-restore", command.Arguments, StringComparison.Ordinal);
+            Assert.Contains("--test-adapter-path=\"", command.Arguments, StringComparison.Ordinal);
+        });
+        Assert.All(processes.Commands, command => Assert.Contains(
+            "-p:CustomBeforeDirectoryBuildProps=\"", command.Arguments, StringComparison.Ordinal));
+        var isolatedProps = File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "tests", "tools", "TestGate.IsolatedBuild.props"));
+        Assert.Contains("<BaseIntermediateOutputPath>$(PreflightOutputRoot)", isolatedProps, StringComparison.Ordinal);
+        Assert.Contains("<MSBuildProjectExtensionsPath>$(PreflightOutputRoot)", isolatedProps, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SQL_manifest_preflight_detects_stale_fingerprint_without_running_a_test()
+    {
+        using var repository = new FinalRepository();
+        var processes = new ManifestDiscoveryProcessRunner();
+        var manifest = TestGateManifestLoader.Load(repository.Manifest);
+        var drifted = manifest with
+        {
+            LogicalCases = manifest.LogicalCases.Select(item =>
+                item with { ReviewedCodeFingerprint = new string('f', 64) }).ToArray(),
+        };
+
+        var result = await new SqlGateManifestPreflight(
+            processes, new FinalInventory(new List<string>())).VerifyAsync(
+                repository.Options(), drifted, drifted.Gates, CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        Assert.Contains(result.Issues, issue => issue.Reason.Contains(
+            "FingerprintMismatch", StringComparison.Ordinal));
+        Assert.DoesNotContain(processes.Commands, command =>
+            command.Arguments.Contains("--logger", StringComparison.Ordinal));
+        Assert.All(processes.Commands, command =>
+            Assert.True(command.Arguments.StartsWith("restore ", StringComparison.Ordinal) ||
+                command.Arguments.StartsWith("build ", StringComparison.Ordinal) ||
+                command.Arguments.Contains("--list-tests", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task SQL_manifest_preflight_accepts_complete_source_and_discovery_without_running_SQL()
+    {
+        using var repository = new FinalRepository();
+        var processes = new ManifestDiscoveryProcessRunner();
+        var manifest = TestGateManifestLoader.Load(repository.Manifest);
+
+        var result = await new SqlGateManifestPreflight(
+            processes, new FinalInventory(new List<string>())).VerifyAsync(
+                repository.Options(), manifest, manifest.Gates, CancellationToken.None);
+
+        Assert.True(result.IsComplete, string.Join(",", result.Issues));
+        Assert.Equal(5, processes.Commands.Count);
+        Assert.DoesNotContain(processes.Commands, command =>
+            command.Arguments.Contains("--logger", StringComparison.Ordinal));
+        Assert.All(processes.Commands, command =>
+            Assert.Contains("CustomBeforeDirectoryBuildProps=", command.Arguments, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Cancellation_releases_lease_only_after_SQL_cleanup()
     {
         using var repository = new FinalRepository();
@@ -118,7 +317,8 @@ public sealed class TestGateCoordinatorTestsFinal
             new FinalApproval(events, valid: true),
             leases,
             new FinalSqlRunner(repository, events, FinalFailure.PreflightRejected),
-            new NoRecovery());
+            new NoRecovery(),
+            new AcceptSqlManifestPreflight());
 
         var result = await coordinator.RunAsync(repository.Options(), CancellationToken.None);
 
@@ -138,7 +338,19 @@ public sealed class TestGateCoordinatorTestsFinal
         new FinalApproval(events, failure != FinalFailure.Approval),
         new FinalLeaseFactory(events, failure),
         new FinalSqlRunner(repository, events, failure),
-        new NoRecovery());
+        new NoRecovery(),
+        new AcceptSqlManifestPreflight());
+
+    private static string RepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null && !File.Exists(Path.Combine(current.FullName, "MyDmsVn.sln")))
+        {
+            current = current.Parent;
+        }
+
+        return current?.FullName ?? throw new DirectoryNotFoundException();
+    }
 
     public enum FinalFailure
     {
@@ -151,6 +363,8 @@ public sealed class TestGateCoordinatorTestsFinal
         Report,
         Cancelled,
         PreflightRejected,
+        PriorLeaseRecovered,
+        UnreconciledOwnership,
     }
 
     private sealed class FinalApproval : ITestGateApprovalReader
@@ -208,7 +422,9 @@ public sealed class TestGateCoordinatorTestsFinal
             });
             LastLease = new SqlExecutionLease(release, completion);
             return Task.FromResult(new SqlExecutionLeaseAcquireResult(
-                SqlExecutionLeaseAcquireStatus.Acquired,
+                _failure == FinalFailure.PriorLeaseRecovered
+                    ? SqlExecutionLeaseAcquireStatus.Recovered
+                    : SqlExecutionLeaseAcquireStatus.Acquired,
                 LastLease));
         }
     }
@@ -273,7 +489,10 @@ public sealed class TestGateCoordinatorTestsFinal
             }
 
             _events.Add("ownership");
-            return Task.FromResult(new BenchmarkRunResult(_failure != FinalFailure.SqlIncomplete, runs));
+            return Task.FromResult(new BenchmarkRunResult(
+                _failure != FinalFailure.SqlIncomplete,
+                runs,
+                _failure == FinalFailure.UnreconciledOwnership));
         }
     }
 
@@ -323,6 +542,81 @@ public sealed class TestGateCoordinatorTestsFinal
         }
     }
 
+    private sealed class AcceptSqlManifestPreflight : ISqlGateManifestPreflight
+    {
+        public Task<SqlGateManifestPreflightResult> VerifyAsync(
+            TestGateRunOptions options,
+            TestGateManifest manifest,
+            IReadOnlyList<TestGateDefinition> gates,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new SqlGateManifestPreflightResult(
+                Array.Empty<SqlGateManifestPreflightIssue>()));
+    }
+
+    private sealed class RejectSqlManifestPreflight : ISqlGateManifestPreflight
+    {
+        public Task<SqlGateManifestPreflightResult> VerifyAsync(
+            TestGateRunOptions options,
+            TestGateManifest manifest,
+            IReadOnlyList<TestGateDefinition> gates,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new SqlGateManifestPreflightResult(new[]
+            {
+                new SqlGateManifestPreflightIssue("final-sql", "net48", "FingerprintMismatch"),
+            }));
+    }
+
+    private sealed class ManifestDiscoveryProcessRunner : IProcessRunner
+    {
+        public List<CommandSpec> Commands { get; } = new();
+
+        public Task<CommandResult> RunAsync(CommandSpec command, CancellationToken cancellationToken)
+        {
+            Commands.Add(command);
+            var name = command.Arguments.Contains("Sql.Module.Tests", StringComparison.Ordinal)
+                ? "Sql.Module.Tests.Case"
+                : "Sql.Tests.Case";
+            var output = command.Arguments.Contains("--list-tests", StringComparison.Ordinal)
+                ? "The following Tests are available:\n    " + name + "\n"
+                : string.Empty;
+            return Task.FromResult(new CommandResult(
+                0, false, 1, output, string.Empty, Array.Empty<int>(), TimeSpan.Zero));
+        }
+    }
+
+    private sealed class OverlappingManifestDiscoveryProcessRunner : IProcessRunner
+    {
+        private int _buildCalls;
+
+        public ConcurrentBag<CommandSpec> Commands { get; } = new();
+
+        public TaskCompletionSource<bool> BothBuildsStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> ReleaseBuilds { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<CommandResult> RunAsync(CommandSpec command, CancellationToken cancellationToken)
+        {
+            Commands.Add(command);
+            if (command.Arguments.StartsWith("build ", StringComparison.Ordinal))
+            {
+                if (Interlocked.Increment(ref _buildCalls) == 2)
+                {
+                    BothBuildsStarted.TrySetResult(true);
+                }
+
+                await ReleaseBuilds.Task.WaitAsync(cancellationToken);
+                return new CommandResult(
+                    0, false, 1, string.Empty, string.Empty, Array.Empty<int>(), TimeSpan.Zero);
+            }
+
+            return new CommandResult(
+                0, false, 1, "The following Tests are available:\n    Sql.Tests.Case\n",
+                string.Empty, Array.Empty<int>(), TimeSpan.Zero);
+        }
+    }
+
     private sealed class NoRecovery : IAbandonedSqlRunRecovery
     {
         public Task<bool> ReconcileAsync(AbandonedSqlRun lease, CancellationToken cancellationToken) =>
@@ -341,7 +635,9 @@ public sealed class TestGateCoordinatorTestsFinal
 
         public FinalRepository(bool multiProject = false)
         {
-            Root = Path.Combine(Path.GetTempPath(), "mydms-final-gate-" + Guid.NewGuid().ToString("N"));
+            Root = Path.Combine(
+                Path.GetPathRoot(Path.GetTempPath())!,
+                "t35-final-" + Guid.NewGuid().ToString("N").Substring(0, 12));
             Directory.CreateDirectory(Path.Combine(Root, "tests", "Sql.Tests"));
             if (multiProject)
             {
@@ -353,6 +649,11 @@ public sealed class TestGateCoordinatorTestsFinal
             File.WriteAllText(
                 Path.Combine(Root, "tests", "Sql.Tests", "Sql.Tests.csproj"),
                 "<Project><PropertyGroup><TargetFrameworks>net48;net8.0</TargetFrameworks></PropertyGroup></Project>");
+            WriteTestAdapterLock(Path.Combine(Root, "tests", "Sql.Tests", "packages.lock.json"));
+            if (multiProject)
+            {
+                WriteTestAdapterLock(Path.Combine(Root, "tests", "Sql.Module.Tests", "packages.lock.json"));
+            }
             Manifest = Path.Combine(Root, "manifest.json");
             File.WriteAllText(Manifest, multiProject ? MultiProjectJson() : Json());
             Approval = Path.Combine(Root, "approval.json");
@@ -369,6 +670,10 @@ public sealed class TestGateCoordinatorTestsFinal
             "0123456789abcdef0123456789abcdef01234567");
 
         public void Dispose() => Directory.Delete(Root, recursive: true);
+
+        private static void WriteTestAdapterLock(string path) => File.WriteAllText(
+            path,
+            "{\"dependencies\":{\"net48\":{\"xunit.runner.visualstudio\":{\"resolved\":\"3.1.5\"}}}} ");
 
         private static string Json() => $$"""
         {
