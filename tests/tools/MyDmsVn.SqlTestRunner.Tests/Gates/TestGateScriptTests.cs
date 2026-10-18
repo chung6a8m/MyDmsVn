@@ -23,6 +23,9 @@ public sealed class TestGateScriptTests
         Assert.Contains("PreflightOutputRoot=$inventoryOutputRoot", script, StringComparison.Ordinal);
         Assert.Contains("MYDMSVN_TESTGATE_INVENTORY_ROOT", script, StringComparison.Ordinal);
         Assert.Contains("MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS", script, StringComparison.Ordinal);
+        Assert.Contains("finally {", script, StringComparison.Ordinal);
+        Assert.Contains("$env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $previousInventoryOutputRoot", script, StringComparison.Ordinal);
+        Assert.Contains("$env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS = $previousIsolatedBuildProps", script, StringComparison.Ordinal);
         Assert.Contains("Remove-IsolatedInventoryOutput $inventoryOutputRoot", script, StringComparison.Ordinal);
         Assert.Contains("Refusing to remove isolated inventory output outside the repository.", script, StringComparison.Ordinal);
         Assert.Contains("MyDmsVn.SqlTestRunner.dll", script, StringComparison.Ordinal);

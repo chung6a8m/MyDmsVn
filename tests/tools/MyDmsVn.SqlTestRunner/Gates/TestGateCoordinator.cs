@@ -167,6 +167,34 @@ public sealed class TestGateCoordinator
         TestGateRunOptions options,
         CancellationToken cancellationToken)
     {
+        if (options.Mode != TestGateMode.Final)
+        {
+            return await RunCoreAsync(options, cancellationToken).ConfigureAwait(false);
+        }
+
+        WorkspaceOutputLease workspaceLease;
+        try
+        {
+            workspaceLease = await WorkspaceOutputLease.AcquireAsync(
+                options.RepositoryRoot,
+                TimeSpan.FromMinutes(30),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return new TestGateRunResult(TestGateRunStatus.Incomplete, Array.Empty<TestGateFrameworkResult>());
+        }
+
+        await using (workspaceLease)
+        {
+            return await RunCoreAsync(options, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<TestGateRunResult> RunCoreAsync(
+        TestGateRunOptions options,
+        CancellationToken cancellationToken)
+    {
         var runs = new List<TestGateFrameworkResult>();
         TestGateSelection selection;
         TestGateManifest manifest;

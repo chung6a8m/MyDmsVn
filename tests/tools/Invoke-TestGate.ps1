@@ -43,6 +43,7 @@ if ($PreflightOnly -and $Mode -ne 'Final') {
     throw 'Manifest preflight is supported for reviewed Final SQL gates only.'
 }
 
+try {
 if ($Mode -eq 'Final' -and -not $PreflightOnly) {
     if (-not $ApprovalFile) {
         throw 'Final test gate requires an approved SQL environment file.'
@@ -85,7 +86,6 @@ if ($Mode -eq 'Final' -and -not $PreflightOnly) {
     & dotnet msbuild $runnerTestsProject -target:BuildRepositoryInventoryFixtures `
         -property:"Configuration=Release;PreflightOutputRoot=$inventoryOutputRoot;CustomBeforeDirectoryBuildProps=$isolatedBuildProps"
     if ($LASTEXITCODE -ne 0) {
-        Remove-IsolatedInventoryOutput $inventoryOutputRoot
         exit 3
     }
     $env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $inventoryOutputRoot
@@ -94,11 +94,6 @@ if ($Mode -eq 'Final' -and -not $PreflightOnly) {
 
 & dotnet build $runnerProject -c Release -f net8.0 --no-restore
 if ($LASTEXITCODE -ne 0) {
-    if ($inventoryOutputRoot) {
-        Remove-IsolatedInventoryOutput $inventoryOutputRoot
-        $env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $previousInventoryOutputRoot
-        $env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS = $previousIsolatedBuildProps
-    }
     exit 3
 }
 
@@ -113,11 +108,6 @@ if ($overBudgetShadowFiles) {
 
 Get-ChildItem -LiteralPath $runnerOutput | Copy-Item -Destination $shadowRoot -Recurse -Force
 if (-not (Test-Path -LiteralPath $runnerDll -PathType Leaf)) {
-    if ($inventoryOutputRoot) {
-        Remove-IsolatedInventoryOutput $inventoryOutputRoot
-        $env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $previousInventoryOutputRoot
-        $env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS = $previousIsolatedBuildProps
-    }
     exit 3
 }
 
@@ -135,9 +125,17 @@ if ($Revision) {
 
 & dotnet @arguments
 $runnerExitCode = $LASTEXITCODE
-if ($inventoryOutputRoot) {
-    Remove-IsolatedInventoryOutput $inventoryOutputRoot
+}
+finally {
     $env:MYDMSVN_TESTGATE_INVENTORY_ROOT = $previousInventoryOutputRoot
     $env:MYDMSVN_TESTGATE_ISOLATED_BUILD_PROPS = $previousIsolatedBuildProps
+    if ($inventoryOutputRoot) {
+        try {
+            Remove-IsolatedInventoryOutput $inventoryOutputRoot
+        }
+        catch {
+            Write-Warning 'Unable to remove isolated inventory output after TestGate invocation.'
+        }
+    }
 }
 exit $runnerExitCode

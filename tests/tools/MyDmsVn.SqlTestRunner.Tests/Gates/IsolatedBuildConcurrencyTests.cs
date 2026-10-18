@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using MyDmsVn.SqlTestRunner.Gates;
 using Xunit;
 
 namespace MyDmsVn.SqlTestRunner.Tests.Gates;
@@ -26,26 +27,12 @@ public sealed class IsolatedBuildConcurrencyTests
             repositoryRoot, "artifacts", "concurrent-inventory-" + Guid.NewGuid().ToString("N"));
         var firstRoot = Path.Combine(isolatedRoot, "first");
         var secondRoot = Path.Combine(isolatedRoot, "second");
-        var activeSqlAssembly = Path.Combine(
-            repositoryRoot, "tests", "MyDmsVn.Server.Infrastructure.IntegrationTests", "bin", "Release",
-            "net48", "MyDmsVn.Server.Infrastructure.IntegrationTests.dll");
-        var createdActiveAssemblySentinel = false;
-        Directory.CreateDirectory(Path.GetDirectoryName(activeSqlAssembly)!);
-        if (!File.Exists(activeSqlAssembly))
-        {
-            using var sentinel = new FileStream(activeSqlAssembly, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
-            sentinel.WriteByte(0x7f);
-            createdActiveAssemblySentinel = true;
-        }
         var before = NormalProjectOutputSnapshot(repositoryRoot);
 
         Directory.CreateDirectory(firstRoot);
         Directory.CreateDirectory(secondRoot);
-        FileStream? activeAssemblyLock = null;
         try
         {
-            activeAssemblyLock = new FileStream(
-                activeSqlAssembly, FileMode.Open, FileAccess.Read, FileShare.Read);
             var first = BuildInventoryFixturesAsync(firstRoot);
             var second = BuildInventoryFixturesAsync(secondRoot);
             var results = await Task.WhenAll(first, second);
@@ -65,7 +52,6 @@ public sealed class IsolatedBuildConcurrencyTests
         }
         finally
         {
-            activeAssemblyLock?.Dispose();
             var artifactsRoot = Path.GetFullPath(Path.Combine(repositoryRoot, "artifacts")) +
                                 Path.DirectorySeparatorChar;
             var targetRoot = Path.GetFullPath(isolatedRoot);
@@ -79,10 +65,6 @@ public sealed class IsolatedBuildConcurrencyTests
                 Directory.Delete(targetRoot, recursive: true);
             }
 
-            if (createdActiveAssemblySentinel)
-            {
-                File.Delete(activeSqlAssembly);
-            }
         }
 
         async Task<(int ExitCode, string Output)> BuildInventoryFixturesAsync(string outputRoot)
@@ -92,10 +74,27 @@ public sealed class IsolatedBuildConcurrencyTests
             return await RunDotnetAsync(
                 repositoryRoot,
                 "msbuild",
+                "-nodeReuse:false",
                 runnerTestsProject,
                 "-target:BuildRepositoryInventoryFixtures",
                 "-property:" + properties).ConfigureAwait(false);
         }
+    }
+
+    [Fact]
+    public async Task Final_workspace_output_lease_serializes_build_and_test_use()
+    {
+        var repositoryRoot = RepositoryRoot();
+        var first = await WorkspaceOutputLease.AcquireAsync(
+            repositoryRoot, TimeSpan.FromSeconds(2), CancellationToken.None);
+        var waiting = WorkspaceOutputLease.AcquireAsync(
+            repositoryRoot, TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        await Task.Delay(250);
+        Assert.False(waiting.IsCompleted);
+
+        await first.DisposeAsync();
+        await using var second = await waiting;
     }
 
     private static async Task<(int ExitCode, string Output)> RunDotnetAsync(
