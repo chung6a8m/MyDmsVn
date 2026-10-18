@@ -21,6 +21,16 @@
           "System.Threading.Tasks.Extensions": "4.6.3"
         }
       },
+      "linq2db": {
+        "type": "Direct",
+        "requested": "[6.3.0, )",
+        "resolved": "6.3.0",
+        "contentHash": "Ew/IWZc9tNBgAYWCME1xN6/QkiVUNp9f3ozHrrugqh4vY3ny7Y8LTqhX8thG0WFPmWer+Kf9lilbFMYu5hXKyw==",
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "8.0.0",
+          "System.ValueTuple": "4.6.2"
+        }
+      },
       "Microsoft.Data.SqlClient": {
         "type": "Direct",
         "requested": "[7.0.2, )",

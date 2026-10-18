@@ -3,7 +3,7 @@
 > **For agentic workers:** Use `superpowers:executing-plans` or `superpowers:subagent-driven-development` to implement this plan task by task after review. Checkboxes describe work still required, not evidence of completion.
 
 **Date:** 2026-10-18
-**Status:** Owner-approved direction 1A + 2A + 3A; L2DB-T00 source binding/inventory complete; T01–T07 NOT RUN. RESP-T05 has accepted the exact local net48 working-tree candidate in [verification](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up). T00 binds those bytes to PR #36 merge `1e24df4c4ad5243963da82d808da19f12278242b`; see [verification](../L2DB_VERIFICATION.md) and [case ledger](../L2DB_CASE_MIGRATION.md). Next is L2DB-T01; no DAL conversion has run.
+**Status:** Owner-approved direction 1A + 2A + 3A; L2DB-T00–T01 complete; T02–T07 NOT RUN. RESP-T05 has accepted the exact local net48 working-tree candidate in [verification](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up). T00 binds those bytes to PR #36 merge `1e24df4c4ad5243963da82d808da19f12278242b`; see [verification](../L2DB_VERIFICATION.md) and [case ledger](../L2DB_CASE_MIGRATION.md). Next is L2DB-T02 pilot; the internal session seam is verified, with production RepoDb/Dapper repositories unchanged.
 **Goal:** Replace the active RepoDb/Dapper application DAL with LINQ to DB and a documented native-SqlClient escape surface, preserving Local v1, active net48, post-rebuild security, existing data and all correctness gates.
 **Architecture:** Existing Clean Architecture modular monolith and explicit UoW. Infrastructure-only mapping/connection adapters; unchanged Application/Contracts/Desktop boundaries; DbUp remains the sole schema owner.
 **Tech stack:** WinForms, CommunityToolkit.Mvvm, net48 product/SQL/Desktop and test projects, LINQ to DB (initial candidate 6.3.0), current Microsoft.Data.SqlClient, SQL Server, DbUp, MediatR, FluentValidation, ErrorOr, Serilog and xUnit.
@@ -111,12 +111,12 @@ Use native parameterized SqlClient where necessary to preserve existing multi-re
 **Consumes:** T00 inventory and existing ISqlExecutionContext/IDbConnectionFactory.
 **Produces:** tested internal session-factory contract and reusable mapping composition. Production composition still uses the old repositories.
 
-- [ ] Write failing tests for borrowed connection identity and same-transaction read visibility; wrapper disposal leaves UoW usable; repository resolution before begin binds after begin; completed/disposed contexts fail before SQL; missing required transaction and wrong provider are rejected.
-- [ ] Add failure tests for cancellation/reader disposal, owned-wrapper construction failure, mapping initialization failure followed by a valid retry, concurrent mapping access and independent UoWs. Retain exceptional UoW cleanup and caller-scoped dependency disposal assertions.
-- [ ] Add exact candidate package to the Infrastructure consumer, perform deliberate unlocked restore only to generate reviewed lock changes, then locked restore/build on net48. Record actual assets, SqlClient/native binding, licenses/advisories and any incompatibility; no unrelated package upgrades or TFM changes.
-- [ ] Observe intended test failures through focused gates, implement the session factory/mappings, then rerun the same gates. No singleton connection, ambient transaction, raw connection string in diagnostics or swallowed SQL error.
-- [ ] Build the net48 Desktop host and DbMigrator through their actual project references to expose transitive packaging issues. Record package failures as blockers, not permission to change runtime.
-- [ ] Commit passing focused evidence. **Exit:** net48 compatibility and ownership established; rollback remains the existing UoW's responsibility.
+- [x] Write failing tests for borrowed connection identity and same-transaction read visibility; wrapper disposal leaves UoW usable; repository resolution before begin binds after begin; completed/disposed contexts fail before SQL; missing required transaction and wrong provider are rejected.
+- [x] Add failure tests for cancellation/reader disposal, owned-wrapper construction failure, mapping initialization failure followed by a valid retry, concurrent mapping access and independent UoWs. Retain exceptional UoW cleanup and caller-scoped dependency disposal assertions.
+- [x] Add exact candidate package to the Infrastructure consumer, perform deliberate unlocked restore only to generate reviewed lock changes, then locked restore/build on net48. Record actual assets, SqlClient/native binding, licenses/advisories and any incompatibility; no unrelated package upgrades or TFM changes.
+- [x] Observe intended test failures through focused gates, implement the session factory/mappings, then rerun the same gates. No singleton connection, ambient transaction, raw connection string in diagnostics or swallowed SQL error.
+- [x] Build the net48 Desktop host and DbMigrator through their actual project references to expose transitive packaging issues. Record package failures as blockers, not permission to change runtime.
+- [x] Commit passing focused evidence. **Exit:** net48 compatibility and ownership established; rollback remains the existing UoW's responsibility.
 
 ### L2DB-T02 — Three-slice pilot and explicit rollout decision
 
@@ -231,7 +231,7 @@ Run one SQL project at a time on the designated non-production instance. Keep ac
 
 Run from a Windows checkout with pinned submodules initialized, .NET Framework 4.8 targeting/runtime support and the SDK selected by `global.json`. These examples are command templates, not executed acceptance. Stop on every nonzero native-command exit. T00 establishes source/dependency/case mappings; it has no runner bootstrap step.
 
-### Focused non-SQL example after T01 creates its tests
+### Focused non-SQL example: implemented T01 boundary tests
 
 ```powershell
 $project = 'tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj'
@@ -242,7 +242,7 @@ dotnet test $project -c Release -f net48 --no-restore `
 if ($LASTEXITCODE -ne 0) { throw 'L2DB boundary tests failed.' }
 ```
 
-Use the actual project/filter for each task. This class is proposed; an empty selection before it is implemented is NOT RUN. `--list-tests` may help inspect a filter but is not execution evidence.
+Use the actual project/filter for each task. This class exists; both cases passed in T01's unfiltered 10-case Architecture run. An empty selection is still NOT RUN. `--list-tests` may help inspect a filter but is not execution evidence.
 
 ### Focused SQL example: Foundation / FastSQL
 
@@ -318,6 +318,6 @@ The migration succeeds when DAL conventions are consolidated, all required invar
 
 If the pilot fails, stop rollout and leave production composition unchanged. A later conversion failure is reverted through its scoped code/package/registration changes on the unchanged supported schema. No database reset, old-security restoration or permanent dual-provider fallback is allowed. Scope-appropriate verification follows TEST_POLICY; T07's SQL/package/smoke breadth remains mandatory. Relevant later changes invalidate their affected evidence and require the applicable rerun after focused repair.
 
-T00 is complete with the accepted RESP commit binding, source inventory and static checks in [L2DB_VERIFICATION](../L2DB_VERIFICATION.md). T01–T07 checkboxes remain open; no provider compatibility or conversion acceptance is implied. The framework removal does not implement either migration or establish net48/SQL/package acceptance.
+T00 is complete with the accepted RESP commit binding, source inventory and static checks in [L2DB_VERIFICATION](../L2DB_VERIFICATION.md). T01 is complete with net48 ownership/package evidence in the same record; T02–T07 checkboxes remain open. No production conversion or release acceptance is implied. The framework removal does not implement either migration or establish net48/SQL/package acceptance.
 
 **Candidate reference:** [official linq2db 6.3.0 package](https://www.nuget.org/packages/linq2db/6.3.0); [official ownership API](https://linq2db.github.io/api/linq2db/linq2db--LinqToDB.Data.ConnectionOptions.html). Published API/assets guide the pilot; they do not prove runtime compatibility or disposal correctness.

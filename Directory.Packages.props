@@ -7,6 +7,7 @@
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="Dapper" Version="2.1.79" />
+    <PackageVersion Include="linq2db" Version="6.3.0" />
     <PackageVersion Include="dbup-sqlserver" Version="7.2.0" />
     <PackageVersion Include="ErrorOr" Version="2.1.1" />
     <PackageVersion Include="FluentValidation" Version="11.12.0" />

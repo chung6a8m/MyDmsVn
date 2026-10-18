@@ -475,7 +475,8 @@
           "RepoDb": "[1.16.0, )",
           "RepoDb.SqlServer": "[1.16.1, )",
           "Serilog": "[4.4.0, )",
-          "Serilog.Sinks.File": "[7.0.0, )"
+          "Serilog.Sinks.File": "[7.0.0, )",
+          "linq2db": "[6.3.0, )"
         }
       },
       "mydmsvn.sharedkernel": {
@@ -539,6 +540,16 @@
         "dependencies": {
           "FluentValidation": "11.12.0",
           "Microsoft.Extensions.Dependencyinjection.Abstractions": "2.1.0"
+        }
+      },
+      "linq2db": {
+        "type": "CentralTransitive",
+        "requested": "[6.3.0, )",
+        "resolved": "6.3.0",
+        "contentHash": "Ew/IWZc9tNBgAYWCME1xN6/QkiVUNp9f3ozHrrugqh4vY3ny7Y8LTqhX8thG0WFPmWer+Kf9lilbFMYu5hXKyw==",
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "8.0.0",
+          "System.ValueTuple": "4.6.2"
         }
       },
       "MediatR": {

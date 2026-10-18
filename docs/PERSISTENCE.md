@@ -58,18 +58,18 @@ uow.Commit();
 
 Standalone CQRS reads do not require a UoW by default. Infrastructure owns their connection and fully materializes DTOs before disposal. A query that needs same-transaction visibility uses the command's explicit connection/transaction; it cannot silently open its own connection. Preserve explicit registration checks and multi-repository atomicity tests. Changing to direct repository injection would require a separately proven ownership design, beyond provider replacement.
 
-### Proposed LINQ to DB adapters
+### LINQ to DB session adapters (verified T01 seam)
 
-L2DB proposes an Infrastructure-only session factory:
+L2DB-T01 adds the internal Infrastructure-only `ILinqToDbSessionFactory` seam alongside the unchanged production RepoDb/Dapper repositories:
 
 ```csharp
 LinqToDB.Data.DataConnection Borrow(ISqlExecutionContext context, bool requireTransaction);
 Task<LinqToDB.Data.DataConnection> OpenOwnedAsync(CancellationToken cancellationToken);
 ```
 
-These methods are planned, not existing source. T01 must bind them to the pinned package's actual API and prove its behavior on net48. A borrowed wrapper obtains the current connection/transaction for each operation and owns neither. Wrapper disposal, query failure and cancellation must not close, dispose, commit or roll back UoW resources. Invalid provider/state or a missing required transaction fails before SQL without opening a fallback connection.
+These methods exist in the verified T01 seam; [verification](L2DB_VERIFICATION.md#l2db-t01--net48-package-and-resource-ownership) binds their net48/package/ownership evidence. This seam does not switch production repositories; T02 still requires its three-slice pilot and GO decision. Each wrapper is operation-scoped and must be materialized/disposed before a UoW state transition; repositories borrow anew for each operation. A borrowed wrapper obtains the current connection/transaction for each operation and owns neither. Wrapper disposal, query failure and cancellation must not close, dispose, commit or roll back UoW resources. Invalid provider/state or a missing required transaction fails before SQL without opening a fallback connection.
 
-An owned standalone wrapper opens through the existing connection factory, owns connection disposal and cleans up if wrapper construction fails. Mapping composition is published only after successful construction and is then reused read-only; a failed initialization cannot poison all later requests.
+An owned standalone wrapper opens through the existing connection factory, owns connection disposal and cleans up if wrapper construction fails. Mapping composition is published only after successful construction and is then reused read-only; a failed initialization cannot poison all later requests. The internal provider composes a private candidate under an instance lock and publishes after FluentMappingBuilder.Build; the package MappingSchema remains mutable, so Infrastructure consumers must not mutate the published schema. Explicit MicrosoftDataSqlClient provider selection and a conservative v2012 dialect avoid automatic server detection opening another connection; T02 reviews the generated SQL before rollout. UseConnection and UseTransaction are mutually exclusive option paths. Borrowed transactions stay UoW-owned; owned standalone wrappers use DisposeConnection=true. The wrapper default command timeout is 30 seconds and async operations receive caller cancellation.
 
 ## 3. Posting, concurrency and query behavior
 
