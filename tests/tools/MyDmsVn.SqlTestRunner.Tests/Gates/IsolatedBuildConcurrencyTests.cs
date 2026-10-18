@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.SqlTestRunner.Gates;
@@ -84,17 +86,49 @@ public sealed class IsolatedBuildConcurrencyTests
     [Fact]
     public async Task Final_workspace_output_lease_serializes_build_and_test_use()
     {
-        var repositoryRoot = RepositoryRoot();
-        var first = await WorkspaceOutputLease.AcquireAsync(
-            repositoryRoot, TimeSpan.FromSeconds(2), CancellationToken.None);
-        var waiting = WorkspaceOutputLease.AcquireAsync(
-            repositoryRoot, TimeSpan.FromSeconds(2), CancellationToken.None);
+        var repositoryRoot = Path.Combine(
+            Path.GetTempPath(), "testgate-workspace-lease-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(repositoryRoot);
+        var canonicalRoot = Path.GetFullPath(repositoryRoot).TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (OperatingSystem.IsWindows())
+        {
+            canonicalRoot = canonicalRoot.ToUpperInvariant();
+        }
 
-        await Task.Delay(250);
-        Assert.False(waiting.IsCompleted);
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRoot)));
+        var lockPath = Path.Combine(
+            Path.GetTempPath(), "MyDmsVn", "TestGate", "workspace-locks", key + ".lock");
+        WorkspaceOutputLease? first = null;
+        WorkspaceOutputLease? second = null;
+        try
+        {
+            first = await WorkspaceOutputLease.AcquireAsync(
+                repositoryRoot, TimeSpan.FromSeconds(10), CancellationToken.None);
+            var waiting = WorkspaceOutputLease.AcquireAsync(
+                repositoryRoot, TimeSpan.FromSeconds(10), CancellationToken.None);
 
-        await first.DisposeAsync();
-        await using var second = await waiting;
+            await Task.Delay(250);
+            Assert.False(waiting.IsCompleted);
+
+            await first.DisposeAsync();
+            second = await waiting;
+        }
+        finally
+        {
+            if (second is not null)
+            {
+                await second.DisposeAsync();
+            }
+
+            if (first is not null)
+            {
+                await first.DisposeAsync();
+            }
+
+            File.Delete(lockPath);
+            Directory.Delete(repositoryRoot);
+        }
     }
 
     private static async Task<(int ExitCode, string Output)> RunDotnetAsync(
