@@ -598,3 +598,75 @@ The independent source reviewer found no P1/P2 business behavior issue. Both met
 **Frozen code manifest SHA256:** `10d1760537505f1a7bd600471214dff91844e3d76a7f9ce9c38f2fa7b4718c74`. Convention: twelve changed/new/deleted .cs paths, sorted repository-relative path/NUL/raw CRLF bytes/NUL; deleted paths contribute literal `<deleted>` instead of bytes, using git diff --no-renames. Ten files exist and two old Catalog files are deleted (the mapping is relocated under Persistence with its Configure body unchanged). The containing commit binds these bytes, final tests and evidence. No package/pin/lock/TFM, Domain/Application/Contracts, Inventory/Security algorithm, production SQL/grant, UoW/session implementation or fixture/helper changes. Static checks verify644 unique logical IDs, links, BOM/CRLF, diff whitespace, explicit DI and zero RepoDb/Dapper references in production Catalog.
 
 **L2DB-T03 complete. Next active task: L2DB-T04.** Production Catalog commands and queries are now LINQ/native; Inventory, Identity/Security and operational consumers retain their previous implementations until their planned tasks. No permanent fallback/provider switch was added. T07's final unfiltered matrix, packaged/manual workflows and release acceptance remain open; existing Pkcs advisory risk is unchanged.
+
+
+## L2DB-T04 — Inventory conversion
+
+**Base:** `0a2e30e520471e56ec7aff7cc2f6d33e745d0ced`, isolated `codex/l2db-t00` worktree. The containing commit binds the code digest, tests and this evidence. **T04 complete** in the scoped gate below; the original v1a checkout is preserved. T05 is next. No push, merge or release acceptance is implied.
+
+### Implementation and retained native SQL
+
+Goods receipt reference loads (Warehouse/Employee), header/line/ledger inserts, draft allowlist updates and generated-token reloads now use registered Inventory/Catalog LINQ mappings through an operation-scoped borrowed T01 session. Each operation obtains the current UoW transaction; no transactional connection is opened independently. Identity/date/alias/nullability/string length/decimal metadata is explicit, including ANSI Status/DocumentType and server-generated RowVersion skipped on insert/update. Explicit Value/Set allowlists preserve server-created identity/audit/version, receipt number, status and posting audit during draft replacement. Draft editing still uses the existing Application header-lock/state/version check; TryMarkPosted retains its exact SQL Draft/RowVersion predicate. SQL duplicate errors and rollback remain intact.
+
+InventoryRepoDbMapping and InventoryRepoDbWriteFields are removed. The T03 Catalog mapping bridge and its DI registration are removed because the final Inventory reference consumers now use LINQ; Foundation's independent custom probe mappings and generic legacy initializer/hooks remain for T06. No shared UoW/session/provider or fixture implementation changes. T00 found no genuine bulk consumer; inserts remain row-wise. No MERGE, C# balance read-modify-write or new stock-card running balance is introduced.
+
+| Retained native surface | Reason and resource ownership |
+|---|---|
+| SqlGoodsReceiptWriteRepository.GetProductReferenceStatesAsync | Existing typed parameterized product batch on the current UoW transaction |
+| LockHeaderAsync, LockPostSnapshotAsync, LockCatalogStateAsync, LockProductStatesAsync, LoadLinesAsync | Existing header -> Warehouse -> Employee -> sorted Products lock order and line ordering; current UoW |
+| TryMarkPostedAsync, ApplyStockBalanceDeltasAsync, NextReceiptNumberValueAsync, ReplaceDraftAsync line delete | Exact conditional Draft/version transition, sorted atomic balance delta/unique-key retry, sequence and line replacement SQL; current UoW |
+| SqlGoodsReceiptQueryService.ListAsync/GetByIdAsync | Existing multi-result count/header and complete aggregate reads; single factory-owned connection and SERIALIZABLE transaction per call. Page line IDs become explicit BigInt parameters in the same set-based query; readers close before commit |
+| SqlInventoryQueryService.GetStockBalancesAsync/GetStockCardAsync | Preserve COUNT_BIG/page batches, CHARINDEX, long offset, movement rows and PostedAtUtc/LedgerId order, UTC DateTime2 boundaries and fallback document numbers; single standalone owned factory connection per call, same transaction behavior as baseline |
+| SqlStockReconciliationQueryService.FindDifferencesAsync | Exact shared table-lock batches and FULL OUTER JOIN totals under one explicit SERIALIZABLE transaction, StockLedger -> StockBalances lock order |
+| InventorySql command/count/row helpers | Small typed native reader layer for those batches, timeout30 and cancellation propagated; creates commands from the existing connection, never creates or owns another connection/transaction |
+
+Static comparison against the base confirmed all receipt/inquiry/reconciliation SQL constants and native write lock/post/delta/sequence/load method sections are unchanged after EOL normalization. Request values remain parameterized; identifiers/projections are private constants. The native query services retain the existing IDbConnectionFactory ownership path, including the recording connection's isolation observer, rather than adding an unused LINQ wrapper around native-only batches.
+
+### Tests and rulings
+
+The registration test first failed **0 passed /1 failed /0 skipped** because InventoryLinqToDbMapping was missing. The new real-SQL mapping/audit/schema case separately failed **0/1/0** at the same missing-registration assertion. After conversion both passed **2/0/0**. Eight retained receipt/inquiry/reconciliation cases passed before and after query execution replacement (**8/0/0** each). The initial Inventory category checkpoint passed **34/0/0**, before the last two command cases and inquiry case were added.
+
+Four new SQL cases are recorded in the [case ledger](L2DB_CASE_MIGRATION.md#t04-inventory-migration-and-retained-boundaries): mapping/sys.columns metadata, decimal maxima and generated/audit allowlists; duplicate-product SQL rejection with aggregate rollback and a consumed sequence value; controller-observed blocked line insert cancellation with drained rollback and a successful new scope; and native inquiry literal Unicode search, tied timestamps, signed minimum movements, document fallbacks, UTC ticks, long offsets, empty/missing results and pre-cancel for every native query service. All four passed in the final gate. Original mapping/registration IDs and the frozen fixture adapter's historical method name remain. ReceiptPilot now labels production LINQ versus its temporary T02 prototype; its native commit/rollback/SPID/decimal/token assertions remain until T06 cleanup.
+
+**Ruling:** preserve the existing SqlClient/net48 cancellation contract rather than require a new public exception type. The first cancellation assertion wrongly required OperationCanceledException and failed; a diagnostic captured SqlException reporting user cancellation from InsertLineAsync, safely translated by the unchanged Application pipeline to InternalError. Existing Foundation cancellation already allows SqlException or OperationCanceledException. The corrected test pins observed blocking before cancellation, cancellation-specific SQL error0 (or propagated OperationCanceledException), no partial rows and successful fresh scope. Cost if wrong: an unrelated cancellation failure could be mistaken for rollback safety; native zero-row checks and the subsequent committed receipt cover that boundary. No production cancellation/error translation change was needed. The extra diagnostic assertion failed as expected during investigation; both command boundary cases then passed **2/0/0**. A first inquiry-test build used the wrong GoodsReceiptListRequest constructor argument order; correcting it yielded **1/0/0**. That compilation error is not behavioral RED or SQL acceptance.
+
+Existing final cases retain stale update/post rejection, duplicate/concurrent posting, all reference deactivation lock orders, receipt update/post interleavings, missing-balance upsert races, partial-ledger failure and reconciliation during posting. Application cases retain decimal/duplicate validators and post-commit audit failure semantics: audit-sink failure does not falsely claim business rollback. Concurrency uses separate owned sessions inside dedicated fresh scenarios; test projects run sequentially.
+
+### Final gate
+
+Windows SDK8.0.425 / Release / net48; explicit designated non-production master configuration present, default fixture mode unset (reuse), unchanged accepted collection/exception boundaries. Each project was restored with locked mode, built and tested sequentially. Actual local command template:
+
+```powershell
+dotnet restore <project.csproj> --locked-mode
+dotnet test <project.csproj> -c Release -f net48 --no-restore `
+  --filter '<selector>' --logger 'trx;LogFileName=cases.trx' `
+  --results-directory TestResults/l2db-t04-gate-<owner>
+```
+
+The script checked every restore/test exit and stopped on nonzero. I/X omitted --filter. Project paths and exact selectors:
+
+| Owner | Project | Selector / reason |
+|---|---|---|
+| I | tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj | unfiltered; all FastSQL + SqlConcurrency and five pure invocations including explicit replacement mapping registration |
+| C | tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj | Category=FastSQL; reference mappings/current-transaction interoperability |
+| F | tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj | FullyQualifiedName~LinqToDb\|FullyQualifiedName~RepositoryAndQueryIntegrationTests\|FullyQualifiedName~PersistenceTransactionTests; sessions/mappings, explicit legacy test probes/hooks and rollback/cancellation after bridge removal |
+| A | tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj | FullyQualifiedName~GoodsReceiptApplicationTests\|FullyQualifiedName~InventoryQueryApplicationTests; receipt/posting/inquiry handlers, validators and audit failure |
+| X | tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj | unfiltered; provider boundaries |
+
+| Owner | Pass/fail/skip invocations | Distinct methods | TRX wall seconds |
+|---|---:|---:|---:|
+| I | 42/0/0 | 40 | 125.28 |
+| C | 19/0/0 | 17 | 36.59 |
+| F | 23/0/0 | 23 | 16.88 |
+| A | 40/0/0 | 30 | 4.65 |
+| X | 10/0/0 | 10 | 4.53 |
+
+Total **134 passed /0 failed /0 skipped**,120 distinct methods:74 SQL and60 pure invocations. Expected case IDs and every Theory cardinality match the source ledger and actual TRX TestMethods exactly; no duplicate result names, aborts, omitted or unexecuted cases. I has40 methods/42 invocations, including37 SQL; its FastSQL27 + SqlConcurrency10 cover the T04 SQL matrix. C has17 methods/19 SQL invocations. Source-wide totals648 logical method IDs and267 methods/298 invocations across the six SQL owners (198 SQL/100 non-SQL) are inventories, not this task's pass count.
+
+All gates and guarded cleanup completed normally; Catalog/Inventory collection diagnostics report successful owned drops and dedicated fresh scenarios drained/disposed through their existing helpers. No failed cleanup, unresolved quarantine/allocation, killed testhost or leftover recovery was reported. No global census, prefix deletion or new SQL principal was attempted. Accepted fixture/helper/adapter/reset/seed/ownership/drain bytes, SQL scripts/grants, schema, packages/locks, TFMs and Domain/Application/Contracts are unchanged.
+
+Fresh-context read-only review of the whole T04 change set found no Critical/Important/Minor issue and declined no behavior for judgment. The reviewer did not run competing tests/SQL. Static verification covers native-section equivalence,648 unique ledger IDs, relative links, BOM/CRLF, whitespace, explicit DI and zero RepoDb/Dapper in production Inventory/Catalog.
+
+**Frozen code manifest SHA256:** `bdb258bf512cc1d9a9e35a5d038cb427fe3f4fbe58a7a3ca9b6f4a8b11035fc9`. Convention:15 changed/new/deleted .cs paths sorted repository-relative path/NUL/raw CRLF bytes/NUL; deleted paths contribute literal `<deleted>` (git diff --no-renames). Twelve files exist and three old mapping/write-field paths are deleted. The containing commit binds these bytes and the final evidence.
+
+M/O/S full suites, full GUI, release packaging and attended workflows were **NOT RUN**: no shared UoW/session/provider/fixture/security/schema/package contract changed. Their T05/T06/T07 milestone obligations remain. Prior T02 package/startup evidence is not relabeled as T04 host acceptance. Existing transitive Pkcs advisory risk remains unchanged. **L2DB-T04 complete; next L2DB-T05.**

@@ -6,12 +6,14 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using LinqToDB;
+using LinqToDB.Async;
+using LinqToDB.Data;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Domain.Catalog;
 using MyDmsVn.Server.Domain.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
-using RepoDb;
 
 namespace MyDmsVn.Server.Infrastructure.Inventory;
 
@@ -43,9 +45,13 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         "END;";
 
     private readonly ISqlExecutionContext _context;
+    private readonly ILinqToDbSessionFactory _sessions;
 
-    public SqlGoodsReceiptWriteRepository(ISqlExecutionContext context) =>
+    public SqlGoodsReceiptWriteRepository(ISqlExecutionContext context, ILinqToDbSessionFactory sessions)
+    {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
+    }
 
     public async Task<GoodsReceiptReferenceSnapshot> GetReferenceSnapshotAsync(
         int warehouseId,
@@ -53,15 +59,11 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         IReadOnlyCollection<int> productIds,
         CancellationToken cancellationToken)
     {
-        var transaction = GetTransaction();
-        var warehouse = (await _context.Connection.QueryAsync<Warehouse>(
-            warehouseId,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false)).SingleOrDefault();
-        var employee = (await _context.Connection.QueryAsync<Employee>(
-            employeeId,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false)).SingleOrDefault();
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
+        var warehouse = await db.GetTable<Warehouse>().SingleOrDefaultAsync(
+            row => row.Id == warehouseId, cancellationToken).ConfigureAwait(false);
+        var employee = await db.GetTable<Employee>().SingleOrDefaultAsync(
+            row => row.Id == employeeId, cancellationToken).ConfigureAwait(false);
         var products = await GetProductReferenceStatesAsync(productIds, cancellationToken)
             .ConfigureAwait(false);
 
@@ -128,22 +130,23 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
             throw new ArgumentNullException(nameof(lines));
         }
 
-        var transaction = GetTransaction();
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
         var sequenceValue = await NextReceiptNumberValueAsync(cancellationToken).ConfigureAwait(false);
         header.ReceiptNumber = "GR" + sequenceValue.ToString("D10", CultureInfo.InvariantCulture);
-        header.Id = await _context.Connection.InsertAsync<GoodsReceipt, long>(
-            header,
-            fields: InventoryRepoDbWriteFields.GoodsReceiptCreate,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+        header.Id = await db.GetTable<GoodsReceipt>()
+            .Value(row => row.ReceiptNumber, header.ReceiptNumber)
+            .Value(row => row.ReceiptDate, header.ReceiptDate)
+            .Value(row => row.WarehouseId, header.WarehouseId)
+            .Value(row => row.EmployeeId, header.EmployeeId)
+            .Value(row => row.Status, header.Status)
+            .Value(row => row.Note, header.Note)
+            .Value(row => row.CreatedByUserId, header.CreatedByUserId)
+            .InsertWithInt64IdentityAsync(cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("The goods receipt insert returned no identity.");
         foreach (var line in lines)
         {
             line.ReceiptId = header.Id;
-            line.Id = await _context.Connection.InsertAsync<GoodsReceiptLine, long>(
-                line,
-                fields: InventoryRepoDbWriteFields.GoodsReceiptLineCreate,
-                transaction: transaction,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+            line.Id = await InsertLineAsync(db, line, cancellationToken).ConfigureAwait(false);
         }
 
         return await ReloadHeaderAsync(header.Id, cancellationToken).ConfigureAwait(false);
@@ -223,7 +226,7 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         int postedByUserId,
         CancellationToken cancellationToken)
     {
-        var transaction = GetTransaction();
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
         foreach (var line in lines.OrderBy(line => line.LineNumber).ThenBy(line => line.Id))
         {
             var entry = new StockLedgerEntry
@@ -237,11 +240,17 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
                 PostedAtUtc = postedAtUtc,
                 PostedByUserId = postedByUserId,
             };
-            entry.Id = await _context.Connection.InsertAsync<StockLedgerEntry, long>(
-                entry,
-                fields: InventoryRepoDbWriteFields.StockLedgerCreate,
-                transaction: transaction,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+            entry.Id = await db.GetTable<StockLedgerEntry>()
+                .Value(row => row.WarehouseId, entry.WarehouseId)
+                .Value(row => row.ProductId, entry.ProductId)
+                .Value(row => row.DocumentType, entry.DocumentType)
+                .Value(row => row.DocumentId, entry.DocumentId)
+                .Value(row => row.DocumentLineId, entry.DocumentLineId)
+                .Value(row => row.QuantityChange, entry.QuantityChange)
+                .Value(row => row.PostedAtUtc, entry.PostedAtUtc)
+                .Value(row => row.PostedByUserId, entry.PostedByUserId)
+                .InsertWithInt64IdentityAsync(cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("The stock ledger insert returned no identity.");
         }
     }
 
@@ -281,12 +290,15 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
             throw new ArgumentNullException(nameof(lines));
         }
 
-        var transaction = GetTransaction();
-        var affected = await _context.Connection.UpdateAsync(
-            header,
-            fields: InventoryRepoDbWriteFields.GoodsReceiptDraftUpdate,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
+        var affected = await db.GetTable<GoodsReceipt>().Where(row => row.Id == header.Id)
+            .Set(row => row.ReceiptDate, header.ReceiptDate)
+            .Set(row => row.WarehouseId, header.WarehouseId)
+            .Set(row => row.EmployeeId, header.EmployeeId)
+            .Set(row => row.Note, header.Note)
+            .Set(row => row.UpdatedAtUtc, header.UpdatedAtUtc)
+            .Set(row => row.UpdatedByUserId, header.UpdatedByUserId)
+            .UpdateAsync(cancellationToken).ConfigureAwait(false);
         if (affected != 1)
         {
             throw new InvalidOperationException("The locked goods receipt header could not be updated.");
@@ -304,11 +316,7 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         foreach (var line in lines)
         {
             line.ReceiptId = header.Id;
-            line.Id = await _context.Connection.InsertAsync<GoodsReceiptLine, long>(
-                line,
-                fields: InventoryRepoDbWriteFields.GoodsReceiptLineCreate,
-                transaction: transaction,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+            line.Id = await InsertLineAsync(db, line, cancellationToken).ConfigureAwait(false);
         }
 
         return await ReloadHeaderAsync(header.Id, cancellationToken).ConfigureAwait(false);
@@ -415,12 +423,22 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
 
     private async Task<GoodsReceipt> ReloadHeaderAsync(long receiptId, CancellationToken cancellationToken)
     {
-        var rows = await _context.Connection.QueryAsync<GoodsReceipt>(
-            receiptId,
-            transaction: GetTransaction(),
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        return rows.Single();
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
+        return await db.GetTable<GoodsReceipt>().SingleAsync(
+            row => row.Id == receiptId, cancellationToken).ConfigureAwait(false);
     }
+
+    // Explicit allowlist: SQL owns identity/default audit fields; callers cannot write rowversion.
+    private static async Task<long> InsertLineAsync(DataConnection db, GoodsReceiptLine line, CancellationToken token) =>
+        await db.GetTable<GoodsReceiptLine>()
+            .Value(row => row.ReceiptId, line.ReceiptId)
+            .Value(row => row.LineNumber, line.LineNumber)
+            .Value(row => row.ProductId, line.ProductId)
+            .Value(row => row.Quantity, line.Quantity)
+            .Value(row => row.UnitCost, line.UnitCost)
+            .Value(row => row.CreatedByUserId, line.CreatedByUserId)
+            .InsertWithInt64IdentityAsync(token).ConfigureAwait(false)
+        ?? throw new InvalidOperationException("The goods receipt line insert returned no identity.");
 
     private System.Data.IDbTransaction GetTransaction() =>
         _context.Transaction

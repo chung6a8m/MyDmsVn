@@ -53,9 +53,7 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddScoped<IInventoryQueryService, SqlInventoryQueryService>();
             services.TryAddScoped<IStockReconciliationQueryService, SqlStockReconciliationQueryService>();
             services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IRepoDbMapping, CatalogRepoDbMapping>());
-            services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IRepoDbMapping, InventoryRepoDbMapping>());
+                ServiceDescriptor.Singleton<ILinqToDbMapping, InventoryLinqToDbMapping>());
             services.Replace(
                 ServiceDescriptor.Scoped<IUserStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));

@@ -24,6 +24,7 @@ public sealed class ReceiptPilotParityTests(ITestOutputHelper output)
     public Task Receipt_pilot_mid_ledger_failure_rolls_back_header_lines_ledger_and_balances() => Run(true);
     private async Task Run(bool fail)
     {
+        // After T04, production is LINQ/native; the candidate is the retained T02 prototype until T06.
         // Command/fault scenarios retain dedicated fresh databases, including each provider execution.
         foreach (var candidate in new[] { false, true })
             await PilotSql.Owned(async database =>
@@ -42,7 +43,7 @@ public sealed class ReceiptPilotParityTests(ITestOutputHelper output)
                 var conn = (SqlConnection)ctx.Connection; conn.StatisticsEnabled = true; conn.ResetStatistics();
                 var saved = candidate ? await adapter.Insert(header, lines) : await old.InsertDraftAsync(header, lines, CancellationToken.None);
                 Assert.True(saved.Id > 0); Assert.All(lines, l => Assert.True(l.Id > 0)); Assert.Equal(8, saved.Version.Length); Assert.NotEqual(header.CreatedAtUtc, saved.CreatedAtUtc); Assert.StartsWith("GR", saved.ReceiptNumber);
-                output.WriteLine("Receipt insert provider=" + (candidate ? "candidate" : "old") + " observed server roundtrips=" + conn.RetrieveStatistics()["ServerRoundtrips"]);
+                output.WriteLine("Receipt insert provider=" + (candidate ? "candidate" : "production") + " observed server roundtrips=" + conn.RetrieveStatistics()["ServerRoundtrips"]);
                 var tx = (SqlTransaction)ctx.Transaction!;
                 Assert.Equal(2, await PilotSql.Scalar<int>(conn, tx, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id", PilotSql.P("@id", SqlDbType.BigInt, saved.Id)));
                 Assert.Equal(1.2500m, await PilotSql.Scalar<decimal>(conn, tx, "SELECT Quantity FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id AND [LineNo]=1", PilotSql.P("@id", SqlDbType.BigInt, saved.Id)));
@@ -58,7 +59,7 @@ public sealed class ReceiptPilotParityTests(ITestOutputHelper output)
                     if (candidate) await adapter.Append(saved.Id, warehouse, new[] { line }, actor);
                     else await old.AppendStockLedgerAsync(saved.Id, warehouse, new[] { line }, new DateTime(2026, 10, 18), actor, CancellationToken.None);
                     await old.ApplyStockBalanceDeltasAsync(warehouse, new Dictionary<int, decimal> { { line.ProductId, line.Quantity } }, CancellationToken.None);
-                    output.WriteLine("Receipt ledger/balance provider=" + (candidate ? "candidate" : "old") + " observed server roundtrips=" + conn.RetrieveStatistics()["ServerRoundtrips"]);
+                    output.WriteLine("Receipt ledger/balance provider=" + (candidate ? "candidate" : "production") + " observed server roundtrips=" + conn.RetrieveStatistics()["ServerRoundtrips"]);
                     if (fail)
                     {
                         Assert.Equal(1, await PilotSql.Scalar<int>(conn, tx, "SELECT COUNT(*) FROM dbo.StockLedger"));
@@ -78,7 +79,7 @@ public sealed class ReceiptPilotParityTests(ITestOutputHelper output)
                     Assert.Equal(3.7500m, await PilotSql.Scalar<decimal>(oracle, null, "SELECT SUM(QuantityChange) FROM dbo.StockLedger"));
                     Assert.Equal(3.7500m, await PilotSql.Scalar<decimal>(oracle, null, "SELECT SUM(Quantity) FROM dbo.StockBalances"));
                 }
-                output.WriteLine("Receipt pilot provider=" + (candidate ? "candidate" : "old") + " outcome=" + (fail ? "rollback" : "commit") + "; identity/rowversion/decimal/same-session checked by native SQL.");
+                output.WriteLine("Receipt pilot provider=" + (candidate ? "candidate" : "production") + " outcome=" + (fail ? "rollback" : "commit") + "; identity/rowversion/decimal/same-session checked by native SQL.");
             });
     }
 }

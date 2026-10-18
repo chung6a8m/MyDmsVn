@@ -19,13 +19,13 @@ public sealed class GoodsReceiptModelRegistrationTests
         services.AddSqlPersistence("Server=invalid;Database=unused;Integrated Security=true");
         using var provider = services.BuildServiceProvider();
         var mappingTypes = provider
-            .GetServices<IRepoDbMapping>()
+            .GetServices<ILinqToDbMapping>()
             .Select(mapping => mapping.GetType().FullName)
             .ToArray();
 
         Assert.NotNull(receiptType);
         Assert.NotNull(lineType);
-        Assert.Contains("MyDmsVn.Server.Infrastructure.Inventory.InventoryRepoDbMapping", mappingTypes);
+        Assert.Contains("MyDmsVn.Server.Infrastructure.Inventory.InventoryLinqToDbMapping", mappingTypes);
         Assert.NotNull(provider.GetService<IGoodsReceiptQueryService>());
     }
 }
