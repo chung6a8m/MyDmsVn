@@ -344,7 +344,10 @@ public sealed class SqlSecurityAdministrationRepository : ISecurityAdministratio
             _context.Transaction,
             commandType: System.Data.CommandType.StoredProcedure,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
-        var target = await results.ReadSingleAsync<ImportTargetRow>().ConfigureAwait(false);
+        // Consume the empty grid so a deferred procedure THROW reaches the store's SQL error mapper.
+        // ReadSingleAsync throws locally first and masks the missing-target SQL 51031 error.
+        var target = await results.ReadSingleOrDefaultAsync<ImportTargetRow>().ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Import target procedure returned no target and no SQL error.");
         var decisions = (await results.ReadAsync<ImportDecisionRow>().ConfigureAwait(false))
             .ToDictionary(row => row.PermissionKey, row => row.Granted, StringComparer.Ordinal);
         return new PermissionAssignmentImportTargetState(

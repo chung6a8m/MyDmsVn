@@ -78,23 +78,37 @@ public sealed class SecurityPilotParityTests(ITestOutputHelper output)
         });
     }
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-    public async Task Security_pilot_identifies_legacy_missing_target_error_translation_gap()
+    public async Task Security_pilot_preserves_missing_target_error_translation_for_users_and_roles()
     {
         foreach (var candidate in new[] { false, true })
             await PilotSql.Owned(async database =>
             {
                 var seed = await Seed(database.ConnectionString);
+                using (var owner = new SqlConnection(database.ConnectionString))
+                {
+                    await owner.OpenAsync();
+                    await PilotSql.Execute(owner, null,
+                        "INSERT dbo.UserPermissions(UserId,PermissionKey,Granted) VALUES(@actor,N'Security.Users.Manage',1)",
+                        PilotSql.P("@actor", SqlDbType.Int, seed.Actor));
+                    Assert.Equal(0, await PilotSql.Scalar<int>(owner, null,
+                        "SELECT (SELECT COUNT(*) FROM dbo.Users WHERE UserId=@id) + (SELECT COUNT(*) FROM dbo.Roles WHERE RoleId=@id)",
+                        PilotSql.P("@id", SqlDbType.Int, int.MaxValue)));
+                }
                 using var provider = new ServiceCollection().BuildServiceProvider();
                 var store = new SqlSecurityAdministrationStore(Factory(database.ConnectionString, candidate, provider));
-                if (!candidate)
-                    await Assert.ThrowsAsync<InvalidOperationException>(() => store.ReadTargetAsync(PermissionImportTargetTypeDto.Role, int.MaxValue, seed.Actor, CancellationToken.None));
-                else
+                foreach (var targetType in new[] { PermissionImportTargetTypeDto.User, PermissionImportTargetTypeDto.Role })
                 {
-                    var result = await store.ReadTargetAsync(PermissionImportTargetTypeDto.Role, int.MaxValue, seed.Actor, CancellationToken.None);
+                    var result = await store.ReadTargetAsync(targetType, int.MaxValue, seed.Actor, CancellationToken.None);
                     Assert.True(result.IsError);
                     Assert.Equal("Security.TargetNotFound", result.FirstError.Code);
-                    output.WriteLine("NO-GO evidence: legacy empty-result materialization masks SQL 51031; native candidate surfaces the existing mapped NotFound error. Rollout requires an explicit baseline-error decision/repair.");
+                    Assert.Equal(ErrorOr.ErrorType.NotFound, result.FirstError.Type);
                 }
+                // A subsequent successful read still materializes both result sets.
+                var existing = await store.ReadTargetAsync(PermissionImportTargetTypeDto.Role, seed.Role, seed.Actor, CancellationToken.None);
+                Assert.False(existing.IsError);
+                Assert.Equal("Pilot target", existing.Value.Name);
+                Assert.Single(existing.Value.ExistingDecisions);
+                output.WriteLine("Missing User/Role targets preserve Security.TargetNotFound for provider=" + (candidate ? "candidate" : "old"));
             });
     }
 

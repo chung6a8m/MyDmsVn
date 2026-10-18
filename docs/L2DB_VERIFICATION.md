@@ -398,3 +398,34 @@ All final commands completed normally. Dedicated ownership/cleanup assertions an
 Independent source review found no new P1/P2 issue; its pre-rollback audit-observation improvement was implemented and passed. Review explicitly agreed NO-GO reflects a legacy observable error gap, not a LINQ compatibility rejection. Final static checks confirmed 636 unique ledger method IDs/source links, BOM/CRLF policy, unchanged pre-existing fixture/safety bytes, unchanged packages/locks/TFMs/production SQL and the frozen eleven-file code digest.
 
 **L2DB-T02 complete as a documented NO-GO decision.** No production provider switch or flag was added. **Next action:** explicitly resolve L2DB-PILOT-01, repair the baseline reader narrowly, then prove strict old/candidate parity and package startup before reconsidering GO. T03–T06 remain blocked. Package startup, publication and manual Local smoke remain NOT RUN; no release acceptance is implied.
+
+
+## L2DB-T02 blocker repair — L2DB-PILOT-01
+
+**Date:** 2026-10-18. **Base:** `b1a8834e0e9645220da45c07046a0107abd532cc`, same isolated worktree. The owner explicitly requested resolving the blocker. **Semantic blocker RESOLVED; T02 GO is still withheld pending successful package startup.** The preceding NO-GO record describes its frozen pre-repair revision; its missing-target diagnosis is not the current behavior.
+
+**Decision:** the existing `Security.TargetNotFound` / NotFound mapping is the intended missing-User/Role contract. Do not preserve an accidental Dapper `Sequence contains no elements` failure. `ReadSingleOrDefaultAsync<ImportTargetRow>` consumes the empty first grid and advances to the deferred SQL 51031; the existing store catches/maps that SqlException. A null guard still rejects an unexpected empty response with no SQL error. Single-row cardinality enforcement, cancellation, the second decisions result set and current connection/transaction ownership remain unchanged. No SQL script, grant, permission evaluator, provider registration, fixture/reset or package/TFM changes.
+
+Two-file repair candidate SHA256 (same sorted path/NUL/raw bytes/NUL convention): `1a1a4732bdf3ee91d25c3779bc972cf9b159b0bcad2c6df8731c1d7163f41c1e`. The commit containing this record binds the reader and successor test bytes. The original gap-detector logical ID is retained with its explicit successor mapping in the case ledger; no coverage disappears or adds to totals.
+
+### Repair verification
+
+The successor test now requires strict old/candidate equality for missing User and Role: independent native absence checks, explicit actor permissions, Security.TargetNotFound and ErrorType.NotFound, then a successful read with both result sets. Each provider uses its own positively owned migrated/seeded disposable database; invalid/revoked actor, real restricted runtime-principal validation, SQL229 generic-write denials and outer import/audit rollback remain in the other pilot Facts.
+
+After locked restore of the affected projects, direct `dotnet test` commands used Release/net48/no-restore and the existing projects/filters below. Raw logs/TRX remain local under `TestResults/l2db-t02-repair-*`.
+
+| Project / selector | Passed / failed / skipped | Evidence |
+|---|---:|---|
+| S / successor missing-target method, pre-fix | 0/1/0 | Expected RED: legacy InvalidOperationException at ReadSingleAsync before mapped SQL51031 |
+| S / FullyQualifiedName~SecurityPilotParityTests, repaired | 3/0/0 | Strict User/Role parity and all three pilots |
+| S / Category=SecurityProvisioning | 33/0/0 | Complete affected category, including principal/import/audit/error boundaries |
+| A / FullyQualifiedName~PermissionImportValidationTests | 8/0/0 | Existing Application parsing/reauthorization/import contract |
+| X / unfiltered | 10/0/0 | Provider/architecture boundaries |
+
+No skips, aborts or duplicate results. The focused three cases overlap the final 33 and are not additional unique acceptance cases. The 33 selected S rows retain exact ledger method/Theory cardinalities with the one successor mapping. Cleanup completed normally, reusable guarded drop succeeded and no unresolved allocation was reported. No global leftover census or orphan deletion was performed. C/I/F are unaffected by this local Security reader repair; their T02 evidence is retained as scoped predecessor evidence, not relabeled as a new run. No full SQL/GUI gate was run.
+
+An independent read-only reviewer found no P1/P2 issue: the optional single-row read preserves cardinality, surfaces deferred SQL errors, and the null guard preserves the unexpected-empty invariant. Startup/package proof remains separate; source review and green SQL tests do not waive it. Existing Pkcs advisory risk and OPEN RELEASE-MANIFEST-01 are unchanged.
+
+### Remaining startup gate
+
+The process environment currently provides only the designated SQL-test administrative connection, not a least-privileged runtime connection. Package publication and bounded entry-point checks will be recorded against the clean repair commit. Do not grant GO using the test administrator as a runtime principal, bypass validation, create a server login or change server security to force startup. T03–T06 remain blocked until successful startup on an explicitly designated non-production database with a suitable runtime identity is evidenced. T07 attended business workflows and release acceptance remain separate obligations.
