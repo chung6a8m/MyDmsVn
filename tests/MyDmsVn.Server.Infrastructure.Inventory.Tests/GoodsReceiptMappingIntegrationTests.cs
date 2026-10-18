@@ -3,7 +3,7 @@ using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Domain.Inventory;
@@ -28,8 +28,8 @@ public sealed class GoodsReceiptMappingIntegrationTests
     }
 
     [SqlServerFact]
-    public Task Goods_receipt_entities_round_trip_through_registered_RepoDb_mappings() =>
-        _fixture.RunAsync(nameof(Goods_receipt_entities_round_trip_through_registered_RepoDb_mappings), _output, async test =>
+    public Task Goods_receipt_entities_round_trip_through_registered_Linq_mappings() =>
+        _fixture.RunAsync(nameof(Goods_receipt_entities_round_trip_through_registered_Linq_mappings), _output, async test =>
         {
             var services = new ServiceCollection();
             services.AddSqlPersistence(test.ConnectionString);
@@ -129,10 +129,10 @@ public sealed class GoodsReceiptMappingIntegrationTests
 
             var sql = (Microsoft.Data.SqlClient.SqlConnection)context.Connection;
             var sqlTx = (Microsoft.Data.SqlClient.SqlTransaction)transaction;
-            Assert.Equal(receiptId, await Pilot.PilotSql.Scalar<long>(sql, sqlTx, "SELECT ReceiptId FROM dbo.GoodsReceipts"));
-            Assert.Equal("GR-MAP-001", await Pilot.PilotSql.Scalar<string>(sql, sqlTx, "SELECT ReceiptNo FROM dbo.GoodsReceipts"));
-            Assert.Equal(lineId, await Pilot.PilotSql.Scalar<long>(sql, sqlTx, "SELECT ReceiptLineId FROM dbo.GoodsReceiptLines"));
-            Assert.Equal(updatedReceipt.Version, await Pilot.PilotSql.Scalar<byte[]>(sql, sqlTx, "SELECT RowVersion FROM dbo.GoodsReceipts"));
+            Assert.Equal(receiptId, await NativeSql.Scalar<long>(sql, sqlTx, "SELECT ReceiptId FROM dbo.GoodsReceipts"));
+            Assert.Equal("GR-MAP-001", await NativeSql.Scalar<string>(sql, sqlTx, "SELECT ReceiptNo FROM dbo.GoodsReceipts"));
+            Assert.Equal(lineId, await NativeSql.Scalar<long>(sql, sqlTx, "SELECT ReceiptLineId FROM dbo.GoodsReceiptLines"));
+            Assert.Equal(updatedReceipt.Version, await NativeSql.Scalar<byte[]>(sql, sqlTx, "SELECT RowVersion FROM dbo.GoodsReceipts"));
             Assert.Equal(createdAtUtc, updatedReceipt.UpdatedAtUtc);
             Assert.Equal(userId, updatedReceipt.UpdatedByUserId);
             db.Dispose(); unitOfWork.Rollback();

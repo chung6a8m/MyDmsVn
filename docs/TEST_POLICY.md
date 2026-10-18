@@ -92,3 +92,7 @@ Automated STA checks and attended packaged-user acceptance are separate evidence
 Record task/revision, changed behavior, selected project/TFM/filter, scope rationale, commands actually run, expected versus observed cases, pass/fail/skip/not-run counts, and duration where useful. Include SQL allocation/reset/seed/cleanup outcomes or manual leftover review when relevant. State missing resources and remaining acceptance blockers explicitly.
 
 Keep raw TRX, Theory values, SQL identifiers, connection data and detailed diagnostics local. Publish reviewed sanitized summaries. No historical total, another revision's result or documentation-only review establishes current runtime or performance evidence.
+
+## L2DB-T06 cutover note
+
+T06 removes active RepoDb/Dapper dependencies and mechanically replaces test/fixture SQL calls with independent native SqlClient oracles. The accepted reset/seed/ownership/drain contract above remains fixed. [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) records separate review, case/row reconciliation and affected boundary reruns; it does not replace RESP history or grant T07 package/manual acceptance.

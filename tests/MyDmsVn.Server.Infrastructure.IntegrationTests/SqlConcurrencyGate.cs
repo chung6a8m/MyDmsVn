@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -59,7 +59,7 @@ internal sealed class SqlConcurrencyGate : IDisposable
             var resourceName =
                 "MyDmsVn.SqlTestGate." + scenarioName + "." + Guid.NewGuid().ToString("N");
             var result = await connection.QuerySingleAsync<int>(
-                    new CommandDefinition(
+                    new SqlTestCommand(
                         "DECLARE @result int; " +
                         "EXEC @result = sys.sp_getapplock " +
                         "@Resource = @resourceName, @LockMode = N'Exclusive', " +
@@ -74,7 +74,7 @@ internal sealed class SqlConcurrencyGate : IDisposable
             }
 
             var sessionId = await connection.QuerySingleAsync<int>(
-                    new CommandDefinition("SELECT @@SPID;", cancellationToken: cancellationToken))
+                    new SqlTestCommand("SELECT @@SPID;", cancellationToken: cancellationToken))
                 .ConfigureAwait(false);
             return new SqlConcurrencyGate(connection, connectionString, resourceName, sessionId);
         }
@@ -95,7 +95,7 @@ internal sealed class SqlConcurrencyGate : IDisposable
             timeout,
             cancellationToken,
             (connection, observationToken, commandTimeout) => connection.QuerySingleOrDefaultAsync<SqlWaitObservation>(
-                new CommandDefinition(
+                new SqlTestCommand(
                     "SELECT TOP (1) request.wait_type AS WaitType, request.blocking_session_id AS BlockingSessionId " +
                     "FROM sys.dm_exec_requests AS request " +
                     "WHERE request.session_id = @holderSessionId " +
@@ -136,7 +136,7 @@ internal sealed class SqlConcurrencyGate : IDisposable
             timeout,
             cancellationToken,
             (connection, observationToken, commandTimeout) => connection.QuerySingleOrDefaultAsync<SqlWaitObservation>(
-                new CommandDefinition(
+                new SqlTestCommand(
                     "SELECT TOP (1) request.wait_type AS WaitType, request.blocking_session_id AS BlockingSessionId " +
                     "FROM sys.dm_exec_requests AS request " +
                     "INNER JOIN sys.dm_tran_locks AS waitingLock " +
@@ -168,7 +168,7 @@ internal sealed class SqlConcurrencyGate : IDisposable
             if (_controllerConnection.State == System.Data.ConnectionState.Open)
             {
                 var result = await _controllerConnection.QuerySingleAsync<int>(
-                        new CommandDefinition(
+                        new SqlTestCommand(
                             "DECLARE @result int; " +
                             "EXEC @result = sys.sp_releaseapplock " +
                             "@Resource = @resourceName, @LockOwner = N'Session'; SELECT @result;",

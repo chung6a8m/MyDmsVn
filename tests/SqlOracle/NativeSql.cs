@@ -5,10 +5,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
+using MyDmsVn.Server.Infrastructure.IntegrationTests;
 
-namespace MyDmsVn.Server.Infrastructure.IntegrationTests.Pilot;
+namespace MyDmsVn.Testing.Sql;
 
-internal static class PilotSql
+internal static class NativeSql
 {
     public static SqlParameter P(string name, SqlDbType type, object? value) => new(name, type) { Value = value ?? DBNull.Value };
     public static SqlCommand Command(SqlConnection connection, SqlTransaction? transaction, string sql, params SqlParameter[] parameters)

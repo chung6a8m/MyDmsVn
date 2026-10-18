@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Xunit;
 using Xunit.Abstractions;
@@ -50,7 +50,7 @@ INSERT dbo.Customers(Code,Name) VALUES(N'KH001',N'Sentinel');");
             backend.Catalog_backend_crud_queries_audit_and_conflicts_use_real_sql_boundaries,
             backend.Explicitly_denied_catalog_write_leaves_business_tables_unchanged,
             backend.Inactive_catalog_rows_remain_historically_queryable_but_are_excluded_from_lookups,
-            mapping.Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings,
+            mapping.Catalog_entities_round_trip_explicit_audit_values_through_registered_Linq_mappings,
             mapping.Catalog_write_repository_uses_database_creation_time_instead_of_entity_creation_time,
         };
         if (reverse) { Array.Reverse(scenarios); }
@@ -67,7 +67,7 @@ INSERT dbo.Customers(Code,Name) VALUES(N'KH001',N'Sentinel');");
     private static async Task AssertEmptyAsync(SqlFixtureTestScope scope, System.Threading.CancellationToken token)
     {
         var connection = CatalogSqlCollectionFixture.Track(scope, new SqlConnection(scope.ConnectionString));
-        Assert.Equal(0, await connection.QuerySingleAsync<int>(new CommandDefinition(@"
+        Assert.Equal(0, await connection.QuerySingleAsync<int>(new SqlTestCommand(@"
 SELECT (SELECT COUNT(*) FROM dbo.Users) + (SELECT COUNT(*) FROM dbo.Products)
      + (SELECT COUNT(*) FROM dbo.Warehouses) + (SELECT COUNT(*) FROM dbo.Employees)
      + (SELECT COUNT(*) FROM dbo.Customers);", cancellationToken: token)));

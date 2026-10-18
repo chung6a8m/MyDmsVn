@@ -4,12 +4,9 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" />
-    <PackageReference Include="Dapper" />
     <PackageReference Include="linq2db" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
-    <PackageReference Include="RepoDb" />
-    <PackageReference Include="RepoDb.SqlServer" />
     <PackageReference Include="Serilog" />
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>

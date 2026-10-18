@@ -832,3 +832,40 @@ All business/operational Identity/Security/DbMigrator legacy ORM calls are conve
 | `S:SecurityNativeMigrationTests.Maintenance_preserves_datetime2_ticks_and_the_bound_account_identity` ([source](../tests/MyDmsVn.Server.Infrastructure.Security.Tests/SecurityNativeMigrationTests.cs)) | single | SQL / SecurityProvisioning, dedicated fresh | Add; native bootstrap/recovery/rename audit precision, stable bound identity and no grants |
 | `X:OperationalPersistenceBoundaryTests.Identity_security_operations_and_migrator_have_no_legacy_orm_consumers` ([source](../tests/MyDmsVn.Architecture.Tests/OperationalPersistenceBoundaryTests.cs)) | single | pure / - | Add; zero legacy ORM consumer in the converted source folders; packages/hooks are a separate T06 obligation |
 | `S:SecurityNativeMigrationTests.Maintenance_rejects_wrong_binding_and_rolls_back_recovery_and_partial_rename_failures` ([source](../tests/MyDmsVn.Server.Infrastructure.Security.Tests/SecurityNativeMigrationTests.cs)) | single | SQL / SecurityProvisioning, dedicated fresh trigger-fault database | Add; bound-identity refusal, recovery/partial-rename rollback and successful new maintenance transaction |
+
+## T06 dependency cutover and complete source reconciliation
+
+Base `0fd9a55b35b5d4814f70cffbe6f74a85d0b71e1f`, net48, 2026-10-19. Every prior logical ID and exact InlineData ordinal/hash remains. Three new single-row cases are added; no test method or Theory row is removed. Seven historical pilot Facts retain their logical names but now run only the registered production implementation against independent native SQL oracles. Removed dual-provider phases are not xUnit rows or lost production assertions. [Evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup).
+
+| Original logical ID (retained) | Actual successor in same owner/class | Rows / retained obligation |
+|---|---|---|
+| F — `RepositoryAndQueryIntegrationTests.Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write` | `Explicit_repository_uses_Linq_and_native_oracle_sees_its_uncommitted_write` | single; explicit registration, returned identity, native uncommitted visibility and rollback |
+| F — `RepositoryAndQueryIntegrationTests.RepoDb_mapping_initialization_is_thread_safe_and_retries_after_failure` | `Linq_mapping_initialization_is_thread_safe_and_retries_after_failure` | single; first setup failure, sixteen concurrent retries, exactly two initialization attempts |
+| F — `PersistenceTransactionTests.Repository_and_Dapper_share_the_same_server_session` | `Repository_and_native_oracle_share_the_same_server_session` | single; native @@SPID equals repository session on the same current transaction |
+| C — `CatalogMappingIntegrationTests.Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings` | `Catalog_entities_round_trip_explicit_audit_values_through_registered_Linq_mappings` | single; all four catalog identities, explicit audit values and field readbacks through LINQ plus native oracle |
+| I — `GoodsReceiptMappingIntegrationTests.Goods_receipt_entities_round_trip_through_registered_RepoDb_mappings` | `Goods_receipt_entities_round_trip_through_registered_Linq_mappings` | single; receipt/header/line identity and number, generated audit and advancing byte-array rowversion assertions |
+
+The S missing-target successor remains the separately recorded T02 mapping. Fixture adapters call the C/I successors explicitly; only invocation labels change. Foundation uses test-only ILinqToDbMapping registrations and retryable schema publication instead of RepoDb bootstrap. Native raw SQL setup/assertions keep the same SQL and ownership/reset/seed/drain order; the sole explicit DateTime2 parameter case now uses typed SqlParameter values.
+
+| Logical ID / source | Row | Resource / category | Decision |
+|---|---|---|---|
+| `F:NativeSqlOracleTests.Native_oracle_maps_nullable_binary_tuple_and_poco_values_without_product_mappings` ([source](../tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/NativeSqlOracleTests.cs)) | single | pure / - | Add; native oracle or active dependency boundary |
+| `F:NativeSqlOracleTests.Native_oracle_preserves_auto_open_current_transaction_types_cardinality_and_deferred_errors` ([source](../tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/NativeSqlOracleTests.cs)) | single | SQL / FastSQL | Add; native oracle or active dependency boundary |
+| `X:OperationalPersistenceBoundaryTests.Active_projects_and_locks_have_no_legacy_orm_dependency_or_bootstrap_hook` ([source](../tests/MyDmsVn.Architecture.Tests/OperationalPersistenceBoundaryTests.cs)) | single | pure / - | Add; native oracle or active dependency boundary |
+
+Complete source inventory after T06; counts are not runtime acceptance. All ten owners target net48. Each original Theory row fingerprint exactly matches the frozen ledger.
+
+| Owner | Project | Methods | Invocations incl. Theory | SQL invocations |
+|---|---|---:|---:|---:|
+| F | `tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/MyDmsVn.Server.Infrastructure.Foundation.Tests.csproj` | 61 | 61 | 51 |
+| C | `tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj` | 17 | 19 | 19 |
+| I | `tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj` | 40 | 42 | 37 |
+| S | `tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj` | 56 | 60 | 38 |
+| M | `tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj` | 65 | 65 | 46 |
+| O | `tests/MyDmsVn.Server.Infrastructure.IntegrationTests/MyDmsVn.Server.Infrastructure.IntegrationTests.csproj` | 34 | 57 | 12 |
+| A | `tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj` | 125 | 157 | 0 |
+| X | `tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj` | 12 | 12 | 0 |
+| D | `tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj` | 108 | 108 | 0 |
+| W | `tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj` | 138 | 139 | 0 |
+
+Total **656 logical IDs**. Six SQL owners: **273 methods / 304 invocations**, 203 SQL and 101 pure. T07 still owns frozen-commit final gates and package/manual workflows.

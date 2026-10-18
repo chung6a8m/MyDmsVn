@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Xunit;
 using Xunit.Abstractions;
@@ -83,7 +83,7 @@ public sealed class ApplicationSqlCollectionFixture : IAsyncLifetime
                 if (_fault == "schema-failure" || _fault == "trigger-failure")
                 {
                     using var connection = new SqlConnection(scope.ConnectionString);
-                    await connection.ExecuteAsync(new CommandDefinition(_fault == "schema-failure"
+                    await connection.ExecuteAsync(new SqlTestCommand(_fault == "schema-failure"
                         ? "ALTER TABLE dbo.Users ADD FixtureProbeOnly int NULL;"
                         : "DISABLE TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger;", cancellationToken: token));
                 }
@@ -135,7 +135,7 @@ public sealed class ApplicationSqlCollectionFixture : IAsyncLifetime
         using var connection = new SqlConnection(scope.ConnectionString);
         foreach (var table in MutableTables)
         {
-            Assert.Equal(0, await connection.QuerySingleAsync<int>(new CommandDefinition(
+            Assert.Equal(0, await connection.QuerySingleAsync<int>(new SqlTestCommand(
                 "SELECT COUNT(*) FROM dbo.[" + table + "];", cancellationToken: token)));
         }
     }

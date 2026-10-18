@@ -6,7 +6,6 @@
   <ItemGroup>
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageVersion Include="Dapper" Version="2.1.79" />
     <PackageVersion Include="linq2db" Version="6.3.0" />
     <PackageVersion Include="dbup-sqlserver" Version="7.2.0" />
     <PackageVersion Include="ErrorOr" Version="2.1.1" />
@@ -24,9 +23,6 @@
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Onova" Version="2.6.13" />
     <PackageVersion Include="Respawn" Version="4.0.0" />
-    <PackageVersion Include="RepoDb" Version="1.16.0" />
-    <PackageVersion Include="RepoDb.SqlServer" Version="1.16.1" />
-    <PackageVersion Include="RepoDb.SqlServer.BulkOperations" Version="1.16.2" />
     <PackageVersion Include="Serilog" Version="4.4.0" />
     <PackageVersion Include="Serilog.Extensions.Logging" Version="8.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />

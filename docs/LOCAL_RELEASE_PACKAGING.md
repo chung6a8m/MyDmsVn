@@ -4,6 +4,8 @@
 
 **RELEASE-MANIFEST-01:** Script đã sửa nguồn metadata: đọc `SchemaCompatibilityPolicy.CurrentScripts` từ DLL admin đã đóng gói qua helper PowerShell x86, thay cho pin `8..8`. Bốn test packaging x86 và đối chiếu artifact từ commit sạch `d8013030` đã đạt: schema9, danh sách001–009, 224 hash file. [L2DB evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed) đóng riêng lỗi metadata này. Chưa có release acceptance.
 
+**L2DB-T06:** Source net48 đã chuyển sang LINQ to DB/native SqlClient và gỡ dependency RepoDb/Dapper active. AppCore vẫn parked; lock cũ phải refresh khi được phép reactivation. T07 phải đóng gói từ commit T06 đã freeze, kiểm tra asset SqlClient/binding redirects và thao tác Local login, Product, receipt, deny, import, logout/relogin. Bằng chứng package T02 ở trên giữ nguyên revision cũ; không thay cho acceptance T07. [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup).
+
 ## Release artifacts
 
 [global.json](../global.json) khai báo SDK nền `8.0.400`, `rollForward: latestFeature`, `allowPrerelease: false`. Máy build cần SDK được resolver chọn theo cấu hình đó, targeting pack .NET Framework 4.8 và dependencies/submodules của solution. Ghi lại SDK thực tế được dùng.

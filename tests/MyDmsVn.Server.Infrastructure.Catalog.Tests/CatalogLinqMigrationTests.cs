@@ -15,7 +15,7 @@ using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Domain.Catalog;
-using MyDmsVn.Server.Infrastructure.IntegrationTests.Pilot;
+using MyDmsVn.Testing.Sql;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using Xunit;
 using Xunit.Abstractions;
@@ -54,7 +54,7 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
             var context = (ISqlExecutionContext)uow;
             foreach (var row in new[] { ("Products", "ProductId", p, product.CreatedAtUtc, product.CreatedByUserId), ("Warehouses", "WarehouseId", w, warehouse.CreatedAtUtc, warehouse.CreatedByUserId), ("Employees", "EmployeeId", e, employee.CreatedAtUtc, employee.CreatedByUserId), ("Customers", "CustomerId", c, customer.CreatedAtUtc, customer.CreatedByUserId) })
             {
-                Assert.Equal(await PilotSql.Scalar<DateTime>((SqlConnection)context.Connection, (SqlTransaction)context.Transaction!, "SELECT CreatedAtUtc FROM dbo." + row.Item1 + " WHERE " + row.Item2 + "=@id", PilotSql.P("@id", SqlDbType.Int, row.Item3)), row.Item4);
+                Assert.Equal(await NativeSql.Scalar<DateTime>((SqlConnection)context.Connection, (SqlTransaction)context.Transaction!, "SELECT CreatedAtUtc FROM dbo." + row.Item1 + " WHERE " + row.Item2 + "=@id", NativeSql.P("@id", SqlDbType.Int, row.Item3)), row.Item4);
                 Assert.Equal(41, row.Item5);
             }
             foreach (var type in new[] { typeof(Product), typeof(Warehouse), typeof(Employee), typeof(Customer) })
@@ -62,9 +62,9 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
                 Assert.DoesNotContain(type.GetProperties(), x => x.Name == "Version" || x.Name == "RowVersion");
                 foreach (var column in db.MappingSchema.GetEntityDescriptor(type, null).Columns)
                 {
-                    var nullable = await PilotSql.Scalar<int>((SqlConnection)context.Connection, (SqlTransaction)context.Transaction!,
+                    var nullable = await NativeSql.Scalar<int>((SqlConnection)context.Connection, (SqlTransaction)context.Transaction!,
                         "SELECT CONVERT(int,is_nullable) FROM sys.columns WHERE object_id=OBJECT_ID(@table) AND name=@column",
-                        PilotSql.P("@table", SqlDbType.NVarChar, "dbo." + type.Name + "s"), PilotSql.P("@column", SqlDbType.NVarChar, column.ColumnName));
+                        NativeSql.P("@table", SqlDbType.NVarChar, "dbo." + type.Name + "s"), NativeSql.P("@column", SqlDbType.NVarChar, column.ColumnName));
                     Assert.Equal(nullable == 1, column.CanBeNull);
                 }
             }
@@ -84,14 +84,14 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
             w.Id = await r.InsertWarehouseAsync(w, token); e.Id = await r.InsertEmployeeAsync(e, token); c.Id = await r.InsertCustomerAsync(c, token);
             foreach (var id in new[] { w.Id, e.Id, c.Id }) { Assert.True(id > 0); Assert.NotEqual(9999, id); }
             foreach (var table in new[] { "Warehouses", "Employees", "Customers" })
-                Assert.Equal(1, await PilotSql.Scalar<int>(sql, tx, "SELECT COUNT(*) FROM dbo." + table + " WHERE CreatedAtUtc>@old AND CreatedByUserId=41 AND UpdatedAtUtc IS NULL AND UpdatedByUserId IS NULL", PilotSql.P("@old", SqlDbType.DateTime2, old)));
+                Assert.Equal(1, await NativeSql.Scalar<int>(sql, tx, "SELECT COUNT(*) FROM dbo." + table + " WHERE CreatedAtUtc>@old AND CreatedByUserId=41 AND UpdatedAtUtc IS NULL AND UpdatedByUserId IS NULL", NativeSql.P("@old", SqlDbType.DateTime2, old)));
             w.Name = "Kho sửa"; w.Address = "Địa chỉ"; w.IsActive = false; w.CreatedByUserId = 999; w.UpdatedAtUtc = updated; w.UpdatedByUserId = 42;
             e.Name = "Người sửa"; e.Phone = "0123"; e.IsActive = false; e.CreatedByUserId = 999; e.UpdatedAtUtc = updated; e.UpdatedByUserId = 42;
             c.Name = "Khách sửa"; c.Address = "Địa chỉ"; c.Phone = "0456"; c.TaxCode = "TAX"; c.IsActive = false; c.CreatedByUserId = 999; c.UpdatedAtUtc = updated; c.UpdatedByUserId = 42;
             var ww = await r.UpdateWarehouseAsync(w, token); var ee = await r.UpdateEmployeeAsync(e, token); var cc = await r.UpdateCustomerAsync(c, token);
             Assert.NotNull(ww); Assert.NotNull(ee); Assert.NotNull(cc); Assert.Equal("Địa chỉ", ww!.Address); Assert.Equal("0123", ee!.Phone); Assert.Equal("TAX", cc!.TaxCode);
             foreach (var table in new[] { "Warehouses", "Employees", "Customers" })
-                Assert.Equal(1, await PilotSql.Scalar<int>(sql, tx, "SELECT COUNT(*) FROM dbo." + table + " WHERE IsActive=1 AND CreatedByUserId=41 AND CreatedAtUtc>@old AND UpdatedAtUtc=@updated AND UpdatedByUserId=42", PilotSql.P("@old", SqlDbType.DateTime2, old), PilotSql.P("@updated", SqlDbType.DateTime2, updated)));
+                Assert.Equal(1, await NativeSql.Scalar<int>(sql, tx, "SELECT COUNT(*) FROM dbo." + table + " WHERE IsActive=1 AND CreatedByUserId=41 AND CreatedAtUtc>@old AND UpdatedAtUtc=@updated AND UpdatedByUserId=42", NativeSql.P("@old", SqlDbType.DateTime2, old), NativeSql.P("@updated", SqlDbType.DateTime2, updated)));
             Assert.True(await r.SetWarehouseActiveAsync(w.Id, false, updated, 43, token)); Assert.True(await r.SetEmployeeActiveAsync(e.Id, false, updated, 43, token)); Assert.True(await r.SetCustomerActiveAsync(c.Id, false, updated, 43, token));
             Assert.False(await r.SetWarehouseActiveAsync(int.MaxValue, false, updated, 43, token)); Assert.False(await r.SetEmployeeActiveAsync(int.MaxValue, false, updated, 43, token)); Assert.False(await r.SetCustomerActiveAsync(int.MaxValue, false, updated, 43, token));
             Assert.Null(await r.UpdateWarehouseAsync(new Warehouse { Id = int.MaxValue, Code = "missing", Name = "Missing" }, token)); Assert.Null(await r.UpdateEmployeeAsync(new Employee { Id = int.MaxValue, Code = "missing", Name = "Missing" }, token)); Assert.Null(await r.UpdateCustomerAsync(new Customer { Id = int.MaxValue, Code = "missing", Name = "Missing" }, token));
@@ -112,7 +112,7 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
         {
             using var provider = Services(scope.ConnectionString); using var uow = provider.GetRequiredService<IUnitOfWorkFactory>().Create(); uow.BeginTransaction();
             var ctx = (ISqlExecutionContext)uow; var sql = (SqlConnection)ctx.Connection; var tx = (SqlTransaction)ctx.Transaction!;
-            var user = await PilotSql.Scalar<int>(sql, tx, "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'link.user',N'LINK.USER',N'Link',N'Local',N'hash',N'',N'BCrypt')");
+            var user = await NativeSql.Scalar<int>(sql, tx, "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'link.user',N'LINK.USER',N'Link',N'Local',N'hash',N'',N'BCrypt')");
             var r = uow.Repository<ICatalogWriteRepository>(); var id = await r.InsertEmployeeAsync(new Employee { Code = "E1", Name = "First", UserId = user }, token);
             var second = await r.InsertEmployeeAsync(new Employee { Code = "E2", Name = "Second" }, token);
             foreach (var update in new[] { false, true })
@@ -125,7 +125,7 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
             var duplicate = await Assert.ThrowsAsync<CatalogWriteConflictException>(() => r.UpdateEmployeeAsync(new Employee { Id = second, Code = "e1", Name = "Duplicate" }, token)); Assert.Equal(CatalogWriteConflict.DuplicateCode, duplicate.Conflict);
             Assert.Null((await r.UpdateEmployeeAsync(new Employee { Id = id, Code = "E1", Name = "Unlinked", UserId = null }, token))!.UserId);
             Assert.NotNull(await r.UpdateEmployeeAsync(new Employee { Id = second, Code = "E2", Name = "Linked", UserId = user }, token));
-            Assert.Equal(1, await PilotSql.Scalar<int>(sql, tx, "SELECT COUNT(*) FROM dbo.Employees WHERE UserId=@user", PilotSql.P("@user", SqlDbType.Int, user)));
+            Assert.Equal(1, await NativeSql.Scalar<int>(sql, tx, "SELECT COUNT(*) FROM dbo.Employees WHERE UserId=@user", NativeSql.P("@user", SqlDbType.Int, user)));
             uow.Rollback();
         });
 
@@ -135,8 +135,8 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
         {
             using var oracle = new SqlConnection(scope.ConnectionString); await oracle.OpenAsync(token);
             foreach (var table in new[] { "Products", "Warehouses", "Employees", "Customers" })
-                await PilotSql.Execute(oracle, null, "INSERT dbo." + table + "(Code,Name,IsActive" + (table == "Products" ? ",Unit" : "") + ") VALUES " + string.Join(",", new[] { ("A_%[", "Hàng Việt", 1), ("B", "ordinary", 1), ("C", "percent%", 1), ("D", "under_score", 1), ("E", "bracket[", 1), ("F", "inactive", 0) }.Select(x => "(N'" + x.Item1 + "',N'" + x.Item2 + "'," + x.Item3 + (table == "Products" ? ",N'EA'" : "") + ")")));
-            using var connections = new PilotConnections(scope.ConnectionString); using var provider = Services(scope.ConnectionString, connections);
+                await NativeSql.Execute(oracle, null, "INSERT dbo." + table + "(Code,Name,IsActive" + (table == "Products" ? ",Unit" : "") + ") VALUES " + string.Join(",", new[] { ("A_%[", "Hàng Việt", 1), ("B", "ordinary", 1), ("C", "percent%", 1), ("D", "under_score", 1), ("E", "bracket[", 1), ("F", "inactive", 0) }.Select(x => "(N'" + x.Item1 + "',N'" + x.Item2 + "'," + x.Item3 + (table == "Products" ? ",N'EA'" : "") + ")")));
+            using var connections = new SqlCommandObserverConnectionFactory(scope.ConnectionString); using var provider = Services(scope.ConnectionString, connections);
             var p = provider.GetRequiredService<IProductQueryService>(); var w = provider.GetRequiredService<IWarehouseQueryService>(); var e = provider.GetRequiredService<IEmployeeQueryService>(); var c = provider.GetRequiredService<ICustomerQueryService>();
             var cases = new QueryCase[]{
                 new("Products","ProductId",async req=>{var r=await p.ListAsync(req,token);return(r.TotalCount,r.Items.Select(x=>x.Id).ToArray());},req=>p.LookupAsync(req,token),async id=>await p.GetByIdAsync(id,token)!=null),
@@ -147,14 +147,14 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
             {
                 foreach (var search in new string?[] { null, "", "   ", "%", "_", "[", "Việt", " ordinary " })
                 {
-                    var s = string.IsNullOrWhiteSpace(search) ? null : search!.Trim(); var expected = await PilotSql.Ids(oracle, "SELECT " + q.Key + " FROM dbo." + q.Table + " WHERE IsActive=1 AND (@s IS NULL OR CHARINDEX(@s,Code)>0 OR CHARINDEX(@s,Name)>0) ORDER BY Code," + q.Key, PilotSql.P("@s", SqlDbType.NVarChar, s));
+                    var s = string.IsNullOrWhiteSpace(search) ? null : search!.Trim(); var expected = await NativeSql.Ids(oracle, "SELECT " + q.Key + " FROM dbo." + q.Table + " WHERE IsActive=1 AND (@s IS NULL OR CHARINDEX(@s,Code)>0 OR CHARINDEX(@s,Name)>0) ORDER BY Code," + q.Key, NativeSql.P("@s", SqlDbType.NVarChar, s));
                     connections.Commands.Clear(); var result = await q.List(new CatalogListRequest(search, 1, 2, false));
                     Assert.Equal(expected.Length, result.Total); Assert.Equal(expected.Take(2), result.Ids); Assert.Equal(1L, connections.RoundTrips);
                     var command = Assert.Single(connections.Commands); Assert.Contains("COUNT_BIG", command.Sql, StringComparison.Ordinal); Assert.Contains("BigInt", command.Parameters, StringComparison.Ordinal);
                     Assert.Equal(expected.Take(3), (await q.Lookup(new CatalogLookupRequest(search, 3))).Select(x => x.Id));
                 }
                 var all = await q.List(new CatalogListRequest(null, 2, 2, true)); Assert.Equal(6, all.Total);
-                var ordered = await PilotSql.Ids(oracle, "SELECT " + q.Key + " FROM dbo." + q.Table + " ORDER BY Code," + q.Key); Assert.Equal(ordered.Skip(2).Take(2), all.Ids);
+                var ordered = await NativeSql.Ids(oracle, "SELECT " + q.Key + " FROM dbo." + q.Table + " ORDER BY Code," + q.Key); Assert.Equal(ordered.Skip(2).Take(2), all.Ids);
                 var far = await q.List(new CatalogListRequest(null, int.MaxValue, 100, true)); Assert.Equal(6, far.Total); Assert.Empty(far.Ids); Assert.Equal(1L, connections.RoundTrips);
                 Assert.False(await q.Exists(int.MaxValue)); Assert.True(await q.Exists(ordered.Last()));
                 output.WriteLine(q.Table + ": literal Unicode/null/blank search, one COUNT_BIG/Int64-offset batch, stable page and active-only limit preserved.");
@@ -163,7 +163,7 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
 
     [SqlServerFact]
     public Task Catalog_writes_share_current_transaction_with_legacy_receipt_reference_reads_and_rollback() =>
-        PilotSql.Owned(async database =>
+        NativeSql.Owned(async database =>
         {
             using var provider = Services(database.ConnectionString); using var uow = provider.GetRequiredService<IUnitOfWorkFactory>().Create();
             var catalog = uow.Repository<ICatalogWriteRepository>(); var receipts = uow.Repository<IGoodsReceiptWriteRepository>(); uow.BeginTransaction();
@@ -173,10 +173,10 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
             var references = await receipts.GetReferenceSnapshotAsync(w, e, new[] { p }, CancellationToken.None);
             Assert.Equal(CatalogReferenceState.Active, references.Warehouse); Assert.Equal(CatalogReferenceState.Active, references.Employee); Assert.Equal(CatalogReferenceState.Active, references.Products[p]);
             var ctx = (ISqlExecutionContext)uow; var sql = (SqlConnection)ctx.Connection; var tx = (SqlTransaction)ctx.Transaction!;
-            Assert.Equal(3, await PilotSql.Scalar<int>(sql, tx, "SELECT (SELECT COUNT(*) FROM dbo.Products)+(SELECT COUNT(*) FROM dbo.Warehouses)+(SELECT COUNT(*) FROM dbo.Employees)"));
+            Assert.Equal(3, await NativeSql.Scalar<int>(sql, tx, "SELECT (SELECT COUNT(*) FROM dbo.Products)+(SELECT COUNT(*) FROM dbo.Warehouses)+(SELECT COUNT(*) FROM dbo.Employees)"));
             using (var db = provider.GetRequiredService<ILinqToDbSessionFactory>().Borrow(ctx, true))
-                Assert.Equal(await PilotSql.Scalar<int>(sql, tx, "SELECT CONVERT(int,@@SPID)"), await db.ExecuteAsync<int>("SELECT CONVERT(int,@@SPID)", CancellationToken.None));
-            uow.Rollback(); using var owner = new SqlConnection(database.ConnectionString); await owner.OpenAsync(); Assert.Equal(0, await PilotSql.Scalar<int>(owner, null, "SELECT (SELECT COUNT(*) FROM dbo.Products)+(SELECT COUNT(*) FROM dbo.Warehouses)+(SELECT COUNT(*) FROM dbo.Employees)"));
+                Assert.Equal(await NativeSql.Scalar<int>(sql, tx, "SELECT CONVERT(int,@@SPID)"), await db.ExecuteAsync<int>("SELECT CONVERT(int,@@SPID)", CancellationToken.None));
+            uow.Rollback(); using var owner = new SqlConnection(database.ConnectionString); await owner.OpenAsync(); Assert.Equal(0, await NativeSql.Scalar<int>(owner, null, "SELECT (SELECT COUNT(*) FROM dbo.Products)+(SELECT COUNT(*) FROM dbo.Warehouses)+(SELECT COUNT(*) FROM dbo.Employees)"));
         });
 
     [SqlServerFact]
@@ -195,7 +195,7 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
                 Assert.True(error.Number == 2628 || error.Number == 8152);
             }
             var ctx = (ISqlExecutionContext)uow;
-            Assert.Equal(0, await PilotSql.Scalar<int>((SqlConnection)ctx.Connection, (SqlTransaction)ctx.Transaction!, "SELECT (SELECT COUNT(*) FROM dbo.Products)+(SELECT COUNT(*) FROM dbo.Warehouses)+(SELECT COUNT(*) FROM dbo.Employees)+(SELECT COUNT(*) FROM dbo.Customers)"));
+            Assert.Equal(0, await NativeSql.Scalar<int>((SqlConnection)ctx.Connection, (SqlTransaction)ctx.Transaction!, "SELECT (SELECT COUNT(*) FROM dbo.Products)+(SELECT COUNT(*) FROM dbo.Warehouses)+(SELECT COUNT(*) FROM dbo.Employees)+(SELECT COUNT(*) FROM dbo.Customers)"));
             uow.Rollback();
         });
 
@@ -211,7 +211,7 @@ public sealed class CatalogLinqMigrationTests(CatalogSqlCollectionFixture fixtur
             using var uow = provider.GetRequiredService<IUnitOfWorkFactory>().Create(); uow.BeginTransaction(); var r = uow.Repository<ICatalogWriteRepository>();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => r.InsertProductAsync(new Product { Code = "P", Name = "Cancelled", Unit = "EA" }, cancel.Token));
             Assert.Equal(UnitOfWorkState.ActiveTransaction, uow.State); var ctx = (ISqlExecutionContext)uow;
-            Assert.Equal(0, await PilotSql.Scalar<int>((SqlConnection)ctx.Connection, (SqlTransaction)ctx.Transaction!, "SELECT COUNT(*) FROM dbo.Products")); uow.Rollback();
+            Assert.Equal(0, await NativeSql.Scalar<int>((SqlConnection)ctx.Connection, (SqlTransaction)ctx.Transaction!, "SELECT COUNT(*) FROM dbo.Products")); uow.Rollback();
         });
 
     private sealed class QueryCase(string table, string key, Func<CatalogListRequest, Task<(long Total, int[] Ids)>> list, Func<CatalogLookupRequest, Task<IReadOnlyList<CatalogLookupDto>>> lookup, Func<int, Task<bool>> exists)

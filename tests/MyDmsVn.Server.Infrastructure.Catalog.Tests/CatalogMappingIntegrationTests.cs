@@ -3,7 +3,7 @@ using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Persistence;
@@ -11,7 +11,6 @@ using MyDmsVn.Server.Domain.Catalog;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using LinqToDB;
 using Microsoft.Data.SqlClient;
-using MyDmsVn.Server.Infrastructure.IntegrationTests.Pilot;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -98,11 +97,11 @@ public sealed class CatalogMappingIntegrationTests
             unitOfWork.Rollback();
         });
 
-    // The logical method name stays frozen because the accepted reuse adapter invokes it directly.
+    // The logical ID is retained in the ledger; the accepted reuse adapter invokes the renamed successor.
     // Its provider-specific body now exercises registered LINQ mappings, with independent native reads.
     [SqlServerFact]
-    public Task Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings() =>
-        _fixture.RunAsync(nameof(Catalog_entities_round_trip_explicit_audit_values_through_registered_RepoDb_mappings), _output, async (test, token) =>
+    public Task Catalog_entities_round_trip_explicit_audit_values_through_registered_Linq_mappings() =>
+        _fixture.RunAsync(nameof(Catalog_entities_round_trip_explicit_audit_values_through_registered_Linq_mappings), _output, async (test, token) =>
         {
             var services = new ServiceCollection(); services.AddSqlPersistence(test.ConnectionString);
             var provider = CatalogSqlCollectionFixture.Track(test, services.BuildServiceProvider());
@@ -127,16 +126,16 @@ public sealed class CatalogMappingIntegrationTests
                 var customerId = await db.InsertWithInt32IdentityAsync(new Customer
                 { Code = "KH001", Name = "Khach hang 1", Address = "Da Nang", Phone = "0911111111", TaxCode = "0101234567", IsActive = true, CreatedAtUtc = createdAtUtc, CreatedByUserId = 7, UpdatedAtUtc = updatedAtUtc, UpdatedByUserId = 8 }, token: token);
                 Assert.True(Convert.ToInt32(customerId) > 0);
-                Assert.Equal(4, await PilotSql.Scalar<int>(connection, transaction,
+                Assert.Equal(4, await NativeSql.Scalar<int>(connection, transaction,
                     "SELECT (SELECT COUNT(*) FROM dbo.Products WHERE ProductId=@p AND Code=N'SP001') + " +
                     "(SELECT COUNT(*) FROM dbo.Warehouses WHERE WarehouseId=@w AND Address=N'Ha Noi') + " +
                     "(SELECT COUNT(*) FROM dbo.Employees WHERE EmployeeId=@e AND Phone=N'0900000000') + " +
                     "(SELECT COUNT(*) FROM dbo.Customers WHERE CustomerId=@c AND TaxCode=N'0101234567')",
-                    PilotSql.P("@p", SqlDbType.Int, productId), PilotSql.P("@w", SqlDbType.Int, warehouseId), PilotSql.P("@e", SqlDbType.Int, employeeId), PilotSql.P("@c", SqlDbType.Int, customerId)));
+                    NativeSql.P("@p", SqlDbType.Int, productId), NativeSql.P("@w", SqlDbType.Int, warehouseId), NativeSql.P("@e", SqlDbType.Int, employeeId), NativeSql.P("@c", SqlDbType.Int, customerId)));
                 foreach (var table in new[] { "Products", "Warehouses", "Employees", "Customers" })
-                    Assert.Equal(1, await PilotSql.Scalar<int>(connection, transaction,
+                    Assert.Equal(1, await NativeSql.Scalar<int>(connection, transaction,
                         "SELECT COUNT(*) FROM dbo." + table + " WHERE CreatedAtUtc=@created AND UpdatedAtUtc=@updated AND CreatedByUserId=7 AND UpdatedByUserId=8",
-                        PilotSql.P("@created", SqlDbType.DateTime2, createdAtUtc), PilotSql.P("@updated", SqlDbType.DateTime2, updatedAtUtc)));
+                        NativeSql.P("@created", SqlDbType.DateTime2, createdAtUtc), NativeSql.P("@updated", SqlDbType.DateTime2, updatedAtUtc)));
             }
             unitOfWork.Rollback();
         });

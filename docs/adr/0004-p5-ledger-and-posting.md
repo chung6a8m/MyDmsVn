@@ -13,7 +13,7 @@ P5 must prove a real transaction involving draft receipt, stock movements and st
 - Append-only StockLedger (one positive movement per receipt line), and current StockBalances materialized by Warehouse+Product.
 - Explicit UoW encloses status change, ledger insertion and atomic balance increment.
 - SQL conditional status transition + UNIQUE document movement identity prevent duplicate postings; concurrency-safe balance update prevents lost increments.
-- Stock Balance/Stock Card are read models, with Dapper currently and LINQ to DB planned; neither exposes direct ledger/balance write APIs.
+- Stock Balance/Stock Card are read models, with typed native SqlClient after L2DB-T04; neither exposes direct ledger/balance write APIs.
 - P5 excludes outbound stock / Sales Orders; customers exist as standalone catalog.
 
 ## Consequences

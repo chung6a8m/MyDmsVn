@@ -8,7 +8,6 @@
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Dapper" />
     <PackageReference Include="Respawn" />
     <PackageReference Include="dbup-sqlserver" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
@@ -38,6 +37,9 @@
     <EmbeddedResource Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\TestScripts\*.sql" Link="TestScripts\%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\Pilot\PilotSql.cs" Link="Pilot\PilotSql.cs" />
+    <Compile Include="..\SqlOracle\NativeSql.cs" Link="SqlOracle\NativeSql.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\SqlOracle\SqlTestOracle.cs" Link="SqlOracle\SqlTestOracle.cs" />
   </ItemGroup>
 </Project>

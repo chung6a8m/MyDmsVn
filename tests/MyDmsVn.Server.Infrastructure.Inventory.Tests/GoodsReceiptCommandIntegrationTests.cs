@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using MediatR;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -1401,8 +1401,8 @@ public sealed class GoodsReceiptCommandIntegrationTests
                 uow.Rollback();
             }
             using var oracle = new SqlConnection(database.ConnectionString); await oracle.OpenAsync();
-            Assert.Equal(0, await Pilot.PilotSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceipts"));
-            Assert.Equal(0, await Pilot.PilotSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines"));
+            Assert.Equal(0, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceipts"));
+            Assert.Equal(0, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines"));
             var saved = await CreateInOwnScopeAsync(provider, seed, "after-rollback"); Assert.False(saved.IsError);
             var consumed = long.Parse(header.ReceiptNumber.Substring(2), System.Globalization.CultureInfo.InvariantCulture);
             Assert.Equal("GR" + (consumed + 1).ToString("D10", System.Globalization.CultureInfo.InvariantCulture), saved.Value.ReceiptNumber);
@@ -1452,11 +1452,11 @@ public sealed class GoodsReceiptCommandIntegrationTests
             await gate.ReleaseAsync(CancellationToken.None);
             using var oracle = new SqlConnection(database.ConnectionString); await oracle.OpenAsync();
             foreach (var table in new[] { "GoodsReceipts", "GoodsReceiptLines", "StockLedger", "StockBalances" })
-                Assert.Equal(0, await Pilot.PilotSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo." + table));
-            await Pilot.PilotSql.Execute(oracle, null, "DROP TRIGGER dbo.TR_TestLineCancellation;");
+                Assert.Equal(0, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo." + table));
+            await NativeSql.Execute(oracle, null, "DROP TRIGGER dbo.TR_TestLineCancellation;");
             var saved = await CreateInOwnScopeAsync(provider, seed, "after-cancel"); Assert.False(saved.IsError);
-            Assert.Equal(1, await Pilot.PilotSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceipts"));
-            Assert.Equal(1, await Pilot.PilotSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines"));
+            Assert.Equal(1, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceipts"));
+            Assert.Equal(1, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines"));
         }
         finally
         {
@@ -1809,11 +1809,11 @@ public sealed class GoodsReceiptCommandIntegrationTests
         if (openedSession != null)
         {
             openedSession.SetResult(await connection.QuerySingleAsync<int>(
-                new CommandDefinition("SELECT @@SPID;", cancellationToken: cancellationToken)));
+                new SqlTestCommand("SELECT @@SPID;", cancellationToken: cancellationToken)));
         }
 
         var affected = await connection.ExecuteAsync(
-            new CommandDefinition(
+            new SqlTestCommand(
                 "UPDATE dbo." + reference.TableName + " SET IsActive = @isActive WHERE " +
                 reference.KeyColumn + " = @id;",
                 new { isActive, id = reference.Id },

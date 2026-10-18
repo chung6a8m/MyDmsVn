@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Xunit;
 using Xunit.Abstractions;
@@ -69,7 +69,7 @@ public sealed class CatalogSqlCollectionFixture : IAsyncLifetime
             await Fixture.RunTestAsync(label, async (scope, token) =>
             {
                 using var connection = new SqlConnection(scope.ConnectionString);
-                Assert.Equal(0, await connection.QuerySingleAsync<int>(new CommandDefinition(@"
+                Assert.Equal(0, await connection.QuerySingleAsync<int>(new SqlTestCommand(@"
 SELECT (SELECT COUNT(*) FROM dbo.Users) + (SELECT COUNT(*) FROM dbo.Products)
      + (SELECT COUNT(*) FROM dbo.Warehouses) + (SELECT COUNT(*) FROM dbo.Employees)
      + (SELECT COUNT(*) FROM dbo.Customers);", cancellationToken: token)));
@@ -77,12 +77,12 @@ SELECT (SELECT COUNT(*) FROM dbo.Users) + (SELECT COUNT(*) FROM dbo.Products)
                 if (_fault == "seed-failure") { throw new InvalidOperationException("Expected adapter seed failure."); }
                 if (_fault == "schema-failure")
                 {
-                    await connection.ExecuteAsync(new CommandDefinition(
+                    await connection.ExecuteAsync(new SqlTestCommand(
                         "ALTER TABLE dbo.Products ADD FixtureProbeOnly int NULL;", cancellationToken: token));
                 }
                 if (_fault == "trigger-failure")
                 {
-                    await connection.ExecuteAsync(new CommandDefinition(
+                    await connection.ExecuteAsync(new SqlTestCommand(
                         "DISABLE TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger;", cancellationToken: token));
                 }
             }, async (scope, token) =>

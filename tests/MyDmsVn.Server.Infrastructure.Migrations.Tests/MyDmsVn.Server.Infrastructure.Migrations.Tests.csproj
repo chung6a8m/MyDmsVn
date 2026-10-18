@@ -5,7 +5,6 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Dapper" />
     <PackageReference Include="dbup-sqlserver" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
@@ -27,5 +26,8 @@
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlTestDatabaseName.cs" Link="SqlTestDatabaseName.cs" />
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\TestDatabaseMigrationRunner.cs" Link="TestDatabaseMigrationRunner.cs" />
     <EmbeddedResource Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\TestScripts\*.sql" Link="TestScripts\%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\SqlOracle\SqlTestOracle.cs" Link="SqlOracle\SqlTestOracle.cs" />
   </ItemGroup>
 </Project>

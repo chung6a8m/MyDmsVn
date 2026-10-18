@@ -63,7 +63,6 @@ namespace MyDmsVn.Server.Infrastructure
             services.Replace(
                 ServiceDescriptor.Scoped<IPermissionStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
-            services.AddSingleton<RepoDbMappingInitializer>();
             services.AddScoped<IUnitOfWorkFactory>(serviceProvider =>
             {
                 var registrations = serviceProvider
@@ -73,7 +72,6 @@ namespace MyDmsVn.Server.Infrastructure
                         registration => registration.Create);
                 return new SqlUnitOfWorkFactory(
                     serviceProvider.GetRequiredService<IDbConnectionFactory>(),
-                    serviceProvider.GetRequiredService<RepoDbMappingInitializer>(),
                     serviceProvider,
                     registrations);
             });

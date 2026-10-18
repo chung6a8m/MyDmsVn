@@ -11,7 +11,7 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Domain.Inventory;
-using MyDmsVn.Server.Infrastructure.IntegrationTests.Pilot;
+using MyDmsVn.Testing.Sql;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using Xunit;
 
@@ -21,17 +21,17 @@ public sealed class InventoryLinqMigrationTests
 {
     [SqlServerFact]
     public Task Registered_inventory_mapping_matches_native_schema_and_preserves_write_allowlists() =>
-        PilotSql.Owned(async database =>
+        NativeSql.Owned(async database =>
         {
             var services = new ServiceCollection(); services.AddSqlPersistence(database.ConnectionString);
             using var provider = services.BuildServiceProvider();
             Assert.Contains(provider.GetServices<ILinqToDbMapping>(), m => m.GetType().Name == "InventoryLinqToDbMapping");
             using var uow = provider.GetRequiredService<IUnitOfWorkFactory>().Create(); uow.BeginTransaction();
             var ctx = (ISqlExecutionContext)uow; var sql = (SqlConnection)ctx.Connection; var tx = (SqlTransaction)ctx.Transaction!;
-            var actor = await PilotSql.Scalar<int>(sql, tx, "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'map',N'MAP',N'Map',N'Local',N'hash',N'',N'BCrypt')");
-            var warehouse = await PilotSql.Scalar<int>(sql, tx, "INSERT dbo.Warehouses(Code,Name) OUTPUT INSERTED.WarehouseId VALUES(N'W',N'Kho')");
-            var employee = await PilotSql.Scalar<int>(sql, tx, "INSERT dbo.Employees(Code,Name) OUTPUT INSERTED.EmployeeId VALUES(N'E',N'Người')");
-            var product = await PilotSql.Scalar<int>(sql, tx, "INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'P',N'Hàng',N'cái')");
+            var actor = await NativeSql.Scalar<int>(sql, tx, "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'map',N'MAP',N'Map',N'Local',N'hash',N'',N'BCrypt')");
+            var warehouse = await NativeSql.Scalar<int>(sql, tx, "INSERT dbo.Warehouses(Code,Name) OUTPUT INSERTED.WarehouseId VALUES(N'W',N'Kho')");
+            var employee = await NativeSql.Scalar<int>(sql, tx, "INSERT dbo.Employees(Code,Name) OUTPUT INSERTED.EmployeeId VALUES(N'E',N'Người')");
+            var product = await NativeSql.Scalar<int>(sql, tx, "INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'P',N'Hàng',N'cái')");
             var old = new DateTime(2000, 1, 1); var stamp = new DateTime(2026, 10, 18, 1, 2, 3).AddTicks(1234567);
             var input = new GoodsReceipt { Id = 999, ReceiptNumber = "client-number", ReceiptDate = stamp, WarehouseId = warehouse, EmployeeId = employee, Note = "Tiếng Việt", CreatedAtUtc = old, CreatedByUserId = actor, UpdatedAtUtc = old, UpdatedByUserId = actor, PostedAtUtc = old, PostedByUserId = actor, Version = new byte[] { 9 } };
             var line = new GoodsReceiptLine { Id = 999, LineNumber = 1, ProductId = product, Quantity = 99999999999999.9999m, UnitCost = 999999999999999.9999m, CreatedAtUtc = old, CreatedByUserId = actor, UpdatedAtUtc = old, UpdatedByUserId = actor };
@@ -58,11 +58,11 @@ public sealed class InventoryLinqMigrationTests
             await r.AppendStockLedgerAsync(changed.Id, warehouse, new[] { line }, stamp, actor, CancellationToken.None);
             var entry = await db.GetTable<StockLedgerEntry>().SingleAsync();
             Assert.Equal(line.Id, entry.DocumentLineId); Assert.Equal(line.Quantity, entry.QuantityChange); Assert.Equal(stamp, entry.PostedAtUtc); Assert.Equal(actor, entry.PostedByUserId);
-            Assert.Equal(stamp, await PilotSql.Scalar<DateTime>(sql, tx, "SELECT PostedAtUtc FROM dbo.StockLedger"));
+            Assert.Equal(stamp, await NativeSql.Scalar<DateTime>(sql, tx, "SELECT PostedAtUtc FROM dbo.StockLedger"));
             foreach (var item in new[] { (typeof(GoodsReceipt), "GoodsReceipts"), (typeof(GoodsReceiptLine), "GoodsReceiptLines"), (typeof(StockLedgerEntry), "StockLedger") })
             foreach (var column in db.MappingSchema.GetEntityDescriptor(item.Item1, null).Columns)
             {
-                using var cmd = PilotSql.Command(sql, tx, "SELECT is_nullable, max_length, precision, scale FROM sys.columns WHERE object_id=OBJECT_ID(@table) AND name=@column", PilotSql.P("@table", SqlDbType.NVarChar, "dbo." + item.Item2), PilotSql.P("@column", SqlDbType.NVarChar, column.ColumnName));
+                using var cmd = NativeSql.Command(sql, tx, "SELECT is_nullable, max_length, precision, scale FROM sys.columns WHERE object_id=OBJECT_ID(@table) AND name=@column", NativeSql.P("@table", SqlDbType.NVarChar, "dbo." + item.Item2), NativeSql.P("@column", SqlDbType.NVarChar, column.ColumnName));
                 using var reader = await cmd.ExecuteReaderAsync(); Assert.True(await reader.ReadAsync());
                 Assert.Equal(reader.GetBoolean(0), column.CanBeNull);
                 if (column.DataType == DataType.Decimal) { Assert.Equal((int)reader.GetByte(2), column.Precision); Assert.Equal((int)reader.GetByte(3), column.Scale); }
@@ -74,20 +74,20 @@ public sealed class InventoryLinqMigrationTests
 
     [SqlServerFact]
     public Task Native_inventory_queries_preserve_literal_unicode_search_tied_movements_fallbacks_and_long_offsets() =>
-        PilotSql.Owned(async database =>
+        NativeSql.Owned(async database =>
         {
             using var oracle = new SqlConnection(database.ConnectionString); await oracle.OpenAsync();
-            var actor = await PilotSql.Scalar<int>(oracle, null, "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'inquiry',N'INQUIRY',N'Inquiry',N'Local',N'hash',N'',N'BCrypt')");
-            var warehouse = await PilotSql.Scalar<int>(oracle, null, "INSERT dbo.Warehouses(Code,Name,IsActive) OUTPUT INSERTED.WarehouseId VALUES(N'W',N'Kho %_ Việt',0)");
-            var product = await PilotSql.Scalar<int>(oracle, null, "INSERT dbo.Products(Code,Name,Unit,IsActive) OUTPUT INSERTED.ProductId VALUES(N'P',N'Hàng',N'cái',0)");
+            var actor = await NativeSql.Scalar<int>(oracle, null, "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'inquiry',N'INQUIRY',N'Inquiry',N'Local',N'hash',N'',N'BCrypt')");
+            var warehouse = await NativeSql.Scalar<int>(oracle, null, "INSERT dbo.Warehouses(Code,Name,IsActive) OUTPUT INSERTED.WarehouseId VALUES(N'W',N'Kho %_ Việt',0)");
+            var product = await NativeSql.Scalar<int>(oracle, null, "INSERT dbo.Products(Code,Name,Unit,IsActive) OUTPUT INSERTED.ProductId VALUES(N'P',N'Hàng',N'cái',0)");
             var stamp = new DateTime(2026, 10, 18, 1, 2, 3, DateTimeKind.Utc).AddTicks(1234567);
-            await PilotSql.Execute(oracle, null, "INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity) VALUES(@w,@p,-.0001)", PilotSql.P("@w", SqlDbType.Int, warehouse), PilotSql.P("@p", SqlDbType.Int, product));
+            await NativeSql.Execute(oracle, null, "INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity) VALUES(@w,@p,-.0001)", NativeSql.P("@w", SqlDbType.Int, warehouse), NativeSql.P("@p", SqlDbType.Int, product));
             var ids = new long[2];
             for (var index = 0; index < 2; index++)
-                ids[index] = await PilotSql.Scalar<long>(oracle, null,
+                ids[index] = await NativeSql.Scalar<long>(oracle, null,
                     "INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId) OUTPUT INSERTED.LedgerId VALUES(@w,@p,@type,@doc,@line,@q,@stamp,@actor)",
-                    PilotSql.P("@w", SqlDbType.Int, warehouse), PilotSql.P("@p", SqlDbType.Int, product), PilotSql.P("@type", SqlDbType.VarChar, index == 0 ? "Adjustment" : "GoodsReceipt"),
-                    PilotSql.P("@doc", SqlDbType.BigInt, 900L + index), PilotSql.P("@line", SqlDbType.BigInt, index + 1L), PilotSql.P("@q", SqlDbType.Decimal, index == 0 ? -.0001m : .0001m), PilotSql.P("@stamp", SqlDbType.DateTime2, stamp), PilotSql.P("@actor", SqlDbType.Int, actor));
+                    NativeSql.P("@w", SqlDbType.Int, warehouse), NativeSql.P("@p", SqlDbType.Int, product), NativeSql.P("@type", SqlDbType.VarChar, index == 0 ? "Adjustment" : "GoodsReceipt"),
+                    NativeSql.P("@doc", SqlDbType.BigInt, 900L + index), NativeSql.P("@line", SqlDbType.BigInt, index + 1L), NativeSql.P("@q", SqlDbType.Decimal, index == 0 ? -.0001m : .0001m), NativeSql.P("@stamp", SqlDbType.DateTime2, stamp), NativeSql.P("@actor", SqlDbType.Int, actor));
             var services = new ServiceCollection(); services.AddSqlPersistence(database.ConnectionString); using var provider = services.BuildServiceProvider();
             var query = provider.GetRequiredService<IInventoryQueryService>();
             var balance = await query.GetStockBalancesAsync(new StockBalanceQuery(warehouse, product, "  %_  ", 1, 10), CancellationToken.None);

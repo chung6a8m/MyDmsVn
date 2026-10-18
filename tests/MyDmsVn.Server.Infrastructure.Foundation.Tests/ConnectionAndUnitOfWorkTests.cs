@@ -2,7 +2,7 @@
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using Xunit;

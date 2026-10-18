@@ -31,7 +31,7 @@ public sealed class ApplicationDataFixtureReuseIntegrationTests
             Assert.False(_fixture.Fixture.IsPoisoned);
             Func<Task>[] scenarios =
             {
-                new GoodsReceiptMappingIntegrationTests(_fixture, _output).Goods_receipt_entities_round_trip_through_registered_RepoDb_mappings,
+                new GoodsReceiptMappingIntegrationTests(_fixture, _output).Goods_receipt_entities_round_trip_through_registered_Linq_mappings,
                 new GoodsReceiptQueryIntegrationTests(_fixture, _output).Get_returns_complete_aggregate_version_and_inactive_historical_labels,
                 new GoodsReceiptQueryIntegrationTests(_fixture, _output).List_is_deterministic_set_based_and_applies_each_filter,
                 new InventoryQueryIntegrationTests(_fixture, _output).Stock_card_query_preserves_datetime2_boundaries,

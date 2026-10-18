@@ -751,3 +751,89 @@ All final commands and guarded database disposal completed normally. Security co
 **Frozen code manifest SHA256:** `ec075a71c862ccbb65b8192ca4e6a587787fc6ce6cac4cbbb140df18583f8b55`. Twelve changed/new .cs paths, sorted repository-relative path/NUL/raw CRLF bytes/NUL; no deletion. The containing commit binds these tested bytes. Static checks confirm exact SQL literal/store/error-map equality,653 unique ledger IDs, links/encoding/whitespace and no legacy ORM consumer in converted production folders. Remaining RepoDb references are the explicit T06 bootstrap/plumbing, not a second business implementation.
 
 Full F/C/I/O repository suites, GUI, package smoke and attended workflows were **NOT RUN** for T05: no Catalog/Inventory algorithms, shared connection/UoW/provider/fixture/schema/package contract changed. T06 dependency cleanup and T07 unfiltered six-owner/package/manual gates remain open. Prior package/login evidence remains bound to its older revision. **L2DB-T05 complete; next L2DB-T06.**
+
+## L2DB-T06 — transitional provider and test graph cleanup
+
+**Date:** 2026-10-19. **Task base:** `0fd9a55b35b5d4814f70cffbe6f74a85d0b71e1f` (T05); branch `codex/l2db-t00`, existing isolated worktree. This section is bound by its containing commit; resolve the exact frozen T06 revision with `git log -- docs/L2DB_VERIFICATION.md`. The original `v1a` checkout remains clean at accepted RESP binding `1e24df4c4ad5243963da82d808da19f12278242b`. T07 packaged/manual acceptance is separate.
+
+### Delivered cleanup and independent oracles
+
+Removed the unused RepoDb initializer, mapping interface and builder hook, their DI plumbing, all active product/test Dapper and RepoDb references, and unused central BulkOperations pin. Explicit repository registration stays in Microsoft DI; the complete SqlUnitOfWork state machine and LINQ session/mapping ownership remain unchanged. Domain/Application/Contracts behavior and production SQL/grant scripts are unchanged; production script bytes match the accepted T00/RESP binding.
+
+Deleted ProductPilot, ReceiptPilot and SecurityPilot adapters and every old/candidate provider switch. Their seven historical logical Facts now execute the sole production implementation with all native identity/audit/field/search/long-offset/batch/rollback/runtime-denial/missing-target assertions retained. Catalog's independent SqlClient command/parameter/roundtrip observer is retained under a permanent test-only name. Historical prototype measurements remain tied to T02 rather than relabeled as current comparisons. NativeSql is a relocation of the independent parameterized pilot oracle, not a second DAL. Its explicit Owned scenario wrapper retains existing disposable allocation/migration and guarded cleanup, without a transactional fallback connection. Existing C/I/S InternalsVisibleTo grants remain necessary for production mapping/session boundaries and native-observer tests; they do not expose provider objects through public DTOs.
+
+All active test SQL setup/assertions now use bounded native SqlClient test helpers under `tests/SqlOracle`, without invoking product repositories, mappings or SQL-generation helpers. SqlTestOracle.cs accepts the inventoried anonymous/explicit parameter shapes and buffered scalar/tuple/test-local mutable row shapes, carries the supplied transaction/timeout/token and preserves caller connection ownership. It drains trailing results so late SQL THROW cannot become a false success; it has no connection factory, SQL generation/list expansion, retry or ambient state. Catalog uses the internal helper in its existing friend IntegrationTests reference, avoiding a duplicate linked type. Other owners link the same source within their existing assembly; no project/framework was introduced.
+
+Foundation's provider-specific probes now use explicit test-only ILinqToDbMapping registrations and LINQ writes on the current UoW, with native same-SPID, uncommitted visibility, rollback and failure assertions. Retry/concurrent schema initialization remains covered. Mapping metadata matches dbo.P1TestProbe (identity ProbeId, Unicode ProbeValue length128). Inventory's one explicit DateTime2 boundary oracle now uses typed SqlParameter values, preserving exact tick assertions.
+
+### Fixture conversion review and case preservation
+
+A fresh-context `requesting-code-review` reviewer inspected the complete code diff against T05, including the helper, mechanical fixture conversion, probes, production-only parity bodies and dependency removal. It found no Critical/Important issue. Two minor stale comments were corrected. The reviewer ran no competing builds/tests/SQL. Static old/new comparison confirms **29 changed test/fixture files** are mechanically identical after only import, command-carrier, helper/successor-name and comment normalization. Every changed fixture/adapter/contamination body falls in that set: SQL, assertions and reset/seed/ownership/drain order are unchanged. The eight non-mechanical body conversions/new boundary changes were reviewed separately. No reset-profile, reusable admission/cleanup core, allocation helper, timeout quarantine or exception/serialization policy is redesigned.
+
+[Complete source/row reconciliation](L2DB_CASE_MIGRATION.md#t06-dependency-cutover-and-complete-source-reconciliation) retains all653 previous logical IDs and exact InlineData ordinal/hash rows. Five T06 renamed methods map explicitly to retained logical IDs; the T02 missing-target successor remains unchanged. Three single-row additions produce **656 logical IDs /720 invocations** across all ten active net48 owners. Six SQL owners contain **273 methods /304 invocations:203 SQL and101 pure**. Scenario phases, repeated modes and old dual-provider loops are not extra xUnit cases. W remains conditional GUI; its source inventory is not an executed GUI total.
+
+### Dependency graph and parked source audit
+
+Affected product/test locks were deliberately regenerated with `dotnet restore <project> --force-evaluate`, sequentially: Infrastructure, DbMigrator, Desktop.App, F/C/I/S/M/O, X/A/D/W. No version pin was upgraded. Active locks contain no Dapper or RepoDb node. Removal of their subgraphs permits two transitive version reductions: Microsoft.Bcl.AsyncInterfaces10.0.11→10.0.3 and System.Collections.Immutable10.0.11→1.5.0, satisfying remaining SqlClient/metadata consumers; other retained resolved versions are unchanged. Removed-only dependencies include async-LINQ/emit nodes whose final consumers disappeared.
+
+AppCore remains net8.0-windows, outside the solution/release. Its historical lock still contains old provider/transitive nodes and was neither restored, built nor edited. A separately authorized reactivation must regenerate its lock against the current central pins after the runtime decision; no parked-runtime acceptance is claimed. TECH_STACK, reactivation and release guidance record this explicitly.
+
+### Verification commands and results
+
+Windows / SDK8.0.425 / Release / net48; explicit designated non-production master SQL configuration. Fixture mode absent uses accepted reuse; fault settings remain unset. SQL owners execute sequentially with existing positive allocation/cleanup checks; no server login is created and the prior T02 one-login approval is not reused. Restricted database principals in retained cases remain genuine allowlist/denial checks.
+
+The new Architecture dependency/bootstrap boundary was observed RED before cleanup:0 passed/1 failed/0 skipped because an active lock retained Dapper. Native oracle probes then passed2/0/0. Intermediate compile checks exposed and corrected the relocated helper namespace, Catalog duplicate linked helper (already available through its existing friend reference), and duplicate using directive before the final gates. Focused Foundation checkpoint passed10/0/0; sole-production C/I/S parity checkpoints passed2/2/3 respectively. These scopes overlap the final gates and are not added to the unique totals below.
+
+Every command exit and actual TRX method/row/outcome is checked. Six owners run unfiltered in F/C/I/S/M/O order; X/A/D run unfiltered for the shared dependency cutover, W selects only its four pure packaging invocations:
+
+```powershell
+dotnet restore <project> --locked-mode
+dotnet test <project> -c Release -f net48 --no-restore `
+  --logger 'trx;LogFileName=cases.trx' `
+  --results-directory TestResults/l2db-t06-gate-<suffix>
+# W adds --filter 'FullyQualifiedName~ReleasePackagingTests'.
+```
+
+| Owner | Pass/fail/skip | Distinct methods | TRX wall seconds |
+|---|---:|---:|---:|
+| F | 61/0/0 | 61 | 296.74 |
+| C | 19/0/0 | 17 | 37.10 |
+| I | 42/0/0 | 40 | 116.57 |
+| S | 60/0/0 | 56 | 144.58 |
+| M | 65/0/0 | 65 | 178.62 |
+| O | 57/0/0 | 34 | 30.13 |
+| X | 12/0/0 | 12 | 4.13 |
+| A | 157/0/0 | 125 | 4.06 |
+| D | 108/0/0 | 108 | 4.13 |
+| W | 4/0/0 | 3 | 8.62 |
+
+**585 passed /0 failed /0 skipped** across the final selected gates:304 six-owner invocations (203 SQL/101 pure),277 A/X/D pure invocations and4 W pure packaging invocations. Actual TRX method/row sets match the source ledger with no omissions, duplicate names, aborts, timeouts or unexecuted results. All ten active test projects restored locked. The remaining135 W source invocations were NOT RUN; no UI behavior changed and full W is conditional, so this is not all-source/GUI acceptance. Both explicit host/migrator locked source builds passed with0 warnings/0 errors.
+
+The full project paths and current TFM list are the T06 table in the case ledger; suffixes are Foundation, Catalog, Inventory, Security, Migrations, Integration, X, A, D and W. All ten locked restores passed. Separate locked source-host checks use `dotnet restore src/MyDmsVn.Desktop.App --locked-mode`, `dotnet build src/MyDmsVn.Desktop.App -c Release -f net48 --no-restore --no-incremental`, and equivalent restore/build for src/MyDmsVn.Server.DbMigrator. These are source builds, not packaged Local smoke.
+
+The affected accepted fixture selection was rerun sequentially with `MYDMSVN_SQL_TEST_FIXTURE_MODE=fresh`, then the previous setting was restored in finally. Actual command for C/I/S:
+
+```powershell
+dotnet test <project> -c Release -f net48 --no-restore --filter '<selector>' `
+  --logger 'trx;LogFileName=cases.trx' `
+  --results-directory TestResults/l2db-t06-fresh-<owner>
+```
+
+| Owner | Exact selector | Pass/fail/skip | Successful scenario scopes |
+|---|---|---:|---:|
+| Catalog | `FullyQualifiedName~CatalogBackendIntegrationTests\|FullyQualifiedName~CatalogMappingIntegrationTests\|FullyQualifiedName~SqlFixtureCollectionAdapterTests\|FullyQualifiedName~CatalogFixtureReuseIntegrationTests` | 10/0/0 | 22 |
+| Inventory | `FullyQualifiedName~GoodsReceiptMappingIntegrationTests.Goods_receipt_entities_round_trip_through_registered_Linq_mappings\|FullyQualifiedName~GoodsReceiptQueryIntegrationTests.Get_returns_complete_aggregate_version_and_inactive_historical_labels\|FullyQualifiedName~GoodsReceiptQueryIntegrationTests.List_is_deterministic_set_based_and_applies_each_filter\|FullyQualifiedName~InventoryQueryIntegrationTests.Stock_card_query_preserves_datetime2_boundaries\|FullyQualifiedName~InventoryQueryIntegrationTests.Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history\|FullyQualifiedName~InventoryStorageIntegrationTests.Reconciliation_flags_missing_keys_on_either_side_and_quantity_mismatch\|FullyQualifiedName~InventoryStorageIntegrationTests.Reconciliation_executes_in_a_serializable_transaction\|FullyQualifiedName~ApplicationDataFixtureReuseIntegrationTests` | 8/0/0 | 25 |
+| Security | `FullyQualifiedName~IdentityStoreIntegrationTests.User_and_permission_stores_read_current_sql_state_and_replace_hash_atomically\|FullyQualifiedName~IdentityStoreIntegrationTests.Identity_unique_relationship_constraints_reject_duplicates\|FullyQualifiedName~IdentityStoreIntegrationTests.Login_with_an_outdated_bcrypt_hash_rehashes_through_the_sql_store\|FullyQualifiedName~SecurityAdministrationSqlTests.Permission_import_previews_without_writes_then_adds_user_and_role_decisions_atomically\|FullyQualifiedName~SecurityAdministrationSqlTests.Permission_import_rechecks_actor_permission_after_preview\|FullyQualifiedName~SecurityAdministrationSqlTests.Permission_import_rejects_inactive_targets_and_stale_preview_revisions\|FullyQualifiedName~SecurityAdministrationSqlTests.Administration_is_revisioned_audited_and_preserves_direct_decision_precedence\|FullyQualifiedName~SecurityAdministrationSqlTests.Missing_targets_and_bound_superuser_lifecycle_changes_are_rejected\|FullyQualifiedName~ApplicationDataFixtureReuseIntegrationTests` | 9/0/0 | 28 |
+
+**27 passed /0 failed /0 skipped** in this additional focused fresh pass. Their exact case/row names equal the same27-case subset in the unfiltered reuse runs. Each mode reports75 successful reset, seed, pre-body verify, cleanup and verify-after operations (C22/I25/S28); fresh additionally reports75 successful owned allocate/migrate/initialize-reset/drop operations. The complete reuse C/I/S runs contain83 successful scenario scopes because newer Catalog tests also participate. The matched accepted subset remains75 in each mode. The fresh run covers the20 original eligible business methods, collection adapter Theory rows and contamination/reordering/final-empty-boundary probes; nested scenarios are not extra xUnit results. Foundation's unfiltered gate separately challenges reset/ownership/poison/drain/quarantine failures in both modes. This revalidates the affected boundary after the reviewed mechanical oracle conversion; it is not a new full six-owner fresh performance comparison or T07 acceptance. All other dedicated exceptions retain their own fresh helpers.
+
+
+### Boundaries and remaining acceptance
+
+All final commands and guarded database disposals completed normally. Reuse collections report successful final owned drops; focused fresh phases prove all75 drops after successful drain and boundary verification. Intentional Foundation quarantine probes explicitly release/await their known workers and perform guarded cleanup, independently asserting absence; fixture teardown itself never auto-drops quarantine. No unexpected cleanup failure, unresolved quarantine/allocation, killed testhost, orphan adoption or prefix deletion was reported. No global allocation census or external recovery service was introduced. Static checks confirm unchanged UoW state machine, accepted reset/admission/cleanup core, production SQL/grant bytes, public contracts and parked AppCore; no package broad upgrade or TFM edit.
+
+Current AGENTS/AI_CONTEXT/Architecture/Persistence/TechStack/PRD/DevelopmentPlan, data-model/project/test/configuration/release/reactivation guidance now describe the delivered LINQ/native source and removed dependencies, with historical evidence left intact. No production schema/grant edit, permission synchronization/auto-grant, runtime upgrade, hidden transaction or new provider flag is introduced.
+
+**Frozen code/config manifest SHA256:** `a673c0bd3c40838a820802c41c77b23609cd7693f173174ca2f2a4790956a0a2`. Hash the68 surviving changed/new .cs/.csproj/.props/packages.lock.json paths, sorted repository-relative path/NUL/raw CRLF bytes/NUL. Six explicit deleted paths are RepoDbMappingInitializer.cs, IRepoDbMapping.cs, ProductPilot.cs, ReceiptPilot.cs, SecurityPilot.cs and the old tests/Pilot/PilotSql.cs; git records their deletion and the NativeSql relocation. Documentation is excluded from the digest. The containing commit binds the complete manifest/deletions and sanitized evidence. CRLF/BOM policies, relative file links, ledger uniqueness/row hashes and git whitespace checks pass. **L2DB-T06 complete; next L2DB-T07.**
+
+T07 remains **NOT RUN**: frozen-commit final matrix, release packaging/assets/binding redirects, attended Local workflows and any applicable GUI checks. T06's four pure packaging tests do not execute the real release command or GUI. Prior T02 startup/package evidence keeps its older revision and authority. P5/P6/HTTP/runtime backlog remains deferred; no release readiness or LINQ performance improvement is claimed.

@@ -3,7 +3,7 @@ using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Contracts;
@@ -234,12 +234,14 @@ public sealed class InventoryQueryIntegrationTests
         DateTime lastTickOfSecond)
     {
         using var connection = new SqlConnection(connectionString);
-        var parameters = new DynamicParameters();
-        parameters.Add("warehouseId", warehouseId);
-        parameters.Add("productId", productId);
-        parameters.Add("lastTickOfSecond", lastTickOfSecond, DbType.DateTime2);
-        parameters.Add("nextSecond", lastTickOfSecond.AddTicks(1), DbType.DateTime2);
-        parameters.Add("userId", userId);
+        var parameters = new[]
+        {
+            new SqlParameter("@warehouseId", SqlDbType.Int) { Value = warehouseId },
+            new SqlParameter("@productId", SqlDbType.Int) { Value = productId },
+            new SqlParameter("@lastTickOfSecond", SqlDbType.DateTime2) { Value = lastTickOfSecond },
+            new SqlParameter("@nextSecond", SqlDbType.DateTime2) { Value = lastTickOfSecond.AddTicks(1) },
+            new SqlParameter("@userId", SqlDbType.Int) { Value = userId },
+        };
         await connection.ExecuteAsync(
             "INSERT dbo.StockLedger " +
             "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) VALUES " +

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
 using Xunit;
@@ -503,11 +503,11 @@ public sealed class ReusableSqlFixtureLifecycleIntegrationTests
     internal static async Task SeedUserAsync(SqlFixtureTestScope scope, CancellationToken token)
     {
         using var connection = new SqlConnection(scope.ConnectionString);
-        await connection.ExecuteAsync(new CommandDefinition(@"
+        await connection.ExecuteAsync(new SqlTestCommand(@"
 INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm)
 VALUES(N'fixture-user',N'FIXTURE-USER',N'Baseline',N'Local',N'hash',N'',N'BCrypt');", cancellationToken: token));
-        Assert.Equal(1, await connection.QuerySingleAsync<int>(new CommandDefinition("SELECT COUNT(*) FROM dbo.Users;", cancellationToken: token)));
-        Assert.Equal(0L, await connection.QuerySingleAsync<long>(new CommandDefinition("SELECT AssignmentRevision FROM dbo.Users;", cancellationToken: token)));
+        Assert.Equal(1, await connection.QuerySingleAsync<int>(new SqlTestCommand("SELECT COUNT(*) FROM dbo.Users;", cancellationToken: token)));
+        Assert.Equal(0L, await connection.QuerySingleAsync<long>(new SqlTestCommand("SELECT AssignmentRevision FROM dbo.Users;", cancellationToken: token)));
     }
 
     private static async Task WithFixtureAsync(Func<Probe, Task> scenario, SqlFixtureRunMode mode = SqlFixtureRunMode.Reuse,
