@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -176,9 +176,20 @@ public sealed class SuperuserBootstrapTests
             Assert.True(result.Successful, result.Error?.ToString());
             return database;
         }
-        catch
+        catch (Exception setupError)
         {
-            await database.DisposeAsync();
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupError)
+            {
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
+            }
+
             throw;
         }
     }

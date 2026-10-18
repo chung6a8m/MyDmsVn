@@ -7,7 +7,7 @@
 | `desktop-net48-win-x86` | `MyDmsVn.Desktop.App.exe` | `net48` / x86 | Publish directory |
 | `admin-migrator-net48-win-x86` | `MyDmsVn.Server.DbMigrator.exe` | `net48` / x86 | Administrator-only publish directory |
 
-`MyDmsVn.Desktop.AppCore` / `net8.0-windows` is parked and must be reported `NOT RUN / NOT SHIPPED`, never PASS. `Publish-LocalRelease.ps1` has no modern package path while the pause is active. The tool-only `net8.0` test runner is not a release artifact.
+`MyDmsVn.Desktop.AppCore` / `net8.0-windows` is parked and must be reported `NOT RUN / NOT SHIPPED`, never PASS. `Publish-LocalRelease.ps1` has no modern package path while the pause is active. The .NET 8 SDK is a build dependency, not a shipped product target.
 
 [global.json](../../global.json) declares SDK `8.0.400` with `rollForward: latestFeature` and no prerelease SDKs. Normal publishing requires a clean committed tree, a new/empty output root, locked restore and the Windows net48 targeting prerequisites. Record the SDK actually selected. Both target packages require .NET Framework 4.8; no .NET 8 product runtime package is currently emitted. There is no MSI, Onova updater or auto-update flow yet.
 

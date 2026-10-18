@@ -2,7 +2,7 @@
 
 **Current source:** `v1a`, updated 2026-10-18. SEC-REBUILD T00–T06 was accepted in PR #34; its baseline uses a code-defined permission catalog, explicit RBAC assignments, and one configured superuser. [HISTORY](HISTORY.md) preserves that evidence and the superseded P3.1 synchronization design. [ADR 0007](adr/0007-code-defined-permissions-and-single-superuser.md) defines the current security decision; P5/P6 operational/release checks remain [OPEN / DEFERRED](DEFERRED_WORK.md).
 
-The active packages are `desktop-net48-win-x86` (`MyDmsVn.Desktop.App.exe`) and `admin-migrator-net48-win-x86` (`MyDmsVn.Server.DbMigrator.exe`), both requiring .NET Framework 4.8. AppCore is parked outside the solution/release; the net8 test runner is tooling only. Commands below run from the admin package directory in an interactive PowerShell console. Replace every quoted placeholder with its reviewed value.
+The active packages are `desktop-net48-win-x86` (`MyDmsVn.Desktop.App.exe`) and `admin-migrator-net48-win-x86` (`MyDmsVn.Server.DbMigrator.exe`), both requiring .NET Framework 4.8. AppCore is parked outside the solution/release. Commands below run from the admin package directory in an interactive PowerShell console. Replace every quoted placeholder with its reviewed value.
 
 ## 1. Prepare a fresh database
 
@@ -81,7 +81,7 @@ If recovery fails, stop and preserve the state. Review safe logs and the bound a
 
 Review security changes through the administration UI and `dbo.SecurityAuditEvents` using an approved read-only/audit procedure. Preserve actor, target, operation, before/after state, timestamp and correlation, with the target revision/preview recorded in the change review. Security administration/import mutation and SQL audit are transactional; a SQL audit failure rolls the mutation back. Local `audit-*.json` files have a separate post-commit failure model described in [diagnostics](LOCAL_DIAGNOSTICS_AND_TROUBLESHOOTING.md). Export only sanitized evidence needed for the change record.
 
-Never publish passwords, password hashes/salts, full connection strings, approval files, ownership journals, raw TRX, SQL exception chains, or user data. Keep test approval and ownership evidence local; share only the independently reviewed sanitized aggregate. Test scope and required acceptance follow the sole [TEST_POLICY](TEST_POLICY.md); report a focused category as its actual selected evidence, not an unfiltered result.
+Never publish passwords, password hashes/salts, full connection strings, raw TRX, SQL exception chains, database identifiers or user data. Keep detailed test configuration and ownership diagnostics local; share only the independently reviewed sanitized aggregate. Test scope and required acceptance follow the sole [TEST_POLICY](TEST_POLICY.md); report a focused category as its actual selected evidence, not an unfiltered result.
 
 ## 6. Failure handling
 

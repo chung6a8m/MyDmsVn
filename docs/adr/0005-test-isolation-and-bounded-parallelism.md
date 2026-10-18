@@ -5,9 +5,9 @@
 
 ## Decision that remains binding
 
-Resource ownership determines isolation. A project name, SQL category or STA thread does not prove that mutable database/UI state can be shared safely. Test collections coordinate only their own assembly/process; cross-process SQL and GUI resources require separate coordination.
+Resource ownership determines isolation. A project name, SQL category or STA thread does not prove that mutable database/UI state can be shared safely. Test collections coordinate only their own assembly/process; cross-process SQL and GUI execution must therefore be coordinated explicitly by the operator. Current policy runs SQL projects sequentially and one GUI command at a time.
 
-SQL tests use positively owned disposable databases on an approved instance, finite waits, process watchdogs, drained workers and verified cleanup. GUI tests interacting with controls, focus, message loops or input retain serialized resources and deterministic STA disposal. Pure tests without shared mutable state can retain normal xUnit behavior.
+SQL tests use positively owned disposable databases on the explicitly designated non-production instance, finite waits, drained workers and verified cleanup. The local helper verifies live instance/allocation identity before drop. The removed external framework supplies no watchdog, lease or orphan cleanup; interrupted allocations need manual operator review. GUI tests interacting with controls, focus, message loops or input retain serialized resources and deterministic STA disposal. Pure tests without shared mutable state can retain normal xUnit behavior.
 
 ## Updated fixture direction
 

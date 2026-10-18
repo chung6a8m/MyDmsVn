@@ -1,6 +1,6 @@
 # MyDmsVn — Current context for Codex
 
-**Branch:** `v1a` · **Context reset:** 2026-10-18 · **Source assessed:** `c7ad32a4b0040f87417973eabd6c12757c54f7d5`.
+**Branch:** `v1a` · **Context reset:** 2026-10-18 · **Context base:** docs refresh `a5ee124bed72f2994c4ee712e660b91d0dc2f953`, followed by the owner's SQL framework removal.
 
 ## Goal and next work
 
@@ -15,10 +15,10 @@ The file numbering is chronological; execution order is defined by [the active i
 
 ## Actual baseline
 
-- Application, SQL tests, Desktop and harness tests execute on `net48`. The shared harness is `netstandard2.0`; runner and runner tests alone execute on `net8.0`.
+- Product, SQL, Desktop and all ten active test projects target `net48`. The .NET 8 SDK is a build dependency; no standalone SQL tool project remains.
 - AppCore (`net8.0-windows`) and historical product .NET 8 cases are parked, outside the active release. Do not reactivate them for Respawn or LINQ to DB.
 - Production persistence still uses RepoDb/Dapper with explicit UoW and DbUp. LINQ to DB is an approved destination, not installed implementation.
-- SQL tests currently allocate fresh disposable databases; Respawn is not installed. The Respawn plan selects a net48-compatible package/API and validates it before migration.
+- SQL tests run directly through `dotnet test`/Test Explorer and a local fresh-database helper in IntegrationTests. The old gate manifest, standalone SQL support/runner projects, their tests and wrappers are removed. Respawn is not installed. The Respawn plan selects a net48-compatible package/API and validates it before migration.
 - Modular test projects, NET8-PAUSE and SEC-REBUILD are implemented. Do not redo those projects.
 - Permissions come from code-owned definitions, explicit user/role assignments and one configured database-bound superuser. Permission-sync and first-Administrator auto-grant flows are retired.
 - P5 catalogs, receipt Draft/Post and ledger/balance/card workflows exist. P5 interactive acceptance and P6 operational/release gates remain open and deferred.
@@ -27,7 +27,7 @@ The file numbering is chronological; execution order is defined by [the active i
 
 Explicit connection/transaction ownership; Application authorization; unknown/deprecated-key denial; current superuser protection; legacy password compatibility; atomic and idempotent posting; immutable posted receipts/ledger; transport-neutral contracts; least-privilege runtime SQL and administrator-only migrations.
 
-[TEST_POLICY.md](docs/TEST_POLICY.md) is the new sole test-execution policy. Select focused tests by affected behavior; broaden for shared infrastructure and named acceptance milestones. Existing runners still enforce their checked-in manifests until RESP updates them. A new plan ID in Markdown does not create a runnable manifest task.
+[TEST_POLICY.md](docs/TEST_POLICY.md) is the new sole test-execution policy. Select focused tests by affected behavior; broaden for shared infrastructure and named acceptance milestones. Use ordinary project/category/method filters and actual TRX cases/outcomes. Only `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` configures SQL tests; explicit master/instance/allocation ownership checks remain local. Run SQL projects sequentially, review interrupted allocations manually and do not restore the removed framework.
 
 ## Known open issue
 

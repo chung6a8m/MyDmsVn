@@ -1,6 +1,6 @@
 # Test coverage — MyDmsVn
 
-**Updated:** 2026-10-18. This document states what behavior must remain covered. [TEST_POLICY](TEST_POLICY.md) alone decides when/how broadly to execute it; [tests/README](../tests/README.md) lists current tools. The current SQL implementation is RepoDb/Dapper. RESP establishes fixture reuse first, then L2DB changes the provider implementation.
+**Updated:** 2026-10-18. This document states what behavior must remain covered. [TEST_POLICY](TEST_POLICY.md) alone decides when/how broadly to execute it; [tests/README](../tests/README.md) lists direct commands. The current SQL implementation is RepoDb/Dapper. RESP establishes fixture reuse first, then L2DB changes the provider implementation.
 
 ## Coverage owners
 
@@ -12,11 +12,10 @@
 | Inventory | `MyDmsVn.Server.Infrastructure.Inventory.Tests` | Receipt draft/post, optimistic concurrency, ledger/balance/card/reconciliation |
 | Security | `MyDmsVn.Server.Infrastructure.Security.Tests` | SQL identity/permissions, superuser, administration/import, audit |
 | Schema | `MyDmsVn.Server.Infrastructure.Migrations.Tests` | Clean/no-op migration, partial/unknown/future schema, maintenance principals |
-| SQL infrastructure | `MyDmsVn.Server.Infrastructure.IntegrationTests`, `MyDmsVn.SqlTestHarness.Tests` | Shared helpers, approval/ownership/timing and concurrency probes; inspect source to distinguish real SQL from pure tests |
-| Runner | `tools/MyDmsVn.SqlTestRunner.Tests` | Scope selection, case discovery/reconciliation, process leases/watchdogs and reports; fixture lifecycle accounting is a RESP deliverable |
+| SQL infrastructure | `MyDmsVn.Server.Infrastructure.IntegrationTests` | Local fresh-database ownership/cleanup, configuration rejection and concurrency probes; inspect source to distinguish real SQL from pure tests |
 | Desktop | `MyDmsVn.Desktop.Session.Tests`, `MyDmsVn.Desktop.Tests` | Pure session/ViewModel behavior and guarded WinForms interaction respectively |
 
-Paths are under `tests/`. Product and active tests use `net48`; runner tests use tool-only `net8.0`. The shared harness library is `netstandard2.0`. Historical product .NET 8 coverage is parked.
+Paths are under `tests/`. Product and all ten active test projects use `net48`; the former standalone SQL framework and its tests are removed. Historical product .NET 8 coverage is parked.
 
 ## Persistence and migrations
 
@@ -58,7 +57,7 @@ Paths are under `tests/`. Product and active tests use `net48`; runner tests use
 - The owned reset profile restores/verifies the StockLedger trigger, constraints, sequence contract and baseline identity behavior. Rowversion is treated as opaque and not rewound.
 - Checkpoint belongs to one database/schema profile; metadata drift or unexpected tables/temporal objects reject reuse.
 - Reset/seed/cleanup failure prevents subsequent test bodies from running on a poisoned fixture. Timed-out workers cannot overlap the next test.
-- Independent testhosts allocate distinct owned databases; interrupted fixture cleanup is reconciled by the runner. Preserve the existing SQL assembly guards and global runner leases. Catalog currently has no assembly guard; its new collection must explicitly serialize every shared-fixture consumer.
+- Independent testhosts allocate distinct owned databases; interrupted allocations require manual operator review. Run SQL projects sequentially and preserve existing assembly guards. Catalog currently has no assembly guard; its new collection must explicitly serialize every shared-fixture consumer. There is no external lease or automatic orphan recovery.
 - Every original logical test and Theory row remains accounted for. Dedicated migration/schema/principal/fault tests continue to use fresh databases.
 
 ## Desktop and release

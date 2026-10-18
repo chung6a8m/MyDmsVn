@@ -1,6 +1,6 @@
 # Cấu hình và quyền SQL cho Local Mode v1
 
-**Trạng thái:** Mô tả cấu hình và quyền hiện có tại `v1a`, commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, cập nhật từ source ngày 2026-10-18. Desktop.App và gói quản trị DbMigrator chạy **net48**. AppCore `net8.0-windows` được giữ trong source nhưng đang parked, ngoài solution/release đang hoạt động. Runner/test runner net8.0 chỉ là tooling, không phải desktop host thứ hai.
+**Trạng thái:** Mô tả cấu hình và quyền hiện có tại `v1a`, commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, cập nhật từ source ngày 2026-10-18. Desktop.App và gói quản trị DbMigrator chạy **net48**. AppCore `net8.0-windows` được giữ trong source nhưng đang parked, ngoài solution/release đang hoạt động.
 
 [RESP](plans/20261018-002-respawn-fixture-reuse.md) và [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) giữ nguyên ranh giới credential và quyền SQL của sản phẩm. RepoDb/Dapper/native SqlClient vẫn là triển khai hiện tại; chuyển sang LINQ to DB chưa được thực hiện. Thay DAL không cho phép mở rộng quyền, đưa maintenance credential vào desktop hoặc thay schema/binding. Bản cập nhật tài liệu này không chạy provisioning, migration, SQL hay kiểm thử triển khai.
 
@@ -107,7 +107,7 @@ Khi rotate: tạo/đổi credential tại SQL, cập nhật đúng runtime hoặ
 - Dùng connection timeout hữu hạn, phù hợp độ trễ môi trường; không cấu hình vô hạn.
 - SQL instance, application database và authentication mode phải đúng ma trận triển khai; mọi product/migration connection phải chỉ rõ application database.
 
-Đây là yêu cầu triển khai giữ nguyên trong RESP/L2DB, không phải tuyên bố loader đã tự kiểm chứng mọi thiết lập TLS/timeout. Test harness có cấu hình approval/instance riêng để tạo database disposable; không thay application/migration connection bằng connection `master` của test runner. [TEST_POLICY](TEST_POLICY.md) quy định phạm vi kiểm thử và tài nguyên test.
+Đây là yêu cầu triển khai giữ nguyên trong RESP/L2DB, không phải tuyên bố loader đã tự kiểm chứng mọi thiết lập TLS/timeout. Integration Test dùng riêng `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING`, trỏ rõ vào `master` của SQL Server non-production do người vận hành chọn. Helper cục bộ tạo database disposable và xác minh instance/định danh/marker trước khi xóa; không còn approval file hoặc SQL runner. Không thay application/migration connection bằng connection `master` của test. [TEST_POLICY](TEST_POLICY.md) quy định phạm vi kiểm thử và tài nguyên test.
 
 ## 6. Startup, redaction và diagnostics
 

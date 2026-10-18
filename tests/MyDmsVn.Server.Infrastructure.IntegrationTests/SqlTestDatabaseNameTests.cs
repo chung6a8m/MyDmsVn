@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -20,7 +20,7 @@ public sealed class SqlTestDatabaseNameTests
     [InlineData("Production")]
     [InlineData("MyDmsVn_Test_")]
     [InlineData("MyDmsVn_Test_not-a-guid")]
-    public void EnsureDisposable_rejects_names_not_created_by_the_harness(string name)
+    public void EnsureDisposable_rejects_names_not_created_by_the_helper(string name)
     {
         Assert.Throws<InvalidOperationException>(() => SqlTestDatabaseName.EnsureDisposable(name));
     }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -845,28 +844,28 @@ public sealed class SecurityAdministrationSqlTests
             new { normalizedName }).ConfigureAwait(false);
     }
 
-    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
             var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
             return database;
         }
-        catch
+        catch (Exception setupError)
         {
             try
             {
                 await database.DisposeAsync();
             }
-            catch
+            catch (Exception cleanupError)
             {
-                // Preserve the migration failure; the ownership journal records any failed cleanup.
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
             }
 
             throw;

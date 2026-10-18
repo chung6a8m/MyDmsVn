@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Data;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -243,16 +242,32 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             }
         }
 
-        private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
-            [CallerMemberName] string testCaseId = "")
+        private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
         {
-            var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
             var database = await SqlTestDatabase.CreateAsync(
-                Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-                measurement);
-            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(result.Successful, result.Error?.ToString());
-            return database;
+                Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+            try
+            {
+                var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+                Assert.True(result.Successful, result.Error?.ToString());
+                return database;
+            }
+            catch (Exception setupError)
+            {
+                try
+                {
+                    await database.DisposeAsync();
+                }
+                catch (Exception cleanupError)
+                {
+                    throw new AggregateException(
+                        "Test database setup and cleanup both failed.",
+                        setupError,
+                        cleanupError);
+                }
+
+                throw;
+            }
         }
 
         private static Task<int> InsertUserAsync(

@@ -1,7 +1,6 @@
-using System;
+﻿using System;
 using System.Data;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -138,16 +137,32 @@ public sealed class InventoryQueryIntegrationTests
         }
     }
 
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
-        var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-        Assert.True(migration.Successful, migration.Error?.ToString());
-        return database;
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            return database;
+        }
+        catch (Exception setupError)
+        {
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupError)
+            {
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
+            }
+
+            throw;
+        }
     }
 
     private static async Task<SeedData> SeedAsync(string connectionString)

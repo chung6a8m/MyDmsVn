@@ -1,6 +1,6 @@
 # Architecture — MyDmsVn
 
-**Status:** Current Local v1 architecture, refreshed against `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5` on 2026-10-18. Documentation changes do not implement either active plan.
+**Status:** Current Local v1 architecture, refreshed against `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5` on 2026-10-18. The subsequent test-framework removal preserves this product baseline; neither active plan is implemented.
 
 ## 1. Current system and approved direction
 
@@ -70,7 +70,7 @@ Code owns the immutable permission catalog; operators own assignments. Applicati
 
 ## 6. Desktop, runtime and startup
 
-The shared WinForms library and Desktop.App actively target `net48`. Desktop.AppCore still declares `net8.0-windows` in parked source and is excluded from the active solution/release. SQL runner and runner tests execute on tool-only `net8.0`; the shared SqlTestHarness library targets `netstandard2.0`. These tooling/library targets do not establish modern product coverage. See [TECH_STACK](TECH_STACK.md) and [PROJECT_STRUCTURE](PROJECT_STRUCTURE.md).
+The shared WinForms library and Desktop.App actively target `net48`. Desktop.AppCore still declares `net8.0-windows` in parked source and is excluded from the active solution/release. All ten active test projects target net48 and run directly through `dotnet test`/Test Explorer. The former standalone SQL framework is removed; the .NET 8 SDK remains a build dependency. See [TECH_STACK](TECH_STACK.md) and [PROJECT_STRUCTURE](PROJECT_STRUCTURE.md).
 
 Use thin WinForms views and CommunityToolkit.Mvvm ViewModels, asynchronous feature APIs, deterministic busy/error state and session-aware late-result guards. Desktop.WinForms references the pinned BootstrapSourceGrid project; check its actual source/API and target compatibility before changing presentation dependencies. Tests creating controls keep STA execution, deterministic disposal and serialized global UI interaction.
 
@@ -78,8 +78,8 @@ Desktop.App configures Microsoft DI once. Local mode requires runtime database c
 
 ## 7. Validation and change control
 
-[Test policy](TEST_POLICY.md) owns execution scope. Use focused affected tests at task boundaries; broaden SQL coverage for shared harness/UoW/migration changes and at the RESP/L2DB final milestones. GUI execution is driven by changed UI behavior or a plan-specific packaged smoke. [TEST_STRATEGY](TEST_STRATEGY.md) describes required behavior coverage, not another execution queue.
+[Test policy](TEST_POLICY.md) owns execution scope. Use focused affected tests at task boundaries; broaden SQL coverage for shared fixture/UoW/migration changes and at the RESP/L2DB final milestones. GUI execution is driven by changed UI behavior or a plan-specific packaged smoke. [TEST_STRATEGY](TEST_STRATEGY.md) describes required behavior coverage, not another execution queue.
 
-Keep resource ownership, SQL approval, watchdogs, independent case evidence and owned cleanup. RESP may implement its reviewed fixture reuse design; L2DB consumes that accepted baseline and freezes fixture boundaries, reset behavior and runner protocol during DAL conversion. Historical acceptance is retained in [HISTORY](HISTORY.md), with unresolved delivery gates in deferred backlog rather than the active queue.
+Keep explicit non-production SQL configuration, local allocation ownership/cleanup, finite waits and independent case evidence. SQL projects execute sequentially; interrupted allocations require manual review because no external lease/watchdog/orphan recovery service remains. RESP may implement its reviewed fixture reuse design; L2DB consumes that accepted baseline and freezes fixture boundaries, reset behavior and direct test commands during DAL conversion. Historical acceptance is retained in [HISTORY](HISTORY.md), with unresolved delivery gates in deferred backlog rather than the active queue.
 
 Changes to runtime, transport contracts, authorization, transaction ownership, password migration or ledger semantics require an explicit decision and corresponding ADR. Both active plans preserve these architectural boundaries.

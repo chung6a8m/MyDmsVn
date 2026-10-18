@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment:** `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed 2026-10-18. This is a map of the checked-in repository. The two [active plans](plans/README.md) describe future fixture and DAL changes; their proposed files are not listed as implemented components.
+**Assessment:** `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed 2026-10-18. Test project entries include the subsequent owner-directed removal of the old SQL test framework. The two [active plans](plans/README.md) describe future fixture and DAL changes; their proposed files are not listed as implemented components.
 
 ## Source projects
 
@@ -20,7 +20,7 @@
 
 `MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. They belong to deferred HTTP v2 work and need a separate runtime decision. Do not create them as part of RESP or L2DB.
 
-## Test and tooling projects
+## Active test projects
 
 | Project under `tests/` | Current target | Ownership |
 |---|---|---|
@@ -33,13 +33,9 @@
 | `MyDmsVn.Server.Infrastructure.Inventory.Tests` | `net48` | Receipt, posting, balance and reconciliation SQL behavior. |
 | `MyDmsVn.Server.Infrastructure.Security.Tests` | `net48` | Security administration, authorization and principal behavior. |
 | `MyDmsVn.Server.Infrastructure.Migrations.Tests` | `net48` | Schema/migration and maintenance behavior. |
-| `MyDmsVn.Server.Infrastructure.IntegrationTests` | `net48` | Remaining Operations/Local SQL scenarios; this name no longer means the entire SQL suite. |
-| `MyDmsVn.SqlTestHarness` | `netstandard2.0` | Shared test support library consumed by active net48 tests; not an independent execution TFM. |
-| `MyDmsVn.SqlTestHarness.Tests` | `net48` | Harness contracts and safeguards. |
-| `tools/MyDmsVn.SqlTestRunner` | tool-only `net8.0` | Guarded SQL execution, inventory/evidence and resource coordination. |
-| `tools/MyDmsVn.SqlTestRunner.Tests` | tool-only `net8.0` | Runner tests; never product/SQL net8 coverage. |
+| `MyDmsVn.Server.Infrastructure.IntegrationTests` | `net48` | Local owned-database helpers and remaining Operations/Local SQL scenarios; this name no longer means the entire SQL suite. |
 
-There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual owning project and reviewed case identity from the manifest/source rather than a historical proposed path. Each SQL owner has its own csproj; a shared library or test trait does not by itself prove isolation or parallel safety.
+There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual owning project and source case rather than a historical proposed path. These are ten current test projects; no standalone SQL support or runner project remains. Each SQL owner has its own csproj; a shared library or test trait does not by itself prove isolation or parallel safety.
 
 ## Actual feature directories
 
@@ -65,8 +61,8 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
 | `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current status, deferred requirements and historical evidence. |
-| `tests/test-gates.v1.json`, `tests/tools/` | Current executable manifest and guarded runner/wrappers; documentation alone does not alter their requirements. |
+| `tests/README.md`, SQL project-local/linked helpers | Direct `dotnet test`/Test Explorer commands, explicit SQL configuration and positively owned database lifecycle. |
 | `deployment/sql/Provision-MyDmsVnPrincipals.sql` | Explicit runtime/maintenance SQL authority separation. |
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
-An assembly targeting `net8.0` cannot be referenced by the net48 product. Keep shared test library compatibility and explicit runner framework selection. Any future runtime reactivation must review the actual source/project/lock graph; neither active plan performs reactivation or a framework upgrade.
+Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph; neither active plan performs reactivation or a framework upgrade.

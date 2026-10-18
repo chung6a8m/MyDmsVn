@@ -1,6 +1,6 @@
 # Active roadmap — v1a
 
-**Owner decision:** 2026-10-18. Exactly two plans are active. Their direction is approved; implementation checkboxes start open. A documentation commit is not runtime or acceptance evidence.
+**Owner decision:** 2026-10-18. Exactly two plans are active. Their direction is approved; implementation checkboxes start open. The documentation reset and removal of the former SQL test framework do not implement either plan or establish their acceptance.
 
 | Execution order | Plan / ID | Entry condition | Current status |
 |---:|---|---|---|
@@ -11,14 +11,14 @@ Filename sequence reflects creation time. Follow the table, not filename sorting
 
 ## Execution contract
 
-Read [AGENTS](../../AGENTS.md), [current context](../../AI_CONTEXT.md), the task and [TEST_POLICY](../TEST_POLICY.md). Use [tests/README](../../tests/README.md) for actual commands. New Markdown task IDs are not automatically registered in `tests/test-gates.v1.json`; register and validate them in the owning implementation task before using manifest-owned commands.
+Read [AGENTS](../../AGENTS.md), [current context](../../AI_CONTEXT.md), the task and [TEST_POLICY](../TEST_POLICY.md). Use [tests/README](../../tests/README.md) for actual commands. Execute actual test projects directly using source-verified category/method filters and ordinary TRX outcomes. Plan/task IDs label work and evidence; there is no executable gate registry or runner bootstrap.
 
-The active target is `net48` for product, SQL and Desktop. `netstandard2.0` is a shared harness library; `net8.0` is a tool host. Neither plan reactivates product .NET 8, changes permissions, replaces DbUp, enables test parallelism or starts HTTP work.
+The active target is `net48` for product, SQL and Desktop. All ten active test projects also target net48; the .NET 8 SDK remains a build tool. Neither plan reactivates product .NET 8, changes permissions, replaces DbUp, enables test parallelism or starts HTTP work.
 
 ## Outside this queue
 
-- Completed foundation, TESTGATE, NET8-PAUSE, modularization and SEC-REBUILD work is summarized in [History](../HISTORY.md). Do not reimplement it.
-- P5 GUI acceptance, P6 hardening/release, P7 HTTP, runtime reactivation and optional manifest-v2 simplification are [deferred](../DEFERRED_WORK.md). They are not active prerequisites except a narrowly identified issue that a current plan explicitly owns.
+- Completed foundation, NET8-PAUSE, modularization and SEC-REBUILD work, plus the now-removed TESTGATE framework, is summarized in [History](../HISTORY.md). Do not reimplement it.
+- P5 GUI acceptance, P6 hardening/release, P7 HTTP and runtime reactivation are [deferred](../DEFERRED_WORK.md). They are not active prerequisites except a narrowly identified issue that a current plan explicitly owns. The old framework's unimplemented manifest-v2 redesign is cancelled by its complete removal.
 - The earlier rejection of fixture reuse is superseded by the owner's Respawn decision and [ADR 0010](../adr/0010-respawn-fixture-reuse-and-test-policy.md). Its old benchmark results remain historical observations.
 
 ## Handoff

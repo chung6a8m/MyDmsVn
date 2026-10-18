@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -24,10 +23,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         try
         {
             var assembly = typeof(DatabaseMigrationRunner).Assembly;
-            var interrupted = MeasuredDatabaseMigrationRunner.Execute(
-                database.MeasurementContext,
-                "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.direct-prefix",
-                () => DeployChanges.To
+            var interrupted = DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScriptsEmbeddedInAssembly(
                     assembly,
@@ -40,14 +36,11 @@ public sealed class SchemaCompatibilityIntegrationTests
                 .WithTransactionPerScript()
                 .LogToNowhere()
                 .Build()
-                .PerformUpgrade());
+                .PerformUpgrade();
             Assert.True(interrupted.Successful, interrupted.Error?.ToString());
             Assert.Equal(6, interrupted.Scripts.Count());
 
-            var injectedFailure = MeasuredDatabaseMigrationRunner.Execute(
-                database.MeasurementContext,
-                "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.direct-failure",
-                () => DeployChanges.To
+            var injectedFailure = DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScript(
                     "007_FaultInjection.sql",
@@ -57,7 +50,7 @@ public sealed class SchemaCompatibilityIntegrationTests
                 .WithTransactionPerScript()
                 .LogToNowhere()
                 .Build()
-                .PerformUpgrade());
+                .PerformUpgrade();
             Assert.False(injectedFailure.Successful);
 
             using (var connection = new SqlConnection(database.ConnectionString))
@@ -75,7 +68,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             Assert.Equal(SchemaCompatibilityStatus.TooOld, blocked.Status);
 
             var rejected = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
             Assert.Equal("Migration.UnsupportedExistingDatabase", rejected.Code);
             var stillBlocked = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
                 .CheckAsync(CancellationToken.None);
@@ -689,31 +682,28 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(
-                database.MeasurementContext,
-                "SchemaCompatibilityIntegrationTests.CreateMigratedDatabaseAsync.migration-01",
-                database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             return database;
         }
-        catch
+        catch (Exception setupError)
         {
             try
             {
                 await database.DisposeAsync();
             }
-            catch
+            catch (Exception cleanupError)
             {
-                // Preserve the migration failure; the ownership journal records any failed cleanup.
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
             }
 
             throw;

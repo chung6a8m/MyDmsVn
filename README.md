@@ -15,7 +15,7 @@ Respawn first establishes reusable, isolated test fixtures on the current DAL. L
 
 ## Current implementation
 
-- Product, SQL tests and WinForms run on **.NET Framework 4.8**. The SQL runner's `net8.0` target is tooling; AppCore and modern product targets remain parked.
+- Product, SQL tests and WinForms run on **.NET Framework 4.8**. All ten active test projects also target net48; AppCore and modern product targets remain parked.
 - Clean Architecture, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork, SQL Server and DbUp.
 - **RepoDb/Dapper remain in production code** until the LINQ to DB migration is completed. Respawn is also planned, not yet installed.
 - WinForms with CommunityToolkit.Mvvm, Bootstrap5WinFormUI and BootstrapSourceGrid.
@@ -26,7 +26,7 @@ Respawn first establishes reusable, isolated test fixtures on the current DAL. L
 
 Start with [AGENTS.md](AGENTS.md), [AI_CONTEXT.md](AI_CONTEXT.md), the active task, and [TEST_POLICY.md](docs/TEST_POLICY.md). The policy has been rewritten for this roadmap: focused affected tests during a task, broader SQL validation for shared infrastructure and the two acceptance milestones, and GUI checks when the change or milestone requires them.
 
-Completed and superseded plans, duplicate test policies and old verification narratives were removed from the working documentation. Their immutable Git sources are indexed in [History](docs/HISTORY.md). Old manifest IDs and runner behavior still exist in code; [tests/README.md](tests/README.md) explains the transition accurately.
+Completed and superseded plans, duplicate test policies and old verification narratives were removed from the working documentation. Their immutable Git sources are indexed in [History](docs/HISTORY.md). The owner also removed the gate manifest, standalone SQL framework, runner, related tests and wrappers. [tests/README.md](tests/README.md) documents direct `dotnet test`/Test Explorer execution and the local owned-database helper.
 
 ## Documentation
 

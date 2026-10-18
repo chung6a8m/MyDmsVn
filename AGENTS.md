@@ -9,7 +9,7 @@ The owner reset the active roadmap on **2026-10-18**. There are exactly **two ac
 1. [RESP — Integration-test fixture reuse with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md).
 2. [L2DB — LINQ to DB persistence migration on net48](docs/plans/20261018-001-linq2db-net48-persistence-migration.md).
 
-Start at the first incomplete RESP task. L2DB starts after RESP acceptance, using the accepted fixture baseline. Neither plan has been implemented by this documentation reset. Completed TESTGATE, NET8-PAUSE and SEC-REBUILD work is context, not an execution queue. Pending P5/P6/P7 work is in [Deferred work](docs/DEFERRED_WORK.md), not a third active plan.
+Start at the first incomplete RESP task. L2DB starts after RESP acceptance, using the accepted fixture baseline. Neither plan has been implemented. The subsequent removal of the old SQL test framework is a baseline simplification, not RESP implementation. Historical TESTGATE, completed modularization, NET8-PAUSE and SEC-REBUILD work is context, not an execution queue. Pending P5/P6/P7 work is in [Deferred work](docs/DEFERRED_WORK.md), not a third active plan.
 
 ## Read order and authority
 
@@ -19,14 +19,14 @@ Start at the first incomplete RESP task. L2DB starts after RESP acceptance, usin
 4. [PRD](docs/PRD.md), [Tech stack](docs/TECH_STACK.md), and applicable [ADRs](docs/adr/README.md).
 5. [History](docs/HISTORY.md) only when a past decision or evidence is needed.
 
-Explicit owner decisions supersede older documents. The active-plan index owns work order; TEST_POLICY owns test execution; TEST_STRATEGY describes coverage; tests/README describes actual tools. Historical plans and old command examples in Git are not current instructions. Flag a real contradiction instead of silently changing architecture or claiming planned behavior already exists.
+Explicit owner decisions supersede older documents. The active-plan index owns work order; TEST_POLICY owns test execution; TEST_STRATEGY describes coverage; tests/README describes direct test commands. Historical plans and old command examples in Git are not current instructions. Flag a real contradiction instead of silently changing architecture or claiming planned behavior already exists.
 
 ## Current implementation and approved destination
 
 | Area | Current v1a code | Approved direction |
 |---|---|---|
-| Runtime | Product, SQL tests, Desktop and harness tests execute on `net48` | Retain `net48`; no runtime upgrade in RESP/L2DB |
-| Tooling | SQL runner and runner tests execute on `net8.0`; shared SQL harness targets `netstandard2.0` | Tool targets do not count as product coverage |
+| Runtime | Product, SQL, Desktop and all ten active test projects target `net48` | Retain `net48`; no runtime upgrade in RESP/L2DB |
+| Test execution | Direct `dotnet test` / Test Explorer; local owned fresh-database helper in IntegrationTests | Add Respawn reuse inside existing SQL test owners; no external framework/manifest restoration |
 | Modern product | AppCore source / historical .NET 8 cases parked; AppCore outside solution/release | Reactivation is deferred and separately scoped |
 | Persistence | RepoDb commands, Dapper queries, explicit UoW, SQL Server, DbUp | LINQ to DB behind existing contracts after RESP acceptance |
 | SQL fixtures | Fresh owned database per existing helper invocation; serial guards present | Reuse migrated collection fixtures with Respawn for eligible tests; dedicated databases for lifecycle/schema exceptions |
@@ -49,7 +49,7 @@ Explicit owner decisions supersede older documents. The active-plan index owns w
 2. Read the checked-in source and actual project targets before changing them. Use current task evidence, not old totals, to establish progress.
 3. Make small, reviewable changes; add tests for meaningful behavior or failure boundaries. Documentation-only changes need static documentation checks, not a product regression run.
 4. Follow [TEST_POLICY](docs/TEST_POLICY.md). Broaden tests for shared dependencies or an explicit milestone; do not run full SQL/GUI/repository suites after each edit or by default for every code PR.
-5. Preserve SQL instance approval, ownership, process watchdog and cleanup checks. Existing tools may still enforce legacy manifests; adapt those tools only in the owning RESP task, never bypass a failed check.
+5. Use the explicit non-production SQL test connection, preserve local allocation ownership/cleanup checks, and run SQL projects sequentially. The former framework, manifest and wrappers are removed; no approval-file, global lease, external watchdog or orphan recovery service remains. Refuse ambiguous cleanup and report leftovers for manual review.
 6. Record commands, revision, scope, actual pass/fail/skip/not-run results and material limitations. Update checkboxes only when their evidence exists.
 7. Summarize what changed, why, verification and the next active task. P5/P6 release checks are still open; this roadmap reset grants no release acceptance.
 
@@ -58,7 +58,7 @@ Explicit owner decisions supersede older documents. The active-plan index owns w
 - Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM with CRLF; C# uses its declared BOM/CRLF policy. Preserve Vietnamese text.
 - Compile against the actual target APIs, especially `net48`. Do not upgrade packages broadly, suppress warnings globally or introduce an additional ORM to avoid a compatibility problem.
 - Register implementations explicitly with Microsoft DI. Keep ErrorOr, MediatR, RepoDb/LINQ to DB and SQL objects out of transport DTOs.
-- Use parameterized SQL. Never commit secrets, production connection strings, approval files or raw test artifacts.
-- SQL tests mutate only positively owned disposable databases on an approved test instance. Reset failure poisons a reused fixture; no subsequent test runs on uncertain state.
+- Use parameterized SQL. Never commit secrets, production connection strings, local SQL configuration or raw test artifacts.
+- SQL tests mutate only positively owned disposable databases on the explicitly designated non-production test instance. Reset failure poisons a reused fixture; no subsequent test runs on uncertain state.
 - GUI tests use STA, serialized UI resources, deterministic disposal, bounded waits and captured exceptions/DataGridView errors. Headless failures must not open blocking dialogs.
-- Missing Windows, targeting packs, SQL approval or GUI access is `BLOCKED / NOT RUN`, never PASS. Use [tests/README.md](tests/README.md) for runnable tool constraints.
+- Missing Windows, targeting packs, SQL configuration or GUI access is `BLOCKED / NOT RUN`, never PASS. Use [tests/README.md](tests/README.md) for current commands and resource constraints.

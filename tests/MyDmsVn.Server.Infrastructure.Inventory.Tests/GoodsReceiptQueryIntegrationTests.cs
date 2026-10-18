@@ -1,6 +1,5 @@
-using System;
+﻿using System;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -154,22 +153,30 @@ public sealed class GoodsReceiptQueryIntegrationTests
         return services.BuildServiceProvider();
     }
 
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
             var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             return database;
         }
-        catch
+        catch (Exception setupError)
         {
-            await database.DisposeAsync();
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupError)
+            {
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
+            }
+
             throw;
         }
     }

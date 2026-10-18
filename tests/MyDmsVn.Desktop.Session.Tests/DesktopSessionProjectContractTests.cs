@@ -46,7 +46,6 @@ namespace MyDmsVn.Desktop.Tests
                 .ToArray();
             Assert.DoesNotContain(references, reference => reference.IndexOf("Desktop.WinForms", StringComparison.OrdinalIgnoreCase) >= 0);
             Assert.DoesNotContain(references, reference => reference.IndexOf("Server.Infrastructure", StringComparison.OrdinalIgnoreCase) >= 0);
-            Assert.DoesNotContain(references, reference => reference.IndexOf("SqlTestHarness", StringComparison.OrdinalIgnoreCase) >= 0);
 
             foreach (var file in SessionTestFiles)
             {
@@ -55,9 +54,6 @@ namespace MyDmsVn.Desktop.Tests
             }
 
             Assert.Contains("MyDmsVn.Desktop.Session.Tests.csproj", File.ReadAllText(Path.Combine(root, "MyDmsVn.sln")));
-            Assert.Contains(
-                "MyDmsVn.Desktop.Session.Tests.csproj",
-                File.ReadAllText(Path.Combine(root, "tests", "tools", "MyDmsVn.SqlTestRunner.Tests", "MyDmsVn.SqlTestRunner.Tests.csproj")));
         }
 
         private static string FindRepositoryRoot()

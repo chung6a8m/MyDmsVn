@@ -1,6 +1,6 @@
 # Technical stack and compatibility baseline
 
-**Current source baseline:** `v1a`, commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed 2026-10-18. Central pins and project declarations below describe checked-in files; this documentation refresh performs no restore, build or runtime verification.
+**Current source baseline:** `v1a`, commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed 2026-10-18. Package pins describe the assessed product source; test-project entries incorporate the owner's subsequent SQL framework removal. Neither active plan has compatibility acceptance yet.
 
 ## Runtime matrix
 
@@ -8,9 +8,7 @@
 |---|---|
 | Product/Application/Infrastructure/Contracts | Active `net48`. |
 | Shared WinForms and Desktop.App | Active `net48`, Windows/.NET Framework 4.8. |
-| SQL integration and other product test projects | Active `net48`; use actual project declarations and reviewed manifest ownership. |
-| Shared `MyDmsVn.SqlTestHarness` library | `netstandard2.0`, consumed by the active tests; not a runnable product target. |
-| SQL runner and runner tests | Tool-only `net8.0`, with explicit framework selection; never counted as product/SQL net8 coverage. |
+| SQL integration and other product test projects | All ten active test projects target `net48`; use actual project declarations and source cases. |
 | Desktop.AppCore | Retained `net8.0-windows` source, parked outside the active solution/release. |
 | Historical modern product/SQL/GUI cases | `PARKED / NOT RUN`; no current modern product coverage is claimed. |
 | HTTP v2 and modern product runtime | Deferred backlog requiring a separate runtime decision before implementation. |
@@ -42,7 +40,7 @@ Current application persistence uses RepoDb, Dapper and explicit native SqlClien
 
 | Plan | Initial candidate | Required proof and scope |
 |---|---|---|
-| RESP, first | [Respawn `4.0.0`](https://www.nuget.org/packages/Respawn/4.0.0) | Prove the active net48/shared-harness dependency graph, reset correctness, ownership and exceptional fresh-database behavior against the current RepoDb/Dapper product. No floating latest version or TFM change. |
+| RESP, first | [Respawn `4.0.0`](https://www.nuget.org/packages/Respawn/4.0.0) | Prove the active net48 SQL test dependency graph, reset correctness, ownership and exceptional fresh-database behavior against the current RepoDb/Dapper product. No floating latest version or TFM change. |
 | L2DB, after accepted RESP | [linq2db `6.3.0`](https://www.nuget.org/packages/linq2db/6.3.0) | Prove actual net48 restore/build/runtime packaging with the pinned SqlClient, borrowed/owned resources, mappings and behavior parity before DAL conversion. |
 
 These are explicit pilot candidates, not claims that either package is installed, runtime-tested or the newest release. Their plans own actual asset selection and compatibility evidence. A failed candidate blocks its dependent rollout; it does not authorize changing the product runtime. L2DB targets removal of active RepoDb/Dapper consumers after verified conversion, retaining only justified native SqlClient operations and DbUp. RESP is test-only.
@@ -50,7 +48,7 @@ These are explicit pilot candidates, not claims that either package is installed
 ## Dependency and build rules
 
 - Reference a package only from projects that consume it. Review transitive assets, target compatibility, native SqlClient packaging and net48 binding redirects when changing dependencies.
-- Generate affected lock changes deliberately, review them and verify locked restore on the actual active matrix. Do not refresh unrelated packages or infer modern-product coverage from tool-only net8 execution.
+- Generate affected lock changes deliberately, review them and verify locked restore on the actual active matrix. Do not refresh unrelated packages or infer modern-product coverage from the SDK used to build net48.
 - Keep the existing central package-management settings. Resolve source-mapping problems explicitly; do not add blanket `NoWarn=NU1507` merely to hide them.
 - Keep LINQ to DB mappings/provider types in Infrastructure. Do not introduce EF Core, another auth framework, T4/scaffolding bundles or a runtime provider-selection flag as part of these plans.
 - Keep shared JSON conventions in `ApiJson`. Additional import/export/updater packages require an actual approved consumer; an unused central MiniExcel/Onova pin is not a feature implementation.
@@ -58,12 +56,12 @@ These are explicit pilot candidates, not claims that either package is installed
 
 ## Test configuration and verification
 
-[Test policy](TEST_POLICY.md) defines focused task scope and broader SQL/final milestones. Keep current guarded runner/manifest constraints until RESP explicitly adapts them. Mandatory SQL acceptance with missing configuration, approval, Windows or targeting resources is `BLOCKED / NOT RUN`, not PASS; a skipped optional/local diagnostic is not mandatory coverage.
+[Test policy](TEST_POLICY.md) defines focused task scope and broader SQL/final milestones. Run test projects directly and preserve the local allocation/cleanup guards. Mandatory SQL acceptance with missing configuration, Windows or targeting resources is `BLOCKED / NOT RUN`, not PASS; a skipped optional/local diagnostic is not mandatory coverage.
 
-`MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` and local approval resources identify the explicitly approved non-production SQL instance for test execution. The guarded runner uses the approved instance's `master` connection to create owned disposable databases. The product migrator instead requires an explicit application database and rejects system databases. Never confuse these configurations, print credentials or silently fall back to a developer/production database.
+`MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` explicitly identifies the designated non-production SQL instance and `master` catalog. The local IntegrationTests helper validates the live allocation before drop. There is no approval-file or external runner requirement. The product migrator instead requires an explicit application database and rejects system databases. Never confuse these configurations, print credentials or silently fall back to a developer/production database.
 
 ## Editing and future review
 
-Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. This refresh changes documentation only.
+Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; the two active implementation plans remain pending.
 
 Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or pins within RESP/L2DB.

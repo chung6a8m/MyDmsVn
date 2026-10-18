@@ -4,15 +4,15 @@
 
 ## Entry conditions
 
-The owner first chooses the supported server/Desktop/runtime release scope, including whether .NET 8 remains appropriate at that future release date. Start from the accepted active-plan baseline and inventory the actual source, dependencies, tests, manifests and packages. Tool-only net8 execution is not product coverage.
+The owner first chooses the supported server/Desktop/runtime release scope, including whether .NET 8 remains appropriate at that future release date. Start from the accepted active-plan baseline and inventory the actual source, dependencies, tests and packages. An SDK version is not product runtime coverage.
 
 ## Restore a coherent graph
 
 1. Restore selected modern targets across SharedKernel, Contracts, Domain, Application, Infrastructure, DbMigrator, Local adapter and applicable tests, retaining net48 unless separately changed by the owner.
 2. Restore modern WinForms/Desktop targets and AppCore solution/composition/package entries only when included in the approved scope. Validate vendored UI references and native dependencies.
 3. Review lock-file/dependency changes and verify locked restore/build on all activated targets. Use the accepted post-L2DB provider and Respawn fixture contract; do not copy retired RepoDb/modern Respawn snippets blindly.
-4. Update actual active test project/TFM mappings, runner framework selections and fixture identities. Preserve historical parked case mappings without relabeling them as executed; account for new/moved/replaced Theory cases explicitly.
-5. Keep test databases separated across testhost processes/TFMs; resource leases and GUI serialization still apply. Reset/profile behavior must work in each activated host.
+4. Update actual active test project/TFM mappings, direct test-command framework selections and fixture ownership. Preserve historical parked case mappings without relabeling them as executed; account for new/moved/replaced Theory cases explicitly.
+5. Keep test databases separated across testhost processes/TFMs; sequential project execution and GUI serialization still apply. Reset/profile behavior must work in each activated host.
 
 ## Verification and release
 

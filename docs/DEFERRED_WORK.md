@@ -75,7 +75,7 @@ Each row needs revision/artifact, OS/architecture/TFM, SQL version, method/comma
 
 ## 3. P7 — HTTP and remote client
 
-- [ ] Decide the supported server/runtime matrix and follow [REACTIVATE_NET8](REACTIVATE_NET8.md) or a separately approved runtime plan. The parked product graph and tool-only net8 runner do not establish API readiness.
+- [ ] Decide the supported server/runtime matrix and follow [REACTIVATE_NET8](REACTIVATE_NET8.md) or a separately approved runtime plan. The parked product graph and the SDK used for net48 builds do not establish API readiness.
 - [ ] Add Server.Api composition and endpoints for supported catalogs, receipts, stock inquiries and identity, reusing Application handlers and the accepted persistence implementation.
 - [ ] Add bearer authentication, HTTPS, 401/403, Application permission enforcement, session expiry/revocation and safe status/ApiResponse/error mapping.
 - [ ] Publish OpenAPI contracts with pagination/filter/order, decimal/UTC and error examples.
@@ -83,8 +83,8 @@ Each row needs revision/artifact, OS/architecture/TFM, SQL version, method/comma
 - [ ] Prove Local/HTTP parity using the same DTO/JSON/validation/permission/draft/post/stock scenarios; SQL credentials and libraries stay in the server deployment, not the remote Desktop package.
 - [ ] Provide deployment, correlation, upgrade/version and support guidance before declaring HTTP support.
 
-## 4. Optional runner simplification
+## Cancelled tooling proposal — historical context
 
-The unimplemented STAB-T03/T04 ideas remain deferred: stable versioned fingerprints over a provable dependency closure, a reviewable proposed manifest-delta command, cached indexing, and a versioned separation of gate definitions, active per-module case inventory and historical retirement metadata. Preserve exact case/TFM/Theory mappings and parked history; no automatic approval of removals or weakened fallback dependency coverage. [Original scope](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs/plans/20261017-001-testgate-stabilization.md).
+The owner completely removed the old SQL test framework on 2026-10-18. Its unimplemented STAB-T03/T04 fingerprint/manifest-v2 redesign is therefore **CANCELLED / SUPERSEDED**, not open deferred work. [Original proposal](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs/plans/20261017-001-testgate-stabilization.md) and [History](HISTORY.md) retain provenance only.
 
-RESP owns only the fixture-aware lifecycle/scoping changes necessary for its plan. Do not make general manifest-v2 redesign a third active roadmap item or a prerequisite for starting Respawn.
+RESP adds fixture reuse inside existing SQL test projects and uses ordinary project/filter commands and test output. Do not recreate the removed framework as an active plan, a deferred prerequisite or a renamed support project.

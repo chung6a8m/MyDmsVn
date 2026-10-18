@@ -1,24 +1,27 @@
 # Respawn fixture reuse on net48 — implementation plan
 
-> **For agentic workers:** Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task by task. This document authorizes no implementation or SQL execution in the documentation refresh.
+> **For agentic workers:** Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task by task. Checkboxes are pending implementation requirements.
 
-**Status:** Owner-selected direction; implementation pending / NOT IMPLEMENTED, 2026-10-18. Source assessment: `c7ad32a4b0040f87417973eabd6c12757c54f7d5`. No package restore, runtime compatibility, reset correctness or performance result is claimed.
-**Order:** First active plan; complete its accepted fixture/test contract before the [LINQ to DB migration](20261018-001-linq2db-net48-persistence-migration.md).
-**Goal:** Amortize database creation and migration across eligible SQL tests while proving that each test receives the same clean, deterministic starting state as a fresh database.
-**Architecture:** A reusable database belongs to one xUnit v2 collection in one assembly, process, run and TFM. A test-only harness owns allocation, reset, seeding and teardown; each test gets an exclusive scope and its own application/connection resources. Tests outside the reviewed reset boundary continue using fresh owned databases.
-**Tech stack:** Active SQL/product/Desktop `net48`; shared harness `netstandard2.0`; runner and runner tests tool-only `net8.0`; xUnit `2.9.3`; DbUp `7.2.0`; central `Microsoft.Data.SqlClient` `7.0.2`; proposed Respawn `4.0.0`.
-**Spec:** The owner's 2026-10-18 fixture-reuse decision, [TEST_POLICY](../TEST_POLICY.md), [TEST_STRATEGY](../TEST_STRATEGY.md), and existing ownership/isolation contracts in [ADR 0005](../adr/0005-test-isolation-and-bounded-parallelism.md).
+**Status:** Owner-selected direction; NOT IMPLEMENTED, 2026-10-18. Updated for the owner's complete SQL test framework removal; no Respawn package/runtime/reset/performance result is claimed.
+**Order:** First active plan; accept its fixture/test contract before the [LINQ to DB migration](20261018-001-linq2db-net48-persistence-migration.md).
+**Goal:** Amortize database creation and migration across eligible SQL tests while proving each test receives the same clean, deterministic starting state as a fresh database.
+**Architecture:** One reusable database belongs to one xUnit v2 collection in one assembly/process/TFM. Small helpers in the existing SQL test projects own allocation, reset, seeding and teardown. Each test owns its application resources; exceptions retain fresh databases.
+**Tech stack:** Active SQL/product/Desktop `net48`; xUnit `2.9.3`; DbUp `7.2.0`; central `Microsoft.Data.SqlClient` `7.0.2`; proposed Respawn `4.0.0`.
+**Spec:** The owner's 2026-10-18 decisions, [TEST_POLICY](../TEST_POLICY.md), [TEST_STRATEGY](../TEST_STRATEGY.md), [ADR 0005](../adr/0005-test-isolation-and-bounded-parallelism.md) and [ADR 0010](../adr/0010-respawn-fixture-reuse-and-test-policy.md).
 
-## 1. Global constraints
+## 1. Current baseline and constraints
 
-- Keep all current application/SQL/Desktop TFMs, parked AppCore and historical net8 inventory unchanged. No runtime upgrade, container requirement, CI rollout, production DAL change or SQL parallelism rollout belongs to this plan.
-- Keep SQL and WinForms assembly serial guards and cross-process SQL leases. A collection name or static lock cannot establish ownership across testhosts; preserve unique generated database names and bind fixture metadata to the actual owner.
-- Allocate only through the guarded test database lifecycle. Require the existing operator-maintained, instance-bound non-production approval and an administrative connection explicitly targeting `master`; revalidate live database ownership before destructive reset and final drop.
-- Preserve DbUp scripts and `dbo.SchemaVersions`, the `MyDmsVn.TestOwnership` database extended property, durable ownership records, quarantine/recovery and positive cleanup proof. Never reset an application, unknown or merely name-matching database.
-- Reset mutable business and security rows, then seed explicitly. Do not exclude `Users`, role/permission assignments, `SystemSecuritySettings`, `SecurityAuditEvents`, catalogs, receipts, balances or ledger data to conceal an incomplete reset.
-- Keep schema/history changes, SQL principal/GRANT/role mutation, bootstrap/maintenance mutation and deliberately destructive/fault or lock-contention cases on fresh dedicated resources. Responsibility categories remain independent of reset eligibility.
-- A reset, seed, ownership/schema validation or teardown failure poisons the fixture. Fail affected tests and reject subsequent users; never silently skip, recreate or switch to fresh mode to report a pass. Fresh mode is an explicit reviewed execution choice.
-- Keep every existing assertion and logical case unless a separately explained replacement preserves its behavior. Do not weaken inventory checks, refresh fingerprints without review or use historical aggregate counts as present acceptance thresholds.
+The six SQL owners run directly through `dotnet test` or Test Explorer. The local `SqlTestDatabase` creates a fresh database per call and validates its live allocation identity before drop. The standalone SQL framework and its manifests/wrappers/tests have been removed. This plan adds reuse to the existing owners; it does not recreate those projects or a runner/reporting framework.
+
+- Keep active net48, parked AppCore, current RepoDb/Dapper and DbUp. No runtime upgrade, container requirement, CI rollout or SQL parallelism rollout belongs to RESP.
+- Keep existing SQL/WinForms assembly serialization; run SQL projects sequentially. Collection coordination cannot establish ownership across testhosts. Generate unique databases and use a distinct allocation for every assembly/process/TFM/collection.
+- Allocate through the local helper, using only the explicitly configured non-production instance and administrative connection targeting `master`. Preserve generated-name guards, instance/database ID/creation-time checks, random ownership marker and finite connection/SQL bounds.
+- Revalidate live allocation ownership before reset and final drop. Never reset an application, unknown, leftover or merely name-matching database. Preserve `dbo.SchemaVersions` and the `MyDmsVn.TestOwnership` extended property. Ambiguous ownership refuses mutation and needs manual operator review.
+- Reset all mutable business and security rows, then seed explicitly. Do not ignore users, assignments, binding, audit, catalogs, receipts, balances or ledger data to hide an incomplete reset.
+- Keep schema/history, SQL principal/GRANT/role, bootstrap/maintenance and unresettable fault/lock cases fresh. Responsibility categories remain independent of reset eligibility.
+- A reset, seed, ownership/schema validation or teardown failure poisons the fixture. Fail affected tests and reject subsequent bodies; no silent recreation, skip or fresh-mode fallback.
+- Preserve existing business/lifecycle assertions and Theory rows. Record explained replacements in the case map; do not import deleted framework tests, fingerprints or historical totals as acceptance requirements.
+- There is no external lease, process watchdog or automatic orphan recovery. Drain operations before releasing a fixture; an interrupted process can leave a database for manual review under TEST_POLICY.
 
 ## 2. Version and reset contract
 
@@ -37,142 +40,138 @@ var checkpoint = new Respawn.Checkpoint {
 await checkpoint.Reset(openDbConnection);
 ```
 
-`TablesToIgnore` is `string[]` matched by table name: `"dbo.SchemaVersions"` and modern `Table`/`Respawner` APIs are incorrect here. Configure no conflicting schema exclusion list. Reject unexpected schemas or ambiguous journal names before reuse. The separate Foundation test migration uses `dbo.TestSchemaVersions`; only a separately reviewed profile that actually uses that schema may preserve that journal. [Checkpoint](https://github.com/jbogard/Respawn/blob/4788e2c51535919221de03edc90d354f4fd7d02f/Respawn/Checkpoint.cs) and [SQL Server adapter](https://github.com/jbogard/Respawn/blob/4788e2c51535919221de03edc90d354f4fd7d02f/Respawn/SqlServerDbAdapter.cs) define these behaviors.
+`TablesToIgnore` is `string[]` matched by table name: `"dbo.SchemaVersions"` and modern `Table`/`Respawner` APIs are incorrect here. Configure no conflicting schema exclusion list. Reject unexpected schemas or ambiguous journal names before reuse. Foundation's separate test migration uses `dbo.TestSchemaVersions`; only a separately reviewed profile actually using that schema may preserve that journal. [Checkpoint](https://github.com/jbogard/Respawn/blob/4788e2c51535919221de03edc90d354f4fd7d02f/Respawn/Checkpoint.cs) and [SQL Server adapter](https://github.com/jbogard/Respawn/blob/4788e2c51535919221de03edc90d354f4fd7d02f/Respawn/SqlServerDbAdapter.cs) define these behaviors.
 
-- Create one checkpoint after migrations finish for each allocated database; first reset builds cached metadata. Never transfer it to another database or continue after schema/profile changes. Complete the initial reset and baseline verification before publishing the fixture as ready.
-- `Reset(DbConnection)` uses the caller's open connection, starts its own transaction and has no cancellation-token overload. Use a dedicated short-lived reset connection, without a caller transaction. `CommandTimeout` bounds delete/reseed commands; metadata queries retain provider defaults. Keep an outer watchdog, close the owned reset connection on cancellation/timeout, await operation termination and poison the fixture before releasing access. A timed-out wait is not proof that SQL stopped.
-- **Full-schema trigger blocker:** `007_Inventory_Stock.sql` installs `dbo.TR_StockLedger_AppendOnly`, an `INSTEAD OF UPDATE, DELETE` trigger that unconditionally throws. This affects the Catalog pilot too. Implement a test-only profile that, after positive ownership and exact schema/trigger verification, temporarily disables only this named trigger, resets, restores it in `finally`, and verifies its definition and enabled state. Verify empty-ledger and populated-ledger resets. Any restoration failure poisons the fixture; without this proven profile, use fresh databases. Never ignore `StockLedger` or change the production migration.
-- Revalidate constraints, schema, journal contents and ownership after reset. The adapter may handle FK cycles internally; verify that all constraints retain their expected enabled/trusted state. Unexpected objects, triggers or permissions invalidate the cached reset boundary.
-- `WithReseed` defaults to false and v4 calculates reseeds from seed minus one. Prove actual `IDENTITY(1,1)` behavior before/after first insert, populated reset and repeated reset. Reset `dbo.GoodsReceiptNumberSequence` explicitly to its reviewed test baseline with test-only SQL, or document relative-number assertions in a profile; Respawn does not reset it. Never expect rowversion, timestamps or database-wide counters to rewind.
-- `SecurityAuditEvents` has an FK to `Users`; `SystemSecuritySettings` also references `Users`. Clear and rebuild their state in the real FK graph. Ordinary security data tests may reuse after proof; SQL principals, grants, bootstrap/maintenance and test-injected audit triggers remain dedicated.
+- Create one checkpoint per allocated database after migrations finish. The first reset builds cached metadata; complete it and verify the baseline before publishing the fixture. Never transfer a checkpoint or continue after schema/profile changes.
+- `Reset(DbConnection)` uses the caller's open connection, starts its own transaction and has no cancellation-token overload. Use a short-lived reset connection without a caller transaction. `CommandTimeout` bounds delete/reseed commands; metadata queries retain provider defaults. On cancellation/timeout, close the owned reset connection, await actual operation termination and poison the fixture before releasing access. A timed-out wait alone does not stop SQL; no external watchdog is assumed.
+- **Full-schema trigger blocker:** `007_Inventory_Stock.sql` installs `dbo.TR_StockLedger_AppendOnly`, an `INSTEAD OF UPDATE, DELETE` trigger that unconditionally throws. This affects the Catalog pilot even with an empty ledger. After positive ownership and exact schema/trigger verification, a test-only profile may temporarily disable only that trigger, reset, restore it in `finally`, then verify its definition and enabled state. Test empty and populated ledgers. Restoration failure poisons the fixture. Do not ignore StockLedger or change the production migration.
+- Revalidate constraints, schema, journal contents and ownership after reset. Verify enabled/trusted FK state, including cycles. Unexpected objects, triggers or permissions invalidate the cached boundary.
+- `WithReseed` defaults to false and v4 calculates reseeds from seed minus one. Prove actual `IDENTITY(1,1)` behavior before/after first insert, populated reset and repeated reset. Reset `dbo.GoodsReceiptNumberSequence` explicitly to its reviewed test baseline with test-only SQL, or use documented relative-number assertions; Respawn does not reset it. Rowversion, timestamps and database-wide counters do not rewind.
+- `SecurityAuditEvents` and `SystemSecuritySettings` reference Users. Clear/rebuild the actual FK graph. Ordinary security data tests may reuse after proof; principal/grant/bootstrap/maintenance and test-injected trigger scenarios remain dedicated.
 
-## 3. Source map and interfaces
+## 3. Existing owners and proposed helpers
 
-All paths are repository-relative. New paths and APIs below are proposed, not implemented.
+All paths are repository-relative. New paths/APIs below are proposed; implement only what the lifecycle needs.
 
-| Responsibility | Existing anchors and planned files |
+| Responsibility | Existing anchor / planned treatment |
 |---|---|
-| Owned allocation/drop | Extend `tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlTestDatabase.cs`; retain `SqlTestDatabaseName.cs` and `tests/MyDmsVn.SqlTestHarness/{Approval,Preflight,Ownership}/`. Existing `CreateAsync(...)`, `ConnectionString`, `MeasurementContext`, `DisposeAsync()` remain usable for fresh tests. |
-| Reuse engine without xUnit dependency | Create `tests/MyDmsVn.SqlTestHarness/Fixtures/{ISqlFixtureDatabase,ReusableSqlFixture,RespawnResetProfile,SqlFixtureCaseExecution,SqlFixtureTestScope,SqlFixtureRunMode}.cs`; add the Respawn package only to test consumers and update affected locks. |
-| Migration and measurement | Preserve `tests/MyDmsVn.Server.Infrastructure.IntegrationTests/{MeasuredDatabaseMigrationRunner,TestDatabaseMigrationRunner}.cs`; adapt `tests/MyDmsVn.SqlTestHarness/Timing/` for separately identified fixture and test operations. |
-| xUnit v2 adapters | Create `Fixtures/` adapters in the Catalog, Inventory and selected Security test owners. Collection fixture implements `IAsyncLifetime.InitializeAsync()` / `DisposeAsync()` for allocation/migration/drop. An explicit per-case async helper binds method/row/execution identity before reset/seed and drains the scope in `finally`; keep xUnit out of the shared harness. |
-| Runner/inventory | Adapt `tests/tools/MyDmsVn.SqlTestRunner/{Gates,Inventory,Reconciliation,Reporting}/`, `Program.cs`, `tests/test-gates.v1.json`, `tests/tools/sqlperf-t01-migration-invocations.json` and `sql-test-nonsql-exemptions.json`, with their existing runner tests. |
-| New correctness checks | Create `tests/MyDmsVn.SqlTestHarness.Tests/Fixtures/ReusableSqlFixtureTests.cs` and `tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/ReusableSqlFixtureIntegrationTests.cs`; keep destructive probe allocations fresh. |
+| Owned allocation/drop | Extend `tests/MyDmsVn.Server.Infrastructure.IntegrationTests/SqlTestDatabase.cs` and retain `SqlTestDatabaseName.cs`. Keep `CreateAsync(...)`, `ConnectionString` and `DisposeAsync()` for fresh tests; add a narrow ownership-verification method usable by reset. |
+| Reusable lifecycle/reset | Add `Fixtures/{ReusableSqlFixture,RespawnResetProfile,SqlFixtureTestScope,SqlFixtureRunMode}.cs` inside the existing IntegrationTests project; use the current reference/linked-source pattern for consumers. Add Respawn only to actual test consumers and review affected locks. |
+| Migration | Call production `DatabaseMigrationRunner.Migrate` directly. Preserve the small `TestDatabaseMigrationRunner` for Foundation's separate embedded schema. No measured-migration wrapper or invocation-ID registry is required. |
+| xUnit v2 adapters | Add explicit collection adapters in Catalog, then proven Inventory/Security owners. Collection `IAsyncLifetime` owns allocation/migration/drop; a per-case async helper resets/seeds before the scenario and drains the scope in `finally`. |
+| Correctness tests | Add `ReusableSqlFixtureTests.cs` in IntegrationTests and `ReusableSqlFixtureIntegrationTests.cs` in Foundation, plus focused adapter tests in their actual owners. Keep destructive probe allocations fresh. |
+| Reviewable evidence | Create `docs/RESPAWN_CASE_MAP.md` and `docs/RESPAWN_VERIFICATION.md` during T00. Use source review, ordinary xUnit/TRX outcomes and small fixture-operation observations, without a new executable gate manifest. |
 
-The existing helper is internal. Catalog references the IntegrationTests assembly and uses its `InternalsVisibleTo` bridge; Foundation/Inventory/Security/Migrations compile linked copies of allocator/migration helpers. Preserve those actual project boundaries or change them explicitly with owner/discovery reconciliation; do not accidentally compile another owner's tests or introduce a production reference to test infrastructure.
+Catalog references the IntegrationTests assembly through its existing internals bridge. Foundation/Inventory/Security/Migrations compile linked helper copies. Preserve those boundaries or explain a narrow change; never accidentally compile another owner's tests or reference test infrastructure from production.
 
-Current source has assembly serial guards in IntegrationTests, Foundation, Inventory, Security, Migrations and Desktop.Tests. Catalog.Tests has no assembly-wide guard; the guard in its referenced assembly does not apply to it. There are no existing xUnit collection-fixture adapters. The Catalog pilot must introduce one explicit collection covering all users of its reusable database; it cannot rely on an inherited serial policy.
+IntegrationTests, Foundation, Inventory, Security, Migrations and Desktop have assembly serial guards. Catalog has no assembly guard; its referenced assembly's guard does not apply to it. The first Catalog collection must include every shared-fixture consumer.
 
-The shared lifecycle contract is:
+Proposed lifecycle:
 
-- `ISqlFixtureDatabase`: `string ConnectionString`, `SqlTestMeasurementContext MeasurementContext`, `Task VerifyOwnershipAsync(CancellationToken)`, `Task DisposeAsync()`. `SqlTestDatabase` implements it without exposing ownership tokens to tests or weakening create/drop checks.
-- `ReusableSqlFixture`: configured with explicit allocation, migration, schema-verification and reset-profile callbacks; `Task InitializeAsync(CancellationToken)`, `Task<SqlFixtureTestScope> BeginTestAsync(SqlFixtureCaseExecution execution, Func<DbConnection, CancellationToken, Task> seed, CancellationToken)`, `Task DisposeAsync()`. No ambient connection/UoW or static mutable fixture cache.
-- `SqlFixtureCaseExecution`: carries the reviewed method-level `LogicalCaseId`, stable `RowKey` (`fact` for a Fact), and a new unique `ExecutionId` per attempted invocation, bound to the fixture's run/owner/TFM. Reconcile them to the existing v1 logical key from normalized signature, TFM, reviewed row and classification; do not replace `LogicalCaseIdentity` with a class name or a new display-name hash. The harness must remain netstandard2.0-compatible and must not reference the net8 runner assembly.
-- `SqlFixtureTestScope`: exposes the allocated connection string, registers `void RegisterCleanup(Func<Task> drainAndDispose)` actions and provides `Task DisposeAsync()`. Cleanup cancels/drains workers and disposes test resources before releasing the single active scope; collect cleanup failures without suppressing the original failure.
-- `SqlFixtureRunMode`: parses test-only `MYDMSVN_SQL_TEST_FIXTURE_MODE` values `fresh` / `reuse`; unknown values fail before allocation. Use `fresh` during the initial rollout. Before freezing the T04 candidate, select `reuse` as the default for profiles that passed their focused correctness gates; T05 verifies and accepts this default. `fresh` remains an explicit control/fallback mode and the required mode for excluded cases. Record requested and effective mode per case in evidence. No product setting or automatic fallback.
+- `ReusableSqlFixture.InitializeAsync(CancellationToken)` allocates, migrates and verifies one owned database in reuse mode. Configuration contains explicit migration/schema/reset callbacks; there is no static mutable fixture cache or ambient application connection/UoW.
+- `BeginTestAsync(caseLabel, seed, cancellationToken)` admits one exclusive test scope after ownership/health verification, reset, deterministic seed and baseline verification. Give each Fact/Theory row a clear non-sensitive method/row label for diagnostics; correctness never depends on parsing an xUnit display name or maintaining a fingerprint registry.
+- `SqlFixtureTestScope` exposes the connection string and registers asynchronous drain/dispose actions. Disposal collects cleanup errors without suppressing the original failure, drains workers/readers/transactions/scopes, then releases admission.
+- `SqlFixtureRunMode` parses the proposed test-only `MYDMSVN_SQL_TEST_FIXTURE_MODE` values `fresh`/`reuse`; unknown values fail before allocation. Use fresh during rollout. Before T04 freezes the candidate, accepted eligible profiles default to reuse; excluded cases remain fresh. Explicit fresh stays available for comparison. This setting does not exist before implementation.
+- A per-case `RunTestAsync(caseLabel, seed, scenario, cancellationToken)` adapter is the first awaited SQL operation of each consumer. It initializes/reset/seeds before invoking the body and drains the scope in `finally`. Fresh mode uses the same profile, seed and assertions but allocates/migrates for each invocation.
 
-In reuse mode collection initialization allocates/migrates once. Each Fact or Theory invocation makes its first awaited test operation an explicit adapter call, `RunTestAsync(execution, seed, scenario, cancellationToken)`. It passes a reviewed method/row binding from the case map and a newly allocated execution ID; the adapter calls `BeginTestAsync`, verifies health/ownership, resets/seeds/verifies the baseline, and only then invokes the scenario delegate. Its `finally` drains/disposes the test scope; collection teardown drops only its allocation. Tests must not perform scenario SQL before this helper. In fresh mode the same helper/profile/seed/assertions allocate and migrate for each invocation.
+xUnit v2 collection `IAsyncLifetime` supplies asynchronous setup/disposal, but parameterless initialization does not supply the current method or Theory arguments. Pass a stable descriptive row label explicitly when diagnostics need it; do not use reflection into xUnit internals or ambient current-test state. Prove at least a Fact and two rows of the same Theory run their own reset/seed. [xUnit shared-context guidance](https://xunit.net/docs/shared-context) describes the lifecycle; `IAsyncDisposable` alone is insufficient for v2 fixture disposal.
 
-xUnit v2 collection `IAsyncLifetime` supports asynchronous allocation and disposal, but its parameterless initialization does not supply the current method or Theory arguments. Do not reset/seed from a parameterless per-test initializer that assumes an ambient current-test identity. Bind explicit stable row keys to the runner's reviewed source/discovery/TRX mapping; reject a missing, unknown or duplicate execution binding before scenario admission. Preserve the existing physical-row locators for reconciliation, without scraping them inside the fixture adapter or reflecting into xUnit internals. [xUnit shared-context guidance](https://xunit.net/docs/shared-context) describes the lifecycle; `IAsyncDisposable` alone is insufficient for v2 fixture disposal.
+## 4. Initial eligibility and review focus
 
-## 4. Eligibility and review focus
-
-| Initial audit group | Decision to prove, with exact owner |
+| Existing group | Decision to prove |
 |---|---|
-| `CatalogMappingIntegrationTests` and `CatalogBackendIntegrationTests` | First reusable pilot in `MyDmsVn.Server.Infrastructure.Catalog.Tests`; include all five existing methods. Backend CRUD also inserts `Users` for employee linkage, so four catalog tables alone are not its reset boundary. |
-| `GoodsReceiptQueryIntegrationTests`, `InventoryQueryIntegrationTests` | Next reusable group in `MyDmsVn.Server.Infrastructure.Inventory.Tests`; their seeded receipt/ledger/balance data requires the complete profile. Review data-only mapping/storage methods individually. |
-| `IdentityStoreIntegrationTests`, data-only `SecurityAdministrationSqlTests` methods | Candidates in `MyDmsVn.Server.Infrastructure.Security.Tests`; reset users, assignments, revisions, bindings and audit. Separate methods injecting triggers or exercising bootstrap/principal/maintenance changes before adoption. |
-| Migration/compatibility, `SqlPrincipalProvisioningTests`, `SuperuserBootstrapTests`, helper lifecycle/fault and multi-session contention tests | Retain fresh ownership. This includes schema-mutating Foundation probes and Inventory command tests installing signal/failure triggers. A `FastSQL` label does not override these exclusions. |
-| Pure unit/policy/architecture/ViewModel tests | Remain independent of SQL fixtures; adding a fixture must not turn them into SQL tests or conceal SQL behind a NonSql exemption. |
+| Catalog `CatalogMappingIntegrationTests`, `CatalogBackendIntegrationTests` | First pilot, including all five methods. Backend CRUD inserts Users for employee linkage; four catalog tables alone are insufficient. |
+| Inventory `GoodsReceiptQueryIntegrationTests`, `InventoryQueryIntegrationTests` | Next group; seeded receipt/ledger/balance data needs the full profile. Review data-only mapping/storage methods individually. |
+| Security `IdentityStoreIntegrationTests`, data-only `SecurityAdministrationSqlTests` methods | Candidates after users/roles/assignments/revisions/binding/audit reset proof. Separate trigger/bootstrap/principal/maintenance mutations. |
+| Migration/compatibility, `SqlPrincipalProvisioningTests`, `SuperuserBootstrapTests`, helper lifecycle/fault and multi-session contention | Fresh ownership, including Foundation schema probes and Inventory command tests installing signal/failure triggers. `FastSQL` does not override exclusions. |
+| Pure unit/policy/architecture/ViewModel tests | Remain independent of SQL; a reusable fixture must not turn them into database tests. |
 
-Five review obligations are assigned below: empty/populated append-only ledger reset; partial reset or seed failure; leaked workers/transactions at scope exit; unexpected schema/trigger or ownership changes; and lost fixture/case attribution in filtered, failed or aborted runs. Security mutation eligibility is a per-method resource decision, not a blanket judgment about its category.
+Review empty/populated append-only ledger reset, partial reset/seed failure, leaked workers/transactions, schema/trigger/ownership drift, and truthful results after filtered/failed/aborted initialization. Classify mixed classes per method.
 
 ## 5. Tasks and acceptance evidence
 
-### RESP-T00 — Freeze the eligibility and compatibility baseline
+### RESP-T00 — Freeze eligibility and compatibility baseline
 
-**Files:** current projects/scripts/helpers/manifests above; create `docs/RESPAWN_CASE_MAP.md` and `docs/RESPAWN_VERIFICATION.md` during implementation.
-**Produces:** reviewed method/theory-row → owner/TFM/category → fresh/reuse/profile/seed mapping and a comparable execution contract.
+**Files:** current projects/scripts/helpers; new case map and verification documents. **Produces:** method/Theory row → owner/TFM/category → fresh/reuse/profile/seed mapping and comparison protocol.
 
-- [ ] Inventory all six SQL owners and every active logical case/theory row. Record seed tables, committed writes, identities/sequence, triggers, schema/principals, scopes and workers; classify every candidate method explicitly, including mixed classes.
-- [ ] Confirm package assets/API, actual identities and trigger definitions against this source revision; record locked dependency, native asset and binding-redirect requirements. Keep proposed compatibility separate from executed proof.
-- [ ] Specify identical fresh/reuse comparison inputs: frozen revision, complete SQL case inventory, machine/approval/configuration, build and runner protocol. Record current per-test create/migrate/drop behavior; do not treat historical 775/793 totals as a baseline for this work.
-- [ ] Bind future RESP selectors/gates only when their referenced tests exist. All `RESP-Txx` IDs are absent from the current v1 manifest; a command using them is not currently runnable. Exit when the map covers every case and reset exception has a concrete reason.
+- [ ] Inventory every case in all six SQL owners. Record seed tables, committed writes, identities/sequence, triggers, schema/principals, scopes and workers. Classify each candidate method and concrete fresh exception.
+- [ ] Confirm candidate package/API, identity and trigger definitions, locked dependencies, native assets and binding redirects. Keep compatibility expectations separate from executed net48 evidence.
+- [ ] Define matching fresh/reuse inputs: frozen candidate, cases, project order, machine/SQL configuration and build. Record current fresh allocation/migration behavior; old SQLPERF totals are historical.
+- [ ] Record direct project/filter commands resolving to actual tests and expected Theory rows. No task registration or bootstrap runner test is required. Exit with complete source mapping and concrete reset exclusions.
 
-### RESP-T01 — Prove the pinned reset profile on the actual runtime
+### RESP-T01 — Prove the pinned reset profile on net48
 
-**Files:** central pins, harness project/locks, `RespawnResetProfile.cs`, new Foundation SQL integration checks. **Consumes:** T00 schema/ownership map.
+**Files:** central pin, consuming SQL projects/locks, proposed reset profile and new Foundation integration checks. **Consumes:** T00 schema/ownership map.
 
-- [ ] Add Respawn 4.0.0 to the test graph and prove locked restore/build/testhost loading with netstandard2.0 harness, net48 SQL tests and SqlClient 7.0.2; verify binding redirects/native dependencies and tool-only net8 runner loading.
-- [ ] Implement the v4 reset adapter and the exact StockLedger trigger treatment in section 2. Use an owned, fully migrated test database, a separate open reset connection and finite timeouts; test `Empty_ledger_reset_restores_append_only_trigger` before claiming the Catalog pilot can work.
-- [ ] Test `Reset_clears_all_mutable_rows_preserves_journal_and_owner`, `Repeated_reset_reseeds_actual_identities_and_sequence`, and `Reset_restores_constraints_and_rejects_schema_drift`. Use independent native SQL assertions for unchanged journal contents, state, constraints, trigger definition/enabled status and absence of cross-test sentinel rows.
-- [ ] Inject reset/trigger-restoration timeout/failure; require no test body admission and guarded cleanup/quarantine. Exit only with measured net48 runtime/reset evidence; package metadata alone cannot close this task.
+- [ ] Add Respawn 4.0.0 only to the test graph. Prove locked restore/build/testhost loading under net48 with SqlClient 7.0.2, including native assets and binding redirects.
+- [ ] Implement the v4 adapter and exact StockLedger handling. On a fresh owned fully migrated database, test `Empty_ledger_reset_restores_append_only_trigger` before claiming Catalog reuse works.
+- [ ] Test `Reset_clears_all_mutable_rows_preserves_journal_and_owner`, `Repeated_reset_reseeds_actual_identities_and_sequence` and `Reset_restores_constraints_and_rejects_schema_drift`. Use independent native SQL assertions for journal, owner, constraints, trigger and sentinel rows.
+- [ ] Inject reset/trigger-restoration failure and timeout; prohibit test-body admission, terminate/drain the operation and attempt guarded cleanup. Ambiguous cleanup remains failed/manual review. Exit requires actual net48 reset proof.
 
-### RESP-T02 — Add owned fixture lifecycle and preserve complete runner accounting
+### RESP-T02 — Implement the local collection lifecycle
 
-**Files:** proposed harness lifecycle APIs, allocator, timing types and runner/manifests/tests in section 3. **Consumes:** T01 profile and T00 identities.
+**Files:** local fixture helpers, allocator ownership verification, xUnit adapters and local helper/lifecycle tests. **Consumes:** T01 profile and T00 map.
 
-- [ ] Implement initialization, exclusive test scopes, fresh/reuse parser, per-test seeding, tracked cleanup and terminal poison state. Preserve run-unique ownership checks before reset/drop; new resource APIs must remain compatible with the existing fresh helper and linked consumers.
-- [ ] Add `Second_scope_cannot_overlap`, `Reset_or_seed_failure_poisons_fixture`, `Ownership_change_prevents_reset_ddl`, and `Outstanding_worker_blocks_reset_until_drained` unit/SQL checks. Cancellation must terminate the actual reset operation before another scope can proceed.
-- [ ] Implement the explicit xUnit v2 `RunTestAsync` identity bridge before T03. Map a Fact and at least two rows of the same Theory to their reviewed stable row keys, assign separate execution IDs, and prove a filtered row selection plus reset/seed failure before the scenario runs. Missing/unknown identity must fail before reset or scenario SQL; collection initialization failure must be reported against the selected member inventory even though no per-case helper ran.
-- [ ] Give fixture create/migration/drop events explicit fixture/owner/TFM/run identities and test reset/seed/cleanup events explicit method/row/execution identities. Record allocated fixture ID and profile/mode without publishing database names or tokens. A shared migration must not masquerade as one migration per test.
-- [ ] Update `MigrationInvocationManifest`, its auditor and `MigrationTimingArtifactReconciler`: v1 currently accepts only `once-per-test-execution` / `once-per-caller-execution`, recognizes source literal patterns and scopes entries by source directory. Add a reviewed `once-per-fixture-lifetime` rule and fixture/member identity fields; derive expected allocations/migrations from reviewed collection membership plus run mode, not observed event counts alone. Preserve old rules for unchanged fresh tests and reconcile every selected member. Do not remove the manifest or timing gate.
-- [ ] Update logical-case binding/classification/fingerprint dependencies to include fixture setup, adapters, reset profiles and theory membership. Verify missing/extra/duplicate fixture migrations, unexecuted members, filtered collections, constructor/helper SQL, failed initialization, aborted run and cleanup-only failure; no NonSql exemption may hide fixture SQL.
-- [ ] Register reviewed RESP Task/Final entries and test the actual v1 migration/selection behavior. Keep SQL approval, source/discovery/TRX completeness, zero required skips, process-tree watchdog, workspace/SQL leases and owned cleanup. Exit with focused harness/runner and lifecycle SQL checks; this is not a fingerprint-v2 or inventory-file redesign.
+- [ ] Implement initialization, exclusive test scopes, fresh/reuse parsing, seed, tracked cleanup and terminal poison state. Preserve live ownership before reset/drop and compatibility with existing fresh consumers.
+- [ ] Prove `Second_scope_cannot_overlap`, `Reset_or_seed_failure_poisons_fixture`, `Ownership_change_prevents_reset_ddl` and `Outstanding_worker_blocks_reset_until_drained`. Cancellation must terminate the actual reset before any next scope.
+- [ ] Prove a Fact and two Theory rows each reset/seed before their scenario, including focused row execution and reset/seed failure. Collection initialization failure must surface as failed affected tests; a helper label is diagnostic, not an authorization token.
+- [ ] Record simple per-fixture allocation/migration/drop and per-test reset/seed/cleanup observations through test-owned output/counters. Include mode/profile and non-sensitive case labels. Shared migration occurs once per fixture; do not report it once per member.
+- [ ] Review selected source versus TRX after normal, filtered, failed initialization and cleanup-only failure. No missing required case or skipped failure may become PASS. Keep all support inside existing test owners; do not add external gate, lease, report or reconciliation machinery.
+- [ ] Run focused local helper/adapter tests and affected lifecycle SQL. Exit with a usable exclusive collection contract and visible failure/cleanup behavior.
 
 ### RESP-T03 — Adopt and challenge the Catalog collection
 
-**Files:** Catalog collection/base adapters, both Catalog test classes and case map/manifests. **Consumes:** T02 scopes/accounting.
+**Files:** Catalog adapters and both classes, case map and evidence. **Consumes:** T02 lifecycle.
 
-- [ ] Move the five Catalog methods to the reviewed collection lifecycle, retaining categories, assertions and per-test DI/UoW disposal. Preserve employee-user linkage setup and exact denied-write/table-count expectations; do not share application scopes or test data between methods.
-- [ ] In explicit reuse mode prove one allocation/migration for that collection, a completed reset/seed before each body and one owned drop. Run the same methods in explicit fresh mode to establish behavioral equivalence.
-- [ ] Test a failed assertion followed by a fresh baseline, and injected reset/seed/trigger/schema failures followed by rejected fixture admission. Run controlled reordered/alternating sentinel cases to expose contamination; do not rely on alphabetical xUnit order.
-- [ ] Exercise tracked multi-connection work within a dedicated lifecycle probe, then prove all readers/transactions/workers finish before reset. Retain existing deliberate business-contention tests on fresh databases and keep assembly serialization.
-- [ ] Reconcile source/discovery/TRX/theory/fixture evidence after normal, filtered and failed runs. Exit with all five Catalog methods safely reusable and every failure producing truthful failed/incomplete evidence.
+- [ ] Move all five Catalog methods into one explicit collection, retaining categories, assertions, employee-user setup, denied-write/table-count checks and per-test DI/UoW disposal.
+- [ ] Prove one allocation/migration/drop in reuse mode and a complete reset/seed before every body. Run the same methods in explicit fresh mode with identical assertions.
+- [ ] Prove a failed scenario leaves the next case with a clean baseline; reset/seed/trigger/schema failure rejects subsequent admission. Use controlled sentinel/reordered scenarios without depending on alphabetical test order.
+- [ ] Exercise tracked multi-connection work in a dedicated lifecycle probe; drain all readers/transactions/workers before reset. Existing business-contention cases stay fresh.
+- [ ] Compare selected/executed cases and actual outcomes after normal, focused and failed runs. Exit with all five methods safely reusable and truthful failure evidence.
 
 ### RESP-T04 — Extend reuse to the proven data-only inventory
 
-**Files:** reviewed Inventory/Security adapters and methods, case map, reset/seed profiles and affected manifests. **Consumes:** accepted Catalog lifecycle.
+**Files:** reviewed Inventory/Security methods/adapters, profiles, case map and evidence. **Consumes:** accepted Catalog lifecycle.
 
-- [ ] Adopt the reviewed Inventory query group and eligible data-only mapping/storage cases; reset seeded receipts, ledger, balances, references and generated values. Preserve rowversion comparisons as relative to values read during that test.
-- [ ] Adopt proven Identity/data-only Security methods with deterministic user/role/assignment/binding/audit seeds. Keep bootstrap/maintenance, SQL principal/grant/schema and test-injected trigger methods fresh; split mixed classes only with explicit logical-case mappings.
-- [ ] Migrate every eligible case in the T00 map or record its concrete exclusion/failure evidence; completion cannot stop at a trivial pilot when further reviewed candidates meet the contract. Keep the original fresh path available through explicit mode selection.
-- [ ] Run each affected owner's smallest supported guarded categories, plus reset contamination/failure checks for its added state. Revalidate profiles when schema/seed dependencies expand; never reuse cached metadata after a profile change.
-- [ ] Review new/moved fingerprints and theory mappings, check linked helper consumers, and freeze the complete candidate with `reuse` selected by default for accepted eligible profiles and `fresh` for dedicated exceptions. Include the default-selection change before T05 runs so its evidence belongs to that candidate. Exit with no unaccounted case or assertion loss and a documented final reuse boundary.
+- [ ] Adopt eligible Inventory queries/data-only mapping/storage with full receipt/ledger/balance/reference reset; compare rowversions relative to values read in the test.
+- [ ] Adopt proven Identity/data-only Security methods with deterministic seeds. Keep bootstrap/maintenance, principal/grant/schema and test-injected trigger methods fresh; explain moved/replaced cases.
+- [ ] Migrate every eligible T00 case or record concrete exclusion/failure evidence. Retain the explicit fresh path; do not stop at a trivial pilot when further reviewed candidates meet the contract.
+- [ ] Run focused actual project/category or method checks plus contamination/failure cases for added state. Revalidate profiles when schema/seed dependencies expand; cached metadata cannot cross a profile change.
+- [ ] Review source/Theory coverage and linked consumers; freeze the candidate with reuse as default for accepted profiles and fresh for exceptions. Include that default change before T05. Exit with no unexplained lost case/assertion.
 
-### RESP-T05 — Accept correctness and measure the same inventory
+### RESP-T05 — Accept correctness and compare the same cases
 
-**Files:** final case map, sanitized verification, task/status checkboxes and current testing guidance. **Consumes:** frozen T04 revision and reviewed RESP gates.
+**Files:** final case map, sanitized verification, testing guidance and supported status changes. **Consumes:** frozen T04 candidate.
 
-- [ ] Build the affected harness/runner/all-six-SQL project matrix and run complete affected harness/runner regressions plus metadata-only SQL preflight. Keep clean revision and approved short artifact roots; metadata PASS is not SQL execution.
-- [ ] Run one complete guarded, unfiltered sequential net48 SQL pass in explicit `fresh` mode, then one in explicit `reuse` mode on the same frozen candidate and logical-case inventory. All six owners participate; unconverted cases stay fresh in both. Preserve original discovery/TRX, zero required skips, watchdog and ownership evidence.
-- [ ] Compare wall time and create/migrate/reset/seed/drop counts/durations, with fixture and case identity mappings. Report the exact two observations and their limits; require measured improvement for a performance claim, without a percentage threshold or mandatory multi-pass benchmark. Record a regression as a failed optimization outcome requiring investigation, not an automatic waiver.
-- [ ] Require identical behavioral results and complete test/fixture accounting, no contamination, no outstanding sessions/owned databases and a proven fresh-mode fallback. Correctness or cleanup failures block acceptance even if timing improves. Repeat a pass only to resolve an invalid run, relevant fix or concrete regression question.
-- [ ] Verify that the frozen candidate defaults to `reuse` for accepted eligible profiles and retains explicit `fresh` mode plus dedicated fresh exceptions; update current guidance and hand off the accepted fixture baseline to L2DB. Verify default-mode selection with focused parser/adapter checks; document that the complete same-inventory comparison above used explicit modes. Do not claim P5/P6/P7, GUI acceptance or product performance from this test-only change. SQL/harness changes require the broad SQL gate here; unrelated full Desktop/repository suites are not automatic requirements.
+- [ ] Locked restore/build all six SQL projects and verify the required source cases and mode selections. Inspect discovery if needed; discovery alone is not SQL acceptance.
+- [ ] Run one unfiltered sequential net48 pass across all six owners in explicit fresh mode, then one in explicit reuse mode on the same candidate. Unconverted cases remain fresh in both. Require every mandatory Fact/Theory row, zero mandatory skips and successful owned cleanup.
+- [ ] Compare case outcomes, wall-clock observations and create/migrate/reset/seed/drop counts/durations. State limits of the two observations; require actual improvement for a speedup claim. Investigate regressions; do not auto-waive them or impose an old percentage threshold.
+- [ ] Require equivalent behavior, no contamination, drained sessions, no unresolved owned allocations and proven explicit fresh mode. Failure or incomplete cleanup blocks acceptance even if timing improves. Repeat only for invalid evidence, relevant repairs or a concrete regression question.
+- [ ] Verify default reuse for accepted profiles with focused parser/adapter checks and preserve dedicated fresh exceptions. Update current guidance and hand the exact accepted baseline to L2DB. No P5/P6/P7, GUI or product-performance acceptance follows from this test-only work.
 
-## 6. Execution scopes and current tooling boundary
+## 6. Direct execution scopes
 
-| Task | Focused checks during implementation | Required SQL evidence |
+| Task | Focused verification | SQL evidence |
 |---|---|---|
-| T00 | Static case/dependency/schema audit; existing runner manifest-contract selectors if modified | No automatic SQL run for planning; define the comparison protocol. |
-| T01 | Package/build and reset-profile tests on affected actual TFMs | Foundation `FastSQL` reset probes through the guarded wrapper; destructive probes own fresh databases. |
-| T02 | Harness lifecycle/parser/timing tests; affected runner inventory/reconciliation/lease tests | Foundation lifecycle/reset safety cases and categories actually changed in shared helper consumers. |
-| T03 | Catalog adapter/setup and selected accounting cases | Catalog `FastSQL`; controlled dedicated fixture lifecycle/failure probes. |
-| T04 | Affected Inventory/Security profiles and case mappings | Inventory `FastSQL`; Security's source-reviewed applicable category (currently many data methods are `SecurityProvisioning`); fresh mutation cases remain covered. |
-| T05 | Complete affected harness/runner checks; full source/discovery preflight | One fresh + one reuse full pass across Foundation, Catalog, Inventory, Security, Migrations and original IntegrationTests, all `net48`. |
+| T00 | Source/case/schema/package audit and resolvable command selection | No automatic SQL run merely for planning |
+| T01 | Actual net48 package/build and profile checks | Foundation reset probes on dedicated fresh databases |
+| T02 | Local lifecycle/parser/adapter tests | Foundation lifecycle/reset safety plus affected shared helper consumers |
+| T03 | Catalog adapter and selected lifecycle cases | Catalog `FastSQL`, dedicated failure/worker probes |
+| T04 | Changed Inventory/Security profiles and case map | Source-reviewed applicable categories/methods; many Security data cases use `SecurityProvisioning` |
+| T05 | All affected lifecycle tests and reviewed source/case inventory | Complete Foundation, Catalog, Inventory, Security, Migrations and original IntegrationTests in each explicit mode |
 
-Follow [tests/README](../../tests/README.md) for operator preparation and full parameter reference. Currently the focused wrapper accepts one project plus one category, not arbitrary SQL method/class selectors; its default includes parked net8, so explicitly pass `-Frameworks @('net48')`. Build the selected project and Release net8 runner first. With the existing SQL/approval environment prepared, this Catalog command already exists:
+Use [tests/README](../../tests/README.md) for SQL configuration and the sequential complete-project loop. Current focused Catalog command:
 
 ```powershell
-$repo = (Get-Location).Path
-$project = Join-Path $repo 'tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj'
-$artifacts = Join-Path $repo ('.sqlperf\resp-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
-& ./tests/tools/Invoke-FocusedSqlIntegrationTests.ps1 -RepositoryRoot $repo `
-  -TestProject $project -ArtifactRoot $artifacts `
-  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
-  -Category FastSQL -Frameworks @('net48')
+$project = 'tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj'
+dotnet restore $project --locked-mode
+if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed.' }
+dotnet test $project -c Release -f net48 --no-restore `
+  --filter 'Category=FastSQL' --logger 'trx;LogFileName=catalog.trx' `
+  --results-directory ('TestResults/resp-' + [guid]::NewGuid().ToString('N').Substring(0,8))
+if ($LASTEXITCODE -ne 0) { throw 'Catalog SQL tests failed.' }
 ```
 
-`Invoke-TestGate.ps1` still selects exact manifest PlanId/TaskId identities with no caller project/filter/TFM override. Its current `Final` requires clean committed revision, approved SQL and complete unfiltered SQL ownership; `Final -PreflightOnly` allows dirty/no-SQL-approval metadata checks only. Existing SEC-REBUILD-T06 Final is the legacy six-owner envelope and includes other gates. It is not a registered RESP milestone. T02 must deliberately register/adapt the new scope; until then use current guarded capabilities and describe their broader enforcement honestly. Never bypass their checks to approximate the new policy.
+After T02 implements the setting, the T05 comparison sets `MYDMSVN_SQL_TEST_FIXTURE_MODE=fresh`, executes the complete six-project loop, then repeats with `reuse` and a separate results directory. Record/restore the caller's prior setting afterward. This is a planned protocol, not a currently supported command switch.
 
-Existing focused runs have 30-minute command / one-hour overall limits; lower strict PR runs have 30-minute command / four-hour overall limits; manifest runs use reviewed gate budgets. Preserve bounded cleanup (currently 30 seconds for post-run ownership reconciliation), path budgets and leases while adding reset-specific timeouts. Keep raw approval, ownership, TRX and timing evidence local and publish reviewed sanitized aggregate results with the exact revision, mode, scope and pass/fail/skip/blocked status. This documentation change itself runs no tests and closes none of the implementation checkboxes above.
+Use the designated non-production master connection, short unique local result paths and finite reset/SQL bounds. Keep raw connections, SQL identifiers, Theory values and TRX local; publish sanitized revision/mode/scope/count/cleanup observations. Missing Windows/SQL or failed required cleanup is BLOCKED / NOT RUN or FAIL as appropriate. All implementation checkboxes remain open.

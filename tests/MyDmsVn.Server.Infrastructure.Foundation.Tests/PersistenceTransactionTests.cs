@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Data;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -173,23 +172,28 @@ public sealed class PersistenceTransactionTests
         return services.BuildServiceProvider();
     }
 
-    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            TestDatabaseMigrationRunner.Migrate(
-                database.MeasurementContext,
-                "PersistenceTransactionTests.CreateMigratedDatabaseAsync.migration-01",
-                database.ConnectionString);
+            TestDatabaseMigrationRunner.Migrate(database.ConnectionString);
         }
-        catch
+        catch (Exception setupError)
         {
-            await database.DisposeAsync();
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupError)
+            {
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
+            }
+
             throw;
         }
 

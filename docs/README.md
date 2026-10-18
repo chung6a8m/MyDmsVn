@@ -12,7 +12,7 @@
 | [Development plan](DEVELOPMENT_PLAN.md) | Scope, dependencies and completion meaning |
 | [Test policy](TEST_POLICY.md) | When and what to test; sole execution policy |
 | [Test coverage](TEST_STRATEGY.md) | Required behavior and failure cases |
-| [Test commands](../tests/README.md) | Available tooling and transition constraints |
+| [Test commands](../tests/README.md) | Direct project/filter commands, SQL configuration and local cleanup constraints |
 
 ## Product and implementation references
 

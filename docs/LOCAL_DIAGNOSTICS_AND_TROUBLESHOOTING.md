@@ -1,6 +1,6 @@
 # Diagnostics, security audit và troubleshooting cho Local Mode v1
 
-**Hiện trạng:** `v1a`, cập nhật 2026-10-18. Host active là `MyDmsVn.Desktop.App` (`net48`/x86). AppCore (`net8.0-windows`) parked ngoài solution/release; runner `net8.0` không phải product host. SEC-REBUILD đã được chấp nhận trong PR #34, còn P5/P6 operational/release evidence được giữ **OPEN / DEFERRED** tại [DEFERRED_WORK](DEFERRED_WORK.md). Xem [HISTORY](HISTORY.md) cho bằng chứng lịch sử.
+**Hiện trạng:** `v1a`, cập nhật 2026-10-18. Host active là `MyDmsVn.Desktop.App` (`net48`/x86). AppCore (`net8.0-windows`) parked ngoài solution/release. SEC-REBUILD đã được chấp nhận trong PR #34, còn P5/P6 operational/release evidence được giữ **OPEN / DEFERRED** tại [DEFERRED_WORK](DEFERRED_WORK.md). Xem [HISTORY](HISTORY.md) cho bằng chứng lịch sử.
 
 ## Log và retention
 
@@ -64,6 +64,6 @@ Khi gửi log cho support:
 | Logging/audit degradation | `Diagnostics.FileSinkUnavailable` hoặc `Diagnostics.AuditFileSinkUnavailable`, ACL/disk quota/path | Khôi phục quyền/dung lượng/đường dẫn, restart process, xác nhận file mới trước khi coi sink healthy |
 | Crash recovery | Trace fallback và log cuối cùng | Ghi correlation/time, restart; kiểm tra schema và trạng thái Post trước retry |
 
-Không mở modal từ logging/audit failure. Modal startup hiện hữu chỉ chứa safe code/message; active executable nhận `--smoke-test` để ghi lỗi startup vào stderr thay cho modal. Kiểm tra unattended vẫn phải giữ process watchdog theo [TEST_POLICY](TEST_POLICY.md) và [tests/README](../tests/README.md); switch này không thay thế bằng chứng packaged login/GUI.
+Không mở modal từ logging/audit failure. Modal startup hiện hữu chỉ chứa safe code/message; active executable nhận `--smoke-test` để ghi lỗi startup vào stderr thay cho modal. Nếu bổ sung probe fatal-process hoặc tác vụ không thể dừng hợp tác, test phải tự sở hữu subprocess có timeout và cleanup; không giả định helper STA có thể dừng mọi process/thread. Khi kiểm tra smoke thủ công, ghi rõ thời hạn, cách dừng process nếu treo và kết quả cleanup; framework cũ đã bị xóa nên không có launcher/watchdog bên ngoài. [TEST_POLICY](TEST_POLICY.md) và [tests/README](../tests/README.md) mô tả cách chạy hiện tại. Switch này không thay thế bằng chứng packaged login/GUI.
 
 Log-path/full-disk, recovery và installed-runtime checks còn mở trong [P6 deferred work](DEFERRED_WORK.md). Support evidence phải ghi đúng revision/package, thời gian, safe code/correlation và kết quả quan sát; không dùng bằng chứng AppCore lịch sử như một lần chạy net48 hiện tại.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
@@ -19,7 +19,7 @@ internal static class SqlTestDatabaseName
             !Guid.TryParseExact(databaseName.Substring(Prefix.Length), "N", out _))
         {
             throw new InvalidOperationException(
-                "Refusing to dispose a database that was not named by the MyDmsVn test harness.");
+                "Refusing to dispose a database that was not named by the MyDmsVn test database helper.");
         }
     }
 }

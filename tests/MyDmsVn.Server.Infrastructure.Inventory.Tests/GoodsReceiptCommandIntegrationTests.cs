@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -1863,22 +1862,30 @@ public sealed class GoodsReceiptCommandIntegrationTests
             note,
             new[] { new SaveGoodsReceiptLineRequest(productId, 1m, 2m) });
 
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "GoodsReceiptCommandIntegrationTests.CreateDatabaseAsync.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             return database;
         }
-        catch
+        catch (Exception setupError)
         {
-            await database.DisposeAsync();
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupError)
+            {
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
+            }
+
             throw;
         }
     }

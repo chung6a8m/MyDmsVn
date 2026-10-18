@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit.Abstractions;
@@ -19,13 +19,11 @@ public sealed class SqlServerFactAttribute : FactAttribute, ITraitAttribute
             ? categories
             : new[] { SqlTestCategory.FastSql };
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
-                SqlTestDatabase.ConnectionStringEnvironmentVariable)) ||
-            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
-                SqlTestDatabase.ApprovalFileEnvironmentVariable)))
+                SqlTestDatabase.ConnectionStringEnvironmentVariable)))
         {
             Skip =
-                $"Set {SqlTestDatabase.ConnectionStringEnvironmentVariable} to a SQL Server master-database connection string " +
-                $"and {SqlTestDatabase.ApprovalFileEnvironmentVariable} to a separately maintained non-production approval file.";
+                $"Set {SqlTestDatabase.ConnectionStringEnvironmentVariable} to a master-database connection string " +
+                "for a designated non-production SQL Server test instance.";
         }
     }
 

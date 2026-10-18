@@ -29,7 +29,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
 | `desktop-net48-win-x86` | `MyDmsVn.Desktop.App.exe` | x86 | publish directory | .NET Framework 4.8 |
 | `admin-migrator-net48-win-x86` | `MyDmsVn.Server.DbMigrator.exe` | x86 | publish directory, admin only | .NET Framework 4.8 |
 
-`MyDmsVn.Desktop.AppCore` / `net8.0-windows` nằm ngoài solution/release và được ghi **PARKED / NOT RUN / NOT SHIPPED**. Runner/test runner `net8.0` là tooling, không phải product package. Việc khôi phục host hiện đại đi qua [REACTIVATE_NET8](REACTIVATE_NET8.md).
+`MyDmsVn.Desktop.AppCore` / `net8.0-windows` nằm ngoài solution/release và được ghi **PARKED / NOT RUN / NOT SHIPPED**. SDK .NET 8 dùng để build, không phải product package. Việc khôi phục host hiện đại đi qua [REACTIVATE_NET8](REACTIVATE_NET8.md).
 
 Native/transitive DLL và cấu hình executable phải đi cùng publish directory. Máy đích cần .NET Framework 4.8, không cần SDK/Visual Studio theo mô hình triển khai dự kiến; clean-machine evidence vẫn phải chứng minh điều đó. Chỉ công bố OS/architecture/runtime được xác nhận trong release matrix P6, không suy diễn support từ build trên developer machine.
 

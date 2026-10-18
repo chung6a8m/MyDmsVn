@@ -7,7 +7,7 @@
 
 The active first-party product, SQL-test and WinForms target is **net48**. Keep Desktop.App as the shipped desktop and DbMigrator as a separate net48 administrator package. AppCore source remains parked outside solution/release; historical product net8/net8-windows cases are PARKED / NOT RUN.
 
-The SQL runner and runner tests continue on tool-only net8.0, and the shared SQL harness stays netstandard2.0. Tool-host tests do not prove product runtime coverage. Preserve vendor source/targets and use the appropriate active host references; no vendor rewrite or SDK downgrade is implied.
+All ten remaining test projects target net48 after the owner's complete removal of the former SQL framework on 2026-10-18. The .NET 8 SDK remains a build dependency; it does not establish modern product coverage. Preserve vendor source/targets and use the appropriate active host references; no vendor rewrite or SDK downgrade is implied.
 
 The owner reaffirmed active net48 when approving L2DB option 3A and the v1a roadmap. Neither Respawn compatibility nor LINQ to DB adoption authorizes modern-target reactivation or a .NET 10 upgrade.
 

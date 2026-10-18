@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Dapper;
 using DbUp;
@@ -27,7 +26,7 @@ public sealed class DatabaseMigrationTests
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Unmanaged_alias_type_is_rejected_without_creating_the_journal.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
 
             Assert.Equal("Migration.UnknownHistory", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
@@ -60,7 +59,7 @@ public sealed class DatabaseMigrationTests
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Unmanaged_database_ddl_trigger_is_rejected_without_creating_the_journal.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
 
             Assert.Equal("Migration.UnknownHistory", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
@@ -90,7 +89,7 @@ public sealed class DatabaseMigrationTests
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Managed_name_with_wrong_object_type_is_rejected_without_creating_the_journal.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
 
             Assert.Equal("Migration.UnknownHistory", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
@@ -120,7 +119,7 @@ public sealed class DatabaseMigrationTests
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Unmanaged_synonym_is_rejected_without_creating_the_journal.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
 
             Assert.Equal("Migration.UnknownHistory", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
@@ -152,7 +151,7 @@ public sealed class DatabaseMigrationTests
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Nonempty_unmanaged_database_outside_dbo_is_rejected_without_touching_existing_data.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
 
             Assert.Equal("Migration.UnknownHistory", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
@@ -182,7 +181,7 @@ public sealed class DatabaseMigrationTests
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Nonempty_unmanaged_database_is_rejected_without_touching_existing_data.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
 
             Assert.Equal("Migration.UnknownHistory", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
@@ -204,7 +203,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var initial = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Migrator_rejects_future_history_without_mutating_existing_data.migration-01", database.ConnectionString);
+            var initial = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(initial.Successful, initial.Error?.ToString());
             using (var connection = new SqlConnection(database.ConnectionString))
             {
@@ -215,7 +214,7 @@ public sealed class DatabaseMigrationTests
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Migrator_rejects_future_history_without_mutating_existing_data.migration-02", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
 
             Assert.Equal("Migration.SchemaTooNew", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
@@ -237,7 +236,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var initial = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Migrator_rejects_partial_schema_without_rewriting_journal.migration-01", database.ConnectionString);
+            var initial = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(initial.Successful, initial.Error?.ToString());
             using (var connection = new SqlConnection(database.ConnectionString))
             {
@@ -246,7 +245,7 @@ public sealed class DatabaseMigrationTests
             }
 
             var exception = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Migrator_rejects_partial_schema_without_rewriting_journal.migration-02", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
 
             Assert.Equal("Migration.PartialSchema", exception.Code);
             using var verification = new SqlConnection(database.ConnectionString);
@@ -282,7 +281,7 @@ public sealed class DatabaseMigrationTests
             Assert.True(lockResult >= 0, $"Unable to establish the test migration lock: {lockResult}.");
 
             var exception = Assert.Throws<DatabaseMigrationConcurrencyException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Competing_migrator_is_rejected_until_the_deployment_lock_is_released.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
             Assert.Equal("Migration.AlreadyRunning", exception.Code);
             Assert.DoesNotContain(database.ConnectionString, exception.Message, StringComparison.Ordinal);
 
@@ -290,7 +289,7 @@ public sealed class DatabaseMigrationTests
                 "EXEC sys.sp_releaseapplock " +
                 "@Resource = N'MyDmsVn.SchemaMigration', @LockOwner = N'Session';");
 
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Competing_migrator_is_rejected_until_the_deployment_lock_is_released.migration-02", database.ConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
             Assert.Equal(9, result.Scripts.Count());
         }
@@ -312,7 +311,7 @@ public sealed class DatabaseMigrationTests
         }.ConnectionString;
         try
         {
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Successful_migration_releases_session_lock_before_connection_is_pooled.migration-01", pooledConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(pooledConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
 
             var independentConnectionString = new SqlConnectionStringBuilder(database.ConnectionString)
@@ -346,10 +345,7 @@ public sealed class DatabaseMigrationTests
         try
         {
             var assembly = typeof(DatabaseMigrationRunner).Assembly;
-            var prefix = MeasuredDatabaseMigrationRunner.Execute(
-                database.MeasurementContext,
-                "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.direct-prefix",
-                () => DeployChanges.To
+            var prefix = DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScriptsEmbeddedInAssembly(
                     assembly,
@@ -362,7 +358,7 @@ public sealed class DatabaseMigrationTests
                 .WithTransactionPerScript()
                 .LogToNowhere()
                 .Build()
-                .PerformUpgrade());
+                .PerformUpgrade();
             Assert.True(prefix.Successful, prefix.Error?.ToString());
 
             var runnerConnectionString = new SqlConnectionStringBuilder(database.ConnectionString)
@@ -381,7 +377,7 @@ public sealed class DatabaseMigrationTests
             {
                 try
                 {
-                    return MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.migration-01", runnerConnectionString).Successful;
+                    return new DatabaseMigrationRunner().Migrate(runnerConnectionString).Successful;
                 }
                 catch (SqlException)
                 {
@@ -415,7 +411,7 @@ public sealed class DatabaseMigrationTests
                 "SELECT OBJECT_ID(N'dbo.StockLedger', N'U');"));
 
             var recovery = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Losing_the_migration_lock_session_stops_schema_preflight.migration-02", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
             Assert.Equal("Migration.UnsupportedExistingDatabase", recovery.Code);
         }
         finally
@@ -455,11 +451,9 @@ public sealed class DatabaseMigrationTests
             "Server=invalid.invalid;User ID=test;Password=test;Connect Timeout=1;Encrypt=false");
 
     private static void AssertSystemDatabaseRejected(
-        string connectionString,
-        [CallerMemberName] string testCaseId = "")
+        string connectionString)
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
-        Assert.Throws<ArgumentException>(() => MeasuredDatabaseMigrationRunner.Migrate(measurement, "DatabaseMigrationTests.System_or_unspecified_database_is_rejected_before_connecting.migration-01", connectionString));
+        Assert.Throws<ArgumentException>(() => new DatabaseMigrationRunner().Migrate(connectionString));
     }
 
     private static async Task<int> WaitForSessionAsync(
@@ -489,14 +483,8 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var first = MeasuredDatabaseMigrationRunner.Migrate(
-                database.MeasurementContext,
-                "DatabaseMigrationTests.Clean_migration_applies_once_and_repeat_is_a_no_op.migration-01",
-                database.ConnectionString);
-            var second = MeasuredDatabaseMigrationRunner.Migrate(
-                database.MeasurementContext,
-                "DatabaseMigrationTests.Clean_migration_applies_once_and_repeat_is_a_no_op.migration-02",
-                database.ConnectionString);
+            var first = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            var second = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
 
             Assert.True(first.Successful, first.Error?.ToString());
             Assert.Equal(9, first.Scripts.Count());
@@ -541,7 +529,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Goods_receipt_migration_enforces_aggregate_keys_checks_and_rowversion.migration-01", database.ConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
 
@@ -697,7 +685,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Identity_migration_creates_required_tables_and_enforces_unique_normalized_names.migration-01", database.ConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
 
             Assert.True(result.Successful, result.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
@@ -745,7 +733,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Catalog_migration_creates_empty_tables_and_enforces_code_uniqueness_and_employee_user_fk.migration-01", database.ConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
 
             Assert.True(result.Successful, result.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
@@ -837,7 +825,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Catalog_required_text_rejects_display_whitespace_only_values.migration-01", database.ConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             var invalidInserts = new[]
@@ -873,7 +861,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Catalog_searchable_text_rejects_nul_values_at_database_boundary.migration-01", database.ConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             var invalidInserts = new[]
@@ -909,7 +897,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Every_catalog_code_is_unique_case_and_accent_insensitively.migration-01", database.ConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             var catalogInserts = new[]
@@ -951,7 +939,7 @@ public sealed class DatabaseMigrationTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var result = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "DatabaseMigrationTests.Employee_user_link_allows_many_nulls_but_only_one_employee_per_user.migration-01", database.ConnectionString);
+            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             var userId = await connection.QuerySingleAsync<int>(

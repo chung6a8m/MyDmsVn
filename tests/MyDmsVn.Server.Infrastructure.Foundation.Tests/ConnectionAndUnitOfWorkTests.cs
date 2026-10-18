@@ -1,6 +1,5 @@
-using System;
+﻿using System;
 using System.Data;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -119,12 +118,9 @@ public sealed class ConnectionAndUnitOfWorkTests
         return new SqlUnitOfWorkFactory(new SqlConnectionFactory(connectionString));
     }
 
-    private static Task<SqlTestDatabase> CreateDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static Task<SqlTestDatabase> CreateDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         return SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
     }
 }
