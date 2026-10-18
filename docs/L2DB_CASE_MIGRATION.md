@@ -768,3 +768,12 @@ T06 removal obligation: remove `Pilot/ProductPilot.cs`, `Pilot/ReceiptPilot.cs`,
 The owner authorized repair of the blocker after commit `b1a8834e0e9645220da45c07046a0107abd532cc`. The existing logical ID `S:SecurityPilotParityTests.Security_pilot_identifies_legacy_missing_target_error_translation_gap` now maps to successor method `Security_pilot_preserves_missing_target_error_translation_for_users_and_roles` in the same source file. This is one retained single-row Fact, not a deletion plus a new acceptance count. All source totals remain 636 method IDs / 287 six-owner invocations.
 
 The successor asserts Security.TargetNotFound / ErrorType.NotFound for missing User and Role on both providers, with independent native absence checks and explicit Users.Manage/Roles.Manage actor grants; a subsequent successful Role read preserves both result sets. Separate old/candidate fresh owned allocations remain. The production baseline repair consumes the empty first grid so deferred SQL 51031 reaches the unchanged store mapper. No SQL, grants, fixtures, provider registration, packages or UoW changes. Historical NO-GO characterization above describes the pre-repair revision; it no longer describes the current test assertion. Package startup remains a separate prerequisite before GO. [Repair verification](L2DB_VERIFICATION.md#l2db-t02-blocker-repair--l2db-pilot-01).
+
+
+## T02 startup metadata follow-up
+
+One new non-SQL packaging boundary; all previous logical IDs/rows remain. Current all-owner total: **637 method IDs**. W source adds one single-row Fact; six SQL-owner counts remain 256 methods / 287 invocations. Existing Manifest_only_mode assertions now compare min/max and ordered requiredScripts with the actual runtime policy; its copied fixture policy has 32BITREQUIRED to cover net48/x86 publication from PS64. [Evidence](L2DB_VERIFICATION.md#l2db-t02-startup-follow-up--runtime-identity-and-schema-manifest).
+
+| Logical ID / source | Row | Resource / category | Decision |
+|---|---|---|---|
+| `W:ReleasePackagingTests.Packages_without_runtime_schema_policy_are_rejected` ([source](../tests/MyDmsVn.Desktop.Tests/ReleasePackagingTests.cs)) | single | pure / - | Add; refuse manifest generation without authoritative shipped runtime policy |

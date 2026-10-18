@@ -2,7 +2,7 @@
 
 **Hiện trạng:** Nhánh `v1a`, cập nhật 2026-10-18. Script đóng gói hiện có chỉ tạo desktop và admin migrator `net48`/x86. SEC-REBUILD đã được chấp nhận trong PR #34; P5 interactive và P6 operational/release vẫn **OPEN / DEFERRED** trong [DEFERRED_WORK](DEFERRED_WORK.md). Lịch sử bằng chứng nằm ở [HISTORY](HISTORY.md); tài liệu này không chứng nhận clean install, upgrade hay production release.
 
-**Release blocker đang mở:** `Publish-LocalRelease.ps1` vẫn ghi schema `8..8`, trong khi runtime yêu cầu scripts `001`–`009`. Theo dõi `RELEASE-MANIFEST-01` trong [deferred work](DEFERRED_WORK.md#release-manifest-01--observed-schema-metadata-discrepancy). Chênh lệch này chưa được sửa bằng code; không dùng manifest đang phát sinh để xác nhận package tương thích runtime hiện tại.
+**RELEASE-MANIFEST-01:** Script đã sửa nguồn metadata: đọc `SchemaCompatibilityPolicy.CurrentScripts` từ DLL admin đã đóng gói qua helper PowerShell x86, thay cho pin `8..8`. Test packaging x86 đã đạt; đối chiếu artifact từ commit sạch còn chờ trong [L2DB evidence](L2DB_VERIFICATION.md#l2db-t02-startup-follow-up--runtime-identity-and-schema-manifest). Chưa có release acceptance.
 
 ## Release artifacts
 
@@ -33,7 +33,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
 
 Native/transitive DLL và cấu hình executable phải đi cùng publish directory. Máy đích cần .NET Framework 4.8, không cần SDK/Visual Studio theo mô hình triển khai dự kiến; clean-machine evidence vẫn phải chứng minh điều đó. Chỉ công bố OS/architecture/runtime được xác nhận trong release matrix P6, không suy diễn support từ build trên developer machine.
 
-`release-manifest.json` ghi kiến trúc/runtime, deployment mode và SHA-256/length của từng file. Phần `schemaSupport` hiện vẫn là `minimum: 8`, `maximum: 8` với wording P3.1 đã lỗi thời; runtime [schema contract](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) là `001`–`009`. `RELEASE-MANIFEST-01` yêu cầu sửa nguồn metadata và kiểm tra artifact sinh ra trước release acceptance. Không sửa riêng file manifest bằng tay để che lệch nguồn.
+`release-manifest.json` ghi kiến trúc/runtime, deployment mode và SHA-256/length của từng file. Phần `schemaSupport` lấy `minimum`, `maximum` và `requiredScripts` theo runtime policy trong DLL admin của package; hiện là schema 9 với scripts `001`–`009`. Helper x86 đọc được DLL net48/x86 cả khi script chạy từ PowerShell 64-bit, có thời hạn và từ chối policy thiếu/rỗng. Đối chiếu [schema contract](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) và artifact sinh ra; không sửa manifest bằng tay.
 
 Danh sách SQL versions đã xác minh vẫn rỗng; SQL support/recovery validation còn mở. Script hiện không thực hiện signing và manifest ghi trạng thái unsigned cần owner acceptance; quyết định trust-chain/signing thuộc release gate. `-SkipPublish` chỉ xử lý các thư mục artifact đã có và tái tạo manifest cho kiểm tra, có thể ghi `sourceTreeDirty: true`; nó không chứng minh đã publish từ revision sạch hoặc hoàn thành acceptance.
 

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')]
@@ -163,6 +163,64 @@ foreach ($directory in @($net48Directory, $adminDirectory)) {
 
 Assert-DesktopArtifactSafe $net48Directory
 
+# Use the policy shipped in this admin package, rather than a second schema version pin.
+$schemaPolicyAssemblyPath = Join-Path $adminDirectory 'MyDmsVn.Server.Infrastructure.dll'
+if (-not (Test-Path -LiteralPath $schemaPolicyAssemblyPath -PathType Leaf)) {
+    throw 'Release.SchemaPolicyMissing: admin package must contain the runtime schema policy assembly.'
+}
+# Published assemblies require x86, including when the publishing shell is 64-bit.
+$schemaReaderExecutable = if ([Environment]::Is64BitOperatingSystem) {
+    Join-Path $env:WINDIR 'SysWOW64/WindowsPowerShell/v1.0/powershell.exe'
+} else {
+    Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe'
+}
+if (-not (Test-Path -LiteralPath $schemaReaderExecutable -PathType Leaf)) {
+    throw 'Release.SchemaPolicyReaderMissing: x86 Windows PowerShell is required for the net48 package.'
+}
+$schemaReaderScript = @'
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$assembly = [System.Reflection.Assembly]::LoadFrom('__POLICY_PATH__')
+$policy = $assembly.GetType('MyDmsVn.Server.Infrastructure.Operations.SchemaCompatibilityPolicy', $true)
+[pscustomobject]@{ bitness = [IntPtr]::Size * 8; scripts = @($policy.GetField('CurrentScripts').GetValue($null)) } | ConvertTo-Json -Compress
+'@
+$schemaReaderScript = $schemaReaderScript.Replace('__POLICY_PATH__', $schemaPolicyAssemblyPath.Replace("'", "''"))
+$schemaReaderEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($schemaReaderScript))
+$schemaReader = New-Object System.Diagnostics.Process
+try {
+    $schemaReader.StartInfo.FileName = $schemaReaderExecutable
+    $schemaReader.StartInfo.Arguments = '-NoProfile -NonInteractive -EncodedCommand ' + $schemaReaderEncoded
+    $schemaReader.StartInfo.UseShellExecute = $false
+    $schemaReader.StartInfo.CreateNoWindow = $true
+    $schemaReader.StartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    $schemaReader.StartInfo.RedirectStandardOutput = $true
+    $schemaReader.StartInfo.RedirectStandardError = $true
+    [void] $schemaReader.Start()
+    $schemaOutput = $schemaReader.StandardOutput.ReadToEndAsync()
+    $schemaError = $schemaReader.StandardError.ReadToEndAsync()
+    if (-not $schemaReader.WaitForExit(30000)) {
+        $schemaReader.Kill()
+        [void] $schemaReader.WaitForExit(10000)
+        throw 'Release.SchemaPolicyReadFailed: policy reader exceeded its time bound.'
+    }
+    $schemaOutputText = $schemaOutput.GetAwaiter().GetResult()
+    $schemaErrorText = $schemaError.GetAwaiter().GetResult()
+    if ($schemaReader.ExitCode -ne 0 -or -not [string]::IsNullOrWhiteSpace($schemaErrorText)) {
+        throw 'Release.SchemaPolicyReadFailed: cannot read the policy from the shipped admin assembly.'
+    }
+    $schemaPolicy = $schemaOutputText | ConvertFrom-Json
+    if ($schemaPolicy.bitness -ne 32) {
+        throw 'Release.SchemaPolicyReadFailed: policy reader must run as x86.'
+    }
+    $requiredSchemaScripts = @($schemaPolicy.scripts)
+}
+finally {
+    $schemaReader.Dispose()
+}
+if ($requiredSchemaScripts.Count -eq 0) {
+    throw 'Release.SchemaPolicyMissing: runtime schema policy has no required scripts.'
+}
+
 $manifest = [ordered]@{
     product = 'MyDmsVn Local v1'
     productVersion = $Version
@@ -170,9 +228,10 @@ $manifest = [ordered]@{
     sourceTreeDirty = $sourceTreeDirty
     generatedAtUtc = [DateTime]::UtcNow.ToString('o')
     schemaSupport = [ordered]@{
-        minimum = 8
-        maximum = 8
-        compatibilityPolicy = 'Exact schema 8 for the P3.1 release baseline'
+        minimum = $requiredSchemaScripts.Count
+        maximum = $requiredSchemaScripts.Count
+        requiredScripts = $requiredSchemaScripts
+        compatibilityPolicy = 'Exact runtime schema from SchemaCompatibilityPolicy.CurrentScripts'
     }
     sqlCompatibility = [ordered]@{
         validatedVersions = @()

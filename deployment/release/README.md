@@ -13,7 +13,7 @@
 
 ## Open release metadata blocker
 
-The script still writes `schemaSupport.minimum = 8`, `maximum = 8` and old P3.1 wording. Runtime `SchemaCompatibilityPolicy.CurrentScripts` requires scripts **001–009**. This observed mismatch is **OPEN RELEASE-MANIFEST-01** in [DEFERRED_WORK](../../docs/DEFERRED_WORK.md#release-manifest-01--observed-schema-metadata-discrepancy); documentation has not corrected the script. Do not certify package/schema compatibility until the source and generated artifact are reconciled and verified.
+The script reads schemaSupport minimum/maximum and ordered requiredScripts from **SchemaCompatibilityPolicy.CurrentScripts in the shipped admin Infrastructure.dll**, currently schema9 / scripts001–009. A hidden bounded x86 Windows PowerShell helper handles the net48/x86 DLL even from a 64-bit publisher; missing/empty/unreadable policy rejects manifest generation. Focused x86 packaging tests pass; clean-commit artifact reconciliation is pending in [L2DB verification](../../docs/L2DB_VERIFICATION.md#l2db-t02-startup-follow-up--runtime-identity-and-schema-manifest) before RELEASE-MANIFEST-01 closes. Package metadata does not prove runtime startup or release acceptance.
 
 The manifest also records an empty validated SQL-version list and unsigned-release status. These are unfinished release decisions/evidence, not implicit support or sign-off. `-SkipPublish` regenerates metadata for existing package directories; it is not a clean build or release-acceptance substitute.
 

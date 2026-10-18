@@ -453,3 +453,37 @@ A temporary local .NET Framework probe used reflection only to invoke the unchan
 Initial local probe setup had a source-path compile failure before allocation; corrected the compiler path and ran the probe above. The static artifact checker initially expected architecture `x86`; the actual documented manifest value is `win-x86`, and the corrected check passed. Neither setup issue changed product code or acceptance assertions.
 
 **Remaining state:** L2DB-PILOT-01 is resolved by the committed baseline repair and strict parity. **T02 GO remains withheld / T03–T06 blocked** until Desktop startup succeeds on an explicitly designated disposable non-production database using a suitable least-privileged runtime identity. No such runtime configuration is currently provided. Do not count the expected privilege rejection as startup PASS. Attended login/catalog/receipt/import workflows are NOT RUN and remain T07 obligations. The package still emits schemaSupport 8 while runtime expects scripts 001–009; OPEN RELEASE-MANIFEST-01 remains an acknowledged release metadata blocker, not a waived or repaired result. Existing Pkcs advisory risk remains open.
+
+
+## L2DB-T02 startup follow-up — runtime identity and schema manifest
+
+**Base:** `a38f6f8bd19907e27bdc64880fed1b5210287b5e`, same isolated worktree, 2026-10-18. The owner requested continuing the startup blocker. No DAL conversion or accepted fixture change is included.
+
+### Runtime identity boundary
+
+A read-only query against the explicitly configured test master verified **contained database authentication disabled** and **SQL authentication available**. No server setting was changed. No least-privileged runtime connection is provided. A prepared local plan requests explicit owner authorization for exactly one temporary random-name/SID SQL login, with no server role or extra server grant, database-local runtime provisioning on a positively owned disposable database, bounded packaged startup, then exact server/name/SID/create_date verification before login removal. It leaves server authentication configuration and unrelated identities unchanged. The login has **not been created**; server-level mutation is outside AGENTS.md's database-only SQL-test rule without that explicit exception. Merely preparing/compiling a local probe does not authorize execution. T02 GO remains withheld pending successful real runtime startup.
+
+### RELEASE-MANIFEST-01 source repair
+
+The packaging script now obtains minimum/maximum schema rank and the ordered `requiredScripts` from **SchemaCompatibilityPolicy.CurrentScripts in the shipped admin Infrastructure assembly**. It no longer owns another hard-coded version8/P3.1 contract. Missing/empty policy rejects manifest generation. Package targets remain net48/x86; SQL scripts, runtime policy, providers, locks and grants are unchanged.
+
+Independent review identified an x86 boundary in the initial implementation: the shipped assembly is 32BITREQUIRED whereas test dependencies build AnyCPU. The fixture now sets 32BITREQUIRED on its own copied policy DLL, matching the real publish shape. The final implementation reads the assembly in a hidden x86 Windows PowerShell subprocess, including when the outer publisher is 64-bit; a 30-second bound and termination/drain wait prevent an unbounded metadata helper. The helper emits only policy JSON, verifies 32-bit execution and suppresses progress records; errors still reject the manifest. No product startup/security validation is bypassed.
+
+### Focused verification and review
+
+After locked restore, executed only `MyDmsVn.Desktop.Tests` Release/net48 with `--filter FullyQualifiedName~ReleasePackagingTests` (non-GUI cases; no SQL). Existing STA/GUI suite is NOT RUN for this packaging-only change.
+
+| Attempt / local results folder suffix | Passed / failed / skipped | Meaning |
+|---|---:|---|
+| metadata-red | 2/2/0 | Expected RED: manifest8 differs from runtime9; missing policy was accepted |
+| metadata-green | 4/0/0 | Intermediate AnyCPU fixture only; insufficient x86 artifact evidence |
+| x86-red | 3/1/0 | Review regression RED: BadImageFormatException when PS64 loads the x86 fixture |
+| x86-green | 3/1/0 | Helper setup failed on encoded-command progress CLIXML emitted to stderr despite exit0; diagnosed via read-only isolated helper output |
+| x86-green2 | 4/0/0 | Final x86 fixture: runtime-list equality, missing-policy rejection and both secret/admin rejection Theory rows |
+
+Actual commands use `dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore --filter 'FullyQualifiedName~ReleasePackagingTests' --logger 'trx;LogFileName=<red|green>.trx' --results-directory TestResults/l2db-startup-<suffix>`. All four final rows passed without skip/abort/duplicates. Test fixture temp directories were disposed normally. No SQL was mutated by these cases. The new single-row rejection case is added to the stable case ledger; the original three invocations remain. Final source total is **637 logical method IDs**; no broader SQL-owner/runtime results are inferred.
+
+Review's x86 finding was fixed through the observed RED/GREEN boundary above. Runtime identity permission remains pending; no login, role, server grant or global authentication setting was modified. Clean-commit real package publication/manifest reconciliation will be recorded below before closing RELEASE-MANIFEST-01. T07 attended workflows, operational/release acceptance and existing Pkcs advisory risk remain open.
+
+
+Frozen packaging code/test SHA256 (sorted path/NUL/raw CRLF bytes/NUL over the two changed .ps1/.cs files): `76aef3bdf093fe94ae9222c66941a333fe00ab0ce05b9dd064506540b1845b60`. The containing source commit binds this package candidate; runtime SQL/application code, accepted fixtures, scripts/grants and package locks are unchanged.
