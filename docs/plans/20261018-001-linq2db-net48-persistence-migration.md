@@ -296,7 +296,7 @@ $output = Join-Path (Get-Location).Path ('artifacts/release/' + $version)
 & ./deployment/release/Publish-LocalRelease.ps1 -Version $version -OutputRoot $output
 ```
 
-This creates a local validation package, not a production release/version assignment. Publish errors are terminating. Do not use SkipPublish for dependency validation or overwrite an existing release output. Verify Desktop/admin package metadata, dependencies, native SqlClient assets and binding redirects. The known schema metadata discrepancy remains [OPEN RELEASE-MANIFEST-01](../DEFERRED_WORK.md#release-manifest-01--observed-schema-metadata-discrepancy); correct and verify that narrow issue if it blocks this plan's package acceptance.
+This creates a local validation package, not a production release/version assignment. Publish errors are terminating. Do not use SkipPublish for dependency validation or overwrite an existing release output. Verify Desktop/admin package metadata, dependencies, native SqlClient assets and binding redirects. [RELEASE-MANIFEST-01](../DEFERRED_WORK.md#release-manifest-01--observed-schema-metadata-discrepancy) is closed narrowly by T02's source fix and clean-commit d8013030 artifact reconciliation ([evidence](../L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed)); each later package must still match its shipped runtime policy.
 
 If changed UI behavior or a packaged-smoke regression makes automated Desktop GUI tests applicable, run W directly on an interactive Windows session:
 

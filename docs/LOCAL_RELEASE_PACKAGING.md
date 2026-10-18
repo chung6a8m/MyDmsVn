@@ -2,7 +2,7 @@
 
 **Hiện trạng:** Nhánh `v1a`, cập nhật 2026-10-18. Script đóng gói hiện có chỉ tạo desktop và admin migrator `net48`/x86. SEC-REBUILD đã được chấp nhận trong PR #34; P5 interactive và P6 operational/release vẫn **OPEN / DEFERRED** trong [DEFERRED_WORK](DEFERRED_WORK.md). Lịch sử bằng chứng nằm ở [HISTORY](HISTORY.md); tài liệu này không chứng nhận clean install, upgrade hay production release.
 
-**RELEASE-MANIFEST-01:** Script đã sửa nguồn metadata: đọc `SchemaCompatibilityPolicy.CurrentScripts` từ DLL admin đã đóng gói qua helper PowerShell x86, thay cho pin `8..8`. Test packaging x86 đã đạt; đối chiếu artifact từ commit sạch còn chờ trong [L2DB evidence](L2DB_VERIFICATION.md#l2db-t02-startup-follow-up--runtime-identity-and-schema-manifest). Chưa có release acceptance.
+**RELEASE-MANIFEST-01:** Script đã sửa nguồn metadata: đọc `SchemaCompatibilityPolicy.CurrentScripts` từ DLL admin đã đóng gói qua helper PowerShell x86, thay cho pin `8..8`. Bốn test packaging x86 và đối chiếu artifact từ commit sạch `d8013030` đã đạt: schema9, danh sách001–009, 224 hash file. [L2DB evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed) đóng riêng lỗi metadata này. Chưa có release acceptance.
 
 ## Release artifacts
 
@@ -54,7 +54,7 @@ Từ thư mục `admin-migrator-net48-win-x86`, lệnh migration active là `& .
 
 ## Verification bắt buộc còn lại
 
-- giải quyết `RELEASE-MANIFEST-01` và kiểm tra package/schema metadata thực tế;
+- đối chiếu metadata runtime/package thực tế; `RELEASE-MANIFEST-01` đã đóng riêng phần chênh lệch nguồn;
 - clean install active desktop/admin package trên Windows VM không SDK/Visual Studio;
 - verify prerequisite `.NET Framework 4.8`, x86/native dependencies và failure UX;
 - review đường upgrade được hỗ trợ, preserve config/shared SQL, restart/repair/uninstall; không coi prefix cũ là upgrade path hiện có;

@@ -29,8 +29,8 @@ Explicit connection/transaction ownership; Application authorization; unknown/de
 
 [TEST_POLICY.md](docs/TEST_POLICY.md) is the new sole test-execution policy. Select focused tests by affected behavior; broaden for shared infrastructure and named acceptance milestones. Use ordinary project/category/method filters and actual TRX cases/outcomes. Only `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` configures SQL tests; explicit master/instance/allocation ownership checks remain local. Run SQL projects sequentially, review interrupted allocations manually and do not restore the removed framework.
 
-## Known open issue
+## Known startup prerequisite
 
-The release script now reads schema support/required scripts from the shipped runtime policy (001–009) using an x86 metadata helper. Focused packaging tests pass; clean-commit artifact verification is pending in [L2DB evidence](docs/L2DB_VERIFICATION.md#l2db-t02-startup-follow-up--runtime-identity-and-schema-manifest). Runtime startup still needs a suitable explicitly authorized identity; T02 has no GO yet.
+The release script now reads schema support/required scripts from the shipped runtime policy (001–009) using an x86 metadata helper. Four packaging tests and clean-commit d8013030 artifact reconciliation passed; RELEASE-MANIFEST-01 is closed narrowly ([evidence](docs/L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed)). Runtime startup still needs a suitable explicitly authorized identity; T02 has no GO yet.
 
 Read [AGENTS.md](AGENTS.md) first. [Documentation index](docs/README.md) links current references. [History](docs/HISTORY.md) is provenance only; historical totals and waivers do not prove either active plan has passed.

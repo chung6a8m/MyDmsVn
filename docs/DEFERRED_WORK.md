@@ -30,9 +30,9 @@ Original detailed scope remains available in the [P5/P6 remainder](https://githu
 
 ### RELEASE-MANIFEST-01 — Observed schema metadata discrepancy
 
-- [ ] Reconcile `deployment/release/Publish-LocalRelease.ps1`, which currently emits `schemaSupport.minimum = 8` and `maximum = 8`, with `SchemaCompatibilityPolicy.CurrentScripts`, which requires scripts 001–009. Remove the stale P3.1 wording, establish one reviewed source for package/runtime schema compatibility and verify the generated artifact.
+- [x] Reconcile package/runtime schema metadata from one source: the shipped admin Infrastructure assembly's `SchemaCompatibilityPolicy.CurrentScripts`. A bounded x86 reader handles the net48/x86 assembly from a 64-bit publisher. Remove the old schema8/P3.1 pin and include the exact required script list.
 
-This is an observed **open release blocker**, not a documentation-only fix. [Release packaging](LOCAL_RELEASE_PACKAGING.md) reports current script behavior accurately. If L2DB's own package acceptance requires correcting it, record that narrow corrective task there and verify it; do not claim the remaining P6 release work is complete.
+**Closed narrowly in L2DB-T02 startup follow-up:** clean commit `d80130300f39ccbf716a1c5df627d3550e2bd0a5` package verified schema9 / ordered001–009, sourceTreeDirty=false and all224 file hashes. Focused packaging tests passed4/0/0, including an x86 policy fixture and missing-policy rejection. [Evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed). Historical schema8 artifacts remain historical; this closes metadata only. Runtime startup, attended business workflows and the remaining P6 release work are not accepted by this result.
 
 ### REMAIN-P6-T05 — Packaged GUI smoke
 

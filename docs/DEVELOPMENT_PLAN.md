@@ -21,7 +21,7 @@ The current product and all ten active test projects target `net48`. Tests run d
 
 [DEFERRED_WORK.md](DEFERRED_WORK.md) preserves the unfinished P5 interactive checks, P6 operational/release requirements, P7 HTTP scope, and runtime reactivation. Deferral changes priority, not completion status. P4.1's accepted partial idle-expiry observation and NET8-PAUSE's waived duration comparison remain limited to their original decisions.
 
-The release script's schema `8..8` versus runtime `001–009` discrepancy is recorded there. The documentation reset and SQL framework removal do not repair packaging or certify release readiness.
+RELEASE-MANIFEST-01's schema metadata discrepancy is now closed narrowly by L2DB-T02's source fix and clean-commit d8013030 artifact verification. Runtime startup still requires an explicitly authorized suitable identity; P5/P6 release readiness remains deferred.
 
 ## Execution and evidence
 

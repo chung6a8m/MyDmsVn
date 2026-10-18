@@ -487,3 +487,14 @@ Review's x86 finding was fixed through the observed RED/GREEN boundary above. Ru
 
 
 Frozen packaging code/test SHA256 (sorted path/NUL/raw CRLF bytes/NUL over the two changed .ps1/.cs files): `76aef3bdf093fe94ae9222c66941a333fe00ab0ce05b9dd064506540b1845b60`. The containing source commit binds this package candidate; runtime SQL/application code, accepted fixtures, scripts/grants and package locks are unchanged.
+
+
+### Clean-commit package reconciliation — RELEASE-MANIFEST-01 closed
+
+Executed the actual release script, without SkipPublish, from clean source commit **`d80130300f39ccbf716a1c5df627d3550e2bd0a5`**, version `0.0.0-l2db.d8013030`, output `artifacts/release/0.0.0-l2db.d8013030`. The exact command follows the existing publish template above with this version/output. Locked solution restore and both net48/x86 publishes completed normally. The outer publisher was 64-bit and its x86 policy subprocess read the real 32BITREQUIRED Infrastructure.dll successfully.
+
+**PASS:** manifest sourceCommit matches d8013030, sourceTreeDirty=false, minimum=maximum=**9**, ordered requiredScripts exactly match runtime's **001–009**, and stale P3.1 wording is absent. Recomputed all **224 SHA256/length pairs** (Desktop142/admin82), and independently checked the policy DLL in both packages has 32BITREQUIRED. Manifest SHA256: `46aecdeaf0f09a0dc7dc997472cc7a1066d54456b7946dfed2943c8f06f7d3ce`. This closes the narrowly scoped **RELEASE-MANIFEST-01 metadata discrepancy**; it does not grant release approval, certify operational SQL versions, signing, attended workflows or a successful runtime startup.
+
+Only documentation changes follow this clean candidate, so the built code/script bytes remain identical. Historical package records with schema8 remain accurate for their predecessor commits. Existing SQL/application/architecture repair evidence remains scoped to its unchanged source; no SQL/GUI regression run was necessary for the metadata-only source change.
+
+**Current next action:** explicit owner decision on the prepared one-login test-instance exception (or provision of an existing suitable runtime identity), then bounded Desktop startup on a positively owned disposable database, drain and identity-checked cleanup. Contained authentication remains disabled; no server authentication setting, login, server role or server grant has been changed. T02 remains NO-GO pending that startup proof; T03–T06 are still blocked. Temporary source/compiled probe and credential-free resource plan are local/ignored, not an additional framework or committed secret.
