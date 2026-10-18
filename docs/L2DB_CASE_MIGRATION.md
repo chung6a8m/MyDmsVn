@@ -869,3 +869,7 @@ Complete source inventory after T06; counts are not runtime acceptance. All ten 
 | W | `tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj` | 138 | 139 | 0 |
 
 Total **656 logical IDs**. Six SQL owners: **273 methods / 304 invocations**, 203 SQL and 101 pure. T07 still owns frozen-commit final gates and package/manual workflows.
+
+## T07 frozen-revision execution checkpoint
+
+Frozen `de3df037c8af40c23328dcc2f253339055eddc9e`, all active net48 declarations and656 logical IDs /720 source rows unchanged. Unfiltered F61/C19/I42/S60/M65/O57/A157/X12/D108 = **581 passed /0 failed /0 skipped**, with exact method/row sets, no omissions/duplicates/aborts/timeouts. No new/replaced/removed case. W139 source invocations are conditional and NOT RUN; actual clean package publication/hash/policy checks are separate evidence rather than xUnit results. Authenticated interactive workflows remain BLOCKED / NOT RUN pending new runtime-identity approval. [T07 checkpoint](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) records package, cleanup and rollback boundaries; it does not mark overall L2DB complete.
