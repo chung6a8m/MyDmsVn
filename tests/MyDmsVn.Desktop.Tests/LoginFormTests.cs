@@ -127,6 +127,128 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Closed_login_ignores_late_success_or_failure_without_notifications_or_dialogs(bool fail)
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    using (var guard = new WinFormsTestGuard())
+                    {
+                        var identity = new ControllableIdentityClient();
+                        var notifications = new DesktopNotificationCenter();
+                        var viewModel = new LoginViewModel(identity, notifications);
+                        using (var form = new LoginForm(viewModel))
+                        {
+                            form.Show();
+                            form.UsernameTextBox.Text = "operator";
+                            form.PasswordTextBox.Text = "synthetic input";
+                            var login = viewModel.LoginAsync(CancellationToken.None);
+                            Assert.True(viewModel.IsBusy);
+                            form.Close();
+                            Assert.True(form.IsDisposed);
+                            var changesAfterClose = 0;
+                            viewModel.PropertyChanged += (_, __) => changesAfterClose++;
+                            if (fail) identity.Fail(new InvalidOperationException("Synthetic sensitive backend detail"));
+                            else identity.Complete(ApiResponse<CurrentUserDto>.Success(new CurrentUserDto(42, "operator", "Operator")));
+                            PumpUntilCompleted(login);
+                            login.GetAwaiter().GetResult();
+                            System.Windows.Forms.Application.DoEvents();
+                            Assert.False(viewModel.IsAuthenticated);
+                            Assert.Null(notifications.LastNotification);
+                            Assert.Equal(0, changesAfterClose);
+                            Assert.Empty(guard.Exceptions);
+                        }
+                    }
+                }, TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Login_error_reporter_failure_keeps_safe_inline_error_without_modal_dialog()
+        {
+            StaTest.Run(
+                _ =>
+                {
+                    using (var guard = new WinFormsTestGuard())
+                    {
+                        var identity = new ControllableIdentityClient();
+                        var reporter = new ThrowingReporter();
+                        using (var form = new LoginForm(new LoginViewModel(identity, new DesktopNotificationCenter(), reporter)))
+                        {
+                            form.Show();
+                            form.UsernameTextBox.Text = "operator";
+                            form.PasswordTextBox.Text = "synthetic input";
+                            var login = form.ViewModel.LoginAsync(CancellationToken.None);
+                            identity.Fail(new InvalidOperationException("Synthetic sensitive backend detail"));
+                            PumpUntilCompleted(login);
+                            login.GetAwaiter().GetResult();
+                            System.Windows.Forms.Application.DoEvents();
+                            var alert = Descendants(form).OfType<BootstrapAlert>().Single();
+                            Assert.True(alert.Visible);
+                            Assert.Contains("Support ID:", alert.Text);
+                            Assert.DoesNotContain("sensitive", alert.Text);
+                            Assert.Equal(1, reporter.Calls);
+                            Assert.Empty(guard.Exceptions);
+                        }
+                    }
+                }, TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Background_login_completion_publishes_state_on_the_form_owner_thread()
+        {
+            StaTest.Run(_ =>
+            {
+                using (var guard = new WinFormsTestGuard())
+                {
+                    var identity = new ControllableIdentityClient();
+                    using (var form = new LoginForm(new LoginViewModel(identity, new DesktopNotificationCenter())))
+                    {
+                        form.Show();
+                        var ownerThread = Thread.CurrentThread.ManagedThreadId;
+                        var publicationThread = 0;
+                        form.ViewModel.PropertyChanged += (_, change) =>
+                        {
+                            if (change.PropertyName == nameof(LoginViewModel.IsAuthenticated))
+                                publicationThread = Thread.CurrentThread.ManagedThreadId;
+                        };
+                        form.UsernameTextBox.Text = "operator";
+                        form.PasswordTextBox.Text = "synthetic input";
+                        var login = form.ViewModel.LoginAsync(CancellationToken.None);
+                        Task.Run(() => identity.Complete(ApiResponse<CurrentUserDto>.Success(
+                            new CurrentUserDto(42, "operator", "Operator")))).GetAwaiter().GetResult();
+                        PumpUntilCompleted(login);
+                        login.GetAwaiter().GetResult();
+                        Assert.Equal(ownerThread, publicationThread);
+                        Assert.Empty(guard.Exceptions);
+                    }
+                }
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        private static void PumpUntilCompleted(Task operation)
+        {
+            var deadline = System.Diagnostics.Stopwatch.StartNew();
+            while (!operation.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(2))
+            {
+                System.Windows.Forms.Application.DoEvents();
+                Thread.Yield();
+            }
+            Assert.True(operation.IsCompleted, "Login completion did not drain while pumping STA messages.");
+        }
+
+        private sealed class ThrowingReporter : IDesktopExceptionReporter
+        {
+            public int Calls { get; private set; }
+            public string Report(string operationName, Exception exception)
+            {
+                Calls++;
+                throw new System.IO.IOException("Synthetic reporting failure");
+            }
+        }
+
         private static void AssertContained(Control control)
         {
             Assert.True(control.Width > 0);
@@ -176,6 +298,8 @@ namespace MyDmsVn.Desktop.Tests
 
             public void Complete(ApiResponse<CurrentUserDto> response) =>
                 _login.TrySetResult(response);
+
+            public void Fail(Exception error) => _login.TrySetException(error);
         }
     }
 }

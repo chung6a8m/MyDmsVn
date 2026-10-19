@@ -14,7 +14,7 @@ namespace MyDmsVn.Desktop.Application
         private string _password = string.Empty;
         private bool _isAuthenticated;
         private bool _isPasswordVisible;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         public LoginViewModel(
             IIdentityApiClient identityClient,
@@ -94,7 +94,9 @@ namespace MyDmsVn.Desktop.Application
                     {
                         var response = await _identityClient.LoginAsync(
                             new LoginRequest(Username.Trim(), Password),
-                            operationCancellation).ConfigureAwait(false);
+                            operationCancellation);
+                        if (_disposed) return;
+                        operationCancellation.ThrowIfCancellationRequested();
                         if (response.IsSuccess)
                         {
                             IsAuthenticated = true;
@@ -113,6 +115,7 @@ namespace MyDmsVn.Desktop.Application
                     }
                     catch (Exception exception)
                     {
+                        if (_disposed || operationCancellation.IsCancellationRequested) return;
                         IsAuthenticated = false;
                         ApplyUnexpectedError(
                             exception,
@@ -120,10 +123,11 @@ namespace MyDmsVn.Desktop.Application
                     }
                     finally
                     {
-                        Password = string.Empty;
+                        if (!_disposed) Password = string.Empty;
                     }
                 },
-                cancellationToken);
+                cancellationToken,
+                publishCancellation: () => !_disposed);
         }
 
         public void Dispose()

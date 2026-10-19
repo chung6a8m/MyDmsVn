@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -341,8 +341,11 @@ namespace MyDmsVn.Desktop.Tests
                 var save = fixture.Editor.SaveAsync(cancellation.Token);
                 Assert.Equal(1, dispatcher.PendingCount);
                 cancellation.Cancel();
-                dispatcher.RunNext();
+                // Publish immediate mode before releasing the asynchronous continuation;
+                // otherwise its follow-up notification can be queued without a consumer.
                 dispatcher.Defer = false;
+                dispatcher.RunNext();
+                Assert.Same(save, await Task.WhenAny(save, Task.Delay(TimeSpan.FromSeconds(2))));
                 Assert.True(await save);
 
                 Assert.Equal(41, fixture.Editor.Id);
@@ -523,7 +526,8 @@ namespace MyDmsVn.Desktop.Tests
         {
             private readonly Queue<DispatchOperation> _pending = new Queue<DispatchOperation>();
 
-            public bool Defer { get; set; }
+            private volatile bool _defer;
+            public bool Defer { get => _defer; set => _defer = value; }
             public int PendingCount => _pending.Count;
 
             public Task InvokeAsync(Action action, CancellationToken cancellationToken)
