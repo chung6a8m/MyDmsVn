@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment:** `v1a` at `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed 2026-10-18. Test project entries include the subsequent owner-directed removal of the old SQL test framework. The two [active plans](plans/README.md) describe future fixture and DAL changes; their proposed files are not listed as implemented components.
+**Assessment:** `v1a` after PR #37 merge `42d94ba`, refreshed 2026-10-19. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP/L2DB are implemented and plan-specifically accepted; GUI-P5 and REL/P6 are the OPEN execution plans, not new product projects.
 
 ## Source projects
 
@@ -57,7 +57,7 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `MyDmsVn.sln` | Current declared solution graph; parked AppCore is excluded. |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/plans/README.md` | The only active execution order: RESP, then L2DB. |
+| `docs/plans/README.md` | Completed RESP/L2DB; next GUI-P5, then REL/P6 release acceptance. |
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
 | `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current status, deferred requirements and historical evidence. |
@@ -65,4 +65,4 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `deployment/sql/Provision-MyDmsVnPrincipals.sql` | Explicit runtime/maintenance SQL authority separation. |
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
-Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph; neither active plan performs reactivation or a framework upgrade.
+Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph; neither GUI-P5 nor REL/P6 performs reactivation or a framework upgrade.
