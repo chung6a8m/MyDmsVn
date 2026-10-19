@@ -1,6 +1,6 @@
 # GUI-P5 verification
 
-This is task-scoped evidence, not full P5/P6 acceptance. [Coverage matrix](GUI_P5_COVERAGE_MATRIX.md), [plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [TEST_POLICY](TEST_POLICY.md) govern. T02–T06, both attended P5 IDs and REL G1–G5 remain OPEN.
+This is task-scoped evidence, not full P5/P6 acceptance. [Coverage matrix](GUI_P5_COVERAGE_MATRIX.md), [plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [TEST_POLICY](TEST_POLICY.md) govern. T03–T06, both attended P5 IDs and REL G1–G5 remain OPEN. T01 and T02 task-scoped evidence follows.
 
 ## GUI-P5-T01 — Bounded GUI reliability foundation
 
@@ -68,4 +68,67 @@ Development runs are not folded into the accepted pass totals:
 
 Owned job tests verify zero active members/root exit and drained pipes on normal, timed-out, canceled and descendant-survival paths; PID absence assertions are additional observations, not cleanup authority. Successful fixture teardown deletes only its own generated directory. Final narrow inspection found **0 probe processes, 0 probe fixture directories and 0 release fixture directories** under these test roots. No unresolved native job/GUI/PowerShell child, quarantine or SQL allocation was reported in accepted runs. Tests intentionally exercising process timeout/crash pass by asserting the expected result and verified teardown; these are not VSTest timeout/abort outcomes. The pipe-reader fault regression uses a controlled reader and does not leave a live child or poison the real session.
 
-Independent read-only review identified and then rechecked the retained-output P2, owner-thread behavior and fake-dispatch race; final review found no blocker. A subsequent review also accepted moving compiler creation into the bounded job. P5 automated coverage gaps and packaged/attended proof remain T02–T06; this developer-host result is not a release support/sign-off matrix.
+Independent read-only review identified and then rechecked the retained-output P2, owner-thread behavior and fake-dispatch race; final review found no blocker. A subsequent review also accepted moving compiler creation into the bounded job. At the T01 exit, coverage gaps and packaged/attended proof remained T02–T06; T02 closure follows below. This developer-host result is not a release support/sign-off matrix.
+
+## GUI-P5-T02 — Deterministic control and ViewModel coverage
+
+**Date/tester:** 2026-10-19 (Asia/Bangkok), Codex. **Base:** `7941124`. **Tested executable revision:** `3a0621c65a2b584d2dfbe99b01febe915769bb44`. **Isolation:** retained managed worktree `gui-p5-t00/CleanArchitecture`, branch `codex/gui-p5-t00`; original checkout untouched. No release package was created.
+
+**T02 COMPLETE in scope.** [Coverage matrix Appendix C](GUI_P5_COVERAGE_MATRIX.md#appendix-c--gui-p5-t02-deterministic-control-closure) maps every L1–U1 control obligation to named new/existing Desktop and Session tests, with explicit visual/runtime limits. T03–T06, real packaged Login, independent SQL E2E, both attended P5 IDs and REL G1–G5 remain OPEN.
+
+### Implemented behavior and boundaries
+
+- Added seven acceptance classes in the existing Desktop.Tests project: **59 methods / 129 new invocations**. Actual controls exercise all four catalog adapters/fields/CRUD/active states, controlled debounce and cancellation/stale results, immediate Refresh and page contracts, fresh/historical lookups, receipt dirty/conflict/Post/duplicate/authorization responses, both Stock controls, security management/import and native tab/focus/read-only/theme/layout behavior. Existing pure Session tests remain the oracle for control-independent state machines; no new framework, dependency, runner or product target was introduced.
+- Login now has distinct Username/Password accessibility names and returns native focus to the first invalid input or password for retry after busy inputs re-enable. Focus is deferred through the UI queue, with disposed/busy guards. Tests verify native child focus, safe response messages (including inactive/expired-session response binding), masking, Enter duplicate suppression, and Escape's Cancel result followed by form closure/drain. This modeless control evidence does not claim actual modal packaged Login or backend account enforcement.
+- Closing a shell disposes/cancels its FoundationViewModel and suppresses old status/error publication. A canceled permission request cannot enable an action even if its client ignores cancellation. Four integrated Receipt/shell rows prove direct user switch or sign-out cancels/disposes a pending Save; late success/failure cannot affect the next user's workspace, input, status or shared notifications.
+- An ambiguous Post exception, cancellation after dispatch, or InternalServerError/Unspecified response locks receipt mutation and requires explicit successful read reload of that same receipt before another mutation. A denied/failed reload retains the lock and owned receipt identity while clearing sensitive details; recovered Read can resolve Draft versus Posted. There is no automatic mutating retry. These are desktop workflow safeguards; SQL atomicity, exactly-once posting and persisted outcome remain independent backend/T03 assertions.
+- Security grids preserve selected identities while rebinding. Programmatic membership updates cannot dispatch commands; protected/deprecated explanation text is displayed. Import uses injectable JSON/confirmation delegates for deterministic control tests; the default constructor retains native file/confirmation dialogs. Selection generation rejects late previews after target changes, including User/Role mode changes. Moving columns within the same row preserves unsaved fields/password and valid preview.
+- Stock filters expose explicit Warehouse ID/Product ID, balance search and UTC date accessibility names. Vendor pins, contracts, schema001–009, SQL permissions/identities, server authorization/posting and package composition are unchanged.
+
+### Actual environment, execution and reconciliation
+
+Reverified developer host: Windows 11 Home Single Language 25H2 build **26200.9457**, x64 interactive desktop/session 38, primary **1920×1080** at the previously observed **100%** baseline; SDK 8.0.425; installed v4 Version4.8.09221 / Release533509. No display settings changed. Light/Dark structural render/tab/focus assertions ran on this desktop; full visual acceptance and supplementary 125% remain **NOT TESTED**. No supported-OS certification is inferred from this host.
+
+Project references, package dependencies and locked restore inputs are unchanged from T01. Direct projects were built/tested sequentially with explicit net48/x86; no SQL project or milestone release matrix was run. Final commands:
+
+```powershell
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore -p:PlatformTarget=x86 --logger 'console;verbosity=detailed' --logger 'trx;LogFileName=t02-final-desktop-x86.trx' --results-directory TestResults/gui-p5-t02 --blame-hang --blame-hang-timeout 45s --blame-hang-dump-type none -- RunConfiguration.TargetPlatform=x86
+
+dotnet test tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj -c Release -f net48 --no-restore -p:PlatformTarget=x86 --logger 'trx;LogFileName=t02-final-session-x86.trx' --results-directory TestResults/gui-p5-t02 -- RunConfiguration.TargetPlatform=x86
+
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore --no-build --list-tests -- RunConfiguration.TargetPlatform=x86
+
+dotnet test tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj -c Release -f net48 --no-restore --no-build --list-tests -- RunConfiguration.TargetPlatform=x86
+```
+
+| Scope | Source / discovered / selected / executed | PASS / FAIL / skipped / unexpected timeout / aborted |
+|---|---|---|
+| Desktop Release/net48/x86, unfiltered | 208 methods: 177 Facts + 31 Theories / 105 rows; **282 / 282 / 282** invocations | **282 /0 /0 /0 /0**, TRX Completed; about 63s command time |
+| Desktop.Session Release/net48/x86, unfiltered | Existing 108 discovered/selected/executed invocations; no new source cases | **108 /0 /0 /0 /0**, TRX Completed |
+
+All 282 Desktop and 108 Session discovered display names match their final TRX exactly (zero differences), all 59 new methods match their 129 source rows, and all 153 earlier T01 display names remain present. Actual `StaTest_runs_action_on_sta_thread` TRX output records **observed testhost bitness 32**; existing owned-process tests assert x86 probe bitness and verified cleanup. Final Desktop test assembly SHA-256: `4D1549BBA7B86AB3C8F935D543785ED0C85871B694DA2FDC5ACA0A7570F31C1B` (test artifact, not a release package).
+
+Raw TRX remain local under `TestResults/gui-p5-t02/`; discovery/build/run logs are local `gui-p5-t02-*.log` files in the operator's temporary directory. Raw SQL IDs, credentials and screenshots are not committed. There is no package/hash/real-Login/SQL-pass claim for T02.
+
+### Development failures, cleanup and review
+
+Development trials are retained separately; filenames containing “green”, “fixpass” or “final” do not override their actual failed TRX outcome:
+
+| Local development TRX | Executed | PASS | FAIL |
+|---|---:|---:|---:|
+| `t02-controls-final.trx` | 129 | 125 | 4 |
+| `t02-controls-fixpass.trx` | 121 | 107 | 14 |
+| `t02-controls-green.trx` | 121 | 118 | 3 |
+| `t02-controls-red.trx` | 103 | 72 | 31 |
+| `t02-login-deferred-focus.trx` | 15 | 14 | 1 |
+| `t02-login-diagnosis.trx` | 4 | 0 | 4 |
+| `t02-login-focus.trx` | 15 | 10 | 5 |
+| `t02-login-native-focus.trx` | 15 | 11 | 4 |
+| `t02-receipt-session.trx` | 4 | 4 | 0 |
+| `t02-review-red.trx` | 17 | 10 | 7 |
+
+Initial control RED exposed real missing focus/names, old-shell callback publication, canceled binder grant, ambiguous-Post retry and security selection/binding/import defects. Later trials isolated composite textbox wrapper versus native child focus, asynchronous retry-focus restoration, modeless Escape semantics and unshown-shell test setup. Those test assumptions were corrected without weakening the control contract. Two independent review findings were reproduced RED: horizontal same-row navigation reset unsaved values; User/Role target change allowed an old preview confirmation. Both now have named passing regressions. Initial compile/analyzer issues in new test code were fixed before execution; no build failure was counted as passing coverage.
+
+All real-control cases ran through serialized STA/WinFormsTestGuard and finite operation waits. Pending fake requests and old-session work drain before teardown. Existing T01 job-owned process/PowerShell/compiler/fatal/modal/hang probes passed cleanup assertions in the unfiltered run; follow-up process inspection found **zero remaining owned GUI probes/testhosts**. No SQL connection, disposable database, principal, runtime credential or protected account was allocated, so no DB cleanup was attempted. Ambiguous database ownership rules and SQL provision steps remain unchanged.
+
+Independent Codex code review found the two security issues above; both were fixed after RED proof, then re-reviewed with no further important findings. Review is not runtime proof; the accepted evidence is the final candidate's 282 Desktop and 108 Session passes. Backend SQL/package/DPI/attended prerequisites remain explicitly separate in the matrix and acceptance plan.
