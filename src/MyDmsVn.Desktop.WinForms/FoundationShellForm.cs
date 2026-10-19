@@ -777,8 +777,6 @@ namespace MyDmsVn.Desktop.WinForms
             topBar.Items.Add(new ToolStripControlHost(themeButton)
             {
                 Alignment = ToolStripItemAlignment.Right,
-                AccessibleName = "Appearance controls",
-                AccessibleRole = AccessibleRole.Grouping,
             });
             UpdateThemeDescription();
             return topBar;
