@@ -51,6 +51,25 @@ public sealed class PackagedGuiAcceptanceTests
     }
 
     [GuiPackageFact]
+    [Trait("Category", "GuiSql")]
+    public async Task Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes()
+    {
+        var package = ValidatedPackage();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" catalog-audit");
+            fixture.ConfigureRuntime(start);
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(120));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("CATALOG_PRODUCT=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertCatalogProductAsync();
+        });
+    }
+
+    [GuiPackageFact]
     public async Task Unavailable_sql_startup_is_safe_owned_and_drains_under_native_uia()
     {
         var package = ValidatedPackage();

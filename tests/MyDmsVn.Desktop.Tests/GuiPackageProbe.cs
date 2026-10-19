@@ -16,6 +16,7 @@ internal static class GuiPackageProbe
     [STAThread]
     private static int Main(string[] args)
     {
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         SetErrorMode(0x0001 | 0x0002);
         WerSetFlags(0x0002);
         Console.WriteLine("BITNESS=" + (IntPtr.Size * 8));
@@ -35,6 +36,32 @@ internal static class GuiPackageProbe
                 if (!_application.WaitForExit(5000) || _application.ExitCode != 2)
                     throw new InvalidOperationException("Startup application did not exit safely.");
                 Console.WriteLine("STARTUP_SAFE_ERROR=PASS");
+            }
+            else if (args[1] == "catalog-audit")
+            {
+                var shell = Login();
+                _stage = "catalog-create";
+                Invoke(Find(shell, "Products", ControlType.Button, false));
+                SetInput(shell, "Code", "GUI-PROD", false);
+                SetInput(shell, "Name", "UIA Product", false);
+                SetInput(shell, "Unit", "pcs", false);
+                Invoke(Find(shell, "Save", ControlType.Button, false));
+                Named(shell, "GUI-PROD");
+                Invoke(Find(shell, "New", ControlType.Button, false));
+                _stage = "catalog-select-row";
+                Dump(shell);
+                Invoke(Find(shell, "Open GUI-PROD", ControlType.Button, false));
+                Wait(delegate { return InputValue(shell, "Code") == "GUI-PROD"; }, "Selected row did not load editor.");
+                _stage = "catalog-update";
+                SetInput(shell, "Name", "UIA Product Updated", false);
+                Invoke(Find(shell, "Save", ControlType.Button, false));
+                Named(shell, "UIA Product Updated");
+                Invoke(Find(shell, "Deactivate", ControlType.Button, false));
+                Named(shell, "Inactive");
+                Invoke(Find(shell, "Activate", ControlType.Button, false));
+                Named(shell, "Active");
+                CloseApplication(shell);
+                Console.WriteLine("CATALOG_PRODUCT=PASS");
             }
             else if (args[1] == "login-audit")
             {
@@ -103,19 +130,10 @@ internal static class GuiPackageProbe
 
     private static void SetInput(AutomationElement root, string name, string value, bool password)
     {
-        AutomationElement editor = null;
+        var editor = InputEditor(root, name);
         var candidates = root.FindAll(TreeScope.Descendants,
             new PropertyCondition(AutomationElement.NameProperty, name));
-        foreach (AutomationElement named in candidates)
-        {
-            var candidate = named.FindFirst(TreeScope.Descendants,
-                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
-            if (candidate == null && named.Current.ControlType == ControlType.Edit) candidate = named;
-            if (candidate == null) continue;
-            if (editor != null && !Automation.Compare(editor, candidate)) throw new InvalidOperationException("Ambiguous input selector.");
-            editor = candidate;
-        }
-        if (editor == null || editor.Current.IsPassword != password) throw new InvalidOperationException("Input accessibility semantics missing.");
+        if (editor.Current.IsPassword != password) throw new InvalidOperationException("Input accessibility semantics missing.");
         Wait(delegate { return editor.Current.IsEnabled; }, "Input disabled.");
         ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
         if (password)
@@ -129,6 +147,44 @@ internal static class GuiPackageProbe
             }
         }
         Console.WriteLine("INPUT_PATTERN=" + name + ":Value");
+    }
+
+    private static AutomationElement InputEditor(AutomationElement root, string name)
+    {
+        AutomationElement editor = null;
+        var candidates = root.FindAll(TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.NameProperty, name));
+        foreach (AutomationElement named in candidates)
+        {
+            var candidate = named.FindFirst(TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+            if (candidate == null && named.Current.ControlType == ControlType.Edit) candidate = named;
+            if (candidate == null) continue;
+            if (editor != null && !Automation.Compare(editor, candidate)) throw new InvalidOperationException("Ambiguous input selector.");
+            editor = candidate;
+        }
+        if (editor == null) throw new InvalidOperationException("Input unavailable.");
+        return editor;
+    }
+
+    private static string InputValue(AutomationElement root, string name)
+    {
+        var editor = InputEditor(root, name);
+        if (editor.Current.IsPassword) throw new InvalidOperationException("Protected value cannot be inspected.");
+        return ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).Current.Value;
+    }
+
+    private static AutomationElement Named(AutomationElement root, string name)
+    {
+        AutomationElement result = null;
+        Wait(delegate
+        {
+            var candidates = root.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name));
+            if (candidates.Count > 1) throw new InvalidOperationException("Ambiguous accessible name.");
+            if (candidates.Count == 1) result = candidates[0];
+            return result != null;
+        }, "Accessible name unavailable.");
+        return result;
     }
 
     private static void Dump(AutomationElement root)

@@ -61,12 +61,21 @@ namespace MyDmsVn.Desktop.WinForms
                 Dock = DockStyle.Fill,
                 TabIndex = 0,
             };
-            Grid = new BootstrapGrid
+            Grid = new AccessibleActionGrid
             {
                 Dock = DockStyle.Fill,
                 TabIndex = 1,
                 TabStop = true,
+                AccessibleName = "Catalog results",
             };
+            ((AccessibleActionGrid)Grid).ConfigureRowActions(
+                row => row > 0 && row <= _rowIds.Count ? (object)_rowIds[row - 1] : null,
+                row => row > 0 && row < Grid.RowsCount ? Convert.ToString(Grid[row, 1]?.Value) ?? string.Empty : string.Empty,
+                row =>
+                {
+                    Grid.Selection.Focus(new SourceGrid.Position(row, 1), true);
+                    SelectActiveRow();
+                });
             Grid.DoubleClick += (_, __) => SelectActiveRow();
             Grid.KeyDown += OnGridKeyDown;
 

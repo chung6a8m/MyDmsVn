@@ -165,6 +165,13 @@ internal sealed class GuiSqlEnvironment : IDisposable
         start.EnvironmentVariables["MYDMSVN_GUI_P5_OWNER_PASSWORD"] = OwnerPassword;
     }
 
+    public async Task AssertCatalogProductAsync()
+    {
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.Products WHERE Code=N'GUI-PROD' AND Name=N'UIA Product Updated' AND Unit=N'pcs' AND IsActive=1;"));
+        Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+    }
+
     public async Task DisposeAsync()
     {
         if (_disposed) return;

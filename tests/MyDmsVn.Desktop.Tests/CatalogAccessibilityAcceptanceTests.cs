@@ -12,6 +12,51 @@ namespace MyDmsVn.Desktop.Tests
     public sealed class CatalogAccessibilityAcceptanceTests
     {
         [Theory]
+        [InlineData(CatalogKind.Product)]
+        [InlineData(CatalogKind.Warehouse)]
+        [InlineData(CatalogKind.Employee)]
+        [InlineData(CatalogKind.Customer)]
+        public void Accessible_open_row_uses_the_existing_selection_path_and_rejects_stale_rows(CatalogKind kind)
+        {
+            StaTest.Run(_ =>
+            {
+                using var guard = new WinFormsTestGuard();
+                using var scenario = CatalogAcceptanceTests.CreateAccessibilityScenario(kind, out var control);
+                var code = Convert.ToString(control.Grid[1, 1].Value)!;
+                control.NewButton.PerformClick();
+                var action = AccessibleDescendants(control.Grid.AccessibilityObject)
+                    .SingleOrDefault(item => item.Role == AccessibleRole.PushButton && item.Name == "Open " + code);
+                Assert.NotNull(action);
+                action!.DoDefaultAction();
+                Assert.True(control.LastOperation.Wait(TimeSpan.FromSeconds(3)));
+                control.LastOperation.GetAwaiter().GetResult();
+                Assert.Equal(code, control.EditorControls["code"].Text);
+                var cell = AccessibleDescendants(control.Grid.AccessibilityObject)
+                    .First(item => item.Role == AccessibleRole.Cell && item.Name == code);
+                Assert.True((cell.State & AccessibleStates.ReadOnly) != 0);
+                Assert.Throws<InvalidOperationException>(() => cell.Value = "MUST NOT CHANGE");
+                Assert.Equal(code, control.Grid[1, 1].Value);
+                control.NewButton.PerformClick();
+                control.Grid.Redim(1, 4);
+                action.DoDefaultAction();
+                Assert.Empty(control.EditorControls["code"].Text);
+                Assert.True((action.State & AccessibleStates.Unavailable) != 0);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        private static IEnumerable<AccessibleObject> AccessibleDescendants(AccessibleObject root)
+        {
+            for (var index = 0; index < root.GetChildCount(); index++)
+            {
+                var child = root.GetChild(index);
+                if (child == null) continue;
+                yield return child;
+                foreach (var descendant in AccessibleDescendants(child)) yield return descendant;
+            }
+        }
+
+        [Theory]
         [InlineData(CatalogKind.Product, BootstrapThemeMode.Light)]
         [InlineData(CatalogKind.Product, BootstrapThemeMode.Dark)]
         [InlineData(CatalogKind.Warehouse, BootstrapThemeMode.Light)]
