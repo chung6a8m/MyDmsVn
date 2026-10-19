@@ -314,7 +314,9 @@ dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release 
 
 **Current T03 exit: COMPLETE in task scope**, with the foreground-resource incident and focused-rerun qualification above. Date/tester:2026-10-19, Asia/Bangkok, Codex. This documentation-only follow-up does not replace executable source02eff22 or its frozen bytes. T04/T05 attended walkthroughs, T06 frozen full acceptance, both P5 sign-offs and REL/P6 G1–G5 remain OPEN; production readiness is not asserted.
 
-## GUI-P5-T04 — Attended Catalog/Lookup (IN PROGRESS / OPEN)
+## GUI-P5-T04 — Attended Catalog/Lookup (COMPLETE / OWNER ACCEPTED)
+
+The preparation and intermediate checkpoints below are historical; final Owner acceptance is recorded at the end of this section.
 
 **Prepared:**2026-10-19, Asia/Bangkok, Codex; documentation base `f33a959`. The [T04 worksheet](GUI_P5_T04_WALKTHROUGH.md) is the per-step attended ledger. T03 package/test/executable source02eff22 is unchanged. All133 Desktop manifest files were copied to a new private per-user versioned installation and every length/SHA-256 verified; the inherited DACL was replaced with current-account/SYSTEM/Administrators access, and no admin migrator was copied. No existing installation or shared runtime configuration/shortcut was changed. This is preparation on the developer desktop, not P6 clean-install or limited-user evidence.
 
@@ -344,6 +346,10 @@ Frozen source d5207b2ce1eae09e9317625b3d7d486c994f09fe/package1.0.0-guip5-t04-c2
 
 Actual125%/1920x1080 was independently measured before chapter2 at21:32:44; actual theme changed toDark at21:40 on the same owned process. Old165GUI ledgers are Dropped; allocation166 remains positively owned for this chapter. Final U-05, disposal/census and explicit Owner signature remain pending. T04/REMAIN-P5-GUI-01, T05/T06, P5 and P6 remain OPEN; no current full unfiltered GUI or P6 certification result is inferred.
 
-### T04 execution verified — final signature pending (21:43)
+### Historical T04 execution checkpoint21:43 — signature pending at that time
 
 All49baseline and24supplemental UX observations PASS (73applicable,132N/A), with source boundaries preserved in the worksheet. At125%Dark Owner completed both requested groups; actual Dark Receipt/Product popup screenshots and restricted no-inventory-write oracle captured. Chapter2 ended normally21:43:26/exit0/CleanupVerified; final helper cleanup21:43:32 PASS/Disposed. All166GUI ledgers Dropped; exact latest database/principal/process census0. T04's14allocations/42principals all Dropped,0uncertain. Final Owner acceptance of the concrete scope/provenance/qualifications remains pending, so T04/REMAIN-P5-GUI-01 remains OPEN. T05/T06/overallP5/P6 remain OPEN. This documentation-only completion adds no new runtime/test claims or full unfiltered gate result.
+
+### Final T04 Owner sign-off —2026-10-19 (recorded21:52 +07:00)
+
+Project Owner explicitly accepted evidence commit bd59f6f: “Xác nhận nghiệm thu T04 theo biên bản.” GUI-P5-T04 COMPLETE / REMAIN-P5-GUI-01 PASS. The accepted worksheet records49baseline +24supplemental UX =73PASS/132N/A/0unresolved,43linked screenshots with verified hashes, explicit28historical02eff22 plus45candidate2d5207b2 provenance and the documented UI qualifications. Actual100/125Light/Dark observations, runtime/SQL separation and all14T04allocations/42principals disposed remain evidenced; final166/166ledgerDropped/exactlatestdatabase-principal-processcensus0. The final sign-off changes documentation only; no new xUnit/runtime execution is claimed. T05/T06, REMAIN-P5-GUI-02, overallP5, REL G1–G5 and production readiness remain OPEN.

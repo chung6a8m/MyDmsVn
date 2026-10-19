@@ -1,6 +1,6 @@
 # GUI-P5 — Full WinForms GUI testing and P5 interactive acceptance
 
-**Created:** 2026-10-19 · **Branch:** `v1a` · **Status:** IN PROGRESS — T00–T03 COMPLETE (inventory/topology/reliability/control coverage/packaged E2E); T04–T06 OPEN. This document does not assert full GUI/P5 acceptance.
+**Created:** 2026-10-19 · **Branch:** `v1a` · **Status:** IN PROGRESS — T00–T04 COMPLETE (inventory/topology/reliability/control coverage/packaged E2E/attended Catalog-Lookup); T05/T06 OPEN. This document does not assert full GUI/P5 acceptance.
 **Planning baseline:** merge `42d94baea1655dddbd46f971e806f84401cd1c63`. Follows completed [RESP](20261018-002-respawn-fixture-reuse.md) and [L2DB](20261018-001-linq2db-net48-persistence-migration.md). [REL](20261019-002-local-v1-p6-release-acceptance.md) owns P6 release acceptance.
 
 ## 1. Objective, authority and scope
@@ -81,15 +81,15 @@ A claimed **full GUI** acceptance needs an explicit behavior-to-test ledger, not
 
 ### GUI-P5-T04 — REMAIN-P5-GUI-01 attended Catalog/Lookup sign-off
 
-- [ ] From the **installed Login-first package**, exercise all four catalog CRUD/active/permission/validation cases, rapid filter/cancel/stale-result behavior, Refresh/page reset, navigation, keyboard and errors.
-- [ ] Keep receipt open during Product/Warehouse/Employee update/deactivate/reactivate; verify same-process lookup refresh, historical selected item, active-only new selection and fresh results on reopen/restart. Never claim cross-process messaging.
-- [ ] Record per-step PASS/FAIL/BLOCKED/NOT RUN, package hash, OS/DPI/runtime, SQL version, actor/permissions, sanitized screenshots, tester/date. GUI automated evidence is listed separately.
+- [x] From the **installed Login-first package**, exercise all four catalog CRUD/active/permission/validation cases, rapid filter/cancel/stale-result behavior, Refresh/page reset, navigation, keyboard and errors.
+- [x] Keep receipt open during Product/Warehouse/Employee update/deactivate/reactivate; verify same-process lookup refresh, historical selected item, active-only new selection and fresh results on reopen/restart. Never claim cross-process messaging.
+- [x] Record per-step PASS/FAIL/BLOCKED/NOT RUN, package hash, OS/DPI/runtime, SQL version, actor/permissions, sanitized screenshots, tester/date. GUI automated evidence is listed separately.
 
-**T04 execution (2026-10-19): VERIFIED / final signature PENDING.** The [operator worksheet](../GUI_P5_T04_WALKTHROUGH.md) records49/49baselinePASS and24/24supplemental UX PASS (73applicable,132N/A by Owner scope). Historical28Catalog functional rows use02eff22; remaining21baseline/all24supplemental rows use candidate2d5207b2. Both100/125Light/Dark UX contexts are Owner-confirmed; artifacts/oracles/final U-05 verified. Both latest chapters closed normally/exit0/CleanupVerified;166/166GUI ledgers Dropped, exact latest database/principal/process census0. T04 checklist/REMAIN-P5-GUI-01 remain OPEN solely pending explicit final Owner signature.
+**T04 execution (2026-10-19): COMPLETE / OWNER ACCEPTED.** The [operator worksheet](../GUI_P5_T04_WALKTHROUGH.md) records49/49baselinePASS and24/24supplemental UX PASS (73applicable,132N/A by Owner scope). Historical28Catalog functional rows use02eff22; remaining21baseline/all24supplemental rows use candidate2d5207b2. Both100/125Light/Dark UX contexts are Owner-confirmed; artifacts/oracles/final U-05 verified. Both latest chapters closed normally/exit0/CleanupVerified;166/166GUI ledgers Dropped, exact latest database/principal/process census0. Project Owner explicitly accepted evidence commit bd59f6f: “Xác nhận nghiệm thu T04 theo biên bản.” Signature recorded21:52 +07:00; T04 COMPLETE / REMAIN-P5-GUI-01 PASS within the documented scope.
 
 Actual old Receipt clipping was repaired in product source1b8bc57. Its filtered candidate1 regression307PASS/3FAIL remains recorded. Frozen candidate2 product/test source d5207b2 passed both100% Lookup Light/Dark rows2/2 within original3-minute subprocess budgets; earlier ReceiptDark working-tree trial passed1/1 on unchanged candidate1 product. Candidate2 attended same-process names, inactive history, active re-selection/real restart and ordinary direct-Deny/no-Read cases have Owner+oracle evidence. Dirty unsaved-Draft navigation is an existing guard; the operator instruction was corrected to close/restart without adding a Save, preserving original Draft2015. No full324-row or125% automated/full-suite candidate2 pass is claimed; attended125%UX observations are recorded separately.
 
-All13T04 ledger allocations/39principals through18:42 were ownership-checked/dropped, exact latest database/principal/process census0 and165/165historical ledgers Dropped. Further UX work uses fresh owned resources with independent cleanup. The worksheet preserves all failures, exact hashes/artifacts, credential-handling correction and remaining cells. T04/P5/P6 remain OPEN.
+The historical18:42 checkpoint had13T04 allocations/39principals disposed. The subsequent UX cohort also completed positive ownership cleanup: final14T04 allocations/42principals disposed,166/166GUI ledgers Dropped and exact latest database/principal/process census0. The worksheet preserves all failures, exact hashes/artifacts, credential-handling correction and accepted UI qualifications. T04 is Owner-accepted; overallP5/P6 and T05/T06 remain OPEN.
 **Exit:** `REMAIN-P5-GUI-01` PASS for every shipped target, else OPEN.
 
 ### GUI-P5-T05 — REMAIN-P5-GUI-02 attended Inventory sign-off

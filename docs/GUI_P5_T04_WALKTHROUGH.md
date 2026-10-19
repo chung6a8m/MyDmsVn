@@ -1,6 +1,6 @@
 # GUI-P5-T04 — Attended Catalog/Lookup walkthrough
 
-**Status: EXECUTION VERIFIED — baseline49/49 and supplemental24/24 observations PASS; final Owner sign-off pending. `REMAIN-P5-GUI-01` remains OPEN until signature.**
+**Status: COMPLETE / OWNER ACCEPTED — baseline49/49 and supplemental24/24 observations PASS; REMAIN-P5-GUI-01 PASS. Owner signature recorded2026-10-19. T05/T06/overallP5/P6 remain OPEN.**
 
 **Plan:** [GUI-P5-T04](plans/20261019-001-full-winforms-gui-p5-acceptance.md#gui-p5-t04--remain-p5-gui-01-attended-cataloglookup-sign-off). **Prepared:** 2026-10-19 (Asia/Bangkok), Codex; documentation base `f33a959`. This is an operator worksheet for actual installed Login-first use. [T03 automated results](GUI_P5_VERIFICATION.md#final-frozen-candidate--gui-p5-t03) remain separate and are not counted as attended passes.
 
@@ -145,11 +145,11 @@ T02 covers deterministic control/debounce/cancellation/stale/focus/error boundar
 
 ## Closure and handoff
 
-**Current decision: OPEN — final Owner signature pending.** Baseline49/49PASS comprises28historical unchanged Catalog rows on02eff22 plus21explicit candidate2 observations including final U-05. Supplemental100%Dark8/8,125%Light8/8 and125%Dark8/8PASS:73applicable observations PASS,132functional repetitions N/A by Owner scope. All166GUI ledgers are Dropped; both current UX chapters ended normally/exit0/CleanupVerified, final exact latest database/principal/process census0. Original failures and source boundaries remain explicit. T04/REMAIN-P5-GUI-01 stays OPEN only for the explicit final Owner signature.
+**Current decision: COMPLETE / OWNER ACCEPTED — REMAIN-P5-GUI-01 PASS.** Baseline49/49PASS comprises28historical unchanged Catalog rows on02eff22 plus21explicit candidate2 observations including final U-05. Supplemental100%Dark8/8,125%Light8/8 and125%Dark8/8PASS:73applicable observations PASS,132functional repetitions N/A by Owner scope. All166GUI ledgers are Dropped; both current UX chapters ended normally/exit0/CleanupVerified, final exact latest database/principal/process census0. Original failures and source boundaries remain explicit. Owner explicitly accepted evidence commit bd59f6f in chat on2026-10-19: “Xác nhận nghiệm thu T04 theo biên bản.” T04/REMAIN-P5-GUI-01 is closed within this recorded scope.
 
 To close: resolve all mandatory case/configuration cells with dated observations, verified artifacts/environment/actors, independent no-mutation checks where specified, sanitized screenshots and positive final cleanup; investigate failures and rerun affected scope on the same or explicitly re-frozen candidate. Record the attendee's exact acceptance scope and outstanding issues. Then, and only then, check T04 and `REMAIN-P5-GUI-01` PASS. T05/T06, the other attended P5 ID and REL/P6 remain OPEN.
 
-**Human sign-off:** PENDING. **Tester/operator:** Project Owner operates/observes, Codex operates/captures and runs restricted oracles; final scope confirmation pending. **Date/time:** PENDING. No signature is inferred from preparation or automated results.
+**Human sign-off:** ACCEPTED — Project Owner: “Xác nhận nghiệm thu T04 theo biên bản.” **Evidence accepted:** bd59f6f, including source provenance, owner-approved matrix and recorded UI qualifications. **Tester/operator:** Project Owner operates/observes; Codex operates/captures and runs restricted oracles. **Recorded:**2026-10-19 21:52 +07:00 (Asia/Bangkok). This is explicit chat sign-off.
 
 ### Frozen attended helper verification
 
@@ -361,3 +361,7 @@ Restricted ownership-verified snapshot ux125dark-final confirms0receipts/Drafts/
 | [candidate2-receipt-125dark.jpg](assets/gui-p5-t04/candidate2-receipt-125dark.jpg) | 24DF299B10AA11D07D15EE37C5E885C52028842057CD8E73ACA2071B5FBFF244 |
 
 Final acceptance proposed to the Project Owner:49baseline plus24supplemental observations (73/73PASS) under the explicitly approved baseline-plus-UX scope. Historical28Catalog functional observations use02eff22; remaining21baseline observations and all24supplemental UX use frozen candidate2d5207b2. Source comparison02eff22..d5207b2 changes only GoodsReceiptControl.cs in product code, so the28Catalog rows are explicitly carried forward, not claimed as rerun. Actual Windows11build26200.9457/net48/x86,1920x1080 at100/125Light/Dark and SQL2017Developer/current001–009 are recorded literally. Known qualifications remain: long lookup result-cell ellipsis, retained global prior-validation notification, and existing dirty unsaved-Draft navigation guard. The repaired Receipt layout is accepted by observed candidate2 UX; prior failed runs remain visible. T05/T06, REMAIN-P5-GUI-02, overallP5 and P6 are OPEN. Final human signature is requested only after this concrete evidence and cleanup record; current task checkbox remains OPEN pending that response.
+
+### Final Owner acceptance —2026-10-19
+
+After the complete evidence/cleanup commit bd59f6f and a plain-chat restatement of the final acceptance question, the Project Owner explicitly replied: “Xác nhận nghiệm thu T04 theo biên bản.” Codex recorded this at21:52 +07:00. This accepts the proposed73/73observations, source boundaries (28historical02eff22,45candidate2d5207b2), approved baseline-plus-UX scope and the recorded UI qualifications. GUI-P5-T04 is COMPLETE; REMAIN-P5-GUI-01 PASS for the sole shipped net48/x86 target under the approved environment. T05/T06, REMAIN-P5-GUI-02, overallP5, REL G1–G5 and production readiness remain OPEN. This signature update changes documentation only; product/package/test bytes and runtime evidence remain unchanged.
