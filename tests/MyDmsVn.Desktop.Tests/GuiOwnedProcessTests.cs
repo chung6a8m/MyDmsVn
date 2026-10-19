@@ -1,12 +1,10 @@
 ﻿using System;
-using System.CodeDom.Compiler;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CSharp;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
@@ -154,15 +152,19 @@ namespace MyDmsVn.Desktop.Tests
             _executable = Path.Combine(_directory, "GuiProcessProbe.exe");
             using (var source = Assembly.GetExecutingAssembly().GetManifestResourceStream("MyDmsVn.Desktop.Tests.GuiProcessProbe.cs")!)
             using (var reader = new StreamReader(source))
-            using (var compiler = new CSharpCodeProvider())
             {
-                var parameters = new CompilerParameters(new[] { "System.dll", "System.Windows.Forms.dll", "System.Drawing.dll" }, _executable)
+                var sourcePath = Path.Combine(_directory, "GuiProcessProbe.cs");
+                File.WriteAllText(sourcePath, reader.ReadToEnd());
+                var compiler = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                    "Microsoft.NET", "Framework", "v4.0.30319", "csc.exe");
+                var result = GuiOwnedProcess.RunAsync(new ProcessStartInfo(compiler,
+                    "/nologo /platform:x86 /target:exe /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /out:\"" +
+                    _executable + "\" \"" + sourcePath + "\"")
                 {
-                    GenerateExecutable = true,
-                    CompilerOptions = "/platform:x86 /target:exe",
-                };
-                var result = compiler.CompileAssemblyFromSource(parameters, reader.ReadToEnd());
-                Assert.False(result.Errors.HasErrors, string.Join(Environment.NewLine, result.Errors.Cast<CompilerError>()));
+                    UseShellExecute = false,
+                    WorkingDirectory = _directory,
+                }, TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
+                Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             }
         }
 
