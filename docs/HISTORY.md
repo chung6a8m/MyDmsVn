@@ -2,7 +2,7 @@
 
 **Reset date:** 2026-10-18 · **Branch assessed:** `v1a` · **Baseline:** [c7ad32a4b0040f87417973eabd6c12757c54f7d5](https://github.com/chung6a8m/MyDmsVn/commit/c7ad32a4b0040f87417973eabd6c12757c54f7d5).
 
-This page is historical provenance, not an execution queue or a test policy. Current work is [RESP then L2DB](plans/README.md). Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
+This page is historical provenance, not an execution queue or a test policy. Current work is [GUI-P5 then REL/P6 after completed RESP/L2DB](plans/README.md). Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
 
 ## Established baseline
 
@@ -43,10 +43,10 @@ Their [immutable pre-removal tests tree](https://github.com/chung6a8m/MyDmsVn/tr
 
 Business SQL tests and their six module owners remain, alongside Application, Architecture and two Desktop owners: ten active net48 test projects. Direct dotnet test/Test Explorer execution uses a local fresh-database helper with live instance/allocation/marker checks before drop. No approval-file, global lease, external watchdog or automatic orphan recovery service is carried forward. See [current test commands](../tests/README.md).
 
-Exactly two implementation plans remain pending: RESP first, then L2DB. Framework removal does not implement fixture reuse, replace the production DAL or grant either plan/release acceptance.
+**Historical state immediately after framework removal (2026-10-18):** two infrastructure plans were then pending, RESP and L2DB. They were implemented/accepted subsequently in PR #36/#37; framework removal **alone** did not implement them or grant release acceptance. The current OPEN acceptance plans are GUI-P5 and REL/P6.
 
 ## Recover a historical source
 
 Use the immutable links above or `git show c7ad32a4b0040f87417973eabd6c12757c54f7d5:<repository-relative-path>`. The full [baseline documentation tree](https://github.com/chung6a8m/MyDmsVn/tree/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs) remains available. A shallow clone may need that commit fetched before using `git show`.
 
-Read historical imperative text as the policy of its date. Current owner decisions, [AGENTS](../AGENTS.md), the two active plans and TEST_POLICY control new work.
+Read historical imperative text as the policy of its date. Current owner decisions, [AGENTS](../AGENTS.md), the current execution-plan index and TEST_POLICY control new work.
