@@ -28,9 +28,9 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 | Case | Action / required evidence |100% Light|
 |---|---|---|
-| A-01 | Actual ordinary Login, masked password, correct actor/session. | NOT RUN |
-| A-02 | GUI create/read fresh T05 Product/Warehouse/Employee; independent fields/active identity. | NOT RUN |
-| R-01 | New Draft, three lookups, quantity/cost/note; Save and independently verify aggregate. | NOT RUN |
+| A-01 | Actual ordinary Login, masked password, correct actor/session. | PASS — Owner confirmed p5.t05.operator/T05Operator, Light and password masking |
+| A-02 | GUI create/read fresh T05 Product/Warehouse/Employee; independent fields/active identity. | PASS — Owner created/read all3; inspected Employee image and restricted oracle catalog-created exact fields |
+| R-01 | New Draft, three lookups, quantity/cost/note; Save and independently verify aggregate. | PASS — Owner Save confirmed; GUI/SQL same Draft1line2.5@4/Total10; actual Note05 baseline draft qualified below |
 | R-02 | Reload, edit quantity/note, Save/reload; same receipt ID, new opaque version, correct total. | NOT RUN |
 | R-03 | Required/empty-lines/zero-quantity and available numeric boundaries; safe errors, retained input, no unintended persisted change. Do not require the UI to accept a numeric value its control rejects. | NOT RUN |
 | R-04 | Dirty unsaved editor blocks navigation/New/Refresh as shipped, preserving input; explicit discard via normal close/restart when needed. | NOT RUN |
@@ -82,3 +82,17 @@ Source002_Identity.sql explicitly declares both normalized identity columns Lati
 Second masked handoff completed; corrected actor seeding reached Ready22:01:23. Existing helper verified schema001–009,3separate principals and limited runtime role. SQL actual14.0.2130.4/Developer Edition64-bit. Fresh restricted oracle baseline-admission verifies8ordinary actors,7active/1disabled,0protected-binding matches;54explicit role assignments with no initial direct grants/denies. Operator/disabled/revoked each13keys, deny5Inventory keys, post-only4Read/Post/Stock keys, writer4Read/Write/Stock keys, no-read onlyPost, restricted onlyReceiptRead. No T05 catalogs/receipts/lines/ledger/balances; independent full-key reconciliation0mismatches.
 
 Chapter1 launched22:01:54, explicit30-minute cap/deadline22:31:54. Actual installed Login window identified; human Login/masking/T05Operator/Light confirmation pending. Desktop child environment excludes test/master/migration/probe credentials. Allocation168 is positively owned/admitted; earlier167ledgers are Dropped. GUI is live and resources deliberately retained under this bounded owner; final cleanup is not yet claimed. The successful SQL setup does not turn any attended ledger case into PASS.
+
+Owner confirmed actual p5.t05.operator Login/T05Operator/Light with masked password and no Login error. A-01 PASS; remaining44applicable observations NOT RUN. Human creating/reading three T05 catalog rows through actual GUI; A-02 is pending confirmation and independent oracle.
+
+### Catalog creation/readback —22:06,100% Light
+
+Owner confirmed GUI create and reopen of Product T05-P-001/T05 Product/pcs, Warehouse T05-W-001/T05 Warehouse/Synthetic T05 and Employee T05-E-001/T05 Employee/0000000000/blankUserId. Restricted ownership-verified catalog-created snapshot matches all fields, all3Active, Employee.HasUserBinding=false;0receipts/lines/ledger/balances. Actual Employee editor/grid and Light theme inspected; A-02 PASS. [Employee readback](assets/gui-p5-t05/employee-readback-100light.jpg), SHA25699CCEB0679DF43452F72D3FDE3AAC0F8F48E437674303200EFBA2D9A9EF4526A. Baseline2/27PASS; supplemental0/18, no Post yet.
+
+Draft instructions issued: one T05-P-001 line2.5000×4.0000, T05-W-001/T05-E-001, Note T05 baseline draft, Save/Total10.00, no Post. R-01 awaits human confirmation, screenshot and oracle. Ignored scoped maintenance controls for later direct-Deny/revocation/rowversion-winner fixtures have syntax validation only and have not executed; every action revalidates exact instance/database ownership and captured maintenance principal. A controlled rowversion winner will be explicitly labeled SQL fixture manipulation, not a second GUI client.
+
+### Initial saved Draft —22:09,100% Light
+
+Owner confirmed Save completed. Restricted baseline-draft-saved oracle: GR0000000001 Draft, one T05-P-001 line2.5000@4.0000, T05-W-001/T05-E-001, rowversion token2019;0ledger/balance/reconciliation mismatches. Inspected actual controls/grid/status match Total10.00 and Goods receipt saved. Actual Note is05 baseline draft in both UI and SQL, differing from the requested synthetic label T05 baseline draft; the actual value is retained in evidence rather than silently corrected or attributed to a product fault. R-01 PASS for the observed aggregate persistence; the next edit explicitly changes Note toT05 baseline edited.
+
+[Saved Draft](assets/gui-p5-t05/draft-saved-100light.jpg), SHA256 C909C3FFFFD0C04A6EBD35A4FDF8F3FC1932014AED0E51F3C56F0C69E25C016F. Baseline3/27PASS, supplemental0/18. Owner instructed to reopen, edit3.1250/NoteT05 baseline edited, attempt Refresh while dirty (must block/preserve), Save and reopen with Total12.50; R-02/R-04 pending human/oracle. No Post authorized yet.
