@@ -1,6 +1,6 @@
 # Test coverage — MyDmsVn
 
-**Updated:** 2026-10-18. This document states what behavior must remain covered. [TEST_POLICY](TEST_POLICY.md) alone decides when/how broadly to execute it; [tests/README](../tests/README.md) lists direct commands. The current SQL implementation is LINQ to DB plus typed native SqlClient. RESP fixture boundaries remain accepted; T06 converts test-only SQL oracles to native SqlClient while retaining cases and assertions. T07 plan-specific correctness/package/Local smoke acceptance is complete; full automated GUI remains conditionally NOT RUN and broader release gates remain deferred.
+**Updated:** 2026-10-19. This document owns required behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) has actual commands. Current production persistence is LINQ to DB and typed native SqlClient, with accepted test-only Respawn fixtures. L2DB-T07 accepted scoped correctness/package/limited Local smoke; its 139 Desktop GUI invocations were NOT RUN. Current OPEN acceptance plans are [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md).
 
 ## Coverage owners
 
@@ -64,6 +64,6 @@ Paths are under `tests/`. Product and all ten active test projects use `net48`; 
 
 Pure ViewModel/session checks use deterministic data and clocks. Controls/message-loop/focus tests use STA and serialized GUI resources with bounded disposal and exception capture. No headless exception, DataError, printer, login or file dialog may stall the testhost.
 
-Packaged manual GUI acceptance is separate evidence. Pending P5 catalog/filter/lookup and end-to-end receipt/stock walkthroughs, P6 clean-machine deployment/recovery and release checks remain in [Deferred work](DEFERRED_WORK.md). They are not completed by earlier automated results or this context reset.
+Guarded STA/control tests, real-login packaged GUI Automation E2E with independent SQL assertions, and attended P5 walkthroughs are separate evidence. [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) owns the full current GUI inventory, modal/hang/process bounding and both P5 checks. [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md) owns clean-VM install/upgrade, credentials/diagnostics, backup/restore and signed G1–G5 gates. Earlier automated or narrow T07 smoke results do not complete either plan.
 
 P7 contract/HTTP parity, bearer authentication and modern-target reactivation are future coverage requirements when that scope is activated. Do not create an API host to satisfy a test listed here.
