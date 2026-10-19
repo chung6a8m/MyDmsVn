@@ -19,6 +19,7 @@ internal sealed class SqlTestDatabase : IDisposable
     private readonly string _serverName;
     private readonly string _ownershipToken;
     private readonly (int Id, DateTime CreateDate) _identity;
+    private readonly bool _guiAllocation;
     private int _disposeState;
 
     private SqlTestDatabase(
@@ -27,13 +28,15 @@ internal sealed class SqlTestDatabase : IDisposable
         string databaseName,
         string serverName,
         string ownershipToken,
-        (int Id, DateTime CreateDate) identity)
+        (int Id, DateTime CreateDate) identity,
+        bool guiAllocation)
     {
         _adminConnectionString = adminConnectionString;
         _connectionFactory = connectionFactory;
         _serverName = serverName;
         _ownershipToken = ownershipToken;
         _identity = identity;
+        _guiAllocation = guiAllocation;
         DatabaseName = databaseName;
         ConnectionString = new SqlConnectionStringBuilder(adminConnectionString)
         {
@@ -55,11 +58,25 @@ internal sealed class SqlTestDatabase : IDisposable
             value => new SqlConnection(value),
             _ => { });
 
-    internal static async Task<SqlTestDatabase> CreateAsync(
+    public static Task<SqlTestDatabase> CreateGuiAsync(
+        string adminConnectionString,
+        CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(adminConnectionString, cancellationToken,
+            value => new SqlConnection(value), _ => { }, guiAllocation: true);
+
+    internal static Task<SqlTestDatabase> CreateAsync(
         string adminConnectionString,
         CancellationToken cancellationToken,
         Func<string, SqlConnection> connectionFactory,
-        Action<string> afterCreate)
+        Action<string> afterCreate) =>
+        CreateCoreAsync(adminConnectionString, cancellationToken, connectionFactory, afterCreate, guiAllocation: false);
+
+    private static async Task<SqlTestDatabase> CreateCoreAsync(
+        string adminConnectionString,
+        CancellationToken cancellationToken,
+        Func<string, SqlConnection> connectionFactory,
+        Action<string> afterCreate,
+        bool guiAllocation)
     {
         var normalizedConnectionString = NormalizeAdminConnectionString(adminConnectionString);
         if (connectionFactory is null)
@@ -76,8 +93,8 @@ internal sealed class SqlTestDatabase : IDisposable
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(LifecycleTimeout);
         var token = timeout.Token;
-        var databaseName = SqlTestDatabaseName.Create();
-        SqlTestDatabaseName.EnsureDisposable(databaseName);
+        var databaseName = guiAllocation ? SqlTestDatabaseName.CreateGui() : SqlTestDatabaseName.Create();
+        EnsureName(databaseName, guiAllocation);
         var ownershipToken = Guid.NewGuid().ToString("N");
         SqlTestDatabase? database = null;
         var createAttempted = false;
@@ -117,7 +134,8 @@ internal sealed class SqlTestDatabase : IDisposable
                 databaseName,
                 serverName,
                 ownershipToken,
-                identity.Value);
+                identity.Value,
+                guiAllocation);
             afterCreate(databaseName);
             return database;
         }
@@ -157,7 +175,7 @@ internal sealed class SqlTestDatabase : IDisposable
             throw new InvalidOperationException("The SQL test allocation is disposing or disposed.");
         }
 
-        SqlTestDatabaseName.EnsureDisposable(DatabaseName);
+        EnsureName(DatabaseName, _guiAllocation);
         if (connection.State != ConnectionState.Open)
         {
             throw new InvalidOperationException("Ownership verification requires an open connection.");
@@ -198,7 +216,7 @@ internal sealed class SqlTestDatabase : IDisposable
 
         try
         {
-            SqlTestDatabaseName.EnsureDisposable(DatabaseName);
+            EnsureName(DatabaseName, _guiAllocation);
             using var timeout = new CancellationTokenSource(LifecycleTimeout);
             var token = timeout.Token;
             using var connection = _connectionFactory(_adminConnectionString);
@@ -244,6 +262,12 @@ internal sealed class SqlTestDatabase : IDisposable
             Volatile.Write(ref _disposeState, 0);
             throw;
         }
+    }
+
+    private static void EnsureName(string name, bool guiAllocation)
+    {
+        if (guiAllocation) SqlTestDatabaseName.EnsureGuiDisposable(name);
+        else SqlTestDatabaseName.EnsureDisposable(name);
     }
 
     private static string NormalizeAdminConnectionString(string connectionString)
