@@ -932,17 +932,24 @@ namespace MyDmsVn.Desktop.WinForms
         private Control CreateLayout()
         {
             var master = new Panel { Dock = DockStyle.Fill };
-            var masterBar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 5, Padding = new Padding(8) };
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            masterBar.Controls.Add(SearchBox, 0, 0);
-            masterBar.Controls.Add(WarehouseFilterLookup, 1, 0);
-            masterBar.Controls.Add(StatusFilter, 2, 0);
-            masterBar.Controls.Add(RefreshButton, 3, 0);
-            masterBar.Controls.Add(NewButton, 4, 0);
+            var masterBar = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(8),
+            };
+            SearchBox.Dock = DockStyle.None;
+            SearchBox.Width = 180;
+            WarehouseFilterLookup.Dock = DockStyle.None;
+            WarehouseFilterLookup.Width = 190;
+            StatusFilter.Dock = DockStyle.None;
+            StatusFilter.Width = 110;
+            masterBar.Controls.AddRange(new Control[]
+            {
+                SearchBox, WarehouseFilterLookup, StatusFilter, RefreshButton, NewButton,
+            });
             var pagingBar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
@@ -959,6 +966,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             var detail = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1 };
             detail.Panel1MinSize = 300;
+            detail.SizeChanged += (_, __) => KeepReceiptEditorsVisible(detail);
             detail.Panel1.Controls.Add(CreateHeaderEditor());
             detail.Panel2.Controls.Add(CreateLineEditor());
 
@@ -968,6 +976,19 @@ namespace MyDmsVn.Desktop.WinForms
             return split;
         }
 
+        private static void KeepReceiptEditorsVisible(SplitContainer split)
+        {
+            // A fixed panel can retain its tiny construction-time distance even below Panel1MinSize.
+            var scale = split.DeviceDpi / 96f;
+            var headerMinimum = (int)Math.Ceiling(300 * scale);
+            var linesMinimum = (int)Math.Ceiling(240 * scale);
+            var available = split.ClientSize.Width - split.SplitterWidth;
+            if (available < headerMinimum + linesMinimum)
+                return;
+            var distance = Math.Max(headerMinimum, Math.Min(split.SplitterDistance, available - linesMinimum));
+            if (split.SplitterDistance != distance)
+                split.SplitterDistance = distance;
+        }
         private Control CreateHeaderEditor()
         {
             var panel = new TableLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 1, Padding = new Padding(8) };

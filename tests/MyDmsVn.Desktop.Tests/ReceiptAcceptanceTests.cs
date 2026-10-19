@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using CommunityToolkit.Mvvm.Messaging;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
@@ -363,6 +364,96 @@ public sealed class ReceiptAcceptanceTests
             Assert.False(nextControl.IsDisposed);
             Assert.Empty(guard.Exceptions);
         }, TimeSpan.FromSeconds(10));
+    }
+
+    [Theory]
+    [InlineData(944, BootstrapThemeMode.Light)]
+    [InlineData(1680, BootstrapThemeMode.Light)]
+    [InlineData(944, BootstrapThemeMode.Dark)]
+    [InlineData(1680, BootstrapThemeMode.Dark)]
+    public void Receipt_header_fields_and_commands_remain_visible_at_supported_workspace_widths(int width, BootstrapThemeMode mode)
+    {
+        StaTest.Run(token =>
+        {
+            var originalTheme = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                using var guard = new WinFormsTestGuard();
+                using var fixture = new Fixture();
+                using var control = fixture.CreateControl();
+                using var host = new Form { ClientSize = new System.Drawing.Size(width, 900), AutoScaleMode = AutoScaleMode.None };
+                host.Controls.Add(control);
+                host.Show();
+                Load(control, token);
+                host.PerformLayout();
+                System.Windows.Forms.Application.DoEvents();
+                host.ClientSize = new System.Drawing.Size(width == 944 ? 1680 : 944, 900);
+                System.Windows.Forms.Application.DoEvents();
+                host.ClientSize = new System.Drawing.Size(width, 900);
+                System.Windows.Forms.Application.DoEvents();
+                var ancestry = string.Join(" / ", Parents(control.WarehouseLookup).Select(p =>
+                    p.GetType().Name + " Bounds=" + p.Bounds + " Client=" + p.ClientSize +
+                    (p is SplitContainer split ? " Distance=" + split.SplitterDistance + " Min1=" + split.Panel1MinSize : "")));
+                Assert.True(control.WarehouseLookup.Width >= 240,
+                    "Warehouse input too narrow: " + control.WarehouseLookup.Bounds + "; " + ancestry);
+                foreach (var input in new Control[] { control.ReceiptDateEditor, control.WarehouseLookup,
+                    control.EmployeeLookup, control.NoteEditor, control.SaveButton, control.PostButton })
+                {
+                    var expected = input.RectangleToScreen(input.ClientRectangle);
+                    var visible = expected;
+                    foreach (var parent in Parents(input))
+                        visible.Intersect(parent.RectangleToScreen(parent.ClientRectangle));
+                    Assert.True(expected == visible, input.GetType().Name + " clipped: expected=" + expected + " visible=" + visible + "; " + ancestry);
+                }
+                Assert.Empty(guard.Exceptions);
+            }
+            finally { BootstrapThemeManager.CurrentTheme = originalTheme; }
+        }, TimeSpan.FromSeconds(10));
+    }
+
+    [Theory]
+    [InlineData(944, BootstrapThemeMode.Light)]
+    [InlineData(1680, BootstrapThemeMode.Light)]
+    [InlineData(944, BootstrapThemeMode.Dark)]
+    [InlineData(1680, BootstrapThemeMode.Dark)]
+    public void Receipt_filters_remain_visible_and_search_usable_at_supported_workspace_widths(int width, BootstrapThemeMode mode)
+    {
+        StaTest.Run(token =>
+        {
+            var originalTheme = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                using var guard = new WinFormsTestGuard();
+                using var fixture = new Fixture();
+                using var control = fixture.CreateControl();
+                using var host = new Form { ClientSize = new System.Drawing.Size(width, 900), AutoScaleMode = AutoScaleMode.None };
+                host.Controls.Add(control);
+                host.Show();
+                Load(control, token);
+                host.PerformLayout();
+                System.Windows.Forms.Application.DoEvents();
+                Assert.True(control.SearchBox.Width >= 100, "Receipt search width=" + control.SearchBox.Width);
+                foreach (var input in new Control[] { control.SearchBox, control.WarehouseFilterLookup,
+                    control.StatusFilter, control.RefreshButton, control.NewButton })
+                {
+                    var expected = input.RectangleToScreen(input.ClientRectangle);
+                    var visible = expected;
+                    foreach (var parent in Parents(input))
+                        visible.Intersect(parent.RectangleToScreen(parent.ClientRectangle));
+                    Assert.True(expected == visible, input.GetType().Name + " clipped: expected=" + expected + " visible=" + visible);
+                }
+                Assert.Empty(guard.Exceptions);
+            }
+            finally { BootstrapThemeManager.CurrentTheme = originalTheme; }
+        }, TimeSpan.FromSeconds(10));
+    }
+
+    private static IEnumerable<Control> Parents(Control control)
+    {
+        for (var parent = control.Parent; parent != null; parent = parent.Parent)
+            yield return parent;
     }
 
     private static IEnumerable<CatalogLookupOption> Options(object? source)
