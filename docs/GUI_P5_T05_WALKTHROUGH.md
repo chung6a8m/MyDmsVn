@@ -190,3 +190,10 @@ Human Login confirmed by actual shell T05 Writer No Post, clean workspace with n
 - [writer-post-denied-100light.jpg](assets/gui-p5-t05/writer-post-denied-100light.jpg), SHA256 9947407750EF0B71A3190B90FE68269B518B34B03733B8BA1FC72D48852FCCFB.
 
 Chapter2 closed normally22:51:15/exit0/CleanupVerified before22:55:37 cap. Chapter3 launch requested while root admission remains open, same positively owned allocation; final disposal pending.
+
+### Direct Post Deny — executed, Owner confirmation pending
+
+Chapter3 actual human Login displayed T05 Direct Deny with clean workspace. GUI loaded T05-FIX-DENY Draft, NoteT05 direct deny/token2027, one1@4line/Total4; Post enabled before assignment change. Existing exact-owned maintenance DenyPost control validated ordinary active/nonprotected actor and role Post grant, then inserted only direct Inventory.GoodsReceipts.Post Deny. Restricted direct-deny-assigned and direct-deny-rejected snapshots verify RoleGrantPost plus DirectGrant0. One actual Post from the still-enabled UI returned The operation is not permitted.; Note/Draft/token2027 retained, total2ledger/onebalance3.375 and0reconciliation/posted-line/document mismatches. No blind retry or extra mutation. P-04 pending Owner observation confirmation; no product/test changes. Sign out then human p5.t05.no-read Login requested.
+
+- [direct-deny-before-100light.jpg](assets/gui-p5-t05/direct-deny-before-100light.jpg), SHA256 5D11040D27628F153D0EE244216F1F427A0E92764463EAC8EFE7AD4AC21AA9A9.
+- [direct-deny-rejected-100light.jpg](assets/gui-p5-t05/direct-deny-rejected-100light.jpg), SHA256 90C3DD5BA38EF8C109A38A2ADAC2ABB87AADA41A9989C15589CC232112AE0654.
