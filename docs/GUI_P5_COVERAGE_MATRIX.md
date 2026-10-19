@@ -1,8 +1,8 @@
 # GUI-P5 coverage matrix and T00 baseline
 
-**Task:** GUI-P5-T00, [acceptance plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md). **Recorded:** 2026-10-19 (Asia/Bangkok), Codex; operator sign-off pending. **Source:** `f275183c8b39dc2b712dc37be7f0f4ac71396357` on `v1a`, isolated implementation branch `codex/gui-p5-t00`. Documentation changes do not change the executable candidate.
+**Task:** GUI-P5-T00, [acceptance plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md). **Recorded:** 2026-10-19 (Asia/Bangkok), Codex; Project Owner approved the Minimal Disposable Test Topology and T00 scope in this chat on the same date. **Executable source:** `f275183c8b39dc2b712dc37be7f0f4ac71396357` on `v1a`, isolated implementation branch `codex/gui-p5-t00`; initial inventory/evidence commit `7cfefd4`. Documentation changes do not change the executable candidate.
 
-**Status: inventory published; topology approval OPEN / packaged acceptance BLOCKED.** The source inventory and focused baseline below are evidence only for their stated scope. T01–T06, both attended P5 IDs, REL G1–G5 and production readiness remain OPEN. No package was built or installed in T00; no package hash or real-login result is available.
+**Status: GUI-P5-T00 COMPLETE — reviewed inventory, owner-approved topology and explicit execution prerequisites. Packaged execution readiness remains BLOCKED / NOT TESTED as detailed below.** T00 completes reconciliation/planning, not environment certification. The source inventory and focused baseline below are evidence only for their stated scope. T01–T06, both attended P5 IDs, REL G1–G5 and production readiness remain OPEN. No package was built or installed in T00; no package hash or real-login result is available.
 
 ## 1. How to use this ledger
 
@@ -23,8 +23,8 @@ All listed test projects and shipped hosts target `net48`. Desktop tests contain
 | Selected/executed | 10 Facts: `LoginFormTests` (2), `WinFormsTestInfrastructureTests` (8) | Focused baseline, ordinary testhost; no actual packaged Login |
 | Actual TRX | 10 executed, 10 passed, 0 failed/error/timeout/aborted/notExecuted | 129 discovered invocations unselected / NOT RUN, not skipped |
 | Session project | Source read for behavior mapping; 0 selected/executed in T00 | No Session project pass claimed |
-| SQL | Test connection setting present in process and User scope; value not printed or used | No connection, SQL version/edition, topology/principal validation or SQL test execution |
-| Display/package | Theme/DPI and x86 packaged/testhost matrix NOT TESTED | Focused rendering tests do not establish a DPI matrix; x64 runner banner does not prove x86 execution |
+| SQL | Test setting present and identical in process/User scope; parsed without opening SQL: effective catalog `master`, no AttachDBFilename/UserInstance | Endpoint/credentials withheld; no connection, SQL version/edition, instance-ownership/principal validation or SQL test execution |
+| Display/package | Follow-up metadata: primary display 1920×1080 at 100%; application DPI/theme matrix and x86 packaged/testhost execution NOT TESTED | Desktop OS theme settings are Dark; they do not establish application theme. Focused rendering tests do not establish a DPI matrix; x64 runner banner does not prove x86 execution |
 | Resources | Focused test command completed; no packaged app, SQL DB or SQL principal allocated | No subprocess/DB cleanup claim for T01/T03; raw TRX/logs remain local |
 
 Commands run sequentially from the isolated repository root:
@@ -101,15 +101,28 @@ If SourceGrid does not expose sufficient patterns, T03 must document the exact f
 
 ## 6. Disposable topology, credentials and cleanup contract
 
-**Approval status: OPEN.** The configured SQL test setting's presence does not identify an approved packaged E2E topology, grant permission to reuse an application DB or certify runtime least privilege. T00 requested the owner/operator's Windows/DPI, non-production SQL instance, runtime principal and approver selection. Until recorded, no SQL allocation/provisioning or real package launch is authorized by this document. This is the remaining T00 exit prerequisite; no approved topology is invented. [T07 resource evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) records a scenario-specific temporary-login exception consumed by cleanup; it is not standing authorization to create another server principal for GUI-P5.
+**Approval: Project Owner, 2026-10-19, explicit chat decision “GUI-P5-T00 — Minimal Disposable Test Topology”.** The owner approved the configuration, identity separation, secure credential delivery/cleanup boundaries and T00 scope below. An owner-managed SQL instance is approved for testing; a shared SQL Server additionally requires its DBA/instance owner's confirmation. The current configured endpoint's private/shared ownership has not been established. Existing credential presence is not proof of that condition, suitability or runtime least privilege. No SQL connection or provisioning was attempted in T00. The earlier [T07 resource exception](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) was consumed by its cleanup; GUI-P5 authorization comes from this new decision, not that old run.
 
-| Proposal for owner review | Required evidence / current status |
+| Approved Minimal Disposable Test Topology | Actual evidence / execution state |
 |---|---|
-| Interactive Windows 11 x64 image, .NET Framework 4.8, published desktop x86; net48 x86 test/probe configuration | Candidate only; observed developer build above is not a supported release image. REL owns final OS support decisions |
-| 96/144/192 DPI (100/150/200%), light/dark, keyboard navigation; one GUI process/suite at a time | Proposed GUI matrix; all combinations NOT TESTED as an acceptance matrix |
-| One designated non-production SQL Server instance, effective test connection `master`; one fresh positively owned GUI E2E DB per scenario group | Exact instance/edition/version/SQL auth/TLS policy and approving operator pending. No LocalDB/default instance substitution; no production/backup/recovery DB |
-| Separate setup/maintenance, least-privilege runtime and independent read-only oracle identities | Actual principal mapping/ACL/effective grants pending; runtime must never inherit test create/drop or maintenance rights |
-| Production schemas/scripts001–009, exact current journal + protected superuser binding, deliberately seeded ordinary accounts | Setup/admin migrator first, then provisioning and bootstrap; no bootstrap/DbUp in desktop; test-specific ownership metadata retained separately from release schema assertions |
+| Windows 11 x64 interactive desktop, .NET Framework 4.8 requirement, application `net48`/x86 | **Observed:** CIM reports Windows 11 Home Single Language 25H2, version `10.0.26200`, build/UBR `26200.9457`; OS x64, interactive true, session 38. Installed v4 runtime registry Version `4.8.09221`, Release `533509`; prior net48 build/focused tests succeeded. An exact 4.8-only image and packaged x86 execution remain **NOT TESTED**. No broader OS support/clean-VM claim |
+| Baseline primary display 1920×1080, 100% (96 DPI); supplementary 125% (120 DPI); application Light/Dark; one GUI suite/process at a time | **PASS, metadata only:** primary physical dimensions 1920×1080, monitor scale 100%, native scale API result 0. **NOT TESTED:** 125% and application Light/Dark scenario matrix. 150% is outside the current mandatory matrix; 200% is not added. No workstation display/theme settings were changed |
+| Prefer suitable existing non-production SQL Server; SQL Server 2022 Developer is target only if new provisioning is needed | **BLOCKED for SQL E2E admission:** actual edition/version, suitability and private/shared ownership not verified. Existing test connection parses to `master` without attachment/user-instance options. No server contacted or new SQL instance installed; shared-instance use needs DBA/instance-owner confirmation |
+| Dedicated application database `MyDmsVn_GuiP5_<GUID>` with scripts001–009; separate from production and recovery drills | **NOT PROVISIONED:** no GUI-P5 database/schema/journal/binding created. Existing SQL helper name guard accepts only `MyDmsVn_Test_<32-hex-GUID>`; it does not yet allocate/admit the approved GUI prefix. T03 prerequisite below preserves positive ownership checks |
+| Distinct test database provisioning, migration/maintenance and runtime identities; Desktop uses only runtime in its application test DB | **NOT PROVISIONED / NOT TESTED:** principal names, effective grants and credential ACLs not established. Harness `master` connection serves infrastructure only. Runtime must receive only reviewed `MyDmsVnRuntimeRole` object/column/procedure rights, no `db_owner`, DDL or out-of-design administration. Independent oracle reads use separately reviewed access, without broadening runtime grants |
+| Ownership proof, actual process/connection/worker drain, identity/marker revalidation before deletion; uncertain ownership retained/reported | **Procedure pinned below; destructive execution NOT TESTED in T00.** No DB/principal/process allocation to delete. Prefix matching alone never authorizes cleanup |
+
+Follow-up observations used read-only CIM/registry/native display metadata: `Win32_OperatingSystem`, Windows CurrentVersion build/UBR, installed Framework v4 Full Release/Version, primary `GetSystemMetrics` under a temporary per-monitor-aware thread context and `GetScaleFactorForMonitor`. The thread context was restored. SQL configuration was parsed locally with `SqlConnectionStringBuilder.set_ConnectionString`; values were never printed or persisted and no SQL connection was opened. Source/project/script checks establish `net48` and publish `-p:PlatformTarget=x86`, not runtime package verification. Test counts in section 2 are the existing T00 run; no additional test invocation is implied by metadata checks.
+
+### Remaining provisioning steps before T03 execution
+
+These are explicit prerequisites, not failed coverage-inventory criteria. T00 does not require their execution; actual results must be recorded by the owning task.
+
+1. **Owner/operator, before SQL admission:** identify the exact designated non-production instance privately, confirm owner-managed versus shared; obtain additional DBA/instance-owner confirmation for shared SQL. Then perform bounded read-only server edition/version/authentication/TLS checks and assess the existing instance. If unsuitable or absent, provision SQL Server 2022 Developer on approved resources; no automatic installation or fallback is specified.
+2. **T03, existing Desktop test owner with affected SQL-helper coverage under TEST_POLICY:** implement a narrowly scoped allocator/guard for `MyDmsVn_GuiP5_<GUID>` retaining the existing instance/database-ID/create-time/random-marker proof and bounded lifecycle. Review allocation and disposal together. The current `SqlTestDatabaseName` and `SqlTestDatabase.CreateAsync` cannot be treated as already supporting this prefix. Do not merely rename a DB, weaken a prefix guard, accept arbitrary names, or change the accepted RESP fixture behavior. No new generic runner/framework is needed.
+3. **Setup operator + T03:** create the positively owned database and distinct provisioning/migration/runtime identities through the approved administration channel. Apply current packaged migration001–009, unchanged principal script, deliberate protected-superuser bootstrap and test account/permission setup. Verify runtime effective grants, including extra EXECUTE, under the actual principal; give Desktop no provisioning/migration/test-harness credential. Record principal ownership and secure per-run credential delivery/ACLs without secrets. No real credentials have been generated or stored by T00.
+4. **T01 then T03:** deliver bounded process-tree ownership/termination/drain first; publish the actual clean x86 package, validate UIA selectors/patterns and independent SQL oracles. Prepare per-child runtime configuration and read-only oracle access with finite timeouts. Capture hashes, schema/binding/principal checks and readiness before Login/E2E; do not use startup smoke as a real-login substitute.
+5. **T02/T03/T06 with operator:** record actual 100% baseline and 125% supplementary runs, Light/Dark, resolution, OS build/runtime/bitness per run. Scaling/theme scenarios remain NOT TESTED until executed. Do not change a shared desktop's display settings as part of T00.
 
 Use [configuration/security runbook](CONFIGURATION_AND_SQL_SECURITY.md), [security administration runbook](SECURITY_ADMINISTRATION_RUNBOOK.md), [schema runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) and [principal provisioning script](../deployment/sql/Provision-MyDmsVnPrincipals.sql). The runtime uses reviewed object/column grants and only the three named security procedures, no fixed broad roles, DDL, journal/binding mutation or blanket EXECUTE. Audit effective grants separately: a successful current startup validator does not check every extra EXECUTE grant. An independent oracle reads business/security assertions under a separately reviewed identity; do not broaden desktop permissions to obtain test evidence.
 
@@ -117,7 +130,7 @@ Credentials stay outside source/package/TRX/screenshots. Prefer a deliberately a
 
 Required T01/T03 resource lifecycle:
 
-1. Record designated instance and generated allocation identity (`database_id`, creation time, random `MyDmsVn.TestOwnership` marker) using the existing owned SQL helper boundary; never identify ownership by name prefix alone. Keep sensitive values local, publish sanitized counts/status.
+1. Record designated instance and generated `MyDmsVn_GuiP5_<GUID>` allocation identity (`database_id`, creation time, random `MyDmsVn.TestOwnership` marker), preserving the existing owned SQL helper's verification semantics through the T03 prefix prerequisite above; never identify ownership by name prefix alone. Keep sensitive values local, publish sanitized counts/status.
 2. Setup schema/limited principals/accounts under the separate admin identity, then capture clean candidate/manifest/SHA-256, Windows/runtime/bitness/DPI/theme and controlled actor permissions. Do not run Respawn on operational or recovery databases; real packaged scenarios require their own explicitly owned lifecycle.
 3. Start the actual package as an owned bounded child/tree. Track any helpers, timers, queries/readers/UoWs, independent oracle connections and setup resources. T01 supplies timeout/termination/drain self-tests before T03 depends on unattended execution.
 4. Close Login/shell and drain all actual child/descendant processes and SQL operations before cleanup. A timed-out wait is not proof that SQL stopped. Preserve both initial and cleanup failures.
@@ -130,14 +143,22 @@ Required T01/T03 resource lifecycle:
 |---|---|
 | Source/DI/permission/packaging/selector reconciliation | Published here; complete Desktop method/row inventory in Appendix A |
 | Current discovery + smallest safe baseline | 139 discovered; selected 10 / passed 10; remaining 129 NOT RUN |
-| Reviewed matrix | Independent Codex review 2026-10-19: no important findings; 138 source anchors, named methods and 10/10 TRX checked. Owner acceptance pending |
-| Approved executable topology/limited identities | OPEN; owner/operator must select actual resources, credential delivery and approver |
+| Reviewed matrix | Independent Codex review of initial inventory 2026-10-19: no important findings; 138 source anchors, named methods and 10/10 TRX checked. Owner subsequently supplied explicit Minimal Disposable Test Topology approval. Independent follow-up review on 2026-10-19 found no important issues: T00 criteria/status, approved scope, metadata versus runtime evidence and T03 prefix prerequisite are consistent |
+| Approved topology/limited-identity design | COMPLETE for T00: Project Owner decision pinned in section 6, including shared-instance approval condition, secure credential boundaries and cleanup. Actual instance/principals/provisioning and packaged execution remain BLOCKED / NOT TESTED as itemized there |
 | T01 | Bound packaging child wait and fatal/hang cleanup before unattended package tests |
 | T02 | Fill named control/VM gaps; retain independent backend semantics |
 | T03 | Validate native UIA selectors/patterns/x86, actual Login and SQL oracles on approved topology |
 | T04/T05/T06 | Attended P5 + frozen unfiltered GUI/Session and cleanup evidence, all OPEN |
 
-The plan's T00 topology checkbox stays open until an approved actual topology is recorded; this matrix is reviewable preparatory work, not a complete T00/P5/release sign-off.
+### T00 acceptance reconciliation
+
+| T00 criterion | Evidence / disposition |
+|---|---|
+| Read current GUI/VM/source, Facts/Theory rows, permissions, DI/package/selectors; list every Desktop method and separate run states | Sections 2–5 and Appendix A; 138 methods / 139 current discovered invocations, 10/10 focused TRX and 129 NOT RUN. **COMPLETE** |
+| Reviewed coverage matrix with exact executable owners/gaps, proposed Windows/DPI/SQL and native automation approach | Sections 3–5; source-linked methods, task owners, selector limitations; no external library adopted, hence external-library spike condition not triggered. Actual native packaged UIA remains T03. **COMPLETE** |
+| Pin approved disposable topology, least-privilege identity design, secure credential handling/cleanup and supported/not-tested distinction | Owner decision and section 6 pin all requested boundaries; verified metadata and unprovisioned components have separate outcomes and executable prerequisite owners. **COMPLETE for T00**, without provisioning/runtime PASS |
+
+**T00 exit met:** reviewed coverage matrix, owner-approved Minimal Disposable Test Topology and explicit prerequisites are recorded. The owner's follow-up explicitly allows unprovisioned infrastructure to be recorded as remaining steps rather than a coverage-inventory failure. T00 completion does not certify environment readiness, actual least privilege, packaged E2E, either P5 walkthrough or P6 release support. Next task is T01; prerequisite/resource preparation may proceed within the recorded approval conditions.
 
 ## Appendix A. Complete Desktop test method inventory
 
