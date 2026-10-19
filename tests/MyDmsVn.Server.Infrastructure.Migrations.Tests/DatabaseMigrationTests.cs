@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using DbUp;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;

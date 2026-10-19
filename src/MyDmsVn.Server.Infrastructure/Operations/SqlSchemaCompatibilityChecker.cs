@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Server.Infrastructure.Persistence;
 using Microsoft.Data.SqlClient;
 
 namespace MyDmsVn.Server.Infrastructure.Operations;
@@ -546,39 +546,30 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
             throw new ArgumentException("The SQL connection must be open.", nameof(connection));
         }
 
-        var journalExists = await connection.QuerySingleAsync<int>(
-            new CommandDefinition(
-                "SELECT CASE WHEN OBJECT_ID(N'dbo.SchemaVersions', N'U') IS NULL THEN 0 ELSE 1 END;",
-                cancellationToken: cancellationToken)).ConfigureAwait(false) == 1;
+        using var journalCommand = SqlRead.Command(connection, null,
+            "SELECT CASE WHEN OBJECT_ID(N'dbo.SchemaVersions', N'U') IS NULL THEN 0 ELSE 1 END;");
+        var journalExists = await SqlRead.SingleAsync(journalCommand, reader => reader.GetInt32(0), cancellationToken).ConfigureAwait(false) == 1;
 
         IReadOnlyList<string> scripts;
         if (journalExists)
         {
-            var applied = await connection.QueryAsync<string>(
-                new CommandDefinition(
-                    "SELECT ScriptName FROM dbo.SchemaVersions ORDER BY Id;",
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
-            scripts = applied.ToList();
+            using var scriptsCommand = SqlRead.Command(connection, null, "SELECT ScriptName FROM dbo.SchemaVersions ORDER BY Id;");
+            scripts = await SqlRead.QueryAsync(scriptsCommand, reader => reader.GetString(0), cancellationToken).ConfigureAwait(false);
         }
         else
         {
             scripts = Array.Empty<string>();
         }
 
-        var artifactRows = await connection.QueryAsync<string>(
-            new CommandDefinition(
-                ArtifactSql,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        using var artifactCommand = SqlRead.Command(connection, null, ArtifactSql);
+        var artifactRows = await SqlRead.QueryAsync(artifactCommand, reader => reader.GetString(0), cancellationToken).ConfigureAwait(false);
         var artifacts = new HashSet<string>(artifactRows, StringComparer.Ordinal);
 
         if (journalExists)
         {
-            var columnArtifactRows = await connection.QueryAsync<string>(
-                new CommandDefinition(
-                    ColumnArtifactSql,
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            using var columnCommand = SqlRead.Command(connection, null, ColumnArtifactSql);
+            var columnArtifactRows = await SqlRead.QueryAsync(columnCommand, reader => reader.GetString(0), cancellationToken).ConfigureAwait(false);
             artifacts.UnionWith(columnArtifactRows);
-
         }
 
         return SchemaCompatibilityPolicy.Evaluate(

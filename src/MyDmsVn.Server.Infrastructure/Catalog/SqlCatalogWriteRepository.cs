@@ -1,226 +1,221 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using LinqToDB;
+using LinqToDB.Async;
+using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Domain.Catalog;
 using MyDmsVn.Server.Infrastructure.Persistence;
-using Microsoft.Data.SqlClient;
-using RepoDb;
 
 namespace MyDmsVn.Server.Infrastructure.Catalog;
 
-internal sealed class SqlCatalogWriteRepository : ICatalogWriteRepository
+internal sealed class SqlCatalogWriteRepository(ISqlExecutionContext context, ILinqToDbSessionFactory sessions) : ICatalogWriteRepository
 {
-    private readonly ISqlExecutionContext _context;
+    public Task<int> InsertProductAsync(Product product, CancellationToken cancellationToken) =>
+        TranslateAsync(async () =>
+        {
+            if (product is null) throw new ArgumentNullException(nameof(product));
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = sessions.Borrow(context, requireTransaction: true);
+            // Explicit create allowlist: identity/server time/update audit stay database-owned.
+            return await db.GetTable<Product>()
+                .Value(e => e.Code, product.Code)
+                .Value(e => e.Name, product.Name)
+                .Value(e => e.Unit, product.Unit)
+                .Value(e => e.IsActive, product.IsActive)
+                .Value(e => e.CreatedByUserId, product.CreatedByUserId)
+                .InsertWithInt32IdentityAsync(cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Product insert returned no identity.");
+        }, employee: false);
 
-    public SqlCatalogWriteRepository(ISqlExecutionContext context)
+    public Task<Product?> UpdateProductAsync(Product product, CancellationToken cancellationToken) =>
+        TranslateAsync(async () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = sessions.Borrow(context, requireTransaction: true);
+            // Ordinary edits cannot overwrite creation audit or reactivate an inactive row.
+            var affected = await db.GetTable<Product>().Where(e => e.Id == product.Id)
+                .Set(e => e.Code, product.Code)
+                .Set(e => e.Name, product.Name)
+                .Set(e => e.Unit, product.Unit)
+                .Set(e => e.UpdatedAtUtc, product.UpdatedAtUtc)
+                .Set(e => e.UpdatedByUserId, product.UpdatedByUserId)
+                .UpdateAsync(cancellationToken).ConfigureAwait(false);
+            return affected == 1
+                ? await db.GetTable<Product>().SingleAsync(e => e.Id == product.Id, cancellationToken).ConfigureAwait(false)
+                : null;
+        }, employee: false);
+
+    public async Task<bool> SetProductActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken)
     {
-        _context = context ?? throw new ArgumentNullException(nameof(context));
+        cancellationToken.ThrowIfCancellationRequested();
+        using var db = sessions.Borrow(context, requireTransaction: true);
+        return await db.GetTable<Product>().Where(e => e.Id == id)
+            .Set(e => e.IsActive, isActive)
+            .Set(e => e.UpdatedAtUtc, updatedAtUtc)
+            .Set(e => e.UpdatedByUserId, updatedByUserId)
+            .UpdateAsync(cancellationToken).ConfigureAwait(false) == 1;
     }
 
-    public Task<int> InsertProductAsync(Product product, CancellationToken cancellationToken)
-    {
-        return InsertWithConflictTranslationAsync(
-            product,
-            CatalogRepoDbWriteFields.ProductCreate,
-            cancellationToken);
-    }
-
-    public Task<Product?> UpdateProductAsync(Product product, CancellationToken cancellationToken)
-    {
-        return UpdateWithConflictTranslationAsync(
-            product,
-            CatalogRepoDbWriteFields.ProductUpdate,
-            product.Id,
-            cancellationToken);
-    }
-
-    public Task<bool> SetProductActiveAsync(
-        int id,
-        bool isActive,
-        DateTime updatedAtUtc,
-        int? updatedByUserId,
-        CancellationToken cancellationToken)
-    {
-        return UpdateAsync(
-            new Product
-            {
-                Id = id,
-                IsActive = isActive,
-                UpdatedAtUtc = updatedAtUtc,
-                UpdatedByUserId = updatedByUserId,
-            },
-            CatalogRepoDbWriteFields.ProductActiveUpdate,
-            cancellationToken);
-    }
-
-    public Task<int> InsertWarehouseAsync(Warehouse warehouse, CancellationToken cancellationToken)
-    {
-        return InsertWithConflictTranslationAsync(
-            warehouse, CatalogRepoDbWriteFields.WarehouseCreate, cancellationToken);
-    }
+    public Task<int> InsertWarehouseAsync(Warehouse warehouse, CancellationToken cancellationToken) =>
+        TranslateAsync(async () =>
+        {
+            if (warehouse is null) throw new ArgumentNullException(nameof(warehouse));
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = sessions.Borrow(context, requireTransaction: true);
+            // Explicit create allowlist: identity/server time/update audit stay database-owned.
+            return await db.GetTable<Warehouse>()
+                .Value(e => e.Code, warehouse.Code)
+                .Value(e => e.Name, warehouse.Name)
+                .Value(e => e.Address, warehouse.Address)
+                .Value(e => e.IsActive, warehouse.IsActive)
+                .Value(e => e.CreatedByUserId, warehouse.CreatedByUserId)
+                .InsertWithInt32IdentityAsync(cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Warehouse insert returned no identity.");
+        }, employee: false);
 
     public Task<Warehouse?> UpdateWarehouseAsync(Warehouse warehouse, CancellationToken cancellationToken) =>
-        UpdateWithConflictTranslationAsync(warehouse, CatalogRepoDbWriteFields.WarehouseUpdate, warehouse.Id, cancellationToken);
+        TranslateAsync(async () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = sessions.Borrow(context, requireTransaction: true);
+            // Ordinary edits cannot overwrite creation audit or reactivate an inactive row.
+            var affected = await db.GetTable<Warehouse>().Where(e => e.Id == warehouse.Id)
+                .Set(e => e.Code, warehouse.Code)
+                .Set(e => e.Name, warehouse.Name)
+                .Set(e => e.Address, warehouse.Address)
+                .Set(e => e.UpdatedAtUtc, warehouse.UpdatedAtUtc)
+                .Set(e => e.UpdatedByUserId, warehouse.UpdatedByUserId)
+                .UpdateAsync(cancellationToken).ConfigureAwait(false);
+            return affected == 1
+                ? await db.GetTable<Warehouse>().SingleAsync(e => e.Id == warehouse.Id, cancellationToken).ConfigureAwait(false)
+                : null;
+        }, employee: false);
 
-    public Task<bool> SetWarehouseActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
-        UpdateAsync(new Warehouse { Id = id, IsActive = isActive, UpdatedAtUtc = updatedAtUtc, UpdatedByUserId = updatedByUserId }, CatalogRepoDbWriteFields.WarehouseActiveUpdate, cancellationToken);
-
-    public Task<int> InsertEmployeeAsync(Employee employee, CancellationToken cancellationToken)
+    public async Task<bool> SetWarehouseActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken)
     {
-        return InsertEmployeeWithConflictTranslationAsync(employee, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        using var db = sessions.Borrow(context, requireTransaction: true);
+        return await db.GetTable<Warehouse>().Where(e => e.Id == id)
+            .Set(e => e.IsActive, isActive)
+            .Set(e => e.UpdatedAtUtc, updatedAtUtc)
+            .Set(e => e.UpdatedByUserId, updatedByUserId)
+            .UpdateAsync(cancellationToken).ConfigureAwait(false) == 1;
     }
+
+    public Task<int> InsertEmployeeAsync(Employee employee, CancellationToken cancellationToken) =>
+        TranslateAsync(async () =>
+        {
+            if (employee is null) throw new ArgumentNullException(nameof(employee));
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = sessions.Borrow(context, requireTransaction: true);
+            // Explicit create allowlist: identity/server time/update audit stay database-owned.
+            return await db.GetTable<Employee>()
+                .Value(e => e.Code, employee.Code)
+                .Value(e => e.Name, employee.Name)
+                .Value(e => e.Phone, employee.Phone)
+                .Value(e => e.UserId, employee.UserId)
+                .Value(e => e.IsActive, employee.IsActive)
+                .Value(e => e.CreatedByUserId, employee.CreatedByUserId)
+                .InsertWithInt32IdentityAsync(cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Employee insert returned no identity.");
+        }, employee: true);
 
     public Task<Employee?> UpdateEmployeeAsync(Employee employee, CancellationToken cancellationToken) =>
-        UpdateEmployeeWithConflictTranslationAsync(employee, cancellationToken);
+        TranslateAsync(async () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = sessions.Borrow(context, requireTransaction: true);
+            // Ordinary edits cannot overwrite creation audit or reactivate an inactive row.
+            var affected = await db.GetTable<Employee>().Where(e => e.Id == employee.Id)
+                .Set(e => e.Code, employee.Code)
+                .Set(e => e.Name, employee.Name)
+                .Set(e => e.Phone, employee.Phone)
+                .Set(e => e.UserId, employee.UserId)
+                .Set(e => e.UpdatedAtUtc, employee.UpdatedAtUtc)
+                .Set(e => e.UpdatedByUserId, employee.UpdatedByUserId)
+                .UpdateAsync(cancellationToken).ConfigureAwait(false);
+            return affected == 1
+                ? await db.GetTable<Employee>().SingleAsync(e => e.Id == employee.Id, cancellationToken).ConfigureAwait(false)
+                : null;
+        }, employee: true);
 
-    public Task<bool> SetEmployeeActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
-        UpdateAsync(new Employee { Id = id, IsActive = isActive, UpdatedAtUtc = updatedAtUtc, UpdatedByUserId = updatedByUserId }, CatalogRepoDbWriteFields.EmployeeActiveUpdate, cancellationToken);
-
-    public Task<int> InsertCustomerAsync(Customer customer, CancellationToken cancellationToken)
+    public async Task<bool> SetEmployeeActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken)
     {
-        return InsertWithConflictTranslationAsync(
-            customer, CatalogRepoDbWriteFields.CustomerCreate, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        using var db = sessions.Borrow(context, requireTransaction: true);
+        return await db.GetTable<Employee>().Where(e => e.Id == id)
+            .Set(e => e.IsActive, isActive)
+            .Set(e => e.UpdatedAtUtc, updatedAtUtc)
+            .Set(e => e.UpdatedByUserId, updatedByUserId)
+            .UpdateAsync(cancellationToken).ConfigureAwait(false) == 1;
     }
+
+    public Task<int> InsertCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
+        TranslateAsync(async () =>
+        {
+            if (customer is null) throw new ArgumentNullException(nameof(customer));
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = sessions.Borrow(context, requireTransaction: true);
+            // Explicit create allowlist: identity/server time/update audit stay database-owned.
+            return await db.GetTable<Customer>()
+                .Value(e => e.Code, customer.Code)
+                .Value(e => e.Name, customer.Name)
+                .Value(e => e.Address, customer.Address)
+                .Value(e => e.Phone, customer.Phone)
+                .Value(e => e.TaxCode, customer.TaxCode)
+                .Value(e => e.IsActive, customer.IsActive)
+                .Value(e => e.CreatedByUserId, customer.CreatedByUserId)
+                .InsertWithInt32IdentityAsync(cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Customer insert returned no identity.");
+        }, employee: false);
 
     public Task<Customer?> UpdateCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
-        UpdateWithConflictTranslationAsync(customer, CatalogRepoDbWriteFields.CustomerUpdate, customer.Id, cancellationToken);
-
-    public Task<bool> SetCustomerActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken) =>
-        UpdateAsync(new Customer { Id = id, IsActive = isActive, UpdatedAtUtc = updatedAtUtc, UpdatedByUserId = updatedByUserId }, CatalogRepoDbWriteFields.CustomerActiveUpdate, cancellationToken);
-
-    private Task<int> InsertAsync<TEntity>(
-        TEntity entity,
-        IEnumerable<Field> fields,
-        CancellationToken cancellationToken)
-        where TEntity : class
-    {
-        if (entity is null)
+        TranslateAsync(async () =>
         {
-            throw new ArgumentNullException(nameof(entity));
-        }
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = sessions.Borrow(context, requireTransaction: true);
+            // Ordinary edits cannot overwrite creation audit or reactivate an inactive row.
+            var affected = await db.GetTable<Customer>().Where(e => e.Id == customer.Id)
+                .Set(e => e.Code, customer.Code)
+                .Set(e => e.Name, customer.Name)
+                .Set(e => e.Address, customer.Address)
+                .Set(e => e.Phone, customer.Phone)
+                .Set(e => e.TaxCode, customer.TaxCode)
+                .Set(e => e.UpdatedAtUtc, customer.UpdatedAtUtc)
+                .Set(e => e.UpdatedByUserId, customer.UpdatedByUserId)
+                .UpdateAsync(cancellationToken).ConfigureAwait(false);
+            return affected == 1
+                ? await db.GetTable<Customer>().SingleAsync(e => e.Id == customer.Id, cancellationToken).ConfigureAwait(false)
+                : null;
+        }, employee: false);
 
-        var transaction = _context.Transaction
-            ?? throw new InvalidOperationException("Catalog writes require an active transaction.");
-        return _context.Connection.InsertAsync<TEntity, int>(
-            entity,
-            fields: fields,
-            transaction: transaction,
-            cancellationToken: cancellationToken);
+    public async Task<bool> SetCustomerActiveAsync(int id, bool isActive, DateTime updatedAtUtc, int? updatedByUserId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var db = sessions.Borrow(context, requireTransaction: true);
+        return await db.GetTable<Customer>().Where(e => e.Id == id)
+            .Set(e => e.IsActive, isActive)
+            .Set(e => e.UpdatedAtUtc, updatedAtUtc)
+            .Set(e => e.UpdatedByUserId, updatedByUserId)
+            .UpdateAsync(cancellationToken).ConfigureAwait(false) == 1;
     }
 
-    private async Task<int> InsertWithConflictTranslationAsync<TEntity>(
-        TEntity entity,
-        IEnumerable<Field> fields,
-        CancellationToken cancellationToken)
-        where TEntity : class
+    private static async Task<T> TranslateAsync<T>(Func<Task<T>> operation, bool employee)
     {
-        try
+        try { return await operation().ConfigureAwait(false); }
+        catch (SqlException error) when (error.Number == 2601 || error.Number == 2627)
         {
-            return await InsertAsync(entity, fields, cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqlException exception) when (exception.Number == 2601 || exception.Number == 2627)
-        {
-            throw new CatalogWriteConflictException(CatalogWriteConflict.DuplicateCode);
-        }
-    }
-
-    private async Task<int> InsertEmployeeWithConflictTranslationAsync(Employee employee, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await InsertAsync(employee, CatalogRepoDbWriteFields.EmployeeCreate, cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqlException exception) when (exception.Number == 2601 || exception.Number == 2627)
-        {
-            var conflict = exception.Message.IndexOf("UX_Employees_UserId", StringComparison.OrdinalIgnoreCase) >= 0
+            var conflict = employee && error.Message.IndexOf("UX_Employees_UserId", StringComparison.OrdinalIgnoreCase) >= 0
                 ? CatalogWriteConflict.EmployeeUserAlreadyLinked
                 : CatalogWriteConflict.DuplicateCode;
             throw new CatalogWriteConflictException(conflict);
         }
-        catch (SqlException exception) when (exception.Number == 547)
+        catch (SqlException error) when (employee && error.Number == 547)
         {
             throw new CatalogWriteConflictException(CatalogWriteConflict.EmployeeUserNotFound);
         }
-    }
-
-    private async Task<Employee?> UpdateEmployeeWithConflictTranslationAsync(Employee employee, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await UpdateAndReloadAsync(employee, CatalogRepoDbWriteFields.EmployeeUpdate, employee.Id, cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqlException exception) when (exception.Number == 2601 || exception.Number == 2627)
-        {
-            var conflict = exception.Message.IndexOf("UX_Employees_UserId", StringComparison.OrdinalIgnoreCase) >= 0
-                ? CatalogWriteConflict.EmployeeUserAlreadyLinked
-                : CatalogWriteConflict.DuplicateCode;
-            throw new CatalogWriteConflictException(conflict);
-        }
-        catch (SqlException exception) when (exception.Number == 547)
-        {
-            throw new CatalogWriteConflictException(CatalogWriteConflict.EmployeeUserNotFound);
-        }
-    }
-
-    private async Task<TEntity?> UpdateWithConflictTranslationAsync<TEntity>(
-        TEntity entity,
-        IEnumerable<Field> fields,
-        object primaryKey,
-        CancellationToken cancellationToken)
-        where TEntity : class
-    {
-        try
-        {
-            return await UpdateAndReloadAsync(entity, fields, primaryKey, cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqlException exception) when (exception.Number == 2601 || exception.Number == 2627)
-        {
-            throw new CatalogWriteConflictException(CatalogWriteConflict.DuplicateCode);
-        }
-    }
-
-    private async Task<TEntity?> UpdateAndReloadAsync<TEntity>(
-        TEntity entity,
-        IEnumerable<Field> fields,
-        object primaryKey,
-        CancellationToken cancellationToken)
-        where TEntity : class
-    {
-        var transaction = _context.Transaction
-            ?? throw new InvalidOperationException("Catalog writes require an active transaction.");
-        var affected = await _context.Connection.UpdateAsync(
-            entity,
-            fields: fields,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (affected != 1)
-        {
-            return null;
-        }
-
-        var rows = await _context.Connection.QueryAsync<TEntity>(
-            primaryKey,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        return rows.SingleOrDefault();
-    }
-
-    private async Task<bool> UpdateAsync<TEntity>(
-        TEntity entity,
-        IEnumerable<Field> fields,
-        CancellationToken cancellationToken)
-        where TEntity : class
-    {
-        var transaction = _context.Transaction
-            ?? throw new InvalidOperationException("Catalog writes require an active transaction.");
-        var affected = await _context.Connection.UpdateAsync(
-            entity,
-            fields: fields,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        return affected == 1;
     }
 }

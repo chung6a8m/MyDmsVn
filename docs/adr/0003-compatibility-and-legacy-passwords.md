@@ -10,7 +10,7 @@ The original 2026-10-08 decision required .NET Framework and .NET 8 compatibilit
 
 - Active product/SQL/Desktop uses `net48`; modern product targets are parked under ADR 0008. The original dual-runtime decision is historical, not a current build instruction.
 - Do not upgrade to .NET 10 absent further approval.
-- Current RepoDb pins remain in code until the approved LINQ to DB migration (ADR 0009) removes their consumers. The central package file is the current version source.
+- L2DB-T06 removes obsolete RepoDb/Dapper pins after converting their active consumers (ADR 0009). The central package file is the current version source.
 - Retain both `Users.PasswordHash` and `Users.PasswordSalt` for migration compatibility, even though BCrypt hashes normally contain their salt.
 - Implement algorithm-aware password verification/rehash through an abstraction; do not invent missing legacy hash semantics.
 

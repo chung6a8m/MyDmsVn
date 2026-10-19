@@ -4,7 +4,7 @@ Status: **Accepted** · Date: 2026-10-08
 
 ## Context
 
-Commands must atomically change receipt status, ledger rows and warehouse balances, using the current RepoDb/Dapper implementation and the approved LINQ to DB destination. Prototype ambient `AsyncLocal<IDbTransaction>` creates difficult nested ownership and leakage risks.
+Commands must atomically change receipt status, ledger rows and warehouse balances, using the current LINQ to DB/native SqlClient implementation. Prototype ambient `AsyncLocal<IDbTransaction>` creates difficult nested ownership and leakage risks.
 
 ## Decision
 

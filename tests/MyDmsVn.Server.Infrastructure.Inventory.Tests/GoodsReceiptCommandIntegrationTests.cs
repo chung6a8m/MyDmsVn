@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using MediatR;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -1378,6 +1378,98 @@ public sealed class GoodsReceiptCommandIntegrationTests
         }
     }
 
+    [SqlServerFact]
+    public async Task Failed_duplicate_product_insert_rolls_back_the_aggregate_and_burns_its_sequence_value()
+    {
+        var database = await CreateDatabaseAsync();
+        try
+        {
+            var seed = await SeedAsync(database.ConnectionString);
+            using var provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true);
+            var header = new GoodsReceipt { ReceiptDate = new DateTime(2026, 10, 18), WarehouseId = seed.WarehouseId, EmployeeId = seed.EmployeeId, CreatedByUserId = seed.UserId };
+            using (var uow = provider.GetRequiredService<IUnitOfWorkFactory>().Create())
+            {
+                uow.BeginTransaction();
+                var lines = new[]
+                {
+                    new GoodsReceiptLine { LineNumber = 1, ProductId = seed.Product1Id, Quantity = .0001m, UnitCost = 0m, CreatedByUserId = seed.UserId },
+                    new GoodsReceiptLine { LineNumber = 2, ProductId = seed.Product1Id, Quantity = 1m, UnitCost = 1m, CreatedByUserId = seed.UserId },
+                };
+                var error = await Assert.ThrowsAsync<SqlException>(() => uow.Repository<IGoodsReceiptWriteRepository>().InsertDraftAsync(header, lines, CancellationToken.None));
+                Assert.Contains(error.Number, new[] { 2601, 2627 });
+                Assert.True(header.Id > 0); Assert.True(lines[0].Id > 0);
+                uow.Rollback();
+            }
+            using var oracle = new SqlConnection(database.ConnectionString); await oracle.OpenAsync();
+            Assert.Equal(0, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceipts"));
+            Assert.Equal(0, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines"));
+            var saved = await CreateInOwnScopeAsync(provider, seed, "after-rollback"); Assert.False(saved.IsError);
+            var consumed = long.Parse(header.ReceiptNumber.Substring(2), System.Globalization.CultureInfo.InvariantCulture);
+            Assert.Equal("GR" + (consumed + 1).ToString("D10", System.Globalization.CultureInfo.InvariantCulture), saved.Value.ReceiptNumber);
+        }
+        finally { await database.DisposeAsync(); }
+    }
+
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
+    public async Task Canceling_a_blocked_line_insert_rolls_back_the_aggregate_and_allows_a_fresh_scope()
+    {
+        var database = await CreateDatabaseAsync();
+        SqlConcurrencyGate? gate = null; ServiceProvider? provider = null;
+        Task<ErrorOr.ErrorOr<GoodsReceiptDto>>? worker = null;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            await EnsureCrossSessionDmvPermissionAsync(database.ConnectionString);
+            var seed = await SeedAsync(database.ConnectionString);
+            var connections = new SessionRecordingConnectionFactory(database.ConnectionString);
+            var reporter = new CancellationExceptionReporter();
+            provider = CreateProvider(database.ConnectionString, seed.UserId, allow: true, connectionFactory: connections, reporter: reporter);
+            gate = await SqlConcurrencyGate.AcquireAsync(database.ConnectionString, "cancel-line-insert", CancellationToken.None);
+            using (var setup = new SqlConnection(database.ConnectionString))
+            {
+                await setup.OpenAsync();
+                using var trigger = new SqlCommand("CREATE TRIGGER dbo.TR_TestLineCancellation ON dbo.GoodsReceiptLines AFTER INSERT AS BEGIN SET NOCOUNT ON; " + gate.TransactionWaitSql + " END;", setup);
+                await trigger.ExecuteNonQueryAsync();
+            }
+            connections.Clear();
+            worker = CreateWithCancellationAsync(provider, seed, cancellation.Token);
+            var session = await connections.TakeNextSessionIdAsync();
+            await gate.WaitForHolderAsync(session, "dbo.GoodsReceiptLines", TimeSpan.FromSeconds(10), CancellationToken.None);
+            Assert.False(worker.IsCompleted);
+            cancellation.Cancel();
+            // SqlClient/net48 can cancel with SqlException (as in the existing Foundation
+            // cancellation contract) or OperationCanceledException; preserve the pipeline semantics.
+            ErrorOr.ErrorOr<GoodsReceiptDto> cancelled = default;
+            var cancellationError = await Record.ExceptionAsync(async () => { cancelled = await AwaitWithTimeoutAsync(worker); });
+            if (cancellationError != null) Assert.IsAssignableFrom<OperationCanceledException>(cancellationError);
+            else
+            {
+                Assert.True(cancelled.IsError); Assert.Equal("InternalError", cancelled.FirstError.Code);
+                var sqlError = Assert.IsType<SqlException>(reporter.Error);
+                Assert.Contains(sqlError.Errors.Cast<SqlError>(), error => error.Number == 0);
+            }
+            Assert.True(cancellation.IsCancellationRequested);
+            await gate.ReleaseAsync(CancellationToken.None);
+            using var oracle = new SqlConnection(database.ConnectionString); await oracle.OpenAsync();
+            foreach (var table in new[] { "GoodsReceipts", "GoodsReceiptLines", "StockLedger", "StockBalances" })
+                Assert.Equal(0, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo." + table));
+            await NativeSql.Execute(oracle, null, "DROP TRIGGER dbo.TR_TestLineCancellation;");
+            var saved = await CreateInOwnScopeAsync(provider, seed, "after-cancel"); Assert.False(saved.IsError);
+            Assert.Equal(1, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceipts"));
+            Assert.Equal(1, await NativeSql.Scalar<int>(oracle, null, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines"));
+        }
+        finally
+        {
+            await SqlConcurrencyCleanup.CompleteAsync(gate, cancellation, provider, database.DisposeAsync, worker);
+        }
+    }
+
+    private static async Task<ErrorOr.ErrorOr<GoodsReceiptDto>> CreateWithCancellationAsync(ServiceProvider provider, SeedData seed, CancellationToken token)
+    {
+        using var scope = provider.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ISender>().Send(new CreateGoodsReceiptDraftCommand(Save(seed, "cancel", seed.Product1Id)), token);
+    }
+
     private static async Task<GoodsReceiptDto> CreateReceiptAsync(
         ServiceProvider provider,
         SeedData seed,
@@ -1717,11 +1809,11 @@ public sealed class GoodsReceiptCommandIntegrationTests
         if (openedSession != null)
         {
             openedSession.SetResult(await connection.QuerySingleAsync<int>(
-                new CommandDefinition("SELECT @@SPID;", cancellationToken: cancellationToken)));
+                new SqlTestCommand("SELECT @@SPID;", cancellationToken: cancellationToken)));
         }
 
         var affected = await connection.ExecuteAsync(
-            new CommandDefinition(
+            new SqlTestCommand(
                 "UPDATE dbo." + reference.TableName + " SET IsActive = @isActive WHERE " +
                 reference.KeyColumn + " = @id;",
                 new { isActive, id = reference.Id },
@@ -1914,10 +2006,12 @@ public sealed class GoodsReceiptCommandIntegrationTests
         int userId,
         bool allow,
         string? onlyPermission = null,
-        IDbConnectionFactory? connectionFactory = null)
+        IDbConnectionFactory? connectionFactory = null,
+        IApplicationExceptionReporter? reporter = null)
     {
         var services = new ServiceCollection();
         services.AddServerApplication();
+        if (reporter != null) services.Replace(ServiceDescriptor.Singleton(reporter));
         services.AddSqlPersistence(connectionString);
         if (connectionFactory != null)
         {
@@ -1929,6 +2023,12 @@ public sealed class GoodsReceiptCommandIntegrationTests
         services.Replace(ServiceDescriptor.Scoped<IPermissionStore>(
             _ => new TestPermissionStore(allow, onlyPermission)));
         return services.BuildServiceProvider();
+    }
+
+    private sealed class CancellationExceptionReporter : IApplicationExceptionReporter
+    {
+        public Exception? Error { get; private set; }
+        public void Report(Type requestType, Exception exception) => Error = exception;
     }
 
     private sealed class SessionRecordingConnectionFactory : IDbConnectionFactory

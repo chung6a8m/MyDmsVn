@@ -33,6 +33,10 @@ namespace MyDmsVn.Server.Infrastructure
             }
 
             services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
+            services.TryAddSingleton<LinqToDbMappingSchemaProvider>();
+            services.TryAddSingleton<ILinqToDbSessionFactory, LinqToDbSessionFactory>();
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<ILinqToDbMapping, CatalogLinqToDbMapping>());
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.TryAddScoped<SqlIdentityStore>();
@@ -49,9 +53,7 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddScoped<IInventoryQueryService, SqlInventoryQueryService>();
             services.TryAddScoped<IStockReconciliationQueryService, SqlStockReconciliationQueryService>();
             services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IRepoDbMapping, CatalogRepoDbMapping>());
-            services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IRepoDbMapping, InventoryRepoDbMapping>());
+                ServiceDescriptor.Singleton<ILinqToDbMapping, InventoryLinqToDbMapping>());
             services.Replace(
                 ServiceDescriptor.Scoped<IUserStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
@@ -61,7 +63,6 @@ namespace MyDmsVn.Server.Infrastructure
             services.Replace(
                 ServiceDescriptor.Scoped<IPermissionStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
-            services.AddSingleton<RepoDbMappingInitializer>();
             services.AddScoped<IUnitOfWorkFactory>(serviceProvider =>
             {
                 var registrations = serviceProvider
@@ -71,7 +72,6 @@ namespace MyDmsVn.Server.Infrastructure
                         registration => registration.Create);
                 return new SqlUnitOfWorkFactory(
                     serviceProvider.GetRequiredService<IDbConnectionFactory>(),
-                    serviceProvider.GetRequiredService<RepoDbMappingInitializer>(),
                     serviceProvider,
                     registrations);
             });

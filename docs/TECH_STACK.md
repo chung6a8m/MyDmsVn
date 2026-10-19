@@ -1,6 +1,6 @@
 # Technical stack and compatibility baseline
 
-**Current source baseline:** `v1a`, commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed 2026-10-18. Package pins describe the assessed product source; test-project entries incorporate the owner's subsequent SQL framework removal. Neither active plan has compatibility acceptance yet.
+**Current cutover:** L2DB-T00–T07 on net48, 2026-10-19; [T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke). RESP and L2DB plan-specific acceptance are complete. Broader P5/P6 release gates remain deferred; historical evidence keeps its original provider/revision.
 
 ## Runtime matrix
 
@@ -21,8 +21,8 @@ The user retains the repository's current net48 profile. Neither [RESP](plans/20
 
 | Package or group | Current central pin |
 |---|---|
-| `RepoDb` / `RepoDb.SqlServer` / `RepoDb.SqlServer.BulkOperations` | `1.16.0` / `1.16.1` / `1.16.2` |
-| `Dapper` | `2.1.79` |
+| `linq2db` | `6.3.0` |
+| `Respawn` (test only) | `4.0.0` |
 | `Microsoft.Data.SqlClient` | `7.0.2` |
 | `dbup-sqlserver` | `7.2.0` |
 | `CommunityToolkit.Mvvm` | `8.4.2` |
@@ -34,16 +34,13 @@ The user retains the repository's current net48 profile. Neither [RESP](plans/20
 | `Serilog` / `Serilog.Extensions.Logging` / `Serilog.Sinks.File` | `4.4.0` / `8.0.0` / `7.0.0` |
 | `Microsoft.NET.Test.Sdk` / `xunit` / `xunit.runner.visualstudio` | `17.14.1` / `2.9.3` / `3.1.5` |
 
-Current application persistence uses RepoDb, Dapper and explicit native SqlClient behind existing interfaces. DbUp owns controlled schema deployment. Microsoft DI composes the Local WinForms host; MediatR, FluentValidation and ErrorOr remain inside their defined Application/adapter boundaries. Cross-process DTOs and JSON are independent of SQL/UI providers. See [ARCHITECTURE](ARCHITECTURE.md), [PERSISTENCE](PERSISTENCE.md) and [CONTRACTS](CONTRACTS.md).
+Current application persistence uses LINQ to DB and typed native SqlClient behind existing interfaces. DbUp owns controlled schema deployment. Microsoft DI composes the Local WinForms host; MediatR, FluentValidation and ErrorOr remain inside their defined Application/adapter boundaries. Cross-process DTOs and JSON are independent of SQL/UI providers. See [ARCHITECTURE](ARCHITECTURE.md), [PERSISTENCE](PERSISTENCE.md) and [CONTRACTS](CONTRACTS.md).
 
-## Planned additions, not delivered dependencies
+## Delivered dependency cutover
 
-| Plan | Initial candidate | Required proof and scope |
-|---|---|---|
-| RESP, first | [Respawn `4.0.0`](https://www.nuget.org/packages/Respawn/4.0.0) | Prove the active net48 SQL test dependency graph, reset correctness, ownership and exceptional fresh-database behavior against the current RepoDb/Dapper product. No floating latest version or TFM change. |
-| L2DB, after accepted RESP | [linq2db `6.3.0`](https://www.nuget.org/packages/linq2db/6.3.0) | Prove actual net48 restore/build/runtime packaging with the pinned SqlClient, borrowed/owned resources, mappings and behavior parity before DAL conversion. |
+RESP pins Respawn 4.0.0 in test owners. L2DB pins linq2db 6.3.0 in Infrastructure with Microsoft.Data.SqlClient 7.0.2; mappings/provider objects stay behind existing interfaces. T06 removes all active RepoDb/Dapper references, central pins, initializer hooks and temporary adapters. Native test-only SQL oracles do not invoke product mappings or repositories. DbUp remains the schema owner.
 
-These are explicit pilot candidates, not claims that either package is installed, runtime-tested or the newest release. Their plans own actual asset selection and compatibility evidence. A failed candidate blocks its dependent rollout; it does not authorize changing the product runtime. L2DB targets removal of active RepoDb/Dapper consumers after verified conversion, retaining only justified native SqlClient operations and DbUp. RESP is test-only.
+Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requirements resolve Microsoft.Bcl.AsyncInterfaces from 10.0.11 to 10.0.3 and System.Collections.Immutable from 10.0.11 to 1.5.0; no other retained package version changes or broad upgrades. Parked AppCore locks retain historical nodes and were neither restored nor edited. Reactivation must regenerate those locks against the current central pins after a separate runtime decision.
 
 ## Dependency and build rules
 
@@ -62,6 +59,6 @@ These are explicit pilot candidates, not claims that either package is installed
 
 ## Editing and future review
 
-Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; the two active implementation plans remain pending.
+Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; RESP and L2DB-T00–T07 have scoped evidence; broader release acceptance remains deferred.
 
 Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or pins within RESP/L2DB.

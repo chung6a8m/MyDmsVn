@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -13,13 +13,11 @@ public sealed class SqlUnitOfWorkFactory : IUnitOfWorkFactory
 {
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IReadOnlyDictionary<Type, Func<IServiceProvider, ISqlExecutionContext, object>> _repositoryFactories;
-    private readonly RepoDbMappingInitializer? _mappingInitializer;
     private readonly IServiceProvider? _serviceProvider;
 
     public SqlUnitOfWorkFactory(IDbConnectionFactory connectionFactory)
         : this(
             connectionFactory,
-            null,
             null,
             new Dictionary<Type, Func<IServiceProvider, ISqlExecutionContext, object>>())
     {
@@ -27,25 +25,21 @@ public sealed class SqlUnitOfWorkFactory : IUnitOfWorkFactory
 
     internal SqlUnitOfWorkFactory(
         IDbConnectionFactory connectionFactory,
-        RepoDbMappingInitializer? mappingInitializer,
         IServiceProvider? serviceProvider,
         IReadOnlyDictionary<Type, Func<IServiceProvider, ISqlExecutionContext, object>> repositoryFactories)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
-        _mappingInitializer = mappingInitializer;
         _serviceProvider = serviceProvider;
         _repositoryFactories = repositoryFactories ?? throw new ArgumentNullException(nameof(repositoryFactories));
     }
 
     public IUnitOfWork Create()
     {
-        _mappingInitializer?.Initialize();
         return new SqlUnitOfWork(_connectionFactory.OpenConnection(), _serviceProvider, _repositoryFactories);
     }
 
     public async Task<IUnitOfWork> CreateAsync(CancellationToken cancellationToken)
     {
-        _mappingInitializer?.Initialize();
         var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         return new SqlUnitOfWork(connection, _serviceProvider, _repositoryFactories);
     }

@@ -3,7 +3,7 @@ using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
 using Xunit;
@@ -281,7 +281,7 @@ AND session_id<>@@SPID AND session_id<>@holder;", new { holder = holder.ServerPr
             Assert.Same(session.Task, await Task.WhenAny(session.Task, Task.Delay(TimeSpan.FromSeconds(10))));
             var resetSession = await session.Task;
             using var observer = new SqlConnection(database.ConnectionString);
-            // Keep this session open: Dapper auto-close/reopen could reuse the reset SPID
+            // Keep this session open: SQL oracle auto-close/reopen could reuse the reset SPID
             // and make the observer count its own request after cancellation.
             await observer.OpenAsync();
             Assert.NotEqual(resetSession, observer.ServerProcessId);

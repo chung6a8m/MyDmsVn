@@ -2,7 +2,7 @@
 
 **Trạng thái:** Mô tả cấu hình và quyền hiện có tại `v1a`, commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, cập nhật từ source ngày 2026-10-18. Desktop.App và gói quản trị DbMigrator chạy **net48**. AppCore `net8.0-windows` được giữ trong source nhưng đang parked, ngoài solution/release đang hoạt động.
 
-[RESP](plans/20261018-002-respawn-fixture-reuse.md) và [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) giữ nguyên ranh giới credential và quyền SQL của sản phẩm. RepoDb/Dapper/native SqlClient vẫn là triển khai hiện tại; chuyển sang LINQ to DB chưa được thực hiện. Thay DAL không cho phép mở rộng quyền, đưa maintenance credential vào desktop hoặc thay schema/binding. Bản cập nhật tài liệu này không chạy provisioning, migration, SQL hay kiểm thử triển khai.
+[RESP](plans/20261018-002-respawn-fixture-reuse.md) và [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) giữ nguyên ranh giới credential và quyền SQL của sản phẩm. Catalog/Inventory đã dùng LINQ/native; T05 chuyển Identity/Security/operations sang SqlClient có kiểu rõ ràng ([bằng chứng](L2DB_VERIFICATION.md#l2db-t05--identity-security-and-operations-conversion)). T06 đã gỡ hook/package/pilot chuyển tiếp; oracle test dùng SqlClient độc lập. T07 còn kiểm chứng package và các luồng Local có người thao tác. Thay DAL không cho phép mở rộng quyền, đưa maintenance credential vào desktop hoặc thay schema/binding. Bản cập nhật tài liệu này không chạy provisioning, migration, SQL hay kiểm thử triển khai.
 
 ## 1. Hai danh tính SQL bắt buộc
 

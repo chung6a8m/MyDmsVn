@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MyDmsVn.Server.Infrastructure.Persistence;
@@ -25,12 +25,7 @@ public sealed class SqlPersistenceBuilder
         return this;
     }
 
-    public SqlPersistenceBuilder AddRepoDbMapping<TMapping>()
-        where TMapping : class, IRepoDbMapping
-    {
-        _services.AddSingleton<IRepoDbMapping, TMapping>();
-        return this;
-    }
+
 }
 
 internal sealed class SqlRepositoryRegistration

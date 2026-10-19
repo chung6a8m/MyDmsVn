@@ -5,7 +5,6 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Dapper" />
     <PackageReference Include="Respawn" />
     <PackageReference Include="dbup-sqlserver" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
@@ -25,5 +24,8 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="TestScripts\*.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\SqlOracle\SqlTestOracle.cs" Link="SqlOracle\SqlTestOracle.cs" />
   </ItemGroup>
 </Project>

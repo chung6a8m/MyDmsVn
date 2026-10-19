@@ -22,7 +22,7 @@ Sequence cấp số phiếu phải giữ đúng `bigint`, start/increment/min b�
 
 Các prefix hợp lệ nhưng chưa đủ, từ `001` đến tối đa `008`, là `Schema.TooOld` và bị desktop chặn. **Migrator hiện tại cũng từ chối TooOld** bằng `Migration.UnsupportedExistingDatabase`; nó không cung cấp auto-upgrade cho dữ liệu của baseline permission cũ hoặc tự hoàn tất một prefix đã commit dở. [DatabaseMigrationRunner](../src/MyDmsVn.Server.DbMigrator/DatabaseMigrationRunner.cs) chỉ nhận `Empty` hoặc `Compatible` trước khi chạy DbUp. Không có prior production baseline/mixed-client upgrade path đã được chấp nhận trong tài liệu hiện tại.
 
-Phân biệt contract runtime này với `release-manifest.json`: [publish script](../deployment/release/Publish-LocalRelease.ps1) vẫn ghi schema `8..8` và wording P3.1. Đây là **OPEN RELEASE-MANIFEST-01** trong [DEFERRED_WORK](DEFERRED_WORK.md#release-manifest-01--observed-schema-metadata-discrepancy), chưa được sửa trong đợt cập nhật docs. Không downgrade schema hoặc thay journal để khớp metadata package đang lỗi thời.
+[Publish script](../deployment/release/Publish-LocalRelease.ps1) hiện lấy schemaSupport và requiredScripts từ runtime policy trong DLL admin của package, qua helper x86. RELEASE-MANIFEST-01 đã đóng riêng phần metadata với package commit sạch `d8013030`: schema9 và danh sách001–009 ([evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed)). Package cũ ghi schema8 là artifact lịch sử; không downgrade schema hoặc thay journal theo metadata cũ. Metadata đúng chưa chứng minh startup hay release acceptance.
 
 ## 2. Desktop read-only preflight
 

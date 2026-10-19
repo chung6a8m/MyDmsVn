@@ -10,7 +10,7 @@
 | `MyDmsVn.SharedKernel` | `net48` | Shared inner primitives. |
 | `MyDmsVn.Server.Domain` | `net48` | Domain types; inner dependencies only. |
 | `MyDmsVn.Server.Application` | `net48` | Feature use cases, validation, authorization, persistence interfaces and transport-neutral mapping. |
-| `MyDmsVn.Server.Infrastructure` | `net48` | RepoDb/Dapper/native SqlClient implementation of inner interfaces; L2DB is the approved future DAL replacement. |
+| `MyDmsVn.Server.Infrastructure` | `net48` | LINQ to DB/native SqlClient implementation of inner interfaces; T07 plan-specific correctness/package/Local smoke acceptance complete; broader release gates deferred. |
 | `MyDmsVn.Server.DbMigrator` | `net48` | Controlled DbUp schema deployment and separate maintenance commands. |
 | `MyDmsVn.Desktop.Application` | `net48` | Contracts-based client interfaces and ViewModels. |
 | `MyDmsVn.Desktop.Infrastructure.Local` | `net48` | In-process Application dispatch, current-account checks and desktop session integration. |
@@ -44,7 +44,7 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | Server.Application | `Catalog/`, `Inventory/`, `Identity/`, `Security/`, `Persistence/`; pipeline behaviors and result mapping at project root. |
 | Server.Infrastructure | `Catalog/`, `Inventory/`, `Identity/`, `Security/`, `Operations/`, `Persistence/`; `DependencyInjection.cs`. |
 | Application persistence contract | `src/MyDmsVn.Server.Application/Persistence/{IUnitOfWork,IUnitOfWorkFactory,UnitOfWorkState}.cs`. |
-| Infrastructure persistence | `src/MyDmsVn.Server.Infrastructure/Persistence/{SqlUnitOfWorkFactory,ISqlExecutionContext,SqlConnectionFactory,SqlPersistenceBuilder,RepoDbMappingInitializer,IRepoDbMapping}.cs`. |
+| Infrastructure persistence | `src/MyDmsVn.Server.Infrastructure/Persistence/{SqlUnitOfWorkFactory,ISqlExecutionContext,SqlConnectionFactory,SqlPersistenceBuilder,LinqToDbSessionFactory,LinqToDbMappingSchemaProvider}.cs`. |
 | Schema | `src/MyDmsVn.Server.DbMigrator/Scripts/001_PersistenceFoundation.sql` through `009_Security_Permission_Import.sql`; exact names in [PERSISTENCE](PERSISTENCE.md). |
 | UI dependency | `vendor/MyDmsVn.BootstrapSourceGrid/`, pinned as checked in. |
 

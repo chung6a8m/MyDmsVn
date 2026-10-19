@@ -1,9 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
 
@@ -46,19 +44,20 @@ internal sealed class SqlStockReconciliationQueryService : IStockReconciliationQ
             .OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
         using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
-        var lockCommand = new CommandDefinition(
-            AcquireReconciliationLocksSql,
-            transaction: transaction,
-            cancellationToken: cancellationToken);
-        await connection.ExecuteAsync(lockCommand).ConfigureAwait(false);
-        var command = new CommandDefinition(
-            ReconciliationSql,
-            transaction: transaction,
-            cancellationToken: cancellationToken);
-        var differences = (await connection
-            .QueryAsync<StockReconciliationDifference>(command)
-            .ConfigureAwait(false))
-            .ToArray();
+        using var lockCommand = InventorySql.Command(connection, transaction, AcquireReconciliationLocksSql);
+        await lockCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        using var command = InventorySql.Command(connection, transaction, ReconciliationSql);
+        StockReconciliationDifference[] differences;
+        using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            differences = await InventorySql.ReadRowsAsync(reader, row => new StockReconciliationDifference
+            {
+                WarehouseId = row.GetInt32(0),
+                ProductId = row.GetInt32(1),
+                HasLedger = row.GetBoolean(2),
+                HasBalance = row.GetBoolean(3),
+                LedgerQuantity = row.GetDecimal(4),
+                BalanceQuantity = row.GetDecimal(5),
+            }, cancellationToken).ConfigureAwait(false);
         transaction.Commit();
         return differences;
     }

@@ -2,7 +2,7 @@
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.Infrastructure.Persistence;
@@ -30,13 +30,17 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             using var connection = await _connectionFactory
                 .OpenConnectionAsync(cancellationToken)
                 .ConfigureAwait(false);
-            var row = await connection.QuerySingleOrDefaultAsync<UserAccountRow>(
-                new CommandDefinition(
-                    "SELECT TOP (1) UserId, Username, NormalizedUsername, DisplayName, IsActive, " +
-                    "PasswordHash, PasswordSalt, PasswordAlgorithm " +
-                    "FROM dbo.Users WHERE NormalizedUsername = @normalizedUsername;",
-                    new { normalizedUsername },
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            using var command = SqlRead.Command(connection, null,
+                "SELECT TOP (1) UserId, Username, NormalizedUsername, DisplayName, IsActive, " +
+                "PasswordHash, PasswordSalt, PasswordAlgorithm " +
+                "FROM dbo.Users WHERE NormalizedUsername = @normalizedUsername;",
+                SqlRead.Text("@normalizedUsername", normalizedUsername));
+            var row = await SqlRead.SingleOrDefaultAsync(command, reader => new UserAccountRow
+            {
+                UserId = reader.GetInt32(0), Username = reader.GetString(1), NormalizedUsername = reader.GetString(2),
+                DisplayName = reader.GetString(3), IsActive = reader.GetBoolean(4), PasswordHash = reader.GetString(5),
+                PasswordSalt = reader.GetString(6), PasswordAlgorithm = reader.GetString(7),
+            }, cancellationToken).ConfigureAwait(false);
             return row == null
                 ? null
                 : new UserAccount(
@@ -62,15 +66,17 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             using var connection = await _connectionFactory
                 .OpenConnectionAsync(cancellationToken)
                 .ConfigureAwait(false);
-            var affected = await connection.ExecuteAsync(
-                new CommandDefinition(
-                    "UPDATE dbo.Users SET PasswordHash = @PasswordHash, PasswordSalt = @PasswordSalt, " +
-                    "PasswordAlgorithm = @PasswordAlgorithm, UpdatedAtUtc = @UpdatedAtUtc, " +
-                    "UpdatedByUserId = @UserId " +
-                    "WHERE UserId = @UserId AND PasswordHash = @ExpectedPasswordHash " +
-                    "AND PasswordAlgorithm = @ExpectedPasswordAlgorithm AND IsActive = 1;",
-                    replacement,
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            using var command = SqlRead.Command(connection, null,
+                "UPDATE dbo.Users SET PasswordHash = @PasswordHash, PasswordSalt = @PasswordSalt, " +
+                "PasswordAlgorithm = @PasswordAlgorithm, UpdatedAtUtc = @UpdatedAtUtc, " +
+                "UpdatedByUserId = @UserId " +
+                "WHERE UserId = @UserId AND PasswordHash = @ExpectedPasswordHash " +
+                "AND PasswordAlgorithm = @ExpectedPasswordAlgorithm AND IsActive = 1;",
+                SqlRead.Text("@PasswordHash", replacement.PasswordHash), SqlRead.Text("@PasswordSalt", replacement.PasswordSalt),
+                SqlRead.Text("@PasswordAlgorithm", replacement.PasswordAlgorithm), SqlRead.P("@UpdatedAtUtc", SqlDbType.DateTime2, replacement.UpdatedAtUtc),
+                SqlRead.P("@UserId", SqlDbType.Int, replacement.UserId), SqlRead.Text("@ExpectedPasswordHash", replacement.ExpectedPasswordHash),
+                SqlRead.Text("@ExpectedPasswordAlgorithm", replacement.ExpectedPasswordAlgorithm));
+            var affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return affected == 1;
         }
 
@@ -86,12 +92,11 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             using var connection = await _connectionFactory
                 .OpenConnectionAsync(cancellationToken)
                 .ConfigureAwait(false);
-            return await connection.ExecuteScalarAsync<bool>(
-                new CommandDefinition(
-                    "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.Users " +
-                    "WHERE UserId = @userId AND IsActive = 1) THEN 1 ELSE 0 END AS bit);",
-                    new { userId },
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            using var command = SqlRead.Command(connection, null,
+                "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.Users " +
+                "WHERE UserId = @userId AND IsActive = 1) THEN 1 ELSE 0 END AS bit);",
+                SqlRead.P("@userId", SqlDbType.Int, userId));
+            return await SqlRead.SingleAsync(command, reader => reader.GetBoolean(0), cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<PermissionSnapshot> GetSnapshotAsync(
@@ -105,8 +110,7 @@ namespace MyDmsVn.Server.Infrastructure.Identity
             using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
             try
             {
-                var row = await connection.QuerySingleOrDefaultAsync<PermissionSnapshotRow>(
-                    new CommandDefinition(
+                using var command = SqlRead.Command(connection, transaction,
                         "SELECT " +
                         "CAST(CASE WHEN u.IsActive = 1 THEN 1 ELSE 0 END AS bit) AS IsAccountActive, " +
                         "u.NormalizedUsername AS DatabaseUsername, " +
@@ -131,9 +135,13 @@ namespace MyDmsVn.Server.Infrastructure.Identity
                         "FROM dbo.Users AS u " +
                         "LEFT JOIN dbo.SystemSecuritySettings AS settings ON settings.Id = 1 " +
                         "WHERE u.UserId = @userId;",
-                        new { userId, permissionKey },
-                        transaction,
-                        cancellationToken: cancellationToken)).ConfigureAwait(false);
+                    SqlRead.P("@userId", SqlDbType.Int, userId), SqlRead.Text("@permissionKey", permissionKey));
+                var row = await SqlRead.SingleOrDefaultAsync(command, reader => new PermissionSnapshotRow
+                {
+                    IsAccountActive = reader.GetBoolean(0), DatabaseUsername = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    BoundSuperuserUserId = reader.IsDBNull(2) ? null : reader.GetInt32(2), BoundNormalizedUsername = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    DirectDecision = reader.IsDBNull(4) ? null : reader.GetBoolean(4), HasRoleGrant = reader.GetBoolean(5),
+                }, cancellationToken).ConfigureAwait(false);
                 transaction.Commit();
                 return row == null
                     ? new PermissionSnapshot(null, false, false)

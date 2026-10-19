@@ -87,3 +87,7 @@ External primary references, checked 2026-10-18 (capability documentation, not r
 - [Official project documentation](https://linq2db.github.io/).
 - [ConnectionOptions ownership contract](https://linq2db.github.io/api/linq2db/linq2db--LinqToDB.Data.ConnectionOptions.html).
 - [Bulk-copy modes and provider-specific caveats](https://linq2db.github.io/articles/sql/Bulk-Copy.html).
+
+## Implementation status — 2026-10-19
+
+L2DB-T01–T06 now deliver the internal session/mapping seam, Catalog/Inventory LINQ/native, Identity/Security/operations native execution and active RepoDb/Dapper dependency/prototype removal. The proposed method shapes above are now implemented; [T06 evidence](../L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) binds the cutover evidence. Historical baseline/decision text remains as provenance. [T07 frozen-revision correctness/package/Local smoke acceptance](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) is complete with verified temporary-resource cleanup; broader release gates remain deferred. No runtime/schema/grant change is implied.

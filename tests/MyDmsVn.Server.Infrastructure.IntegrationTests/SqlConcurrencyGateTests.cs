@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -49,7 +49,7 @@ public sealed class SqlConcurrencyGateTests
             var holderSessionId = await holderConnection.QuerySingleAsync<int>("SELECT @@SPID;");
             holderTransaction = holderConnection.BeginTransaction();
             holder = holderConnection.ExecuteAsync(
-                new CommandDefinition(
+                new SqlTestCommand(
                     "UPDATE dbo.TestGateDelayedObservation SET Value = Value + 1 WHERE Id = 1;",
                     transaction: holderTransaction,
                     cancellationToken: holderCancellation.Token));
@@ -116,7 +116,7 @@ public sealed class SqlConcurrencyGateTests
             var holderSessionId = await holderConnection.QuerySingleAsync<int>("SELECT @@SPID;");
             holderTransaction = holderConnection.BeginTransaction();
             holder = holderConnection.ExecuteAsync(
-                new CommandDefinition(
+                new SqlTestCommand(
                     "UPDATE dbo.TestGateCancellation SET Value = Value + 1 WHERE Id = 1;",
                     transaction: holderTransaction,
                     cancellationToken: holderCancellation.Token));
@@ -231,7 +231,7 @@ public sealed class SqlConcurrencyGateTests
             var holderSessionId = await holderConnection.QuerySingleAsync<int>("SELECT @@SPID;");
             holderTransaction = holderConnection.BeginTransaction();
             holder = holderConnection.ExecuteAsync(
-                new CommandDefinition(
+                new SqlTestCommand(
                     "UPDATE dbo.TestGateBusiness SET Value = Value + 1 WHERE Id = 1;",
                     transaction: holderTransaction,
                     cancellationToken: cleanupCancellation.Token));
@@ -251,7 +251,7 @@ public sealed class SqlConcurrencyGateTests
             var contenderSessionId = await contenderConnection.QuerySingleAsync<int>("SELECT @@SPID;");
             contenderTransaction = contenderConnection.BeginTransaction();
             contender = contenderConnection.ExecuteAsync(
-                new CommandDefinition(
+                new SqlTestCommand(
                     "UPDATE dbo.TestGateBusiness SET Value = Value + 1 WHERE Id = 1;",
                     transaction: contenderTransaction,
                     cancellationToken: cleanupCancellation.Token));
@@ -330,7 +330,7 @@ public sealed class SqlConcurrencyGateTests
             await holderConnection.OpenAsync();
             var holderSessionId = await holderConnection.QuerySingleAsync<int>("SELECT @@SPID;");
             holderTransaction = holderConnection.BeginTransaction();
-            holder = holderConnection.ExecuteAsync(new CommandDefinition(
+            holder = holderConnection.ExecuteAsync(new SqlTestCommand(
                 "UPDATE dbo.TestGateInjectedFailure SET Value = Value + 1 WHERE Id = 1;",
                 transaction: holderTransaction,
                 cancellationToken: cleanupCancellation.Token));
@@ -344,7 +344,7 @@ public sealed class SqlConcurrencyGateTests
             await contenderConnection.OpenAsync();
             var contenderSessionId = await contenderConnection.QuerySingleAsync<int>("SELECT @@SPID;");
             contenderTransaction = contenderConnection.BeginTransaction();
-            contender = contenderConnection.ExecuteAsync(new CommandDefinition(
+            contender = contenderConnection.ExecuteAsync(new SqlTestCommand(
                 "UPDATE dbo.TestGateInjectedFailure SET Value = Value + 1 WHERE Id = 1;",
                 transaction: contenderTransaction,
                 cancellationToken: cleanupCancellation.Token));
