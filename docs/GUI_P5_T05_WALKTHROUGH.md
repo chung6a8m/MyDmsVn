@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS —13/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: IN PROGRESS —15/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -40,8 +40,8 @@ PASS requires the named actual observation plus any independent oracle and Owner
 | S-02 | Card warehouse/product/date filters, order/document identity/visible delta agree with oracle. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
 | S-03 | Empty/invalid filter, safe error and explicit Refresh recovery without stale rows/totals. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
 | S-04 | Actual multi-page Balance/Card data when declared, Next/Previous and filter change page1; fixture rows distinguished from attended posts. | NOT RUN |
-| P-01 | Ordinary Read+Post without Write: read saved Draft, cannot edit/save, Post authorized with correct actor and single stock effect. | NOT RUN |
-| P-02 | Read+Write without Post: Draft write succeeds, Post unavailable/denied; no posted mutation. | NOT RUN |
+| P-01 | Ordinary Read+Post without Write: read saved Draft, server rejects Save without Write, Post authorized with correct actor and single stock effect. | PASS — Owner confirmed Save denial then Post success; restricted stock/audit oracle |
+| P-02 | Read+Write without Post: Draft write succeeds, Post unavailable/denied; no posted mutation. | PASS — Owner confirmed Save success then server Post denial; Draft/token/stock preserved |
 | P-03 | Post without Read cannot load/post an unseen receipt; no leaked detail or mutation. | NOT RUN |
 | P-04 | Ordinary role Post grant plus direct Post Deny after enabled UI admission; server rejection/input preserved/no mutation, actual assignment snapshot. | NOT RUN |
 | P-05 | Restricted Stock permissions: Balance/Card deny safely and clear rows/totals; no previous actor data. | NOT RUN |
@@ -69,7 +69,7 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 ## Session / artifacts / decision
 
-T05 attended ledger currently13/45 Owner-confirmed PASS (13/27 baseline,0/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
+T05 attended ledger currently15/45 Owner-confirmed PASS (15/27 baseline,0/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
 
 ### Setup attempt1 — FAIL, safely disposed
 
@@ -171,3 +171,22 @@ C-01: actual GUI loaded T05-FIX-SAVE/token2029, Codex edited Note toT05 stale lo
 | [stale-save-rejected-100light.jpg](assets/gui-p5-t05/stale-save-rejected-100light.jpg) | 06ED0B75D1876B30ACE389D56ED56FFCC1CB62A3B0C79E17C3BCEA4113800B58 |
 
 Checkpoint22:45:13/45observations PASS. Sign out discarded unsaved stale loser input; actual human Login as p5.t05.post-only requested for P-01. Chapter2 remains bounded until22:55:37; retained allocation168/final disposal pending. No fault installed or additional stock effect.
+
+### Post-only permission observation — Owner confirmed
+
+Human confirmed T05 Post Only after real Login. Actual GUI loaded setup-only T05-FIX-POSTONLY, NoteT05 post only, quantity0.25@4/Total1/token2025. Contrary to the initial worksheet expectation, editor/Save are enabled for Draft regardless of role: GoodsReceiptControl canEdit uses busy/status/access-denied/outcome-lock state, without permission prefetch. Actual Save with unchanged fields returns The operation is not permitted.; restricted post-only-save-denied snapshot preserves Draft/token2025 and original stock3.125/oneledger. This corrects an unsupported UI-lock expectation; it does not waive the server Write authorization requirement or claim edits are visually prevented.
+
+One actual Post then succeeds despite absent Write: restricted post-only-posted snapshot records Posted/token2035, PostedByP5.T05.POST-ONLY, exactly one additional GoodsReceipt movement0.25, total2movements/onebalance3.375. Full-key reconciliation and posted-line/document invariants all0mismatches. Actual Posted editor/Save/Post/Add/Remove are disabled. Role assignment snapshot contains ReceiptRead/Post/StockRead and three CatalogRead prerequisites, no Write/protected binding. Owner explicitly confirmed this group with the subsequent Writer observation; P-01 PASS. No product/test byte change. Sign out performed; human p5.t05.writer Login requested.
+
+- [post-only-draft-100light.jpg](assets/gui-p5-t05/post-only-draft-100light.jpg), SHA256 484C0D8E0EB5E8B81A4A1BD3273C9B33B9F8A10966369533BDE713322101F011.
+- [post-only-save-denied-100light.jpg](assets/gui-p5-t05/post-only-save-denied-100light.jpg), SHA256 F52070241D569D032C2D575A2BB3F78A1A12B4B842FACB06A2963573FAE65049.
+- [post-only-posted-100light.jpg](assets/gui-p5-t05/post-only-posted-100light.jpg), SHA256 F8D7F05C6E3C2DD7FF8461824971C1E6E0C93AAA2AF17352A8978A8A7A720E93.
+
+### Writer without Post — Owner confirmed
+
+Human Login confirmed by actual shell T05 Writer No Post, clean workspace with no prior actor editor. Actual T05-FIX-WRITER Draft loaded/token2026; native Note changed toT05 writer saved without Post, actual Save succeeded/token2038. Actual Post button was enabled after Save; one click returned The operation is not permitted., preserving Note/Draft/token2038. Restricted writer-saved and writer-post-denied snapshots preserve2ledger movements/onebalance3.375,0full-key or line/document mismatches. Owner explicitly confirmed both Post-only and Writer groups: P-01/P-02 PASS,15/45total. UI admission is not permission enforcement; no disabled-Post assertion for this role. No product change.
+
+- [writer-saved-100light.jpg](assets/gui-p5-t05/writer-saved-100light.jpg), SHA256 33212C1C532CD84835CAB42C8E98711261A9F77717E712EF3BAD5A8A21CDAD7A.
+- [writer-post-denied-100light.jpg](assets/gui-p5-t05/writer-post-denied-100light.jpg), SHA256 9947407750EF0B71A3190B90FE68269B518B34B03733B8BA1FC72D48852FCCFB.
+
+Chapter2 closed normally22:51:15/exit0/CleanupVerified before22:55:37 cap. Chapter3 launch requested while root admission remains open, same positively owned allocation; final disposal pending.
