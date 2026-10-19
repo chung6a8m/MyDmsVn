@@ -164,6 +164,27 @@ public sealed class PackagedGuiAcceptanceTests
         });
     }
 
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
+    public async Task Invalid_receipt_fields_preserve_input_and_create_no_inventory(string theme)
+    {
+        var package = ValidatedPackage();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" invalid-audit " + theme);
+            fixture.ConfigureRuntime(start);
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(90));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("INVALID_FIELDS_NO_WRITE=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertNoInventoryAsync();
+        });
+    }
+
     [GuiPackageFact]
     public async Task Unavailable_sql_startup_is_safe_owned_and_drains_under_native_uia()
     {

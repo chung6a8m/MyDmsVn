@@ -45,6 +45,21 @@ internal static class GuiPackageProbe
                     throw new InvalidOperationException("Startup application did not exit safely.");
                 Console.WriteLine("STARTUP_SAFE_ERROR=PASS");
             }
+            else if (args[1] == "invalid-audit")
+            {
+                var shell = Login();
+                _stage = "receipt-invalid-fields";
+                Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+                var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+                Invoke(Find(page, "Add line", ControlType.Button, false));
+                SetInput(page, "Quantity", 0m.ToString("F4"), false);
+                SetInput(page, "Note", "GUI invalid input retained", false);
+                Invoke(Find(page, "Save", ControlType.Button, false));
+                Find(page, "The request is invalid.", ControlType.Text, false);
+                if (InputValue(page, "Note") != "GUI invalid input retained") throw new InvalidOperationException("Invalid draft input was lost.");
+                CloseApplication(shell);
+                Console.WriteLine("INVALID_FIELDS_NO_WRITE=PASS");
+            }
             else if (args[1] == "negative-audit")
             {
                 _stage = "disabled-login";
@@ -52,7 +67,7 @@ internal static class GuiPackageProbe
                 SetInput(login, "Username", "gui.p5.disabled", false);
                 SetInput(login, "Password", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), true);
                 Invoke(Find(login, "Đăng nhập", ControlType.Button, false));
-                Named(login, "Tên đăng nhập hoặc mật khẩu không đúng.");
+                Find(login, "Tên đăng nhập hoặc mật khẩu không đúng.", ControlType.Pane, true);
                 Console.WriteLine("DISABLED_LOGIN_REJECTED=PASS");
                 var shell = Login("gui.p5.deny", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), "GUI P5 Deny");
                 Invoke(Find(shell, "Products", ControlType.Button, false));

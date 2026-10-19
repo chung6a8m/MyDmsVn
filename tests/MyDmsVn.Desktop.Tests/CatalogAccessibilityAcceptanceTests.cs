@@ -34,6 +34,7 @@ namespace MyDmsVn.Desktop.Tests
                 var cell = AccessibleDescendants(control.Grid.AccessibilityObject)
                     .First(item => item.Role == AccessibleRole.Cell && item.Name == code);
                 Assert.Equal("Code", cell.Description);
+                Assert.Equal("Code", cell.Help);
                 Assert.True((cell.State & AccessibleStates.ReadOnly) != 0);
                 Assert.Throws<InvalidOperationException>(() => cell.Value = "MUST NOT CHANGE");
                 Assert.Equal(code, control.Grid[1, 1].Value);

@@ -72,6 +72,12 @@ internal sealed class GuiSqlEnvironment : IDisposable
             Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo." + table + ";"));
     }
 
+    public async Task AssertNoInventoryAsync()
+    {
+        foreach (var table in new[] { "GoodsReceipts", "GoodsReceiptLines", "StockLedger", "StockBalances" })
+            Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo." + table + ";"));
+    }
+
     private GuiSqlEnvironment(SqlTestDatabase database, string administration, string repository)
     {
         _database = database;

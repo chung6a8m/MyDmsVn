@@ -91,6 +91,7 @@ internal sealed class AccessibleActionGrid : BootstrapGrid
 
     private sealed class CellAccessibleObject : AccessibleObject
     {
+        public override string? Help => Description;
         private readonly RowAccessibleObject _row;
         private readonly int _column;
         private readonly string _value;
