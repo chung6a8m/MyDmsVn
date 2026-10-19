@@ -141,7 +141,8 @@ internal static class GuiPackageProbe
         Invoke(Find(login, "Đăng nhập", ControlType.Button, false));
         var shell = Window("MyDmsVn");
         Find(shell, "GUI P5 Owner", ControlType.Text, false);
-        var theme = Find(shell, "Light / Dark", ControlType.Button, false);
+        Dump(shell);
+        var theme = Find(shell, "Theme toggle", ControlType.Button, false);
         if (theme.Current.HelpText != "Current theme: " + _theme) Invoke(theme);
         Wait(delegate { return theme.Current.HelpText == "Current theme: " + _theme; }, "Theme metadata did not match the requested mode.");
         Console.WriteLine("APPLICATION_THEME=" + _theme);

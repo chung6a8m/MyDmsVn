@@ -121,7 +121,14 @@ namespace MyDmsVn.Desktop.Tests
                               var toggle = shell.Controls.OfType<ToolStrip>()
                                   .SelectMany(strip => strip.Items.OfType<ToolStripButton>())
                                   .Single(button => button.Text == "Light / Dark");
-                              Assert.Equal("Current theme: Light", toggle.AccessibleDescription);
+                              shell.Show();
+                            System.Windows.Forms.Application.DoEvents();
+                            var toolbar = toggle.Owner;
+                            var names = Enumerable.Range(0, toolbar.AccessibilityObject.GetChildCount()).Select(i => toolbar.AccessibilityObject.GetChild(i).Name).ToArray();
+                            Assert.True(names.Contains("Theme toggle"), string.Join(";", names) + " Layout=" + toggle.Placement + "/" + toggle.Bounds + "/" + toolbar.Bounds);
+                            Assert.Equal("Theme toggle", toggle.AccessibleName);
+                            Assert.Equal(System.Windows.Forms.AccessibleRole.PushButton, toggle.AccessibleRole);
+                            Assert.Equal("Current theme: Light", toggle.AccessibleDescription);
                             shell.ToggleTheme();
 
                             Assert.Equal(

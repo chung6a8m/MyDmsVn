@@ -758,6 +758,9 @@ namespace MyDmsVn.Desktop.WinForms
             var title = new ToolStripLabel("MyDmsVn");
             var themeButton = new ToolStripButton("Light / Dark")
             {
+                Name = "ThemeToggle",
+                AccessibleName = "Theme toggle",
+                AccessibleRole = AccessibleRole.PushButton,
                 Alignment = ToolStripItemAlignment.Right,
             };
             _themeButton = themeButton;
