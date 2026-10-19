@@ -85,6 +85,8 @@ A claimed **full GUI** acceptance needs an explicit behavior-to-test ledger, not
 - [ ] Keep receipt open during Product/Warehouse/Employee update/deactivate/reactivate; verify same-process lookup refresh, historical selected item, active-only new selection and fresh results on reopen/restart. Never claim cross-process messaging.
 - [ ] Record per-step PASS/FAIL/BLOCKED/NOT RUN, package hash, OS/DPI/runtime, SQL version, actor/permissions, sanitized screenshots, tester/date. GUI automated evidence is listed separately.
 
+**T04 preparation (2026-10-19): IN PROGRESS / attended execution NOT RUN.** [Operator worksheet and per-step ledger](../GUI_P5_T04_WALKTHROUGH.md) pins the unchanged T03 package source02eff22, verified133-file private per-user installation, exact hashes, current Windows/runtime/display metadata, catalog/lookup actions, actor/permission setup, screenshots and owned cleanup. No T04 SQL allocation or Desktop launch has occurred. Human attendance was requested; session observations, all mandatory cells and sign-off remain pending. Preparation does not close this task or reuse T03 automation as attended evidence.
+
 **Exit:** `REMAIN-P5-GUI-01` PASS for every shipped target, else OPEN.
 
 ### GUI-P5-T05 — REMAIN-P5-GUI-02 attended Inventory sign-off

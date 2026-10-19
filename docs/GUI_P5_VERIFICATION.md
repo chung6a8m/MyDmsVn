@@ -313,3 +313,11 @@ dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release 
 ```
 
 **Current T03 exit: COMPLETE in task scope**, with the foreground-resource incident and focused-rerun qualification above. Date/tester:2026-10-19, Asia/Bangkok, Codex. This documentation-only follow-up does not replace executable source02eff22 or its frozen bytes. T04/T05 attended walkthroughs, T06 frozen full acceptance, both P5 sign-offs and REL/P6 G1–G5 remain OPEN; production readiness is not asserted.
+
+## GUI-P5-T04 — Attended Catalog/Lookup preparation (OPEN)
+
+**Prepared:**2026-10-19, Asia/Bangkok, Codex; documentation base `f33a959`. The [T04 worksheet](GUI_P5_T04_WALKTHROUGH.md) is the per-step attended ledger. T03 package/test/executable source02eff22 is unchanged. All133 Desktop manifest files were copied to a new private per-user versioned installation and every length/SHA-256 verified; the inherited DACL was replaced with current-account/SYSTEM/Administrators access, and no admin migrator was copied. No existing installation or shared runtime configuration/shortcut was changed. This is preparation on the developer desktop, not P6 clean-install or limited-user evidence.
+
+Fresh metadata observed Windows11 Home Single Language25H2/build26200.9457/x64/session38; installed v4 Version4.8.09221/Release533509;1920×1080 with native x86 primary scale100/HRESULT0. Actual scale is re-measured per attended session; the final T03 run's125% is not assumed to persist. Computer-use runtime initialized and returned no existing MyDmsVn target window; no application authentication or UI input was performed.
+
+**Selected/executed attended cases:0/0; all worksheet cells NOT RUN.** No T04 SQL database/principal was allocated, no Desktop process launched, no screenshot/oracle/cleanup execution recorded and no human signature received. No new xUnit run, runner, framework or product/test behavior change is claimed. Under TEST_POLICY this preparation uses actual file/hash/ACL/environment verification and documentation checks; it does not rerun the GUI/SQL suite for Markdown. T04 remains OPEN pending attended execution, screenshot/oracle evidence and verified teardown. T05/T06, both P5 sign-offs and REL/P6 remain OPEN.
