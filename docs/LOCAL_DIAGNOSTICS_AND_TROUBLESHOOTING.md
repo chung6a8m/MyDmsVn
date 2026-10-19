@@ -1,6 +1,6 @@
 # Diagnostics, security audit và troubleshooting cho Local Mode v1
 
-**Hiện trạng:** `v1a`, cập nhật 2026-10-18. Host active là `MyDmsVn.Desktop.App` (`net48`/x86). AppCore (`net8.0-windows`) parked ngoài solution/release. SEC-REBUILD đã được chấp nhận trong PR #34, còn P5/P6 operational/release evidence được giữ **OPEN / DEFERRED** tại [DEFERRED_WORK](DEFERRED_WORK.md). Xem [HISTORY](HISTORY.md) cho bằng chứng lịch sử.
+**Hiện trạng:** `v1a`, cập nhật 2026-10-19. Host active `MyDmsVn.Desktop.App` (`net48`/x86), AppCore (`net8.0-windows`) parked. SEC-REBUILD/RESP/L2DB đã hoàn thành trong phạm vi plan; kiểm thử GUI/P5 và P6 diagnostics/recovery/release vẫn OPEN trong [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) và [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md). [HISTORY](HISTORY.md) giữ nguồn lịch sử.
 
 ## Log và retention
 
@@ -55,7 +55,7 @@ Khi gửi log cho support:
 | Configuration failure | Mã `Startup.*`, source loại cấu hình; không thu connection string | Sửa file/env theo [configuration runbook](CONFIGURATION_AND_SQL_SECURITY.md), restart |
 | SQL offline/timeout | Correlation ID, `Startup.DatabaseUnavailable`, network/TLS | Kiểm tra SQL service/firewall/certificate; không blind-retry command |
 | Schema incompatible | Mã `Schema.*`, runtime scripts 001–009, journal read-only | Dừng client, dùng [migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md); prefix cũ bị migrator hiện tại từ chối, không blind-retry upgrade |
-| Package ghi schema 8 trong khi runtime yêu cầu 009 | Package/commit/hash và `schemaSupport` | Giữ release blocked theo `RELEASE-MANIFEST-01` trong [deferred work](DEFERRED_WORK.md); không sửa journal theo package metadata lỗi thời |
+| Package cũ ghi schema 8 trong khi runtime yêu cầu 009 | Package/commit/hash và `schemaSupport` | Lỗi `RELEASE-MANIFEST-01` đã **sửa ở publisher hiện hành** (schema9/scripts001–009). Không chỉnh DbUp journal hay manifest thủ công; từ chối package cũ và đối chiếu artifact/commit sạch theo [L2DB evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed). Việc cài đặt vẫn phải qua [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md) |
 | Authorization denied | Audit `Denied`, actor/action/document, current key/assignment/revision | Dùng [security administration](SECURITY_ADMINISTRATION_RUNBOOK.md), kiểm tra default deny/direct Deny và binding; không sync hoặc tự cấp grant |
 | Slow query | Operation/correlation/timestamp, không SQL parameter | Đối chiếu SQL health và query plan bằng DBA tooling |
 | Post failed | Error code, document ID, ledger/balance reconciliation | Reload receipt; không retry khi commit outcome chưa rõ |
@@ -66,4 +66,4 @@ Khi gửi log cho support:
 
 Không mở modal từ logging/audit failure. Modal startup hiện hữu chỉ chứa safe code/message; active executable nhận `--smoke-test` để ghi lỗi startup vào stderr thay cho modal. Nếu bổ sung probe fatal-process hoặc tác vụ không thể dừng hợp tác, test phải tự sở hữu subprocess có timeout và cleanup; không giả định helper STA có thể dừng mọi process/thread. Khi kiểm tra smoke thủ công, ghi rõ thời hạn, cách dừng process nếu treo và kết quả cleanup; framework cũ đã bị xóa nên không có launcher/watchdog bên ngoài. [TEST_POLICY](TEST_POLICY.md) và [tests/README](../tests/README.md) mô tả cách chạy hiện tại. Switch này không thay thế bằng chứng packaged login/GUI.
 
-Log-path/full-disk, recovery và installed-runtime checks còn mở trong [P6 deferred work](DEFERRED_WORK.md). Support evidence phải ghi đúng revision/package, thời gian, safe code/correlation và kết quả quan sát; không dùng bằng chứng AppCore lịch sử như một lần chạy net48 hiện tại.
+Log-path/full-disk, recovery và installed-runtime checks còn mở trong [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md). Support evidence phải ghi đúng revision/package, thời gian, safe code/correlation và kết quả quan sát; không dùng bằng chứng AppCore lịch sử như một lần chạy net48 hiện tại.
