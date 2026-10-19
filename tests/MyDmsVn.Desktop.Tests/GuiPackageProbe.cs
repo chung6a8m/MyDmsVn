@@ -8,6 +8,7 @@ using System.Windows.Automation;
 
 internal static class GuiPackageProbe
 {
+    private static readonly System.Collections.Generic.Dictionary<string, int> CatalogIds = new System.Collections.Generic.Dictionary<string, int>();
     private static string _stage = "startup";
     private static string _detail = "none";
     private static string _theme = "Light";
@@ -51,7 +52,7 @@ internal static class GuiPackageProbe
                 SetInput(login, "Username", "gui.p5.disabled", false);
                 SetInput(login, "Password", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), true);
                 Invoke(Find(login, "Đăng nhập", ControlType.Button, false));
-                Find(login, "Tên đăng nhập hoặc mật khẩu không đúng.", ControlType.Text, true);
+                Named(login, "Tên đăng nhập hoặc mật khẩu không đúng.");
                 Console.WriteLine("DISABLED_LOGIN_REJECTED=PASS");
                 var shell = Login("gui.p5.deny", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), "GUI P5 Deny");
                 Invoke(Find(shell, "Products", ControlType.Button, false));
@@ -166,6 +167,10 @@ internal static class GuiPackageProbe
         Named(results, "Inactive");
         Invoke(Find(page, "Activate", ControlType.Button, false));
         Named(results, "Active");
+        var row = Named(results, "Result " + code);
+        var id = row.FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.HelpTextProperty, "ID"));
+        if (id == null) throw new InvalidOperationException("Catalog ID column inaccessible.");
+        CatalogIds[title] = int.Parse(id.Current.Name, System.Globalization.CultureInfo.InvariantCulture);
         Console.WriteLine("CATALOG_FLOW=" + title + ":PASS");
     }
 
@@ -245,6 +250,14 @@ internal static class GuiPackageProbe
         Dump(balance);
         Find(balance, 3.125m.ToString("F4"), ControlType.Text, false);
         Console.WriteLine("STOCK_BALANCE_TOTAL=PASS");
+        _stage = "stock-card";
+        Invoke(Find(shell, "Thẻ kho", ControlType.Button, false));
+        var card = Find(shell, "Thẻ kho", ControlType.TabItem, false);
+        SetInput(card, "Warehouse ID", CatalogIds["Warehouses"].ToString(), false);
+        SetInput(card, "Product ID", CatalogIds["Products"].ToString(), false);
+        Invoke(Find(card, "Refresh", ControlType.Button, false));
+        Find(card, 3.125m.ToString("F4"), ControlType.Text, false);
+        Console.WriteLine("STOCK_CARD_TOTAL=PASS");
     }
 
     private static void CloseApplication(AutomationElement shell)

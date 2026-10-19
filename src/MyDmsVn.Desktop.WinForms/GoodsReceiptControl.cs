@@ -106,23 +106,21 @@ namespace MyDmsVn.Desktop.WinForms
             LineGrid.Click += (_, __) => SelectActiveLine();
             LineGrid.KeyDown += OnLineGridKeyDown;
             ProductLookup = CreateLookup("Product");
-            QuantityEditor = new BootstrapNumericBox
+            QuantityEditor = new AccessibleNumericBox
             {
                 Dock = DockStyle.Top,
                 DecimalPlaces = GoodsReceiptContractLimits.DecimalPlaces,
                 Minimum = 0,
                 Maximum = GoodsReceiptContractLimits.MaximumQuantity,
                 AccessibleName = "Quantity",
-                AccessibleRole = AccessibleRole.Grouping,
             };
-            UnitCostEditor = new BootstrapNumericBox
+            UnitCostEditor = new AccessibleNumericBox
             {
                 Dock = DockStyle.Top,
                 DecimalPlaces = GoodsReceiptContractLimits.DecimalPlaces,
                 Minimum = 0,
                 Maximum = GoodsReceiptContractLimits.MaximumUnitCost,
                 AccessibleName = "Unit cost",
-                AccessibleRole = AccessibleRole.Grouping,
             };
             AddLineButton = CreateButton("Add line", AddLine);
             RemoveLineButton = CreateButton("Remove line", RemoveSelectedLine);

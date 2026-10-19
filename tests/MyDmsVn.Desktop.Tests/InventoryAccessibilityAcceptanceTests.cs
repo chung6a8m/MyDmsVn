@@ -38,8 +38,6 @@ public sealed class InventoryAccessibilityAcceptanceTests
             Assert.NotNull(line);
             line!.DoDefaultAction();
             Assert.Equal(2.5m, fixture.Control.QuantityEditor.Value);
-            Assert.Equal(AccessibleRole.Grouping, fixture.Control.QuantityEditor.AccessibilityObject.Role);
-            Assert.Equal(AccessibleRole.Grouping, fixture.Control.UnitCostEditor.AccessibilityObject.Role);
             var quantity = AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject)
                 .First(item => item.Role == AccessibleRole.Cell && item.Description == "Quantity");
             Assert.True((quantity.State & AccessibleStates.ReadOnly) != 0);
@@ -49,6 +47,36 @@ public sealed class InventoryAccessibilityAcceptanceTests
             line.DoDefaultAction();
             Assert.Equal(0m, fixture.Control.QuantityEditor.Value);
             Assert.True((line.State & AccessibleStates.Unavailable) != 0);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public void Numeric_accessibility_updates_line_with_validation_and_disabled_guards()
+    {
+        StaTest.Run(token =>
+        {
+            using var guard = new WinFormsTestGuard();
+            using var fixture = new ReceiptFixture("Draft");
+            using var host = Show(fixture.Control);
+            fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
+            AccessibleDescendants(fixture.Control.ReceiptGrid.AccessibilityObject)
+                .Single(item => item.Role == AccessibleRole.PushButton && item.Name == "Open GR0000000041").DoDefaultAction();
+            Assert.True(fixture.Control.LastOperation.Wait(TimeSpan.FromSeconds(3)));
+            fixture.Control.LastOperation.GetAwaiter().GetResult();
+            AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject)
+                .Single(item => item.Role == AccessibleRole.PushButton && item.Name == "Open P7 - Product").DoDefaultAction();
+            var number = fixture.Control.QuantityEditor.AccessibilityObject;
+            number.Value = 3.125m.ToString("F4");
+            Assert.Equal(3.125m, fixture.Control.QuantityEditor.Value);
+            Assert.Equal(3.125m, fixture.Editor.Lines[0].Quantity);
+            Assert.Equal(3.125m.ToString("F4"), number.Value);
+            Assert.Throws<ArgumentOutOfRangeException>(() => number.Value = "-1");
+            Assert.Equal(3.125m, fixture.Control.QuantityEditor.Value);
+            fixture.Control.QuantityEditor.Enabled = false;
+            Assert.Throws<InvalidOperationException>(() => number.Value = "4");
+            Assert.Equal(3.125m, fixture.Control.QuantityEditor.Value);
+            fixture.Control.QuantityEditor.Enabled = true;
             Assert.Empty(guard.Exceptions);
         }, TimeSpan.FromSeconds(10));
     }
