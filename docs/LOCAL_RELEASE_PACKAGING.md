@@ -1,10 +1,10 @@
 # Đóng gói và triển khai Local Mode v1
 
-**Hiện trạng:** Nhánh `v1a`, cập nhật 2026-10-18. Script đóng gói hiện có chỉ tạo desktop và admin migrator `net48`/x86. SEC-REBUILD đã được chấp nhận trong PR #34; P5 interactive và P6 operational/release vẫn **OPEN / DEFERRED** trong [DEFERRED_WORK](DEFERRED_WORK.md). Lịch sử bằng chứng nằm ở [HISTORY](HISTORY.md); tài liệu này không chứng nhận clean install, upgrade hay production release.
+**Hiện trạng:** Nhánh `v1a`, cập nhật 2026-10-19. Package hiện chỉ có desktop và admin migrator `net48`/x86. SEC-REBUILD, RESP và L2DB đã hoàn tất trong phạm vi plan; **GUI/P5** và **P6 release acceptance** vẫn OPEN, đã có [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) và [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md). Tài liệu này mô tả cách đóng gói, không chứng nhận clean install, upgrade hay production release.
 
 **RELEASE-MANIFEST-01:** Script đã sửa nguồn metadata: đọc `SchemaCompatibilityPolicy.CurrentScripts` từ DLL admin đã đóng gói qua helper PowerShell x86, thay cho pin `8..8`. Bốn test packaging x86 và đối chiếu artifact từ commit sạch `d8013030` đã đạt: schema9, danh sách001–009, 224 hash file. [L2DB evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed) đóng riêng lỗi metadata này. Chưa có release acceptance.
 
-**L2DB-T06:** Source net48 đã chuyển sang LINQ to DB/native SqlClient và gỡ dependency RepoDb/Dapper active. AppCore vẫn parked; lock cũ phải refresh khi được phép reactivation. T07 phải đóng gói từ commit T06 đã freeze, kiểm tra asset SqlClient/binding redirects và thao tác Local login, Product, receipt, deny, import, logout/relogin. Bằng chứng package T02 ở trên giữ nguyên revision cũ; không thay cho acceptance T07. [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup).
+**L2DB-T06/T07:** Product net48 đã chuyển sang LINQ to DB/native SqlClient và gỡ dependency RepoDb/Dapper active; AppCore vẫn parked. T07 đã hoàn thành correctness/package, limited authenticated Local smoke và kiểm tra cleanup trên frozen revision (xem [evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)). **139 invocations Desktop GUI chưa chạy tại T07**; clean VM, full GUI/P5, phục hồi dữ liệu và G1–G5 vẫn phải kiểm chứng trong hai plan mới. Không dùng artifact T02/T07 của revision cũ để suy ra release acceptance.
 
 ## Release artifacts
 
@@ -62,6 +62,6 @@ Từ thư mục `admin-migrator-net48-win-x86`, lệnh migration active là `& .
 - review đường upgrade được hỗ trợ, preserve config/shared SQL, restart/repair/uninstall; không coi prefix cũ là upgrade path hiện có;
 - limited-user execution và writable log folder;
 - optional signature/trust chain theo owner policy;
-- packaged P5 smoke và các release scenarios còn mở trên host net48 thực sự được phát hành.
+- packaged GUI-P5 full STA, real packaged-login E2E và manual P5; P6 G1–G5 release scenarios còn mở trên host net48 thực sự phát hành.
 
 Các mục trên theo [TEST_POLICY](TEST_POLICY.md) và [DEFERRED_WORK](DEFERRED_WORK.md), ghi revision/artifact, Pass/Fail/Blocked/Not run, OS build, architecture, runtime, SQL version, tester và timestamp. Publish-directory output không thay thế VM, GUI, migration/recovery hay owner release evidence. Việc chọn RESP và L2DB làm hai kế hoạch active không đóng các yêu cầu này.
