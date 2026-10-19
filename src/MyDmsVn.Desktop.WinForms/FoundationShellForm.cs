@@ -28,7 +28,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly int _uiThreadId;
         private long? _workspaceSessionVersion;
         private bool _openingWorkspace;
-        private ToolStripButton? _themeButton;
+        private Button? _themeButton;
 
         public FoundationShellForm(FoundationViewModel viewModel)
             : this(viewModel, null, null, null, null, null, null, true)
@@ -756,12 +756,14 @@ namespace MyDmsVn.Desktop.WinForms
                 GripStyle = ToolStripGripStyle.Hidden,
             };
             var title = new ToolStripLabel("MyDmsVn");
-            var themeButton = new ToolStripButton("Light / Dark")
+            // A hosted HWND-backed button remains available through native UIA on net48.
+            var themeButton = new BootstrapButton
             {
+                Text = "Light / Dark",
+                AutoSize = true,
                 Name = "ThemeToggle",
                 AccessibleName = "Theme toggle",
                 AccessibleRole = AccessibleRole.PushButton,
-                Alignment = ToolStripItemAlignment.Right,
             };
             _themeButton = themeButton;
             themeButton.Click += (_, _) => ToggleTheme();
@@ -772,7 +774,12 @@ namespace MyDmsVn.Desktop.WinForms
             signOutButton.Click += (_, _) => SignOut();
             topBar.Items.Add(title);
             topBar.Items.Add(signOutButton);
-            topBar.Items.Add(themeButton);
+            topBar.Items.Add(new ToolStripControlHost(themeButton)
+            {
+                Alignment = ToolStripItemAlignment.Right,
+                AccessibleName = "Appearance controls",
+                AccessibleRole = AccessibleRole.Grouping,
+            });
             UpdateThemeDescription();
             return topBar;
         }

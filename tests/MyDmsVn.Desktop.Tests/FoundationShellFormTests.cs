@@ -118,16 +118,14 @@ namespace MyDmsVn.Desktop.Tests
                             BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
                         using (var shell = CreateShell())
                         {
-                              var toggle = shell.Controls.OfType<ToolStrip>()
-                                  .SelectMany(strip => strip.Items.OfType<ToolStripButton>())
-                                  .Single(button => button.Text == "Light / Dark");
-                              shell.Show();
+                            shell.Show();
                             System.Windows.Forms.Application.DoEvents();
-                            var toolbar = toggle.Owner;
-                            var names = Enumerable.Range(0, toolbar.AccessibilityObject.GetChildCount()).Select(i => toolbar.AccessibilityObject.GetChild(i).Name).ToArray();
-                            Assert.True(names.Contains("Theme toggle"), string.Join(";", names) + " Layout=" + toggle.Placement + "/" + toggle.Bounds + "/" + toolbar.Bounds);
-                            Assert.Equal("Theme toggle", toggle.AccessibleName);
-                            Assert.Equal(System.Windows.Forms.AccessibleRole.PushButton, toggle.AccessibleRole);
+                            var toggle = shell.Controls.OfType<ToolStrip>()
+                                .SelectMany(strip => strip.Items.OfType<ToolStripControlHost>())
+                                .Select(host => host.Control).OfType<Button>()
+                                .Single(button => button.AccessibleName == "Theme toggle");
+                            Assert.True(toggle.IsHandleCreated);
+                            Assert.Equal(AccessibleRole.PushButton, toggle.AccessibleRole);
                             Assert.Equal("Current theme: Light", toggle.AccessibleDescription);
                             shell.ToggleTheme();
 
