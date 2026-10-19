@@ -1,12 +1,12 @@
 # Test policy — v1a
 
-**Effective:** 2026-10-18. **Authority:** the owner's replacement test policy and complete removal of the former SQL test framework. This is the sole execution policy; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage and [tests/README](../tests/README.md) provides current commands. The active roadmap is [RESP, then L2DB](plans/README.md).
+**Effective:** 2026-10-19 (updated roadmap; execution policy retained). **Authority:** the owner's replacement test policy after complete SQL framework removal. This is the sole execution policy; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage and [tests/README](../tests/README.md) owns commands. [RESP/L2DB are accepted](plans/README.md); GUI-P5 and REL/P6 are now the OPEN milestone plans.
 
 ## 1. Current execution model
 
 Run the existing test projects directly with `dotnet test` or Test Explorer. There are ten active test projects, all targeting `net48`; six own SQL integration scenarios. Use Windows, the SDK selected by `global.json`, and .NET Framework 4.8 targeting/runtime support. AppCore and modern product targets remain PARKED / NOT RUN.
 
-The shared SQL helper in the IntegrationTests project currently creates one fresh disposable database per call. It is linked into the other owners that need it. RESP-T01 adds Respawn 4.0.0 and a verified owned application-schema reset profile inside IntegrationTests, linked into Foundation probes. RESP-T02 adds exclusive collection scopes, tracked workers/cleanup, terminal poison and the explicit `MYDMSVN_SQL_TEST_FIXTURE_MODE=fresh|reuse` setting. RESP-T03–T04 adopt all 20 original data-only candidates across Catalog/Inventory/Security. Accepted profiles default to reuse for absent/blank settings; explicit fresh uses the same seeds/assertions on new owned allocations. Dedicated exceptions keep their existing fresh helper and ignore the fixture setting; lazy Inventory/Security collection setup allocates nothing when only exceptions are selected. RESP-T05 accepts the exact local working-tree candidate in [verification](RESPAWN_VERIFICATION.md#pr-36-review-follow-up); preserve its boundaries during L2DB. The removed gate manifest, standalone SQL support projects, command wrappers and their tests are historical context only. Neither active plan restores them.
+The shared SQL helper in the IntegrationTests project currently creates one fresh disposable database per call. It is linked into the other owners that need it. RESP-T01 adds Respawn 4.0.0 and a verified owned application-schema reset profile inside IntegrationTests, linked into Foundation probes. RESP-T02 adds exclusive collection scopes, tracked workers/cleanup, terminal poison and the explicit `MYDMSVN_SQL_TEST_FIXTURE_MODE=fresh|reuse` setting. RESP-T03–T04 adopt all 20 original data-only candidates across Catalog/Inventory/Security. Accepted profiles default to reuse for absent/blank settings; explicit fresh uses the same seeds/assertions on new owned allocations. Dedicated exceptions keep their existing fresh helper and ignore the fixture setting; lazy Inventory/Security collection setup allocates nothing when only exceptions are selected. RESP-T05 accepts the exact local working-tree candidate in [verification](RESPAWN_VERIFICATION.md#pr-36-review-follow-up); preserve its boundaries during L2DB. The removed gate manifest, standalone SQL support projects, command wrappers and their tests are historical context only. Neither completed infrastructure plan nor the new GUI-P5/REL plans restore them.
 
 ## 2. Choose scope from the changed behavior
 
@@ -71,7 +71,7 @@ Schema/history/principal/destructive-lifecycle and unresettable cases retain ded
 
 Respawn 4's reset method has no cancellation-token overload. Its implementation must use finite command timeouts and terminate/drain the actual owned reset operation before releasing fixture access. A timed-out `Task.WhenAny` wait alone does not stop SQL. This requirement does not imply that an external watchdog exists today.
 
-## 6. Acceptance for the two plans
+## 6. Completed infrastructure acceptance and open GUI/P6 milestones
 
 **RESP:** execute every case in all six SQL projects on `net48`, including the local helper/reset/lifecycle checks affected by the change. Prove no contamination, preserved journal/ownership/trigger/seed state, failed initialization/reset behavior and real multi-session semantics. Verify that accepted eligible profiles default to reuse and explicit exceptions remain fresh.
 
@@ -79,13 +79,17 @@ Compare the same frozen candidate and SQL cases once in explicit test-only `fres
 
 **L2DB:** use the accepted RESP baseline unchanged. Require all six SQL owners, affected Application/architecture/session coverage, and the plan's net48 package/host smoke. Preserve rollback, rowversion, locking, permissions and stored procedures. Individual module edits still use focused checks; final breadth follows from replacing shared persistence.
 
+**GUI-P5:** after source-test inventory, run the complete Desktop.Session and Desktop GUI tests on interactive Windows/net48, plus bounded out-of-process real-package Login/feature E2E with independent SQL state checks and two attended P5 walkthroughs. The 139 Desktop GUI invocations left NOT RUN at L2DB-T07 do not establish a current GUI pass; reconcile each new candidate's discovered Facts/Theory rows and executed TRX. See [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md).
+
+**REL/P6:** define an approved OS/SQL/legacy/signing/backup support matrix, verify clean publish-install-upgrade/recovery and separate migration principals, and require all ten active test project results plus GUI-P5 release evidence on a frozen candidate. G1–G5 need independent runtime/manual evidence and named release sign-off. See [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md). No former Final manifest/runner or blanket full suite after each edit.
+
 Acceptance belongs to the exact candidate and scope. A later relevant source, test, schema, fixture, dependency or build change invalidates the evidence it can affect; rerun that scope. A documentation correction does not invalidate unrelated runtime evidence. Missing, skipped, timed-out, aborted or unexplained mandatory cases are never PASS.
 
 ## 7. GUI execution
 
 Use the existing Desktop test project directly on an interactive Windows session. Keep its `StaTest`, `WinFormsTestGuard`, assembly serialization, bounded waits, deterministic disposal and captured exception/DataError behavior. Run one GUI command at a time; no external GUI lease or launcher remains. Any future fatal or non-cooperative hang probe must own a bounded subprocess and terminate/drain it; an in-process STA timeout cannot provide that guarantee. Current packaging subprocess tests have no suite watchdog, so a hung process requires an explicit stop and incomplete-result report.
 
-Automated STA checks and attended packaged-user acceptance are separate evidence. Do not launch GUI suites for unrelated Markdown or DAL-only edits unless the active plan names a meaningful host/package check. Missing Windows, targeting packs or GUI access is BLOCKED / NOT RUN.
+Automated STA control checks, bounded out-of-process packaged E2E with real Login, and attended packaged-user acceptance are three separate evidence types. GUI-P5-T01 first hardens the current unbounded packaging child wait and fatal/non-cooperative hang paths; do not call an unsafe in-process timeout a process watchdog. Do not launch GUI suites for unrelated Markdown or DAL-only edits unless the active plan names a meaningful host/package check. Missing Windows, targeting packs or GUI access is BLOCKED / NOT RUN.
 
 ## 8. Evidence record
 
@@ -95,4 +99,4 @@ Keep raw TRX, Theory values, SQL identifiers, connection data and detailed diagn
 
 ## L2DB-T06 cutover note
 
-T06 removes active RepoDb/Dapper dependencies and mechanically replaces test/fixture SQL calls with independent native SqlClient oracles. The accepted reset/seed/ownership/drain contract above remains fixed. [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) records separate review, case/row reconciliation and affected boundary reruns; it does not replace RESP history or grant T07 package/manual acceptance.
+T06 removes active RepoDb/Dapper dependencies and mechanically replaces test/fixture SQL calls with independent native SqlClient oracles. The accepted reset/seed/ownership/drain contract above remains fixed. [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) records separate review, case/row reconciliation and affected boundary reruns; it does not replace RESP history or broaden the subsequently completed T07 package/limited Local smoke to full P5 GUI or P6 acceptance.
