@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -266,7 +266,7 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     EnterAccessDeniedEditorState(false);
                 }
-                else if (_editor.Id.HasValue)
+                else if (_editor.Id.HasValue || _editor.RequiresPostOutcomeReload)
                 {
                     if (await _editor.RefreshAsync(CancellationToken.None).ConfigureAwait(true))
                     {
@@ -283,6 +283,10 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task SelectReceiptCoreAsync(long id, CancellationToken cancellationToken)
         {
+            if (_editor.RequiresPostOutcomeReload)
+            {
+                return;
+            }
             if (!CanAbandonEditor())
             {
                 return;
@@ -356,6 +360,10 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void BeginNew()
         {
+            if (_editor.RequiresPostOutcomeReload)
+            {
+                return;
+            }
             if (!CanAbandonEditor())
             {
                 return;
@@ -440,7 +448,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void AddLine()
         {
-            if (_editor.IsReadOnly)
+            if (_editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
             {
                 return;
             }
@@ -450,7 +458,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void RemoveSelectedLine()
         {
-            if (_selectedLine == null || _editor.IsReadOnly)
+            if (_selectedLine == null || _editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
             {
                 return;
             }
@@ -461,7 +469,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private bool ApplyEditorsToViewModel()
         {
-            if (_editor.IsReadOnly)
+            if (_editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
             {
                 return false;
             }
@@ -473,7 +481,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void ApplySelectedLineEditors()
         {
-            if (_selectedLine == null || _editor.IsReadOnly)
+            if (_selectedLine == null || _editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
             {
                 return;
             }
@@ -586,7 +594,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnReceiptDateChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && !_editor.IsReadOnly)
+            if (!_applyingState && !_editor.IsReadOnly && !_editor.RequiresPostOutcomeReload)
             {
                 _editor.ReceiptDate = ReceiptDateEditor.Value;
             }
@@ -594,7 +602,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnWarehouseChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && TrySelectedOption(WarehouseLookup, out var option))
+            if (!_applyingState && !_editor.RequiresPostOutcomeReload && TrySelectedOption(WarehouseLookup, out var option))
             {
                 _editor.SetWarehouse(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -602,7 +610,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnEmployeeChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && TrySelectedOption(EmployeeLookup, out var option))
+            if (!_applyingState && !_editor.RequiresPostOutcomeReload && TrySelectedOption(EmployeeLookup, out var option))
             {
                 _editor.SetEmployee(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -610,7 +618,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnProductChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && _selectedLine != null && TrySelectedOption(ProductLookup, out var option))
+            if (!_applyingState && !_editor.RequiresPostOutcomeReload && _selectedLine != null && TrySelectedOption(ProductLookup, out var option))
             {
                 _selectedLine.SetProduct(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -618,7 +626,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnNoteChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && !_editor.IsReadOnly)
+            if (!_applyingState && !_editor.IsReadOnly && !_editor.RequiresPostOutcomeReload)
             {
                 _editor.Note = NoteEditor.Text;
             }
@@ -765,14 +773,18 @@ namespace MyDmsVn.Desktop.WinForms
                 UnitCostEditor.Value = Clamp(UnitCostEditor, _selectedLine?.UnitCost ?? 0m);
 
                 var busy = _isRefreshing || _list.IsLoading || _list.IsBusy || _editor.IsBusy;
+                var requiresPostReload = _editor.RequiresPostOutcomeReload;
                 BusyIndicator.Visible = busy;
-                OperationStatusLabel.Text = _workflowMessage ??
+                OperationStatusLabel.Text = requiresPostReload
+                    ? "Posting outcome unknown. Refresh to reload the receipt before making further changes. " + _editor.ErrorMessage
+                    : _workflowMessage ??
                     _editor.ErrorMessage ??
                     _list.ErrorMessage ??
                     (busy ? "Loading..." : "Ready");
-                ReceiptGrid.Enabled = !busy;
+                ReceiptGrid.Enabled = !busy && !requiresPostReload;
+                LineGrid.Enabled = !busy && !requiresPostReload;
                 RefreshButton.Enabled = !busy;
-                NewButton.Enabled = !busy;
+                NewButton.Enabled = !busy && !requiresPostReload;
                 WarehouseFilterLookup.Enabled = !busy;
                 StatusFilter.Enabled = !busy;
                 var pageCount = Math.Max(1, (int)Math.Ceiling(
@@ -780,7 +792,7 @@ namespace MyDmsVn.Desktop.WinForms
                 PageLabel.Text = $"Page {_list.PageNumber} of {pageCount}";
                 PreviousPageButton.Enabled = !busy && _list.PageNumber > 1;
                 NextPageButton.Enabled = !busy && _list.PageNumber < pageCount;
-                var canEdit = !busy && !_editor.IsReadOnly && !_isAccessDeniedEditorLocked;
+                var canEdit = !busy && !_editor.IsReadOnly && !_isAccessDeniedEditorLocked && !requiresPostReload;
                 ReceiptDateEditor.Enabled = canEdit;
                 WarehouseLookup.Enabled = canEdit;
                 EmployeeLookup.Enabled = canEdit;

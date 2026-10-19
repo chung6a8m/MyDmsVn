@@ -48,6 +48,7 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
     private string _password = string.Empty;
     private int? _selectedUserId;
     private int? _selectedRoleId;
+    private long _selectionVersion;
     private bool _disposed;
     private bool _canManageUsers;
     private bool _canManageRoles;
@@ -149,9 +150,14 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
         RebuildCatalogItems();
     }
 
+    public void InvalidatePermissionImportPreview()
+    {
+        Interlocked.Increment(ref _selectionVersion);
+        ImportPreview = null;
+    }
     public void SelectUser(int? userId)
     {
-        ImportPreview = null;
+        InvalidatePermissionImportPreview();
         SelectedRoleId = null;
         SelectedUserId = userId;
         if (SelectedUser != null)
@@ -165,7 +171,7 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
 
     public void SelectRole(int? roleId)
     {
-        ImportPreview = null;
+        InvalidatePermissionImportPreview();
         SelectedUserId = null;
         SelectedRoleId = roleId;
         if (SelectedRole != null)
@@ -182,6 +188,7 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
     {
         ThrowIfDisposed();
         ImportPreview = null;
+        var selectionVersion = Interlocked.Read(ref _selectionVersion);
         if (!TryCaptureSession(out var sessionVersion))
         {
             return;
@@ -193,7 +200,8 @@ public sealed class SecurityAdministrationViewModel : DesktopViewModelBase, IDis
             {
                 var response = await _administration.PreviewPermissionImportAsync(
                     targetType, targetId, json, token).ConfigureAwait(false);
-                if (!IsCurrentSession(sessionVersion, token)) return;
+                if (!IsCurrentSession(sessionVersion, token) ||
+                    Interlocked.Read(ref _selectionVersion) != selectionVersion) return;
                 if (!response.IsSuccess)
                 {
                     ApplyApiError(response.Error!);

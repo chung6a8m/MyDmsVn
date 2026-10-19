@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -30,11 +31,12 @@ namespace MyDmsVn.Desktop.WinForms
             ClientSize = new Size(420, 340);
             MinimumSize = new Size(420, 340);
 
-            UsernameTextBox = new BootstrapTextBox { Dock = DockStyle.Fill, TabIndex = 0 };
+            UsernameTextBox = new BootstrapTextBox { Dock = DockStyle.Fill, TabIndex = 0, AccessibleName = "Username" };
             PasswordTextBox = new BootstrapTextBox
             {
                 Dock = DockStyle.Fill,
                 TabIndex = 1,
+                AccessibleName = "Password",
                 UseSystemPasswordChar = true,
             };
             _showPassword = new BootstrapCheckBox
@@ -162,6 +164,24 @@ namespace MyDmsVn.Desktop.WinForms
                 DialogResult = DialogResult.OK;
                 Close();
             }
+            else if (!IsDisposed && !_viewModel.IsBusy)
+            {
+                if (_viewModel.GetErrors(nameof(LoginViewModel.Username)).Cast<string>().Any())
+                    FocusInput(UsernameTextBox);
+                else
+                    FocusInput(PasswordTextBox);
+            }
+        }
+
+        private void FocusInput(BootstrapTextBox input)
+        {
+            // Let native focus restoration finish after busy inputs are re-enabled.
+            BeginInvoke(new Action(() =>
+            {
+                if (_disposed || IsDisposed || Disposing || _viewModel.IsBusy) return;
+                ActiveControl = null;
+                input.Select();
+            }));
         }
 
         private void OnShowPasswordChanged(object? sender, EventArgs eventArgs)

@@ -442,6 +442,7 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     _notifications.NotificationPublished -= OnNotificationPublished;
                 }
+                _viewModel.Dispose();
             }
 
             base.Dispose(disposing);

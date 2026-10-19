@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading;
@@ -17,9 +17,11 @@ namespace MyDmsVn.Desktop.WinForms
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             Dock = DockStyle.Fill;
 
-            SearchTextBox = new TextBox { Width = 180 };
+            SearchTextBox = new TextBox { Width = 180, AccessibleName = "Search stock balances" };
             WarehouseFilter = CreateIdFilter();
+            WarehouseFilter.AccessibleName = "Warehouse ID";
             ProductFilter = CreateIdFilter();
+            ProductFilter.AccessibleName = "Product ID";
             RefreshButton = new Button { Text = "Refresh", AutoSize = true };
             PreviousPageButton = new Button { Text = "Previous", AutoSize = true };
             NextPageButton = new Button { Text = "Next", AutoSize = true };

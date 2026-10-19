@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,9 +17,13 @@ namespace MyDmsVn.Desktop.WinForms
             Dock = DockStyle.Fill;
 
             WarehouseFilter = CreateIdFilter();
+            WarehouseFilter.AccessibleName = "Warehouse ID";
             ProductFilter = CreateIdFilter();
+            ProductFilter.AccessibleName = "Product ID";
             FromUtcFilter = CreateDateFilter();
+            FromUtcFilter.AccessibleName = "From UTC";
             ToUtcFilter = CreateDateFilter();
+            ToUtcFilter.AccessibleName = "To UTC";
             RefreshButton = new Button { Text = "Refresh", AutoSize = true };
             PreviousPageButton = new Button { Text = "Previous", AutoSize = true };
             NextPageButton = new Button { Text = "Next", AutoSize = true };
