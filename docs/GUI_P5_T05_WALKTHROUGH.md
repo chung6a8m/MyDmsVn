@@ -33,7 +33,7 @@ PASS requires the named actual observation plus any independent oracle and Owner
 | R-01 | New Draft, three lookups, quantity/cost/note; Save and independently verify aggregate. | PASS — Owner Save confirmed; GUI/SQL same Draft1line2.5@4/Total10; actual Note05 baseline draft qualified below |
 | R-02 | Reload, edit quantity/note, Save/reload; same receipt ID, new opaque version, correct total. | NOT RUN |
 | R-03 | Required/empty-lines/zero-quantity and available numeric boundaries; safe errors, retained input, no unintended persisted change. Do not require the UI to accept a numeric value its control rejects. | NOT RUN |
-| R-04 | Dirty unsaved editor blocks navigation/New/Refresh as shipped, preserving input; explicit discard via normal close/restart when needed. | NOT RUN |
+| R-04 | Dirty unsaved editor blocks Refresh as shipped and preserves input; additional New/selection observations must be recorded separately. | PASS — Owner explicitly confirmed pre-Save Refresh blocked and retained edited input; no broader New/selection repetition claimed |
 | R-05 | Post saved current Draft; Posted actor/time/status, one ledger movement per line and balance atomically match oracle. | NOT RUN |
 | R-06 | Posted editor immutable; duplicate Post blocked/rejected with no extra ledger/balance increment. Distinguish disabled button from a server request. | NOT RUN |
 | S-01 | Balance filters and visible totals agree with independent stock sum; no mixed-product grand-quantity claim. | NOT RUN |
@@ -96,3 +96,16 @@ Draft instructions issued: one T05-P-001 line2.5000×4.0000, T05-W-001/T05-E-001
 Owner confirmed Save completed. Restricted baseline-draft-saved oracle: GR0000000001 Draft, one T05-P-001 line2.5000@4.0000, T05-W-001/T05-E-001, rowversion token2019;0ledger/balance/reconciliation mismatches. Inspected actual controls/grid/status match Total10.00 and Goods receipt saved. Actual Note is05 baseline draft in both UI and SQL, differing from the requested synthetic label T05 baseline draft; the actual value is retained in evidence rather than silently corrected or attributed to a product fault. R-01 PASS for the observed aggregate persistence; the next edit explicitly changes Note toT05 baseline edited.
 
 [Saved Draft](assets/gui-p5-t05/draft-saved-100light.jpg), SHA256 C909C3FFFFD0C04A6EBD35A4FDF8F3FC1932014AED0E51F3C56F0C69E25C016F. Baseline3/27PASS, supplemental0/18. Owner instructed to reopen, edit3.1250/NoteT05 baseline edited, attempt Refresh while dirty (must block/preserve), Save and reopen with Total12.50; R-02/R-04 pending human/oracle. No Post authorized yet.
+
+### Edit/reload and Note pre/post-Save diagnosis —22:13,100% Light
+
+Owner completed the requested reopen/edit3.1250/dirtyRefresh-block/Save/reopen sequence. Restricted baseline-edited-reloaded snapshot confirms original GR0000000001,3.1250@4.0000,Total12.50, token2020 (from2019), Draft and0stock. Actual Note again read05 baseline edited in both UI and SQL. The precise source of that requested-label discrepancy was not established; no product defect or user typo is inferred.
+
+Codex explicitly set the real Note inner editor through its native ValuePattern toT05 baseline edited, then inspected both accessibility and screenshot before Save. Post was disabled while dirty. Codex clicked the actual Save; screenshot and independent note-explicit-before-after-save snapshot preserve the complete Note, token2021,Total12.50 and0stock. Thus this actual Save probe did not reproduce loss of the leadingT. It does not prove all typing/focus paths defect-free. No product/test bytes changed. Owner is now asked to reopen/check the complete Note before Quantity0 validation; R-02 final full-Note confirmation remains pending. R-04 PASS for the explicitly confirmed dirty Refresh path, without claiming unobserved New/selection repetitions.
+
+| Artifact | SHA-256 |
+|---|---|
+| [note-before-save-100light.jpg](assets/gui-p5-t05/note-before-save-100light.jpg) | 0AAEE26986DCDCDB6D4DB80D0E923B974BC531251107ECD20663468250F289D9 |
+| [draft-edited-note-verified-100light.jpg](assets/gui-p5-t05/draft-edited-note-verified-100light.jpg) | 0557FC653F0BD467A35506B9227ED35F969104AA2F0E1A0955CC7B48458FE89D |
+
+Scope ruling: R-04 attended action is the requested dirty Refresh rejection/input retention. New/selection variants remain separately covered by existing control tests and are not relabeled as attended repetitions; T05 plan does not mandate every equivalent dirty-guard trigger.
