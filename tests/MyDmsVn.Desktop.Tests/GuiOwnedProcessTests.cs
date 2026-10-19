@@ -93,6 +93,42 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Attended_budget_accepts_thirty_minutes_but_cancellation_still_drains_the_owned_tree()
+        {
+            var name = "Local\\MyDmsVn.GuiProbe.Attended." + Guid.NewGuid().ToString("N");
+            using (var ready = new EventWaitHandle(false, EventResetMode.ManualReset, name))
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var start = _probe.Start("tree");
+                start.EnvironmentVariables["MYDMSVN_GUI_PROBE_READY"] = name;
+                var run = GuiOwnedProcess.RunAttendedAsync(start, TimeSpan.FromMinutes(30), cancellation.Token);
+                var observedReady = await Task.Run(() => ready.WaitOne(TimeSpan.FromSeconds(10)));
+                cancellation.Cancel();
+                var failure = await Assert.ThrowsAsync<GuiProcessException>(() => run);
+                Assert.True(observedReady, "Attended probe did not signal readiness.");
+                Assert.Equal("Canceled", failure.Reason);
+                Assert.True(failure.CleanupVerified, failure.ToString());
+                AssertOwnedPidsExited(failure.StandardOutput);
+            }
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(31)]
+        public async Task Attended_budget_rejects_nonpositive_or_above_thirty_minutes_before_launch(int minutes)
+        {
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                GuiOwnedProcess.RunAttendedAsync(_probe.Start("hang"), TimeSpan.FromMinutes(minutes)));
+        }
+
+        [Fact]
+        public async Task Automated_budget_still_rejects_above_five_minutes_before_launch()
+        {
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                GuiOwnedProcess.RunAsync(_probe.Start("hang"), TimeSpan.FromMinutes(6)));
+        }
+
+        [Fact]
         public async Task Parent_exit_does_not_leave_a_descendant_holding_redirected_pipes()
         {
             var failure = await Assert.ThrowsAsync<GuiProcessException>(

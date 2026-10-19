@@ -87,6 +87,8 @@ A claimed **full GUI** acceptance needs an explicit behavior-to-test ledger, not
 
 **T04 preparation (2026-10-19): IN PROGRESS / attended execution NOT RUN.** [Operator worksheet and per-step ledger](../GUI_P5_T04_WALKTHROUGH.md) pins the unchanged T03 package source02eff22, verified133-file private per-user installation, exact hashes, current Windows/runtime/display metadata, catalog/lookup actions, actor/permission setup, screenshots and owned cleanup. No T04 SQL allocation or Desktop launch has occurred. Human attendance was requested; session observations, all mandatory cells and sign-off remain pending. Preparation does not close this task or reuse T03 automation as attended evidence.
 
+**T04 attended continuation:** Owner is present;12 Products/Warehouse/Employee case rows at100% Light have confirmed manual+restricted-oracle evidence. Remaining rows/configurations, final ownership cleanup and human sign-off are pending. Checklist stays unchecked; see the worksheet for exact chapters, setup interruptions and credential-handling correction.
+
 **Exit:** `REMAIN-P5-GUI-01` PASS for every shipped target, else OPEN.
 
 ### GUI-P5-T05 — REMAIN-P5-GUI-02 attended Inventory sign-off
@@ -128,3 +130,5 @@ For packaged GUI automation, use only a reviewed bounded child-process flow from
 ## 6. Explicit non-goals
 
 No AppCore/.NET 8 reactivation, P7/HTTP, new business modules, SQL runner/test-gate rebuild, test-login bypass, production DB reset, secret-in-package or implicit migration. The distribution method is presently a versioned publish-directory, **not** an MSI or auto-updater. Signing, SQL/Windows support decisions, backup/restore and final G1–G5 live in [REL](20261019-002-local-v1-p6-release-acceptance.md).
+
+T04 checkpoint: Owner selected full100% Light functional baseline plus supplemental layout/keyboard/errors/popup UX at100% Dark and125% Light/Dark. Customers chapter5 exceeded its5-minute supervisor before complete artifacts; it remains pending for replay. Test-only RunAttendedAsync adds an explicit30-minute cap using existing cleanup; automated RunAsync retains5minutes. Focused owned-process typed tests passed16/16; product/package02eff22 remains unchanged. T04 and P5 remain OPEN.

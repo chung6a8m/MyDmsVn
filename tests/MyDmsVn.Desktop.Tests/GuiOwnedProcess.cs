@@ -17,11 +17,18 @@ namespace MyDmsVn.Desktop.Tests
         public const int OutputLimit = 32768;
         private static readonly TimeSpan CleanupBudget = TimeSpan.FromSeconds(5);
 
-        public static async Task<GuiProcessResult> RunAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default)
+        public static Task<GuiProcessResult> RunAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default)
+            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(5), cancellationToken);
+
+        // Human walkthroughs use an explicit longer budget with the same job, fail-stop and drain policy.
+        public static Task<GuiProcessResult> RunAttendedAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default)
+            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(30), cancellationToken);
+
+        private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout, CancellationToken cancellationToken)
         {
             GuiTestSafety.ThrowIfPoisoned();
             cancellationToken.ThrowIfCancellationRequested();
-            if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes(5))
+            if (timeout <= TimeSpan.Zero || timeout > maximumTimeout)
                 throw new ArgumentOutOfRangeException(nameof(timeout));
             if (!Path.IsPathRooted(start.FileName) || !File.Exists(start.FileName) || start.UseShellExecute)
                 throw new ArgumentException("GUI child requires an existing absolute executable and UseShellExecute=false.", nameof(start));
