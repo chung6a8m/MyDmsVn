@@ -29,6 +29,7 @@ internal static class GuiPackageProbe
         SetErrorMode(0x0001 | 0x0002);
         WerSetFlags(0x0002);
         Console.WriteLine("BITNESS=" + (IntPtr.Size * 8));
+        Console.WriteLine("CULTURE=" + System.Globalization.CultureInfo.CurrentCulture.Name);
         try
         {
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING")) ||
@@ -69,6 +70,11 @@ internal static class GuiPackageProbe
             }
             else if (args[1] == "negative-audit")
             {
+                if (_theme == "Dark")
+                {
+                    var ownerShell = Login();
+                    Invoke(Find(ownerShell, "Sign out", ControlType.Button, false));
+                }
                 _stage = "disabled-login";
                 var login = Window("MyDmsVn — Đăng nhập");
                 SetInput(login, "Username", "gui.p5.disabled", false);
@@ -94,15 +100,22 @@ internal static class GuiPackageProbe
                 CloseApplication(shell);
                 Console.WriteLine("SERVER_DIRECT_DENY=PASS");
             }
-            else if (args[1] == "inventory-audit" || args[1] == "inventory-stale" || args[1] == "inventory-fault")
+            else if (args[1] == "inventory-audit" || args[1] == "inventory-stale" || args[1] == "inventory-fault" || args[1] == "inventory-lookup")
             {
                 var shell = Login();
                 Catalog(shell, "Products", "GUI-PROD", "UIA Product", new[] { "Unit" }, new[] { "pcs" });
                 Catalog(shell, "Warehouses", "GUI-WH", "UIA Warehouse", new[] { "Address" }, new[] { "GUI address" });
                 Catalog(shell, "Employees", "GUI-EMP", "UIA Employee", new[] { "Phone" }, new[] { "0900123456" });
                 Receipt(shell, args[0], args[1]);
-                CloseApplication(shell);
-                if (args[1] != "inventory-stale") Console.WriteLine("RECEIPT_POST_STOCK=PASS");
+                if (args[1] != "inventory-lookup") CloseApplication(shell);
+                if (args[1] == "inventory-fault")
+                {
+                    _application.Dispose();
+                    StartApplication(args[0]);
+                    CloseApplication(Login());
+                    Console.WriteLine("FAULT_REMOVED_STARTUP_REVALIDATED=PASS");
+                }
+                if (args[1] == "inventory-audit" || args[1] == "inventory-fault") Console.WriteLine("RECEIPT_POST_STOCK=PASS");
             }
             else if (args[1] == "catalog-audit")
             {
@@ -203,12 +216,22 @@ internal static class GuiPackageProbe
 
     private static AutomationElement Login(string username, string password, string displayName)
     {
-        var login = Window("MyDmsVn — Đăng nhập");
+        var login = Window("MyDmsVn — Đăng nhập", 30);
         Dump(login); // Names/patterns only, before any credential is entered.
         SetInput(login, "Username", username, false);
         SetInput(login, "Password", password, true);
         Invoke(Find(login, "Đăng nhập", ControlType.Button, false));
-        var shell = Window("MyDmsVn");
+        AutomationElement shell;
+        try { shell = Window("MyDmsVn", 30); }
+        catch
+        {
+            foreach (AutomationElement pane in login.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Pane)))
+            {
+                if (pane.Current.Name.StartsWith("Tên đăng nhập hoặc mật khẩu không đúng.", StringComparison.Ordinal)) Console.WriteLine("LOGIN_OUTCOME=INVALID_CREDENTIALS");
+                if (pane.Current.Name.StartsWith("Không thể đăng nhập.", StringComparison.Ordinal)) Console.WriteLine("LOGIN_OUTCOME=SAFE_SERVICE_ERROR");
+            }
+            throw;
+        }
         Find(shell, displayName, ControlType.Text, false);
         Dump(shell);
         var theme = Find(shell, "Theme toggle", ControlType.Button, false);
@@ -233,6 +256,7 @@ internal static class GuiPackageProbe
         SetInput(page, "Quantity", 2.5m.ToString("F4"), false);
         SetInput(page, "Unit cost", 4m.ToString("F4"), false);
         InputEditor(page, "Note").SetFocus();
+        Find(page, 10m.ToString("F2"), ControlType.Text, false);
         Invoke(Find(page, "Save", ControlType.Button, false));
         var results = Find(page, "Goods receipt results", ControlType.Table, false);
         AutomationElement open = null;
@@ -256,9 +280,15 @@ internal static class GuiPackageProbe
         Invoke(Find(page, "Open GUI-PROD - UIA Product Updated", ControlType.Button, false));
         SetInput(page, "Quantity", 3.125m.ToString("F4"), false);
         InputEditor(page, "Note").SetFocus();
+        Find(page, 12.5m.ToString("F2"), ControlType.Text, false);
         Invoke(Find(page, "Save", ControlType.Button, false));
         var post = Find(page, "Post", ControlType.Button, false);
         Wait(delegate { return post.Current.IsEnabled; }, "Saved draft cannot be posted.");
+        if (scenario == "inventory-lookup")
+        {
+            ChangedLookupsAndReopen(shell, page, executable, receiptAction);
+            return;
+        }
         if (scenario == "inventory-fault") PostAfterUncertainOutcome(page, post);
         else if (!PostWithSecondClient(page, post, executable, scenario, receiptAction)) return;
         _stage = "stock-balance";
@@ -289,6 +319,96 @@ internal static class GuiPackageProbe
         ReadOnlyValue(cardRows, "GUI-PROD - UIA Product Updated");
         ReadOnlyValue(cardRows, 3.125m.ToString("F4"));
         Console.WriteLine("STOCK_CARD_TOTAL=PASS");
+    }
+
+    private static void ChangedLookupsAndReopen(AutomationElement shell, AutomationElement page, string executable, string receiptAction)
+    {
+        var names = new[] { "Product", "Warehouse", "Employee" };
+        var titles = new[] { "Products", "Warehouses", "Employees" };
+        var codes = new[] { "GUI-PROD", "GUI-WH", "GUI-EMP" };
+        var editors = new IntPtr[names.Length];
+        for (var index = 0; index < names.Length; index++) editors[index] = new IntPtr(InputEditor(page, names[index]).Current.NativeWindowHandle);
+        for (var index = 0; index < names.Length; index++)
+        {
+            var current = index;
+            var updated = codes[index] + " - UIA " + names[index] + " Changed";
+            var historical = codes[index] + " - UIA " + names[index] + " Updated";
+            _stage = "same-process-lookup-" + names[index];
+            Invoke(Find(shell, titles[index], ControlType.Button, false));
+            var catalog = Find(shell, titles[index], ControlType.TabItem, false);
+            var results = Find(catalog, "Catalog results", ControlType.Table, false);
+            Invoke(Find(catalog, "Open " + codes[index], ControlType.Button, false));
+            Wait(delegate { return InputValue(catalog, "Code") == codes[current]; }, "Changed catalog row did not load.");
+            SetInput(catalog, "Name", "UIA " + names[index] + " Changed", false);
+            Invoke(Find(catalog, "Save", ControlType.Button, false));
+            Named(results, "UIA " + names[index] + " Changed");
+            // Read the ORIGINAL offscreen receipt editor. No tab activation/Refresh can substitute for messaging.
+            Wait(delegate { return OwnedEditorValue(editors[current]) == updated; }, "Offscreen lookup did not receive its same-process name change.");
+            Console.WriteLine("SAME_PROCESS_LOOKUP_REFRESH=" + names[index] + ":PASS");
+            Invoke(Find(catalog, "Deactivate", ControlType.Button, false));
+            Named(results, "Inactive");
+            Wait(delegate { return OwnedEditorValue(editors[current]) == historical; }, "Inactive historical selection was not retained.");
+            Console.WriteLine("HISTORICAL_LOOKUP_RETAINED=" + names[index] + ":PASS");
+        }
+        Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+        page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+        Invoke(Find(page, "New", ControlType.Button, false));
+        Invoke(Find(page, "Add line", ControlType.Button, false));
+        for (var index = 0; index < names.Length; index++)
+        {
+            _stage = "inactive-new-selection-" + names[index];
+            SetInput(page, names[index], codes[index], false);
+            var lookup = Find(page, names[index], ControlType.ComboBox, false);
+            Invoke(Find(lookup, "Open lookup results", ControlType.Button, false));
+            VisibleOwnedText("0 / 0");
+            InputEditor(page, "Note").SetFocus();
+            Wait(delegate { return lookup.Current.HelpText == "No selection"; }, "Inactive catalog became selectable in a new draft.");
+        }
+        SetInput(page, "Note", "Inactive references must not persist", false);
+        Invoke(Find(page, "Save", ControlType.Button, false));
+        Find(page, "The request is invalid.", ControlType.Text, false);
+        Console.WriteLine("INACTIVE_NEW_SELECTION_REJECTED=PASS");
+        CloseApplication(shell);
+        _application.Dispose();
+        _stage = "changed-lookup-real-reopen";
+        StartApplication(executable);
+        shell = Login();
+        Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+        page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+        Invoke(Find(page, receiptAction, ControlType.Button, false));
+        Wait(delegate { return InputValue(page, "Note") == "GUI edited"; }, "Saved historical receipt did not reopen.");
+        for (var index = 0; index < names.Length; index++)
+        {
+            var current = index;
+            Wait(delegate { return InputValue(page, names[current]) == codes[current] + " - UIA " + names[current] + " Changed"; }, "Reopen did not fetch fresh catalog names.");
+        }
+        CloseApplication(shell);
+        Console.WriteLine("CHANGED_LOOKUPS_REAL_REOPEN=PASS");
+    }
+
+    private static string OwnedEditorValue(IntPtr handle)
+    {
+        uint process;
+        GetWindowThreadProcessId(handle, out process);
+        if (process != _application.Id) throw new InvalidOperationException("Historical editor ownership changed.");
+        return ((ValuePattern)AutomationElement.FromHandle(handle).GetCurrentPattern(ValuePattern.Pattern)).Current.Value;
+    }
+
+    private static void VisibleOwnedText(string name)
+    {
+        Wait(delegate
+        {
+            var found = new System.Collections.Generic.List<AutomationElement>();
+            var roots = AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, _application.Id));
+            foreach (AutomationElement root in roots)
+                foreach (AutomationElement item in root.FindAll(TreeScope.Descendants, new AndCondition(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text), new PropertyCondition(AutomationElement.NameProperty, name))))
+                {
+                    if (item.Current.IsOffscreen) continue;
+                    if (!found.Exists(delegate(AutomationElement prior) { return Automation.Compare(prior, item); })) found.Add(item);
+                }
+            if (found.Count > 1) throw new InvalidOperationException("Ambiguous visible popup status.");
+            return found.Count == 1;
+        }, "Visible lookup result status unavailable.");
     }
 
     private static void ReadOnlyValue(AutomationElement root, string expected)
@@ -361,6 +481,7 @@ internal static class GuiPackageProbe
     {
         _stage = "real-sql-post-timeout";
         Signal("posting");
+        AwaitSignal("allow-post");
         Invoke(post);
         Find(page, "Posting outcome unknown.", ControlType.Text, true, 45);
         foreach (var name in new[] { "Save", "Post", "New" })
@@ -526,7 +647,7 @@ internal static class GuiPackageProbe
         }
     }
 
-    private static AutomationElement Window(string title)
+    private static AutomationElement Window(string title, int seconds = 15)
     {
         AutomationElement result = null;
         Wait(delegate
@@ -536,7 +657,7 @@ internal static class GuiPackageProbe
             foreach (AutomationElement candidate in windows)
                 if (candidate.Current.Name == title) { result = candidate; return true; }
             return false;
-        }, "Owned window unavailable.");
+        }, "Owned window unavailable.", seconds);
         var handle = new IntPtr(result.Current.NativeWindowHandle);
         int scale;
         if (GetScaleFactorForMonitor(MonitorFromWindow(handle, 2), out scale) != 0) throw new InvalidOperationException("Monitor scale unavailable.");

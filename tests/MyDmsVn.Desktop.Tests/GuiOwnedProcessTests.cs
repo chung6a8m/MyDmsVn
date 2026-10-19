@@ -28,6 +28,33 @@ namespace MyDmsVn.Desktop.Tests
             Assert.True(result.CleanupVerified);
         }
 
+        [Fact]
+        public async Task Infrastructure_probe_does_not_inherit_SQL_credentials()
+        {
+            var names = new[] { "MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING", "MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING", "MYDMSVN_RUNTIME_SQLSERVER_CONNECTION_STRING" };
+            var original = names.Select(Environment.GetEnvironmentVariable).ToArray();
+            try
+            {
+                foreach (var name in names) Environment.SetEnvironmentVariable(name, "synthetic infrastructure secret");
+                var result = await GuiOwnedProcess.RunAsync(_probe.Start("environment"), TimeSpan.FromSeconds(10));
+                Assert.Equal(0, result.ExitCode);
+                Assert.Contains("SQL_ENVIRONMENT_EXCLUDED=True", result.StandardOutput);
+            }
+            finally
+            {
+                for (var index = 0; index < names.Length; index++) Environment.SetEnvironmentVariable(names[index], original[index]);
+            }
+        }
+
+        [Fact]
+        public async Task Poisoned_gui_session_blocks_SQL_allocation_before_configuration_or_database_work()
+        {
+            var result = await GuiOwnedProcess.RunAsync(_probe.Start("poison-admission \"" + Assembly.GetExecutingAssembly().Location + "\""), TimeSpan.FromSeconds(15));
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("POISON_BLOCKS_SQL_ADMISSION=PASS", result.StandardOutput);
+            Assert.False(GuiTestSafety.IsPoisoned); // The synthetic latch lives only in the owned child.
+        }
+
         [Theory]
         [InlineData("hang")]
         [InlineData("modal")]
@@ -185,19 +212,29 @@ namespace MyDmsVn.Desktop.Tests
                     UseShellExecute = false,
                     WorkingDirectory = _directory,
                 };
-                foreach (var key in compilerStart.EnvironmentVariables.Keys.Cast<string>().ToArray())
-                    if (key.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase) || key.StartsWith("Security__", StringComparison.OrdinalIgnoreCase))
-                        compilerStart.EnvironmentVariables.Remove(key);
+                ExcludeSqlEnvironment(compilerStart);
                 var result = GuiOwnedProcess.RunAsync(compilerStart, TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
                 Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             }
         }
 
-        public ProcessStartInfo Start(string mode) => new ProcessStartInfo(_executable, mode)
+        public ProcessStartInfo Start(string mode)
         {
-            UseShellExecute = false,
-            WorkingDirectory = _directory,
-        };
+            var start = new ProcessStartInfo(_executable, mode)
+            {
+                UseShellExecute = false,
+                WorkingDirectory = _directory,
+            };
+            ExcludeSqlEnvironment(start);
+            return start;
+        }
+
+        private static void ExcludeSqlEnvironment(ProcessStartInfo start)
+        {
+            foreach (var key in start.EnvironmentVariables.Keys.Cast<string>().ToArray())
+                if (key.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase) || key.StartsWith("Security__", StringComparison.OrdinalIgnoreCase))
+                    start.EnvironmentVariables.Remove(key);
+        }
 
         public void Dispose()
         {

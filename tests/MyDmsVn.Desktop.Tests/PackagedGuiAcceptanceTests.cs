@@ -33,12 +33,22 @@ public sealed class GuiPackageTheoryAttribute : TheoryAttribute
 public sealed class PackagedGuiAcceptanceTests
 {
     private readonly ITestOutputHelper _output;
-    public PackagedGuiAcceptanceTests(ITestOutputHelper output) { _output = output; }
+    public PackagedGuiAcceptanceTests(ITestOutputHelper output)
+    {
+        _output = output;
+        _output.WriteLine("TESTHOST_BITNESS=" + (IntPtr.Size * 8));
+        Assert.Equal(4, IntPtr.Size);
+        Assert.True(Environment.Is64BitOperatingSystem);
+    }
     [GuiPackageFact]
     [Trait("Category", "GuiSql")]
     public async Task Disposable_gui_topology_separates_provisioning_migration_runtime_and_readonly_oracle()
     {
-        await GuiSqlEnvironment.RunAsync(ValidatedPackage(), fixture => fixture.VerifySeparationAsync());
+        await GuiSqlEnvironment.RunAsync(Candidate(), async fixture =>
+        {
+            _output.WriteLine(await fixture.DescribeSqlEngineAsync());
+            await fixture.VerifySeparationAsync();
+        });
     }
 
     [GuiPackageTheory]
@@ -47,7 +57,7 @@ public sealed class PackagedGuiAcceptanceTests
     [Trait("Category", "GuiSql")]
     public async Task Actual_packaged_login_uses_native_uia_and_authenticates_against_the_owned_database(string theme)
     {
-        var package = ValidatedPackage();
+        var package = Candidate();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             using var probe = new GuiProcessProbeFixture(package: true);
@@ -70,7 +80,7 @@ public sealed class PackagedGuiAcceptanceTests
     [Trait("Category", "GuiSql")]
     public async Task Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes(string theme)
     {
-        var package = ValidatedPackage();
+        var package = Candidate();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             using var probe = new GuiProcessProbeFixture(package: true);
@@ -93,7 +103,7 @@ public sealed class PackagedGuiAcceptanceTests
     [Trait("Category", "GuiSql")]
     public async Task Packaged_receipt_draft_reload_edit_post_and_stock_reconcile_with_readonly_sql(string theme)
     {
-        var package = ValidatedPackage();
+        var package = Candidate();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             using var probe = new GuiProcessProbeFixture(package: true);
@@ -116,7 +126,7 @@ public sealed class PackagedGuiAcceptanceTests
     [Trait("Category", "GuiSql")]
     public async Task Two_actual_clients_reject_stale_receipt_save_and_preserve_losing_input(string theme)
     {
-        var package = ValidatedPackage();
+        var package = Candidate();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             using var probe = new GuiProcessProbeFixture(package: true);
@@ -137,7 +147,7 @@ public sealed class PackagedGuiAcceptanceTests
     [Trait("Category", "GuiSql")]
     public async Task Disabled_login_and_server_direct_deny_reject_a_previously_enabled_write_without_mutation(string theme)
     {
-        var package = ValidatedPackage();
+        var package = Candidate();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             await fixture.SeedNegativeActorsAsync();
@@ -190,12 +200,38 @@ public sealed class PackagedGuiAcceptanceTests
     [InlineData("Light")]
     [InlineData("Dark")]
     [Trait("Category", "GuiSql")]
-    public async Task Real_sql_post_timeout_locks_mutation_until_explicit_reload_and_checked_retry(string theme)
+    public async Task Same_process_lookup_messages_preserve_history_reject_inactive_new_choices_and_reopen_fresh(string theme)
     {
-        var package = ValidatedPackage();
+        var package = Candidate();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
-            await fixture.InstallOwnedPostTimeoutAsync();
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-lookup " + theme);
+            fixture.ConfigureRuntime(start);
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            foreach (var kind in new[] { "Product", "Warehouse", "Employee" })
+            {
+                Assert.Contains("SAME_PROCESS_LOOKUP_REFRESH=" + kind + ":PASS", result.StandardOutput);
+                Assert.Contains("HISTORICAL_LOOKUP_RETAINED=" + kind + ":PASS", result.StandardOutput);
+            }
+            Assert.Contains("INACTIVE_NEW_SELECTION_REJECTED=PASS", result.StandardOutput);
+            Assert.Contains("CHANGED_LOOKUPS_REAL_REOPEN=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertChangedLookupsAsync();
+        });
+    }
+
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
+    public async Task Real_sql_post_timeout_locks_mutation_until_explicit_reload_and_checked_retry(string theme)
+    {
+        var package = Candidate();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
             using var probe = new GuiProcessProbeFixture(package: true);
             var barrier = Path.Combine(Path.GetTempPath(), "MyDmsVn.GuiBarrier-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(barrier);
@@ -209,6 +245,8 @@ public sealed class PackagedGuiAcceptanceTests
             try
             {
                 await WaitForSignalAsync(barrier, "posting", execution, TimeSpan.FromSeconds(100));
+                await fixture.InstallOwnedPostTimeoutAsync();
+                File.WriteAllText(Path.Combine(barrier, "allow-post"), "release");
                 var waiting = Stopwatch.StartNew();
                 var observed = false;
                 while (!execution.IsCompleted && waiting.Elapsed < TimeSpan.FromSeconds(35))
@@ -222,7 +260,7 @@ public sealed class PackagedGuiAcceptanceTests
                 await fixture.AssertTimedOutDraftAndRemoveFaultAsync();
                 File.WriteAllText(Path.Combine(barrier, "allow-reload"), "release");
                 await WaitForSignalAsync(barrier, "reloaded", execution, TimeSpan.FromSeconds(25));
-                await fixture.AssertTimedOutDraftAsync(); // Check persisted state again after the UI's explicit read.
+                await fixture.AssertSavedDraftWithoutPostingAsync(); // Check persisted state again after the UI's explicit read.
                 File.WriteAllText(Path.Combine(barrier, "allow-retry"), "release");
                 result = await execution;
             }
@@ -235,13 +273,14 @@ public sealed class PackagedGuiAcceptanceTests
                 {
                     if (!ReferenceEquals(initial, error)) initial = initial == null ? error : new AggregateException(initial, error);
                 }
-                foreach (var name in new[] { "posting", "uncertain", "allow-reload", "reloaded", "allow-retry" }) File.Delete(Path.Combine(barrier, name));
+                foreach (var name in new[] { "posting", "allow-post", "uncertain", "allow-reload", "reloaded", "allow-retry" }) File.Delete(Path.Combine(barrier, name));
                 Directory.Delete(barrier);
             }
             if (initial != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(initial).Throw();
             _output.WriteLine(result!.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             Assert.Contains("UNCERTAIN_POST_RELOAD_EXPLICIT_RETRY=PASS", result.StandardOutput);
+            Assert.Contains("FAULT_REMOVED_STARTUP_REVALIDATED=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
             await fixture.AssertPostedReceiptAsync();
         });
@@ -264,7 +303,7 @@ public sealed class PackagedGuiAcceptanceTests
     [Trait("Category", "GuiSql")]
     public async Task Invalid_receipt_fields_preserve_input_and_create_no_inventory(string theme)
     {
-        var package = ValidatedPackage();
+        var package = Candidate();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             using var probe = new GuiProcessProbeFixture(package: true);
@@ -282,14 +321,15 @@ public sealed class PackagedGuiAcceptanceTests
     [GuiPackageFact]
     public async Task Unavailable_sql_startup_is_safe_owned_and_drains_under_native_uia()
     {
-        var package = ValidatedPackage();
+        var package = Candidate();
         using var probe = new GuiProcessProbeFixture(package: true);
         var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" startup-unavailable");
         ClearSqlEnvironment(start);
         start.EnvironmentVariables["Security__SuperuserUsername"] = "gui.p5.owner";
         start.EnvironmentVariables["MYDMSVN_GUI_P5_EXPECTED_SCALE"] = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
         start.EnvironmentVariables["MYDMSVN_RUNTIME_SQLSERVER_CONNECTION_STRING"] =
-            "Server=127.0.0.1,1;Database=Unavailable;Integrated Security=true;Encrypt=false;Connect Timeout=1;ConnectRetryCount=0;Pooling=false;";
+            "Server=127.0.0.1,1;Database=Unavailable;User ID=GuiP5_Unavailable;Password=" + Guid.NewGuid().ToString("N") +
+            ";Integrated Security=false;Encrypt=false;Connect Timeout=1;ConnectRetryCount=0;Pooling=false;";
         var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(30));
         _output.WriteLine(result.StandardOutput);
         Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
@@ -306,6 +346,24 @@ public sealed class PackagedGuiAcceptanceTests
                 start.EnvironmentVariables.Remove(key);
     }
 
+    private string Candidate()
+    {
+        var root = ValidatedPackage();
+        var manifestPath = Path.Combine(root, "release-manifest.json");
+        var manifest = JObject.Parse(File.ReadAllText(manifestPath));
+        _output.WriteLine("PACKAGE_SOURCE=" + manifest.Value<string>("sourceCommit"));
+        using (var stream = File.OpenRead(manifestPath))
+        using (var hash = SHA256.Create())
+            _output.WriteLine("MANIFEST_SHA256=" + BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", ""));
+        var revision = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_TEST_REVISION");
+        if (revision != null && System.Text.RegularExpressions.Regex.IsMatch(revision, "^[a-fA-F0-9]{40}$"))
+        {
+            Assert.Equal(manifest.Value<string>("sourceCommit"), revision, ignoreCase: true);
+            _output.WriteLine("TEST_SOURCE=" + revision);
+        }
+        else _output.WriteLine("TEST_SOURCE=WORKING_TREE_TRIAL");
+        return root;
+    }
     internal static string ValidatedPackage()
     {
         var root = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_PACKAGE")!);

@@ -78,6 +78,18 @@ internal sealed class GuiSqlEnvironment : IDisposable
             Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo." + table + ";"));
     }
 
+    public Task<string> DescribeSqlEngineAsync() => ScalarAsync<string>(_administration,
+        "SELECT N'SQL_ENGINE=' + CONVERT(nvarchar(128),SERVERPROPERTY('ProductVersion')) + N';EDITION=' + CONVERT(nvarchar(128),SERVERPROPERTY('Edition')); ");
+
+    public async Task AssertChangedLookupsAsync()
+    {
+        await AssertSavedDraftWithoutPostingAsync();
+        foreach (var entry in new[] { new[] { "Products", "GUI-PROD", "UIA Product Changed" }, new[] { "Warehouses", "GUI-WH", "UIA Warehouse Changed" }, new[] { "Employees", "GUI-EMP", "UIA Employee Changed" } })
+            Assert.Equal(1, await ScalarAsync<int>(_oracle,
+                "SELECT COUNT(*) FROM dbo." + entry[0] + " WHERE Code=@code AND Name=@name AND IsActive=0;",
+                new SqlParameter("@code", entry[1]), new SqlParameter("@name", entry[2])));
+    }
+
     public async Task AssertConcurrentWinnerAsync()
     {
         Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
@@ -113,7 +125,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
 
     public async Task AssertTimedOutDraftAndRemoveFaultAsync()
     {
-        await AssertTimedOutDraftAsync();
+        await AssertSavedDraftWithoutPostingAsync();
         using var connection = new SqlConnection(_database.ConnectionString);
         await connection.OpenAsync();
         await _database.VerifyOwnershipAsync(connection, CancellationToken.None);
@@ -122,7 +134,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
         await ExecuteAsync(_migration, "DROP TRIGGER dbo.GuiP5_PostTimeout;");
     }
 
-    public async Task AssertTimedOutDraftAsync()
+    public async Task AssertSavedDraftWithoutPostingAsync()
     {
         Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
         Assert.Equal(1, await ScalarAsync<int>(_oracle,
@@ -139,7 +151,15 @@ internal sealed class GuiSqlEnvironment : IDisposable
         _resourceFile = Path.Combine(repository, "TestResults", "gui-p5-t03", "resources-" + Guid.NewGuid().ToString("N") + ".json");
     }
 
-    public static async Task<GuiSqlEnvironment> CreateAsync(string package)
+    public static Task<GuiSqlEnvironment> CreateAsync(string package)
+    {
+        GuiTestSafety.ThrowIfPoisoned();
+        return CreateCoreAsync(package);
+    }
+
+    // Keep admission before the async state machine's SQL dependency/configuration work.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static async Task<GuiSqlEnvironment> CreateCoreAsync(string package)
     {
         var configured = Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable);
         if (string.IsNullOrWhiteSpace(configured)) throw new InvalidOperationException("BLOCKED: designated non-production master connection is missing.");
@@ -199,6 +219,10 @@ internal sealed class GuiSqlEnvironment : IDisposable
         await (Task<int>)type.GetMethod("BootstrapAsync")!.Invoke(engine,
             new object[] { _migration, OwnerUsername, "GUI P5 Owner", OwnerPassword, DateTime.UtcNow, CancellationToken.None })!;
         await VerifySeparationAsync();
+        Assert.Equal(BcryptPasswordHasher.AlgorithmName, await ScalarAsync<string>(_oracle,
+            "SELECT PasswordAlgorithm FROM dbo.Users WHERE NormalizedUsername=N'GUI.P5.OWNER';"));
+        Assert.True(new BcryptPasswordHasher(10).Verify(OwnerPassword, await ScalarAsync<string>(_oracle,
+            "SELECT PasswordHash FROM dbo.Users WHERE NormalizedUsername=N'GUI.P5.OWNER';")), "Administrative bootstrap credentials did not verify.");
         Record("ProvisionedAndValidated");
     }
 

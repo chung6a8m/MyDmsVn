@@ -26,6 +26,37 @@ internal static class GuiProcessProbe
         }
         Console.WriteLine("PID=" + Process.GetCurrentProcess().Id);
         Console.WriteLine("BITNESS=" + (IntPtr.Size * 8));
+        if (mode == "environment")
+        {
+            var excluded = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING")) &&
+                string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING")) &&
+                string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_RUNTIME_SQLSERVER_CONNECTION_STRING"));
+            Console.WriteLine("SQL_ENVIRONMENT_EXCLUDED=" + excluded);
+            return excluded ? 0 : 1;
+        }
+        if (mode == "poison-admission")
+        {
+            var tests = Assembly.LoadFrom(args[1]);
+            var cause = new InvalidOperationException("Synthetic uncertain cleanup.");
+            tests.GetType("MyDmsVn.Desktop.Tests.GuiTestSafety", true).GetMethod("Poison").Invoke(null, new object[] { cause });
+            try
+            {
+                var task = (System.Threading.Tasks.Task)tests.GetType("MyDmsVn.Desktop.Tests.GuiSqlEnvironment", true)
+                    .GetMethod("CreateAsync").Invoke(null, new object[] { "unused-package" });
+                task.GetAwaiter().GetResult();
+            }
+            catch (Exception error)
+            {
+                while (error is TargetInvocationException && error.InnerException != null) error = error.InnerException;
+                if (ReferenceEquals(cause, error.InnerException))
+                {
+                    Console.WriteLine("POISON_BLOCKS_SQL_ADMISSION=PASS");
+                    return 0;
+                }
+                Console.WriteLine("ADMISSION_EXCEPTION=" + error.GetType().Name);
+            }
+            return 1;
+        }
         if (mode == "tree" || mode == "orphan")
         {
             using (var child = Process.Start(new ProcessStartInfo(Assembly.GetExecutingAssembly().Location, "branch") { UseShellExecute = false, CreateNoWindow = true }))
