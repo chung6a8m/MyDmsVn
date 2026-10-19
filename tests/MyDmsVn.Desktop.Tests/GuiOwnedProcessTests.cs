@@ -178,13 +178,17 @@ namespace MyDmsVn.Desktop.Tests
                     foreach (var name in new[] { "UIAutomationClient", "UIAutomationTypes", "WindowsBase" })
                         references += "/reference:\"" + Path.Combine(Path.GetDirectoryName(compiler)!, "WPF", name + ".dll") + "\" ";
                 }
-                var result = GuiOwnedProcess.RunAsync(new ProcessStartInfo(compiler,
+                var compilerStart = new ProcessStartInfo(compiler,
                     "/nologo /platform:x86 /target:exe " + references + "/out:\"" +
                     _executable + "\" \"" + sourcePath + "\"")
                 {
                     UseShellExecute = false,
                     WorkingDirectory = _directory,
-                }, TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
+                };
+                foreach (var key in compilerStart.EnvironmentVariables.Keys.Cast<string>().ToArray())
+                    if (key.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase) || key.StartsWith("Security__", StringComparison.OrdinalIgnoreCase))
+                        compilerStart.EnvironmentVariables.Remove(key);
+                var result = GuiOwnedProcess.RunAsync(compilerStart, TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
                 Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             }
         }

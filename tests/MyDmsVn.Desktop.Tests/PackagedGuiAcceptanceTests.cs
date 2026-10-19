@@ -190,6 +190,78 @@ public sealed class PackagedGuiAcceptanceTests
     [InlineData("Light")]
     [InlineData("Dark")]
     [Trait("Category", "GuiSql")]
+    public async Task Real_sql_post_timeout_locks_mutation_until_explicit_reload_and_checked_retry(string theme)
+    {
+        var package = ValidatedPackage();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            await fixture.InstallOwnedPostTimeoutAsync();
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var barrier = Path.Combine(Path.GetTempPath(), "MyDmsVn.GuiBarrier-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(barrier);
+            using var cancellation = new CancellationTokenSource();
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-fault " + theme);
+            fixture.ConfigureRuntime(start);
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
+            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3), cancellation.Token);
+            GuiProcessResult? result = null;
+            Exception? initial = null;
+            try
+            {
+                await WaitForSignalAsync(barrier, "posting", execution, TimeSpan.FromSeconds(100));
+                var waiting = Stopwatch.StartNew();
+                var observed = false;
+                while (!execution.IsCompleted && waiting.Elapsed < TimeSpan.FromSeconds(35))
+                {
+                    if (await fixture.OwnedRuntimeIsWaitingInsideSqlAsync()) { observed = true; break; }
+                    await Task.Delay(100);
+                }
+                Assert.True(observed, "The owned runtime SQL session never reached the controlled WAITFOR fault.");
+                _output.WriteLine("RUNTIME_SQL_WAITFOR_OBSERVED=PASS");
+                await WaitForSignalAsync(barrier, "uncertain", execution, TimeSpan.FromSeconds(45));
+                await fixture.AssertTimedOutDraftAndRemoveFaultAsync();
+                File.WriteAllText(Path.Combine(barrier, "allow-reload"), "release");
+                await WaitForSignalAsync(barrier, "reloaded", execution, TimeSpan.FromSeconds(25));
+                await fixture.AssertTimedOutDraftAsync(); // Check persisted state again after the UI's explicit read.
+                File.WriteAllText(Path.Combine(barrier, "allow-retry"), "release");
+                result = await execution;
+            }
+            catch (Exception error) { initial = error; }
+            finally
+            {
+                if (!execution.IsCompleted) cancellation.Cancel();
+                try { await execution; }
+                catch (Exception error)
+                {
+                    if (!ReferenceEquals(initial, error)) initial = initial == null ? error : new AggregateException(initial, error);
+                }
+                foreach (var name in new[] { "posting", "uncertain", "allow-reload", "reloaded", "allow-retry" }) File.Delete(Path.Combine(barrier, name));
+                Directory.Delete(barrier);
+            }
+            if (initial != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(initial).Throw();
+            _output.WriteLine(result!.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("UNCERTAIN_POST_RELOAD_EXPLICIT_RETRY=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertPostedReceiptAsync();
+        });
+    }
+
+    private static async Task WaitForSignalAsync(string directory, string name, Task execution, TimeSpan timeout)
+    {
+        var wait = Stopwatch.StartNew();
+        while (!File.Exists(Path.Combine(directory, name)))
+        {
+            if (execution.IsCompleted) { await execution; throw new InvalidOperationException("Owned probe exited before coordination point " + name); }
+            if (wait.Elapsed >= timeout) throw new TimeoutException("Owned probe did not reach coordination point " + name);
+            await Task.Delay(25);
+        }
+    }
+
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
     public async Task Invalid_receipt_fields_preserve_input_and_create_no_inventory(string theme)
     {
         var package = ValidatedPackage();

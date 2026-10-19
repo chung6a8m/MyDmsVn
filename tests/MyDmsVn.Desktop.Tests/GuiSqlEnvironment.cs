@@ -89,6 +89,49 @@ internal sealed class GuiSqlEnvironment : IDisposable
         Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.StockBalances;"));
     }
 
+    private const string PostTimeoutTrigger = "CREATE TRIGGER dbo.GuiP5_PostTimeout ON dbo.GoodsReceipts AFTER UPDATE AS " +
+        "BEGIN SET NOCOUNT ON; IF EXISTS(SELECT 1 FROM inserted i JOIN deleted d ON d.ReceiptId=i.ReceiptId " +
+        "WHERE i.Status=N'Posted' AND d.Status=N'Draft') WAITFOR DELAY '00:00:45'; END;";
+    private int _postTimeoutTriggerId;
+
+    public async Task InstallOwnedPostTimeoutAsync()
+    {
+        await VerifySeparationAsync();
+        await ExecuteAsync(_migration, PostTimeoutTrigger);
+        _postTimeoutTriggerId = await ScalarAsync<int>(_migration, "SELECT OBJECT_ID(N'dbo.GuiP5_PostTimeout',N'TR');");
+        Assert.True(_postTimeoutTriggerId > 0);
+    }
+
+    public async Task<bool> OwnedRuntimeIsWaitingInsideSqlAsync()
+    {
+        return await ScalarAsync<int>(_administration,
+            "SELECT COUNT(*) FROM sys.dm_exec_requests r JOIN sys.dm_exec_sessions s ON s.session_id=r.session_id " +
+            "WHERE r.database_id=DB_ID(@database) AND s.login_name=@login AND r.wait_type=N'WAITFOR';",
+            new SqlParameter("@database", _database.DatabaseName),
+            new SqlParameter("@login", new SqlConnectionStringBuilder(_runtime).UserID)) > 0;
+    }
+
+    public async Task AssertTimedOutDraftAndRemoveFaultAsync()
+    {
+        await AssertTimedOutDraftAsync();
+        using var connection = new SqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await _database.VerifyOwnershipAsync(connection, CancellationToken.None);
+        Assert.Equal(_postTimeoutTriggerId, await ScalarAsync<int>(_migration, "SELECT OBJECT_ID(N'dbo.GuiP5_PostTimeout',N'TR');"));
+        Assert.Equal(PostTimeoutTrigger, await ScalarAsync<string>(_migration, "SELECT OBJECT_DEFINITION(OBJECT_ID(N'dbo.GuiP5_PostTimeout',N'TR'));"));
+        await ExecuteAsync(_migration, "DROP TRIGGER dbo.GuiP5_PostTimeout;");
+    }
+
+    public async Task AssertTimedOutDraftAsync()
+    {
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE Status=N'Draft' AND Note=N'GUI edited' AND PostedAtUtc IS NULL;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE Quantity=3.125 AND UnitCost=4;"));
+        Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.StockLedger;"));
+        Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.StockBalances;"));
+    }
+
     private GuiSqlEnvironment(SqlTestDatabase database, string administration, string repository)
     {
         _database = database;

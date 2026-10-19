@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -241,19 +241,43 @@ namespace MyDmsVn.Desktop.Tests
                         control.WarehouseLookup.Text = "remote warehouse";
                         control.LastOperation.GetAwaiter().GetResult();
                         Assert.Equal("remote warehouse", fixture.WarehouseSource.Requests.Last().Search);
+                        Assert.Equal("remote warehouse", control.WarehouseLookup.Text);
+                        Assert.True(control.WarehouseLookup.HasPendingText);
 
                         control.EmployeeLookup.Text = "remote employee";
                         control.LastOperation.GetAwaiter().GetResult();
                         Assert.Equal("remote employee", fixture.EmployeeSource.Requests.Last().Search);
+                        Assert.Equal("remote employee", control.EmployeeLookup.Text);
+                        Assert.True(control.EmployeeLookup.HasPendingText);
 
                         control.ProductLookup.Text = "remote product";
                         control.LastOperation.GetAwaiter().GetResult();
                         Assert.Equal("remote product", fixture.ProductSource.Requests.Last().Search);
+                        Assert.Equal("remote product", control.ProductLookup.Text);
+                        Assert.True(control.ProductLookup.HasPendingText);
                     }
                 },
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Explicit_new_discards_uncommitted_lookup_text_in_an_unsaved_empty_draft()
+        {
+            StaTest.Run(token =>
+            {
+                using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.WarehouseLookup.Text = "remote warehouse";
+                control.LastOperation.GetAwaiter().GetResult();
+                Assert.True(control.WarehouseLookup.HasPendingText);
+                Assert.Null(fixture.Editor.WarehouseId);
+                control.NewButton.PerformClick();
+                Assert.Empty(control.WarehouseLookup.Text);
+                Assert.False(control.WarehouseLookup.HasPendingText);
+                Assert.Null(control.WarehouseLookup.SelectedValue);
+            }, TimeSpan.FromSeconds(10));
+        }
         [Fact]
         public void Receipt_line_keeps_a_historical_product_selected_outside_the_active_page()
         {

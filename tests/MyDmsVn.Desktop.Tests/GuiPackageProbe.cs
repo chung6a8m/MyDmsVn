@@ -18,6 +18,9 @@ internal static class GuiPackageProbe
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
     [DllImport("shcore.dll")] private static extern int GetScaleFactorForMonitor(IntPtr monitor, out int scale);
+    [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr key, IntPtr data);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+    [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr window, uint flags);
 
     [STAThread]
     private static int Main(string[] args)
@@ -28,6 +31,10 @@ internal static class GuiPackageProbe
         Console.WriteLine("BITNESS=" + (IntPtr.Size * 8));
         try
         {
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING")) ||
+                !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING")))
+                throw new InvalidOperationException("Administrative SQL environment reached the UI probe.");
+            Console.WriteLine("ADMIN_SQL_ENV_EXCLUDED=PASS");
             if ((args.Length != 2 && args.Length != 3) || !Path.IsPathRooted(args[0])) throw new ArgumentException();
             _theme = args.Length == 3 ? args[2] : "Light";
             if (_theme != "Light" && _theme != "Dark") throw new ArgumentException();
@@ -87,7 +94,7 @@ internal static class GuiPackageProbe
                 CloseApplication(shell);
                 Console.WriteLine("SERVER_DIRECT_DENY=PASS");
             }
-            else if (args[1] == "inventory-audit" || args[1] == "inventory-stale")
+            else if (args[1] == "inventory-audit" || args[1] == "inventory-stale" || args[1] == "inventory-fault")
             {
                 var shell = Login();
                 Catalog(shell, "Products", "GUI-PROD", "UIA Product", new[] { "Unit" }, new[] { "pcs" });
@@ -95,7 +102,7 @@ internal static class GuiPackageProbe
                 Catalog(shell, "Employees", "GUI-EMP", "UIA Employee", new[] { "Phone" }, new[] { "0900123456" });
                 Receipt(shell, args[0], args[1]);
                 CloseApplication(shell);
-                if (args[1] == "inventory-audit") Console.WriteLine("RECEIPT_POST_STOCK=PASS");
+                if (args[1] != "inventory-stale") Console.WriteLine("RECEIPT_POST_STOCK=PASS");
             }
             else if (args[1] == "catalog-audit")
             {
@@ -252,6 +259,28 @@ internal static class GuiPackageProbe
         Invoke(Find(page, "Save", ControlType.Button, false));
         var post = Find(page, "Post", ControlType.Button, false);
         Wait(delegate { return post.Current.IsEnabled; }, "Saved draft cannot be posted.");
+        if (scenario == "inventory-fault") PostAfterUncertainOutcome(page, post);
+        else if (!PostWithSecondClient(page, post, executable, scenario, receiptAction)) return;
+        _stage = "stock-balance";
+        Invoke(Find(shell, "Tồn kho", ControlType.Button, false));
+        var balance = Find(shell, "Tồn kho", ControlType.TabItem, false);
+        SetInput(balance, "Search stock balances", "GUI-PROD", false);
+        Invoke(Find(balance, "Refresh", ControlType.Button, false));
+        Dump(balance);
+        Find(balance, 3.125m.ToString("F4"), ControlType.Text, false);
+        Console.WriteLine("STOCK_BALANCE_TOTAL=PASS");
+        _stage = "stock-card";
+        Invoke(Find(shell, "Thẻ kho", ControlType.Button, false));
+        var card = Find(shell, "Thẻ kho", ControlType.TabItem, false);
+        SetInput(card, "Warehouse ID", CatalogIds["Warehouses"].ToString(), false);
+        SetInput(card, "Product ID", CatalogIds["Products"].ToString(), false);
+        Invoke(Find(card, "Refresh", ControlType.Button, false));
+        Find(card, 3.125m.ToString("F4"), ControlType.Text, false);
+        Console.WriteLine("STOCK_CARD_TOTAL=PASS");
+    }
+
+    private static bool PostWithSecondClient(AutomationElement page, AutomationElement post, string executable, string scenario, string receiptAction)
+    {
         var firstClient = _application;
         StartApplication(executable);
         var otherClient = _application;
@@ -280,7 +309,7 @@ internal static class GuiPackageProbe
             otherClient.Dispose();
             _application = firstClient;
             Console.WriteLine("STALE_RECEIPT_REJECTED_INPUT_RETAINED=PASS");
-            return;
+            return false;
         }
         _application = firstClient;
         _stage = "receipt-post";
@@ -296,22 +325,41 @@ internal static class GuiPackageProbe
         otherClient.Dispose();
         _application = firstClient;
         Console.WriteLine("SERVER_DUPLICATE_POST_REJECTED=PASS");
-        _stage = "stock-balance";
-        Invoke(Find(shell, "Tồn kho", ControlType.Button, false));
-        var balance = Find(shell, "Tồn kho", ControlType.TabItem, false);
-        SetInput(balance, "Search stock balances", "GUI-PROD", false);
-        Invoke(Find(balance, "Refresh", ControlType.Button, false));
-        Dump(balance);
-        Find(balance, 3.125m.ToString("F4"), ControlType.Text, false);
-        Console.WriteLine("STOCK_BALANCE_TOTAL=PASS");
-        _stage = "stock-card";
-        Invoke(Find(shell, "Thẻ kho", ControlType.Button, false));
-        var card = Find(shell, "Thẻ kho", ControlType.TabItem, false);
-        SetInput(card, "Warehouse ID", CatalogIds["Warehouses"].ToString(), false);
-        SetInput(card, "Product ID", CatalogIds["Products"].ToString(), false);
-        Invoke(Find(card, "Refresh", ControlType.Button, false));
-        Find(card, 3.125m.ToString("F4"), ControlType.Text, false);
-        Console.WriteLine("STOCK_CARD_TOTAL=PASS");
+        return true;
+    }
+
+    private static void PostAfterUncertainOutcome(AutomationElement page, AutomationElement post)
+    {
+        _stage = "real-sql-post-timeout";
+        Signal("posting");
+        Invoke(post);
+        Find(page, "Posting outcome unknown.", ControlType.Text, true, 45);
+        foreach (var name in new[] { "Save", "Post", "New" })
+            if (Find(page, name, ControlType.Button, false).Current.IsEnabled)
+                throw new InvalidOperationException("Uncertain Post permits a mutation.");
+        if (InputEditor(page, "Note").Current.IsEnabled) throw new InvalidOperationException("Uncertain editor remained editable.");
+        Signal("uncertain");
+        AwaitSignal("allow-reload");
+        _stage = "explicit-outcome-reload";
+        Invoke(Find(page, "Refresh", ControlType.Button, false));
+        Find(page, "Draft", ControlType.Text, false);
+        Wait(delegate { return post.Current.IsEnabled; }, "Explicit reload did not restore the persisted Draft.");
+        Signal("reloaded");
+        AwaitSignal("allow-retry");
+        _stage = "explicit-post-after-reload";
+        Invoke(post);
+        Find(page, "Posted", ControlType.Text, false);
+        Console.WriteLine("UNCERTAIN_POST_RELOAD_EXPLICIT_RETRY=PASS");
+    }
+
+    private static void Signal(string name)
+    {
+        File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER"), name), name);
+    }
+
+    private static void AwaitSignal(string name)
+    {
+        Wait(delegate { return File.Exists(Path.Combine(Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER"), name)); }, "Owned test coordination did not release " + name);
     }
 
     private static void CloseApplication(AutomationElement shell)
@@ -345,10 +393,59 @@ internal static class GuiPackageProbe
 
     private static void SetLookup(AutomationElement page, string name, string display)
     {
-        SetInput(page, name, display, false);
-        InputEditor(page, "Note").SetFocus();
+        SetInput(page, name, display.Substring(0, display.IndexOf(" - ", StringComparison.Ordinal)), false);
         var lookup = Find(page, name, ControlType.ComboBox, false);
-        Wait(delegate { return lookup.Current.HelpText == "Selected: " + display; }, "Lookup selection did not commit: " + name);
+        Invoke(Find(lookup, "Open lookup results", ControlType.Button, false));
+        var editor = InputEditor(page, name);
+        var handle = new IntPtr(editor.Current.NativeWindowHandle);
+        var shell = GetAncestor(handle, 2);
+        try { Wait(delegate
+        {
+            var found = 0;
+            var roots = AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, _application.Id));
+            foreach (AutomationElement popup in roots)
+            {
+                var cells = popup.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+                foreach (AutomationElement cell in cells)
+                {
+                    if (cell.Current.IsPassword) continue;
+                    object pattern;
+                    if (cell.Current.Name == display || (cell.TryGetCurrentPattern(ValuePattern.Pattern, out pattern) && ((ValuePattern)pattern).Current.Value == display)) found++;
+                }
+            }
+            if (found > 1) throw new InvalidOperationException("Ambiguous lookup result.");
+            return found == 1;
+        }, "Unique lookup result not available: " + name); }
+        catch
+        {
+            var roots = AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, _application.Id));
+            foreach (AutomationElement root in roots)
+            {
+                Console.WriteLine("LOOKUP_ROOT=" + root.Current.ControlType.ProgrammaticName + ":" + root.Current.Name);
+                foreach (AutomationElement child in root.FindAll(TreeScope.Descendants, Condition.TrueCondition))
+                    if (!child.Current.IsPassword && (child.Current.Name.Contains("GUI") || child.Current.ControlType == ControlType.DataGrid || child.Current.ControlType == ControlType.Table))
+                    {
+                        Console.WriteLine("LOOKUP_ITEM=" + child.Current.ControlType.ProgrammaticName + ":" + child.Current.Name);
+                        foreach (var pattern in child.GetSupportedPatterns()) Console.WriteLine("LOOKUP_PATTERN=" + pattern.ProgrammaticName);
+                    }
+            }
+            throw;
+        }
+        editor.SetFocus();
+        uint process;
+        GetWindowThreadProcessId(handle, out process);
+        _detail = "Keyboard target must be the focused owned lookup editor.";
+        if (process != _application.Id) throw new InvalidOperationException("Keyboard input target is not an owned editor.");
+        Wait(delegate { return editor.Current.HasKeyboardFocus; }, "Owned lookup editor did not receive keyboard focus.");
+        if (!PostMessage(handle, 0x100, new IntPtr(13), new IntPtr(1)) ||
+            !PostMessage(handle, 0x101, new IntPtr(13), new IntPtr(unchecked((int)0xC0000001))))
+            throw new InvalidOperationException("Owned lookup keyboard input failed.");
+        try { Wait(delegate { return lookup.Current.HelpText == "Selected: " + display; }, "Lookup selection did not commit: " + name); }
+        catch {
+            Console.WriteLine("LOOKUP_HELP=" + lookup.Current.HelpText + ";TEXT=" + InputValue(page, name));
+            Console.WriteLine("LOOKUP_FOCUS=" + InputEditor(page, name).Current.HasKeyboardFocus + ";NOTE_FOCUS=" + InputEditor(page, "Note").Current.HasKeyboardFocus);
+            throw;
+        }
     }
 
     private static AutomationElement InputEditor(AutomationElement root, string name)
@@ -420,7 +517,7 @@ internal static class GuiPackageProbe
         return result;
     }
 
-    private static AutomationElement Find(AutomationElement root, string name, ControlType type, bool contains)
+    private static AutomationElement Find(AutomationElement root, string name, ControlType type, bool contains, int seconds = 15)
     {
         AutomationElement result = null;
         Wait(delegate
@@ -437,7 +534,7 @@ internal static class GuiPackageProbe
                 }
             }
             return result != null;
-        }, "Required accessible element unavailable.");
+        }, "Required accessible element unavailable.", seconds);
         return result;
     }
 
@@ -447,10 +544,10 @@ internal static class GuiPackageProbe
         ((InvokePattern)element.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
     }
 
-    private static void Wait(Func<bool> condition, string failure)
+    private static void Wait(Func<bool> condition, string failure, int seconds = 15)
     {
         var clock = Stopwatch.StartNew();
-        while (clock.Elapsed < TimeSpan.FromSeconds(15))
+        while (clock.Elapsed < TimeSpan.FromSeconds(seconds))
         {
             try { if (condition()) return; }
             catch (ElementNotAvailableException) { }

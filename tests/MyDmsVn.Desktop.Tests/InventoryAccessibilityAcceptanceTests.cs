@@ -195,7 +195,7 @@ public sealed class InventoryAccessibilityAcceptanceTests
             var original = BootstrapThemeManager.CurrentTheme;
             try
             {
-                using var fixture = new ReceiptFixture("Draft", new WaitingDelay());
+                using var fixture = new ReceiptFixture("Draft");
                 using var host = Show(fixture.Control);
                 fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
                 Assert.True(fixture.Control.ReceiptGrid.Selection.Focus(new SourceGrid.Position(1, 0), true));

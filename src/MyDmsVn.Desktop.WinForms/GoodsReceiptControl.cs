@@ -269,6 +269,8 @@ namespace MyDmsVn.Desktop.WinForms
                 return;
             }
 
+            CancelEditorLookupEdits();
+
             var selectedLineId = _selectedLine?.Id;
             var selectedLineIndex = _selectedLine == null
                 ? -1
@@ -320,6 +322,7 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             _workflowMessage = null;
+            CancelEditorLookupEdits();
             _editor.Load(selected);
             _selectedLine = _editor.Lines.FirstOrDefault();
             ApplyState();
@@ -387,6 +390,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             _workflowMessage = null;
             _isAccessDeniedEditorLocked = false;
+            CancelEditorLookupEdits();
             _list.NewDraft();
             _editor.Load(null);
             _selectedLine = null;
@@ -409,6 +413,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (_editor.Id.HasValue)
             {
+                CancelEditorLookupEdits();
                 _editor.Load(null);
                 _selectedLine = null;
             }
@@ -468,6 +473,7 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 return;
             }
+            ProductLookup.CancelPendingEdit();
             _selectedLine = _editor.AddLine();
             ApplyState();
         }
@@ -478,6 +484,7 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 return;
             }
+            ProductLookup.CancelPendingEdit();
             _editor.RemoveLine(_selectedLine);
             _selectedLine = _editor.Lines.FirstOrDefault();
             ApplyState();
@@ -519,6 +526,7 @@ namespace MyDmsVn.Desktop.WinForms
             var row = LineGrid.Selection.ActivePosition.Row;
             if (row > 0 && row - 1 < _editor.Lines.Count)
             {
+                ProductLookup.CancelPendingEdit();
                 ApplySelectedLineEditors();
                 _selectedLine = _editor.Lines[row - 1];
                 ApplyState();
@@ -770,14 +778,11 @@ namespace MyDmsVn.Desktop.WinForms
                 WarehouseFilterLookup.DataSource = _editor.WarehouseLookup.Items
                     .Where(item => item.IsAvailableForNewSelection)
                     .ToArray();
-                WarehouseLookup.DataSource = _editor.WarehouseLookup.Items.ToArray();
-                EmployeeLookup.DataSource = _editor.EmployeeLookup.Items.ToArray();
-                ProductLookup.DataSource = _editor.ProductOptions.Items.ToArray();
+                BindEditorLookup(WarehouseLookup, _editor.WarehouseLookup.Items, _editor.WarehouseId);
+                BindEditorLookup(EmployeeLookup, _editor.EmployeeLookup.Items, _editor.EmployeeId);
+                BindEditorLookup(ProductLookup, _editor.ProductOptions.Items, _selectedLine?.ProductId);
                 WarehouseFilterLookup.SelectValue(_warehouseFilterId);
                 StatusFilter.SelectedItem = _statusFilter ?? "All";
-                WarehouseLookup.SelectValue(_editor.WarehouseId);
-                EmployeeLookup.SelectValue(_editor.EmployeeId);
-                ProductLookup.SelectValue(_selectedLine?.ProductId);
                 ReceiptDateEditor.Value = _editor.ReceiptDate;
                 NoteEditor.Text = _editor.Note ?? string.Empty;
                 StatusLabel.Text = _editor.Status;
@@ -1006,6 +1011,23 @@ namespace MyDmsVn.Desktop.WinForms
         {
             panel.Controls.Add(new Label { Text = label, AutoSize = true });
             panel.Controls.Add(editor);
+        }
+
+        private void CancelEditorLookupEdits()
+        {
+            WarehouseLookup.CancelPendingEdit();
+            EmployeeLookup.CancelPendingEdit();
+            ProductLookup.CancelPendingEdit();
+        }
+
+        private static void BindEditorLookup(BootstrapLookupBox lookup, IEnumerable<CatalogLookupOption> options, int? selectedId)
+        {
+            var selection = selectedId > 0 ? selectedId : null;
+            var preservePending = lookup.HasPendingText && Equals(lookup.SelectedValue, selection);
+            var pendingText = lookup.Text;
+            lookup.DataSource = options.ToArray();
+            lookup.SelectValue(selection);
+            if (preservePending) lookup.Text = pendingText;
         }
 
         private static BootstrapLookupBox CreateLookup(string accessibleName)
