@@ -1,6 +1,6 @@
 # Technical stack and compatibility baseline
 
-**Current cutover:** L2DB-T00–T07 on net48, 2026-10-19; [T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke). RESP and L2DB plan-specific acceptance are complete. Broader P5/P6 release gates remain deferred; historical evidence keeps its original provider/revision.
+**Current cutover:** L2DB-T00–T07 on net48 accepted in plan scope on 2026-10-19 ([T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); RESP also accepted. Current next work is full [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md), with P5/P6 release gates still OPEN. Historical evidence retains its original provider/revision.
 
 ## Runtime matrix
 
