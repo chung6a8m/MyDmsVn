@@ -98,6 +98,8 @@ The historical18:42 checkpoint had13T04 allocations/39principals disposed. The s
 - [ ] Exercise Post-only vs Write/Read, direct Deny, restricted/disabled user, rowversion conflict, invalid input, catalog changes, logout/other account/restart and failure/uncertain Post. Confirm no mutation on denial/failure and no blind Post retry.
 - [ ] Record exact steps, safe results, controlled account/permission state, revision/artifacts and operator screenshots independently from backend test evidence. L2DB-T07's limited smoke does **not** close this checklist.
 
+**T05 execution (2026-10-19): IN PROGRESS / NOT RUN.** The [Inventory worksheet](../GUI_P5_T05_WALKTHROUGH.md) maps27baseline obligations and18supplemental UX cells, all NOT RUN. Owner approved full100%Light baseline plus100%Dark/125%Light/Dark UX. Fresh native x86 scale100/HRESULT0 and1920x1080 verified; installed133/133files and frozen candidate d5207b2 testDLL/manifest hashes verified. Pre-T05 exact census0/166Dropped. Initial setup collation failure was cleaned (167Dropped/census0); corrected fresh setup verified8ordinary actors, SQL2017Developer/current001–009, separated principals and empty inventory. Chapter1 launched22:01:54/30min cap; human Login and all45attended observations remain NOT RUN. Current168thallocation is positively owned; final cleanup pending. No new product/test framework or runtime change.
+
 **Exit:** `REMAIN-P5-GUI-02` PASS for every shipped target, else OPEN.
 
 ### GUI-P5-T06 — Unfiltered GUI gate and evidence handoff
