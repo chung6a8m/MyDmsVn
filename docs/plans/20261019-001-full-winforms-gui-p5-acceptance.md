@@ -32,7 +32,7 @@ At frozen T07, nine test projects supplied **581 passing** invocations; the Desk
 | Security | `SecurityAdministrationFormTests`, `PermissionActionBinderTests`, Security ViewModels/SQL | Protected superuser, role/direct decisions, import preview/apply stale revisions, sign-out/revocation and no-mutation on denial |
 | Resilience / UX | `WinFormsTestInfrastructureTests`, `StaTest`, `WinFormsTestGuard`, `ReleasePackagingTests` | Bounded startup and SQL failures, unexpected modal/`DataError`, disposal, error rendering, theme, accessibility, keyboard, supported DPI matrix |
 
-A claimed **full GUI** acceptance needs an explicit behavior-to-test ledger, not a coverage-percentage slogan. Create [GUI_P5_COVERAGE_MATRIX.md](../GUI_P5_COVERAGE_MATRIX.md) during T00, marking each behavior `existing automated`, `new automated`, `packaged E2E`, `attended`, `backend oracle` and any gap. A manual check cannot turn a missing mandatory automated case into PASS.
+A claimed **full GUI** acceptance needs an explicit behavior-to-test ledger, not a coverage-percentage slogan. Create `docs/GUI_P5_COVERAGE_MATRIX.md` during T00, marking each behavior `existing automated`, `new automated`, `packaged E2E`, `attended`, `backend oracle` and any gap. A manual check cannot turn a missing mandatory automated case into PASS.
 
 ## 4. Task list
 
