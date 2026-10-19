@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS —6/45 attended observations PASS; Post/Stock group executed, human confirmation pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: IN PROGRESS —13/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -34,11 +34,11 @@ PASS requires the named actual observation plus any independent oracle and Owner
 | R-02 | Reload, edit quantity/note, Save/reload; same receipt ID, new opaque version, correct total. | PASS — Owner reopened full T05 baseline edited/Total12.50; same Draft1line3.125@4 and advanced versions, restricted oracle |
 | R-03 | Required/empty-lines/zero-quantity and available numeric boundaries; safe errors, retained input, no unintended persisted change. Do not require the UI to accept a numeric value its control rejects. | PASS — Owner confirmed Quantity0 rejection/recovery and empty New/Save rejection; inspected errors, original-only Draft oracle, no stock |
 | R-04 | Dirty unsaved editor blocks Refresh as shipped and preserves input; additional New/selection observations must be recorded separately. | PASS — Owner explicitly confirmed pre-Save Refresh blocked and retained edited input; no broader New/selection repetition claimed |
-| R-05 | Post saved current Draft; Posted actor/time/status, one ledger movement per line and balance atomically match oracle. | NOT RUN |
-| R-06 | Posted editor immutable; duplicate Post blocked/rejected with no extra ledger/balance increment. Distinguish disabled button from a server request. | NOT RUN |
-| S-01 | Balance filters and visible totals agree with independent stock sum; no mixed-product grand-quantity claim. | NOT RUN |
-| S-02 | Card warehouse/product/date filters, order/document identity/visible delta agree with oracle. | NOT RUN |
-| S-03 | Empty/invalid filter, safe error and explicit Refresh recovery without stale rows/totals. | NOT RUN |
+| R-05 | Post saved current Draft; Posted actor/time/status, one ledger movement per line and balance atomically match oracle. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
+| R-06 | Posted editor immutable; duplicate Post blocked/rejected with no extra ledger/balance increment. Distinguish disabled button from a server request. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
+| S-01 | Balance filters and visible totals agree with independent stock sum; no mixed-product grand-quantity claim. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
+| S-02 | Card warehouse/product/date filters, order/document identity/visible delta agree with oracle. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
+| S-03 | Empty/invalid filter, safe error and explicit Refresh recovery without stale rows/totals. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
 | S-04 | Actual multi-page Balance/Card data when declared, Next/Previous and filter change page1; fixture rows distinguished from attended posts. | NOT RUN |
 | P-01 | Ordinary Read+Post without Write: read saved Draft, cannot edit/save, Post authorized with correct actor and single stock effect. | NOT RUN |
 | P-02 | Read+Write without Post: Draft write succeeds, Post unavailable/denied; no posted mutation. | NOT RUN |
@@ -47,8 +47,8 @@ PASS requires the named actual observation plus any independent oracle and Owner
 | P-05 | Restricted Stock permissions: Balance/Card deny safely and clear rows/totals; no previous actor data. | NOT RUN |
 | P-06 | Disabled user's actual Login denied safely; no admitted application session. | NOT RUN |
 | P-07 | Actor disabled after actual Login: subsequent server operation fails closed/no stock or receipt mutation. | NOT RUN |
-| C-01 | Stale Save rowversion loses to controlled accepted winner; safe conflict retains loser input and winner unchanged. | NOT RUN |
-| C-02 | Stale Post version after winner Draft update is rejected; no ledger/balance and no overwrite. | NOT RUN |
+| C-01 | Stale Save rowversion loses to controlled accepted winner; safe conflict retains loser input and winner unchanged. | PASS — Owner confirmed safe conflict/loser input retained; restricted oracle preserves controlled SQL winner and stock |
+| C-02 | Stale Post version after winner Draft update is rejected; no ledger/balance and no overwrite. | PASS — Owner confirmed safe conflict/no retry; restricted oracle preserves Draft winner and original-only stock |
 | K-01 | Catalog rename/active change while Receipt/Stock views exist; fresh/historical names and active-only new choices match shipped contracts. | NOT RUN |
 | L-01 | Real logout/other account/restart clears former actor data and reads current persisted Draft/Posted state. | NOT RUN |
 | F-01 | Actual SQL Post timeout observed; safe uncertain outcome and mutation lock; independently establish persisted state after worker drain. | NOT RUN |
@@ -69,7 +69,7 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 ## Session / artifacts / decision
 
-T05 selected/executed attended0/0; no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
+T05 attended ledger currently13/45 Owner-confirmed PASS (13/27 baseline,0/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
 
 ### Setup attempt1 — FAIL, safely disposed
 
@@ -87,7 +87,7 @@ Owner confirmed actual p5.t05.operator Login/T05Operator/Light with masked passw
 
 ### Catalog creation/readback —22:06,100% Light
 
-Owner confirmed GUI create and reopen of Product T05-P-001/T05 Product/pcs, Warehouse T05-W-001/T05 Warehouse/Synthetic T05 and Employee T05-E-001/T05 Employee/0000000000/blankUserId. Restricted ownership-verified catalog-created snapshot matches all fields, all3Active, Employee.HasUserBinding=false;0receipts/lines/ledger/balances. Actual Employee editor/grid and Light theme inspected; A-02 PASS. [Employee readback](assets/gui-p5-t05/employee-readback-100light.jpg), SHA25699CCEB0679DF43452F72D3FDE3AAC0F8F48E437674303200EFBA2D9A9EF4526A. Baseline2/27PASS; supplemental0/18, no Post yet.
+Owner confirmed GUI create and reopen of Product T05-P-001/T05 Product/pcs, Warehouse T05-W-001/T05 Warehouse/Synthetic T05 and Employee T05-E-001/T05 Employee/0000000000/blankUserId. Restricted ownership-verified catalog-created snapshot matches all fields, all3Active, Employee.HasUserBinding=false;0receipts/lines/ledger/balances. Actual Employee editor/grid and Light theme inspected; A-02 PASS. [Employee readback](assets/gui-p5-t05/employee-readback-100light.jpg), SHA256 99CCEB0679DF43452F72D3FDE3AAC0F8F48E437674303200EFBA2D9A9EF4526A. Baseline2/27PASS; supplemental0/18, no Post yet.
 
 Draft instructions issued: one T05-P-001 line2.5000×4.0000, T05-W-001/T05-E-001, Note T05 baseline draft, Save/Total10.00, no Post. R-01 awaits human confirmation, screenshot and oracle. Ignored scoped maintenance controls for later direct-Deny/revocation/rowversion-winner fixtures have syntax validation only and have not executed; every action revalidates exact instance/database ownership and captured maintenance principal. A controlled rowversion winner will be explicitly labeled SQL fixture manipulation, not a second GUI client.
 
@@ -152,3 +152,22 @@ Final post-stock-group-final restricted snapshot keeps1Posted receipt/1line/1led
 ### Permission actor lookup prerequisites
 
 Before logging the permission actors in, source LookupProducts/Warehouses/Employees query authorization was checked: each requires its Catalog.*.Read key. The initial actor setup's Inventory-only post-only/writer/deny roles would not provide these lookup prerequisites. An exact ownership/principal-verified migration-side fixed control added only3CatalogRead keys to each of those3roles (9assignments), before those actors were used. No CatalogWrite, InventoryWrite or Post privilege was added by this correction. Restricted oracle permission-lookup-prerequisites now records63role assignments: post-only7, writer7, deny8; their original Inventory permission differences remain. There are still8ordinary actors/0protected matches. This is test setup correction, not a product permission change or an attended PASS. Inventory remains one original Posted/one ledger/one balance3.1250.
+
+Owner explicitly confirmed all requested actual Post/Stock/empty/date-error/Refresh observations. R-05/R-06/S-01/S-02/S-03 PASS within their recorded limits; total11/45attended observations PASS. No new full-suite/permission/P6 acceptance is implied.
+
+### Separate fixture Drafts and stale rowversion cases
+
+Exact owned maintenance control prepared7separate schema-valid Drafts, with explicit synthetic T05-FIX-* numbers and one line each referencing the GUI-created T05 catalog rows. These are setup-only fixtures, not additional GUI create/Save passes. Post-only quantity0.25; writer/deny/revoked/stale-save/stale-post/fault quantities1, cost4. Original GR0000000001 remains the sole Posted/ledger/balance3.125. First preparation attempt had unquoted reserved column LineNo and failed before adding rows; restricted oracle confirmed only original state. Corrected [LineNo] batch succeeded atomically:8total receipts/8lines,7Drafts. No product/schema/permission contract changed.
+
+C-02: actual GUI loaded T05-FIX-POST NoteT05 stale post/token2030. Controlled maintenance update changed persisted Note toT05 conflict winner post/token2032, not a second GUI client. Fresh native view still held oldNote/token, Post enabled. Actual Post rejected The goods receipt was changed by another operation.; GUI retained old snapshot. Restricted stale-post-rejected query confirms Draft/winnerNote/token2032 unchanged,1original ledger/balance3.125.
+
+C-01: actual GUI loaded T05-FIX-SAVE/token2029, Codex edited Note toT05 stale loser input. Controlled maintenance update persisted T05 conflict winner save/token2033. Fresh GUI still held loserinput/token2029. Actual Save rejected the same safe conflict, preserved loserinput and did not report success; Post remains disabled while dirty. Restricted stale-save-rejected confirms accepted winnerNote/token2033 and original stock unchanged. No blind retry. Owner explicitly confirmed both stale Post and stale Save observations, safe conflicts, preserved loser input and no success/blind retry; C-01/C-02 PASS. Global Support GUIDs shown in app-only artifacts are synthetic request correlations, not SQL allocation identities.
+
+| Artifact | SHA-256 |
+|---|---|
+| [stale-post-before-100light.jpg](assets/gui-p5-t05/stale-post-before-100light.jpg) | 65F1E1F66B12B84A74D90E295E6AB965A6533E1B01ADD77BD7B11950B32383F8 |
+| [stale-post-rejected-100light.jpg](assets/gui-p5-t05/stale-post-rejected-100light.jpg) | C78E8DE216D7B3DC6860084E4DAB5EC011832C63059DB8A441A163FBFD376980 |
+| [stale-save-before-100light.jpg](assets/gui-p5-t05/stale-save-before-100light.jpg) | EB0818072C153C11324E2AD1C0EFA5659C0527B046A5579D8B25AA5E104B0AEC |
+| [stale-save-rejected-100light.jpg](assets/gui-p5-t05/stale-save-rejected-100light.jpg) | 06ED0B75D1876B30ACE389D56ED56FFCC1CB62A3B0C79E17C3BCEA4113800B58 |
+
+Checkpoint22:45:13/45observations PASS. Sign out discarded unsaved stale loser input; actual human Login as p5.t05.post-only requested for P-01. Chapter2 remains bounded until22:55:37; retained allocation168/final disposal pending. No fault installed or additional stock effect.
