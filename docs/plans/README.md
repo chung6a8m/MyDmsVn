@@ -1,26 +1,34 @@
-# Active roadmap — v1a
+# Execution roadmap — v1a
 
-**Owner decision:** 2026-10-18. Exactly two plans are active. Their direction is approved; task evidence below records progress. The documentation reset and removal of the former SQL test framework do not implement either plan or establish their acceptance.
+**Updated:** 2026-10-19. This index owns execution order and plan state. **RESP and L2DB are completed foundations**; the next acceptance work is GUI-P5, followed by P6 release acceptance (REL). Adding plans does not mark deferred release requirements passed.
 
-| Execution order | Plan / ID | Entry condition | Current status |
+| Order | Plan | Status / source of truth | Next action |
 |---:|---|---|---|
-| 1 | [20261018-002-respawn-fixture-reuse.md](20261018-002-respawn-fixture-reuse.md) / `RESP` | Current net48 checkout and approved test resources for implementation | RESP-T00–T05 accepted on exact local working-tree candidate; full fresh/reuse 265/265 each, cleanup and observed suite improvement; see [evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up) |
-| 2 | [20261018-001-linq2db-net48-persistence-migration.md](20261018-001-linq2db-net48-persistence-migration.md) / `L2DB` | RESP acceptance on current RepoDb/Dapper baseline | T00–T01 complete: accepted RESP bound to PR #36 merge `1e24df4`; net48 session/package ownership verified ([evidence](../L2DB_VERIFICATION.md#l2db-t01--net48-package-and-resource-ownership)). T02 final **GO**: strict error parity, schema9/x86 package and least-privileged startup passed; temporary identity/database cleaned up ([decision](../L2DB_VERIFICATION.md#l2db-t02-final-go--approved-runtime-startup)). T03 Catalog conversion complete,125 scoped test invocations passed ([evidence](../L2DB_VERIFICATION.md#l2db-t03--catalog-conversion)). T04 Inventory conversion complete,134 scoped invocations passed ([evidence](../L2DB_VERIFICATION.md#l2db-t04--inventory-conversion)). T05 Identity/Security/operations conversion complete,200 scoped invocations passed ([evidence](../L2DB_VERIFICATION.md#l2db-t05--identity-security-and-operations-conversion)). T06 transitional dependency/test cleanup delivered ([evidence](../L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup)); T07 complete:581 correctness invocations, clean205-file package checks and approved restricted-runtime packaged Local smoke passed; temporary login/database cleanup verified ([evidence](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); L2DB plan-specific acceptance complete, deferred release gates open |
+| 1 | [RESP — Respawn fixture reuse](20261018-002-respawn-fixture-reuse.md) | **COMPLETE / accepted**: T00–T05; frozen fresh/reuse SQL comparison and ownership evidence in [RESP verification](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up); PR #36 merge `1e24df4` | Preserve accepted fixture/reset/isolation behavior |
+| 2 | [L2DB — net48 LINQ to DB migration](20261018-001-linq2db-net48-persistence-migration.md) | **COMPLETE / accepted in plan scope**: T00–T07; native cutover and clean package/limited real Local smoke in [L2DB verification](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke); PR #37 merge `42d94ba` | Preserve SQL/Application contracts; do not repeat migration work |
+| 3 | [GUI-P5 — full WinForms testing and P5 interactive acceptance](20261019-001-full-winforms-gui-p5-acceptance.md) | **NEW / OPEN (planned)**: T00–T06; no new GUI checks accepted | Inventory current Desktop tests, close GUI infrastructure/coverage, automate actual package and attend both P5 walkthroughs |
+| 4 | [REL — P6 Local v1 release acceptance](20261019-002-local-v1-p6-release-acceptance.md) | **NEW / OPEN (planned)**: T00–T06 and G1–G5; NOT READY FOR PRODUCTION | Define supported OS/SQL/legacy/signing/recovery choices; run operational evidence and frozen release gate |
 
-Filename sequence reflects creation time. Follow the table, not filename sorting. RESP must produce a reusable-fixture baseline with verified reset/seed, ownership and case coverage. L2DB consumes that baseline and freezes fixture behavior while replacing DAL internals.
+Filename prefixes follow creation time. **Follow this table, not filename sorting or historical roadmap instructions.** GUI-P5 completes P5 interaction and full GUI proof. REL-T00–T04 preparatory work may proceed alongside GUI-P5 on separate approved resources; final REL-T05/T06 and G4 need accepted GUI-P5 evidence. Neither new plan is a new framework/runtime/persistence migration.
 
-## Execution contract
+## Baseline and exact remaining gap
 
-Read [AGENTS](../../AGENTS.md), [current context](../../AI_CONTEXT.md), the task and [TEST_POLICY](../TEST_POLICY.md). Use [tests/README](../../tests/README.md) for actual commands. Execute actual test projects directly using source-verified category/method filters and ordinary TRX outcomes. Plan/task IDs label work and evidence; there is no executable gate registry or runner bootstrap.
+- Product and all ten active tests target `net48`; shipped release host is Windows x86 `MyDmsVn.Desktop.App.exe` plus separate net48 x86 admin migrator. AppCore/net8 remains PARKED.
+- The current persistence is **LINQ to DB + typed native SqlClient**; **Respawn 4** is implemented in test-only owned fixtures. DbUp scripts/journal and strict runtime schema `001–009` remain. Do not reintroduce RepoDb/Dapper or the deleted generic SQL runner/test-gates.
+- In L2DB-T07 the nine non-GUI owners had 581 passed invocations; 139 `Desktop.Tests` GUI invocations were conditionally **NOT RUN**. T07's limited packaged Local smoke does not complete full GUI/P5 acceptance or P6 operations.
+- The release-manifest schema8/9 metadata discrepancy is **closed narrowly** by L2DB-T02/clean-commit evidence. Actual install/upgrade, backup/restore, legacy policy, supported environment and G1–G5 are **still OPEN**. Never reopen fixed metadata solely because an older checklist called it open.
 
-The active target is `net48` for product, SQL and Desktop. All ten active test projects also target net48; the .NET 8 SDK remains a build tool. Neither plan reactivates product .NET 8, changes permissions, replaces DbUp, enables test parallelism or starts HTTP work.
+## Execution and policy
+
+1. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), this index, the particular task and the sole [TEST_POLICY](../TEST_POLICY.md).
+2. Read [TEST_STRATEGY](../TEST_STRATEGY.md) for required behaviors and [tests/README](../../tests/README.md) for real direct commands. Pick source-verified task-scoped test cases, not automatic full SQL/GUI for every edit; acceptance tasks explicitly require broader matrix.
+3. For GUI test safety use interactive Windows/serialized STA, bounded processes and no modal hangs. For real SQL use an operator-designated test instance, positive database allocation ownership, correct worker disposal and direct sequential project tests. Missing resources/skips are BLOCKED / NOT RUN.
+4. For completed work record revision/package, observed cases and Theory rows, SQL/temp resource cleanup, safe logs/screenshots and tester/date. **Plans only** do not assert PASS; each checkbox needs actual evidence.
 
 ## Outside this queue
 
-- Completed foundation, NET8-PAUSE, modularization and SEC-REBUILD work, plus the now-removed TESTGATE framework, is summarized in [History](../HISTORY.md). Do not reimplement it.
-- P5 GUI acceptance, P6 hardening/release, P7 HTTP and runtime reactivation are [deferred](../DEFERRED_WORK.md). They are not active prerequisites except a narrowly identified issue that a current plan explicitly owns. The old framework's unimplemented manifest-v2 redesign is cancelled by its complete removal.
-- The earlier rejection of fixture reuse is superseded by the owner's Respawn decision and [ADR 0010](../adr/0010-respawn-fixture-reuse-and-test-policy.md). Its old benchmark results remain historical observations.
+[P7 HTTP/remote, AppCore/net8 reactivation and future modules](../DEFERRED_WORK.md) remain unapproved/deferred. Historical removed framework proposals, permission synchronization and old host dual-TFM checklists are available via [History](../HISTORY.md), not executable instructions. The owner has not authorized an MSI/auto-update feature or schema upgrade from rejected 001–008 prefixes.
 
 ## Handoff
 
-Report the active task, changed files/behavior, verification commands and actual outcomes, missing requirements, accepted implementation revision and next task. Move to the next plan only after the previous acceptance criteria have evidence. Do not turn a parked target, historical result, deferred gate or owner's unrelated waiver into a new PASS.
+State the current task, exact revision/target, changes, verification and counts, remaining risks/resources and next task. Report explicit **GO / NO-GO** only at the milestone for which corresponding evidence exists. GUI-P5 success by itself is not a production release.
