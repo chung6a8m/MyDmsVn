@@ -123,6 +123,11 @@ public sealed class InventoryAccessibilityAcceptanceTests
             using var host = Show(fixture.Control);
             Named(fixture.Warehouse, "Warehouse ID");
             Named(fixture.Product, "Product ID");
+            Named(fixture.Grid, card ? "Stock card results" : "Stock balance results");
+            fixture.Product.AccessibilityObject.Value = "3";
+            Assert.Equal(3m, fixture.Product.Value);
+            Assert.Throws<ArgumentOutOfRangeException>(() => fixture.Product.AccessibilityObject.Value = "-1");
+            Assert.Throws<ArgumentOutOfRangeException>(() => fixture.Product.AccessibilityObject.Value = 1.5m.ToString());
             if (fixture.Card != null)
             {
                 Named(fixture.Card.FromUtcFilter, "From UTC");

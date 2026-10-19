@@ -280,6 +280,8 @@ internal sealed class GuiSqlEnvironment : IDisposable
     public async Task AssertPostedReceiptAsync()
     {
         Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.StockBalances;"));
         Assert.Equal(1, await ScalarAsync<int>(_oracle,
             "SELECT COUNT(*) FROM dbo.GoodsReceipts r JOIN dbo.Warehouses w ON w.WarehouseId=r.WarehouseId " +
             "JOIN dbo.Employees e ON e.EmployeeId=r.EmployeeId JOIN dbo.Users u ON u.UserId=r.PostedByUserId " +

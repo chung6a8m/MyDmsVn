@@ -181,6 +181,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             var grid = new DataGridView
             {
+                AccessibleName = "Stock balance results",
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
                 AllowUserToAddRows = false,
@@ -194,7 +195,7 @@ namespace MyDmsVn.Desktop.WinForms
         }
 
         private static NumericUpDown CreateIdFilter() =>
-            new NumericUpDown { Minimum = 0, Maximum = int.MaxValue, Width = 100 };
+            new AccessibleIdFilter { Minimum = 0, Maximum = int.MaxValue, Width = 100 };
 
         private static int? ToOptionalId(decimal value) => value <= 0 ? null : decimal.ToInt32(value);
 

@@ -265,9 +265,15 @@ internal static class GuiPackageProbe
         Invoke(Find(shell, "Tồn kho", ControlType.Button, false));
         var balance = Find(shell, "Tồn kho", ControlType.TabItem, false);
         SetInput(balance, "Search stock balances", "GUI-PROD", false);
+        SetInput(balance, "Warehouse ID", CatalogIds["Warehouses"].ToString(), false);
+        SetInput(balance, "Product ID", CatalogIds["Products"].ToString(), false);
         Invoke(Find(balance, "Refresh", ControlType.Button, false));
         Dump(balance);
         Find(balance, 3.125m.ToString("F4"), ControlType.Text, false);
+        var balanceRows = Named(balance, "Stock balance results");
+        ReadOnlyValue(balanceRows, "GUI-WH - UIA Warehouse Updated");
+        ReadOnlyValue(balanceRows, "GUI-PROD - UIA Product Updated");
+        ReadOnlyValue(balanceRows, 3.125m.ToString("F4"));
         Console.WriteLine("STOCK_BALANCE_TOTAL=PASS");
         _stage = "stock-card";
         Invoke(Find(shell, "Thẻ kho", ControlType.Button, false));
@@ -276,7 +282,30 @@ internal static class GuiPackageProbe
         SetInput(card, "Product ID", CatalogIds["Products"].ToString(), false);
         Invoke(Find(card, "Refresh", ControlType.Button, false));
         Find(card, 3.125m.ToString("F4"), ControlType.Text, false);
+        var cardRows = Named(card, "Stock card results");
+        ReadOnlyValue(cardRows, receiptAction.Substring("Open ".Length));
+        ReadOnlyValue(cardRows, "GoodsReceipt");
+        ReadOnlyValue(cardRows, "GUI-WH - UIA Warehouse Updated");
+        ReadOnlyValue(cardRows, "GUI-PROD - UIA Product Updated");
+        ReadOnlyValue(cardRows, 3.125m.ToString("F4"));
         Console.WriteLine("STOCK_CARD_TOTAL=PASS");
+    }
+
+    private static void ReadOnlyValue(AutomationElement root, string expected)
+    {
+        Wait(delegate
+        {
+            var found = 0;
+            foreach (AutomationElement cell in root.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.IsValuePatternAvailableProperty, true)))
+            {
+                var value = (ValuePattern)cell.GetCurrentPattern(ValuePattern.Pattern);
+                if (value.Current.Value != expected) continue;
+                if (!value.Current.IsReadOnly) throw new InvalidOperationException("Stock cell is editable.");
+                found++;
+            }
+            if (found > 1) throw new InvalidOperationException("Ambiguous stock result value.");
+            return found == 1;
+        }, "Expected readonly stock value unavailable.");
     }
 
     private static bool PostWithSecondClient(AutomationElement page, AutomationElement post, string executable, string scenario, string receiptAction)
