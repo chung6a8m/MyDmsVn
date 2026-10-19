@@ -23,7 +23,8 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     if (_owner.IsDisposed || !_owner.Enabled) throw new InvalidOperationException("Numeric input is unavailable.");
                     if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var number) ||
-                        number < _owner.Minimum || number > _owner.Maximum)
+                        number < _owner.Minimum || number > _owner.Maximum ||
+                        decimal.Round(number, _owner.DecimalPlaces) != number)
                         throw new ArgumentOutOfRangeException(nameof(value));
                     _owner.Value = number;
                 }

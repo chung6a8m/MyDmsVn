@@ -86,6 +86,8 @@ namespace MyDmsVn.Desktop.Tests
                                 System.Windows.Forms.Application.DoEvents();
                                 var alert = Descendants(form).OfType<BootstrapAlert>().Single();
                                 Assert.True(alert.Visible);
+                                Assert.Equal(alert.Text, alert.AccessibilityObject.Name);
+                                Assert.DoesNotContain("Sensitive detail.", alert.AccessibilityObject.Name);
                                 AssertContained(alert);
                                 Assert.True(
                                     alert.Height >= 52,
@@ -187,6 +189,8 @@ namespace MyDmsVn.Desktop.Tests
                             System.Windows.Forms.Application.DoEvents();
                             var alert = Descendants(form).OfType<BootstrapAlert>().Single();
                             Assert.True(alert.Visible);
+                                Assert.Equal(alert.Text, alert.AccessibilityObject.Name);
+                                Assert.DoesNotContain("Sensitive detail.", alert.AccessibilityObject.Name);
                             Assert.Contains("Support ID:", alert.Text);
                             Assert.DoesNotContain("sensitive", alert.Text);
                             Assert.Equal(1, reporter.Calls);

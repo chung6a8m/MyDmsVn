@@ -72,6 +72,7 @@ public sealed class InventoryAccessibilityAcceptanceTests
             Assert.Equal(3.125m, fixture.Editor.Lines[0].Quantity);
             Assert.Equal(3.125m.ToString("F4"), number.Value);
             Assert.Throws<ArgumentOutOfRangeException>(() => number.Value = "-1");
+            Assert.Throws<ArgumentOutOfRangeException>(() => number.Value = 1.12345m.ToString());
             Assert.Equal(3.125m, fixture.Control.QuantityEditor.Value);
             fixture.Control.QuantityEditor.Enabled = false;
             Assert.Throws<InvalidOperationException>(() => number.Value = "4");
