@@ -1,6 +1,6 @@
 # Reactivate modern product targets — deferred procedure
 
-**Status:** DEFERRED / NOT AUTHORIZED FOR EXECUTION by the current roadmap. The active product is net48. [ADR 0008](adr/0008-temporary-net8-target-pause.md) preserves modern source for a future coherent reactivation; RESP and L2DB do not reactivate it.
+**Status:** DEFERRED / NOT AUTHORIZED by the current [GUI-P5 and REL/P6 roadmap](plans/README.md). Active production and all ten test projects remain net48. [ADR 0008](adr/0008-temporary-net8-target-pause.md) retains parked AppCore source. Completed RESP/L2DB and the new acceptance plans do **not** reactivate net8.
 
 ## Entry conditions
 
