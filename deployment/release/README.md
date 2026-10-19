@@ -1,6 +1,6 @@
 # Local release matrix
 
-**Current source:** `v1a`, 2026-10-18. [Publish-LocalRelease.ps1](Publish-LocalRelease.ps1) emits these two packages:
+**Current source:** `v1a`, updated 2026-10-19. [Publish-LocalRelease.ps1](Publish-LocalRelease.ps1) emits these two active net48/x86 packages. RESP/L2DB are completed in their scope; clean install, full GUI and P6 release acceptance remain OPEN:
 
 | Directory | Executable | Target / architecture | Deployment |
 |---|---|---|---|
@@ -21,4 +21,4 @@ The manifest also records an empty validated SQL-version list and unsigned-relea
 
 Use [LOCAL_RELEASE_PACKAGING](../../docs/LOCAL_RELEASE_PACKAGING.md) for the publish command, prerequisites, artifact handling and install procedure. Run the admin package from its own directory as `& .\MyDmsVn.Server.DbMigrator.exe`; use the [migration runbook](../../docs/SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) and [security administration runbook](../../docs/SECURITY_ADMINISTRATION_RUNBOOK.md) for protected configuration and maintenance commands.
 
-Verification follows the sole [TEST_POLICY](../../docs/TEST_POLICY.md) and the explicitly required release scope in [DEFERRED_WORK](../../docs/DEFERRED_WORK.md). SEC-REBUILD acceptance is recorded in [HISTORY](../../docs/HISTORY.md); pending P5 interactive, P6 clean-install/upgrade/recovery and release sign-off remain open. A documentation refresh or successful publish does not satisfy them. Restore modern packages only through the reviewed [net8 reactivation procedure](../../docs/REACTIVATE_NET8.md).
+Verification follows the sole [TEST_POLICY](../../docs/TEST_POLICY.md) and the explicitly required GUI/P5 and P6 scope in [GUI-P5](../../docs/plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](../../docs/plans/20261019-002-local-v1-p6-release-acceptance.md). SEC-REBUILD acceptance is recorded in [HISTORY](../../docs/HISTORY.md); pending P5 interactive, P6 clean-install/upgrade/recovery and release sign-off remain open. A documentation refresh or successful publish does not satisfy them. Restore modern packages only through the reviewed [net8 reactivation procedure](../../docs/REACTIVATE_NET8.md).
