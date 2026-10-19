@@ -6,7 +6,7 @@
 
 Current identity tables include Users, Roles, UserRoles, RolePermissions, UserPermissions, SystemSecuritySettings and SecurityAuditEvents. The checked-in migrations define their constraints/revisions. Preserve `Users.PasswordHash`, `PasswordSalt` and algorithm identity when importing legacy data; a separate salt column is not permission to guess the old algorithm.
 
-New credentials use the configured one-way password hasher. Legacy verification/rehash must use approved specifications and sanitized test vectors, fail closed for unsupported algorithms and preserve valid state on failure. Never log the supplied password, stored hash/salt or raw authentication exceptions. Legacy release support remains an explicit [open decision](DEFERRED_WORK.md).
+New credentials use the configured one-way password hasher. Legacy verification/rehash must use approved specifications and sanitized test vectors, fail closed for unsupported algorithms and preserve valid state on failure. Never log the supplied password, stored hash/salt or raw authentication exceptions. Legacy release support or an owner-approved exclusion/reset procedure remains an explicit [REL-T06 decision](plans/20261019-002-local-v1-p6-release-acceptance.md).
 
 ## 2. Authorization order
 
@@ -44,7 +44,7 @@ Login validates current backend account state before publishing the process-loca
 
 The default idle timeout is 30 minutes on a monotonic clock. Keyboard/mouse activity renews it; background polling/API traffic does not. Local Mode does not issue bearer tokens. A future trusted HTTP host owns its own authentication/session boundary.
 
-P4.1 was owner-accepted with a specific incomplete packaged idle-expiry observation; [History](HISTORY.md) records that qualification. SEC-REBUILD acceptance is complete. Pending P5/P6 walkthrough/release checks remain in [Deferred work](DEFERRED_WORK.md), not an active permission-rebuild task.
+P4.1 was owner-accepted with a specific incomplete packaged idle-expiry observation; [History](HISTORY.md) records that qualification. SEC-REBUILD acceptance is complete. Pending P5 GUI/user walkthroughs and P6 operational/release checks are **OPEN** under [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md), not a new permission-rebuild task.
 
 ## 6. Trust, audit and tests
 
