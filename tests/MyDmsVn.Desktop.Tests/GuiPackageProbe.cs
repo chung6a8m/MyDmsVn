@@ -17,7 +17,10 @@ internal static class GuiPackageProbe
     [DllImport("kernel32.dll")] private static extern int WerSetFlags(uint flags);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
-    [DllImport("shcore.dll")] private static extern int GetScaleFactorForMonitor(IntPtr monitor, out int scale);
+    [DllImport("shcore.dll")] private static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint x, out uint y);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool SetProcessDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] private static extern IntPtr GetThreadDpiAwarenessContext();
+    [DllImport("user32.dll")] private static extern int GetAwarenessFromDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr key, IntPtr data);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr window, uint flags);
@@ -32,6 +35,10 @@ internal static class GuiPackageProbe
         Console.WriteLine("CULTURE=" + System.Globalization.CultureInfo.CurrentCulture.Name);
         try
         {
+            // Configure only the UIA client; the launched product keeps its shipped DPI settings.
+            if (!SetProcessDpiAwarenessContext(new IntPtr(-4)) || GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext()) != 2)
+                throw new InvalidOperationException("UIA per-monitor DPI awareness unavailable.");
+            Console.WriteLine("UIA_DPI_CONTEXT=PerMonitorV2");
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING")) ||
                 !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING")))
                 throw new InvalidOperationException("Administrative SQL environment reached the UI probe.");
@@ -659,11 +666,15 @@ internal static class GuiPackageProbe
             return false;
         }, "Owned window unavailable.", seconds);
         var handle = new IntPtr(result.Current.NativeWindowHandle);
-        int scale;
-        if (GetScaleFactorForMonitor(MonitorFromWindow(handle, 2), out scale) != 0) throw new InvalidOperationException("Monitor scale unavailable.");
+        // Effective DPI is measured independently of the target window's virtualized DPI.
+        uint dpiX, dpiY;
+        var dpiResult = GetDpiForMonitor(MonitorFromWindow(handle, 2), 0, out dpiX, out dpiY);
+        if (dpiResult != 0 || dpiX != dpiY) throw new InvalidOperationException("Monitor effective DPI unavailable.");
+        var scale = dpiX * 100m / 96m;
+        Console.WriteLine("MONITOR_SCALE=" + scale + ";WINDOW_DPI=" + GetDpiForWindow(handle) + ";MONITOR_DPI=" + dpiX);
         var expected = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
-        if ((expected != "100" && expected != "125") || scale.ToString() != expected) throw new InvalidOperationException("Desktop scale differs from declared configuration.");
-        Console.WriteLine("MONITOR_SCALE=" + scale + ";WINDOW_DPI=" + GetDpiForWindow(handle));
+        if ((expected != "100" && expected != "125") || scale.ToString(System.Globalization.CultureInfo.InvariantCulture) != expected)
+            throw new InvalidOperationException("Desktop scale differs from declared configuration.");
         return result;
     }
 

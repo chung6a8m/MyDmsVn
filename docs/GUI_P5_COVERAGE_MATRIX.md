@@ -2,7 +2,7 @@
 
 **Task:** GUI-P5-T00, [acceptance plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md). **Recorded:** 2026-10-19 (Asia/Bangkok), Codex; Project Owner approved the Minimal Disposable Test Topology and T00 scope in this chat on the same date. **Executable source:** `f275183c8b39dc2b712dc37be7f0f4ac71396357` on `v1a`, isolated implementation branch `codex/gui-p5-t00`; initial inventory/evidence commit `7cfefd4`. Documentation changes do not change the executable candidate.
 
-**Status: GUI-P5-T00 COMPLETE — reviewed inventory, owner-approved topology and explicit execution prerequisites. Packaged execution readiness remains BLOCKED / NOT TESTED as detailed below.** T00 completes reconciliation/planning, not environment certification. The source inventory and focused baseline below are evidence only for their stated scope. T03–T06, both attended P5 IDs, REL G1–G5 and production readiness remain OPEN. T01/T02 completion evidence is recorded separately below and in the verification document. No package was built or installed in T00; no package hash or real-login result is available.
+**Status: GUI-P5-T00 COMPLETE — reviewed inventory, owner-approved topology and explicit execution prerequisites. Packaged execution readiness remains BLOCKED / NOT TESTED as detailed below.** T00 completes reconciliation/planning, not environment certification. The source inventory and focused baseline below are evidence only for their stated scope. T03–T06, both attended P5 IDs, REL G1–G5 and production readiness remain OPEN. T01/T02 completion evidence is recorded separately below and in the verification document. Current T03 automation evidence is in Appendix D; historical T00 BLOCKED/NOT TESTED entries are not relabeled as runtime passes. No package was built or installed in T00; no package hash or real-login result is available.
 
 ## 1. How to use this ledger
 
@@ -497,3 +497,37 @@ Each class is in `tests/MyDmsVn.Desktop.Tests/<Class>.cs`; names below are exact
 | `SecurityControlAcceptanceTests.Deprecated_permission_is_visible_for_user_but_cannot_be_assigned` | Fact | 1 |
 | `SecurityControlAcceptanceTests.Moving_between_columns_of_the_same_user_keeps_editor_and_preview` | Fact | 1 |
 | `SecurityControlAcceptanceTests.Changing_target_mode_while_user_import_preview_is_pending_cannot_confirm_old_user` | Fact | 1 |
+
+## Appendix D — T03 packaged real-login automation (125% pending)
+
+**Frozen executable/package/test source:** `e412ebc41cce554953585d5d1ec4f3839a301e42`, clean `gui-p5-t03-candidate1`; full hashes, topology, commands and oracles are in [T03 verification](GUI_P5_VERIFICATION.md#frozen-candidate--100-complete-125-pending). This appendix updates current automation readiness; the T00 inventory above remains historical evidence. The owner confirmed that the designated non-production SQL instance is privately managed and approved for T03. Actual SQL2017 Developer14.0.2130.4 was provisioned with separate per-case GUI databases and migration/runtime/oracle principals; current schema001–009, restricted runtime grants, ownership and positive cleanup passed.
+
+| Obligation | Named packaged methods (`PackagedGuiAcceptanceTests`) | Actual100% Light/Dark | Actual125% Light/Dark |
+|---|---|---|---|
+| L1 / real authentication and session lifecycle | `Actual_packaged_login_uses_native_uia_and_authenticates_against_the_owned_database` | 2/2 PASS | NOT TESTED |
+| C1 / all four catalog create/edit/active actions | `Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes` | 2/2 PASS | NOT TESTED |
+| G1 / Draft, persisted reload/edit/Post, balance/card and duplicate Post | `Packaged_receipt_draft_reload_edit_post_and_stock_reconcile_with_readonly_sql` | 2/2 PASS | NOT TESTED |
+| G1 / concurrent stale write and input preservation | `Two_actual_clients_reject_stale_receipt_save_and_preserve_losing_input` | 2/2 PASS | NOT TESTED |
+| Security / disabled Login and server-side direct Deny after enabled UI | `Disabled_login_and_server_direct_deny_reject_a_previously_enabled_write_without_mutation` | 2/2 PASS | NOT TESTED |
+| K1 / same-process changed lookup, inactive history/new choice and restart | `Same_process_lookup_messages_preserve_history_reject_inactive_new_choices_and_reopen_fresh` | 2/2 PASS | NOT TESTED |
+| G1 / real SQL command timeout, uncertain Post, explicit reload and checked retry | `Real_sql_post_timeout_locks_mutation_until_explicit_reload_and_checked_retry` | 2/2 PASS | NOT TESTED |
+| G1 / invalid fields and no inventory mutation | `Invalid_receipt_fields_preserve_input_and_create_no_inventory` | 2/2 PASS | NOT TESTED |
+| SQL identity/schema/permissions/ownership | `Disposable_gui_topology_separates_provisioning_migration_runtime_and_readonly_oracle` | 1/1 PASS (no theme) | NOT TESTED |
+| L1 / unavailable SQL safe startup and process drain | `Unavailable_sql_startup_is_safe_owned_and_drains_under_native_uia` | 1/1 PASS (default Login theme) | NOT TESTED |
+
+The18 added Desktop methods contribute29 invocations:10 packaged methods/18 rows, plus these8 methods/11 control/infrastructure rows:
+
+| Added method | Rows |
+|---|---:|
+| `CatalogAccessibilityAcceptanceTests.Accessible_open_row_uses_the_existing_selection_path_and_rejects_stale_rows` | 4 |
+| `GoodsReceiptControlTests.Explicit_new_discards_uncommitted_lookup_text_in_an_unsaved_empty_draft` | 1 |
+| `InventoryAccessibilityAcceptanceTests.Receipt_and_line_accessible_actions_use_existing_selection_and_readonly_columns` | 1 |
+| `InventoryAccessibilityAcceptanceTests.Numeric_accessibility_updates_line_with_validation_and_disabled_guards` | 1 |
+| `InventoryAccessibilityAcceptanceTests.Lookup_accessibility_distinguishes_committed_selection_from_pending_text` | 1 |
+| `GuiOwnedProcessTests.Normal_tree_exit_allows_a_short_bounded_natural_drain` | 1 |
+| `GuiOwnedProcessTests.Infrastructure_probe_does_not_inherit_SQL_credentials` | 1 |
+| `GuiOwnedProcessTests.Poisoned_gui_session_blocks_SQL_allocation_before_configuration_or_database_work` | 1 |
+
+Unfiltered100% Desktop source/discovery/TRX reconcile **226 methods /311 invocations /311 PASS /0 failed/skipped**, including all18 packaged rows and all282 prior T02 display names. Actual monitor100/windowDPI96 and32-bit testhost are recorded in the TRX. Session108/108, Architecture12/12 and the six sequential SQL projects306/306 passed. The17 GUI allocations from this run drained/dropped with exact ownership; read-only follow-up found zero captured databases/principals and zero owned GUI processes remaining. Raw evidence remains ignored, with no credentials/raw SQL IDs/screenshots committed.
+
+**T03 remains OPEN pending corrected-probe frozen125%/100% reruns and final reconciliation.** After100% stopped/drained, the owner switched to125%; the first run failed17 native rows because the probe reported scale100 while actual effective DPI was120. The failed294/17 run and temporary diagnostics are preserved in verification. A DPI-aware effective-monitor-DPI reader passed focused startup/real Login2/2 at125%; full matrix results are still pending. T04/T05 attended walkthroughs, T06 frozen acceptance and REL/P6 gates remain OPEN.

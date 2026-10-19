@@ -135,11 +135,11 @@ Independent Codex code review found the two security issues above; both were fix
 
 ## GUI-P5-T03 — Packaged real-login E2E candidate (acceptance OPEN)
 
-**Implementation:** `30171015f46fa553d9524329038b1b9afd95e727`; branch `codex/gui-p5-t00`, managed worktree `gui-p5-t00/CleanArchitecture`. **Date/tester:** 2026-10-19 (Asia/Bangkok), Codex. This is an implementation checkpoint. Frozen-candidate regression, independent review and the full 100%/125% Light/Dark matrix are still pending; no T03/P5/P6 completion is asserted here.
+**Implementation:** `30171015f46fa553d9524329038b1b9afd95e727`; branch `codex/gui-p5-t00`, managed worktree `gui-p5-t00/CleanArchitecture`. **Date/tester:** 2026-10-19 (Asia/Bangkok), Codex. The frozen candidate and100% regression results are recorded below; independent review is complete. Actual125% Light/Dark execution is still pending, so no T03/P5/P6 completion is asserted here.
 
 ### Approved topology and actual provision
 
-The Project Owner approved the private, owner-managed non-production SQL instance for T03. Shared-instance DBA approval is therefore not a missing prerequisite for this instance. Windows 11 x64 interactive, net48/x86, 1920×1080/100% plus supplemental 125%, and Bootstrap Light/Dark remain the approved matrix; 150% is outside the mandatory matrix. The owner agreed to switch the desktop to 125% after the 100% runs stop and drain. That transition has not happened at this checkpoint.
+The Project Owner approved the private, owner-managed non-production SQL instance for T03. Shared-instance DBA approval is therefore not a missing prerequisite for this instance. Windows 11 x64 interactive, net48/x86, 1920×1080/100% plus supplemental 125%, and Bootstrap Light/Dark remain the approved matrix; 150% is outside the mandatory matrix. The owner agreed to switch the desktop to 125% after the 100% runs stop and drain. The owner subsequently confirmed the125% transition; the run and its initial failure are recorded below.
 
 The existing SQL Server is **2017 Developer, version 14.0.2130.4 (64-bit)**, verified through server metadata. SQL Server 2022 Developer remains the target only if a new instance is provisioned. No new SQL instance, Docker/Testcontainers, test project, runner/framework or net8 product was introduced. The T01/T02 host observations above remain the baseline; final candidate metadata must be recorded again with the matrix. These observations establish a tested developer topology, not general OS/SQL production support.
 
@@ -181,4 +181,59 @@ The real SQL timeout is an owned-database-only temporary trigger installed **aft
 - Earlier development TRX separately establish real Login lifecycle, all four catalog flows, disabled/direct-Deny and invalid-input cases. They span intermediate revisions and do not form a combined frozen-candidate pass.
 - Focused receipt/lookup control regression: **53/53 PASS**; stock accessibility/control regression: **18/18 PASS**. Final process/environment/poison admission plus safe startup probe: **13/13 PASS**. The topology/context follow-up: **2/2 PASS**. Raw TRX, package outputs, allocation identities and diagnostics remain local/ignored.
 
-**Outstanding before T03 exit:** fresh whole-branch review; clean final candidate publication and hash/source recording; affected SQL/shared-helper and GUI/Session/Architecture regressions; final discovery/selected/executed/skip reconciliation; full Light/Dark at actual100% and125%; final ownership/process/connection cleanup evidence. T03 checkboxes stay OPEN. T04–T06, both attended P5 IDs and REL G1–G5 remain OPEN independently.
+### Frozen candidate — 100% complete; 125% pending
+
+The clean candidate was published with the existing `deployment/release/Publish-LocalRelease.ps1 -Version 1.0.0-guip5-t03` under the bounded supervisor. Manifest source is **`e412ebc41cce554953585d5d1ec4f3839a301e42`**, `sourceTreeDirty=false`, schema maximum9, exactly the Desktop and admin migrator net48/win-x86 packages. Local output is `artifacts/release/gui-p5-t03-candidate1/`. The test sources at that same revision were built Release/net48/x86; package rows require the matching `MYDMSVN_GUI_P5_TEST_REVISION` and log that exact revision. Documentation-only follow-up does not replace these tested executable bytes.
+
+| Artifact | SHA-256 |
+|---|---|
+| `release-manifest.json` | `17173D89D9C76B56F8885C5DD3A021E735F9FC35AE13B9CB5440AF99A4E299F1` |
+| Desktop `MyDmsVn.Desktop.App.exe` | `7D8EDF0417E6C52ECF1914BC053AD2C0F364B479E29DF9DE7DA8C12F9C48F029` |
+| Desktop `MyDmsVn.Desktop.WinForms.dll` | `70B5DEFE437A6FBB7015D9AEFA7E65FD1E49620E1CADCE828021707F71772956` |
+| Admin `MyDmsVn.Server.DbMigrator.exe` | `3F1729310A266FFC451727E3005FC4C3AA2DA414D9DC7E19411E373E1DAEF5F4` |
+| Test `MyDmsVn.Desktop.Tests.dll` | `89B9D0C1D1EB8DA80BD8FA75E71F484CDEEF24D6E0CF9431F0D8574D88DA8E1C` |
+
+All manifest-listed package file lengths/hashes and x86 executable headers were checked by the executable tests. Actual host recheck: CIM caption **Microsoft Windows 11 Home Single Language**, version10.0.26200, build **26200.9457**, DisplayVersion25H2, OS64-bit, interactive session38; installed v4 Version **4.8.09221**, Release **533509**, SDK8.0.425. The registry ProductName still says Windows10 Home Single Language; the CIM caption and exact build are recorded rather than inferring a support policy. SQL topology TRX records **14.0.2130.4 / Developer Edition (64-bit)**.
+
+| Scope / actual TRX | Discovered / selected / executed | PASS / FAIL / skipped |
+|---|---:|---:|
+| Desktop 100%, unfiltered, `t03-final100.trx` | **311 /311 /311** | **311 /0 /0** |
+| Desktop.Session, `t03-MyDmsVn.Desktop.Session.Tests.trx` | 108 /108 /108 | **108 /0 /0** |
+| Architecture, `t03-MyDmsVn.Architecture.Tests.trx` | 12 /12 /12 | **12 /0 /0** |
+| SQL Foundation | 61 /61 /61 | **61 /0 /0** |
+| SQL Migrations | 65 /65 /65 | **65 /0 /0** |
+| SQL Integration | 59 /59 /59 | **59 /0 /0** |
+| SQL Catalog | 19 /19 /19 | **19 /0 /0** |
+| SQL Inventory | 42 /42 /42 | **42 /0 /0** |
+| SQL Security | 60 /60 /60 | **60 /0 /0** |
+| Desktop 125%, first frozen attempt, `t03-final125.trx` | 311 /311 /311 | **294 /17 /0**; NOT ACCEPTED |
+
+SQL project TRX are `TestResults/gui-p5-t03/sql-regression/t03-<project-name>.trx`; the six SQL projects ran sequentially and passed **306/306**. Their normal fixture reset/seed/ownership/lifecycle checks remain separate from GUI E2E. Server.Application tests were not rerun because this task changes neither that layer nor its contracts; this is an affected-scope regression, not the T06/P6 full release gate.
+
+Desktop source contains **226 methods:186 Facts and40 Theories /125 InlineData rows =311 invocations**, up from T02's208 methods/282 rows. The18 added methods contribute29 rows: the10 packaged methods/18 rows above, Catalog semantic selection4 rows, receipt pending-input discard1, numeric/lookup/receipt-grid accessibility3, and owned-process natural drain/environment isolation/poison admission3. Current discovery and final100 TRX have311 unique identical display names, zero omissions or duplicates; all282 previous T02 display names remain represented. The100 run completed **2026-10-19 12:51:41–13:10:30 +07:00**,1128.28s TRX wall time, with no unexpected timeout/abort/error. Deliberate subprocess timeout/fatal probes and the real SQL command timeout are passing expected-error tests, not unexpected suite timeouts.
+
+All18 packaged rows passed at100%:16 Light/Dark UIA scenario rows, one SQL topology row and one unavailable-startup row. Their TRX record32-bit testhost18 times, administrative SQL environment exclusion17 times, and actual monitor scale100/window DPI96 in61 window observations. Light/Dark mode is read back from the application; the OS theme does not substitute. Safe startup, real Login/logout/relogin/restart, four catalogs, Draft/Post/Stock/duplicate, stale write, direct Deny/disabled login, invalid input, changed lookup/history/reopen and real SQL uncertain-Post/reload/retry all passed their independent assertions.
+
+Commands use ordinary direct project testing, with both `-p:PlatformTarget=x86` and `-- RunConfiguration.TargetPlatform=x86`. After sequential SQL, Session and Architecture runs, the frozen GUI invocation was:
+
+```powershell
+$env:MYDMSVN_GUI_P5_PACKAGE = '<worktree>/artifacts/release/gui-p5-t03-candidate1'
+$env:MYDMSVN_GUI_P5_TEST_REVISION = 'e412ebc41cce554953585d5d1ec4f3839a301e42'
+$env:MYDMSVN_GUI_P5_EXPECTED_SCALE = '100'
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore --no-build --list-tests -- RunConfiguration.TargetPlatform=x86
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore -p:PlatformTarget=x86 --logger 'trx;LogFileName=t03-final100.trx' --logger 'console;verbosity=normal' --results-directory TestResults/gui-p5-t03 -- RunConfiguration.TargetPlatform=x86
+```
+
+The100 run's17 GUI SQL allocations completed positive ownership/principal checks and cleanup; together with47 development allocations, all64 local resource ledgers record `DatabaseAndAllPrincipalsDroppedAfterVerifiedDrain`. A subsequent read-only query of each exact captured database/principal name found **zero remaining databases and zero principals**; process inspection found **zero owned GUI probe/package processes**. No prefix cleanup was attempted. Raw allocation identities, TRX and TEMP logs remain local/ignored; no credentials, SQL IDs or screenshots are committed.
+
+One fresh independent whole-branch static review covered `4c557f2..e412ebc`, including product accessibility/pending binding, real-login UIA, process ownership and SQL lifecycle/fault oracles. It found no reproducible blocking P1/P2 issue. The reviewer ran no tests and review is not counted as runtime proof.
+
+### DPI125 probe correction — final reruns pending
+
+After the100% run stopped/drained, the owner switched the actual desktop to125%, retaining1920×1080. Independent native32-bit and64-bit metadata reads confirmed125%. The initial frozen125% run (`t03-final125.trx`) completed **294 PASS /17 FAIL /0 skipped**: the16 scenario rows and unavailable-startup failed before business interactions, while the SQL-only topology and293 control/infrastructure rows passed. Cleanup was verified; this failed run is retained and is not an acceptance result.
+
+Temporary diagnostic startup probes (`t03-scale125-diagnostic`, `t03-scale125-monitor-diagnostic`, `t03-scale125-aware`, `t03-scale125-thread-diagnostic`, `t03-scale125-effective-dpi`) each failed1/1 and showed that this host's compiled UIA client returned monitor scale100 from `GetScaleFactorForMonitor` even after explicit process/thread per-monitor awareness2; the same monitor's effective DPI was120,120. Independent PowerShell processes returned scale125. No cause beyond these observations is asserted, and the Desktop window's observed DPI96 is not relabeled120.
+
+The probe now declares and verifies PerMonitorV2 awareness before any UIA call and measures the actual monitor's effective DPI using `GetDpiForMonitor(MDT_EFFECTIVE_DPI)`, checking equal axes and successful HRESULT. It compares measured DPI/96 against the declared100/125 scale and logs observations before rejection. This changes only the temporary test client; shipped application DPI settings/manifest are unchanged. Microsoft describes [UIA client scaling](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-screenscaling) and the awareness-dependent [effective monitor DPI return values](https://learn.microsoft.com/en-us/windows/win32/api/shellscalingapi/nf-shellscalingapi-getdpiformonitor). Existing native startup assertions now require the declared UIA context. Focused startup and real-Login Light passed **2/2** at actual125% (`t03-scale125-effective-green.trx`, working-tree trial); this does not substitute for the full matrix.
+
+**Outstanding before T03 exit:** freeze the corrected probe and clean publication, rerun full125% Light/Dark, then100% on the same candidate, reconcile discovery/TRX and verify final resource cleanup. T03 checkboxes stay OPEN. T04–T06, both attended P5 IDs and REL G1–G5 remain OPEN independently.

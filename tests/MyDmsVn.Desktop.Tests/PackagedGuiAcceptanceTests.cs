@@ -334,6 +334,7 @@ public sealed class PackagedGuiAcceptanceTests
         _output.WriteLine(result.StandardOutput);
         Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
         Assert.Contains("BITNESS=32", result.StandardOutput);
+        Assert.Contains("UIA_DPI_CONTEXT=PerMonitorV2", result.StandardOutput);
         Assert.Contains("STARTUP_SAFE_ERROR=PASS", result.StandardOutput);
         Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
     }
