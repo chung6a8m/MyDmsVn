@@ -1,64 +1,46 @@
 # Codex instructions — MyDmsVn / v1a
 
-Applies to the entire repository. Human-facing discussion is Vietnamese; identifiers and technical documentation are English unless an existing runbook uses Vietnamese.
+Applies to the whole repository. Human-facing discussion is Vietnamese; technical documentation and identifiers are generally English unless an established runbook is Vietnamese.
 
-## Start here
+## First read — current roadmap (2026-10-19)
 
-The owner reset the active roadmap on **2026-10-18**. There are exactly **two active implementation plans**, in this order:
+The owner-selected [execution roadmap](docs/plans/README.md) contains two **completed** infrastructure plans followed by two **new OPEN** acceptance plans:
 
-1. [RESP — Integration-test fixture reuse with Respawn](docs/plans/20261018-002-respawn-fixture-reuse.md).
-2. [L2DB — LINQ to DB persistence migration on net48](docs/plans/20261018-001-linq2db-net48-persistence-migration.md).
+1. [RESP — Respawn fixture reuse](docs/plans/20261018-002-respawn-fixture-reuse.md) — **COMPLETE**, accepted against PR #36 merge `1e24df4`; preserve reset/seed/lifecycle proof and positively owned DB cleanup.
+2. [L2DB — LINQ to DB persistence on net48](docs/plans/20261018-001-linq2db-net48-persistence-migration.md) — **COMPLETE in plan scope**, PR #37 merge `42d94ba`; active LINQ/native cutover and T07 narrow correctness/package/Local smoke accepted. [T07 evidence](docs/L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke).
+3. [GUI-P5 — full WinForms GUI tests and P5 attended acceptance](docs/plans/20261019-001-full-winforms-gui-p5-acceptance.md) — **NEXT / OPEN**; existing full GUI suite, bounded subprocess handling, actual packaged Login E2E and two P5 walkthroughs.
+4. [REL/P6 — Local v1 production release acceptance](docs/plans/20261019-002-local-v1-p6-release-acceptance.md) — **OPEN / NOT READY**; clean install, SQL/recovery, release matrix, full regression and G1–G5 sign-off. Preparatory tasks may overlap GUI-P5, but final G4 needs GUI-P5.
 
-RESP-T00–T05 are complete and accepted on the local net48 working-tree candidate recorded in [verification](docs/RESPAWN_VERIFICATION.md#pr-36-review-follow-up). L2DB-T00 has bound the accepted fixture bytes to PR #36 merge `1e24df4c4ad5243963da82d808da19f12278242b`; see [L2DB verification](docs/L2DB_VERIFICATION.md). L2DB-T01 has verified the internal net48 session/package ownership seam. L2DB-T02 is complete with a final GO after the missing-target repair, x86 package/schema reconciliation and successful least-privileged packaged startup ([evidence](docs/L2DB_VERIFICATION.md#l2db-t02-final-go--approved-runtime-startup)). The explicitly approved temporary test login and owned database were removed with identity/ownership checks. L2DB-T03 has converted all four Catalog write/query implementations to LINQ/native with125 scoped test invocations passed ([evidence](docs/L2DB_VERIFICATION.md#l2db-t03--catalog-conversion)). L2DB-T04 has converted Inventory to LINQ/native with134 scoped invocations passed ([evidence](docs/L2DB_VERIFICATION.md#l2db-t04--inventory-conversion)); the obsolete Catalog/Inventory RepoDb mapping bridge is removed. L2DB-T05 has converted Identity/Security/operational SQL execution to native SqlClient with200 scoped invocations passed ([evidence](docs/L2DB_VERIFICATION.md#l2db-t05--identity-security-and-operations-conversion)). L2DB-T06 removes transitional providers/hooks/packages/pilots and reconciles the active dependency/test graph ([evidence](docs/L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup)). T07 is complete:581 frozen-revision invocations, clean205-file package reconciliation and approved restricted-runtime packaged Local workflows passed; temporary login/database cleanup was verified ([evidence](docs/L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)). L2DB plan-specific acceptance is complete; deferred P5/P6 release obligations remain open. Preserve local work and keep fixture boundaries fixed. The prior removal of the old SQL test framework is a baseline simplification, not RESP implementation. Historical TESTGATE, completed modularization, NET8-PAUSE and SEC-REBUILD work is context, not an execution queue. Pending P5/P6/P7 work is in [Deferred work](docs/DEFERRED_WORK.md), not a third active plan.
+**Important:** L2DB-T07's 581 passing invocations **exclude** the 139 Desktop.GUI invocations (NOT RUN at that frozen revision). Its restricted packaged Local smoke does not close full GUI/P5/P6 gates. `RELEASE-MANIFEST-01` metadata inconsistency is already repaired (schema9/scripts001–009); full VM install/upgrade/recovery/sign-off is not. New plan checkboxes are open until actual evidence exists.
 
-## Read order and authority
+## Documentation authority
 
-1. This file and [AI_CONTEXT.md](AI_CONTEXT.md).
-2. [Active plans](docs/plans/README.md), the specific task, and [TEST_POLICY.md](docs/TEST_POLICY.md).
-3. Relevant contracts: [Architecture](docs/ARCHITECTURE.md), [Persistence](docs/PERSISTENCE.md), [Contracts](docs/CONTRACTS.md), [Security](docs/SECURITY.md), [Data model](docs/DATA_MODEL.md).
-4. [PRD](docs/PRD.md), [Tech stack](docs/TECH_STACK.md), and applicable [ADRs](docs/adr/README.md).
-5. [History](docs/HISTORY.md) only when a past decision or evidence is needed.
+Read in order: (1) this file and [AI_CONTEXT](AI_CONTEXT.md), (2) [plan index](docs/plans/README.md) and active task, (3) sole [TEST_POLICY](docs/TEST_POLICY.md), [TEST_STRATEGY](docs/TEST_STRATEGY.md), [tests/README](tests/README.md), (4) relevant [Architecture](docs/ARCHITECTURE.md), [Persistence](docs/PERSISTENCE.md), [Contracts](docs/CONTRACTS.md), [Security](docs/SECURITY.md), [Data model](docs/DATA_MODEL.md), [PRD](docs/PRD.md) and runbooks. [History](docs/HISTORY.md) records superseded design/evidence; it is not an active policy.
 
-Explicit owner decisions supersede older documents. The active-plan index owns work order; TEST_POLICY owns test execution; TEST_STRATEGY describes coverage; tests/README describes direct test commands. Historical plans and old command examples in Git are not current instructions. Flag a real contradiction instead of silently changing architecture or claiming planned behavior already exists.
+Source code/actual project graph and explicit owner decisions override stale historical examples. Point out contradictions instead of silently reviving old modules/runner/permissions. Plan documentation alone is not runtime verification.
 
-## Current implementation and approved destination
+## Current code invariants
 
-| Area | Current v1a code | Approved direction |
-|---|---|---|
-| Runtime | Product, SQL, Desktop and all ten active test projects target `net48` | Retain `net48`; no runtime upgrade in RESP/L2DB |
-| Test execution | Direct `dotnet test` / Test Explorer; local owned helper and accepted test-only Respawn collections | Preserve accepted fixture baseline; no external framework/manifest restoration |
-| Modern product | AppCore source / historical .NET 8 cases parked; AppCore outside solution/release | Reactivation is deferred and separately scoped |
-| Persistence | Catalog/Inventory LINQ/native; Identity/Security/operations native; no active legacy ORM dependency; explicit UoW, SQL Server, DbUp | LINQ to DB behind existing contracts after RESP acceptance |
-| SQL fixtures | Default reusable collections for 20 original Catalog/Inventory/Identity/Security data cases; explicit fresh and dedicated exceptions; serial guards | Preserve accepted reset/seed/ownership/drain contract and dedicated lifecycle/schema/principal/trigger/contention databases during L2DB |
-| Permissions | Code-defined registry, explicit assignments, one configured database-bound superuser | Preserve current implementation and invariants |
+- Product, SQL, Desktop and all **ten** active test projects target `net48`. Shipped Windows x86 desktop `MyDmsVn.Desktop.App.exe` and separate admin `MyDmsVn.Server.DbMigrator.exe` are the only active release packages. AppCore `net8.0-windows` remains PARKED / NOT SHIPPED; the newer SDK is tooling, not product target.
+- Local WinForms invokes Desktop.Application interfaces via in-process Local adapter and Server.Application. Domain/Application remain independent of Infrastructure/WinForms/HTTP. Public DTOs stay transport-neutral.
+- Current persistence is LINQ to DB for Catalog/Inventory plus typed native SqlClient for other SQL consumers; explicit UoW owns one connection/current transaction, typed `unitOfWork.Repository<TRepository>()` resolves repository interfaces and no ambient/static/global UoW, hidden connections, fallback ORM or uncontrolled nested transactions are permitted. DbUp owns scripts/schema.
+- Posting modifies receipt status, append-only ledger and derived balances atomically; optimistic rowversion and idempotent concurrent retries remain. Reconciliation and real SQL sessions are required independent business checks.
+- Code-defined permissions require a registered Active key and current active identity; unknown/deprecated deny before superuser, configured superuser must match protected DB binding, ordinary direct Deny wins over role grants. No old permission sync, first-Administrator automatic grants or privileged client bootstrap.
+- Preserve PasswordHash/PasswordSalt and algorithm-aware verification; legacy release support/exclusion requires explicit verified choice. Do not guess algorithms or include secrets in logs, package, screenshots or source.
+- Admin-only migration/maintenance and limited SQL runtime identities stay separate. Desktop startup does read-only schema preflight and accepts current scripts001–009; admin migrator admits Empty/Compatible, **not** old-prefix auto upgrade. Local direct-SQL is an explicit security trust limitation.
 
-## Architecture and business invariants
+## Implementation and test protocol
 
-- Local v1 dispatches Application in process; future HTTP uses the same transport-neutral DTO/result semantics.
-- Domain/Application do not depend on SQL-provider, HTTP or WinForms implementations. Desktop views/ViewModels depend on desktop abstractions and Contracts.
-- Explicit UoW owns one open connection and optional transaction. Scope-bound repositories and queries share them explicitly. No ambient/static/AsyncLocal transaction, implicit nested transaction, or hidden second connection for transactional work.
-- Repository resolution stays within the UoW scope and remains explicit; preserve the rule in PERSISTENCE and ARCHITECTURE.
-- Posting changes receipt, ledger and balances atomically; retries/concurrent requests cannot duplicate a movement. Posted receipts and the ledger remain immutable to business callers.
-- Preserve `PasswordHash` / `PasswordSalt` and algorithm-aware verification. Unknown/deprecated permissions deny before superuser evaluation; ordinary direct-user decisions override active-role grants. No permission synchronization, automatic grants, startup seeding or normal-path changes to the protected superuser.
-- Keep DbUp and administrator-only migration/maintenance operations. Production SQL scripts do not become test-reset scripts. Local desktop SQL access remains a documented trust limitation.
-- P5 contains catalogs, Goods Receipt Draft/Post, Stock Balance and Stock Card. New business modules and HTTP hosting remain deferred.
+1. Declare current plan/task, exact changed behavior, target/provisioning requirements and smallest affected test scope.
+2. Inspect actual checked-in source, csproj/lock files, package/GUI code and project tests before proposing new tools. No blanket upgrades, generic fallback DAL or unapproved AppCore reactivation.
+3. Add tests for behavior/error boundaries; run focused build/project/filter during each edit. Expand for shared UoW/schema/security/fixture/GUI changes, and run full release matrix only for milestone acceptance. [TEST_POLICY](docs/TEST_POLICY.md) governs.
+4. Use ordinary `dotnet test`/Test Explorer, direct projects and actual TRX. The old `tests/test-gates.v1.json`, `SqlTestHarness`, SQL runner/tests, approval files, global lease and manifest fingerprint tooling were intentionally **removed**. Do not recreate them.
+5. SQL: configure explicit designated non-production `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` with effective master, run SQL projects sequentially, verify database identity/ownership token before cleanup, drain workers/connections before reset/drop, quarantine uncertain allocations. Never bulk-drop by prefix or use application databases.
+6. GUI: require interactive Windows session, STA serialized forms, `WinFormsTestGuard` ThreadException/DataError capture, bounded waits and disposal. `StaTest` cannot kill a noncooperative STA; fatal/hang/real-package probes must use a GUI-owned bounded subprocess and verified child cleanup. No background modal hangs; never equate form creation or test-session injection with real Login.
+7. Record commit/package/hash, environment, selected/discovered/executed Facts/Theory rows, pass/fail/skip/blocked/timeouts, resource ownership/cleanup, sanitized log/screenshot evidence, tester/date and remaining risks. Do not mark deferred/open/release gates accepted based on prose or old totals.
 
-## Work protocol
+## Editing and release boundaries
 
-1. State the active plan/task, affected behavior and smallest meaningful verification scope.
-2. Read the checked-in source and actual project targets before changing them. Use current task evidence, not old totals, to establish progress.
-3. Make small, reviewable changes; add tests for meaningful behavior or failure boundaries. Documentation-only changes need static documentation checks, not a product regression run.
-4. Follow [TEST_POLICY](docs/TEST_POLICY.md). Broaden tests for shared dependencies or an explicit milestone; do not run full SQL/GUI/repository suites after each edit or by default for every code PR.
-5. Use the explicit non-production SQL test connection, preserve local allocation ownership/cleanup checks, and run SQL projects sequentially. The former framework, manifest and wrappers are removed; no approval-file, global lease, external watchdog or orphan recovery service remains. Refuse ambiguous cleanup and report leftovers for manual review.
-6. Record commands, revision, scope, actual pass/fail/skip/not-run results and material limitations. Update checkboxes only when their evidence exists.
-7. Summarize what changed, why, verification and the next active task. P5/P6 release checks are still open; this roadmap reset grants no release acceptance.
+Follow `.editorconfig` and `.gitattributes`: Markdown UTF-8 without BOM with CRLF in the working tree (Git-normalized blob); C# uses its declared BOM/CRLF. Preserve Vietnamese diacritics and pinned vendor/submodule files. Do not commit credentials, local connections, proprietary raw TRX/SQL IDs or unredacted screenshots.
 
-## Editing and resource rules
-
-- Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM with CRLF; C# uses its declared BOM/CRLF policy. Preserve Vietnamese text.
-- Compile against the actual target APIs, especially `net48`. Do not upgrade packages broadly, suppress warnings globally or introduce an additional ORM to avoid a compatibility problem.
-- Register implementations explicitly with Microsoft DI. Keep ErrorOr, MediatR, RepoDb/LINQ to DB and SQL objects out of transport DTOs.
-- Use parameterized SQL. Never commit secrets, production connection strings, local SQL configuration or raw test artifacts.
-- SQL tests mutate only positively owned disposable databases on the explicitly designated non-production test instance. Reset/boundary failure poisons reuse; cleanup timeout quarantines the allocation with no later reset/drop until manual review. Verify the boundary again after drained scenario cleanup, including final/focused cases.
-- GUI tests use STA, serialized UI resources, deterministic disposal, bounded waits and captured exceptions/DataGridView errors. Headless failures must not open blocking dialogs.
-- Missing Windows, targeting packs, SQL configuration or GUI access is `BLOCKED / NOT RUN`, never PASS. Use [tests/README.md](tests/README.md) for current commands and resource constraints.
+GUI-P5 and REL must preserve production contracts rather than implement P7/HTTP, new stock features, MSI/auto-updater, new migration framework or net8 reactivation. Record owner choices for SQL/Windows support, signing, legacy conversion and recovery without guessing. Missing Windows/SQL/resources or skipped mandatory cases = BLOCKED / NOT RUN. P5 GUI acceptance and P6 G1–G5 remain OPEN until evidenced and signed; v1 is **not ready for production**.
