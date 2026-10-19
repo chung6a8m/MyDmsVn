@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. [Active work](../plans/README.md) consists only of RESP then L2DB; [TEST_POLICY](../TEST_POLICY.md) is the sole test-execution policy.
+Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. [Execution roadmap](../plans/README.md) records completed RESP/L2DB and OPEN GUI-P5 then REL/P6; [TEST_POLICY](../TEST_POLICY.md) is the sole test-execution policy.
 
 | ADR | Decision | Current status |
 |---|---|---|
