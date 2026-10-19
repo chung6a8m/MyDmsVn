@@ -764,7 +764,6 @@ namespace MyDmsVn.Desktop.WinForms
                 Alignment = ToolStripItemAlignment.Right,
             };
             _themeButton = themeButton;
-            UpdateThemeDescription();
             themeButton.Click += (_, _) => ToggleTheme();
             var signOutButton = new ToolStripButton("Sign out")
             {
@@ -774,6 +773,7 @@ namespace MyDmsVn.Desktop.WinForms
             topBar.Items.Add(title);
             topBar.Items.Add(signOutButton);
             topBar.Items.Add(themeButton);
+            UpdateThemeDescription();
             return topBar;
         }
     }

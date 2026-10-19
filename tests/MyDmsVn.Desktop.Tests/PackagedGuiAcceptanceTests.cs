@@ -86,6 +86,28 @@ public sealed class PackagedGuiAcceptanceTests
         });
     }
 
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
+    public async Task Packaged_receipt_draft_reload_edit_post_and_stock_reconcile_with_readonly_sql(string theme)
+    {
+        var package = ValidatedPackage();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-audit " + theme);
+            fixture.ConfigureRuntime(start);
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("RECEIPT_POST_STOCK=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertPostedReceiptAsync();
+        });
+    }
+
     [GuiPackageFact]
     public async Task Unavailable_sql_startup_is_safe_owned_and_drains_under_native_uia()
     {

@@ -179,6 +179,30 @@ internal sealed class GuiSqlEnvironment : IDisposable
         Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
     }
 
+    public async Task AssertPostedReceiptAsync()
+    {
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.GoodsReceipts r JOIN dbo.Warehouses w ON w.WarehouseId=r.WarehouseId " +
+            "JOIN dbo.Employees e ON e.EmployeeId=r.EmployeeId JOIN dbo.Users u ON u.UserId=r.PostedByUserId " +
+            "WHERE r.Status=N'Posted' AND r.Note=N'GUI edited' AND w.Code=N'GUI-WH' AND e.Code=N'GUI-EMP' " +
+            "AND u.NormalizedUsername=N'GUI.P5.OWNER' AND r.PostedAtUtc IS NOT NULL;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.GoodsReceiptLines l JOIN dbo.Products p ON p.ProductId=l.ProductId " +
+            "WHERE p.Code=N'GUI-PROD' AND l.Quantity=3.125 AND l.UnitCost=4;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.StockLedger;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.StockLedger s JOIN dbo.GoodsReceiptLines l ON l.ReceiptLineId=s.DocumentLineId " +
+            "JOIN dbo.GoodsReceipts r ON r.ReceiptId=l.ReceiptId WHERE s.DocumentType=N'GoodsReceipt' " +
+            "AND s.DocumentId=r.ReceiptId AND s.ProductId=l.ProductId AND s.WarehouseId=r.WarehouseId " +
+            "AND s.QuantityChange=3.125 AND s.PostedByUserId=r.PostedByUserId;"));
+        Assert.Equal(3.125m, await ScalarAsync<decimal>(_oracle, "SELECT SUM(Quantity) FROM dbo.StockBalances;"));
+        Assert.Equal(0, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM (SELECT WarehouseId,ProductId,SUM(QuantityChange) Quantity FROM dbo.StockLedger " +
+            "GROUP BY WarehouseId,ProductId) l FULL JOIN dbo.StockBalances b " +
+            "ON b.WarehouseId=l.WarehouseId AND b.ProductId=l.ProductId WHERE ISNULL(l.Quantity,0)<>ISNULL(b.Quantity,0);"));
+    }
+
     public async Task DisposeAsync()
     {
         if (_disposed) return;

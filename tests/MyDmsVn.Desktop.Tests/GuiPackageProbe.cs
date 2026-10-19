@@ -44,6 +44,16 @@ internal static class GuiPackageProbe
                     throw new InvalidOperationException("Startup application did not exit safely.");
                 Console.WriteLine("STARTUP_SAFE_ERROR=PASS");
             }
+            else if (args[1] == "inventory-audit")
+            {
+                var shell = Login();
+                Catalog(shell, "Products", "GUI-PROD", "UIA Product", new[] { "Unit" }, new[] { "pcs" });
+                Catalog(shell, "Warehouses", "GUI-WH", "UIA Warehouse", new[] { "Address" }, new[] { "GUI address" });
+                Catalog(shell, "Employees", "GUI-EMP", "UIA Employee", new[] { "Phone" }, new[] { "0900123456" });
+                Receipt(shell);
+                CloseApplication(shell);
+                Console.WriteLine("RECEIPT_POST_STOCK=PASS");
+            }
             else if (args[1] == "catalog-audit")
             {
                 var shell = Login();
@@ -149,6 +159,61 @@ internal static class GuiPackageProbe
         return shell;
     }
 
+    private static void Receipt(AutomationElement shell)
+    {
+        _stage = "receipt-draft";
+        Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+        var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+        Dump(page);
+        SetInput(page, "Warehouse", "GUI-WH - UIA Warehouse Updated", false);
+        SetInput(page, "Employee", "GUI-EMP - UIA Employee Updated", false);
+        SetInput(page, "Note", "GUI draft", false);
+        Invoke(Find(page, "Add line", ControlType.Button, false));
+        SetInput(page, "Product", "GUI-PROD - UIA Product Updated", false);
+        SetInput(page, "Quantity", 2.5m.ToString("F4"), false);
+        SetInput(page, "Unit cost", 4m.ToString("F4"), false);
+        InputEditor(page, "Note").SetFocus();
+        Invoke(Find(page, "Save", ControlType.Button, false));
+        var results = Find(page, "Goods receipt results", ControlType.Table, false);
+        AutomationElement open = null;
+        Wait(delegate
+        {
+            var buttons = results.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button));
+            foreach (AutomationElement button in buttons)
+                if (button.Current.Name.StartsWith("Open ", StringComparison.Ordinal))
+                {
+                    if (open != null && !Automation.Compare(open, button)) throw new InvalidOperationException("Ambiguous receipt.");
+                    open = button;
+                }
+            return open != null;
+        }, "Saved receipt row unavailable.");
+        var receiptAction = open.Current.Name;
+        Invoke(Find(page, "New", ControlType.Button, false));
+        Invoke(Find(results, receiptAction, ControlType.Button, false));
+        Wait(delegate { return InputValue(page, "Note") == "GUI draft"; }, "Saved draft did not reload.");
+        _stage = "receipt-edit";
+        SetInput(page, "Note", "GUI edited", false);
+        Invoke(Find(page, "Open GUI-PROD - UIA Product Updated", ControlType.Button, false));
+        SetInput(page, "Quantity", 3.125m.ToString("F4"), false);
+        InputEditor(page, "Note").SetFocus();
+        Invoke(Find(page, "Save", ControlType.Button, false));
+        var post = Find(page, "Post", ControlType.Button, false);
+        Wait(delegate { return post.Current.IsEnabled; }, "Saved draft cannot be posted.");
+        _stage = "receipt-post";
+        Invoke(post);
+        Find(page, "Posted", ControlType.Text, false);
+        Wait(delegate { return !post.Current.IsEnabled; }, "Posted receipt still permits Post.");
+        Console.WriteLine("POST_BUTTON_DUPLICATE_DISABLED=PASS");
+        _stage = "stock-balance";
+        Invoke(Find(shell, "Tồn kho", ControlType.Button, false));
+        var balance = Find(shell, "Tồn kho", ControlType.TabItem, false);
+        SetInput(balance, "Search stock balances", "GUI-PROD", false);
+        Invoke(Find(balance, "Refresh", ControlType.Button, false));
+        Dump(balance);
+        Find(balance, 3.125m.ToString("F4"), ControlType.Text, false);
+        Console.WriteLine("STOCK_BALANCE_TOTAL=PASS");
+    }
+
     private static void CloseApplication(AutomationElement shell)
     {
         ((WindowPattern)shell.GetCurrentPattern(WindowPattern.Pattern)).Close();
@@ -163,6 +228,7 @@ internal static class GuiPackageProbe
             new PropertyCondition(AutomationElement.NameProperty, name));
         if (editor.Current.IsPassword != password) throw new InvalidOperationException("Input accessibility semantics missing.");
         Wait(delegate { return editor.Current.IsEnabled; }, "Input disabled.");
+        editor.SetFocus();
         ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
         if (password)
         {
