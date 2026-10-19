@@ -2,7 +2,7 @@
 
 **Task:** GUI-P5-T00, [acceptance plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md). **Recorded:** 2026-10-19 (Asia/Bangkok), Codex; Project Owner approved the Minimal Disposable Test Topology and T00 scope in this chat on the same date. **Executable source:** `f275183c8b39dc2b712dc37be7f0f4ac71396357` on `v1a`, isolated implementation branch `codex/gui-p5-t00`; initial inventory/evidence commit `7cfefd4`. Documentation changes do not change the executable candidate.
 
-**Status: GUI-P5-T00 COMPLETE — reviewed inventory, owner-approved topology and explicit execution prerequisites. Packaged execution readiness remains BLOCKED / NOT TESTED as detailed below.** T00 completes reconciliation/planning, not environment certification. The source inventory and focused baseline below are evidence only for their stated scope. T01–T06, both attended P5 IDs, REL G1–G5 and production readiness remain OPEN. No package was built or installed in T00; no package hash or real-login result is available.
+**Status: GUI-P5-T00 COMPLETE — reviewed inventory, owner-approved topology and explicit execution prerequisites. Packaged execution readiness remains BLOCKED / NOT TESTED as detailed below.** T00 completes reconciliation/planning, not environment certification. The source inventory and focused baseline below are evidence only for their stated scope. T02–T06, both attended P5 IDs, REL G1–G5 and production readiness remain OPEN. No package was built or installed in T00; no package hash or real-login result is available.
 
 ## 1. How to use this ledger
 
@@ -55,8 +55,8 @@ The existing automated column identifies concrete evidence anchors, not exhausti
 | R3 Read/Write/Post-only, direct Deny/revoked/disabled/no mutation | D `GoodsReceiptControlTests.Forbidden_refresh_clears_visible_receipt_data`, `Reactivation_after_access_revocation_clears_visible_receipt_data`, `Write_only_create_clears_sensitive_detail_and_locks_save_after_commit`; D `PermissionActionBinderTests.Delayed_permission_result_cannot_reenable_an_action_after_sign_out` | T02: control matrix for Read/Write/Post combinations, direct Deny, disabled account and pending completion; hiding buttons is insufficient | T03 SQL-backed deliberate grants/deny/disabled state; T05 per-actor steps | Inventory `GoodsReceiptCommandIntegrationTests.Post_only_user_cannot_read_or_write_and_leaves_the_aggregate_unchanged`, `Stale_or_denied_post_leaves_status_ledger_and_balances_unchanged`, `Inactive_reference_and_explicit_write_deny_leave_receipt_tables_empty` |
 | I1 Balance/Card filters/order/page/date/zero/empty/history/busy/errors | D `InventoryControlTests.Balance_control_renders_history_totals_and_runs_explicit_filters_immediately`, `Stock_card_control_filters_without_debounce_and_reports_errors_without_dialogs`, `Stock_card_control_applies_dates_chosen_before_ids_in_first_query`; S `InventoryViewModelTests.Balance_does_not_total_quantities_without_a_single_product_filter`, `Stock_card_selection_date_and_refresh_are_immediate_and_discard_late_responses` | T02: real controls page/order/busy/revocation/stale callbacks and historical references; verify date boundaries independent of display labels | T03 package balance/card + SQL oracle; T05 totals and movement order | Inventory `InventoryQueryIntegrationTests.Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history`, `Stock_card_query_preserves_datetime2_boundaries`; independent ledger aggregation/reconciliation |
 | S1 Security administration, protected superuser/roles/direct decisions/import revisions | D `SecurityAdministrationFormTests.Administration_control_loads_and_disposes_on_serialized_sta_without_modal_errors`, `Security_workspace_is_session_scoped_and_closes_on_sign_out`; S `SecurityAdministrationViewModelTests.Bound_protected_account_cannot_be_edited_from_the_view_model`, `Revision_conflict_is_reported_and_refreshes_the_current_assignment_without_retrying`; S `PermissionImportViewModelTests.Selection_change_invalidates_preview_before_apply` | T02: real-control protected-target/read/manage permissions, import Preview/Apply stale-revision/error binding, session revocation; two existing control tests only load/dispose/session-scope | T03 deliberate identities + stale preview/direct Deny; T04/T05 relevant permission flows | Security `SecurityAdministrationSqlTests.Permission_import_rejects_stale_catalog_revision_conflicts_and_audit_failure`, `Permission_import_rechecks_actor_permission_after_preview`, `Administration_is_revisioned_audited_and_preserves_direct_decision_precedence`, `Missing_targets_and_bound_superuser_lifecycle_changes_are_rejected` |
-| F1 Errors/async after close/disposal/ThreadException/DataError/fatal hang | D `WinFormsTestInfrastructureTests` (all eight Appendix A methods); D `ProductionDiagnosticsTests.Redactor_removes_credentials_and_nested_sql_exception_details`; D `CatalogControlTests.Disposing_control_disposes_view_model_and_prevents_delayed_work`; D `GoodsReceiptEditorViewModelTests.Dispose_ignores_a_late_detail_refresh_response` | T01: regression for close/async/reporting + bounded noncooperative/fatal owned subprocess, kill/drain descendants, stop after cleanup failure. `StaTest` cancels then waits 5s; it cannot kill hung STA | T03 startup/SQL failure, unexpected modal + bounded teardown; T04/T05 safe error UX | No DB reset until all workers/connections drain; timeout/uncertain ownership quarantines allocation |
-| F2 Packaging/composition/schema/x86 | D `ReleasePackagingTests.Manifest_only_mode_hashes_active_desktop_and_separate_admin_package`, `Packages_without_runtime_schema_policy_are_rejected`, two rows of `Desktop_packages_reject_admin_tools_and_embedded_secrets`; D `DesktopCompositionTests.WinForms_composition_resolves_goods_receipt_factory_and_shell`; D `DesktopHostRunnerTests.Smoke_mode_creates_and_renders_login_without_bypassing_authentication` | T01: fix unbounded PowerShell child wait/drain in `ReleasePackagingTests`; T03: actual published x86 Login-first host; manifest fixtures/smoke form creation do not establish real authentication | T03 frozen clean publish + manifest/hash; REL owns clean install/recovery and support matrix | Migrations/Security owners supply exact schema001–009 and runtime principal preflight; no prefix auto-upgrade |
+| F1 Errors/async after close/disposal/ThreadException/DataError/fatal hang | D `WinFormsTestInfrastructureTests` (all eight Appendix A methods); D `ProductionDiagnosticsTests.Redactor_removes_credentials_and_nested_sql_exception_details`; D `CatalogControlTests.Disposing_control_disposes_view_model_and_prevents_delayed_work`; D `GoodsReceiptEditorViewModelTests.Dispose_ignores_a_late_detail_refresh_response` | T01 COMPLETE: close/async/reporting + owned noncooperative/modal/fatal subprocess, verified descendant/pipe drain, fail-stop admission on uncertain cleanup ([evidence](GUI_P5_VERIFICATION.md)). T02 owns remaining control-specific disposal/callback gaps. `StaTest` cancels then waits 5s; it cannot kill hung STA | T03 startup/SQL failure, unexpected modal + bounded teardown; T04/T05 safe error UX | No DB reset until all workers/connections drain; timeout/uncertain ownership quarantines allocation |
+| F2 Packaging/composition/schema/x86 | D `ReleasePackagingTests.Manifest_only_mode_hashes_active_desktop_and_separate_admin_package`, `Packages_without_runtime_schema_policy_are_rejected`, two rows of `Desktop_packages_reject_admin_tools_and_embedded_secrets`; D `DesktopCompositionTests.WinForms_composition_resolves_goods_receipt_factory_and_shell`; D `DesktopHostRunnerTests.Smoke_mode_creates_and_renders_login_without_bypassing_authentication` | T01 COMPLETE: packaging now uses bounded job-owned PowerShell/tree/pipe drain ([evidence](GUI_P5_VERIFICATION.md)); T03: actual published x86 Login-first host; manifest fixtures/smoke form creation do not establish real authentication | T03 frozen clean publish + manifest/hash; REL owns clean install/recovery and support matrix | Migrations/Security owners supply exact schema001–009 and runtime principal preflight; no prefix auto-upgrade |
 | U1 Theme/accessibility/keyboard/DPI | D `UiDependencyCompatibilityTests.Bootstrap_source_grid_tracks_runtime_theme_changes`; D `FoundationShellFormTests.ToggleTheme_switches_between_light_and_dark`; D `CatalogControlTests.Enter_selects_the_active_catalog_row`; Login tests above | T02: keyboard/focus/tab/read-only/error semantics for all workspaces and stable accessible selectors; T03 runtime UIA tree/pattern checks | T03 DPI/theme automation; T04/T05 attended clipping/readability/focus. Visual usability remains attended, mandatory automation stays mandatory | No backend substitute for visual/focus behavior; T06 reconciles each declared environment |
 
 ### Source/plan reconciliation
@@ -145,7 +145,7 @@ Required T01/T03 resource lifecycle:
 | Current discovery + smallest safe baseline | 139 discovered; selected 10 / passed 10; remaining 129 NOT RUN |
 | Reviewed matrix | Independent Codex review of initial inventory 2026-10-19: no important findings; 138 source anchors, named methods and 10/10 TRX checked. Owner subsequently supplied explicit Minimal Disposable Test Topology approval. Independent follow-up review on 2026-10-19 found no important issues: T00 criteria/status, approved scope, metadata versus runtime evidence and T03 prefix prerequisite are consistent |
 | Approved topology/limited-identity design | COMPLETE for T00: Project Owner decision pinned in section 6, including shared-instance approval condition, secure credential boundaries and cleanup. Actual instance/principals/provisioning and packaged execution remain BLOCKED / NOT TESTED as itemized there |
-| T01 | Bound packaging child wait and fatal/hang cleanup before unattended package tests |
+| T01 | COMPLETE: [bounded reliability evidence](GUI_P5_VERIFICATION.md); final Desktop153/153 and Session108/108 on x86. T02–T06 remain OPEN |
 | T02 | Fill named control/VM gaps; retain independent backend semantics |
 | T03 | Validate native UIA selectors/patterns/x86, actual Login and SQL oracles on approved topology |
 | T04/T05/T06 | Attended P5 + frozen unfiltered GUI/Session and cleanup evidence, all OPEN |
@@ -158,9 +158,9 @@ Required T01/T03 resource lifecycle:
 | Reviewed coverage matrix with exact executable owners/gaps, proposed Windows/DPI/SQL and native automation approach | Sections 3–5; source-linked methods, task owners, selector limitations; no external library adopted, hence external-library spike condition not triggered. Actual native packaged UIA remains T03. **COMPLETE** |
 | Pin approved disposable topology, least-privilege identity design, secure credential handling/cleanup and supported/not-tested distinction | Owner decision and section 6 pin all requested boundaries; verified metadata and unprovisioned components have separate outcomes and executable prerequisite owners. **COMPLETE for T00**, without provisioning/runtime PASS |
 
-**T00 exit met:** reviewed coverage matrix, owner-approved Minimal Disposable Test Topology and explicit prerequisites are recorded. The owner's follow-up explicitly allows unprovisioned infrastructure to be recorded as remaining steps rather than a coverage-inventory failure. T00 completion does not certify environment readiness, actual least privilege, packaged E2E, either P5 walkthrough or P6 release support. Next task is T01; prerequisite/resource preparation may proceed within the recorded approval conditions.
+**T00 exit met:** reviewed coverage matrix, owner-approved Minimal Disposable Test Topology and explicit prerequisites are recorded. The owner's follow-up explicitly allows unprovisioned infrastructure to be recorded as remaining steps rather than a coverage-inventory failure. T00 completion does not certify environment readiness, actual least privilege, packaged E2E, either P5 walkthrough or P6 release support. At the T00 handoff the next task was T01. T01 is now complete in its [bounded reliability scope](GUI_P5_VERIFICATION.md); next is T02, with T03 provisioning still subject to section 6 conditions.
 
-## Appendix A. Complete Desktop test method inventory
+## Appendix A. Frozen T00 Desktop test method inventory
 
 Inventory below is derived from checked-in `[Fact]`/`[Theory]` declarations, reconciled with actual VSTest discovery. All are in namespace `MyDmsVn.Desktop.Tests`. `Fact` = one invocation; only `ReleasePackagingTests.Desktop_packages_reject_admin_tools_and_embedded_secrets` is a Theory (two rows). Its row labels below identify the input class without reproducing the dummy connection string. Helpers without test attributes are excluded. A method marked `PASS` was selected in the focused T00 TRX; `NOT RUN` means unselected, not skipped.
 
@@ -168,218 +168,237 @@ Inventory below is derived from checked-in `[Fact]`/`[Theory]` declarations, rec
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Catalog_control_renders_active_state_and_keeps_compact_keyboard_layout`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L18) | Fact / 1 | NOT RUN |
-| [`Catalog_control_pages_beyond_the_first_twenty_five_rows`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L52) | Fact / 1 | NOT RUN |
-| [`Canceled_activation_does_not_start_a_catalog_query`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L84) | Fact / 1 | NOT RUN |
-| [`Save_button_forwards_editor_values_and_shows_field_errors_without_modal_dialogs`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L105) | Fact / 1 | NOT RUN |
-| [`Editor_fields_are_disabled_while_a_save_is_in_flight`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L144) | Fact / 1 | NOT RUN |
-| [`Editor_fields_are_disabled_while_a_row_selection_is_in_flight`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L175) | Fact / 1 | NOT RUN |
-| [`Enter_selects_the_active_catalog_row`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L212) | Fact / 1 | NOT RUN |
-| [`All_catalog_list_cells_are_read_only`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L239) | Fact / 1 | NOT RUN |
-| [`Enter_uses_the_immutable_row_id_instead_of_the_visible_cell_value`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L271) | Fact / 1 | NOT RUN |
-| [`Enter_does_not_select_a_row_while_the_active_cell_is_editing`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L300) | Fact / 1 | NOT RUN |
-| [`Background_view_model_updates_are_marshaled_to_the_control_thread`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L336) | Fact / 1 | NOT RUN |
-| [`Disposing_control_disposes_view_model_and_prevents_delayed_work`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L362) | Fact / 1 | NOT RUN |
-| [`Shell_reuses_catalog_tab_and_disposes_catalog_controls_on_sign_out`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L380) | Fact / 1 | NOT RUN |
-| [`Reopening_existing_catalog_tab_refreshes_authoritative_data_without_new_control`](../tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L412) | Fact / 1 | NOT RUN |
+| [`Catalog_control_renders_active_state_and_keeps_compact_keyboard_layout`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L18) | Fact / 1 | NOT RUN |
+| [`Catalog_control_pages_beyond_the_first_twenty_five_rows`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L52) | Fact / 1 | NOT RUN |
+| [`Canceled_activation_does_not_start_a_catalog_query`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L84) | Fact / 1 | NOT RUN |
+| [`Save_button_forwards_editor_values_and_shows_field_errors_without_modal_dialogs`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L105) | Fact / 1 | NOT RUN |
+| [`Editor_fields_are_disabled_while_a_save_is_in_flight`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L144) | Fact / 1 | NOT RUN |
+| [`Editor_fields_are_disabled_while_a_row_selection_is_in_flight`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L175) | Fact / 1 | NOT RUN |
+| [`Enter_selects_the_active_catalog_row`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L212) | Fact / 1 | NOT RUN |
+| [`All_catalog_list_cells_are_read_only`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L239) | Fact / 1 | NOT RUN |
+| [`Enter_uses_the_immutable_row_id_instead_of_the_visible_cell_value`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L271) | Fact / 1 | NOT RUN |
+| [`Enter_does_not_select_a_row_while_the_active_cell_is_editing`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L300) | Fact / 1 | NOT RUN |
+| [`Background_view_model_updates_are_marshaled_to_the_control_thread`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L336) | Fact / 1 | NOT RUN |
+| [`Disposing_control_disposes_view_model_and_prevents_delayed_work`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L362) | Fact / 1 | NOT RUN |
+| [`Shell_reuses_catalog_tab_and_disposes_catalog_controls_on_sign_out`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L380) | Fact / 1 | NOT RUN |
+| [`Reopening_existing_catalog_tab_refreshes_authoritative_data_without_new_control`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs#L412) | Fact / 1 | NOT RUN |
 
 ### DesktopCompositionTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Local_desktop_services_use_one_shared_weak_reference_messenger`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L26) | Fact / 1 | NOT RUN |
-| [`Local_desktop_services_resolve_api_without_database_configuration`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L43) | Fact / 1 | NOT RUN |
-| [`Local_api_returns_validation_failure_as_api_response`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L65) | Fact / 1 | NOT RUN |
-| [`Local_api_honors_pre_canceled_request`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L91) | Fact / 1 | NOT RUN |
-| [`Local_api_maps_handler_exceptions_and_reports_diagnostics`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L115) | Fact / 1 | NOT RUN |
-| [`Local_catalog_clients_are_registered_and_map_application_errors_to_api_responses`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L144) | Fact / 1 | NOT RUN |
-| [`Local_catalog_validation_fields_are_relative_to_public_request_dtos`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L169) | Fact / 1 | NOT RUN |
-| [`WinForms_composition_resolves_goods_receipt_factory_and_shell`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L205) | Fact / 1 | NOT RUN |
-| [`WinForms_composition_resolves_inventory_factory_and_controls`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L229) | Fact / 1 | NOT RUN |
-| [`In_flight_catalog_mutation_keeps_authorized_actor_after_local_sign_out`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L254) | Fact / 1 | NOT RUN |
-| [`Stale_login_error_keeps_request_correlation_and_cleans_up_scope`](../tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L299) | Fact / 1 | NOT RUN |
+| [`Local_desktop_services_use_one_shared_weak_reference_messenger`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L26) | Fact / 1 | NOT RUN |
+| [`Local_desktop_services_resolve_api_without_database_configuration`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L43) | Fact / 1 | NOT RUN |
+| [`Local_api_returns_validation_failure_as_api_response`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L65) | Fact / 1 | NOT RUN |
+| [`Local_api_honors_pre_canceled_request`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L91) | Fact / 1 | NOT RUN |
+| [`Local_api_maps_handler_exceptions_and_reports_diagnostics`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L115) | Fact / 1 | NOT RUN |
+| [`Local_catalog_clients_are_registered_and_map_application_errors_to_api_responses`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L144) | Fact / 1 | NOT RUN |
+| [`Local_catalog_validation_fields_are_relative_to_public_request_dtos`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L169) | Fact / 1 | NOT RUN |
+| [`WinForms_composition_resolves_goods_receipt_factory_and_shell`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L205) | Fact / 1 | NOT RUN |
+| [`WinForms_composition_resolves_inventory_factory_and_controls`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L229) | Fact / 1 | NOT RUN |
+| [`In_flight_catalog_mutation_keeps_authorized_actor_after_local_sign_out`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L254) | Fact / 1 | NOT RUN |
+| [`Stale_login_error_keeps_request_correlation_and_cleans_up_scope`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopCompositionTests.cs#L299) | Fact / 1 | NOT RUN |
 
 ### DesktopHostRunnerTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Smoke_mode_creates_and_renders_login_without_bypassing_authentication`](../tests/MyDmsVn.Desktop.Tests/DesktopHostRunnerTests.cs#L11) | Fact / 1 | NOT RUN |
-| [`Production_smoke_resolves_login_inside_a_disposed_scope`](../tests/MyDmsVn.Desktop.Tests/DesktopHostRunnerTests.cs#L50) | Fact / 1 | NOT RUN |
+| [`Smoke_mode_creates_and_renders_login_without_bypassing_authentication`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopHostRunnerTests.cs#L11) | Fact / 1 | NOT RUN |
+| [`Production_smoke_resolves_login_inside_a_disposed_scope`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/DesktopHostRunnerTests.cs#L50) | Fact / 1 | NOT RUN |
 
 ### FoundationShellFormTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Shell_exposes_navigation_workspace_and_session_status`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L16) | Fact / 1 | NOT RUN |
-| [`OpenWorkspace_reuses_existing_document_for_the_same_key`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L34) | Fact / 1 | NOT RUN |
-| [`Inventory_navigation_opens_and_reuses_balance_and_stock_card_workspaces`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L64) | Fact / 1 | NOT RUN |
-| [`ToggleTheme_switches_between_light_and_dark`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L108) | Fact / 1 | NOT RUN |
-| [`Shell_reflects_shared_session_and_notification_changes`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L136) | Fact / 1 | NOT RUN |
-| [`Sign_out_and_session_expiry_clear_the_session_with_explicit_status`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L163) | Fact / 1 | NOT RUN |
-| [`Changing_authenticated_user_closes_the_previous_users_workspace`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L216) | Fact / 1 | NOT RUN |
-| [`OpenWorkspace_rejects_content_after_sign_out`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L246) | Fact / 1 | NOT RUN |
-| [`OpenWorkspace_rejects_a_stale_request_after_another_user_signs_in`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L277) | Fact / 1 | NOT RUN |
-| [`Shell_binding_tracks_async_command_busy_and_ready_state`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L309) | Fact / 1 | NOT RUN |
-| [`Session_and_notification_updates_are_marshaled_to_the_shell_thread`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L335) | Fact / 1 | NOT RUN |
-| [`Session_change_before_handle_creation_is_reconciled_when_handle_is_created`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L384) | Fact / 1 | NOT RUN |
-| [`Ready_view_model_state_before_handle_creation_is_reconciled`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L420) | Fact / 1 | NOT RUN |
-| [`Busy_view_model_state_before_handle_creation_is_reconciled`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L448) | Fact / 1 | NOT RUN |
-| [`Notification_before_handle_creation_is_reconciled`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L481) | Fact / 1 | NOT RUN |
-| [`Goods_receipt_navigation_reuses_one_workspace_and_sign_out_disposes_it`](../tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L510) | Fact / 1 | NOT RUN |
+| [`Shell_exposes_navigation_workspace_and_session_status`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L16) | Fact / 1 | NOT RUN |
+| [`OpenWorkspace_reuses_existing_document_for_the_same_key`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L34) | Fact / 1 | NOT RUN |
+| [`Inventory_navigation_opens_and_reuses_balance_and_stock_card_workspaces`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L64) | Fact / 1 | NOT RUN |
+| [`ToggleTheme_switches_between_light_and_dark`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L108) | Fact / 1 | NOT RUN |
+| [`Shell_reflects_shared_session_and_notification_changes`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L136) | Fact / 1 | NOT RUN |
+| [`Sign_out_and_session_expiry_clear_the_session_with_explicit_status`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L163) | Fact / 1 | NOT RUN |
+| [`Changing_authenticated_user_closes_the_previous_users_workspace`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L216) | Fact / 1 | NOT RUN |
+| [`OpenWorkspace_rejects_content_after_sign_out`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L246) | Fact / 1 | NOT RUN |
+| [`OpenWorkspace_rejects_a_stale_request_after_another_user_signs_in`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L277) | Fact / 1 | NOT RUN |
+| [`Shell_binding_tracks_async_command_busy_and_ready_state`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L309) | Fact / 1 | NOT RUN |
+| [`Session_and_notification_updates_are_marshaled_to_the_shell_thread`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L335) | Fact / 1 | NOT RUN |
+| [`Session_change_before_handle_creation_is_reconciled_when_handle_is_created`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L384) | Fact / 1 | NOT RUN |
+| [`Ready_view_model_state_before_handle_creation_is_reconciled`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L420) | Fact / 1 | NOT RUN |
+| [`Busy_view_model_state_before_handle_creation_is_reconciled`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L448) | Fact / 1 | NOT RUN |
+| [`Notification_before_handle_creation_is_reconciled`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L481) | Fact / 1 | NOT RUN |
+| [`Goods_receipt_navigation_reuses_one_workspace_and_sign_out_disposes_it`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/FoundationShellFormTests.cs#L510) | Fact / 1 | NOT RUN |
 
 ### GoodsReceiptControlTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Activation_and_selection_render_master_detail_lookups_total_and_read_only_state`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L17) | Fact / 1 | NOT RUN |
-| [`Draft_post_button_posts_current_version_and_locks_the_editor`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L51) | Fact / 1 | NOT RUN |
-| [`Draft_commands_update_lines_and_validation_errors_stay_inline`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L85) | Fact / 1 | NOT RUN |
-| [`Draft_decimal_values_round_trip_at_the_contract_precision_and_range`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L115) | Fact / 1 | NOT RUN |
-| [`In_flight_activation_disables_commands_until_the_list_finishes`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L150) | Fact / 1 | NOT RUN |
-| [`Operation_errors_render_in_the_non_modal_status_area`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L176) | Fact / 1 | NOT RUN |
-| [`Paging_and_explicit_filters_refresh_immediately`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L198) | Fact / 1 | NOT RUN |
-| [`Lookup_text_searches_the_server_side_catalog_sources`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L229) | Fact / 1 | NOT RUN |
-| [`Receipt_line_keeps_a_historical_product_selected_outside_the_active_page`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L257) | Fact / 1 | NOT RUN |
-| [`Failed_selection_does_not_reload_the_previous_receipt_into_a_new_editor`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L282) | Fact / 1 | NOT RUN |
-| [`Dirty_editor_blocks_selection_new_and_refresh_without_losing_input`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L309) | Fact / 1 | NOT RUN |
-| [`Forbidden_refresh_clears_visible_receipt_data`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L341) | Fact / 1 | NOT RUN |
-| [`Editing_a_line_after_save_updates_the_reloaded_line`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L370) | Fact / 1 | NOT RUN |
-| [`Canceled_post_save_refresh_still_refreshes_list_and_reports_saved`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L395) | Fact / 1 | NOT RUN |
-| [`Editing_a_line_after_refresh_updates_the_reloaded_line`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L437) | Fact / 1 | NOT RUN |
-| [`Detail_inputs_stay_disabled_during_the_entire_refresh`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L462) | Fact / 1 | NOT RUN |
-| [`Reactivation_after_access_revocation_clears_visible_receipt_data`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L493) | Fact / 1 | NOT RUN |
-| [`Write_only_create_clears_sensitive_detail_and_locks_save_after_commit`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L520) | Fact / 1 | NOT RUN |
-| [`Repeated_activation_refreshes_and_disposal_owns_both_view_models`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L564) | Fact / 1 | NOT RUN |
-| [`Open_catalog_controls_refresh_receipt_lookups_without_losing_selected_references`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L585) | Fact / 1 | NOT RUN |
+| [`Activation_and_selection_render_master_detail_lookups_total_and_read_only_state`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L17) | Fact / 1 | NOT RUN |
+| [`Draft_post_button_posts_current_version_and_locks_the_editor`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L51) | Fact / 1 | NOT RUN |
+| [`Draft_commands_update_lines_and_validation_errors_stay_inline`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L85) | Fact / 1 | NOT RUN |
+| [`Draft_decimal_values_round_trip_at_the_contract_precision_and_range`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L115) | Fact / 1 | NOT RUN |
+| [`In_flight_activation_disables_commands_until_the_list_finishes`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L150) | Fact / 1 | NOT RUN |
+| [`Operation_errors_render_in_the_non_modal_status_area`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L176) | Fact / 1 | NOT RUN |
+| [`Paging_and_explicit_filters_refresh_immediately`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L198) | Fact / 1 | NOT RUN |
+| [`Lookup_text_searches_the_server_side_catalog_sources`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L229) | Fact / 1 | NOT RUN |
+| [`Receipt_line_keeps_a_historical_product_selected_outside_the_active_page`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L257) | Fact / 1 | NOT RUN |
+| [`Failed_selection_does_not_reload_the_previous_receipt_into_a_new_editor`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L282) | Fact / 1 | NOT RUN |
+| [`Dirty_editor_blocks_selection_new_and_refresh_without_losing_input`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L309) | Fact / 1 | NOT RUN |
+| [`Forbidden_refresh_clears_visible_receipt_data`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L341) | Fact / 1 | NOT RUN |
+| [`Editing_a_line_after_save_updates_the_reloaded_line`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L370) | Fact / 1 | NOT RUN |
+| [`Canceled_post_save_refresh_still_refreshes_list_and_reports_saved`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L395) | Fact / 1 | NOT RUN |
+| [`Editing_a_line_after_refresh_updates_the_reloaded_line`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L437) | Fact / 1 | NOT RUN |
+| [`Detail_inputs_stay_disabled_during_the_entire_refresh`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L462) | Fact / 1 | NOT RUN |
+| [`Reactivation_after_access_revocation_clears_visible_receipt_data`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L493) | Fact / 1 | NOT RUN |
+| [`Write_only_create_clears_sensitive_detail_and_locks_save_after_commit`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L520) | Fact / 1 | NOT RUN |
+| [`Repeated_activation_refreshes_and_disposal_owns_both_view_models`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L564) | Fact / 1 | NOT RUN |
+| [`Open_catalog_controls_refresh_receipt_lookups_without_losing_selected_references`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptControlTests.cs#L585) | Fact / 1 | NOT RUN |
 
 ### GoodsReceiptEditorViewModelTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Create_sends_current_lines_then_refreshes_the_persisted_aggregate`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L17) | Fact / 1 | NOT RUN |
-| [`Post_uses_persisted_identity_and_version_then_refreshes_the_posted_receipt`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L47) | Fact / 1 | NOT RUN |
-| [`Update_reuses_opaque_version_and_conflict_preserves_user_input`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L78) | Fact / 1 | NOT RUN |
-| [`Concurrent_save_requests_issue_only_one_create_command`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L103) | Fact / 1 | NOT RUN |
-| [`Successful_create_keeps_identity_when_follow_up_refresh_fails`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L121) | Fact / 1 | NOT RUN |
-| [`Immediate_validation_blocks_missing_fields_and_posted_receipts_are_read_only`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L149) | Fact / 1 | NOT RUN |
-| [`Dirty_state_tracks_user_edits_and_resets_after_load_or_save`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L168) | Fact / 1 | NOT RUN |
-| [`Lookup_metadata_changes_do_not_dirty_a_posted_receipt`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L190) | Fact / 1 | NOT RUN |
-| [`Throwing_create_is_reported_inline_without_faulting_save`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L203) | Fact / 1 | NOT RUN |
-| [`Throwing_update_is_reported_inline_without_faulting_save`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L224) | Fact / 1 | NOT RUN |
-| [`Throwing_follow_up_get_preserves_successful_create_identity`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L246) | Fact / 1 | NOT RUN |
-| [`Throwing_detail_refresh_is_reported_inline_without_replacing_the_editor`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L269) | Fact / 1 | NOT RUN |
-| [`Delayed_refresh_applies_collection_mutations_on_the_owning_sta_thread`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L290) | Fact / 1 | NOT RUN |
-| [`Cancellation_after_create_response_reports_saved_without_refreshing_details`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L330) | Fact / 1 | NOT RUN |
-| [`Boundary_line_amount_overflow_is_safe_and_blocks_save`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L364) | Fact / 1 | NOT RUN |
-| [`Aggregate_overflow_across_safe_lines_is_safe_and_blocks_save`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L383) | Fact / 1 | NOT RUN |
-| [`Dispose_ignores_a_late_detail_refresh_response`](../tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L407) | Fact / 1 | NOT RUN |
+| [`Create_sends_current_lines_then_refreshes_the_persisted_aggregate`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L17) | Fact / 1 | NOT RUN |
+| [`Post_uses_persisted_identity_and_version_then_refreshes_the_posted_receipt`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L47) | Fact / 1 | NOT RUN |
+| [`Update_reuses_opaque_version_and_conflict_preserves_user_input`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L78) | Fact / 1 | NOT RUN |
+| [`Concurrent_save_requests_issue_only_one_create_command`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L103) | Fact / 1 | NOT RUN |
+| [`Successful_create_keeps_identity_when_follow_up_refresh_fails`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L121) | Fact / 1 | NOT RUN |
+| [`Immediate_validation_blocks_missing_fields_and_posted_receipts_are_read_only`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L149) | Fact / 1 | NOT RUN |
+| [`Dirty_state_tracks_user_edits_and_resets_after_load_or_save`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L168) | Fact / 1 | NOT RUN |
+| [`Lookup_metadata_changes_do_not_dirty_a_posted_receipt`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L190) | Fact / 1 | NOT RUN |
+| [`Throwing_create_is_reported_inline_without_faulting_save`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L203) | Fact / 1 | NOT RUN |
+| [`Throwing_update_is_reported_inline_without_faulting_save`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L224) | Fact / 1 | NOT RUN |
+| [`Throwing_follow_up_get_preserves_successful_create_identity`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L246) | Fact / 1 | NOT RUN |
+| [`Throwing_detail_refresh_is_reported_inline_without_replacing_the_editor`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L269) | Fact / 1 | NOT RUN |
+| [`Delayed_refresh_applies_collection_mutations_on_the_owning_sta_thread`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L290) | Fact / 1 | NOT RUN |
+| [`Cancellation_after_create_response_reports_saved_without_refreshing_details`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L330) | Fact / 1 | NOT RUN |
+| [`Boundary_line_amount_overflow_is_safe_and_blocks_save`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L364) | Fact / 1 | NOT RUN |
+| [`Aggregate_overflow_across_safe_lines_is_safe_and_blocks_save`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L383) | Fact / 1 | NOT RUN |
+| [`Dispose_ignores_a_late_detail_refresh_response`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/GoodsReceiptEditorViewModelTests.cs#L407) | Fact / 1 | NOT RUN |
 
 ### InventoryControlTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Balance_control_shows_empty_state_after_first_successful_zero_row_query`](../tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L15) | Fact / 1 | NOT RUN |
-| [`Stock_card_control_shows_empty_state_after_first_successful_zero_row_query`](../tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L39) | Fact / 1 | NOT RUN |
-| [`Balance_control_renders_history_totals_and_runs_explicit_filters_immediately`](../tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L64) | Fact / 1 | NOT RUN |
-| [`Stock_card_control_filters_without_debounce_and_reports_errors_without_dialogs`](../tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L104) | Fact / 1 | NOT RUN |
-| [`Stock_card_control_applies_dates_chosen_before_ids_in_first_query`](../tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L148) | Fact / 1 | NOT RUN |
+| [`Balance_control_shows_empty_state_after_first_successful_zero_row_query`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L15) | Fact / 1 | NOT RUN |
+| [`Stock_card_control_shows_empty_state_after_first_successful_zero_row_query`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L39) | Fact / 1 | NOT RUN |
+| [`Balance_control_renders_history_totals_and_runs_explicit_filters_immediately`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L64) | Fact / 1 | NOT RUN |
+| [`Stock_card_control_filters_without_debounce_and_reports_errors_without_dialogs`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L104) | Fact / 1 | NOT RUN |
+| [`Stock_card_control_applies_dates_chosen_before_ids_in_first_query`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/InventoryControlTests.cs#L148) | Fact / 1 | NOT RUN |
 
 ### LocalIdentityApiClientTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Successful_login_updates_the_shared_local_session_and_current_user_query`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L23) | Fact / 1 | NOT RUN |
-| [`Signing_out_clears_the_server_current_user_for_subsequent_requests`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L44) | Fact / 1 | NOT RUN |
-| [`Login_while_authenticated_is_rejected_without_replacing_the_current_user`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L64) | Fact / 1 | NOT RUN |
-| [`Login_result_does_not_create_a_session_when_sql_account_validation_rejects_it`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L87) | Fact / 1 | NOT RUN |
-| [`Disabled_account_revalidation_clears_the_desktop_session`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L112) | Fact / 1 | NOT RUN |
-| [`Sql_validation_failure_is_not_reported_as_bad_credentials`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L139) | Fact / 1 | NOT RUN |
-| [`Sql_failure_during_credential_lookup_is_reported_as_database_unavailable`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L160) | Fact / 1 | NOT RUN |
-| [`Late_account_validation_from_user_a_cannot_expire_user_b_session`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L182) | Fact / 1 | NOT RUN |
-| [`Late_current_user_validation_from_user_a_cannot_sign_out_user_b`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L219) | Fact / 1 | NOT RUN |
-| [`Request_waiting_for_account_validation_is_rejected_after_session_switch`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L255) | Fact / 1 | NOT RUN |
-| [`Late_validation_from_old_login_attempt_cannot_clear_new_session`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L296) | Fact / 1 | NOT RUN |
-| [`Signing_out_invalidates_a_login_that_is_still_in_flight`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L329) | Fact / 1 | NOT RUN |
-| [`Concurrent_login_attempts_allow_only_the_latest_attempt_to_publish_session`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L360) | Fact / 1 | NOT RUN |
-| [`Parallel_local_requests_keep_the_actor_captured_for_each_session`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L398) | Fact / 1 | NOT RUN |
-| [`Canceled_login_cannot_establish_a_session_when_the_handler_ignores_cancellation`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L440) | Fact / 1 | NOT RUN |
-| [`Canceled_login_cannot_establish_a_session_when_account_validation_ignores_cancellation`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L469) | Fact / 1 | NOT RUN |
-| [`Canceled_login_cleans_up_when_account_validation_observes_cancellation`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L500) | Fact / 1 | NOT RUN |
-| [`Explicit_logout_then_pending_login_invalidates_the_old_principals_desktop_requests`](../tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L530) | Fact / 1 | NOT RUN |
+| [`Successful_login_updates_the_shared_local_session_and_current_user_query`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L23) | Fact / 1 | NOT RUN |
+| [`Signing_out_clears_the_server_current_user_for_subsequent_requests`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L44) | Fact / 1 | NOT RUN |
+| [`Login_while_authenticated_is_rejected_without_replacing_the_current_user`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L64) | Fact / 1 | NOT RUN |
+| [`Login_result_does_not_create_a_session_when_sql_account_validation_rejects_it`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L87) | Fact / 1 | NOT RUN |
+| [`Disabled_account_revalidation_clears_the_desktop_session`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L112) | Fact / 1 | NOT RUN |
+| [`Sql_validation_failure_is_not_reported_as_bad_credentials`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L139) | Fact / 1 | NOT RUN |
+| [`Sql_failure_during_credential_lookup_is_reported_as_database_unavailable`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L160) | Fact / 1 | NOT RUN |
+| [`Late_account_validation_from_user_a_cannot_expire_user_b_session`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L182) | Fact / 1 | NOT RUN |
+| [`Late_current_user_validation_from_user_a_cannot_sign_out_user_b`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L219) | Fact / 1 | NOT RUN |
+| [`Request_waiting_for_account_validation_is_rejected_after_session_switch`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L255) | Fact / 1 | NOT RUN |
+| [`Late_validation_from_old_login_attempt_cannot_clear_new_session`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L296) | Fact / 1 | NOT RUN |
+| [`Signing_out_invalidates_a_login_that_is_still_in_flight`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L329) | Fact / 1 | NOT RUN |
+| [`Concurrent_login_attempts_allow_only_the_latest_attempt_to_publish_session`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L360) | Fact / 1 | NOT RUN |
+| [`Parallel_local_requests_keep_the_actor_captured_for_each_session`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L398) | Fact / 1 | NOT RUN |
+| [`Canceled_login_cannot_establish_a_session_when_the_handler_ignores_cancellation`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L440) | Fact / 1 | NOT RUN |
+| [`Canceled_login_cannot_establish_a_session_when_account_validation_ignores_cancellation`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L469) | Fact / 1 | NOT RUN |
+| [`Canceled_login_cleans_up_when_account_validation_observes_cancellation`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L500) | Fact / 1 | NOT RUN |
+| [`Explicit_logout_then_pending_login_invalidates_the_old_principals_desktop_requests`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LocalIdentityApiClientTests.cs#L530) | Fact / 1 | NOT RUN |
 
 ### LoginFormTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Login_form_is_compact_keyboard_accessible_and_masks_password`](../tests/MyDmsVn.Desktop.Tests/LoginFormTests.cs#L18) | Fact / 1 | PASS |
-| [`Login_form_renders_after_theme_change_and_disposes_without_ui_exceptions`](../tests/MyDmsVn.Desktop.Tests/LoginFormTests.cs#L49) | Fact / 1 | PASS |
+| [`Login_form_is_compact_keyboard_accessible_and_masks_password`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LoginFormTests.cs#L18) | Fact / 1 | PASS |
+| [`Login_form_renders_after_theme_change_and_disposes_without_ui_exceptions`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/LoginFormTests.cs#L49) | Fact / 1 | PASS |
 
 ### MasterDetailPrototypeControlTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`SetRows_projects_master_rows_into_the_source_grid`](../tests/MyDmsVn.Desktop.Tests/MasterDetailPrototypeControlTests.cs#L12) | Fact / 1 | NOT RUN |
-| [`Lookup_and_field_errors_follow_reusable_contracts`](../tests/MyDmsVn.Desktop.Tests/MasterDetailPrototypeControlTests.cs#L34) | Fact / 1 | NOT RUN |
-| [`Editor_panel_keeps_a_usable_width_after_the_control_is_resized`](../tests/MyDmsVn.Desktop.Tests/MasterDetailPrototypeControlTests.cs#L65) | Fact / 1 | NOT RUN |
+| [`SetRows_projects_master_rows_into_the_source_grid`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/MasterDetailPrototypeControlTests.cs#L12) | Fact / 1 | NOT RUN |
+| [`Lookup_and_field_errors_follow_reusable_contracts`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/MasterDetailPrototypeControlTests.cs#L34) | Fact / 1 | NOT RUN |
+| [`Editor_panel_keeps_a_usable_width_after_the_control_is_resized`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/MasterDetailPrototypeControlTests.cs#L65) | Fact / 1 | NOT RUN |
 
 ### PermissionActionBinderTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Action_stays_disabled_until_permission_is_granted`](../tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L14) | Fact / 1 | NOT RUN |
-| [`Action_is_disabled_when_permission_is_denied_or_cannot_be_verified`](../tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L40) | Fact / 1 | NOT RUN |
-| [`Delayed_permission_result_cannot_reenable_an_action_after_sign_out`](../tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L75) | Fact / 1 | NOT RUN |
-| [`Queued_permission_grant_cannot_reenable_an_action_after_sign_out`](../tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L102) | Fact / 1 | NOT RUN |
-| [`Queued_permission_grant_cannot_reenable_an_action_after_binder_disposal`](../tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L130) | Fact / 1 | NOT RUN |
-| [`Permission_update_without_a_control_handle_is_marshaled_to_the_ui_thread`](../tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L165) | Fact / 1 | NOT RUN |
-| [`Previous_sessions_permission_result_cannot_override_a_new_grant`](../tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L205) | Fact / 1 | NOT RUN |
-| [`Older_permission_result_cannot_override_the_latest_same_session_result`](../tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L239) | Fact / 1 | NOT RUN |
+| [`Action_stays_disabled_until_permission_is_granted`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L14) | Fact / 1 | NOT RUN |
+| [`Action_is_disabled_when_permission_is_denied_or_cannot_be_verified`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L40) | Fact / 1 | NOT RUN |
+| [`Delayed_permission_result_cannot_reenable_an_action_after_sign_out`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L75) | Fact / 1 | NOT RUN |
+| [`Queued_permission_grant_cannot_reenable_an_action_after_sign_out`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L102) | Fact / 1 | NOT RUN |
+| [`Queued_permission_grant_cannot_reenable_an_action_after_binder_disposal`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L130) | Fact / 1 | NOT RUN |
+| [`Permission_update_without_a_control_handle_is_marshaled_to_the_ui_thread`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L165) | Fact / 1 | NOT RUN |
+| [`Previous_sessions_permission_result_cannot_override_a_new_grant`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L205) | Fact / 1 | NOT RUN |
+| [`Older_permission_result_cannot_override_the_latest_same_session_result`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/PermissionActionBinderTests.cs#L239) | Fact / 1 | NOT RUN |
 
 ### ProductionDiagnosticsTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Production_registration_writes_structured_audit_with_request_correlation`](../tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L19) | Fact / 1 | NOT RUN |
-| [`Redactor_removes_credentials_and_nested_sql_exception_details`](../tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L65) | Fact / 1 | NOT RUN |
-| [`Unwritable_log_location_uses_non_modal_fallback_sink`](../tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L87) | Fact / 1 | NOT RUN |
-| [`Runtime_audit_file_failure_degrades_health_and_reports_committed_state`](../tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L122) | Fact / 1 | NOT RUN |
-| [`Retention_cleanup_failure_does_not_disable_subsequent_audit_writes`](../tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L167) | Fact / 1 | NOT RUN |
-| [`Sharing_violation_reports_failure_and_recovers_on_the_next_audit_write`](../tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L210) | Fact / 1 | NOT RUN |
-| [`Desktop_exception_reporter_writes_redacted_diagnostic_with_support_id`](../tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L264) | Fact / 1 | NOT RUN |
+| [`Production_registration_writes_structured_audit_with_request_correlation`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L19) | Fact / 1 | NOT RUN |
+| [`Redactor_removes_credentials_and_nested_sql_exception_details`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L65) | Fact / 1 | NOT RUN |
+| [`Unwritable_log_location_uses_non_modal_fallback_sink`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L87) | Fact / 1 | NOT RUN |
+| [`Runtime_audit_file_failure_degrades_health_and_reports_committed_state`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L122) | Fact / 1 | NOT RUN |
+| [`Retention_cleanup_failure_does_not_disable_subsequent_audit_writes`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L167) | Fact / 1 | NOT RUN |
+| [`Sharing_violation_reports_failure_and_recovers_on_the_next_audit_write`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L210) | Fact / 1 | NOT RUN |
+| [`Desktop_exception_reporter_writes_redacted_diagnostic_with_support_id`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ProductionDiagnosticsTests.cs#L264) | Fact / 1 | NOT RUN |
 
 ### ReleasePackagingTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Manifest_only_mode_hashes_active_desktop_and_separate_admin_package`](../tests/MyDmsVn.Desktop.Tests/ReleasePackagingTests.cs#L14) | Fact / 1 | NOT RUN |
-| [`Packages_without_runtime_schema_policy_are_rejected`](../tests/MyDmsVn.Desktop.Tests/ReleasePackagingTests.cs#L49) | Fact / 1 | NOT RUN |
-| [`Desktop_packages_reject_admin_tools_and_embedded_secrets`](../tests/MyDmsVn.Desktop.Tests/ReleasePackagingTests.cs#L67) | Theory / 2 | NOT RUN |
+| [`Manifest_only_mode_hashes_active_desktop_and_separate_admin_package`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ReleasePackagingTests.cs#L14) | Fact / 1 | NOT RUN |
+| [`Packages_without_runtime_schema_policy_are_rejected`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ReleasePackagingTests.cs#L49) | Fact / 1 | NOT RUN |
+| [`Desktop_packages_reject_admin_tools_and_embedded_secrets`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/ReleasePackagingTests.cs#L67) | Theory / 2 | NOT RUN |
 
 ### SecurityAdministrationFormTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Administration_control_loads_and_disposes_on_serialized_sta_without_modal_errors`](../tests/MyDmsVn.Desktop.Tests/SecurityAdministrationFormTests.cs#L19) | Fact / 1 | NOT RUN |
-| [`Security_workspace_is_session_scoped_and_closes_on_sign_out`](../tests/MyDmsVn.Desktop.Tests/SecurityAdministrationFormTests.cs#L60) | Fact / 1 | NOT RUN |
+| [`Administration_control_loads_and_disposes_on_serialized_sta_without_modal_errors`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/SecurityAdministrationFormTests.cs#L19) | Fact / 1 | NOT RUN |
+| [`Security_workspace_is_session_scoped_and_closes_on_sign_out`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/SecurityAdministrationFormTests.cs#L60) | Fact / 1 | NOT RUN |
 
 ### UiDependencyCompatibilityTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`Bootstrap_source_grid_tracks_runtime_theme_changes`](../tests/MyDmsVn.Desktop.Tests/UiDependencyCompatibilityTests.cs#L11) | Fact / 1 | NOT RUN |
-| [`Bootstrap_source_grid_constructs_and_renders_without_host_startup_state`](../tests/MyDmsVn.Desktop.Tests/UiDependencyCompatibilityTests.cs#L39) | Fact / 1 | NOT RUN |
+| [`Bootstrap_source_grid_tracks_runtime_theme_changes`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/UiDependencyCompatibilityTests.cs#L11) | Fact / 1 | NOT RUN |
+| [`Bootstrap_source_grid_constructs_and_renders_without_host_startup_state`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/UiDependencyCompatibilityTests.cs#L39) | Fact / 1 | NOT RUN |
 
 ### WinFormsTestInfrastructureTests
 
 | Method / source | Type / rows | T00 outcome |
 |---|---|---|
-| [`StaTest_runs_action_on_sta_thread`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L12) | Fact / 1 | PASS |
-| [`StaTest_cancels_timed_out_action_and_waits_for_cleanup`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L24) | Fact / 1 | PASS |
-| [`StaTest_rethrows_action_failure_on_test_thread`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L47) | Fact / 1 | PASS |
-| [`WinFormsTestGuard_captures_thread_exception`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L58) | Fact / 1 | PASS |
-| [`WinFormsTestGuard_fails_when_captured_exception_is_not_consumed`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L77) | Fact / 1 | PASS |
-| [`WinFormsTestGuard_suppresses_error_dialogs_on_current_sta_thread`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L96) | Fact / 1 | PASS |
-| [`WinFormsTestGuard_disposal_does_not_disable_another_sta_thread_guard`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L110) | Fact / 1 | PASS |
-| [`WinFormsTestGuard_captures_grid_data_error_without_throwing`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L150) | Fact / 1 | PASS |
+| [`StaTest_runs_action_on_sta_thread`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L12) | Fact / 1 | PASS |
+| [`StaTest_cancels_timed_out_action_and_waits_for_cleanup`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L24) | Fact / 1 | PASS |
+| [`StaTest_rethrows_action_failure_on_test_thread`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L47) | Fact / 1 | PASS |
+| [`WinFormsTestGuard_captures_thread_exception`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L58) | Fact / 1 | PASS |
+| [`WinFormsTestGuard_fails_when_captured_exception_is_not_consumed`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L77) | Fact / 1 | PASS |
+| [`WinFormsTestGuard_suppresses_error_dialogs_on_current_sta_thread`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L96) | Fact / 1 | PASS |
+| [`WinFormsTestGuard_disposal_does_not_disable_another_sta_thread_guard`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L110) | Fact / 1 | PASS |
+| [`WinFormsTestGuard_captures_grid_data_error_without_throwing`](https://github.com/chung6a8m/MyDmsVn/blob/f275183c8b39dc2b712dc37be7f0f4ac71396357/tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L150) | Fact / 1 | PASS |
 
 Theory row reconciliation: admin executable payload (1) and embedded-configuration payload (1), both discovered / NOT RUN. Total: **138 methods / 139 invocations**, matching VSTest discovery.
+
+
+## Appendix B. T01 current-source additions and outcomes
+
+Candidate `32ea40c`: **149 methods / 153 discovered and executed invocations**, all PASS, including all 139 T00 invocations. This is an unfiltered T01 regression, not T06/final P5 acceptance. Appendix A retains frozen T00 names/outcomes and now links to that exact source commit. The 11 new methods below supply 14 invocations; [verification](GUI_P5_VERIFICATION.md) records commands, TRX, cleanup, development failures and review.
+
+| New method / source | Type / rows | T01 outcome |
+|---|---|---|
+| [`GuiOwnedProcessTests.Large_stdout_and_stderr_are_drained_without_deadlock_and_retention_is_bounded`](../tests/MyDmsVn.Desktop.Tests/GuiOwnedProcessTests.cs#L18) | Fact / 1 | PASS |
+| [`GuiOwnedProcessTests.Timeout_terminates_and_drains_owned_GUI_and_descendants`](../tests/MyDmsVn.Desktop.Tests/GuiOwnedProcessTests.cs#L31) | Theory / 3 | PASS |
+| [`GuiOwnedProcessTests.Cancellation_after_start_drains_the_owned_tree_before_returning`](../tests/MyDmsVn.Desktop.Tests/GuiOwnedProcessTests.cs#L45) | Fact / 1 | PASS |
+| [`GuiOwnedProcessTests.Parent_exit_does_not_leave_a_descendant_holding_redirected_pipes`](../tests/MyDmsVn.Desktop.Tests/GuiOwnedProcessTests.cs#L68) | Fact / 1 | PASS |
+| [`GuiOwnedProcessTests.Fatal_child_failure_returns_exit_and_diagnostics_without_poisoning_testhost`](../tests/MyDmsVn.Desktop.Tests/GuiOwnedProcessTests.cs#L78) | Fact / 1 | PASS |
+| [`GuiOwnedProcessTests.Pre_canceled_launch_creates_no_child`](../tests/MyDmsVn.Desktop.Tests/GuiOwnedProcessTests.cs#L89) | Fact / 1 | PASS |
+| [`GuiOwnedProcessTests.Pipe_read_failure_keeps_already_captured_failure_diagnostics`](../tests/MyDmsVn.Desktop.Tests/GuiOwnedProcessTests.cs#L100) | Fact / 1 | PASS |
+| [`LoginFormTests.Closed_login_ignores_late_success_or_failure_without_notifications_or_dialogs`](../tests/MyDmsVn.Desktop.Tests/LoginFormTests.cs#L130) | Theory / 2 | PASS |
+| [`LoginFormTests.Login_error_reporter_failure_keeps_safe_inline_error_without_modal_dialog`](../tests/MyDmsVn.Desktop.Tests/LoginFormTests.cs#L168) | Fact / 1 | PASS |
+| [`LoginFormTests.Background_login_completion_publishes_state_on_the_form_owner_thread`](../tests/MyDmsVn.Desktop.Tests/LoginFormTests.cs#L199) | Fact / 1 | PASS |
+| [`WinFormsTestInfrastructureTests.StaTest_timeout_preserves_failure_raised_during_cooperative_cleanup`](../tests/MyDmsVn.Desktop.Tests/WinFormsTestInfrastructureTests.cs#L64) | Fact / 1 | PASS |
