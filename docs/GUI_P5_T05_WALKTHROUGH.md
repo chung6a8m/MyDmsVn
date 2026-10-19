@@ -31,8 +31,8 @@ PASS requires the named actual observation plus any independent oracle and Owner
 | A-01 | Actual ordinary Login, masked password, correct actor/session. | PASS — Owner confirmed p5.t05.operator/T05Operator, Light and password masking |
 | A-02 | GUI create/read fresh T05 Product/Warehouse/Employee; independent fields/active identity. | PASS — Owner created/read all3; inspected Employee image and restricted oracle catalog-created exact fields |
 | R-01 | New Draft, three lookups, quantity/cost/note; Save and independently verify aggregate. | PASS — Owner Save confirmed; GUI/SQL same Draft1line2.5@4/Total10; actual Note05 baseline draft qualified below |
-| R-02 | Reload, edit quantity/note, Save/reload; same receipt ID, new opaque version, correct total. | NOT RUN |
-| R-03 | Required/empty-lines/zero-quantity and available numeric boundaries; safe errors, retained input, no unintended persisted change. Do not require the UI to accept a numeric value its control rejects. | NOT RUN |
+| R-02 | Reload, edit quantity/note, Save/reload; same receipt ID, new opaque version, correct total. | PASS — Owner reopened full T05 baseline edited/Total12.50; same Draft1line3.125@4 and advanced versions, restricted oracle |
+| R-03 | Required/empty-lines/zero-quantity and available numeric boundaries; safe errors, retained input, no unintended persisted change. Do not require the UI to accept a numeric value its control rejects. | PASS — Owner confirmed Quantity0 rejection/recovery and empty New/Save rejection; inspected errors, original-only Draft oracle, no stock |
 | R-04 | Dirty unsaved editor blocks Refresh as shipped and preserves input; additional New/selection observations must be recorded separately. | PASS — Owner explicitly confirmed pre-Save Refresh blocked and retained edited input; no broader New/selection repetition claimed |
 | R-05 | Post saved current Draft; Posted actor/time/status, one ledger movement per line and balance atomically match oracle. | NOT RUN |
 | R-06 | Posted editor immutable; duplicate Post blocked/rejected with no extra ledger/balance increment. Distinguish disabled button from a server request. | NOT RUN |
@@ -109,3 +109,17 @@ Codex explicitly set the real Note inner editor through its native ValuePattern 
 | [draft-edited-note-verified-100light.jpg](assets/gui-p5-t05/draft-edited-note-verified-100light.jpg) | 0557FC653F0BD467A35506B9227ED35F969104AA2F0E1A0955CC7B48458FE89D |
 
 Scope ruling: R-04 attended action is the requested dirty Refresh rejection/input retention. New/selection variants remain separately covered by existing control tests and are not relabeled as attended repetitions; T05 plan does not mandate every equivalent dirty-guard trigger.
+
+### Quantity0 rejected without mutation —22:15,100% Light
+
+Owner explicitly confirmed reopening the complete T05 baseline edited Note/Total12.50, then Quantity0/Save rejected and input retained. R-02 PASS for observed reopen/edit/persist identity and advanced versions. Current actual UI quantity/grid0, Total0, safe The request is invalid., inline error and Post disabled were inspected. Restricted zero-quantity-rejected oracle keeps original Draft/token2021, NoteT05 baseline edited, one3.1250@4line and0stock: no failed-write mutation. R-03 numeric lower-bound subcase observed, but full R-03 remains NOT RUN until the requested empty New/Save validation and recovery evidence. Baseline5/27PASS,0/18supplemental.
+
+Owner instructed restore3.1250/Save, then New/Save fully blank and retain error screen, without Post. No unsaved reference choice is requested, so the existing clean blank editor should remain navigable; do not bypass a dirty guard if a different state is observed.
+
+Quantity0 error artifact: [quantity-zero-rejected-100light.jpg](assets/gui-p5-t05/quantity-zero-rejected-100light.jpg), SHA256 A849D71C6E1FF8E93FBBFD21F081A29F3DF6B9121638DC075626EAD32EA76DC3. It was captured after fresh native observation and Owner's confirmation; all content is synthetic app-only. Current R-03 empty-New validation/recovery observation remains pending; no blind Save/Post retry requested.
+
+### Empty Draft validation / recovery —22:17,100% Light
+
+Owner restored3.1250/Save successfully, then New/Save with all fields empty rejected. Actual UI no Warehouse/Employee selection, blankNote/version,0lines, required icons, The request is invalid., disabled Post inspected. Restricted empty-draft-rejected oracle retains exactly the original GR0000000001 Draft, NoteT05 baseline edited, one3.1250@4line, token2022 after the successful restore Save,0stock. No extra Draft was created by the blank Save. R-03 PASS for required/empty-lines and numeric minimum0 rejection, retained input and observed recovery; no manual claim for inaccessible out-of-range values. Existing automated precision/range cases stay separate.
+
+[Empty Draft rejection](assets/gui-p5-t05/empty-draft-rejected-100light.jpg), SHA256 ABB2B9CBB5EC20CDC595A844AEFE0128DEDDFC006F6354691D9461B6D2C8D626. Baseline6/27PASS;0/18supplemental. Owner now instructed to reopen only the original receipt, verify Total12.50 and Post once; after definite Posted, inspect readonly editor/Save/Post and duplicate prevention. R-05/R-06 pending actual results/oracle; no timeout/fault installed.
