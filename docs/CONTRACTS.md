@@ -88,4 +88,4 @@ Preserve or extend source-owned golden JSON and behavior fixtures for:
 - decimal quantities and UTC timestamps,
 - current catalog, receipt, inventory and security/import DTOs.
 
-The active plans preserve current Local behavior and contract assertions. A future approved HTTP adapter must run the same behavior/response assertions against Local and HTTP. A contract breaking change requires versioning or an ADR. [TEST_POLICY](TEST_POLICY.md) selects execution scope; this coverage reference does not require a full suite after every change.
+The completed RESP/L2DB plans and current GUI-P5/REL acceptance plans preserve Local behavior and contract assertions. A future approved HTTP adapter must run the same behavior/response assertions against Local and HTTP. A contract breaking change requires versioning or an ADR. [TEST_POLICY](TEST_POLICY.md) selects execution scope; this coverage reference does not require a full suite after every change.
