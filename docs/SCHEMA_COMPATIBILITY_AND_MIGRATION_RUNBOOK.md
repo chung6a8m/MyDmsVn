@@ -1,6 +1,6 @@
 # Schema compatibility và migration runbook
 
-**Hiện trạng:** `v1a`, cập nhật 2026-10-18. SEC-REBUILD đã được chấp nhận trong PR #34; runtime hiện tại yêu cầu scripts 001–009. Active desktop và migrator đều `net48`/x86; AppCore parked và không được đóng gói. Migrator là gói admin độc lập; desktop không chứa hoặc tự chạy DbUp hay security bootstrap. Xem [HISTORY](HISTORY.md) và các yêu cầu recovery/release còn **OPEN / DEFERRED** tại [DEFERRED_WORK](DEFERRED_WORK.md).
+**Hiện trạng:** `v1a`, cập nhật 2026-10-19. SEC-REBUILD/RESP/L2DB đã hoàn thành theo phạm vi đã kiểm chứng; runtime yêu cầu chính xác scripts 001–009. Desktop và DbMigrator phát hành đều `net48`/x86, AppCore parked. DbMigrator là gói admin riêng; desktop không tự chạy DbUp hoặc security bootstrap. Các yêu cầu schema-compatibility, recovery và release **vẫn OPEN**, hiện thuộc [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md), không còn nằm trong deferred backlog.
 
 ## 1. Runtime schema contract hiện tại
 
