@@ -1,6 +1,6 @@
 # Test projects and commands — v1a
 
-**Updated:** 2026-10-18 after the owner's SQL test framework removal. [TEST_POLICY](../docs/TEST_POLICY.md) owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. The two active plans remain [RESP, then L2DB](../docs/plans/README.md).
+**Updated:** 2026-10-19. [TEST_POLICY](../docs/TEST_POLICY.md) alone owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. RESP and L2DB are completed/accepted in their scopes; next [GUI-P5](../docs/plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](../docs/plans/20261019-002-local-v1-p6-release-acceptance.md) remain OPEN. There is no external SQL test framework.
 
 ## Current implementation
 
@@ -120,7 +120,7 @@ dotnet test $project -c Release -f net48 --no-restore `
 if ($LASTEXITCODE -ne 0) { throw 'Desktop tests failed.' }
 ```
 
-Add a real `FullyQualifiedName` filter for affected focused work; the example is unfiltered and is required only for an applicable broader scope. Future fatal or non-cooperative hang probes must implement their own bounded subprocess isolation. Current `ReleasePackagingTests` waits for its PowerShell child without a timeout; direct execution has no suite watchdog. Stop a hung test/child process explicitly and record incomplete evidence. Automated GUI results do not replace attended packaged workflows.
+Add a real `FullyQualifiedName` filter for affected focused work; the example is unfiltered and is required only for an applicable broader scope. Future fatal or non-cooperative hang probes must implement their own bounded subprocess isolation. Current `ReleasePackagingTests` waits for its PowerShell child without a timeout; direct execution has no suite watchdog. Stop a hung test/child process explicitly and record incomplete evidence. Automated GUI results do not replace attended packaged workflows or real packaged-login E2E under GUI-P5. The L2DB-T07 correctness gate intentionally left 139 Desktop GUI invocations NOT RUN; that is a historical, frozen-revision count, not a permanent case total or a current PASS. GUI-P5-T01 must bound the current ReleasePackagingTests child wait before relying on unattended/fatal GUI probes.
 
 ## Accepted reuse and evidence
 
@@ -155,4 +155,4 @@ PR36 review repairs add `verify-after` after tracked drain while admission is he
 
 Active net48 product/test graphs now use LINQ to DB/native SqlClient only. `tests/SqlOracle` contains bounded raw-SQL test helpers, linked into the existing owners; Catalog uses the helper from its existing IntegrationTests reference. The per-command oracle has no product mappings, SQL generation, replacement-connection creation, retries or ambient transaction. NativeSql.Owned retains explicit scenario-level disposable database allocation/migration and guarded cleanup through the existing helper; it is not a fallback connection path. Foundation retains LINQ probes with independent native same-session/rollback observations. Historical pilot case names remain logical IDs but run the sole production implementation.
 
-T06 source/row reconciliation and sequential six-owner results are in [verification](../docs/L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) and the [case ledger](../docs/L2DB_CASE_MIGRATION.md#t06-dependency-cutover-and-complete-source-reconciliation). The 265-case paragraph above is accepted RESP history, not the current source total. [T07 frozen-revision correctness/package/Local smoke acceptance](../docs/L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) is complete:581/0/0 required invocations, verified package and guarded runtime smoke cleanup. W139 remains conditionally NOT RUN; broader release acceptance remains deferred.
+T06 source/row reconciliation and sequential six-owner results are in [verification](../docs/L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) and the [case ledger](../docs/L2DB_CASE_MIGRATION.md#t06-dependency-cutover-and-complete-source-reconciliation). The 265-case paragraph above is accepted RESP history, not the current source total. [T07 frozen-revision correctness/package/Local smoke acceptance](../docs/L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) is complete:581/0/0 required invocations, verified package and guarded runtime smoke cleanup. W139 was conditionally NOT RUN in T07's frozen scope; full GUI-P5 and REL/P6 release acceptance are now planned but remain OPEN.
