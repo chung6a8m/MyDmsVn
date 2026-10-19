@@ -13,6 +13,13 @@ internal static class GuiPackageProbe
     private static string _detail = "none";
     private static string _theme = "Light";
     private static Process _application;
+    private static IntPtr MainWindow;
+    private static readonly Stopwatch TraceClock = Stopwatch.StartNew();
+    private sealed class CachedInput { internal AutomationElement Named; internal AutomationElement Editor; }
+    private static readonly System.Collections.Generic.Dictionary<string, CachedInput> InputEditors = new System.Collections.Generic.Dictionary<string, CachedInput>();
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr window, uint flags);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("kernel32.dll")] private static extern uint SetErrorMode(uint mode);
     [DllImport("kernel32.dll")] private static extern int WerSetFlags(uint flags);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
@@ -172,6 +179,8 @@ internal static class GuiPackageProbe
 
     private static void StartApplication(string executable)
     {
+        InputEditors.Clear();
+        MainWindow = IntPtr.Zero;
         var start = new ProcessStartInfo(executable)
         {
             WorkingDirectory = Path.GetDirectoryName(executable), UseShellExecute = false,
@@ -363,10 +372,13 @@ internal static class GuiPackageProbe
         for (var index = 0; index < names.Length; index++)
         {
             _stage = "inactive-new-selection-" + names[index];
+            Console.WriteLine("STAGE=" + _stage + ";MS=" + TraceClock.ElapsedMilliseconds);
             SetInput(page, names[index], codes[index], false);
             var lookup = Find(page, names[index], ControlType.ComboBox, false);
             SendOwnedLookupKey(InputEditor(page, names[index]), 0x73); // F4 opens without toggling an already-open popup.
+            TraceLookupState(page, names[index], "inactive-open-posted", null);
             VisibleOwnedText("0 / 0");
+            Console.WriteLine("INACTIVE_POPUP_EMPTY=" + names[index] + ";MS=" + TraceClock.ElapsedMilliseconds);
             InputEditor(page, "Note").SetFocus();
             Wait(delegate { return lookup.Current.HelpText == "No selection"; }, "Inactive catalog became selectable in a new draft.");
         }
@@ -437,9 +449,11 @@ internal static class GuiPackageProbe
     private static bool PostWithSecondClient(AutomationElement page, AutomationElement post, string executable, string scenario, string receiptAction)
     {
         var firstClient = _application;
+        var firstWindow = MainWindow;
         StartApplication(executable);
         var otherClient = _application;
         var otherShell = Login();
+        var otherWindow = MainWindow;
         Invoke(Find(otherShell, "Goods Receipts", ControlType.Button, false));
         var otherPage = Find(otherShell, "Goods Receipts", ControlType.TabItem, false);
         Invoke(Find(otherPage, receiptAction, ControlType.Button, false));
@@ -454,19 +468,23 @@ internal static class GuiPackageProbe
             Find(otherShell, "Goods receipt saved.", ControlType.Text, false);
             Wait(delegate { return otherPost.Current.IsEnabled; }, "Concurrent save did not settle.");
             _application = firstClient;
+            MainWindow = firstWindow;
             _stage = "receipt-stale-save";
             SetInput(page, "Note", "GUI stale losing input", false);
             Invoke(Find(page, "Save", ControlType.Button, false));
             Find(page, "The goods receipt was changed by another operation.", ControlType.Text, true);
             if (InputValue(page, "Note") != "GUI stale losing input") throw new InvalidOperationException("Stale edit was lost.");
             _application = otherClient;
+            MainWindow = otherWindow;
             CloseApplication(otherShell);
             otherClient.Dispose();
             _application = firstClient;
+            MainWindow = firstWindow;
             Console.WriteLine("STALE_RECEIPT_REJECTED_INPUT_RETAINED=PASS");
             return false;
         }
         _application = firstClient;
+        MainWindow = firstWindow;
         _stage = "receipt-post";
         Invoke(post);
         Find(page, "Posted", ControlType.Text, false);
@@ -474,11 +492,13 @@ internal static class GuiPackageProbe
         Console.WriteLine("POST_BUTTON_DUPLICATE_DISABLED=PASS");
         _stage = "receipt-server-duplicate-post";
         _application = otherClient;
+        MainWindow = otherWindow;
         Invoke(otherPost); // This independent client still holds the original Draft version.
         Find(otherPage, "The goods receipt is already posted.", ControlType.Text, true);
         CloseApplication(otherShell);
         otherClient.Dispose();
         _application = firstClient;
+        MainWindow = firstWindow;
         Console.WriteLine("SERVER_DUPLICATE_POST_REJECTED=PASS");
         return true;
     }
@@ -552,19 +572,37 @@ internal static class GuiPackageProbe
         SetInput(page, name, display.Substring(0, display.IndexOf(" - ", StringComparison.Ordinal)), false);
         var lookup = Find(page, name, ControlType.ComboBox, false);
         var editor = InputEditor(page, name);
+        TraceLookupState(page, name, "before-open", display);
         SendOwnedLookupKey(editor, 0x73); // Typing may already have opened results; F4 is idempotent.
+        TraceLookupState(page, name, "after-open-posted", display);
+        var selectedPopup = IntPtr.Zero;
         try { Wait(delegate
         {
             var found = 0;
             var roots = AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, _application.Id));
             foreach (AutomationElement popup in roots)
             {
-                var cells = popup.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+                // Cache only non-password candidates; one provider snapshot avoids per-cell cross-process reads.
+                var cache = new CacheRequest();
+                cache.Add(AutomationElement.NameProperty);
+                cache.Add(ValuePattern.Pattern);
+                cache.Add(ValuePattern.ValueProperty);
+                AutomationElementCollection cells;
+                using (cache.Activate())
+                    cells = popup.FindAll(TreeScope.Descendants, new AndCondition(
+                        new PropertyCondition(AutomationElement.IsPasswordProperty, false),
+                        new PropertyCondition(AutomationElement.IsOffscreenProperty, false),
+                        new OrCondition(new PropertyCondition(AutomationElement.NameProperty, display),
+                            new PropertyCondition(AutomationElement.IsValuePatternAvailableProperty, true))));
                 foreach (AutomationElement cell in cells)
                 {
-                    if (cell.Current.IsPassword) continue;
                     object pattern;
-                    if (cell.Current.Name == display || (cell.TryGetCurrentPattern(ValuePattern.Pattern, out pattern) && ((ValuePattern)pattern).Current.Value == display)) found++;
+                    if (cell.Cached.Name != display &&
+                        (!cell.TryGetCachedPattern(ValuePattern.Pattern, out pattern) || ((ValuePattern)pattern).Cached.Value != display)) continue;
+                    var popupWindow = OwnedPopupWindow(cell);
+                    if (popupWindow == IntPtr.Zero) continue; // A matching main-editor value is not a popup result.
+                    selectedPopup = popupWindow;
+                    found++;
                 }
             }
             if (found > 1) throw new InvalidOperationException("Ambiguous lookup result.");
@@ -572,6 +610,7 @@ internal static class GuiPackageProbe
         }, "Unique lookup result not available: " + name); }
         catch
         {
+            TraceLookupState(page, name, "result-failed", display);
             var roots = AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, _application.Id));
             foreach (AutomationElement root in roots)
             {
@@ -586,7 +625,10 @@ internal static class GuiPackageProbe
             throw;
         }
         SendOwnedLookupKey(editor, 13);
-        try { Wait(delegate { return lookup.Current.HelpText == "Selected: " + display; }, "Lookup selection did not commit: " + name); }
+        try { Wait(delegate { return lookup.Current.HelpText == "Selected: " + display; }, "Lookup selection did not commit: " + name);
+            Wait(delegate { return !IsWindowVisible(selectedPopup); }, "Committed lookup popup did not close: " + name);
+            Console.WriteLine("LOOKUP_COMMITTED_POPUP_CLOSED=" + name + ";MS=" + TraceClock.ElapsedMilliseconds);
+            TraceLookupState(page, name, "committed", display); }
         catch {
             Console.WriteLine("LOOKUP_HELP=" + lookup.Current.HelpText + ";TEXT=" + InputValue(page, name));
             Console.WriteLine("LOOKUP_FOCUS=" + InputEditor(page, name).Current.HasKeyboardFocus + ";NOTE_FOCUS=" + InputEditor(page, "Note").Current.HasKeyboardFocus);
@@ -594,6 +636,50 @@ internal static class GuiPackageProbe
         }
     }
 
+    private static IntPtr OwnedPopupWindow(AutomationElement result)
+    {
+        if (MainWindow == IntPtr.Zero) throw new InvalidOperationException("Owned main-window identity is unavailable.");
+        var depth = 0;
+        for (var node = result; node != null && depth++ < 32; node = TreeWalker.ControlViewWalker.GetParent(node))
+        {
+            var handle = new IntPtr(node.Current.NativeWindowHandle);
+            if (handle == IntPtr.Zero) continue;
+            var window = GetAncestor(handle, 2); // GA_ROOT, from the actual result cell's native ancestry.
+            uint process;
+            GetWindowThreadProcessId(window, out process);
+            if (process != _application.Id) throw new InvalidOperationException("Lookup result is not an owned window.");
+            return window == MainWindow ? IntPtr.Zero : window;
+        }
+        return IntPtr.Zero;
+    }
+    private static void TraceLookupState(AutomationElement page, string name, string phase, string expected)
+    {
+        if (Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_TRACE_LOOKUPS") != "1") return;
+        try
+        {
+            var editor = InputEditor(page, name);
+            uint foregroundProcess;
+            GetWindowThreadProcessId(GetForegroundWindow(), out foregroundProcess);
+            Console.WriteLine("LOOKUP_TRACE=" + phase + ";NAME=" + name + ";MS=" + TraceClock.ElapsedMilliseconds +
+                ";FOREGROUND_OWNED=" + (foregroundProcess == _application.Id) +
+                ";FOCUSED=" + editor.Current.HasKeyboardFocus + ";ENABLED=" + editor.Current.IsEnabled +
+                ";OFFSCREEN=" + editor.Current.IsOffscreen + ";BOUNDS=" + editor.Current.BoundingRectangle +
+                ";TEXT=" + InputValue(page, name));
+            var roots = AutomationElement.RootElement.FindAll(TreeScope.Children,
+                new PropertyCondition(AutomationElement.ProcessIdProperty, _application.Id));
+            foreach (AutomationElement root in roots)
+            {
+                if (root.Current.ControlType == ControlType.Window && root.Current.Name == "MyDmsVn") continue;
+                var grid = root.FindFirst(TreeScope.Descendants,
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.DataGrid));
+                var expectedRows = expected == null ? -1 : root.FindAll(TreeScope.Descendants,
+                    new PropertyCondition(AutomationElement.NameProperty, expected)).Count;
+                Console.WriteLine("LOOKUP_POPUP=" + phase + ";NAME=" + name + ";TYPE=" + root.Current.ControlType.ProgrammaticName +
+                    ";OFFSCREEN=" + root.Current.IsOffscreen + ";GRID=" + (grid != null) + ";EXPECTED_ROWS=" + expectedRows);
+            }
+        }
+        catch (Exception error) { Console.WriteLine("LOOKUP_TRACE_ERROR=" + error.GetType().Name); }
+    }
     private static void SendOwnedLookupKey(AutomationElement editor, int key)
     {
         var handle = new IntPtr(editor.Current.NativeWindowHandle);
@@ -610,7 +696,23 @@ internal static class GuiPackageProbe
 
     private static AutomationElement InputEditor(AutomationElement root, string name)
     {
+        var key = _application.Id + ":" + string.Join(".", root.GetRuntimeId()) + ":" + name;
+        CachedInput cached;
+        if (InputEditors.TryGetValue(key, out cached))
+        {
+            try
+            {
+                // Cache widget identity only; values and all grid/result assertions remain live.
+                if (cached.Named.Current.ProcessId == _application.Id && cached.Named.Current.Name == name &&
+                    cached.Editor.Current.ProcessId == _application.Id && cached.Editor.Current.NativeWindowHandle != 0)
+                    return cached.Editor;
+            }
+            catch (ElementNotAvailableException) { }
+            catch (InvalidOperationException) { }
+            InputEditors.Remove(key);
+        }
         AutomationElement editor = null;
+        AutomationElement semantic = null;
         var candidates = root.FindAll(TreeScope.Descendants,
             new PropertyCondition(AutomationElement.NameProperty, name));
         foreach (AutomationElement named in candidates)
@@ -621,11 +723,12 @@ internal static class GuiPackageProbe
             if (candidate == null) continue;
             if (editor != null && !Automation.Compare(editor, candidate)) { _detail = "Ambiguous input selector"; throw new InvalidOperationException(); }
             editor = candidate;
+            semantic = named;
         }
         if (editor == null) { _detail = "Input unavailable: " + name; throw new InvalidOperationException(); }
+        InputEditors[key] = new CachedInput { Named = semantic, Editor = editor };
         return editor;
     }
-
     private static string InputValue(AutomationElement root, string name)
     {
         var editor = InputEditor(root, name);
@@ -669,6 +772,7 @@ internal static class GuiPackageProbe
             return false;
         }, "Owned window unavailable.", seconds);
         var handle = new IntPtr(result.Current.NativeWindowHandle);
+        if (title == "MyDmsVn") MainWindow = handle;
         // Effective DPI is measured independently of the target window's virtualized DPI.
         uint dpiX, dpiY;
         var dpiResult = GetDpiForMonitor(MonitorFromWindow(handle, 2), 0, out dpiX, out dpiY);

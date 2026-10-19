@@ -1,6 +1,6 @@
 # GUI-P5-T04 — Attended Catalog/Lookup walkthrough
 
-**Status: ATTENDED EXECUTION IN PROGRESS. `REMAIN-P5-GUI-01` remains OPEN.**
+**Status: IN PROGRESS — attended continuation waits for repaired-candidate verification. `REMAIN-P5-GUI-01` remains OPEN.**
 
 **Plan:** [GUI-P5-T04](plans/20261019-001-full-winforms-gui-p5-acceptance.md#gui-p5-t04--remain-p5-gui-01-attended-cataloglookup-sign-off). **Prepared:** 2026-10-19 (Asia/Bangkok), Codex; documentation base `f33a959`. This is an operator worksheet for actual installed Login-first use. [T03 automated results](GUI_P5_VERIFICATION.md#final-frozen-candidate--gui-p5-t03) remain separate and are not counted as attended passes.
 
@@ -197,3 +197,25 @@ Additional inspected artifacts (same synthetic-data boundary; layout failure ima
 | [catalog-keyboard-focus-100light.jpg](assets/gui-p5-t04/catalog-keyboard-focus-100light.jpg) | 8C34881DD918EDF0372869A2F71E3BA7B8AAE3067E147947DC59143085C4C66C |
 | [draft-saved-windowed-100light.jpg](assets/gui-p5-t04/draft-saved-windowed-100light.jpg) | F5A235417C1E89C8429D4C82ADD3B28D4C9DD40B4D46EE22B0C4D86B567F3FCB |
 | [receipt-header-clipped-maximized-100light.jpg](assets/gui-p5-t04/receipt-header-clipped-maximized-100light.jpg) | 1DCA1863F9DBCB05452102E59B252AE86EA49FC9A897987F599629286249DF12 |
+
+## Repaired candidate1 — filtered automated regression FAILED
+
+Clean source1b8bc571768d4eb6e7ba862c23e6530e7c328905, version1.0.0-guip5-t04, net48/x86;133 Desktop files installed to a new private per-user versioned directory with exact manifest lengths/hashes, protected3-rule ACL and no admin artifacts. Original02eff22 package/testhost and historical attended results remain preserved. New hashes:
+
+| Artifact | SHA-256 |
+|---|---|
+| release-manifest.json | 729BA3B9795BCFD8860DC86F3752A39C1025E865384991488A59FFBCBE6C7D37 |
+| desktop-net48-win-x86/MyDmsVn.Desktop.App.exe | 1D5C9ACA6DB03B4EC51C350809ED16EB38CD856CC107B8A7918E817FA97D38F7 |
+| desktop-net48-win-x86/MyDmsVn.Desktop.WinForms.dll | 17588FB914F8C40BD5477E8CC98111110C4041F17D01F3443C95136CCDCA450B |
+| admin-migrator-net48-win-x86/MyDmsVn.Server.DbMigrator.exe | 510A9D9BD1E61915F1F6BD4B588E0BD5A4CF9EAC718F2AAA1A0F730213DCE22B |
+
+Frozen candidate1 test DLL SHA-2568A7F2C91241F59BED129906CBDF719E37A8E5F41391A17FE48C32017088FBA4B (archived locally before diagnostic edits). Actual100%, exclusive desktop explicitly confirmed by Owner: filter selected/discovered/executed310 rows,307PASS/3FAIL/0SKIP, t04-candidate1-receipt-regression100.trx. All306 non-packaged rows passed; packaged Receipt Light passed. Receipt Dark failed at Employee popup readiness after Warehouse selection (DescendantsOutlivedParent after probe exit1; cleanupVerified=true). Both packaged Lookup rows reached all three same-process rename/history assertions then hit the3-minute owned supervisor (TimedOut; cleanupVerified=true). No full unfiltered324-row pass, attended pass or125% result is claimed for candidate1.
+
+All four regression databases/12 principals were ownership-checked/dropped; exact captured-name census and owned process census0. Together with four earlier attended allocations, eight T04 allocations/24 principals are dropped by17:01; all160 historical GUI resource ledgers are Dropped. A later one-row diagnostic uses a fresh owned allocation, unchanged candidate1 product bytes and a test-only working-tree trace (foreground-owned bool, focus/visibility/bounds, synthetic text, popup presence and stage timing). It is explicitly not a frozen acceptance run. Source audit identifies possible deferred-popup/focus readiness boundaries, but no cause is yet assigned to focus, external interaction or product regression. The original failures stay recorded.
+## Driver readiness trial — Receipt Dark, 2026-10-19 17:20 +07:00
+
+On unchanged candidate1 product bytes/source1b8bc57, the working-tree test driver now batches fresh non-password UIA result snapshots, caches widget identity only, rejects main-editor matches using the owned popup's native ancestry, and waits for the committed popup to close before proceeding. Main-window HWND is saved/restored together with the owned process when opening the second client. Business assertions, ambiguity rejection,3-minute subprocess limit, permissions and cleanup are unchanged. The verbose trace switch is not forwarded by ConfigureRuntime; this trial reports the always-on completion markers, not foreground/focus diagnostics.
+
+Release/net48/x86 build and existing owned temporary-probe compilation PASS. Exact Receipt Dark row selected/executed1, PASS1/FAIL0/SKIP0, duration2m33s, local t04-receipt-dark-optimized.trx. It explicitly reports TEST_SOURCE=WORKING_TREE_TRIAL. Actual native monitor100%/96DPI; Warehouse, Employee and Product committed-popup-closed markers at60.289/68.371/82.136 seconds. Duplicate Post rejected, receipt/stock SQL oracle and application drain PASS. The fresh database and3 principals are ownership-checked/dropped; exact captured-name census0, owned processes0, all162 historical ledgers Dropped. The first read-only census invocation failed in PowerShell property assignment before opening SQL; corrected connection-string indexer completed successfully and changed no SQL resources.
+
+This passing trial does not erase candidate1's307/310 result or close attended U-02/K-* cases. Both Lookup rows still require driver verification; a new clean test-source/package freeze and affected checks are required before final acceptance. No external desktop interference or product root cause is inferred from timing improvement alone.
