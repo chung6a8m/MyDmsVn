@@ -87,15 +87,15 @@ internal static class GuiPackageProbe
                 CloseApplication(shell);
                 Console.WriteLine("SERVER_DIRECT_DENY=PASS");
             }
-            else if (args[1] == "inventory-audit")
+            else if (args[1] == "inventory-audit" || args[1] == "inventory-stale")
             {
                 var shell = Login();
                 Catalog(shell, "Products", "GUI-PROD", "UIA Product", new[] { "Unit" }, new[] { "pcs" });
                 Catalog(shell, "Warehouses", "GUI-WH", "UIA Warehouse", new[] { "Address" }, new[] { "GUI address" });
                 Catalog(shell, "Employees", "GUI-EMP", "UIA Employee", new[] { "Phone" }, new[] { "0900123456" });
-                Receipt(shell);
+                Receipt(shell, args[0], args[1]);
                 CloseApplication(shell);
-                Console.WriteLine("RECEIPT_POST_STOCK=PASS");
+                if (args[1] == "inventory-audit") Console.WriteLine("RECEIPT_POST_STOCK=PASS");
             }
             else if (args[1] == "catalog-audit")
             {
@@ -211,17 +211,17 @@ internal static class GuiPackageProbe
         return shell;
     }
 
-    private static void Receipt(AutomationElement shell)
+    private static void Receipt(AutomationElement shell, string executable, string scenario)
     {
         _stage = "receipt-draft";
         Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
         var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
         Dump(page);
-        SetInput(page, "Warehouse", "GUI-WH - UIA Warehouse Updated", false);
-        SetInput(page, "Employee", "GUI-EMP - UIA Employee Updated", false);
+        SetLookup(page, "Warehouse", "GUI-WH - UIA Warehouse Updated");
+        SetLookup(page, "Employee", "GUI-EMP - UIA Employee Updated");
         SetInput(page, "Note", "GUI draft", false);
         Invoke(Find(page, "Add line", ControlType.Button, false));
-        SetInput(page, "Product", "GUI-PROD - UIA Product Updated", false);
+        SetLookup(page, "Product", "GUI-PROD - UIA Product Updated");
         Dump(page);
         SetInput(page, "Quantity", 2.5m.ToString("F4"), false);
         SetInput(page, "Unit cost", 4m.ToString("F4"), false);
@@ -252,11 +252,50 @@ internal static class GuiPackageProbe
         Invoke(Find(page, "Save", ControlType.Button, false));
         var post = Find(page, "Post", ControlType.Button, false);
         Wait(delegate { return post.Current.IsEnabled; }, "Saved draft cannot be posted.");
+        var firstClient = _application;
+        StartApplication(executable);
+        var otherClient = _application;
+        var otherShell = Login();
+        Invoke(Find(otherShell, "Goods Receipts", ControlType.Button, false));
+        var otherPage = Find(otherShell, "Goods Receipts", ControlType.TabItem, false);
+        Invoke(Find(otherPage, receiptAction, ControlType.Button, false));
+        Wait(delegate { return InputValue(otherPage, "Note") == "GUI edited"; }, "Second client did not load the saved draft.");
+        var otherPost = Find(otherPage, "Post", ControlType.Button, false);
+        Wait(delegate { return otherPost.Current.IsEnabled; }, "Second client did not receive the Draft version.");
+        if (scenario == "inventory-stale")
+        {
+            _stage = "receipt-concurrent-winner";
+            SetInput(otherPage, "Note", "GUI concurrent winner", false);
+            Invoke(Find(otherPage, "Save", ControlType.Button, false));
+            Find(otherShell, "Goods receipt saved.", ControlType.Text, false);
+            Wait(delegate { return otherPost.Current.IsEnabled; }, "Concurrent save did not settle.");
+            _application = firstClient;
+            _stage = "receipt-stale-save";
+            SetInput(page, "Note", "GUI stale losing input", false);
+            Invoke(Find(page, "Save", ControlType.Button, false));
+            Find(page, "The goods receipt was changed by another operation.", ControlType.Text, true);
+            if (InputValue(page, "Note") != "GUI stale losing input") throw new InvalidOperationException("Stale edit was lost.");
+            _application = otherClient;
+            CloseApplication(otherShell);
+            otherClient.Dispose();
+            _application = firstClient;
+            Console.WriteLine("STALE_RECEIPT_REJECTED_INPUT_RETAINED=PASS");
+            return;
+        }
+        _application = firstClient;
         _stage = "receipt-post";
         Invoke(post);
         Find(page, "Posted", ControlType.Text, false);
         Wait(delegate { return !post.Current.IsEnabled; }, "Posted receipt still permits Post.");
         Console.WriteLine("POST_BUTTON_DUPLICATE_DISABLED=PASS");
+        _stage = "receipt-server-duplicate-post";
+        _application = otherClient;
+        Invoke(otherPost); // This independent client still holds the original Draft version.
+        Find(otherPage, "The goods receipt is already posted.", ControlType.Text, true);
+        CloseApplication(otherShell);
+        otherClient.Dispose();
+        _application = firstClient;
+        Console.WriteLine("SERVER_DUPLICATE_POST_REJECTED=PASS");
         _stage = "stock-balance";
         Invoke(Find(shell, "Tồn kho", ControlType.Button, false));
         var balance = Find(shell, "Tồn kho", ControlType.TabItem, false);
@@ -302,6 +341,14 @@ internal static class GuiPackageProbe
             }
         }
         Console.WriteLine("INPUT_PATTERN=" + name + ":Value");
+    }
+
+    private static void SetLookup(AutomationElement page, string name, string display)
+    {
+        SetInput(page, name, display, false);
+        InputEditor(page, "Note").SetFocus();
+        var lookup = Find(page, name, ControlType.ComboBox, false);
+        Wait(delegate { return lookup.Current.HelpText == "Selected: " + display; }, "Lookup selection did not commit: " + name);
     }
 
     private static AutomationElement InputEditor(AutomationElement root, string name)

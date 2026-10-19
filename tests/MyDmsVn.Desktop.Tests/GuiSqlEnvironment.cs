@@ -78,6 +78,17 @@ internal sealed class GuiSqlEnvironment : IDisposable
             Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo." + table + ";"));
     }
 
+    public async Task AssertConcurrentWinnerAsync()
+    {
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE Status=N'Draft' AND Note=N'GUI concurrent winner' AND PostedAtUtc IS NULL;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE Quantity=3.125 AND UnitCost=4;"));
+        Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.StockLedger;"));
+        Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.StockBalances;"));
+    }
+
     private GuiSqlEnvironment(SqlTestDatabase database, string administration, string repository)
     {
         _database = database;

@@ -82,6 +82,24 @@ public sealed class InventoryAccessibilityAcceptanceTests
         }, TimeSpan.FromSeconds(10));
     }
 
+    [Fact]
+    public void Lookup_accessibility_distinguishes_committed_selection_from_pending_text()
+    {
+        StaTest.Run(token =>
+        {
+            using var fixture = new ReceiptFixture("Draft", new WaitingDelay());
+            using var host = Show(fixture.Control);
+            fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
+            var lookup = fixture.Control.WarehouseLookup;
+            Assert.Equal("No selection", lookup.AccessibilityObject.Help);
+            Assert.True(lookup.SelectValue(2));
+            Assert.Equal("Selected: C2 - Choice", lookup.AccessibilityObject.Help);
+            lookup.Text = "pending text";
+            Assert.Equal("Pending selection", lookup.AccessibilityObject.Help);
+            lookup.ClearSelection();
+            Assert.Equal("No selection", lookup.AccessibilityObject.Help);
+        }, TimeSpan.FromSeconds(10));
+    }
     private static IEnumerable<AccessibleObject> AccessibleDescendants(AccessibleObject root)
     {
         for (var index = 0; index < root.GetChildCount(); index++)
@@ -177,7 +195,7 @@ public sealed class InventoryAccessibilityAcceptanceTests
             var original = BootstrapThemeManager.CurrentTheme;
             try
             {
-                using var fixture = new ReceiptFixture("Draft");
+                using var fixture = new ReceiptFixture("Draft", new WaitingDelay());
                 using var host = Show(fixture.Control);
                 fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
                 Assert.True(fixture.Control.ReceiptGrid.Selection.Focus(new SourceGrid.Position(1, 0), true));
@@ -339,13 +357,13 @@ public sealed class InventoryAccessibilityAcceptanceTests
 
     private sealed class ReceiptFixture : IDisposable
     {
-        public ReceiptFixture(string status)
+        public ReceiptFixture(string status, IAsyncDelay? inputDelay = null)
         {
             var api = new Api { ReceiptStatus = status };
             var dispatcher = new ImmediateUiDispatcher();
             var notifications = new DesktopNotificationCenter();
             var messenger = new WeakReferenceMessenger();
-            var delay = new Delay();
+            var delay = inputDelay ?? new Delay();
             var list = new GoodsReceiptListViewModel(api, dispatcher, notifications, delay);
             Editor = new GoodsReceiptEditorViewModel(api,
                 new CatalogLookupViewModel(new Lookup(CatalogKind.Warehouse, 2), messenger, dispatcher, notifications, delay),
@@ -357,6 +375,11 @@ public sealed class InventoryAccessibilityAcceptanceTests
         public GoodsReceiptEditorViewModel Editor { get; }
         public GoodsReceiptControl Control { get; }
         public void Dispose() => Control.Dispose();
+    }
+
+    private sealed class WaitingDelay : IAsyncDelay
+    {
+        public Task DelayAsync(TimeSpan interval, CancellationToken token) => Task.Delay(Timeout.Infinite, token);
     }
 
     private sealed class Delay : IAsyncDelay

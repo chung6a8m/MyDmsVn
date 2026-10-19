@@ -103,9 +103,31 @@ public sealed class PackagedGuiAcceptanceTests
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             Assert.Contains("RECEIPT_POST_STOCK=PASS", result.StandardOutput);
+            Assert.Contains("SERVER_DUPLICATE_POST_REJECTED=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
             await fixture.AssertPostedReceiptAsync();
+        });
+    }
+
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
+    public async Task Two_actual_clients_reject_stale_receipt_save_and_preserve_losing_input(string theme)
+    {
+        var package = ValidatedPackage();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-stale " + theme);
+            fixture.ConfigureRuntime(start);
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("STALE_RECEIPT_REJECTED_INPUT_RETAINED=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertConcurrentWinnerAsync();
         });
     }
 

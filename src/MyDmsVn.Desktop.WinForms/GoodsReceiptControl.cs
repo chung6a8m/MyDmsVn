@@ -1010,7 +1010,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private static BootstrapLookupBox CreateLookup(string accessibleName)
         {
-            var lookup = new BootstrapLookupBox
+            var lookup = new AccessibleLookupBox
             {
                 Dock = DockStyle.Top,
                 AccessibleName = accessibleName,
