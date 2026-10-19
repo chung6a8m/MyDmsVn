@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS / NOT RUN. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: IN PROGRESS —6/45 attended observations PASS; Post/Stock group executed, human confirmation pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -123,3 +123,32 @@ Quantity0 error artifact: [quantity-zero-rejected-100light.jpg](assets/gui-p5-t0
 Owner restored3.1250/Save successfully, then New/Save with all fields empty rejected. Actual UI no Warehouse/Employee selection, blankNote/version,0lines, required icons, The request is invalid., disabled Post inspected. Restricted empty-draft-rejected oracle retains exactly the original GR0000000001 Draft, NoteT05 baseline edited, one3.1250@4line, token2022 after the successful restore Save,0stock. No extra Draft was created by the blank Save. R-03 PASS for required/empty-lines and numeric minimum0 rejection, retained input and observed recovery; no manual claim for inaccessible out-of-range values. Existing automated precision/range cases stay separate.
 
 [Empty Draft rejection](assets/gui-p5-t05/empty-draft-rejected-100light.jpg), SHA256 ABB2B9CBB5EC20CDC595A844AEFE0128DEDDFC006F6354691D9461B6D2C8D626. Baseline6/27PASS;0/18supplemental. Owner now instructed to reopen only the original receipt, verify Total12.50 and Post once; after definite Posted, inspect readonly editor/Save/Post and duplicate prevention. R-05/R-06 pending actual results/oracle; no timeout/fault installed.
+
+### Unsaved new-editor navigation guard / normal discard —22:25
+
+Owner reported unable to open the original after blank validation. Fresh native state differed from the earlier fully blank screenshot: Warehouse/Employee now selected, emptyNote/version and0lines; actual workflow message Save the current draft before leaving it. The transition that selected those references was not independently observed; no cause is attributed. Source CanAbandonEditor blocks selection while IsDirty. The instruction to open directly was corrected for the actual dirty state, preserving this observation rather than bypassing the guard or saving an extra receipt.
+
+Codex normally closed without Save22:25:22, chapter1 exit0/CleanupVerified before22:31:54 cap. Before/after-discard exact restricted oracles retain only original Draft/token2022/one3.125@4/NoteT05 baseline edited and0stock. [Unsaved navigation guard](assets/gui-p5-t05/unsaved-new-navigation-guard-100light.jpg), SHA256 B9223C6178E819BC590EB6EFA2075A5BF223BD79C9F9704BC02326D5D694CEBC. Same positively owned database retained for chapter2; human real Login requested, no Post has occurred. This is the existing guard already qualified at T04, not evidence of a new product fix or a second saved Draft.
+
+### Chapter2 actual Post / Stock group — human confirmation pending
+
+Chapter2 launched22:25:37 (deadline22:55:37); Owner completed actual ordinary Login and explicitly confirmed ready to observe Codex operating Post/Stock. Codex opened Goods Receipts, selected original grid row and Enter; complete NoteT05 baseline edited, token2022,3.1250@4/Total12.50 reloaded. One actual Post button click succeeded at15:28:13.1832705UTC (22:28:13+07). Fresh native state/screenshot Posted, disabled date/Warehouse/Employee/Note/Product/Quantity/cost/Save/Post/Add/Remove. A mouse click on the visibly disabled Post button caused no action; this is UI duplicate prevention, not a server duplicate request. Restricted snapshots baseline-posted/duplicate-post-ui-blocked preserve token2023, exactly1GoodsReceipt movement3.1250 with matching original line/warehouse/product/actor/time and one balance3.1250/token2024. PostedBy=P5.T05.OPERATOR; no orphan/mismatched movement or balance key.
+
+Balance initially shows the one stock row but no mixed-product total (dash with ProductID0). Native ProductID1 then WarehouseID1 immediately filter the row and Visible total3.1250. Warehouse999 returns no rows/total0/No stock balances; restore1 and explicit Refresh returns the correct row/total/Ready. Card warehouse1/product1 with unchecked date boxes shows original document GR0000000001, TypeGoodsReceipt, PostedUTC15:28:13Z, delta3.1250. Enabling FromUTC22:30:06 (after Post) produces no rows/delta0. The attempted native DatePicker ValuePattern change while unchecked did not change the actual date, and is not counted as an applied date action. Actual keyboard Right selected year, Up changed From to2027; enabling To2026 then produced safe The request is invalid., cleared rows/delta0 and a synthetic Support correlation ID. Unchecking From then To and explicit Refresh recovers the original row/delta3.1250/operation statusReady. Global status retains the prior validation notification; no claim it clears on success. One-row ordering is observed only; multi-page/order evidence remains S-04.
+
+Final post-stock-group-final restricted snapshot keeps1Posted receipt/1line/1ledger/1balance,0full-key reconciliation mismatches,0invalid posted-line/orphan movements. No further receipt/stock write occurred during these filter/error/recovery probes. R-05/R-06/S-01/S-02/S-03 are executed with artifacts/oracles but table cells remain NOT RUN until Owner confirms this attended group. No permission/conflict/fault or supplemental context is inferred.
+
+| Artifact | SHA-256 |
+|---|---|
+| [receipt-posted-locked-100light.jpg](assets/gui-p5-t05/receipt-posted-locked-100light.jpg) | E2241361AE4725B64B57A86C2F13F59DF62D93ECD414757F25F860C149AAF148 |
+| [balance-filtered-100light.jpg](assets/gui-p5-t05/balance-filtered-100light.jpg) | CA1C5B501243B321191E9FBC2CECFF7B78F4EB2C7130B5E922BCFA713BD71813 |
+| [balance-empty-100light.jpg](assets/gui-p5-t05/balance-empty-100light.jpg) | CA6A63E4D39B1B0A49F49B2789CF3FA037FA6FE30DEF19B0A648AA3040662164 |
+| [balance-refresh-recovered-100light.jpg](assets/gui-p5-t05/balance-refresh-recovered-100light.jpg) | 589332C0011F37389F3252B43EA8AC3DE3E2B904DDE430E1047FFC70CDAE6CAD |
+| [stock-card-movement-100light.jpg](assets/gui-p5-t05/stock-card-movement-100light.jpg) | CD63281768606BAF0FB0BE194B93C389CD6A1E32C24FB3945E67B772670614DF |
+| [stock-card-date-empty-100light.jpg](assets/gui-p5-t05/stock-card-date-empty-100light.jpg) | 66E0BBF2304E342794BA5A7FB701FA0218B9F25E4107B2887255F212B7A33002 |
+| [stock-card-invalid-date-100light.jpg](assets/gui-p5-t05/stock-card-invalid-date-100light.jpg) | 49508A418B41D82E2A7BF9CF6D2AB4D13D098622BE2C88BF011FC030B08867AA |
+| [stock-card-refresh-recovered-100light.jpg](assets/gui-p5-t05/stock-card-refresh-recovered-100light.jpg) | DD0B1981BB1AC9B61EF018B4943E9BDB23B9E1BCFB448833EE09F7C96F8DCB3D |
+
+### Permission actor lookup prerequisites
+
+Before logging the permission actors in, source LookupProducts/Warehouses/Employees query authorization was checked: each requires its Catalog.*.Read key. The initial actor setup's Inventory-only post-only/writer/deny roles would not provide these lookup prerequisites. An exact ownership/principal-verified migration-side fixed control added only3CatalogRead keys to each of those3roles (9assignments), before those actors were used. No CatalogWrite, InventoryWrite or Post privilege was added by this correction. Restricted oracle permission-lookup-prerequisites now records63role assignments: post-only7, writer7, deny8; their original Inventory permission differences remain. There are still8ordinary actors/0protected matches. This is test setup correction, not a product permission change or an attended PASS. Inventory remains one original Posted/one ledger/one balance3.1250.
