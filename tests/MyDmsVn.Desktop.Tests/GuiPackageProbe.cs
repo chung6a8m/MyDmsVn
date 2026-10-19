@@ -9,9 +9,14 @@ using System.Windows.Automation;
 internal static class GuiPackageProbe
 {
     private static string _stage = "startup";
+    private static string _detail = "none";
+    private static string _theme = "Light";
     private static Process _application;
     [DllImport("kernel32.dll")] private static extern uint SetErrorMode(uint mode);
     [DllImport("kernel32.dll")] private static extern int WerSetFlags(uint flags);
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
+    [DllImport("shcore.dll")] private static extern int GetScaleFactorForMonitor(IntPtr monitor, out int scale);
 
     [STAThread]
     private static int Main(string[] args)
@@ -22,7 +27,9 @@ internal static class GuiPackageProbe
         Console.WriteLine("BITNESS=" + (IntPtr.Size * 8));
         try
         {
-            if (args.Length != 2 || !Path.IsPathRooted(args[0])) throw new ArgumentException();
+            if ((args.Length != 2 && args.Length != 3) || !Path.IsPathRooted(args[0])) throw new ArgumentException();
+            _theme = args.Length == 3 ? args[2] : "Light";
+            if (_theme != "Light" && _theme != "Dark") throw new ArgumentException();
             StartApplication(args[0]);
             if (args[1] == "startup-unavailable")
             {
@@ -40,28 +47,13 @@ internal static class GuiPackageProbe
             else if (args[1] == "catalog-audit")
             {
                 var shell = Login();
-                _stage = "catalog-create";
-                Invoke(Find(shell, "Products", ControlType.Button, false));
-                SetInput(shell, "Code", "GUI-PROD", false);
-                SetInput(shell, "Name", "UIA Product", false);
-                SetInput(shell, "Unit", "pcs", false);
-                Invoke(Find(shell, "Save", ControlType.Button, false));
-                Named(shell, "GUI-PROD");
-                Invoke(Find(shell, "New", ControlType.Button, false));
-                _stage = "catalog-select-row";
-                Dump(shell);
-                Invoke(Find(shell, "Open GUI-PROD", ControlType.Button, false));
-                Wait(delegate { return InputValue(shell, "Code") == "GUI-PROD"; }, "Selected row did not load editor.");
-                _stage = "catalog-update";
-                SetInput(shell, "Name", "UIA Product Updated", false);
-                Invoke(Find(shell, "Save", ControlType.Button, false));
-                Named(shell, "UIA Product Updated");
-                Invoke(Find(shell, "Deactivate", ControlType.Button, false));
-                Named(shell, "Inactive");
-                Invoke(Find(shell, "Activate", ControlType.Button, false));
-                Named(shell, "Active");
+                Catalog(shell, "Products", "GUI-PROD", "UIA Product", new[] { "Unit" }, new[] { "pcs" });
+                Catalog(shell, "Warehouses", "GUI-WH", "UIA Warehouse", new[] { "Address" }, new[] { "GUI address" });
+                Catalog(shell, "Employees", "GUI-EMP", "UIA Employee", new[] { "Phone" }, new[] { "0900123456" });
+                Catalog(shell, "Customers", "GUI-CUST", "UIA Customer", new[] { "Address", "Phone", "Tax code" }, new[] { "GUI address", "0900123456", "P5-TAX" });
                 CloseApplication(shell);
                 Console.WriteLine("CATALOG_PRODUCT=PASS");
+                Console.WriteLine("CATALOGS=PASS");
             }
             else if (args[1] == "login-audit")
             {
@@ -89,7 +81,7 @@ internal static class GuiPackageProbe
         catch (Exception error)
         {
             // Never print credential-bearing exceptions, element values or connection strings.
-            Console.Error.WriteLine("GUI_PROBE_FAILED=" + _stage + ":" + error.GetType().Name);
+            Console.Error.WriteLine("GUI_PROBE_FAILED=" + _stage + ":" + error.GetType().Name + ":" + _detail);
             return 1;
         }
         finally
@@ -105,8 +97,39 @@ internal static class GuiPackageProbe
         {
             WorkingDirectory = Path.GetDirectoryName(executable), UseShellExecute = false,
         };
-        start.EnvironmentVariables.Remove("MYDMSVN_GUI_P5_OWNER_PASSWORD");
+        var keys = new string[start.EnvironmentVariables.Count];
+        start.EnvironmentVariables.Keys.CopyTo(keys, 0);
+        foreach (var key in keys)
+            if (key.StartsWith("MYDMSVN_GUI_P5_", StringComparison.OrdinalIgnoreCase)) start.EnvironmentVariables.Remove(key);
         _application = Process.Start(start);
+    }
+
+    private static void Catalog(AutomationElement shell, string title, string code, string name, string[] fields, string[] values)
+    {
+        _stage = "catalog-create-" + title;
+        Invoke(Find(shell, title, ControlType.Button, false));
+        var page = Find(shell, title, ControlType.TabItem, false);
+        Console.WriteLine("PAGE_START=" + title);
+        Dump(page);
+        var results = Find(page, "Catalog results", ControlType.Table, false);
+        SetInput(page, "Code", code, false);
+        SetInput(page, "Name", name, false);
+        for (var index = 0; index < fields.Length; index++) SetInput(page, fields[index], values[index], false);
+        Invoke(Find(page, "Save", ControlType.Button, false));
+        Named(results, code);
+        Invoke(Find(page, "New", ControlType.Button, false));
+        _stage = "catalog-select-row-" + title;
+        Invoke(Find(page, "Open " + code, ControlType.Button, false));
+        Wait(delegate { return InputValue(page, "Code") == code; }, "Selected row did not load editor.");
+        _stage = "catalog-update-" + title;
+        SetInput(page, "Name", name + " Updated", false);
+        Invoke(Find(page, "Save", ControlType.Button, false));
+        Named(results, name + " Updated");
+        Invoke(Find(page, "Deactivate", ControlType.Button, false));
+        Named(results, "Inactive");
+        Invoke(Find(page, "Activate", ControlType.Button, false));
+        Named(results, "Active");
+        Console.WriteLine("CATALOG_FLOW=" + title + ":PASS");
     }
 
     private static AutomationElement Login()
@@ -118,6 +141,10 @@ internal static class GuiPackageProbe
         Invoke(Find(login, "Đăng nhập", ControlType.Button, false));
         var shell = Window("MyDmsVn");
         Find(shell, "GUI P5 Owner", ControlType.Text, false);
+        var theme = Find(shell, "Light / Dark", ControlType.Button, false);
+        if (theme.Current.HelpText != "Current theme: " + _theme) Invoke(theme);
+        Wait(delegate { return theme.Current.HelpText == "Current theme: " + _theme; }, "Theme metadata did not match the requested mode.");
+        Console.WriteLine("APPLICATION_THEME=" + _theme);
         return shell;
     }
 
@@ -160,10 +187,10 @@ internal static class GuiPackageProbe
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
             if (candidate == null && named.Current.ControlType == ControlType.Edit) candidate = named;
             if (candidate == null) continue;
-            if (editor != null && !Automation.Compare(editor, candidate)) throw new InvalidOperationException("Ambiguous input selector.");
+            if (editor != null && !Automation.Compare(editor, candidate)) { _detail = "Ambiguous input selector"; throw new InvalidOperationException(); }
             editor = candidate;
         }
-        if (editor == null) throw new InvalidOperationException("Input unavailable.");
+        if (editor == null) { _detail = "Input unavailable"; throw new InvalidOperationException(); }
         return editor;
     }
 
@@ -180,7 +207,7 @@ internal static class GuiPackageProbe
         Wait(delegate
         {
             var candidates = root.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name));
-            if (candidates.Count > 1) throw new InvalidOperationException("Ambiguous accessible name.");
+            if (candidates.Count > 1) { _detail = "Ambiguous accessible result name"; return false; }
             if (candidates.Count == 1) result = candidates[0];
             return result != null;
         }, "Accessible name unavailable.");
@@ -209,6 +236,12 @@ internal static class GuiPackageProbe
                 if (candidate.Current.Name == title) { result = candidate; return true; }
             return false;
         }, "Owned window unavailable.");
+        var handle = new IntPtr(result.Current.NativeWindowHandle);
+        int scale;
+        if (GetScaleFactorForMonitor(MonitorFromWindow(handle, 2), out scale) != 0) throw new InvalidOperationException("Monitor scale unavailable.");
+        var expected = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
+        if ((expected != "100" && expected != "125") || scale.ToString() != expected) throw new InvalidOperationException("Desktop scale differs from declared configuration.");
+        Console.WriteLine("MONITOR_SCALE=" + scale + ";WINDOW_DPI=" + GetDpiForWindow(handle));
         return result;
     }
 
@@ -224,7 +257,7 @@ internal static class GuiPackageProbe
                 var actual = candidate.Current.Name;
                 if (contains ? actual.Contains(name) : actual == name)
                 {
-                    if (result != null) throw new InvalidOperationException("Ambiguous accessible selector.");
+                    if (result != null) { _detail = "Ambiguous accessible selector"; throw new InvalidOperationException(); }
                     result = candidate;
                 }
             }
@@ -248,6 +281,7 @@ internal static class GuiPackageProbe
             catch (ElementNotAvailableException) { }
             Thread.Sleep(25); // Finite predicate polling; never a guessed UI delay.
         }
-        throw new TimeoutException(failure);
+        _detail = failure;
+        throw new TimeoutException();
     }
 }

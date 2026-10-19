@@ -100,6 +100,8 @@ internal sealed class AccessibleActionGrid : BootstrapGrid
         public override AccessibleObject Parent => _row;
         public override AccessibleRole Role => _header ? AccessibleRole.ColumnHeader : AccessibleRole.Cell;
         public override string? Name { get => _value; set { } }
+        public override string? Description => !_row.Grid.IsDisposed && _row.Grid.RowsCount > 0 && _column < _row.Grid.ColumnsCount
+            ? Convert.ToString(_row.Grid[0, _column]?.Value) : null;
         public override string? Value { get => _value; set => throw new InvalidOperationException("Result cells are read-only."); }
         public override AccessibleStates State => AccessibleStates.ReadOnly | (_row.CurrentRow < 0 ? AccessibleStates.Unavailable : 0);
         public override Rectangle Bounds => _row.Grid.CellBounds(_row.CurrentRow, _column);

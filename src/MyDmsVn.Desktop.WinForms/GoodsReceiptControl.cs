@@ -62,7 +62,15 @@ namespace MyDmsVn.Desktop.WinForms
             PreviousPageButton = CreateButton("Previous", () => MovePage(-1));
             NextPageButton = CreateButton("Next", () => MovePage(1));
             PageLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
-            ReceiptGrid = new BootstrapGrid { Dock = DockStyle.Fill, TabStop = true };
+            ReceiptGrid = new AccessibleActionGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt results" };
+            ((AccessibleActionGrid)ReceiptGrid).ConfigureRowActions(
+                row => row > 0 && row <= _receiptIds.Count ? (object)_receiptIds[row - 1] : null,
+                row => row > 0 && row < ReceiptGrid.RowsCount ? Convert.ToString(ReceiptGrid[row, 1]?.Value) ?? string.Empty : string.Empty,
+                row =>
+                {
+                    ReceiptGrid.Selection.Focus(new SourceGrid.Position(row, 1), true);
+                    SelectActiveReceipt();
+                });
             ReceiptGrid.DoubleClick += (_, __) => SelectActiveReceipt();
             ReceiptGrid.KeyDown += OnReceiptGridKeyDown;
 
@@ -86,7 +94,15 @@ namespace MyDmsVn.Desktop.WinForms
             SaveButton = CreateButton("Save", () => SetOperation(SaveAsync()));
             PostButton = CreateButton("Post", () => SetOperation(PostAsync()));
 
-            LineGrid = new BootstrapGrid { Dock = DockStyle.Fill, TabStop = true };
+            LineGrid = new AccessibleActionGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt lines" };
+            ((AccessibleActionGrid)LineGrid).ConfigureRowActions(
+                row => row > 0 && row <= _editor.Lines.Count ? _editor.Lines[row - 1] : null,
+                row => row > 0 && row <= _editor.Lines.Count ? _editor.Lines[row - 1].ProductDisplayName ?? string.Empty : string.Empty,
+                row =>
+                {
+                    LineGrid.Selection.Focus(new SourceGrid.Position(row, 1), true);
+                    SelectActiveLine();
+                });
             LineGrid.Click += (_, __) => SelectActiveLine();
             LineGrid.KeyDown += OnLineGridKeyDown;
             ProductLookup = CreateLookup("Product");

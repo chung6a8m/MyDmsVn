@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -19,6 +20,15 @@ public sealed class GuiPackageFactAttribute : FactAttribute
     }
 }
 
+public sealed class GuiPackageTheoryAttribute : TheoryAttribute
+{
+    public GuiPackageTheoryAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_PACKAGE")))
+            Skip = "BLOCKED: set MYDMSVN_GUI_P5_PACKAGE to a clean published GUI-P5 candidate.";
+    }
+}
+
 public sealed class PackagedGuiAcceptanceTests
 {
     private readonly ITestOutputHelper _output;
@@ -30,40 +40,47 @@ public sealed class PackagedGuiAcceptanceTests
         await GuiSqlEnvironment.RunAsync(ValidatedPackage(), fixture => fixture.VerifySeparationAsync());
     }
 
-    [GuiPackageFact]
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
     [Trait("Category", "GuiSql")]
-    public async Task Actual_packaged_login_uses_native_uia_and_authenticates_against_the_owned_database()
+    public async Task Actual_packaged_login_uses_native_uia_and_authenticates_against_the_owned_database(string theme)
     {
         var package = ValidatedPackage();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             using var probe = new GuiProcessProbeFixture(package: true);
-            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" login-audit");
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" login-audit " + theme);
             fixture.ConfigureRuntime(start);
             var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(90));
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             Assert.Contains("REAL_LOGIN=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
             Assert.Contains("LOGOUT_RELOGIN_RESTART=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
             await fixture.VerifySeparationAsync();
         });
     }
 
-    [GuiPackageFact]
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
     [Trait("Category", "GuiSql")]
-    public async Task Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes()
+    public async Task Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes(string theme)
     {
         var package = ValidatedPackage();
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             using var probe = new GuiProcessProbeFixture(package: true);
-            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" catalog-audit");
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" catalog-audit " + theme);
             fixture.ConfigureRuntime(start);
             var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(120));
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             Assert.Contains("CATALOG_PRODUCT=PASS", result.StandardOutput);
+            Assert.Contains("CATALOGS=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
             await fixture.AssertCatalogProductAsync();
         });
@@ -77,6 +94,7 @@ public sealed class PackagedGuiAcceptanceTests
         var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" startup-unavailable");
         ClearSqlEnvironment(start);
         start.EnvironmentVariables["Security__SuperuserUsername"] = "gui.p5.owner";
+        start.EnvironmentVariables["MYDMSVN_GUI_P5_EXPECTED_SCALE"] = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
         start.EnvironmentVariables["MYDMSVN_RUNTIME_SQLSERVER_CONNECTION_STRING"] =
             "Server=127.0.0.1,1;Database=Unavailable;Integrated Security=true;Encrypt=false;Connect Timeout=1;ConnectRetryCount=0;Pooling=false;";
         var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(30));
@@ -120,6 +138,10 @@ public sealed class PackagedGuiAcceptanceTests
                 Assert.Equal(file.Value<string>("sha256"), BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", ""));
             }
         }
+        var desktop = Assembly.ReflectionOnlyLoadFrom(Path.Combine(root, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe"));
+        desktop.ManifestModule.GetPEKind(out var pe, out var machine);
+        Assert.Equal(ImageFileMachine.I386, machine);
+        Assert.True((pe & PortableExecutableKinds.Required32Bit) != 0);
         return root;
     }
 }

@@ -163,12 +163,19 @@ internal sealed class GuiSqlEnvironment : IDisposable
         start.EnvironmentVariables["MYDMSVN_RUNTIME_SQLSERVER_CONNECTION_STRING"] = _runtime;
         start.EnvironmentVariables["Security__SuperuserUsername"] = OwnerUsername;
         start.EnvironmentVariables["MYDMSVN_GUI_P5_OWNER_PASSWORD"] = OwnerPassword;
+        start.EnvironmentVariables["MYDMSVN_GUI_P5_EXPECTED_SCALE"] = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
     }
 
     public async Task AssertCatalogProductAsync()
     {
         Assert.Equal(1, await ScalarAsync<int>(_oracle,
             "SELECT COUNT(*) FROM dbo.Products WHERE Code=N'GUI-PROD' AND Name=N'UIA Product Updated' AND Unit=N'pcs' AND IsActive=1;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.Warehouses WHERE Code=N'GUI-WH' AND Name=N'UIA Warehouse Updated' AND Address=N'GUI address' AND IsActive=1;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.Employees WHERE Code=N'GUI-EMP' AND Name=N'UIA Employee Updated' AND Phone=N'0900123456' AND UserId IS NULL AND IsActive=1;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.Customers WHERE Code=N'GUI-CUST' AND Name=N'UIA Customer Updated' AND Address=N'GUI address' AND Phone=N'0900123456' AND TaxCode=N'P5-TAX' AND IsActive=1;"));
         Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
     }
 

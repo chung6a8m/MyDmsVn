@@ -17,6 +17,51 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed class InventoryAccessibilityAcceptanceTests
 {
+    [Fact]
+    public void Receipt_and_line_accessible_actions_use_existing_selection_and_readonly_columns()
+    {
+        StaTest.Run(token =>
+        {
+            using var guard = new WinFormsTestGuard();
+            using var fixture = new ReceiptFixture("Draft");
+            using var host = Show(fixture.Control);
+            fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
+            var receipt = AccessibleDescendants(fixture.Control.ReceiptGrid.AccessibilityObject)
+                .SingleOrDefault(item => item.Role == AccessibleRole.PushButton && item.Name == "Open GR0000000041");
+            Assert.NotNull(receipt);
+            receipt!.DoDefaultAction();
+            Assert.True(fixture.Control.LastOperation.Wait(TimeSpan.FromSeconds(3)));
+            fixture.Control.LastOperation.GetAwaiter().GetResult();
+            Assert.Equal(41, fixture.Editor.Id);
+            var line = AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject)
+                .SingleOrDefault(item => item.Role == AccessibleRole.PushButton && item.Name == "Open P7 - Product");
+            Assert.NotNull(line);
+            line!.DoDefaultAction();
+            Assert.Equal(2.5m, fixture.Control.QuantityEditor.Value);
+            var quantity = AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject)
+                .First(item => item.Role == AccessibleRole.Cell && item.Description == "Quantity");
+            Assert.True((quantity.State & AccessibleStates.ReadOnly) != 0);
+            Assert.Throws<InvalidOperationException>(() => quantity.Value = "999");
+            Assert.Equal(2.5m, fixture.Editor.Lines[0].Quantity);
+            fixture.Control.NewButton.PerformClick();
+            line.DoDefaultAction();
+            Assert.Equal(0m, fixture.Control.QuantityEditor.Value);
+            Assert.True((line.State & AccessibleStates.Unavailable) != 0);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(10));
+    }
+
+    private static IEnumerable<AccessibleObject> AccessibleDescendants(AccessibleObject root)
+    {
+        for (var index = 0; index < root.GetChildCount(); index++)
+        {
+            var child = root.GetChild(index);
+            if (child == null) continue;
+            yield return child;
+            foreach (var descendant in AccessibleDescendants(child)) yield return descendant;
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

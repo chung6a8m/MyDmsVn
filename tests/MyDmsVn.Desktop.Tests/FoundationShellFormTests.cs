@@ -118,11 +118,19 @@ namespace MyDmsVn.Desktop.Tests
                             BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
                         using (var shell = CreateShell())
                         {
+                              var toggle = shell.Controls.OfType<ToolStrip>()
+                                  .SelectMany(strip => strip.Items.OfType<ToolStripButton>())
+                                  .Single(button => button.Text == "Light / Dark");
+                              Assert.Equal("Current theme: Light", toggle.AccessibleDescription);
                             shell.ToggleTheme();
 
                             Assert.Equal(
                                 BootstrapThemeMode.Dark,
                                 BootstrapThemeManager.CurrentTheme.Mode);
+                              Assert.Equal("Current theme: Dark", toggle.AccessibilityObject.Description);
+                              toggle.PerformClick();
+                              Assert.Equal(BootstrapThemeMode.Light, BootstrapThemeManager.CurrentTheme.Mode);
+                              Assert.Equal("Current theme: Light", toggle.AccessibilityObject.Description);
                         }
                     }
                     finally
