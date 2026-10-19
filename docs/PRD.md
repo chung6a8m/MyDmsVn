@@ -1,6 +1,6 @@
 # Product requirements — MyDmsVn
 
-**Current scope:** Local v1 on net48 · **Updated:** 2026-10-18. The initial idea has been consolidated into this PRD and the current architecture/contracts. [Active implementation](plans/README.md) is limited to RESP and L2DB; these infrastructure plans preserve product behavior.
+**Current scope:** Local v1 on net48 · **Updated:** 2026-10-19. The initial idea is consolidated into this PRD and current architecture/contracts. [RESP/L2DB](plans/README.md) are completed/accepted in plan scope; [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md) own still-OPEN product/release acceptance.
 
 ## 1. Product goal
 
@@ -28,7 +28,7 @@ One account may hold several roles. For ordinary users, an explicit user decisio
 - UTC audit fields, correlated/redacted diagnostics, DbUp migrations and explicit schema/deployment verification.
 - Existing password hash/salt columns and an algorithm-aware legacy boundary; legacy account support requires approved vectors or a separately accepted release exclusion.
 
-Product persistence now uses LINQ to DB and typed native SqlClient after L2DB-T03–T06, preserving workflows and contracts. T07 frozen-revision correctness/package/Local smoke acceptance is complete; broader P5/P6 release acceptance remains deferred. Respawn changes test infrastructure only.
+Product persistence now uses LINQ to DB and typed native SqlClient after L2DB-T03–T06, preserving workflows and contracts. T07 frozen-revision correctness/package/Local smoke acceptance is complete; broader GUI/P5 and P6 release acceptance remains OPEN under the new plans. Respawn changes test infrastructure only.
 
 ## 4. Acceptance behavior
 
@@ -54,7 +54,7 @@ Posting must be all-or-nothing and idempotent within its SQL boundary. Concurren
 
 Keep DB work off the UI thread, with bounded timeouts/cancellation, loading/empty/error states and field validation. Headless GUI failures cannot leave modal dialogs blocking a process. Do not log passwords, hashes, salts, connection strings, raw SQL parameters or authentication material.
 
-Product completion requires behavioral evidence under [TEST_POLICY](TEST_POLICY.md). P5 interactive checks and P6 clean-install/upgrade/recovery, principal/credential, diagnostics/audit, packaged GUI and release sign-off remain [OPEN / DEFERRED](DEFERRED_WORK.md). A successful developer build is not installed-host evidence. The current release schema-metadata discrepancy must be resolved before release acceptance.
+Product completion requires behavioral evidence under [TEST_POLICY](TEST_POLICY.md). P5 interactive/full GUI checks remain **OPEN** in [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md); P6 clean install, upgrade/recovery, privilege/credential, diagnostics/audit and release sign-off remain **OPEN** in [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md). A successful developer build is not installed-host evidence. The release schema-metadata discrepancy is already closed **narrowly** (schema9/scripts001–009 from the shipped policy); full packaged install, recovery and G1–G5 are still unaccepted.
 
 ## 7. Deferred scope
 
