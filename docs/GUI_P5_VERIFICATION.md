@@ -1,6 +1,6 @@
 # GUI-P5 verification
 
-This is task-scoped evidence, not full P5/P6 acceptance. [Coverage matrix](GUI_P5_COVERAGE_MATRIX.md), [plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [TEST_POLICY](TEST_POLICY.md) govern. T03–T06, both attended P5 IDs and REL G1–G5 remain OPEN. T01 and T02 task-scoped evidence follows.
+This is task-scoped evidence, not full P5/P6 acceptance. [Coverage matrix](GUI_P5_COVERAGE_MATRIX.md), [plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [TEST_POLICY](TEST_POLICY.md) govern. T00–T03 are COMPLETE in task scope; T04–T06, both attended P5 IDs and REL G1–G5 remain OPEN. The final T03 evidence preserves the failed full125% run and its focused automated rerun separately.
 
 ## GUI-P5-T01 — Bounded GUI reliability foundation
 
@@ -133,9 +133,9 @@ All real-control cases ran through serialized STA/WinFormsTestGuard and finite o
 
 Independent Codex code review found the two security issues above; both were fixed after RED proof, then re-reviewed with no further important findings. Review is not runtime proof; the accepted evidence is the final candidate's 282 Desktop and 108 Session passes. Backend SQL/package/DPI/attended prerequisites remain explicitly separate in the matrix and acceptance plan.
 
-## GUI-P5-T03 — Packaged real-login E2E candidate (acceptance OPEN)
+## GUI-P5-T03 — Packaged real-login E2E (COMPLETE in task scope)
 
-**Implementation:** `30171015f46fa553d9524329038b1b9afd95e727`; branch `codex/gui-p5-t00`, managed worktree `gui-p5-t00/CleanArchitecture`. **Date/tester:** 2026-10-19 (Asia/Bangkok), Codex. Frozen candidate results are recorded below; independent review is complete. Corrected-probe candidate125% Light/Dark passed; its final100% execution is still pending, so no T03/P5/P6 completion is asserted here.
+**Implementation:** `30171015f46fa553d9524329038b1b9afd95e727`; branch `codex/gui-p5-t00`, managed worktree `gui-p5-t00/CleanArchitecture`. **Date/tester:** 2026-10-19 (Asia/Bangkok), Codex. Implementation checkpoints and failed trials are preserved below. Final candidate02eff22 has passed all312 unique obligations at100% and125%, with the125% full-run failure and focused automated rerun explicitly reconciled below. Independent review and follow-ups are complete. T03 closes only its automated scenario/SQL/cleanup scope; attended P5 and T06/P6 remain OPEN.
 
 ### Approved topology and actual provision
 
@@ -228,7 +228,7 @@ The100 run's17 GUI SQL allocations completed positive ownership/principal checks
 
 One fresh independent whole-branch static review covered `4c557f2..e412ebc`, including product accessibility/pending binding, real-login UIA, process ownership and SQL lifecycle/fault oracles. It found no reproducible blocking P1/P2 issue. The reviewer ran no tests and review is not counted as runtime proof.
 
-### DPI125 probe correction — final reruns pending
+### DPI125 probe correction — development checkpoint
 
 After the100% run stopped/drained, the owner switched the actual desktop to125%, retaining1920×1080. Independent native32-bit and64-bit metadata reads confirmed125%. The initial frozen125% run (`t03-final125.trx`) completed **294 PASS /17 FAIL /0 skipped**: the16 scenario rows and unavailable-startup failed before business interactions, while the SQL-only topology and293 control/infrastructure rows passed. Cleanup was verified; this failed run is retained and is not an acceptance result.
 
@@ -236,7 +236,7 @@ Temporary diagnostic startup probes (`t03-scale125-diagnostic`, `t03-scale125-mo
 
 The probe now declares and verifies PerMonitorV2 awareness before any UIA call and measures the actual monitor's effective DPI using `GetDpiForMonitor(MDT_EFFECTIVE_DPI)`, checking equal axes and successful HRESULT. It compares measured DPI/96 against the declared100/125 scale and logs observations before rejection. This changes only the temporary test client; shipped application DPI settings/manifest are unchanged. Microsoft describes [UIA client scaling](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-screenscaling) and the awareness-dependent [effective monitor DPI return values](https://learn.microsoft.com/en-us/windows/win32/api/shellscalingapi/nf-shellscalingapi-getdpiformonitor). Existing native startup assertions now require the declared UIA context. Focused startup and real-Login Light passed **2/2** at actual125% (`t03-scale125-effective-green.trx`, working-tree trial); this does not substitute for the full matrix.
 
-**Outstanding before T03 exit:** freeze the corrected probe and clean publication, rerun full125% Light/Dark, then100% on the same candidate, reconcile discovery/TRX and verify final resource cleanup. T03 checkboxes stay OPEN. T04–T06, both attended P5 IDs and REL G1–G5 remain OPEN independently.
+**Outstanding at that checkpoint (superseded below):** freeze the corrected probe and clean publication, rerun full125% Light/Dark, then100% on the same candidate, reconcile discovery/TRX and verify final resource cleanup. T03 checkboxes stay OPEN. T04–T06, both attended P5 IDs and REL G1–G5 remain OPEN independently.
 
 ### Second frozen candidate — GUI-P5-T03
 
@@ -261,7 +261,7 @@ All17 SQL GUI allocations in this125% run completed verified drain and exact own
 
 **Second-candidate exit: OPEN.** Its100% run completed310 PASS/1 FAIL; the failed receipt/Post/Stock Light row is retained separately. The next corrected driver candidate must pass both configurations before T03 closes.
 
-### Lookup opening race — corrected driver candidate pending
+### Lookup opening race — development checkpoint
 
 The owner restored the desktop to100%, confirmed by the native API. The second candidate's unfiltered100% run (`t03-candidate2-final100.trx`) completed **310 PASS /1 FAIL /0 skipped**. Receipt/Post/Stock Light timed out at `receipt-draft`, waiting for the unique Product lookup result; the probe/application tree cleanup was verified. The other17 packaged rows passed. This run is not accepted as a complete matrix pass.
 
@@ -269,4 +269,47 @@ A source-level timing boundary explained the driver defect: typing can auto-open
 
 The temporary UIA driver now sends F4 to the verified focused HWND belonging to the owned application, then waits for exactly one native result and sends Enter through the same ownership/focus guard. The inactive-new-choice path uses the same idempotent open action. No vendor/control/business source, retry, wait budget or SQL behavior changed. The previously failing native receipt/Post/Stock Light plus the new control fact passed **2/2** (`t03-idempotent-open-positive.trx`, working-tree trial). The existing reviewer checked this small delta and found no blocking issue.
 
-**T03 remains OPEN.** A new clean publication and complete100%/125% matrix will record the final source and hashes. The added control fact increases current source to **227 methods:187 Facts and40 Theories /125 InlineData rows =312 expected invocations**; final discovery/TRX must confirm that count. All117 GUI resource ledgers after the focused native run record verified drain/drop; final ownership evidence will be recorded separately from these development trials.
+**At that development checkpoint T03 remained OPEN.** A new clean publication and complete100%/125% matrix will record the final source and hashes. The added control fact increases current source to **227 methods:187 Facts and40 Theories /125 InlineData rows =312 expected invocations**; final discovery/TRX must confirm that count. All117 GUI resource ledgers after the focused native run record verified drain/drop; final ownership evidence will be recorded separately from these development trials.
+### Final frozen candidate — GUI-P5-T03
+
+**Source, package and test revision:** `02eff225d41ff564769bedbb0ca4420d27233a67`, published from a clean tree to `artifacts/release/gui-p5-t03-candidate3/`. The manifest contains exactly two net48/win-x86 packages and current schema9. The test-only F4 change leaves product/vendor/business source and SQL behavior unchanged. Git informational revision metadata produces new artifact hashes, so both DPI configurations use these same frozen bytes. The existing independent reviewer accepted the F4 delta after reviewing ownership, focus and selection ordering.
+
+| Artifact | Final SHA-256 |
+|---|---|
+| `release-manifest.json` | `4C28486221AFB81243F94DDBCC1A8482BAAE43E6E92BFD6ABAA4E11096BD9F51` |
+| Desktop `MyDmsVn.Desktop.App.exe` | `92D400CD583689D82C99B85EDBB7D4B969E1B68804BC938AA3B6F8C9B91C38D6` |
+| Desktop `MyDmsVn.Desktop.WinForms.dll` | `A6D1531867B26E51B18137277EBD2445FBD9BCD00D1BAD16878FF6C7DE2548AB` |
+| Admin `MyDmsVn.Server.DbMigrator.exe` | `163DAD57DED228234DDF47D11DEC48EBAF98E9F0D406831B9B5987B6B21D2E90` |
+| Test `MyDmsVn.Desktop.Tests.dll` | `4A517B2D30EA07CBDE00143F97ACA0C89A869121F7A0216C6F6B6B6DAD6A6A4F` |
+
+| Configuration / local TRX | Methods / discovered / selected / executed | PASS / FAIL / skipped / unexpected timeout / aborted |
+|---|---|---|
+| Actual100%, Light/Dark, `t03-candidate3-final100.trx` | **227 /312 /312 /312** | **312 /0 /0 /0 /0** |
+| Actual125%, Light/Dark, `t03-candidate3-final125.trx` | **227 /312 /312 /312** | **311 /1 /0 /0 /0**; full-run failure retained |
+| Actual125%, exclusive desktop, `t03-candidate3-lookup125-exclusive.trx` | Same frozen binary /1 selected /1 executed | **1 /0 /0 /0 /0**; exact failed Light lookup row |
+
+The 100% run completed on 2026-10-19 at **14:29:56–14:48:24 +07:00**, with1107.68s TRX wall time. Its312 unique discovered names exactly match312 final TRX results. All18 packaged rows passed, including the previously failing receipt/Post/Stock Light. The new real-control popup-order fact also passed. Source now contains227 methods:187 Facts plus40 Theories with125 InlineData rows; the19 T03 additions contribute30 invocations beyond T02's282.
+
+The17 UIA processes verified PerMonitorV2;61 window observations record **monitor scale100 / effective monitor DPI96 / Desktop window DPI96**. Source logs identify the exact package/test revision above; each configured package case verifies manifest hashes and runtime identity boundaries. The earlier six SQL projects306/306, Session108/108 and Architecture12/12 remain the affected-scope regression evidence at `e412ebc`; only the temporary probe/control regression changed afterward. Those broader project results are not relabeled as executions at the final revision, and Server.Application/full P6 regression is not claimed.
+
+All17 GUI SQL allocations from the final100% run have complete instance/database-ID/create-date/ownership-marker snapshots and three captured principal identities. They completed verified process/worker/connection drain and exact ownership cleanup. All134 local GUI resource ledgers (including earlier trials) record successful guarded drop; read-only queries of every exact captured database/principal name found zero remaining. Process inspection found zero owned GUI probes/package processes. Four early development ledgers lack the expanded database snapshot, as noted above; none belongs to this final matrix. No prefix deletion or uncertain ownership cleanup was performed.
+
+The owner confirmed the actual desktop transition to125%, retaining1920×1080. The full125% run completed **2026-10-19 14:50:50–15:09:00 +07:00**,1090.07s TRX wall time: **311 PASS /1 FAIL /0 skipped**. Only `Same_process_lookup_messages_preserve_history_reject_inactive_new_choices_and_reopen_fresh(theme: "Light")` failed at `inactive-new-selection-Product`, waiting for visible lookup result status. All three same-process refresh and historical-selection checks had already passed; the Dark row and every other case passed. TRX timeout/abort counters are zero; this assertion failure is retained separately from deliberate timeout tests.
+
+The owner confirmed using/switching windows during that run. The existing vendor lookup controller closes its popup on application deactivation; this makes foreground interference consistent with the observed missing popup, although no event trace proves the exact instant of deactivation. After requesting an exclusive desktop interval, the **same package, test DLL, assertions and budgets**, without rebuilding or source changes, ran only that exact Light row on a new owned disposable database. `t03-candidate3-lookup125-exclusive.trx` passed **1/1**, **15:12:00–15:14:10 +07:00**,129.85s wall time. It exercised the complete lookup/history/inactive-new-choice/restart scenario and SQL oracles. This was a separate test execution after verified cleanup, not an unchecked retry of a business mutation.
+
+Full100% and full125% TRX contain the same312 unique display names; the focused row exactly equals the sole failed125% name. Thus **312 unique automated obligations have passing results at each scale on these frozen binaries**. The125% evidence is explicitly **311/1 full run plus1/0 focused rerun**, not a claim that an unfiltered125% run passed312/312. All18 packaged obligations have automated passing results in both configurations. The125% full run recorded59 window observations and the focused rerun4: **monitor scale125 / effective monitor DPI120 / Desktop window DPI96**. This does not establish pixel-perfect rendering or attended keyboard/visual acceptance. Future GUI runs require an exclusive foreground desktop; T06 retains the obligation for a fresh frozen full-suite acceptance run.
+
+The final100%, full125% and focused125% executions allocated **17 +17 +1** GUI databases respectively. Every one of these35 allocations has the full instance/database-ID/create-date/ownership-marker snapshot and three captured principal ID/SID/create-date identities, with no uncertain principal. All **152** local GUI resource ledgers, including earlier trials, record `DatabaseAndAllPrincipalsDroppedAfterVerifiedDrain`. Final read-only queries against every exact captured name found **zero databases and zero principals**; process inspection found **zero owned GUI probes/package processes**. Four early development ledgers lacking the expanded snapshot remain excluded from final-matrix ownership evidence. No prefix deletion was used. Manifest, Desktop, WinForms, migrator and test DLL hashes were rechecked after the focused run and remain exactly as listed above. Raw TRX/resource identities/logs remain local and ignored.
+
+Final ordinary project commands used the frozen DLL, with only expected scale and TRX filename changed between full configurations:
+
+```powershell
+$env:MYDMSVN_GUI_P5_PACKAGE = '<worktree>/artifacts/release/gui-p5-t03-candidate3'
+$env:MYDMSVN_GUI_P5_TEST_REVISION = '02eff225d41ff564769bedbb0ca4420d27233a67'
+$env:MYDMSVN_GUI_P5_EXPECTED_SCALE = '125' # '100' for final100
+# Full run: omit --filter; filenames t03-candidate3-final100.trx / t03-candidate3-final125.trx.
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore --no-build -p:PlatformTarget=x86 --filter '(FullyQualifiedName~Same_process_lookup_messages_preserve_history_reject_inactive_new_choices_and_reopen_fresh&DisplayName~Light)' --logger 'trx;LogFileName=t03-candidate3-lookup125-exclusive.trx' --logger 'console;verbosity=normal' --results-directory TestResults/gui-p5-t03 -- RunConfiguration.TargetPlatform=x86
+```
+
+**Current T03 exit: COMPLETE in task scope**, with the foreground-resource incident and focused-rerun qualification above. Date/tester:2026-10-19, Asia/Bangkok, Codex. This documentation-only follow-up does not replace executable source02eff22 or its frozen bytes. T04/T05 attended walkthroughs, T06 frozen full acceptance, both P5 sign-offs and REL/P6 G1–G5 remain OPEN; production readiness is not asserted.

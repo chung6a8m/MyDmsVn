@@ -2,7 +2,7 @@
 
 **Task:** GUI-P5-T00, [acceptance plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md). **Recorded:** 2026-10-19 (Asia/Bangkok), Codex; Project Owner approved the Minimal Disposable Test Topology and T00 scope in this chat on the same date. **Executable source:** `f275183c8b39dc2b712dc37be7f0f4ac71396357` on `v1a`, isolated implementation branch `codex/gui-p5-t00`; initial inventory/evidence commit `7cfefd4`. Documentation changes do not change the executable candidate.
 
-**Status: GUI-P5-T00 COMPLETE — reviewed inventory, owner-approved topology and explicit execution prerequisites. Packaged execution readiness remains BLOCKED / NOT TESTED as detailed below.** T00 completes reconciliation/planning, not environment certification. The source inventory and focused baseline below are evidence only for their stated scope. T03–T06, both attended P5 IDs, REL G1–G5 and production readiness remain OPEN. T01/T02 completion evidence is recorded separately below and in the verification document. Current T03 automation evidence is in Appendix D; historical T00 BLOCKED/NOT TESTED entries are not relabeled as runtime passes. No package was built or installed in T00; no package hash or real-login result is available.
+**Status: GUI-P5-T00 COMPLETE — reviewed inventory, owner-approved topology and explicit execution prerequisites. Packaged execution readiness remains BLOCKED / NOT TESTED as detailed below.** T00 completes reconciliation/planning, not environment certification. The source inventory and focused baseline below are evidence only for their stated scope. Current T00–T03 task scope is COMPLETE; T04–T06, both attended P5 IDs, REL G1–G5 and production readiness remain OPEN. T01/T02 completion evidence is recorded separately below and in the verification document. Current T03 automation evidence is in Appendix D; historical T00 BLOCKED/NOT TESTED entries are not relabeled as runtime passes. No package was built or installed in T00; no package hash or real-login result is available.
 
 ## 1. How to use this ledger
 
@@ -498,24 +498,24 @@ Each class is in `tests/MyDmsVn.Desktop.Tests/<Class>.cs`; names below are exact
 | `SecurityControlAcceptanceTests.Moving_between_columns_of_the_same_user_keeps_editor_and_preview` | Fact | 1 |
 | `SecurityControlAcceptanceTests.Changing_target_mode_while_user_import_preview_is_pending_cannot_confirm_old_user` | Fact | 1 |
 
-## Appendix D — T03 packaged real-login automation (final100% pending)
+## Appendix D — T03 packaged real-login automation (COMPLETE in task scope)
 
-**Frozen executable/package/test source:** `45c7b230334c550677379109b48a38d34566b3a1`, clean `gui-p5-t03-candidate2`; full hashes, topology, commands and oracles are in [T03 verification](GUI_P5_VERIFICATION.md#second-frozen-candidate--gui-p5-t03). This appendix updates current automation readiness; the T00 inventory above remains historical evidence. The owner confirmed that the designated non-production SQL instance is privately managed and approved for T03. Actual SQL2017 Developer14.0.2130.4 was provisioned with separate per-case GUI databases and migration/runtime/oracle principals; current schema001–009, restricted runtime grants, ownership and positive cleanup passed.
+**Frozen executable/package/test source:** `02eff225d41ff564769bedbb0ca4420d27233a67`, clean `gui-p5-t03-candidate3`; full hashes, topology, commands and oracles are in [T03 verification](GUI_P5_VERIFICATION.md#final-frozen-candidate--gui-p5-t03). This appendix updates current automation readiness; the T00 inventory above remains historical evidence. The owner confirmed that the designated non-production SQL instance is privately managed and approved for T03. Actual SQL2017 Developer14.0.2130.4 was provisioned with separate per-case GUI databases and migration/runtime/oracle principals; current schema001–009, restricted runtime grants, ownership and positive cleanup passed.
 
 | Obligation | Named packaged methods (`PackagedGuiAcceptanceTests`) | Actual100% Light/Dark | Actual125% Light/Dark |
 |---|---|---|---|
-| L1 / real authentication and session lifecycle | `Actual_packaged_login_uses_native_uia_and_authenticates_against_the_owned_database` | NOT TESTED (final candidate) | 2/2 PASS |
-| C1 / all four catalog create/edit/active actions | `Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes` | NOT TESTED (final candidate) | 2/2 PASS |
-| G1 / Draft, persisted reload/edit/Post, balance/card and duplicate Post | `Packaged_receipt_draft_reload_edit_post_and_stock_reconcile_with_readonly_sql` | NOT TESTED (final candidate) | 2/2 PASS |
-| G1 / concurrent stale write and input preservation | `Two_actual_clients_reject_stale_receipt_save_and_preserve_losing_input` | NOT TESTED (final candidate) | 2/2 PASS |
-| Security / disabled Login and server-side direct Deny after enabled UI | `Disabled_login_and_server_direct_deny_reject_a_previously_enabled_write_without_mutation` | NOT TESTED (final candidate) | 2/2 PASS |
-| K1 / same-process changed lookup, inactive history/new choice and restart | `Same_process_lookup_messages_preserve_history_reject_inactive_new_choices_and_reopen_fresh` | NOT TESTED (final candidate) | 2/2 PASS |
-| G1 / real SQL command timeout, uncertain Post, explicit reload and checked retry | `Real_sql_post_timeout_locks_mutation_until_explicit_reload_and_checked_retry` | NOT TESTED (final candidate) | 2/2 PASS |
-| G1 / invalid fields and no inventory mutation | `Invalid_receipt_fields_preserve_input_and_create_no_inventory` | NOT TESTED (final candidate) | 2/2 PASS |
-| SQL identity/schema/permissions/ownership | `Disposable_gui_topology_separates_provisioning_migration_runtime_and_readonly_oracle` | NOT TESTED (final candidate) | 1/1 PASS (no theme) |
-| L1 / unavailable SQL safe startup and process drain | `Unavailable_sql_startup_is_safe_owned_and_drains_under_native_uia` | NOT TESTED (final candidate) | 1/1 PASS (default Login theme) |
+| L1 / real authentication and session lifecycle | `Actual_packaged_login_uses_native_uia_and_authenticates_against_the_owned_database` | 2/2 PASS | 2/2 PASS |
+| C1 / all four catalog create/edit/active actions | `Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes` | 2/2 PASS | 2/2 PASS |
+| G1 / Draft, persisted reload/edit/Post, balance/card and duplicate Post | `Packaged_receipt_draft_reload_edit_post_and_stock_reconcile_with_readonly_sql` | 2/2 PASS | 2/2 PASS |
+| G1 / concurrent stale write and input preservation | `Two_actual_clients_reject_stale_receipt_save_and_preserve_losing_input` | 2/2 PASS | 2/2 PASS |
+| Security / disabled Login and server-side direct Deny after enabled UI | `Disabled_login_and_server_direct_deny_reject_a_previously_enabled_write_without_mutation` | 2/2 PASS | 2/2 PASS |
+| K1 / same-process changed lookup, inactive history/new choice and restart | `Same_process_lookup_messages_preserve_history_reject_inactive_new_choices_and_reopen_fresh` | 2/2 PASS | 2/2 PASS across full Dark + focused Light; full Light failure retained |
+| G1 / real SQL command timeout, uncertain Post, explicit reload and checked retry | `Real_sql_post_timeout_locks_mutation_until_explicit_reload_and_checked_retry` | 2/2 PASS | 2/2 PASS |
+| G1 / invalid fields and no inventory mutation | `Invalid_receipt_fields_preserve_input_and_create_no_inventory` | 2/2 PASS | 2/2 PASS |
+| SQL identity/schema/permissions/ownership | `Disposable_gui_topology_separates_provisioning_migration_runtime_and_readonly_oracle` | 1/1 PASS (no theme) | 1/1 PASS (no theme) |
+| L1 / unavailable SQL safe startup and process drain | `Unavailable_sql_startup_is_safe_owned_and_drains_under_native_uia` | 1/1 PASS (default Login theme) | 1/1 PASS (default Login theme) |
 
-The18 added Desktop methods contribute29 invocations:10 packaged methods/18 rows, plus these8 methods/11 control/infrastructure rows:
+The19 added Desktop methods contribute30 invocations:10 packaged methods/18 rows, plus these9 methods/12 control/infrastructure rows:
 
 | Added method | Rows |
 |---|---:|
@@ -527,7 +527,8 @@ The18 added Desktop methods contribute29 invocations:10 packaged methods/18 rows
 | `GuiOwnedProcessTests.Normal_tree_exit_allows_a_short_bounded_natural_drain` | 1 |
 | `GuiOwnedProcessTests.Infrastructure_probe_does_not_inherit_SQL_credentials` | 1 |
 | `GuiOwnedProcessTests.Poisoned_gui_session_blocks_SQL_allocation_before_configuration_or_database_work` | 1 |
+| `InventoryAccessibilityAcceptanceTests.Lookup_F4_keeps_results_open_when_typing_has_already_opened_them` | 1 |
 
-Unfiltered125% final Desktop source/discovery/TRX reconcile **226 methods /311 invocations /311 PASS /0 failed/skipped**, including all18 packaged rows and all282 prior T02 display names. Actual effective monitorDPI120/scale125/windowDPI96 and32-bit testhost are recorded in the TRX. Session108/108, Architecture12/12 and the six sequential SQL projects306/306 passed. The17 GUI allocations from this125% run drained/dropped with exact ownership; read-only follow-up found zero captured databases/principals and zero owned GUI processes remaining. Raw evidence remains ignored, with no credentials/raw SQL IDs/screenshots committed.
+Unfiltered100% final Desktop source/discovery/TRX reconcile **227 methods /312 invocations /312 PASS /0 failed/skipped**, including all18 packaged rows and all282 prior T02 display names. Actual effective monitorDPI96/scale100/windowDPI96 and32-bit testhost are recorded in the TRX. Session108/108, Architecture12/12 and the six sequential SQL projects306/306 passed. The17 GUI allocations from this100% run drained/dropped with exact ownership; read-only follow-up found zero captured databases/principals and zero owned GUI processes remaining. Raw evidence remains ignored, with no credentials/raw SQL IDs/screenshots committed.
 
-**T03 remains OPEN pending a clean idempotent-lookup-driver candidate and complete100%/125% execution.** Candidate2 passed125%311/311, then its100% run failed1/311 at a lookup-open toggle race in the driver. A controlled popup-order check and corrected F4 native receipt/Post/Stock Light now pass; the failed run is preserved. One new control fact brings expected source to227 methods/312 invocations. The earlier candidate results remain historical evidence. T04/T05 attended walkthroughs, T06 frozen acceptance and REL/P6 gates remain OPEN.
+**T03 COMPLETE in task scope.** Final125% full execution was311 PASS/1 FAIL/0 skipped; the exact failed Light lookup row passed1/1 on the same frozen binaries after requesting an exclusive desktop. The owner confirmed window switching during the full run; popup closure on deactivation is consistent with that failure, without an event-level causal trace. The312 unique names reconcile exactly across configurations, with all312 ultimately passing automatically; this is not an unfiltered125%312/312 pass. Full125% plus focused rerun recorded63 observations of monitorDPI120/scale125/windowDPI96. The35 final GUI allocations all have complete ownership/principal snapshots and verified cleanup; all152 local GUI ledgers are dropped, with exact-name SQL census and owned-process census zero. Package/test hashes are unchanged. Failed trials remain separately recorded, and future runs require an exclusive foreground desktop. T04/T05 attended walkthroughs, T06 frozen acceptance and REL/P6 gates remain OPEN.
