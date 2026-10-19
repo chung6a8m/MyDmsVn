@@ -38,9 +38,11 @@ A claimed **full GUI** acceptance needs an explicit behavior-to-test ledger, not
 
 ### GUI-P5-T00 — Reconcile source and baseline
 
-- [ ] Read the current GUI/ViewModel implementations, Test Facts/Theory rows, permission keys, production DI, packaging and available UI Automation selectors. List all `MyDmsVn.Desktop.Tests` methods and separately record selected/discovered/executed/skipped cases. The historical 139 are not evidence that current GUI tests passed.
-- [ ] Publish `docs/GUI_P5_COVERAGE_MATRIX.md` with exact source test mapping, uncovered control/packaged paths, owning task, proposed supported Windows/DPI/test SQL configurations and supported native UI Automation approach. Prove any external automation library works with net48/x86 in a small spike before adoption; never require brittle screen coordinates/global sleeps.
+- [x] Read the current GUI/ViewModel implementations, Test Facts/Theory rows, permission keys, production DI, packaging and available UI Automation selectors. List all `MyDmsVn.Desktop.Tests` methods and separately record selected/discovered/executed/skipped cases. The historical 139 are not evidence that current GUI tests passed.
+- [x] Publish `docs/GUI_P5_COVERAGE_MATRIX.md` with exact source test mapping, uncovered control/packaged paths, owning task, proposed supported Windows/DPI/test SQL configurations and supported native UI Automation approach. Prove any external automation library works with net48/x86 in a small spike before adoption; never require brittle screen coordinates/global sleeps.
 - [ ] Pin an approved disposable test topology, least-privilege runtime identity, secure credentials and cleanup procedure. Capture baseline supported/not-tested distinction.
+
+**T00 execution (2026-10-19):** [Coverage matrix and complete source inventory](../GUI_P5_COVERAGE_MATRIX.md) at source `f275183c8b39dc2b712dc37be7f0f4ac71396357`: 138 methods / 139 discovered invocations; focused Login/infrastructure baseline 10 passed, 0 failed/skipped, remaining 129 NOT RUN. Native UIA is proposed; no external library adopted or packaged E2E claimed. Actual topology/limited identities and operator approval remain OPEN, so T00 is IN PROGRESS and T01–T06/P5/P6 remain OPEN.
 
 **Exit:** reviewed coverage matrix with executable owners and explicit prerequisites.
 
