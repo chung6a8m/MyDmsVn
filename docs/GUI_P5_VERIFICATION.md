@@ -135,7 +135,7 @@ Independent Codex code review found the two security issues above; both were fix
 
 ## GUI-P5-T03 — Packaged real-login E2E candidate (acceptance OPEN)
 
-**Implementation:** `30171015f46fa553d9524329038b1b9afd95e727`; branch `codex/gui-p5-t00`, managed worktree `gui-p5-t00/CleanArchitecture`. **Date/tester:** 2026-10-19 (Asia/Bangkok), Codex. The frozen candidate and100% regression results are recorded below; independent review is complete. Actual125% Light/Dark execution is still pending, so no T03/P5/P6 completion is asserted here.
+**Implementation:** `30171015f46fa553d9524329038b1b9afd95e727`; branch `codex/gui-p5-t00`, managed worktree `gui-p5-t00/CleanArchitecture`. **Date/tester:** 2026-10-19 (Asia/Bangkok), Codex. Frozen candidate results are recorded below; independent review is complete. Corrected-probe candidate125% Light/Dark passed; its final100% execution is still pending, so no T03/P5/P6 completion is asserted here.
 
 ### Approved topology and actual provision
 
@@ -181,7 +181,7 @@ The real SQL timeout is an owned-database-only temporary trigger installed **aft
 - Earlier development TRX separately establish real Login lifecycle, all four catalog flows, disabled/direct-Deny and invalid-input cases. They span intermediate revisions and do not form a combined frozen-candidate pass.
 - Focused receipt/lookup control regression: **53/53 PASS**; stock accessibility/control regression: **18/18 PASS**. Final process/environment/poison admission plus safe startup probe: **13/13 PASS**. The topology/context follow-up: **2/2 PASS**. Raw TRX, package outputs, allocation identities and diagnostics remain local/ignored.
 
-### Frozen candidate — 100% complete; 125% pending
+### First frozen candidate — 100% PASS; 125% FAIL
 
 The clean candidate was published with the existing `deployment/release/Publish-LocalRelease.ps1 -Version 1.0.0-guip5-t03` under the bounded supervisor. Manifest source is **`e412ebc41cce554953585d5d1ec4f3839a301e42`**, `sourceTreeDirty=false`, schema maximum9, exactly the Desktop and admin migrator net48/win-x86 packages. Local output is `artifacts/release/gui-p5-t03-candidate1/`. The test sources at that same revision were built Release/net48/x86; package rows require the matching `MYDMSVN_GUI_P5_TEST_REVISION` and log that exact revision. Documentation-only follow-up does not replace these tested executable bytes.
 
@@ -237,3 +237,26 @@ Temporary diagnostic startup probes (`t03-scale125-diagnostic`, `t03-scale125-mo
 The probe now declares and verifies PerMonitorV2 awareness before any UIA call and measures the actual monitor's effective DPI using `GetDpiForMonitor(MDT_EFFECTIVE_DPI)`, checking equal axes and successful HRESULT. It compares measured DPI/96 against the declared100/125 scale and logs observations before rejection. This changes only the temporary test client; shipped application DPI settings/manifest are unchanged. Microsoft describes [UIA client scaling](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-screenscaling) and the awareness-dependent [effective monitor DPI return values](https://learn.microsoft.com/en-us/windows/win32/api/shellscalingapi/nf-shellscalingapi-getdpiformonitor). Existing native startup assertions now require the declared UIA context. Focused startup and real-Login Light passed **2/2** at actual125% (`t03-scale125-effective-green.trx`, working-tree trial); this does not substitute for the full matrix.
 
 **Outstanding before T03 exit:** freeze the corrected probe and clean publication, rerun full125% Light/Dark, then100% on the same candidate, reconcile discovery/TRX and verify final resource cleanup. T03 checkboxes stay OPEN. T04–T06, both attended P5 IDs and REL G1–G5 remain OPEN independently.
+
+### Final frozen candidate — GUI-P5-T03
+
+**Source/package/test revision:** `45c7b230334c550677379109b48a38d34566b3a1`; clean `artifacts/release/gui-p5-t03-candidate2/`, same two net48/win-x86 packages and schema9. Only the UIA probe DPI measurement/context and its existing startup assertion changed after the earlier candidate. Product source, SQL helper, package tooling and dependency graph are unchanged. A follow-up review by the same independent reviewer found no issue in the DPI delta; no second fresh review agent or concurrent test executor was introduced.
+
+| Artifact | Final candidate SHA-256 |
+|---|---|
+| `release-manifest.json` | `90A2F50ECBE559306B2ED9D071B374AE1723D4021369031671A716D46D214CA0` |
+| Desktop `MyDmsVn.Desktop.App.exe` | `1EDF0EE3EFE6AB898032B7589CE34668CDF922B3351BB50255F61D299200589B` |
+| Desktop `MyDmsVn.Desktop.WinForms.dll` | `A406D03A0BE30EC01F1FD33FB7CF296B3065A009B161FAAC90395482A69F753D` |
+| Admin `MyDmsVn.Server.DbMigrator.exe` | `009E908E6341CEE1CDA8C14A44D755E355231D7E43CF4700AA92E3B9FFF0B9A4` |
+| Test `MyDmsVn.Desktop.Tests.dll` | `F8E9529286FBD19A6B01510EA53E3C5E98F818FF4B67273B830A3EC036AF84A6` |
+
+| Final configuration / local TRX | Source / discovery / selected / executed | PASS / FAIL / skipped / unexpected timeout / aborted |
+|---|---|---|
+| Actual125%, Light/Dark, `t03-candidate2-final125.trx` | 226 methods /311 /311 /311 | **311 /0 /0 /0 /0** |
+| Actual100%, Light/Dark, same candidate | NOT RUN; owner transition pending | **NOT TESTED** |
+
+The125% run completed2026-10-19 **13:24:15–13:43:36 +07:00**,1160.34s TRX wall time. All311 discovered names exactly match unique TRX results, including18/18 packaged rows and all282 original T02 display names. The17 UIA processes verified `PerMonitorV2`;61 window observations recorded **monitor scale125 / effective monitor DPI120 / Desktop window DPI96**. Native32-bit and64-bit independent metadata also observed125%, with active1920×1080. The application's virtualized96 window DPI is recorded literally; no per-monitor-aware product, pixel-perfect rendering or supported-OS certification is asserted.
+
+All17 SQL GUI allocations in this125% run completed verified drain and exact ownership cleanup. Including prior development, first100% and failed125% trials, all99 local GUI resource ledgers record `DatabaseAndAllPrincipalsDroppedAfterVerifiedDrain`. Read-only queries against every exact captured database/principal name found zero remaining; process inspection found zero owned package/probe processes. The owner was then notified to restore100% for the final same-candidate run. Cleanup ambiguity was not observed and no prefix deletion was used. Four early development ledgers (before the expanded snapshot existed) omit the additional instance/database-ID/create-date/marker JSON object; their captured three-principal identities and successful guarded helper cleanup remain recorded. They are not used as final-matrix ownership evidence. All17 final125% allocations include the full ownership snapshot and three principal identities.
+
+**Current exit status: OPEN — final100% rerun and reconciliation pending.** The earlier candidate's100% pass is preserved above but does not substitute for this corrected-probe candidate's100% matrix.
