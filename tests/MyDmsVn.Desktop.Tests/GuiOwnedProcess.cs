@@ -57,6 +57,12 @@ namespace MyDmsVn.Desktop.Tests
                     if (reason == null)
                     {
                         exitCode = child.ExitCode;
+                        // Job accounting and short-lived compiler helpers may finish just after the root handle signals.
+                        // Allow a bounded natural drain inside the caller's budget, then still reject actual orphans.
+                        var naturalDrain = Stopwatch.StartNew();
+                        while (child.ActiveProcesses != 0 && naturalDrain.Elapsed < TimeSpan.FromMilliseconds(500)
+                            && clock.Elapsed < timeout && !cancellationToken.IsCancellationRequested)
+                            await Task.Delay(20).ConfigureAwait(false);
                         if (child.ActiveProcesses != 0)
                         {
                             reason = "DescendantsOutlivedParent";

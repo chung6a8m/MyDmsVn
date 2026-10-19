@@ -17,6 +17,13 @@ internal static class GuiProcessProbe
         SetErrorMode(0x0001 | 0x0002);
         WerSetFlags(0x0002);
         string mode = args[0];
+        if (mode == "draining-child") { Thread.Sleep(150); return 0; }
+        if (mode == "draining-parent")
+        {
+            using (var child = Process.Start(new ProcessStartInfo(Assembly.GetExecutingAssembly().Location, "draining-child") { UseShellExecute = false, CreateNoWindow = true }))
+                Console.WriteLine("PID=" + child.Id);
+            return 0;
+        }
         Console.WriteLine("PID=" + Process.GetCurrentProcess().Id);
         Console.WriteLine("BITNESS=" + (IntPtr.Size * 8));
         if (mode == "tree" || mode == "orphan")

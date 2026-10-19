@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -105,6 +106,61 @@ public sealed class PackagedGuiAcceptanceTests
             Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
             await fixture.AssertPostedReceiptAsync();
+        });
+    }
+
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
+    public async Task Disabled_login_and_server_direct_deny_reject_a_previously_enabled_write_without_mutation(string theme)
+    {
+        var package = ValidatedPackage();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            await fixture.SeedNegativeActorsAsync();
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var barrier = Path.Combine(Path.GetTempPath(), "MyDmsVn.GuiBarrier-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(barrier);
+            using var cancellation = new CancellationTokenSource();
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" negative-audit " + theme);
+            fixture.ConfigureRuntime(start);
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_ACTOR_PASSWORD"] = fixture.ActorPassword;
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
+            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(2), cancellation.Token);
+            GuiProcessResult? result = null;
+            Exception? initial = null;
+            try
+            {
+                var wait = Stopwatch.StartNew();
+                while (!File.Exists(Path.Combine(barrier, "ready")) && !execution.IsCompleted && wait.Elapsed < TimeSpan.FromSeconds(40))
+                    await Task.Delay(25);
+                if (!File.Exists(Path.Combine(barrier, "ready")))
+                {
+                    await execution;
+                    throw new TimeoutException("GUI permission barrier was not reached.");
+                }
+                await fixture.DenyProductWriteAsync();
+                File.WriteAllText(Path.Combine(barrier, "release"), "release");
+                result = await execution;
+            }
+            catch (Exception error) { initial = error; }
+            finally
+            {
+                if (!execution.IsCompleted) cancellation.Cancel();
+                try { await execution; }
+                catch (Exception error) { if (initial == null) initial = error; }
+                File.Delete(Path.Combine(barrier, "ready"));
+                File.Delete(Path.Combine(barrier, "release"));
+                Directory.Delete(barrier); // Exact owned, now empty directory; never recursive/prefix cleanup.
+            }
+            if (initial != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(initial).Throw();
+            _output.WriteLine(result!.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("DISABLED_LOGIN_REJECTED=PASS", result.StandardOutput);
+            Assert.Contains("SERVER_DIRECT_DENY=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertDeniedAndNoMutationAsync();
         });
     }
 

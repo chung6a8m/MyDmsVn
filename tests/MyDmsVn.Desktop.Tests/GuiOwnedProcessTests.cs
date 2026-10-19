@@ -76,6 +76,15 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Normal_tree_exit_allows_a_short_bounded_natural_drain()
+        {
+            var result = await GuiOwnedProcess.RunAsync(_probe.Start("draining-parent"), TimeSpan.FromSeconds(10));
+            Assert.Equal(0, result.ExitCode);
+            Assert.True(result.CleanupVerified);
+            AssertOwnedPidsExited(result.StandardOutput);
+        }
+
+        [Fact]
         public async Task Fatal_child_failure_returns_exit_and_diagnostics_without_poisoning_testhost()
         {
             var result = await GuiOwnedProcess.RunAsync(_probe.Start("crash"), TimeSpan.FromSeconds(15));

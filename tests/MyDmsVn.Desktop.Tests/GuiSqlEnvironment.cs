@@ -33,6 +33,44 @@ internal sealed class GuiSqlEnvironment : IDisposable
     private readonly string _resourceFile;
     public string OwnerPassword { get; } = Guid.NewGuid().ToString("N") + "aA9!";
     public const string OwnerUsername = "gui.p5.owner";
+    public string ActorPassword { get; } = Guid.NewGuid().ToString("N") + "aA9!";
+
+    public async Task SeedNegativeActorsAsync()
+    {
+        using var connection = new SqlConnection(_migration);
+        await connection.OpenAsync();
+        using var command = new SqlCommand(
+            "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm,IsActive) VALUES " +
+            "(N'gui.p5.disabled',N'GUI.P5.DISABLED',N'GUI P5 Disabled',N'Local',@hash,N'',N'BCrypt',0)," +
+            "(N'gui.p5.deny',N'GUI.P5.DENY',N'GUI P5 Deny',N'Local',@hash,N'',N'BCrypt',1); " +
+            "INSERT dbo.Roles(RoleName,NormalizedRoleName) VALUES(N'GUI P5 Writer',N'GUI P5 WRITER'); " +
+            "DECLARE @role int=SCOPE_IDENTITY(),@user int=(SELECT UserId FROM dbo.Users WHERE NormalizedUsername=N'GUI.P5.DENY'); " +
+            "INSERT dbo.UserRoles(UserId,RoleId) VALUES(@user,@role); " +
+            "INSERT dbo.RolePermissions(RoleId,PermissionKey) VALUES(@role,N'Catalog.Products.Read'),(@role,N'Catalog.Products.Write');",
+            connection) { CommandTimeout = 15 };
+        command.Parameters.AddWithValue("@hash", new BcryptPasswordHasher(10).Hash(ActorPassword));
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public async Task DenyProductWriteAsync()
+    {
+        await ExecuteAsync(_migration,
+            "INSERT dbo.UserPermissions(UserId,PermissionKey,Granted) SELECT UserId,N'Catalog.Products.Write',0 " +
+            "FROM dbo.Users WHERE NormalizedUsername=N'GUI.P5.DENY';");
+    }
+
+    public async Task AssertDeniedAndNoMutationAsync()
+    {
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.Users u JOIN dbo.UserRoles ur ON ur.UserId=u.UserId " +
+            "JOIN dbo.RolePermissions rp ON rp.RoleId=ur.RoleId JOIN dbo.UserPermissions up ON up.UserId=u.UserId " +
+            "AND up.PermissionKey=rp.PermissionKey WHERE u.NormalizedUsername=N'GUI.P5.DENY' " +
+            "AND rp.PermissionKey=N'Catalog.Products.Write' AND up.Granted=0;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.Users WHERE NormalizedUsername=N'GUI.P5.DISABLED' AND IsActive=0;"));
+        foreach (var table in new[] { "Products", "GoodsReceipts", "GoodsReceiptLines", "StockLedger", "StockBalances" })
+            Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo." + table + ";"));
+    }
 
     private GuiSqlEnvironment(SqlTestDatabase database, string administration, string repository)
     {

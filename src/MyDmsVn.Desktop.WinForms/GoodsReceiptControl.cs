@@ -113,6 +113,7 @@ namespace MyDmsVn.Desktop.WinForms
                 Minimum = 0,
                 Maximum = GoodsReceiptContractLimits.MaximumQuantity,
                 AccessibleName = "Quantity",
+                AccessibleRole = AccessibleRole.Grouping,
             };
             UnitCostEditor = new BootstrapNumericBox
             {
@@ -121,6 +122,7 @@ namespace MyDmsVn.Desktop.WinForms
                 Minimum = 0,
                 Maximum = GoodsReceiptContractLimits.MaximumUnitCost,
                 AccessibleName = "Unit cost",
+                AccessibleRole = AccessibleRole.Grouping,
             };
             AddLineButton = CreateButton("Add line", AddLine);
             RemoveLineButton = CreateButton("Remove line", RemoveSelectedLine);

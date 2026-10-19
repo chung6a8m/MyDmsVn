@@ -44,6 +44,33 @@ internal static class GuiPackageProbe
                     throw new InvalidOperationException("Startup application did not exit safely.");
                 Console.WriteLine("STARTUP_SAFE_ERROR=PASS");
             }
+            else if (args[1] == "negative-audit")
+            {
+                _stage = "disabled-login";
+                var login = Window("MyDmsVn — Đăng nhập");
+                SetInput(login, "Username", "gui.p5.disabled", false);
+                SetInput(login, "Password", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), true);
+                Invoke(Find(login, "Đăng nhập", ControlType.Button, false));
+                Find(login, "Tên đăng nhập hoặc mật khẩu không đúng.", ControlType.Text, true);
+                Console.WriteLine("DISABLED_LOGIN_REJECTED=PASS");
+                var shell = Login("gui.p5.deny", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), "GUI P5 Deny");
+                Invoke(Find(shell, "Products", ControlType.Button, false));
+                var page = Find(shell, "Products", ControlType.TabItem, false);
+                SetInput(page, "Code", "GUI-DENY", false);
+                SetInput(page, "Name", "Must not persist", false);
+                SetInput(page, "Unit", "pcs", false);
+                var save = Find(page, "Save", ControlType.Button, false);
+                Wait(delegate { return save.Current.IsEnabled; }, "Writer grant did not enable Save before revocation.");
+                var barrier = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER");
+                File.WriteAllText(Path.Combine(barrier, "ready"), "ready");
+                Wait(delegate { return File.Exists(Path.Combine(barrier, "release")); }, "Permission update was not released.");
+                _stage = "server-direct-deny";
+                Invoke(save); // Existing UI still grants Write; the actual server must reauthorize this request.
+                Find(shell, "The operation is not permitted.", ControlType.Text, true);
+                if (InputValue(page, "Code") != "GUI-DENY") throw new InvalidOperationException("Denied edit was lost.");
+                CloseApplication(shell);
+                Console.WriteLine("SERVER_DIRECT_DENY=PASS");
+            }
             else if (args[1] == "inventory-audit")
             {
                 var shell = Login();
@@ -144,13 +171,18 @@ internal static class GuiPackageProbe
 
     private static AutomationElement Login()
     {
+        return Login("gui.p5.owner", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_OWNER_PASSWORD"), "GUI P5 Owner");
+    }
+
+    private static AutomationElement Login(string username, string password, string displayName)
+    {
         var login = Window("MyDmsVn — Đăng nhập");
         Dump(login); // Names/patterns only, before any credential is entered.
-        SetInput(login, "Username", "gui.p5.owner", false);
-        SetInput(login, "Password", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_OWNER_PASSWORD"), true);
+        SetInput(login, "Username", username, false);
+        SetInput(login, "Password", password, true);
         Invoke(Find(login, "Đăng nhập", ControlType.Button, false));
         var shell = Window("MyDmsVn");
-        Find(shell, "GUI P5 Owner", ControlType.Text, false);
+        Find(shell, displayName, ControlType.Text, false);
         Dump(shell);
         var theme = Find(shell, "Theme toggle", ControlType.Button, false);
         if (theme.Current.HelpText != "Current theme: " + _theme) Invoke(theme);
@@ -170,6 +202,7 @@ internal static class GuiPackageProbe
         SetInput(page, "Note", "GUI draft", false);
         Invoke(Find(page, "Add line", ControlType.Button, false));
         SetInput(page, "Product", "GUI-PROD - UIA Product Updated", false);
+        Dump(page);
         SetInput(page, "Quantity", 2.5m.ToString("F4"), false);
         SetInput(page, "Unit cost", 4m.ToString("F4"), false);
         InputEditor(page, "Note").SetFocus();
@@ -257,7 +290,7 @@ internal static class GuiPackageProbe
             if (editor != null && !Automation.Compare(editor, candidate)) { _detail = "Ambiguous input selector"; throw new InvalidOperationException(); }
             editor = candidate;
         }
-        if (editor == null) { _detail = "Input unavailable"; throw new InvalidOperationException(); }
+        if (editor == null) { _detail = "Input unavailable: " + name; throw new InvalidOperationException(); }
         return editor;
     }
 
@@ -284,7 +317,7 @@ internal static class GuiPackageProbe
     private static void Dump(AutomationElement root)
     {
         var children = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
-        for (var index = 0; index < children.Count && index < 80; index++)
+        for (var index = 0; index < children.Count && index < 160; index++)
         {
             var item = children[index];
             if (item.Current.IsPassword) continue;

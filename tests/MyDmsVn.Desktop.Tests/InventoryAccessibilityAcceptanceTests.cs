@@ -38,6 +38,8 @@ public sealed class InventoryAccessibilityAcceptanceTests
             Assert.NotNull(line);
             line!.DoDefaultAction();
             Assert.Equal(2.5m, fixture.Control.QuantityEditor.Value);
+            Assert.Equal(AccessibleRole.Grouping, fixture.Control.QuantityEditor.AccessibilityObject.Role);
+            Assert.Equal(AccessibleRole.Grouping, fixture.Control.UnitCostEditor.AccessibilityObject.Role);
             var quantity = AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject)
                 .First(item => item.Role == AccessibleRole.Cell && item.Description == "Quantity");
             Assert.True((quantity.State & AccessibleStates.ReadOnly) != 0);
