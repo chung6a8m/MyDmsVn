@@ -100,6 +100,47 @@ public sealed class InventoryAccessibilityAcceptanceTests
             Assert.Equal("No selection", lookup.AccessibilityObject.Help);
         }, TimeSpan.FromSeconds(10));
     }
+    [Fact]
+    public void Lookup_F4_keeps_results_open_when_typing_has_already_opened_them()
+    {
+        StaTest.Run(token =>
+        {
+            using var guard = new WinFormsTestGuard();
+            using var fixture = new ReceiptFixture("Draft", new WaitingDelay());
+            using var host = Show(fixture.Control);
+            fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
+            var lookup = fixture.Control.WarehouseLookup;
+            lookup.SearchDebounceMilliseconds = 0;
+            lookup.Focus();
+            lookup.Text = "C2";
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
+            while (!lookup.IsDropDownOpen && elapsed.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                System.Windows.Forms.Application.DoEvents();
+                Thread.Yield();
+            }
+            Assert.True(lookup.IsDropDownOpen); // Typing can open results before the driver acts.
+            var children = new List<Control> { lookup };
+            for (var index = 0; index < children.Count; index++) children.AddRange(children[index].Controls.Cast<Control>());
+            var toggle = children.Single(item => item.AccessibleName == "Open lookup results");
+            var mouseDown = toggle.GetType().GetMethod("OnMouseDown", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(mouseDown);
+            mouseDown!.Invoke(toggle, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 0, 0, 0) });
+            Assert.False(lookup.IsDropDownOpen); // The old driver's action closes an already-open popup.
+            var method = lookup.GetType().GetMethod("OnEditorKeyDown", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(method);
+            for (var index = 0; index < 2; index++)
+            {
+                var key = new KeyEventArgs(Keys.F4);
+                method!.Invoke(lookup, new object[] { key });
+                Assert.True(key.Handled);
+                Assert.True(lookup.IsDropDownOpen); // Both closed and open starting states stay open.
+            }
+            lookup.CancelPendingEdit();
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(10));
+    }
+
     private static IEnumerable<AccessibleObject> AccessibleDescendants(AccessibleObject root)
     {
         for (var index = 0; index < root.GetChildCount(); index++)

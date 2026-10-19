@@ -238,7 +238,7 @@ The probe now declares and verifies PerMonitorV2 awareness before any UIA call a
 
 **Outstanding before T03 exit:** freeze the corrected probe and clean publication, rerun full125% Light/Dark, then100% on the same candidate, reconcile discovery/TRX and verify final resource cleanup. T03 checkboxes stay OPEN. T04–T06, both attended P5 IDs and REL G1–G5 remain OPEN independently.
 
-### Final frozen candidate — GUI-P5-T03
+### Second frozen candidate — GUI-P5-T03
 
 **Source/package/test revision:** `45c7b230334c550677379109b48a38d34566b3a1`; clean `artifacts/release/gui-p5-t03-candidate2/`, same two net48/win-x86 packages and schema9. Only the UIA probe DPI measurement/context and its existing startup assertion changed after the earlier candidate. Product source, SQL helper, package tooling and dependency graph are unchanged. A follow-up review by the same independent reviewer found no issue in the DPI delta; no second fresh review agent or concurrent test executor was introduced.
 
@@ -253,10 +253,20 @@ The probe now declares and verifies PerMonitorV2 awareness before any UIA call a
 | Final configuration / local TRX | Source / discovery / selected / executed | PASS / FAIL / skipped / unexpected timeout / aborted |
 |---|---|---|
 | Actual125%, Light/Dark, `t03-candidate2-final125.trx` | 226 methods /311 /311 /311 | **311 /0 /0 /0 /0** |
-| Actual100%, Light/Dark, same candidate | NOT RUN; owner transition pending | **NOT TESTED** |
+| Actual100%, Light/Dark, `t03-candidate2-final100.trx` | 226 methods /311 /311 /311 | **310 /1 /0 /0 /0**; NOT ACCEPTED |
 
 The125% run completed2026-10-19 **13:24:15–13:43:36 +07:00**,1160.34s TRX wall time. All311 discovered names exactly match unique TRX results, including18/18 packaged rows and all282 original T02 display names. The17 UIA processes verified `PerMonitorV2`;61 window observations recorded **monitor scale125 / effective monitor DPI120 / Desktop window DPI96**. Native32-bit and64-bit independent metadata also observed125%, with active1920×1080. The application's virtualized96 window DPI is recorded literally; no per-monitor-aware product, pixel-perfect rendering or supported-OS certification is asserted.
 
 All17 SQL GUI allocations in this125% run completed verified drain and exact ownership cleanup. Including prior development, first100% and failed125% trials, all99 local GUI resource ledgers record `DatabaseAndAllPrincipalsDroppedAfterVerifiedDrain`. Read-only queries against every exact captured database/principal name found zero remaining; process inspection found zero owned package/probe processes. The owner was then notified to restore100% for the final same-candidate run. Cleanup ambiguity was not observed and no prefix deletion was used. Four early development ledgers (before the expanded snapshot existed) omit the additional instance/database-ID/create-date/marker JSON object; their captured three-principal identities and successful guarded helper cleanup remain recorded. They are not used as final-matrix ownership evidence. All17 final125% allocations include the full ownership snapshot and three principal identities.
 
-**Current exit status: OPEN — final100% rerun and reconciliation pending.** The earlier candidate's100% pass is preserved above but does not substitute for this corrected-probe candidate's100% matrix.
+**Second-candidate exit: OPEN.** Its100% run completed310 PASS/1 FAIL; the failed receipt/Post/Stock Light row is retained separately. The next corrected driver candidate must pass both configurations before T03 closes.
+
+### Lookup opening race — corrected driver candidate pending
+
+The owner restored the desktop to100%, confirmed by the native API. The second candidate's unfiltered100% run (`t03-candidate2-final100.trx`) completed **310 PASS /1 FAIL /0 skipped**. Receipt/Post/Stock Light timed out at `receipt-draft`, waiting for the unique Product lookup result; the probe/application tree cleanup was verified. The other17 packaged rows passed. This run is not accepted as a complete matrix pass.
+
+A source-level timing boundary explained the driver defect: typing can auto-open lookup results, while the named dropdown affordance toggles an already-open popup closed. The driver had unconditionally invoked that toggle after typing. A controlled real-control fact now verifies that typing opens results before the action, the old affordance activation closes them, and F4 opens from the closed state and remains open from the open state. Its first setup attempt could not locate the affordance through local accessibility enumeration (`t03-lookup-open-order-proof`,0/1); using the actual child control activation produced1/1 PASS (`t03-lookup-open-order-confirmed`). The monotonic-wait follow-up also passed1/1.
+
+The temporary UIA driver now sends F4 to the verified focused HWND belonging to the owned application, then waits for exactly one native result and sends Enter through the same ownership/focus guard. The inactive-new-choice path uses the same idempotent open action. No vendor/control/business source, retry, wait budget or SQL behavior changed. The previously failing native receipt/Post/Stock Light plus the new control fact passed **2/2** (`t03-idempotent-open-positive.trx`, working-tree trial). The existing reviewer checked this small delta and found no blocking issue.
+
+**T03 remains OPEN.** A new clean publication and complete100%/125% matrix will record the final source and hashes. The added control fact increases current source to **227 methods:187 Facts and40 Theories /125 InlineData rows =312 expected invocations**; final discovery/TRX must confirm that count. All117 GUI resource ledgers after the focused native run record verified drain/drop; final ownership evidence will be recorded separately from these development trials.

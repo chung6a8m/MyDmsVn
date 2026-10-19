@@ -23,7 +23,6 @@ internal static class GuiPackageProbe
     [DllImport("user32.dll")] private static extern int GetAwarenessFromDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr key, IntPtr data);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
-    [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr window, uint flags);
 
     [STAThread]
     private static int Main(string[] args)
@@ -366,7 +365,7 @@ internal static class GuiPackageProbe
             _stage = "inactive-new-selection-" + names[index];
             SetInput(page, names[index], codes[index], false);
             var lookup = Find(page, names[index], ControlType.ComboBox, false);
-            Invoke(Find(lookup, "Open lookup results", ControlType.Button, false));
+            SendOwnedLookupKey(InputEditor(page, names[index]), 0x73); // F4 opens without toggling an already-open popup.
             VisibleOwnedText("0 / 0");
             InputEditor(page, "Note").SetFocus();
             Wait(delegate { return lookup.Current.HelpText == "No selection"; }, "Inactive catalog became selectable in a new draft.");
@@ -552,10 +551,8 @@ internal static class GuiPackageProbe
     {
         SetInput(page, name, display.Substring(0, display.IndexOf(" - ", StringComparison.Ordinal)), false);
         var lookup = Find(page, name, ControlType.ComboBox, false);
-        Invoke(Find(lookup, "Open lookup results", ControlType.Button, false));
         var editor = InputEditor(page, name);
-        var handle = new IntPtr(editor.Current.NativeWindowHandle);
-        var shell = GetAncestor(handle, 2);
+        SendOwnedLookupKey(editor, 0x73); // Typing may already have opened results; F4 is idempotent.
         try { Wait(delegate
         {
             var found = 0;
@@ -588,21 +585,27 @@ internal static class GuiPackageProbe
             }
             throw;
         }
-        editor.SetFocus();
-        uint process;
-        GetWindowThreadProcessId(handle, out process);
-        _detail = "Keyboard target must be the focused owned lookup editor.";
-        if (process != _application.Id) throw new InvalidOperationException("Keyboard input target is not an owned editor.");
-        Wait(delegate { return editor.Current.HasKeyboardFocus; }, "Owned lookup editor did not receive keyboard focus.");
-        if (!PostMessage(handle, 0x100, new IntPtr(13), new IntPtr(1)) ||
-            !PostMessage(handle, 0x101, new IntPtr(13), new IntPtr(unchecked((int)0xC0000001))))
-            throw new InvalidOperationException("Owned lookup keyboard input failed.");
+        SendOwnedLookupKey(editor, 13);
         try { Wait(delegate { return lookup.Current.HelpText == "Selected: " + display; }, "Lookup selection did not commit: " + name); }
         catch {
             Console.WriteLine("LOOKUP_HELP=" + lookup.Current.HelpText + ";TEXT=" + InputValue(page, name));
             Console.WriteLine("LOOKUP_FOCUS=" + InputEditor(page, name).Current.HasKeyboardFocus + ";NOTE_FOCUS=" + InputEditor(page, "Note").Current.HasKeyboardFocus);
             throw;
         }
+    }
+
+    private static void SendOwnedLookupKey(AutomationElement editor, int key)
+    {
+        var handle = new IntPtr(editor.Current.NativeWindowHandle);
+        editor.SetFocus();
+        uint process;
+        GetWindowThreadProcessId(handle, out process);
+        _detail = "Keyboard target must be the focused owned lookup editor.";
+        if (process != _application.Id) throw new InvalidOperationException("Keyboard input target is not an owned editor.");
+        Wait(delegate { return editor.Current.HasKeyboardFocus; }, "Owned lookup editor did not receive keyboard focus.");
+        if (!PostMessage(handle, 0x100, new IntPtr(key), new IntPtr(1)) ||
+            !PostMessage(handle, 0x101, new IntPtr(key), new IntPtr(unchecked((int)0xC0000001))))
+            throw new InvalidOperationException("Owned lookup keyboard input failed.");
     }
 
     private static AutomationElement InputEditor(AutomationElement root, string name)
