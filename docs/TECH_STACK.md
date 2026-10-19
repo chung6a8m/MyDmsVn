@@ -1,6 +1,6 @@
 # Technical stack and compatibility baseline
 
-**Current cutover:** L2DB-T06 on net48, 2026-10-19; [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup). RESP is accepted. T07 frozen-revision package/manual acceptance remains pending; historical evidence keeps its original provider/revision.
+**Current cutover:** L2DB-T00–T07 on net48, 2026-10-19; [T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke). RESP and L2DB plan-specific acceptance are complete. Broader P5/P6 release gates remain deferred; historical evidence keeps its original provider/revision.
 
 ## Runtime matrix
 
@@ -59,6 +59,6 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 
 ## Editing and future review
 
-Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; RESP and T00–T06 have scoped evidence; T07 acceptance remains pending.
+Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; RESP and L2DB-T00–T07 have scoped evidence; broader release acceptance remains deferred.
 
 Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or pins within RESP/L2DB.

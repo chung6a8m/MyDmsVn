@@ -28,7 +28,7 @@ One account may hold several roles. For ordinary users, an explicit user decisio
 - UTC audit fields, correlated/redacted diagnostics, DbUp migrations and explicit schema/deployment verification.
 - Existing password hash/salt columns and an algorithm-aware legacy boundary; legacy account support requires approved vectors or a separately accepted release exclusion.
 
-Product persistence now uses LINQ to DB and typed native SqlClient after L2DB-T03–T06, preserving workflows and contracts. T07 frozen-revision package/manual acceptance remains pending. Respawn changes test infrastructure only.
+Product persistence now uses LINQ to DB and typed native SqlClient after L2DB-T03–T06, preserving workflows and contracts. T07 frozen-revision correctness/package/Local smoke acceptance is complete; broader P5/P6 release acceptance remains deferred. Respawn changes test infrastructure only.
 
 ## 4. Acceptance behavior
 

@@ -2,7 +2,7 @@
 
 **Status:** Implemented schema at `v1a` commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed from source on 2026-10-18. This is a model of current SQL objects, not a new schema proposal or fresh SQL acceptance result.
 
-The application now uses LINQ to DB and typed native Microsoft.Data.SqlClient behind Application interfaces. [RESP](plans/20261018-002-respawn-fixture-reuse.md) first established the accepted test-fixture baseline using the pre-migration implementation; [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) then delivered LINQ to DB plus justified native SqlClient through T06; T07 package/manual acceptance remains pending. Both plans preserve this supported schema, DbUp history and business semantics. See [PERSISTENCE](PERSISTENCE.md) for provider/transaction ownership and [CONTRACTS](CONTRACTS.md) for public DTO behavior.
+The application now uses LINQ to DB and typed native Microsoft.Data.SqlClient behind Application interfaces. [RESP](plans/20261018-002-respawn-fixture-reuse.md) first established the accepted test-fixture baseline using the pre-migration implementation; [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) then delivered LINQ to DB plus justified native SqlClient through T06; T07 correctness/package/Local smoke acceptance is complete with verified temporary-resource cleanup; broader release gates remain deferred. Both plans preserve this supported schema, DbUp history and business semantics. See [PERSISTENCE](PERSISTENCE.md) for provider/transaction ownership and [CONTRACTS](CONTRACTS.md) for public DTO behavior.
 
 ## 1. Schema ownership and migration inventory
 

@@ -840,7 +840,7 @@ T07 remains **NOT RUN**: frozen-commit final matrix, release packaging/assets/bi
 
 ## L2DB-T07 — frozen revision acceptance and package smoke
 
-**Date:** 2026-10-19. **Frozen code/package revision:** `de3df037c8af40c23328dcc2f253339055eddc9e` (T06). **Branch/worktree:** codex/l2db-t00, the existing isolated worktree; clean before tests and publication. Subsequent T07 evidence edits are documentation only. This section records fresh T07 execution rather than reusing T06's results. **Status:** automated correctness/package gates passed; interactive smoke is pending a new restricted-runtime identity authorization.
+**Date:** 2026-10-19. **Frozen code/package revision:** `de3df037c8af40c23328dcc2f253339055eddc9e` (T06). **Branch/worktree:** codex/l2db-t00, the existing isolated worktree; clean before tests and publication. Subsequent T07 evidence edits are documentation only. This section records fresh T07 execution rather than reusing T06's results. **Status:** T07 and L2DB plan-specific acceptance complete. Automated correctness/package checks and the subsequently approved restricted-runtime packaged Local smoke passed; exact temporary-resource cleanup verified. Broader release gates remain deferred.
 
 ### Frozen correctness gate
 
@@ -888,7 +888,7 @@ No SkipPublish or output overwrite. Locked solution restore and sequential Deskt
 
 Independent checks verify exact ordered scripts001–009 against current source, minimum=maximum=9, net48 runtime config, actual x86 PE/32BITREQUIRED executable flags, linq2db/SqlClient DLLs, x86 native SNI machine header, binding redirects (Desktop14/admin12), no RepoDb/Dapper asset and no admin executable/SQL script in Desktop. Native assets/config remain together with each publish directory. AppCore stays PARKED / NOT RESTORED / NOT RUN / NOT SHIPPED. Prior T02 manifests retain their original224-file counts and revision; they are not overwritten or relabeled as this package.
 
-### Interactive runtime prerequisite and smoke
+### Interactive runtime prerequisite — historical approval checkpoint
 
 Desktop access was verified through computer-use. The environment has no separately configured runtime connection. The previous T02 approval authorized exactly its prepared one-login exception and was consumed with cleanup; it does not authorize another server principal. No new login or smoke database has been created yet. A credential-free local resource plan identifies exactly one new random login/SID on the designated test instance, no server role/additional server grant or authentication-mode change, and one helper-owned disposable database. The explicit setup would run packaged migration, unchanged principal provisioning, test-only superuser bootstrap and Warehouse/Employee reference seed. The prepared probe would supply a runtime-only child environment excluding test/admin credentials and generate its SQL password in memory, never printing/persisting it or passing it as an argument.
 
@@ -904,4 +904,46 @@ Operational rollback is a binary switch on unchanged schema9: stop/drain all cli
 
 P5 full interactive acceptance, P6 clean-machine/signing/install/upgrade/recovery/SQL support, HTTP v2 and runtime reactivation remain in [Deferred work](DEFERRED_WORK.md). L2DB smoke overlaps selected workflows but does not automatically close that backlog, waive release gates or claim performance improvement. No merge, push or deployment is performed.
 
-**T07 checkpoint:** correctness and clean package accepted in their stated scope; authenticated interactive smoke awaits explicit runtime-identity approval. T07 and overall L2DB final acceptance remain incomplete. The containing documentation commit binds this checkpoint; no candidate code changed.
+**Historical T07 checkpoint (e100dc8):** correctness and clean package accepted in their stated scope; authenticated interactive smoke awaits explicit runtime-identity approval. T07 and overall L2DB final acceptance remain incomplete. The containing documentation commit binds this checkpoint; no candidate code changed.
+
+
+### Approved packaged Local smoke — final execution
+
+On 2026-10-19 the owner explicitly authorized the pending exact one-login resource plan ("Tôi cho phép"). This supersedes the historical approval blocker above; T02 authority was not reused. The code/package remains frozen at `de3df037c8af40c23328dcc2f253339055eddc9e`; continuation began from documentation-only checkpoint `e100dc8a6b9e474b96aff0d5b25816f8bfec815c` in the existing isolated worktree. No product/test/package/fixture/production SQL bytes changed.
+
+After the sequential test and publication gates, the local net48/x86 probe ran one scenario with no competing SQL project. It used the unchanged helper's positively owned disposable database and exactly the prepared temporary SQL login/SID, generated its SQL password only in memory, and supplied Desktop only runtime credentials (test/admin variables removed). Setup used packaged migration, unchanged principal provisioning, the packaged bootstrap engine with synthetic test accounts and Warehouse/Employee seed on that disposable database. No server role, additional server grant, authentication-mode change or production resource was used. The actual runtime principal validator passed before startup and again after GUI drain. Packaged migrator exit0 and packaged Desktop `--smoke-test` exit0 preceded the actual interactive application; startup-only proof is not counted as business workflow evidence.
+
+The existing computer-use skill drove the actual packaged Desktop, with observed UI states and independent native SqlClient reads of this owned database. These are agent-operated manual workflow observations, not attended owner/P5 acceptance or additional xUnit results:
+
+| Workflow | Observed result |
+|---|---|
+| Login | Synthetic bound superuser authenticated; shell showed the expected display name. |
+| Product lifecycle | Created/read one Product, edited its name, deactivated and reactivated it; one unchanged identity persisted with the updated name and active state. Physical delete is not exposed by the current product. |
+| Same-process lookup refresh | Goods Receipts workspace was already open before the Product edit; its later lookup displayed and selected the updated Product name without reopening the workspace. |
+| Receipt Draft/Post | Selected seeded Warehouse/Employee, saved a Draft with quantity2.0000 and unit cost3.2500 (total6.50), then posted it. Grid/editor showed Posted; Save/Post and line/header editing became disabled. The existing resizable splitter was widened to expose header controls; no UI code was changed. |
+| Inquiry and independent oracle | Balance UI showed2.0000; Stock Card showed the same receipt and one +2.0000 GoodsReceipt movement, ending2.0000. Native reads independently confirmed one Posted receipt, exactly one ledger row/sum2.0000 and matching balance2.0000. |
+| Explicit assignment import | Created one ordinary active synthetic user through Security UI. JSON preview identified that user, current revision0 and exactly one additive Catalog.Products.Read Allow; reviewed confirmation was applied. Native reads showed exactly that direct assignment and user revision1, while bound superuser revision stayed0. |
+| Logout/relogin and permission deny | Signed out superuser and authenticated the ordinary user in the same process. Products read succeeded. Attempted Product edit/Save returned "The operation is not permitted"; Security administration and Balance query also denied access. Native reads after denial confirmed the Product name remained unchanged, no extra ledger movement/assignment and only the expected two audit records (user creation/import). Ordinary user was then signed out. |
+
+The approved execution used the local-only command below after explicit authorization (the ignored probe and resource plan are not shipped tooling):
+
+```powershell
+& ./tests/MyDmsVn.Server.Infrastructure.Security.Tests/bin/Release/net48/T07RuntimeProbe.exe `
+  (Join-Path $PWD 'artifacts/release/0.0.0-l2db.de3df037') `
+  $PWD.Path (Join-Path $PWD 'TestResults/l2db-t07-smoke/resource-plan.json') `
+  --execute-approved
+# Separate controller during this single live scenario:
+Set-Content TestResults/l2db-t07-smoke/command.txt snapshot
+# After all observed workflows:
+Set-Content TestResults/l2db-t07-smoke/command.txt finish
+```
+
+The probe was completed with the local ignored control command `finish`. It closed/awaited its exact Desktop process, verified drain and the unchanged native schema/grant/history fingerprint, reread final business state, and reran runtime-principal validation. Before cleanup it checked exact login SID/principal-id/create-date, zero sessions and no server role. The unchanged helper completed positive-owned database cleanup; login identity/session/role checks were repeated before dropping exactly that login, followed by absence by name/SID. Supervisor exit0, status DrainedAndVerified, and both cleanup success outputs were observed. No unresolved allocation/quarantine, orphan adoption, prefix cleanup or forced testhost termination remained. The intended single business permission assignment is part of the disposable smoke scenario, not a SQL grant or mutation of existing assignments; it disappeared with the owned database.
+
+After cleanup, all205 package file hashes/lengths and manifest SHA256 were independently rechecked unchanged; original581 TRX outcomes still reconcile exactly to frozen source methods/Theory rows. These are result/artifact reconciliation, not a second execution of the test matrix. No candidate fix required a rerun. Local probe/plan/status/snapshots/logs stay ignored and uncommitted; no SQL identifier, connection string, password or raw artifact is published here.
+
+Full W139 automated GUI invocations remain **NOT RUN (conditional)**: no UI behavior changed and this packaged smoke exposed no migration-related UI/package regression requiring W. Manual package observations are independent of automated totals. Administrator maintenance/recovery and a production/complete rollback workflow were **NOT RUN** in this runtime smoke; existing six-owner test coverage and the compatibility procedure above retain their own stated scopes. AppCore remains parked. Deferred P5/P6/HTTP/runtime checkboxes are not closed.
+
+**Final T07 result:** mandatory correctness581/0/0, clean net48/x86 package205-file integrity, required packaged Local workflows, runtime-principal/schema/grant/history checks and positive owned cleanup passed on frozen de3df037. **L2DB-T00–T07 and plan-specific L2DB acceptance are complete.** No broader release readiness, measured performance improvement, merge, push or deployment is claimed. The containing documentation commit records this approval continuation and final evidence.
+
+Final documentation checks:16 changed Markdown files are UTF-8 without BOM/CRLF,861 local link paths resolve, all seven T07 checkboxes have evidence, final native business/status assertions pass and `git diff --check` is clean. Diff against frozen de3df037 has no product/test-source/package/configuration change; the only changed test-directory file is tests/README.md. The original v1a checkout remains clean.

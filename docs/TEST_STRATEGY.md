@@ -1,6 +1,6 @@
 # Test coverage — MyDmsVn
 
-**Updated:** 2026-10-18. This document states what behavior must remain covered. [TEST_POLICY](TEST_POLICY.md) alone decides when/how broadly to execute it; [tests/README](../tests/README.md) lists direct commands. The current SQL implementation is LINQ to DB plus typed native SqlClient. RESP fixture boundaries remain accepted; T06 converts test-only SQL oracles to native SqlClient while retaining cases and assertions. T07 acceptance remains pending.
+**Updated:** 2026-10-18. This document states what behavior must remain covered. [TEST_POLICY](TEST_POLICY.md) alone decides when/how broadly to execute it; [tests/README](../tests/README.md) lists direct commands. The current SQL implementation is LINQ to DB plus typed native SqlClient. RESP fixture boundaries remain accepted; T06 converts test-only SQL oracles to native SqlClient while retaining cases and assertions. T07 plan-specific correctness/package/Local smoke acceptance is complete; full automated GUI remains conditionally NOT RUN and broader release gates remain deferred.
 
 ## Coverage owners
 

@@ -10,7 +10,7 @@
 | `MyDmsVn.SharedKernel` | `net48` | Shared inner primitives. |
 | `MyDmsVn.Server.Domain` | `net48` | Domain types; inner dependencies only. |
 | `MyDmsVn.Server.Application` | `net48` | Feature use cases, validation, authorization, persistence interfaces and transport-neutral mapping. |
-| `MyDmsVn.Server.Infrastructure` | `net48` | LINQ to DB/native SqlClient implementation of inner interfaces; T07 package/manual acceptance remains pending. |
+| `MyDmsVn.Server.Infrastructure` | `net48` | LINQ to DB/native SqlClient implementation of inner interfaces; T07 plan-specific correctness/package/Local smoke acceptance complete; broader release gates deferred. |
 | `MyDmsVn.Server.DbMigrator` | `net48` | Controlled DbUp schema deployment and separate maintenance commands. |
 | `MyDmsVn.Desktop.Application` | `net48` | Contracts-based client interfaces and ViewModels. |
 | `MyDmsVn.Desktop.Infrastructure.Local` | `net48` | In-process Application dispatch, current-account checks and desktop session integration. |

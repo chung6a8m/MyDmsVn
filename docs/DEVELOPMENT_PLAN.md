@@ -9,7 +9,7 @@
 | 1 | [RESP](plans/20261018-002-respawn-fixture-reuse.md) | net48-compatible Respawn fixtures, deterministic per-test reset/seed, dedicated exceptions, local collection lifecycle and useful fixture-operation evidence | All RESP tasks accepted, required SQL cases retained, reset/ownership failure behavior verified and comparable timing reported |
 | 2 | [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) | LINQ to DB persistence behind existing Application/UoW/DTO contracts | Pilot, module migration, cleanup and acceptance complete on the accepted RESP baseline |
 
-RESP is accepted; L2DB-T00–T06 deliver the LINQ/native cutover and dependency cleanup. T07 frozen-revision acceptance, packaging and manual Local smoke remain pending. RESP established fixture isolation before the DAL migration. A correctness or compatibility failure is resolved in its owning task before progressing.
+RESP is accepted; L2DB-T00–T07 deliver the LINQ/native cutover, dependency cleanup and frozen-revision correctness/package/Local smoke acceptance with verified temporary-resource cleanup. See [T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke). RESP established fixture isolation before the DAL migration. A correctness or compatibility failure is resolved in its owning task before progressing.
 
 ## Established implementation
 
@@ -21,7 +21,7 @@ The current product and all ten active test projects target `net48`. Tests run d
 
 [DEFERRED_WORK.md](DEFERRED_WORK.md) preserves the unfinished P5 interactive checks, P6 operational/release requirements, P7 HTTP scope, and runtime reactivation. Deferral changes priority, not completion status. P4.1's accepted partial idle-expiry observation and NET8-PAUSE's waived duration comparison remain limited to their original decisions.
 
-RELEASE-MANIFEST-01's schema metadata discrepancy is now closed narrowly by L2DB-T02's source fix and clean-commit d8013030 artifact verification. T02 now has final GO after owner-approved temporary-identity startup and guarded cleanup ([evidence](L2DB_VERIFICATION.md#l2db-t02-final-go--approved-runtime-startup)); T03–T06 now deliver the Catalog/Inventory/Identity/Security/operations conversion and dependency cleanup; next T07. See [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup). P5/P6 release readiness remains deferred.
+RELEASE-MANIFEST-01's schema metadata discrepancy is now closed narrowly by L2DB-T02's source fix and clean-commit d8013030 artifact verification. T02 now has final GO after owner-approved temporary-identity startup and guarded cleanup ([evidence](L2DB_VERIFICATION.md#l2db-t02-final-go--approved-runtime-startup)); T03–T06 now deliver the Catalog/Inventory/Identity/Security/operations conversion and dependency cleanup; T07 correctness/package/Local smoke is now complete in its plan-specific scope. See [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup). P5/P6 release readiness remains deferred.
 
 ## Execution and evidence
 
