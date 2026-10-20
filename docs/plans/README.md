@@ -6,11 +6,11 @@
 
 | Order | Plan | State | Next action |
 |---:|---|---|---|
-| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE**; BCI-T00–T02 complete in recorded proof/scalar/adapter scopes; T03–T06 planned | BCI-T03: lookup and command integration; retain T00–T02 evidence |
+| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE**; BCI-T00–T03 complete in recorded proof/scalar/adapter/control scopes; T04–T06 planned | BCI-T04: writable native accessibility; retain T00–T03 evidence |
 
 Read [BUSINESS_COMPACT_UI](../BUSINESS_COMPACT_UI.md) for the design and [BUSINESS_COMPACT_ACCEPTANCE](../BUSINESS_COMPACT_ACCEPTANCE.md) for required observable outcomes. Supporting specifications are not independent plans. Execute BCI-T00 → T01 → T02 → T03 → T04 → T05 → T06; preparation or parallel work must respect the interfaces and dependencies recorded in that plan.
 
-The planning documents implement no product feature. T00 now supplies the scoped native editor proof recorded in the acceptance ledger; T01 supplies the scalar numeric parser; T02 supplies the stable grid/session foundation; production command/lookup integration, writable accessibility, package and final UI acceptance still belong to T03–T06.
+The planning documents implement no product feature. T00 now supplies the scoped native editor proof recorded in the acceptance ledger; T01 supplies the scalar numeric parser; T02 supplies the stable grid/session foundation; T03 integrates lookup and commands into the actual receipt control. Writable accessibility, package and final UI acceptance still belong to T04–T06.
 
 ## Completed baselines — retain, do not restart
 

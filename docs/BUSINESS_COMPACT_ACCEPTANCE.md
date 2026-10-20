@@ -1,15 +1,15 @@
 # Business Compact inline Goods Receipt — acceptance specification
 
-**Status:** BCI-T00 proof, T01 scalar parser and T02 projection/session foundation complete in their recorded scopes; BCI-T03–T06 remain PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
+**Status:** BCI-T00 proof, T01 scalar parser, T02 projection/session foundation and T03 lookup/command integration complete in their recorded scopes; BCI-T04–T06 remain PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
 **Prepared:** 2026-10-20. **Planning baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`.
 
 ## 1. Scope and authority
 
 This specification verifies the [Business Compact design](BUSINESS_COMPACT_UI.md) and [BCI implementation plan](plans/20261020-001-business-compact-inline-goods-receipt.md). It is an acceptance ledger, not an executable test manifest or a replacement for [TEST_POLICY](TEST_POLICY.md).
 The product remains Windows Forms `net48`, with the shipped x86 Desktop and current Local application contracts. SourceGrid owns edit lifecycle; application code owns receipt state, validation presentation and command admission.
-All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; other outcomes remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
-Names outside the retained T00 proof, T01 scalar parser/tests and T02 grid/session code/tests identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
-T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField`, not yet connected to the receipt controls. T02 implements `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)` as an internal foundation tested against a hosted grid and real VM; shipping command wiring and writable accessibility remain T03/T04 work; their exact contracts are owned by the design and plan.
+All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; other outcomes remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
+Names outside the retained T00 proof, T01 scalar parser/tests, T02 grid/session code/tests and T03 integration/tests identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
+T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField`; T03 connects them to the receipt controls. T02 implements `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)` as an internal foundation tested against a hosted grid and real VM; T03 now supplies shipping-control command wiring and writable accessibility remains T04 work; their exact contracts are owned by the design and plan.
 
 ## 2. Accepted historical baseline — external line editors
 
@@ -47,7 +47,7 @@ Registry-created vendor editors do not automatically instantiate E-U's applicati
 
 ## 4. Acceptance matrix
 
-`New:` names below are proposed methods except the retained T00 proof in `GoodsReceiptInlineEditorTests` and T01 scalar tests in `ReceiptNumericInputTests` within the existing Desktop test project; numeric pure cases use the proposed `ReceiptNumericInputTests`; accessibility cases use `GoodsReceiptInlineAccessibilityTests`, and layout cases use `BusinessCompactLayoutTests` in that same project. E-* references are existing anchors, not new-result credit.
+`New:` names below are proposed methods except the implemented T00–T03 methods recorded in §8.1–§8.4 within the existing Desktop test project; numeric pure cases use the proposed `ReceiptNumericInputTests`; accessibility cases use `GoodsReceiptInlineAccessibilityTests`, and layout cases use `BusinessCompactLayoutTests` in that same project. E-* references are existing anchors, not new-result credit.
 Each row belongs to its named plan task. BCI-T06 reconciles every row and the affected existing regressions; it cannot waive an earlier failure by rerunning a narrower successful selection.
 
 ### 4.1. Editor proof and strict numeric input
@@ -60,7 +60,7 @@ Each row belongs to its named plan task. BCI-T06 reconciles every row and the af
 | BCI-A04 | BCI-T01 | Existing: E-C decimal boundary test; New: `Extra_fractional_zeros_are_exact_but_meaningful_overprecision_is_rejected` | Preserve raw text until validation: `1.23000` is exactly 1.23; `1.23001` and a far-tail nonzero beyond four places fail before decimal parsing can round them away. No meaningful digit is silently truncated. | PASS — T01 scalar only (§8.2) |
 | BCI-A05 | BCI-T01 | Existing: E-A numeric validation; New: `Culture_and_paste_preserve_the_same_decimal_value` | Exercise vi-VN/en-US decimal separators, typing and paste with the captured culture; accept ungrouped input and reject grouping, wrong/mixed separators, exponent/currency syntax and ambiguity with an actionable error while retaining raw text. Display formatting cannot turn invalid pasted input into a valid different value. | PASS — T01 scalar only (§8.2) |
 | BCI-A06 | BCI-T01 | Existing: E-C/E-A; New: `Field_bounds_and_zero_rules_match_receipt_contracts` | Quantity must be greater than zero and within its contract maximum; Unit cost may be zero and must not exceed its maximum. Negative, empty, malformed and over-range input is rejected without clamping or VM mutation. | PASS — T01 scalar only (§8.2) |
-| BCI-A07 | BCI-T03 | Existing: E-V overflow methods; New: `Overflow_preserves_input_and_blocks_commands` | Both line multiplication and aggregate overflow remain safe; error state retains entered values, does not display a fabricated total and dispatches no Save/Post. | NOT RUN |
+| BCI-A07 | BCI-T03 | Existing: E-V overflow methods; New: `Overflow_preserves_input_and_blocks_commands` | Both line multiplication and aggregate overflow remain safe; error state retains entered values, does not display a fabricated total and dispatches no Save/Post. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
 
 ### 4.2. Stable grid state, lookup and command boundaries
 
@@ -70,18 +70,18 @@ Each row belongs to its named plan task. BCI-T06 reconciles every row and the af
 | BCI-A09 | BCI-T02 | Existing: E-C dirty guards; New: `Pending_cell_edits_participate_in_dirty_command_guards` | Pending text cannot be ignored by selection/New/Refresh/Post guards. Cancel restores the original typed value; successful commit marks the correct receipt dirty once. | PASS — T02 adapter host only (§8.3) |
 | BCI-A10 | BCI-T02 | Existing: E-C saved-line reselection; New: `Unsaved_zero_id_lines_are_distinguished_by_reference` | Multiple unsaved lines with `Id == 0` remain distinct across selection, add/remove and recalculation; late events cannot update another row with the same zero ID. | PASS — T02 adapter host only (§8.3) |
 | BCI-A11 | BCI-T02 | Existing: E-C/E-G; New: `Reloaded_line_references_replace_old_edit_targets_safely` | Save/reload replacing VM objects preserves intended selection by valid persisted identity; stale references are invalidated, and subsequent editing updates the current line exactly once. | PASS — T02 adapter host only (§8.3) |
-| BCI-A12 | BCI-T03 | Existing: E-L/E-C; New: `Current_query_survives_same_context_refresh` | Current pending query is retained during same-context option/state refresh; committed key and pending text remain distinct, with no silent selection or stale query overwrite. | NOT RUN |
-| BCI-A13 | BCI-T03 | Existing: E-C explicit New test; New: `Explicit_new_cancels_pending_lookup_after_navigation_guard` | After existing dirty/discard policy admits New, pending text/selection intent and outstanding query are canceled; a late result cannot populate or select a product in the new receipt. | NOT RUN |
-| BCI-A14 | BCI-T03 | Existing: E-L/E-R session fencing; New: `Late_lookup_results_cannot_cross_row_receipt_or_session` | Rapid queries, row switches, removal, receipt change and sign-out invalidate obsolete results, including canceled operations whose provider completes anyway. Current input and next-user state remain intact. | NOT RUN |
-| BCI-A15 | BCI-T03 | Existing: E-C historical references/E-R reopen; New: `Historical_product_display_does_not_enable_inactive_new_selection` | Reopened historical selection stays readable; active-only new choices and rename/deactivate/reactivate refresh retain existing business rules without losing the selected line. | NOT RUN |
-| BCI-A16 | BCI-T03 | Existing: E-A F4 test; New: `Lookup_popup_keys_mouse_and_focus_commit_once` | Native F4/open, filtering, arrows/Page keys, Enter, mouse choice, Escape, Tab/Shift+Tab and outside focus behave as designed; popup Escape differs from cell cancel, and one selection produces one logical commit. | NOT RUN |
-| BCI-A17 | BCI-T03 | Existing: E-C/E-R; New: `Save_flushes_active_edit_or_dispatches_nothing` | `TryFinishEdit(Save)` returns false for invalid raw/lookup input and keeps its error/focus; success uses the newly committed typed values. Save never serializes a pre-edit value accidentally. | NOT RUN |
-| BCI-A18 | BCI-T03 | Existing: E-R Post/dirty cases; New: `Post_never_auto_saves_or_uses_pre_edit_values` | Post finishes or rejects the active edit, then respects dirty/persisted identity/opaque version rules. Changed input needs explicit Save; repeated clicks cannot issue duplicate commands. | NOT RUN |
-| BCI-A19 | BCI-T03 | Existing: E-C navigation guards; New: `All_edit_intents_observe_their_commit_or_cancel_policy` | Exercise SelectReceipt/NewReceipt/Refresh/AddLine/RemoveLine intents as well as Save/Post; failed completion leaves row and input intact, and explicit cancellation never writes pending values. | NOT RUN |
-| BCI-A20 | BCI-T03 | Existing: E-R conflict test/E-P stale clients; New: `Conflict_retains_inline_input_and_original_expected_version` | A stale Save/Post does not silently reload, retry or overwrite the winner; inline input, dirty state and the appropriate opaque version/error remain observable. | NOT RUN |
-| BCI-A21 | BCI-T03 | Existing: E-R authorization cases; New: `Denied_or_readonly_state_blocks_active_and_future_edits` | Posted, busy, access-denied and read-revoked states prevent mutation through keys, mouse, active control, command and accessibility; denied read clears sensitive stale detail. | NOT RUN |
-| BCI-A22 | BCI-T03 | Existing: E-R uncertain Post matrix/E-P timeout; New: `Uncertain_post_retains_lock_until_authoritative_read` | Cover server-committed and not-committed outcomes, exception/API failure, denied reload and recovery. No edit/Save/Post resumes until a successful read resolves the state; only a justified retry may post once. | NOT RUN |
-| BCI-A23 | BCI-T03 | Existing: E-R disposal/session switch; New: `Disposed_or_old_session_completions_cannot_overwrite_current_input` | Pending Save/Post/lookup cancellation and grid disposal prevent late UI values, notifications, queries or selection from contaminating a replacement workspace/session. | NOT RUN |
+| BCI-A12 | BCI-T03 | Existing: E-L/E-C; New: `Current_query_survives_same_context_refresh` | Current pending query is retained during same-context option/state refresh; committed key and pending text remain distinct, with no silent selection or stale query overwrite. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A13 | BCI-T03 | Existing: E-C explicit New test; New: `Explicit_new_cancels_pending_lookup_after_navigation_guard` | After existing dirty/discard policy admits New, pending text/selection intent and outstanding query are canceled; a late result cannot populate or select a product in the new receipt. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A14 | BCI-T03 | Existing: E-L/E-R session fencing; New: `Late_lookup_results_cannot_cross_row_receipt_or_session` | Rapid queries, row switches, removal, receipt change and sign-out invalidate obsolete results, including canceled operations whose provider completes anyway. Current input and next-user state remain intact. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A15 | BCI-T03 | Existing: E-C historical references/E-R reopen; New: `Historical_product_display_does_not_enable_inactive_new_selection` | Reopened historical selection stays readable; active-only new choices and rename/deactivate/reactivate refresh retain existing business rules without losing the selected line. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A16 | BCI-T03 | Existing: E-A F4 test; New: `Lookup_popup_keys_mouse_and_focus_commit_once` | Native F4/open, filtering, arrows/Page keys, Enter, mouse choice, Escape, Tab/Shift+Tab and outside focus behave as designed; popup Escape differs from cell cancel, and one selection produces one logical commit. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A17 | BCI-T03 | Existing: E-C/E-R; New: `Save_flushes_active_edit_or_dispatches_nothing` | `TryFinishEdit(Save)` returns false for invalid raw/lookup input and keeps its error/focus; success uses the newly committed typed values. Save never serializes a pre-edit value accidentally. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A18 | BCI-T03 | Existing: E-R Post/dirty cases; New: `Post_never_auto_saves_or_uses_pre_edit_values` | Post finishes or rejects the active edit, then respects dirty/persisted identity/opaque version rules. Changed input needs explicit Save; repeated clicks cannot issue duplicate commands. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A19 | BCI-T03 | Existing: E-C navigation guards; New: `All_edit_intents_observe_their_commit_or_cancel_policy` | Exercise SelectReceipt/NewReceipt/Refresh/AddLine/RemoveLine intents as well as Save/Post; failed completion leaves row and input intact, and explicit cancellation never writes pending values. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A20 | BCI-T03 | Existing: E-R conflict test/E-P stale clients; New: `Conflict_retains_inline_input_and_original_expected_version` | A stale Save/Post does not silently reload, retry or overwrite the winner; inline input, dirty state and the appropriate opaque version/error remain observable. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A21 | BCI-T03 | Existing: E-R authorization cases; New: `Denied_or_readonly_state_blocks_active_and_future_edits` | Posted, busy, access-denied and read-revoked states prevent mutation through keys, mouse, active control, command and accessibility; denied read clears sensitive stale detail. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A22 | BCI-T03 | Existing: E-R uncertain Post matrix/E-P timeout; New: `Uncertain_post_retains_lock_until_authoritative_read` | Cover server-committed and not-committed outcomes, exception/API failure, denied reload and recovery. No edit/Save/Post resumes until a successful read resolves the state; only a justified retry may post once. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
+| BCI-A23 | BCI-T03 | Existing: E-R disposal/session switch; New: `Disposed_or_old_session_completions_cannot_overwrite_current_input` | Pending Save/Post/lookup cancellation and grid disposal prevent late UI values, notifications, queries or selection from contaminating a replacement workspace/session. | PASS — T03 focused control scope (§8.4); writable UIA remains T04 |
 
 ### 4.3. Accessibility, visual shell and integrated acceptance
 
@@ -314,6 +314,116 @@ Independent read-only code review found one Important new-line selection defect:
 Final TRX names/rows reconcile to **15 inline Facts** (4 retained proofs + 11 new session Facts), **21 control Facts**, **17 ViewModel Facts** and **36 parser invocations** = **89**. Assertions observe actual focused editors, raw text/caret, typed VM/cell values, stable cell references, totals, event counts, cancellation, same-ordinal replacement, stale notification rejection, new-line saved selection and active-popup disposal. Existing control/VM/parser assertions are retained. No old historical project total was used as a discovery target.
 
 Final built Desktop.WinForms DLL SHA256: `95F61D87DC2071161872668E6285DFCFF3780E2F477815B7A8ADB444193CED96`; Desktop.Tests DLL SHA256: `E4090BA01C6788B1B850411F102F47E617086E485B74E60E04C69438EDACF9B7`. Raw TRX is local only. All hosted controls were deterministically disposed and owned UIA clients reported process/tree/pipe drain; final process inspection found no probe/testhost left. No package/EXE or SQL cleanup is claimed because none was created. T03 still must prove the real command/session/lookup path, and T04 must add writable providers/native metadata; T02 does not certify their future behavior or production readiness.
+
+## 8.4. BCI-T03 lookup and command integration — 2026-10-20
+
+**Boundary:** T03 is complete in the focused actual-control/VM scope below. Product, Quantity and Unit cost now edit in the shipping GoodsReceiptControl path; the external line editor panel and its event/synchronization path are removed. A07/A12–A23 outcomes refer to this hosted-control evidence, not frozen package, writable native UIA, native 125%/Dark or production acceptance. Those remaining obligations belong to T04–T06.
+
+### Source and implementation
+
+Base `b003099bd387955755c4c177ea95242aa45ba558`; product/test source `436cd7204d85780e348e909df5802e890c45fc3d`. The same managed worktree and branch from §8.3 are retained. All three vendor pins are unchanged. No application/transport API, DTO, schema, permission, persistence, runtime target, project/lock or module change. The app-owned control helper properties now expose the actual shared lookup/formatted controls, not hidden numeric/lookup substitutes.
+
+- GoodsReceiptControl is partial; [InlineEditing](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.InlineEditing.cs) owns command admission, first-line-error focus and the two receipt-specific input classes. The [adapter](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptLinesGridAdapter.cs) preserves active cells on notifications, consumes T01 parsing, and admits writes using current options and full live editability.
+- Product text drives the existing ProductOptions VM. DataSource refresh uses the pinned lookup's committed-selection reconciliation without redundantly selecting its value, preserving raw text and caret. Ending/canceling the product session changes the VM query generation; obsolete providers that ignore cancellation cannot bind into the next row/document/session. Historical labels remain displayable, while historical-only IDs are rejected as new choices.
+- Every command applies its existing intent policy before the VM action. Save completes valid input; unresolved product/invalid numeric input retains raw text and dispatches nothing. Post completes input and then requires a clean saved ID/version, with an explicit Save message for changed input and no implicit Save/Post retry. Dirty navigation preserves pending input. Query-only allowed navigation cancels it. Add completes the candidate and focuses the new Product cell; Remove cancels its selected target.
+- ReceiptCommandButton retains cell focus during native mouse capture and admits the actual release/click through the same handlers. A canceled drag never resolves the pending query. ReceiptResultsGrid gates pointer navigation before native focus; its inherited AccessibleActionGrid remains the read-only receipt-results bridge. Unsealing that app class changes no other caller's behavior. Writable line accessibility remains T04.
+- Full busy/read-only/access-denied/uncertain-Post and disposal guards apply at edit start, conversion, VM write and command admission. Header workflows and opaque expectedVersion remain. First server line errors map through the current submitted line order to the actual editable cell; all indexed error messages remain available on the grid. Native Enter/Tab conversion failures now publish inline status, preserve raw/focus, and clear on valid completion/cancel.
+- [GoodsReceiptEditorViewModel](../src/MyDmsVn.Desktop.Application/GoodsReceiptEditorViewModel.cs) now fences async Save/Post/Refresh UI callbacks by document generation, checked inside the dispatcher as well as before follow-up work. An old provider completion cannot overwrite a replacement document or publish its old error/success. Existing lifetime/session cancellation, uncertain-Post read recovery and backend authority remain unchanged.
+- Native Tab/Shift+Tab skip row number/Total using SourceGrid's public Unselectable controller and form traversal. No trailing row is created. Line and aggregate overflow calculations/validation remain independently covered by the existing VM cases selected below.
+
+### Executed scope
+
+Windows 10.0.26200, SDK 8.0.425, net48/Release/x86, interactive serialized guarded STA. The retained native proof in this run reports 96 DPI/100%, 1920x1080, Light. The affected existing theme tests ran in their named modes; that is not a native 125%/Dark or frozen layout matrix. Each hosted test uses actual controls, deterministic client doubles, finite waits and disposal; no live SQL, ordinary Login, package probe or frozen package was used.
+
+```powershell
+dotnet restore tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj --locked-mode
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore -p:PlatformTarget=x86 --filter 'FullyQualifiedName~GoodsReceiptControlTests|FullyQualifiedName~ReceiptAcceptanceTests|FullyQualifiedName~GoodsReceiptInlineEditorTests|FullyQualifiedName~GoodsReceiptEditorViewModelTests|FullyQualifiedName~ReceiptNumericInputTests|FullyQualifiedName~InventoryAccessibilityAcceptanceTests' --logger 'trx;LogFileName=verified.trx' --results-directory TestResults/bci-t03-verified -- RunConfiguration.TargetPlatform=x86
+dotnet restore tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj --locked-mode
+dotnet test tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj -c Release -f net48 --no-restore -p:PlatformTarget=x86 --filter 'FullyQualifiedName~GoodsReceiptProductOptionsViewModelTests|FullyQualifiedName~CatalogLookupViewModelTests|FullyQualifiedName~GoodsReceiptListViewModelTests|FullyQualifiedName~DesktopSessionExpiryTests' --logger 'trx;LogFileName=verified-session.trx' --results-directory TestResults/bci-t03-verified-session -- RunConfiguration.TargetPlatform=x86
+dotnet restore src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj --locked-mode
+dotnet build src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj -c Release --no-restore -p:PlatformTarget=x86
+```
+
+Final committed-source verification: **146/146 Desktop + 28/28 Session PASS**, zero failed/skipped/not-executed/aborted/timed-out. Locked restores succeeded; Desktop.App build succeeded with zero warnings/errors. Reconciled actual TRX invocations:
+
+| Class | Executed PASS |
+|---|---:|
+| GoodsReceiptControlTests | 35 (21 retained + 14 new integration Facts) |
+| ReceiptAcceptanceTests | 29 (including 2 new Facts and retained Theory rows) |
+| GoodsReceiptInlineEditorTests | 15 |
+| GoodsReceiptEditorViewModelTests | 17 |
+| ReceiptNumericInputTests | 36 |
+| InventoryAccessibilityAcceptanceTests | 14 |
+| Session: GoodsReceiptProductOptionsViewModelTests | 6 |
+| Session: CatalogLookupViewModelTests | 12 |
+| Session: GoodsReceiptListViewModelTests | 6 |
+| Session: DesktopSessionExpiryTests | 4 |
+
+All proposed A07/A12–A23 method names now exist and ran. Three retained acceptance methods were deliberately renamed to the A20/A22/A23 names: conflict, four uncertain-Post combinations and four session-switch/late-success/failure combinations. Their behavior assertions remain; the session-switch scenario now starts with a real inline numeric candidate and checks its submitted value. Existing line multiplication and aggregate overflow cases both ran. The new native input cases include F2, typed query, Enter, Escape, Page keys, Tab/Shift+Tab, physical popup mouse selection, ordinary outside focus, button-window-message down/up with a message loop between them, drag-abort and master-list pointer admission.
+
+### Review, failures and explicit decisions
+
+Initial RED was 0/5 because the original control had no registered cell editors. The first integration trial retained six failures from external-control assumptions and pre-handle line selection; these were corrected against the actual grid/VM. The boundary trial found an old Save overwriting a replacement document (3/4 PASS); the new generation fence made its regression and all 17 VM cases green. A two-case caret trial failed because redundant SelectValue reset pending presentation; using the pinned DataSource reconciliation made both green. Dirty-draft query cancellation, indexed server-error focus and computed-cell Tab traversal each had an observed failing regression before their fixes.
+
+One independent read-only review found two Important issues: unconditional wrapper Focus stole native input focus after failure, and native-key conversion errors were invisible. Regressions reproduced them; focus now changes only when the editor does not ContainsFocus, and inline error events update/clear status for native as well as command commits. The stale-error Minor was fixed by the same tested error lifecycle. No second review or reviewer certification of TRX is claimed; the reviewer did not run GUI/tests. The supplemental review-green trial still failed stale error clearing before native Escape cleanup was corrected.
+
+Explicit decisions/limits:
+1. The former external Open-line/read-only provider assertion no longer describes the product. Its replacement retains receipt Open action and typed inline rows; the old AccessibleNumericBox typed/disabled guard is retained as a standalone wrapper test. Writable line provider semantics are **NOT RUN**, owned by T04, not inferred from names or wrapper success.
+2. Supplemental physical New-button hit-window preconditions failed. Final New command proof uses native button window messages, with an actual loop between down/up and a drag-abort; physical popup selection remains a separate successful case with exact hit/foreground guards. Do not infer physical New-button/package/UIA success from that distinction. The remaining native package/accessibility milestone must certify the complete user path.
+3. App-owned receipt command/results subclasses coordinate before native focus, rather than patching vendor internals or disabling keyboard selection. Their native input/drag/keyboard tests pass; writable UIA and final layout remain downstream costs.
+4. The first Session run used an AnyCPU host against the prior x86 output and failed all 28 cases before their bodies with BadImageFormatException. Re-running the same selectors with explicit x86 build/host flags passed 28/28; the failed run remains below. A later outside-focus assertion initially expected wrapper Focus() to return true even though focus was forwarded to its native child; it now verifies ContainsFocus and the committed typed VM value instead.
+5. All work is retained on the existing branch/worktree. No merge, push, package publication or release sign-off is implied.
+
+Every TRX below is retained locally; the table contains reviewed counts/hashes only. Intermediate compile failures (incorrect test enum member and a void-lambda return during the generation-fence edit) were repaired before execution and confer no test credit. Per-case RED/diagnostic trials used their named exact-method selectors; broad focused/final/verified runs used the complete Desktop filter above; Session runs used the four-class filter above (the failed initial one omitted x86 flags).
+
+| Local TRX under TestResults/ | Actual outcome | SHA256 |
+|---|---|---|
+| `bci-t03-boundary/boundary.trx` | 3 PASS / 1 FAIL / 0 not executed | `A484C08A3F045B681D41315340830578B830D7F3BCB5C81C9560F3B2300B0486` |
+| `bci-t03-caret-green/caret.trx` | 2 PASS / 0 FAIL / 0 not executed | `958F64EB086A76914B498FD48AB9CEB98D2918FA797228BDBE95934E457A0E62` |
+| `bci-t03-caret-red/caret.trx` | 0 PASS / 2 FAIL / 0 not executed | `AB9B9FBD2C3B78BB2F0155140C063421914B1A0AF3EF8745A8784E81AB59D0E6` |
+| `bci-t03-diagnostic/diagnostic.trx` | 0 PASS / 1 FAIL / 0 not executed | `AA67C77D38E7D1B651824076316BEA0086BBFB95CD3D87C77394D60607D04076` |
+| `bci-t03-errors-red/errors.trx` | 0 PASS / 1 FAIL / 0 not executed | `D0606AC99944C7BDA85D33EE59E30F6CCF4A7546D7EADB42646A87C3B94CC0C1` |
+| `bci-t03-final/final.trx` | 146 PASS / 0 FAIL / 0 not executed | `C1354EAC87B00D1660BDEC51951130710BD5E9A691982616710AA0220F7C8FB9` |
+| `bci-t03-final2/final.trx` | 145 PASS / 1 FAIL / 0 not executed | `BDB666314379551886DAED4387BC170A83C59620FF1940E0E194DB8EEFBDF0B0` |
+| `bci-t03-final3/final.trx` | 146 PASS / 0 FAIL / 0 not executed | `DD9648F33550984F52FBD32384C2B8AAD7AD8F40792101D0BC7069A040B9362D` |
+| `bci-t03-focus-diagnostic/focus.trx` | 0 PASS / 2 FAIL / 0 not executed | `060352578AA8095822A0AA0309CE182FC5A2BB70A8E2FF1F459E7D45D25F18F2` |
+| `bci-t03-focus2/focus.trx` | 0 PASS / 2 FAIL / 0 not executed | `9D93AD3E07935068F6008993C49CDAE3A2A5AA14EAFE6B48F8333D857CF5B032` |
+| `bci-t03-focused/focused.trx` | 136 PASS / 5 FAIL / 0 not executed | `2C9FBC638B167A9FE850471D69BC9600268607B6879E1348DF0118A0ED3F1447` |
+| `bci-t03-focused2/focused.trx` | 140 PASS / 2 FAIL / 0 not executed | `92512FAC09F66473EAAF196DDE4DEFC22E8902932654D5B3F913A90D354AC029` |
+| `bci-t03-focused3/focused.trx` | 143 PASS / 0 FAIL / 0 not executed | `DB345BC47817D6648DFAF06BC2C274C8165D6D6E180DF098BA589BC5BDF0C53A` |
+| `bci-t03-green/green.trx` | 20 PASS / 6 FAIL / 0 not executed | `0FE02630534A6ACB1EA34AB4DE860FF634AD90A07E128B206D99EE3D700B36CC` |
+| `bci-t03-guard-red/guard.trx` | 0 PASS / 1 FAIL / 0 not executed | `3538D02BF049E49BEC7A5461807B72E2656A5D9C1FD1577C8F39AE68104FB31B` |
+| `bci-t03-integrated/integrated.trx` | 68 PASS / 0 FAIL / 0 not executed | `4C890AB7569F17C24B791E072189980C41F53EDF594B63C6C5DC7865259E5939` |
+| `bci-t03-intent/intent.trx` | 0 PASS / 3 FAIL / 0 not executed | `03F19D056FEAFE9F3117291E357EC01398B58457266DF3E3820CD8F09118479D` |
+| `bci-t03-intent2/intent.trx` | 0 PASS / 3 FAIL / 0 not executed | `EC4DD9D94ADBD13F0B90DF519369974FC7070B4F2AC36E9CB5C15D1E46FCD753` |
+| `bci-t03-intent3/intent.trx` | 0 PASS / 3 FAIL / 0 not executed | `5051094BCBD182E3BD0F164790710B07301716610AF16EA6219079CBBCDA49C2` |
+| `bci-t03-intent4/intent.trx` | 0 PASS / 3 FAIL / 0 not executed | `ADDD0162AB6C6C90D95128482A5B379FCE76FF05747292D08F1C6A2304DA6A4F` |
+| `bci-t03-lookup/lookup.trx` | 2 PASS / 1 FAIL / 0 not executed | `71637F9741220FDDEFBFD2B39C72EAB84A3C0B8AC5630E5331696473D0524793` |
+| `bci-t03-lookup2/lookup.trx` | 9 PASS / 1 FAIL / 0 not executed | `75F2F31CC16B4C11995F057A0BC4518811F8172A1D7A32714E8CBC4BDBF6B71D` |
+| `bci-t03-mouse/mouse.trx` | 2 PASS / 0 FAIL / 0 not executed | `960EDC0B62A8D761537B3C9682CEA01D0C8FC241C66BDB6AEE06FFBE576706DE` |
+| `bci-t03-pointer-red/pointer.trx` | 0 PASS / 1 FAIL / 0 not executed | `5410FD85053BAAAAC2F00A4775D97D05D608371BE8BA79B43C1ADD85BD6A5BEE` |
+| `bci-t03-red/red.trx` | 0 PASS / 5 FAIL / 0 not executed | `E08E79AF9DCDAC0FAC565DE727073AC4BDD1CDE0DD22142BC88A07AE307DBA62` |
+| `bci-t03-review-green/review.trx` | 3 PASS / 1 FAIL / 0 not executed | `F0FB6D18BAA6964FDA56F383B139FDC18E43608E918F11B5A29F8FE2C4904F92` |
+| `bci-t03-review-red/review.trx` | 1 PASS / 2 FAIL / 0 not executed | `45DA77966401F9D1C513B988BC6A425AEC32C34C9072AB18D036EA4D91B03F8C` |
+| `bci-t03-reviewed/focused.trx` | 145 PASS / 0 FAIL / 0 not executed | `5099A77487CB71EDB60BDA5B84A5778DCC2C4B1800B6F6A81141A08404A0DC5F` |
+| `bci-t03-session/session.trx` | 0 PASS / 28 FAIL / 0 not executed | `8C50A8A2B324ADA17860CDACAAF151705B07A073959D1C44D384EC92BE4D3B4D` |
+| `bci-t03-session-x86/session.trx` | 28 PASS / 0 FAIL / 0 not executed | `C77B2F1113C3849002782DBE3B664FAB25A2567FDE513A5DBF4B293905122DC6` |
+| `bci-t03-tab-red/tab.trx` | 0 PASS / 1 FAIL / 0 not executed | `4C83BB0EB2D6BCEF6B86DC17FF8F803B2B8F37DFD72DADA68F0615B479DDDD36` |
+| `bci-t03-verified/verified.trx` | 146 PASS / 0 FAIL / 0 not executed | `595A4428BAAA22016E84092A8B546D0FCC4E42EE1AEE075F3ACCAB30FD5D1D0D` |
+| `bci-t03-verified-session/verified-session.trx` | 28 PASS / 0 FAIL / 0 not executed | `BDF2466329484430B7B55B82D86E95B7C58D520F10A9CC6C785C34F8C759F1AC` |
+| `bci-t03-vm-green/vm.trx` | 18 PASS / 0 FAIL / 0 not executed | `7B89C0B56D2C19E075638D95AB1DF09E0C3BD2564798DBCDBE826C0F482BE91A` |
+
+Final build artifact hashes (EXE is a build output, **not a packaged/accepted candidate**):
+
+| Local artifact | SHA256 |
+|---|---|
+| `src/MyDmsVn.Desktop.Application/bin/Release/net48/MyDmsVn.Desktop.Application.dll` | `0AF2B73A0F013FE865BE5274F006819CF2C76F7C104BE3BACF3B8974515DD300` |
+| `src/MyDmsVn.Desktop.WinForms/bin/Release/net48/MyDmsVn.Desktop.WinForms.dll` | `FB3BE0C204BD663DB09BE0A1398E87E2F48B980A9117743BC11C8582B3931E6A` |
+| `tests/MyDmsVn.Desktop.Tests/bin/Release/net48/MyDmsVn.Desktop.Tests.dll` | `027E76188BBAF90212CE1C4EC390DD5A56171992705FA749BCC3E883C5F09622` |
+| `tests/MyDmsVn.Desktop.Session.Tests/bin/Release/net48/MyDmsVn.Desktop.Session.Tests.dll` | `B246D7701E223B66C14DE1610659A566A5CEAF26F7478097916208775958EA12` |
+| `src/MyDmsVn.Desktop.App/bin/Release/net48/MyDmsVn.Desktop.App.exe` | `FDFA05A8C5E3EA90D0966746E7FFEB0F607875F4096599685E671E18B06EB87D` |
+
+Raw TRX/logs remain local. Hosted controls, shared editors and owned UIA clients completed/disposed; final process inspection found no owned probe or testhost remaining. No SQL allocation/cleanup or ordinary Login is claimed. T04 must implement the writable provider and refresh the bounded semantic package probe; T05/T06 must supply the compact/frozen UI and package evidence. T03 is not production certification.
 
 ## 9. Deferred production constraints
 

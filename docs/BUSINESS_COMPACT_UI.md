@@ -1,9 +1,9 @@
 # Business Compact UI and inline Goods Receipt design
 
-**Direction:** approved; integrated UI implementation remains planned/unaccepted. The acceptance ledger records the completed T00 proof, T01 scalar parser and T02 projection/session foundation scopes.
+**Direction:** approved; full Business Compact UI acceptance remains unaccepted. The acceptance ledger records the completed T00 proof, T01 scalar parser, T02 projection/session foundation and T03 control-integration scopes.
 **Plan:** [BCI execution plan](plans/20261020-001-business-compact-inline-goods-receipt.md).
 **Acceptance:** [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md).
-**Source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).
+**Planning source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).
 This specification introduces no runtime PASS, completed implementation task, or production-release approval.
 Historical GUI-P5 evidence retains its original candidate, scope, signatures, and exceptions.
 
@@ -22,7 +22,7 @@ The visual proposal is a layout reference, not an additional business contract o
 - Keep existing English UI copy unless a separate localization change defines its labels and acceptance scope.
   Vietnamese text in the conceptual proposal does not authorize wholesale localization.
 
-## 2. Verified starting point
+## 2. Verified planning starting point
 
 The application [project graph][app-project] references BootstrapSourceGrid through the pinned submodule.
 The integration [project graph][integration-project] references both pinned vendors; BCI does not silently advance these pins.
@@ -33,8 +33,8 @@ The integration [project graph][integration-project] references both pinned vend
 | MyDmsVn.Bootstrap5WinFormUI | `aba102e33c48937fd92468791c287afda0a59e77` |
 | SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944` |
 
-Current Goods Receipt lines are [plain cells][app-lines], with product/quantity/unit-cost controls in a [panel below the grid][app-line-panel].
-The application accessibility bridge deliberately exposes read-only cells plus an Open row action. [Source][action-grid]
+At the planning baseline, Goods Receipt lines were plain cells, with product/quantity/unit-cost controls in a panel below the grid. T03 has replaced those paths in [GoodsReceiptControl][app-lines] with the adapter; see [current integration evidence](BUSINESS_COMPACT_ACCEPTANCE.md#84-bci-t03-lookup-and-command-integration--2026-10-20).
+The retained result-list accessibility bridge exposes read-only cells plus an Open row action; the new line grid awaits its T04 writable provider. [Source][action-grid]
 The integration already supplies real lookup and formatted-text editor adapters; their construction and ownership are reusable. [Source][editor-registry]
 The current accessible numeric wrapper derives from BootstrapNumericBox, not BootstrapFormattedTextBox. [Source][accessible-number]
 These facts justify an application integration task; they do not establish that inline editing or its accessibility is already complete.
@@ -84,7 +84,7 @@ Insufficient space must produce reachable scrolling/reflow, not hidden Save/Post
 
 ## 5. Application-owned integration
 
-T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField` with scalar tests; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). T02 implements `GoodsReceiptLinesGrid`, its adapter and `ReceiptEditIntent` as a tested foundation; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#83-bci-t02-stable-projection-and-cell-sessions--2026-10-20). These internal seams are not yet wired to receipt controls. Full command integration and writable accessibility remain T03/T04; none is a vendor API.
+T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField` with scalar tests; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). T02 implements `GoodsReceiptLinesGrid`, its adapter and `ReceiptEditIntent` as a tested foundation; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#83-bci-t02-stable-projection-and-cell-sessions--2026-10-20). T03 now wires these internal seams into GoodsReceiptControl and removes the external line panel; [focused evidence](BUSINESS_COMPACT_ACCEPTANCE.md#84-bci-t03-lookup-and-command-integration--2026-10-20). Writable accessibility remains T04; none is a vendor API.
 Keep this integration in Desktop.WinForms; do not move grid/control dependencies into Domain or Application.
 
 | App-owned element | Intended responsibility (scope above governs implementation status) |
