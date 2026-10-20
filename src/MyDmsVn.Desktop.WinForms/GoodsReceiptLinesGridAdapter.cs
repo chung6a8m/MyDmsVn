@@ -224,7 +224,9 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         if (session.Column == 1)
         {
             value = _product.BootstrapControl.SelectedValue;
-            var option = _product.BootstrapControl.SelectedItem as CatalogLookupOption;
+            // The hosted popup can intentionally retain its presentation snapshot. Admission
+            // uses current VM options, so a rebound inactive choice cannot reuse an old grant.
+            var option = value is int selectedId ? _editor.ProductOptions.Items.FirstOrDefault(item => item.Id == selectedId) : null;
             if (_product.BootstrapControl.HasPendingText || !(value is int id) || id <= 0 ||
                 (id != session.Line.ProductId && (option == null || !option.IsAvailableForNewSelection)))
             {
@@ -263,7 +265,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         else if (controller.Column == 3) session.Line.UnitCost = (decimal)context.Value;
         else
         {
-            var option = _product.BootstrapControl.SelectedItem as CatalogLookupOption;
+            var option = _editor.ProductOptions.Items.FirstOrDefault(item => item.Id == (int)context.Value);
             session.Line.SetProduct((int)context.Value, option?.DisplayName ?? session.Line.ProductDisplayName,
                 option?.IsAvailableForNewSelection ?? session.Line.ProductIsAvailable);
         }

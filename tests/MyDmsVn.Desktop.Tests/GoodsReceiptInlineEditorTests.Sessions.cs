@@ -139,6 +139,24 @@ public sealed partial class GoodsReceiptInlineEditorTests
     }
 
     [Fact]
+    public void A_rebound_inactive_option_cannot_be_committed_from_the_old_shared_lookup_snapshot()
+    {
+        SessionTest(host =>
+        {
+            host.Begin(1, 1);
+            var editor = (MyDmsVn.BootstrapSourceGrid.Editors.BootstrapLookupBoxEditor)host.Grid[1, 1].Editor;
+            host.Editor.Lines[1].SetProduct(8, "P8 - Inactive", false);
+            host.Editor.ProductOptions.TrackLines(host.Editor.Lines);
+            Assert.True(editor.BootstrapControl.SelectValue(8)); // Presentation snapshot is deliberately deferred while editing.
+            Assert.False(host.Adapter.TryFinishEdit(ReceiptEditIntent.Save));
+            Assert.Equal(7, host.Editor.Lines[0].ProductId);
+            Assert.NotNull(host.Adapter.EditError);
+            host.Adapter.CancelActiveEdit();
+            Assert.Equal(7, host.Grid[1, 1].Value);
+        });
+    }
+
+    [Fact]
     public void A_saved_new_line_uses_its_own_selection_fallback_instead_of_a_previous_persisted_id()
     {
         SessionTest(host =>
