@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,9 +17,13 @@ namespace MyDmsVn.Desktop.WinForms
             Dock = DockStyle.Fill;
 
             WarehouseFilter = CreateIdFilter();
+            WarehouseFilter.AccessibleName = "Warehouse ID";
             ProductFilter = CreateIdFilter();
+            ProductFilter.AccessibleName = "Product ID";
             FromUtcFilter = CreateDateFilter();
+            FromUtcFilter.AccessibleName = "From UTC";
             ToUtcFilter = CreateDateFilter();
+            ToUtcFilter.AccessibleName = "To UTC";
             RefreshButton = new Button { Text = "Refresh", AutoSize = true };
             PreviousPageButton = new Button { Text = "Previous", AutoSize = true };
             NextPageButton = new Button { Text = "Next", AutoSize = true };
@@ -197,6 +201,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             var grid = new DataGridView
             {
+                AccessibleName = "Stock card results",
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
                 AllowUserToAddRows = false,
@@ -213,7 +218,7 @@ namespace MyDmsVn.Desktop.WinForms
         }
 
         private static NumericUpDown CreateIdFilter() =>
-            new NumericUpDown { Minimum = 0, Maximum = int.MaxValue, Width = 100 };
+            new AccessibleIdFilter { Minimum = 0, Maximum = int.MaxValue, Width = 100 };
 
         private static DateTimePicker CreateDateFilter() =>
             new DateTimePicker

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading;
@@ -17,9 +17,11 @@ namespace MyDmsVn.Desktop.WinForms
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             Dock = DockStyle.Fill;
 
-            SearchTextBox = new TextBox { Width = 180 };
+            SearchTextBox = new TextBox { Width = 180, AccessibleName = "Search stock balances" };
             WarehouseFilter = CreateIdFilter();
+            WarehouseFilter.AccessibleName = "Warehouse ID";
             ProductFilter = CreateIdFilter();
+            ProductFilter.AccessibleName = "Product ID";
             RefreshButton = new Button { Text = "Refresh", AutoSize = true };
             PreviousPageButton = new Button { Text = "Previous", AutoSize = true };
             NextPageButton = new Button { Text = "Next", AutoSize = true };
@@ -179,6 +181,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             var grid = new DataGridView
             {
+                AccessibleName = "Stock balance results",
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
                 AllowUserToAddRows = false,
@@ -192,7 +195,7 @@ namespace MyDmsVn.Desktop.WinForms
         }
 
         private static NumericUpDown CreateIdFilter() =>
-            new NumericUpDown { Minimum = 0, Maximum = int.MaxValue, Width = 100 };
+            new AccessibleIdFilter { Minimum = 0, Maximum = int.MaxValue, Width = 100 };
 
         private static int? ToOptionalId(decimal value) => value <= 0 ? null : decimal.ToInt32(value);
 

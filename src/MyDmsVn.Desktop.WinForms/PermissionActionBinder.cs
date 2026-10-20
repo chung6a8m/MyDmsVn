@@ -58,6 +58,8 @@ namespace MyDmsVn.Desktop.WinForms
             var response = await _permissionApiClient
                 .CheckAsync(permissionKey, cancellationToken);
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             SetEnabled(
                 action,
                 response.IsSuccess && response.Data!.IsAllowed,

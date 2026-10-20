@@ -28,6 +28,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly int _uiThreadId;
         private long? _workspaceSessionVersion;
         private bool _openingWorkspace;
+        private Button? _themeButton;
 
         public FoundationShellForm(FoundationViewModel viewModel)
             : this(viewModel, null, null, null, null, null, null, true)
@@ -197,6 +198,7 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 _notifications.NotificationPublished += OnNotificationPublished;
             }
+            BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         }
 
         public FoundationViewModel ViewModel => _viewModel;
@@ -413,6 +415,7 @@ namespace MyDmsVn.Desktop.WinForms
         protected override void OnHandleCreated(EventArgs eventArgs)
         {
             base.OnHandleCreated(eventArgs);
+            UpdateThemeDescription();
             ApplyViewModelState();
             if (_session != null)
             {
@@ -431,6 +434,7 @@ namespace MyDmsVn.Desktop.WinForms
             if (disposing)
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+                BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
                 Navigation.SelectedItemChanged -= OnNavigationSelectedItemChanged;
                 Workspace.SelectedIndexChanged -= OnWorkspaceSelectedIndexChanged;
                 if (_session != null)
@@ -442,6 +446,7 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     _notifications.NotificationPublished -= OnNotificationPublished;
                 }
+                _viewModel.Dispose();
             }
 
             base.Dispose(disposing);
@@ -455,6 +460,15 @@ namespace MyDmsVn.Desktop.WinForms
         private void OnNotificationPublished(object? sender, DesktopNotification notification)
         {
             DispatchToUi(() => SetStatus(notification.Message));
+        }
+
+        private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs eventArgs) =>
+            DispatchToUi(UpdateThemeDescription);
+
+        private void UpdateThemeDescription()
+        {
+            if (_themeButton != null && !_themeButton.IsDisposed)
+                _themeButton.AccessibleDescription = "Current theme: " + BootstrapThemeManager.CurrentTheme.Mode;
         }
 
         private void OnNavigationSelectedItemChanged(object? sender, EventArgs eventArgs)
@@ -742,10 +756,16 @@ namespace MyDmsVn.Desktop.WinForms
                 GripStyle = ToolStripGripStyle.Hidden,
             };
             var title = new ToolStripLabel("MyDmsVn");
-            var themeButton = new ToolStripButton("Light / Dark")
+            // A hosted HWND-backed button remains available through native UIA on net48.
+            var themeButton = new BootstrapButton
             {
-                Alignment = ToolStripItemAlignment.Right,
+                Text = "Light / Dark",
+                AutoSize = true,
+                Name = "ThemeToggle",
+                AccessibleName = "Theme toggle",
+                AccessibleRole = AccessibleRole.PushButton,
             };
+            _themeButton = themeButton;
             themeButton.Click += (_, _) => ToggleTheme();
             var signOutButton = new ToolStripButton("Sign out")
             {
@@ -754,7 +774,11 @@ namespace MyDmsVn.Desktop.WinForms
             signOutButton.Click += (_, _) => SignOut();
             topBar.Items.Add(title);
             topBar.Items.Add(signOutButton);
-            topBar.Items.Add(themeButton);
+            topBar.Items.Add(new ToolStripControlHost(themeButton)
+            {
+                Alignment = ToolStripItemAlignment.Right,
+            });
+            UpdateThemeDescription();
             return topBar;
         }
     }

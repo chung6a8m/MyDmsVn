@@ -9,6 +9,48 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class SqlTestDatabaseLifecycleTests
 {
     [SqlServerFact(SqlTestCategory.MigrationSchema)]
+    public async Task Gui_allocation_verifies_live_ownership_and_refuses_a_changed_marker_before_drop()
+    {
+        var factory = typeof(SqlTestDatabase).GetMethod("CreateGuiAsync");
+        Assert.NotNull(factory);
+        var administration = Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!;
+        var allocation = await (Task<SqlTestDatabase>)factory!.Invoke(null,
+            new object[] { administration, System.Threading.CancellationToken.None })!;
+        string? marker = null;
+        try
+        {
+            Assert.StartsWith("MyDmsVn_GuiP5_", allocation.DatabaseName, StringComparison.Ordinal);
+            using (var connection = new SqlConnection(allocation.ConnectionString))
+            {
+                await connection.OpenAsync();
+                await allocation.VerifyOwnershipAsync(connection, default);
+                marker = await connection.QuerySingleAsync<string>(
+                    "SELECT CONVERT(nvarchar(128), value) FROM sys.extended_properties " +
+                    "WHERE class=0 AND name=N'MyDmsVn.TestOwnership';");
+                await connection.ExecuteAsync("EXEC sys.sp_updateextendedproperty " +
+                    "@name=N'MyDmsVn.TestOwnership', @value=N'changed';");
+            }
+            await Assert.ThrowsAsync<InvalidOperationException>(() => allocation.DisposeAsync());
+            using var master = new SqlConnection(administration);
+            Assert.Equal(1, await master.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM sys.databases WHERE name=@name;", new { name = allocation.DatabaseName }));
+        }
+        finally
+        {
+            if (marker != null)
+            {
+                using var connection = new SqlConnection(allocation.ConnectionString);
+                await connection.ExecuteAsync("EXEC sys.sp_updateextendedproperty " +
+                    "@name=N'MyDmsVn.TestOwnership', @value=@marker;", new { marker });
+            }
+            await allocation.DisposeAsync();
+        }
+        using var verify = new SqlConnection(administration);
+        Assert.Equal(0, await verify.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sys.databases WHERE name=@name;", new { name = allocation.DatabaseName }));
+    }
+
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Create_and_dispose_only_manages_a_generated_database()
     {
         var adminConnectionString = Environment.GetEnvironmentVariable(

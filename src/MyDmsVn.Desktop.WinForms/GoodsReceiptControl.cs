@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -62,7 +62,15 @@ namespace MyDmsVn.Desktop.WinForms
             PreviousPageButton = CreateButton("Previous", () => MovePage(-1));
             NextPageButton = CreateButton("Next", () => MovePage(1));
             PageLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
-            ReceiptGrid = new BootstrapGrid { Dock = DockStyle.Fill, TabStop = true };
+            ReceiptGrid = new AccessibleActionGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt results" };
+            ((AccessibleActionGrid)ReceiptGrid).ConfigureRowActions(
+                row => row > 0 && row <= _receiptIds.Count ? (object)_receiptIds[row - 1] : null,
+                row => row > 0 && row < ReceiptGrid.RowsCount ? Convert.ToString(ReceiptGrid[row, 1]?.Value) ?? string.Empty : string.Empty,
+                row =>
+                {
+                    ReceiptGrid.Selection.Focus(new SourceGrid.Position(row, 1), true);
+                    SelectActiveReceipt();
+                });
             ReceiptGrid.DoubleClick += (_, __) => SelectActiveReceipt();
             ReceiptGrid.KeyDown += OnReceiptGridKeyDown;
 
@@ -86,11 +94,19 @@ namespace MyDmsVn.Desktop.WinForms
             SaveButton = CreateButton("Save", () => SetOperation(SaveAsync()));
             PostButton = CreateButton("Post", () => SetOperation(PostAsync()));
 
-            LineGrid = new BootstrapGrid { Dock = DockStyle.Fill, TabStop = true };
+            LineGrid = new AccessibleActionGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt lines" };
+            ((AccessibleActionGrid)LineGrid).ConfigureRowActions(
+                row => row > 0 && row <= _editor.Lines.Count ? _editor.Lines[row - 1] : null,
+                row => row > 0 && row <= _editor.Lines.Count ? _editor.Lines[row - 1].ProductDisplayName ?? string.Empty : string.Empty,
+                row =>
+                {
+                    LineGrid.Selection.Focus(new SourceGrid.Position(row, 1), true);
+                    SelectActiveLine();
+                });
             LineGrid.Click += (_, __) => SelectActiveLine();
             LineGrid.KeyDown += OnLineGridKeyDown;
             ProductLookup = CreateLookup("Product");
-            QuantityEditor = new BootstrapNumericBox
+            QuantityEditor = new AccessibleNumericBox
             {
                 Dock = DockStyle.Top,
                 DecimalPlaces = GoodsReceiptContractLimits.DecimalPlaces,
@@ -98,7 +114,7 @@ namespace MyDmsVn.Desktop.WinForms
                 Maximum = GoodsReceiptContractLimits.MaximumQuantity,
                 AccessibleName = "Quantity",
             };
-            UnitCostEditor = new BootstrapNumericBox
+            UnitCostEditor = new AccessibleNumericBox
             {
                 Dock = DockStyle.Top,
                 DecimalPlaces = GoodsReceiptContractLimits.DecimalPlaces,
@@ -253,6 +269,8 @@ namespace MyDmsVn.Desktop.WinForms
                 return;
             }
 
+            CancelEditorLookupEdits();
+
             var selectedLineId = _selectedLine?.Id;
             var selectedLineIndex = _selectedLine == null
                 ? -1
@@ -266,7 +284,7 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     EnterAccessDeniedEditorState(false);
                 }
-                else if (_editor.Id.HasValue)
+                else if (_editor.Id.HasValue || _editor.RequiresPostOutcomeReload)
                 {
                     if (await _editor.RefreshAsync(CancellationToken.None).ConfigureAwait(true))
                     {
@@ -283,6 +301,10 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task SelectReceiptCoreAsync(long id, CancellationToken cancellationToken)
         {
+            if (_editor.RequiresPostOutcomeReload)
+            {
+                return;
+            }
             if (!CanAbandonEditor())
             {
                 return;
@@ -300,6 +322,7 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             _workflowMessage = null;
+            CancelEditorLookupEdits();
             _editor.Load(selected);
             _selectedLine = _editor.Lines.FirstOrDefault();
             ApplyState();
@@ -356,6 +379,10 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void BeginNew()
         {
+            if (_editor.RequiresPostOutcomeReload)
+            {
+                return;
+            }
             if (!CanAbandonEditor())
             {
                 return;
@@ -363,6 +390,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             _workflowMessage = null;
             _isAccessDeniedEditorLocked = false;
+            CancelEditorLookupEdits();
             _list.NewDraft();
             _editor.Load(null);
             _selectedLine = null;
@@ -385,6 +413,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (_editor.Id.HasValue)
             {
+                CancelEditorLookupEdits();
                 _editor.Load(null);
                 _selectedLine = null;
             }
@@ -440,20 +469,22 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void AddLine()
         {
-            if (_editor.IsReadOnly)
+            if (_editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
             {
                 return;
             }
+            ProductLookup.CancelPendingEdit();
             _selectedLine = _editor.AddLine();
             ApplyState();
         }
 
         private void RemoveSelectedLine()
         {
-            if (_selectedLine == null || _editor.IsReadOnly)
+            if (_selectedLine == null || _editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
             {
                 return;
             }
+            ProductLookup.CancelPendingEdit();
             _editor.RemoveLine(_selectedLine);
             _selectedLine = _editor.Lines.FirstOrDefault();
             ApplyState();
@@ -461,7 +492,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private bool ApplyEditorsToViewModel()
         {
-            if (_editor.IsReadOnly)
+            if (_editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
             {
                 return false;
             }
@@ -473,7 +504,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void ApplySelectedLineEditors()
         {
-            if (_selectedLine == null || _editor.IsReadOnly)
+            if (_selectedLine == null || _editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
             {
                 return;
             }
@@ -495,6 +526,7 @@ namespace MyDmsVn.Desktop.WinForms
             var row = LineGrid.Selection.ActivePosition.Row;
             if (row > 0 && row - 1 < _editor.Lines.Count)
             {
+                ProductLookup.CancelPendingEdit();
                 ApplySelectedLineEditors();
                 _selectedLine = _editor.Lines[row - 1];
                 ApplyState();
@@ -586,7 +618,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnReceiptDateChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && !_editor.IsReadOnly)
+            if (!_applyingState && !_editor.IsReadOnly && !_editor.RequiresPostOutcomeReload)
             {
                 _editor.ReceiptDate = ReceiptDateEditor.Value;
             }
@@ -594,7 +626,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnWarehouseChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && TrySelectedOption(WarehouseLookup, out var option))
+            if (!_applyingState && !_editor.RequiresPostOutcomeReload && TrySelectedOption(WarehouseLookup, out var option))
             {
                 _editor.SetWarehouse(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -602,7 +634,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnEmployeeChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && TrySelectedOption(EmployeeLookup, out var option))
+            if (!_applyingState && !_editor.RequiresPostOutcomeReload && TrySelectedOption(EmployeeLookup, out var option))
             {
                 _editor.SetEmployee(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -610,7 +642,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnProductChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && _selectedLine != null && TrySelectedOption(ProductLookup, out var option))
+            if (!_applyingState && !_editor.RequiresPostOutcomeReload && _selectedLine != null && TrySelectedOption(ProductLookup, out var option))
             {
                 _selectedLine.SetProduct(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -618,7 +650,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnNoteChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && !_editor.IsReadOnly)
+            if (!_applyingState && !_editor.IsReadOnly && !_editor.RequiresPostOutcomeReload)
             {
                 _editor.Note = NoteEditor.Text;
             }
@@ -746,14 +778,11 @@ namespace MyDmsVn.Desktop.WinForms
                 WarehouseFilterLookup.DataSource = _editor.WarehouseLookup.Items
                     .Where(item => item.IsAvailableForNewSelection)
                     .ToArray();
-                WarehouseLookup.DataSource = _editor.WarehouseLookup.Items.ToArray();
-                EmployeeLookup.DataSource = _editor.EmployeeLookup.Items.ToArray();
-                ProductLookup.DataSource = _editor.ProductOptions.Items.ToArray();
+                BindEditorLookup(WarehouseLookup, _editor.WarehouseLookup.Items, _editor.WarehouseId);
+                BindEditorLookup(EmployeeLookup, _editor.EmployeeLookup.Items, _editor.EmployeeId);
+                BindEditorLookup(ProductLookup, _editor.ProductOptions.Items, _selectedLine?.ProductId);
                 WarehouseFilterLookup.SelectValue(_warehouseFilterId);
                 StatusFilter.SelectedItem = _statusFilter ?? "All";
-                WarehouseLookup.SelectValue(_editor.WarehouseId);
-                EmployeeLookup.SelectValue(_editor.EmployeeId);
-                ProductLookup.SelectValue(_selectedLine?.ProductId);
                 ReceiptDateEditor.Value = _editor.ReceiptDate;
                 NoteEditor.Text = _editor.Note ?? string.Empty;
                 StatusLabel.Text = _editor.Status;
@@ -765,14 +794,18 @@ namespace MyDmsVn.Desktop.WinForms
                 UnitCostEditor.Value = Clamp(UnitCostEditor, _selectedLine?.UnitCost ?? 0m);
 
                 var busy = _isRefreshing || _list.IsLoading || _list.IsBusy || _editor.IsBusy;
+                var requiresPostReload = _editor.RequiresPostOutcomeReload;
                 BusyIndicator.Visible = busy;
-                OperationStatusLabel.Text = _workflowMessage ??
+                OperationStatusLabel.Text = requiresPostReload
+                    ? "Posting outcome unknown. Refresh to reload the receipt before making further changes. " + _editor.ErrorMessage
+                    : _workflowMessage ??
                     _editor.ErrorMessage ??
                     _list.ErrorMessage ??
                     (busy ? "Loading..." : "Ready");
-                ReceiptGrid.Enabled = !busy;
+                ReceiptGrid.Enabled = !busy && !requiresPostReload;
+                LineGrid.Enabled = !busy && !requiresPostReload;
                 RefreshButton.Enabled = !busy;
-                NewButton.Enabled = !busy;
+                NewButton.Enabled = !busy && !requiresPostReload;
                 WarehouseFilterLookup.Enabled = !busy;
                 StatusFilter.Enabled = !busy;
                 var pageCount = Math.Max(1, (int)Math.Ceiling(
@@ -780,7 +813,7 @@ namespace MyDmsVn.Desktop.WinForms
                 PageLabel.Text = $"Page {_list.PageNumber} of {pageCount}";
                 PreviousPageButton.Enabled = !busy && _list.PageNumber > 1;
                 NextPageButton.Enabled = !busy && _list.PageNumber < pageCount;
-                var canEdit = !busy && !_editor.IsReadOnly && !_isAccessDeniedEditorLocked;
+                var canEdit = !busy && !_editor.IsReadOnly && !_isAccessDeniedEditorLocked && !requiresPostReload;
                 ReceiptDateEditor.Enabled = canEdit;
                 WarehouseLookup.Enabled = canEdit;
                 EmployeeLookup.Enabled = canEdit;
@@ -899,17 +932,24 @@ namespace MyDmsVn.Desktop.WinForms
         private Control CreateLayout()
         {
             var master = new Panel { Dock = DockStyle.Fill };
-            var masterBar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 5, Padding = new Padding(8) };
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            masterBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            masterBar.Controls.Add(SearchBox, 0, 0);
-            masterBar.Controls.Add(WarehouseFilterLookup, 1, 0);
-            masterBar.Controls.Add(StatusFilter, 2, 0);
-            masterBar.Controls.Add(RefreshButton, 3, 0);
-            masterBar.Controls.Add(NewButton, 4, 0);
+            var masterBar = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(8),
+            };
+            SearchBox.Dock = DockStyle.None;
+            SearchBox.Width = 180;
+            WarehouseFilterLookup.Dock = DockStyle.None;
+            WarehouseFilterLookup.Width = 190;
+            StatusFilter.Dock = DockStyle.None;
+            StatusFilter.Width = 110;
+            masterBar.Controls.AddRange(new Control[]
+            {
+                SearchBox, WarehouseFilterLookup, StatusFilter, RefreshButton, NewButton,
+            });
             var pagingBar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
@@ -926,6 +966,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             var detail = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1 };
             detail.Panel1MinSize = 300;
+            detail.SizeChanged += (_, __) => KeepReceiptEditorsVisible(detail);
             detail.Panel1.Controls.Add(CreateHeaderEditor());
             detail.Panel2.Controls.Add(CreateLineEditor());
 
@@ -935,6 +976,19 @@ namespace MyDmsVn.Desktop.WinForms
             return split;
         }
 
+        private static void KeepReceiptEditorsVisible(SplitContainer split)
+        {
+            // A fixed panel can retain its tiny construction-time distance even below Panel1MinSize.
+            var scale = split.DeviceDpi / 96f;
+            var headerMinimum = (int)Math.Ceiling(300 * scale);
+            var linesMinimum = (int)Math.Ceiling(240 * scale);
+            var available = split.ClientSize.Width - split.SplitterWidth;
+            if (available < headerMinimum + linesMinimum)
+                return;
+            var distance = Math.Max(headerMinimum, Math.Min(split.SplitterDistance, available - linesMinimum));
+            if (split.SplitterDistance != distance)
+                split.SplitterDistance = distance;
+        }
         private Control CreateHeaderEditor()
         {
             var panel = new TableLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 1, Padding = new Padding(8) };
@@ -980,9 +1034,26 @@ namespace MyDmsVn.Desktop.WinForms
             panel.Controls.Add(editor);
         }
 
+        private void CancelEditorLookupEdits()
+        {
+            WarehouseLookup.CancelPendingEdit();
+            EmployeeLookup.CancelPendingEdit();
+            ProductLookup.CancelPendingEdit();
+        }
+
+        private static void BindEditorLookup(BootstrapLookupBox lookup, IEnumerable<CatalogLookupOption> options, int? selectedId)
+        {
+            var selection = selectedId > 0 ? selectedId : null;
+            var preservePending = lookup.HasPendingText && Equals(lookup.SelectedValue, selection);
+            var pendingText = lookup.Text;
+            lookup.DataSource = options.ToArray();
+            lookup.SelectValue(selection);
+            if (preservePending) lookup.Text = pendingText;
+        }
+
         private static BootstrapLookupBox CreateLookup(string accessibleName)
         {
-            var lookup = new BootstrapLookupBox
+            var lookup = new AccessibleLookupBox
             {
                 Dock = DockStyle.Top,
                 AccessibleName = accessibleName,

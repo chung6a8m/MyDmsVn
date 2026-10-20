@@ -1,6 +1,6 @@
 # Deferred work — outside the active acceptance queue
 
-**Updated:** 2026-10-19. This page contains work that remains outside the approved near-term implementation/acceptance queue. **P5 interactive/full GUI and P6 operational/release requirements are no longer parked here**: they are still OPEN, but now explicitly planned under [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md). Moving requirements into a plan is **not** their acceptance or a release waiver.
+**Updated:** 2026-10-20. This page contains work outside the approved near-term acceptance queue. [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) is COMPLETE within the Owner-approved scope, including the signed T05 Down NOT TESTED exception. [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md) remains OPEN / NOT READY; GUI acceptance is not a release waiver.
 
 Historical original scope remains in the [P5/P6 remainder](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs/plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) and [P6 operations source](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs/plans/archive/20261008-007-phase-6-local-hardening.md). Current plan IDs preserve `REMAIN-P5-GUI-01/02`, `REMAIN-P6-OPS-01/T05–T08` and G1–G5; older TESTGATE/dual-host/P3.1 command instructions are superseded. [Execution index](plans/README.md) decides order.
 

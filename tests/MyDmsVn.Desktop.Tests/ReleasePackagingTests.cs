@@ -42,7 +42,7 @@ namespace MyDmsVn.Desktop.Tests
             }
             finally
             {
-                Directory.Delete(fixture.Root, recursive: true);
+                if (!GuiTestSafety.IsPoisoned) Directory.Delete(fixture.Root, recursive: true);
             }
         }
 
@@ -60,7 +60,7 @@ namespace MyDmsVn.Desktop.Tests
             }
             finally
             {
-                Directory.Delete(fixture.Root, recursive: true);
+                if (!GuiTestSafety.IsPoisoned) Directory.Delete(fixture.Root, recursive: true);
             }
         }
 
@@ -84,7 +84,7 @@ namespace MyDmsVn.Desktop.Tests
             }
             finally
             {
-                Directory.Delete(fixture.Root, recursive: true);
+                if (!GuiTestSafety.IsPoisoned) Directory.Delete(fixture.Root, recursive: true);
             }
         }
 
@@ -142,7 +142,7 @@ namespace MyDmsVn.Desktop.Tests
             throw new InvalidOperationException("Fixture policy has no CLR header.");
         }
 
-        private static async Task<ProcessResult> RunPackagingScriptAsync(
+        private static async Task<GuiProcessResult> RunPackagingScriptAsync(
             string outputRoot,
             string version)
         {
@@ -150,7 +150,7 @@ namespace MyDmsVn.Desktop.Tests
             var script = Path.Combine(repositoryRoot, "deployment", "release", "Publish-LocalRelease.ps1");
             var startInfo = new ProcessStartInfo
             {
-                FileName = "powershell.exe",
+                FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
                 Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" +
                     script + "\" -Version \"" + version + "\" -OutputRoot \"" +
                     outputRoot + "\" -SkipPublish",
@@ -160,13 +160,7 @@ namespace MyDmsVn.Desktop.Tests
                 UseShellExecute = false,
                 WorkingDirectory = repositoryRoot,
             };
-            using (var process = Process.Start(startInfo)!)
-            {
-                var output = process.StandardOutput.ReadToEndAsync();
-                var error = process.StandardError.ReadToEndAsync();
-                await Task.Run(() => process.WaitForExit());
-                return new ProcessResult(process.ExitCode, await output, await error);
-            }
+            return await GuiOwnedProcess.RunAsync(startInfo, TimeSpan.FromSeconds(60));
         }
 
         private static string FindRepositoryRoot()
@@ -193,18 +187,5 @@ namespace MyDmsVn.Desktop.Tests
             public string DesktopDirectory { get; }
         }
 
-        private sealed class ProcessResult
-        {
-            public ProcessResult(int exitCode, string standardOutput, string standardError)
-            {
-                ExitCode = exitCode;
-                StandardOutput = standardOutput;
-                StandardError = standardError;
-            }
-
-            public int ExitCode { get; }
-            public string StandardOutput { get; }
-            public string StandardError { get; }
-        }
     }
 }

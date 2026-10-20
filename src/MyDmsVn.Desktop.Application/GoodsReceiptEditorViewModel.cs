@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -27,6 +27,8 @@ namespace MyDmsVn.Desktop.Application
         private int _postInFlight;
         private bool _isApplyingReceipt;
         private bool _isDirty;
+        private bool _requiresPostOutcomeReload;
+        private long? _uncertainPostReceiptId;
         private bool _disposed;
 
         public GoodsReceiptEditorViewModel(
@@ -120,6 +122,11 @@ namespace MyDmsVn.Desktop.Application
         }
 
         public bool IsReadOnly => string.Equals(Status, "Posted", StringComparison.Ordinal);
+        public bool RequiresPostOutcomeReload
+        {
+            get => _requiresPostOutcomeReload;
+            private set => SetProperty(ref _requiresPostOutcomeReload, value);
+        }
         public bool IsDirty
         {
             get => _isDirty;
@@ -276,7 +283,8 @@ namespace MyDmsVn.Desktop.Application
         public async Task<bool> RefreshAsync(CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
-            if (!Id.HasValue)
+            var receiptId = _uncertainPostReceiptId ?? Id;
+            if (!receiptId.HasValue)
             {
                 return false;
             }
@@ -290,7 +298,7 @@ namespace MyDmsVn.Desktop.Application
                 try
                 {
                     response = await _apiClient
-                        .GetAsync(Id.Value, linkedCancellation.Token)
+                        .GetAsync(receiptId.Value, linkedCancellation.Token)
                         .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
@@ -349,6 +357,11 @@ namespace MyDmsVn.Desktop.Application
                             }
 
                             Load(response.Data);
+                            if (response.Data!.Id == _uncertainPostReceiptId)
+                            {
+                                _uncertainPostReceiptId = null;
+                                RequiresPostOutcomeReload = false;
+                            }
                             applied = true;
                         },
                         linkedCancellation.Token).ConfigureAwait(false);
@@ -365,6 +378,10 @@ namespace MyDmsVn.Desktop.Application
         public async Task<bool> SaveAsync(CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
+            if (RequiresPostOutcomeReload)
+            {
+                return false;
+            }
             if (Interlocked.CompareExchange(ref _saveInFlight, 1, 0) != 0)
             {
                 return false;
@@ -394,6 +411,10 @@ namespace MyDmsVn.Desktop.Application
         public async Task<bool> PostAsync(CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
+            if (RequiresPostOutcomeReload)
+            {
+                return false;
+            }
             if (Interlocked.CompareExchange(ref _postInFlight, 1, 0) != 0)
             {
                 return false;
@@ -442,12 +463,23 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                if (!lifetimeToken.IsCancellationRequested)
+                {
+                    await _dispatcher.InvokeAsync(
+                        () => RequirePostOutcomeReload(receiptId),
+                        lifetimeToken).ConfigureAwait(false);
+                }
                 throw;
             }
             catch (Exception exception)
             {
                 await _dispatcher.InvokeAsync(
-                    () => ApplyUnexpectedError(exception),
+                    () =>
+                    {
+                        RequirePostOutcomeReload(receiptId);
+                        ApplyUnexpectedError(exception,
+                            "The posting outcome could not be confirmed. Reload the receipt before making further changes.");
+                    },
                     lifetimeToken).ConfigureAwait(false);
                 return false;
             }
@@ -455,8 +487,17 @@ namespace MyDmsVn.Desktop.Application
             if (!response.IsSuccess)
             {
                 await _dispatcher.InvokeAsync(
-                    () => ApplyApiError(response.Error!),
-                    cancellationToken).ConfigureAwait(false);
+                    () =>
+                    {
+                        var error = response.Error!;
+                        if (error.Status == ApiStatusCode.InternalServerError ||
+                            error.Status == ApiStatusCode.Unspecified)
+                        {
+                            RequirePostOutcomeReload(receiptId);
+                        }
+                        ApplyApiError(error);
+                    },
+                    lifetimeToken).ConfigureAwait(false);
                 return false;
             }
 
@@ -530,6 +571,12 @@ namespace MyDmsVn.Desktop.Application
                     DesktopNotificationKind.Warning,
                     "Goods receipt was posted, but its latest details were not refreshed because the operation was canceled."),
                 cancellationToken);
+
+        private void RequirePostOutcomeReload(long receiptId)
+        {
+            _uncertainPostReceiptId = receiptId;
+            RequiresPostOutcomeReload = true;
+        }
 
         private async Task<bool> SaveCoreAsync(
             CancellationToken cancellationToken,
@@ -805,6 +852,10 @@ namespace MyDmsVn.Desktop.Application
 
         private void ThrowIfReadOnly()
         {
+            if (RequiresPostOutcomeReload)
+            {
+                throw new InvalidOperationException("Reload the receipt to confirm the posting outcome before making further changes.");
+            }
             if (IsReadOnly)
             {
                 throw new InvalidOperationException("Posted goods receipts are read-only.");

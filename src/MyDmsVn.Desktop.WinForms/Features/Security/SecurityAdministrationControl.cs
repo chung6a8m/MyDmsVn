@@ -25,6 +25,8 @@ public interface IActivatableDesktopControl
 public sealed class SecurityAdministrationControl : UserControl, IActivatableDesktopControl
 {
     private readonly SecurityAdministrationViewModel _viewModel;
+    private readonly Func<string?> _selectImportJson;
+    private readonly Func<string, bool> _confirmImport;
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
     private readonly DataGridView _usersGrid = CreateGrid();
     private readonly DataGridView _rolesGrid = CreateGrid();
@@ -45,8 +47,18 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
     private bool _disposed;
 
     public SecurityAdministrationControl(SecurityAdministrationViewModel viewModel)
+        : this(viewModel, null, null)
+    {
+    }
+
+    public SecurityAdministrationControl(
+        SecurityAdministrationViewModel viewModel,
+        Func<string?>? selectImportJson,
+        Func<string, bool>? confirmImport)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        _selectImportJson = selectImportJson ?? SelectImportJson;
+        _confirmImport = confirmImport ?? ConfirmImport;
         _uiThreadId = Thread.CurrentThread.ManagedThreadId;
         Dock = DockStyle.Fill;
         _password.UseSystemPasswordChar = true;
@@ -84,6 +96,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         _roleName.TextChanged += (_, _) => _viewModel.RoleName = _roleName.Text;
         _target.SelectedIndexChanged += (_, _) =>
         {
+            _viewModel.InvalidatePermissionImportPreview();
             UpdateDecisionOptions(string.Equals(_target.SelectedItem as string, "Role", StringComparison.Ordinal));
             RefreshPermissionRows();
             ApplyState();
@@ -126,13 +139,17 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         ConfigureColumns(_usersGrid,
             ("Username", "User name"), ("DisplayName", "Display name"), ("Email", "Email"),
             ("IsActive", "Active"), ("IsProtectedAccount", "Protected"));
-        _usersGrid.SelectionChanged += (_, _) =>
+        _usersGrid.CurrentCellChanged += (_, _) =>
         {
             if (!_applying && _usersGrid.CurrentRow?.DataBoundItem is SecurityUserDto user)
             {
-                _viewModel.SelectUser(user.UserId);
+                if (_viewModel.SelectedUserId != user.UserId)
+                {
+                    _viewModel.SelectUser(user.UserId);
+                    RefreshMemberships();
+                }
+
                 _target.SelectedIndex = 0;
-                RefreshMemberships();
             }
         };
         _memberships.ItemCheck += (_, eventArgs) =>
@@ -198,11 +215,15 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
     {
         ConfigureColumns(_rolesGrid,
             ("Name", "Role"), ("IsActive", "Active"), ("AssignmentRevision", "Revision"));
-        _rolesGrid.SelectionChanged += (_, _) =>
+        _rolesGrid.CurrentCellChanged += (_, _) =>
         {
             if (!_applying && _rolesGrid.CurrentRow?.DataBoundItem is SecurityRoleDto role)
             {
-                _viewModel.SelectRole(role.RoleId);
+                if (_viewModel.SelectedRoleId != role.RoleId)
+                {
+                    _viewModel.SelectRole(role.RoleId);
+                }
+
                 _target.SelectedIndex = 1;
             }
         };
@@ -227,7 +248,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         ConfigureColumns(_permissionsGrid,
             ("Key", "Permission"), ("Module", "Module"), ("Status", "Lifecycle"),
             ("Change", "Catalog change"), ("AssignmentStatus", "Assignment"));
-        _permissionsGrid.SelectionChanged += (_, _) => UpdatePermissionExplanation();
+        _permissionsGrid.CurrentCellChanged += (_, _) => UpdatePermissionExplanation();
         _permissionsGrid.CellDoubleClick += (_, _) => ApplyPermissionSelection();
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8) };
         _target.Width = 100;
@@ -238,7 +259,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         toolbar.Controls.Add(_search);
         toolbar.Controls.Add(_decision);
         toolbar.Controls.Add(CreateButton("Apply assignment", (_, _) => ApplyPermissionSelection()));
-        _importButton.Click += async (_, _) => await ImportPermissionFileAsync();
+        _importButton.Click += (_, _) => BeginOperation(ImportPermissionFileAsync());
         toolbar.Controls.Add(_importButton);
         var footer = new Panel { Dock = DockStyle.Bottom, Height = 56, Padding = new Padding(8) };
         var explanation = new Label { Dock = DockStyle.Fill, AutoSize = false, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
@@ -270,10 +291,8 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         _applying = true;
         try
         {
-            _usersGrid.DataSource = null;
-            _usersGrid.DataSource = _viewModel.Users.ToList();
-            _rolesGrid.DataSource = null;
-            _rolesGrid.DataSource = _viewModel.Roles.ToList();
+            BindRows(_usersGrid, _viewModel.Users, user => user.UserId == _viewModel.SelectedUserId);
+            BindRows(_rolesGrid, _viewModel.Roles, role => role.RoleId == _viewModel.SelectedRoleId);
             _username.Text = _viewModel.Username;
             _displayName.Text = _viewModel.DisplayName;
             _email.Text = _viewModel.Email;
@@ -307,17 +326,41 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         }
     }
 
-    private void RefreshMemberships()
+    private static void BindRows<T>(DataGridView grid, IReadOnlyList<T> rows, Func<T, bool> selected)
     {
-        _memberships.Items.Clear();
-        var user = _viewModel.SelectedUser;
-        foreach (var role in _viewModel.Roles)
+        if (grid.DataSource is not List<T> current || !current.SequenceEqual(rows))
         {
-            var index = _memberships.Items.Add(role.Name + (role.IsActive ? string.Empty : " (inactive)"));
-            _memberships.SetItemChecked(index, user?.RoleIds.Contains(role.RoleId) == true);
+            grid.DataSource = rows.ToList();
         }
 
-        _memberships.Enabled = user != null && !user.IsProtectedAccount;
+        var selectedRow = grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(row =>
+            row.DataBoundItem is T item && selected(item));
+        if (selectedRow != null && grid.CurrentRow != selectedRow)
+        {
+            grid.CurrentCell = selectedRow.Cells[0];
+        }
+    }
+
+    private void RefreshMemberships()
+    {
+        var wasApplying = _applying;
+        _applying = true;
+        try
+        {
+            _memberships.Items.Clear();
+            var user = _viewModel.SelectedUser;
+            foreach (var role in _viewModel.Roles)
+            {
+                var index = _memberships.Items.Add(role.Name + (role.IsActive ? string.Empty : " (inactive)"));
+                _memberships.SetItemChecked(index, user?.RoleIds.Contains(role.RoleId) == true);
+            }
+
+            _memberships.Enabled = user != null && !user.IsProtectedAccount;
+        }
+        finally
+        {
+            _applying = wasApplying;
+        }
     }
 
     private void RefreshPermissionRows()
@@ -345,8 +388,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
             return;
         }
 
-        var label = _tabs.TabPages[2].Controls.OfType<Panel>()
-            .SelectMany(panel => panel.Controls.OfType<Label>())
+        var label = Descendants(_tabs.TabPages[2]).OfType<Label>()
             .FirstOrDefault(item => item.Name == "PermissionExplanation");
         if (label != null)
         {
@@ -388,7 +430,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
         return _viewModel.CanManageRoles && _viewModel.SelectedRole != null && _viewModel.SelectedRole.IsActive;
     }
 
-    private async Task ImportPermissionFileAsync()
+    private string? SelectImportJson()
     {
         using var dialog = new OpenFileDialog
         {
@@ -397,11 +439,18 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
             Filter = "Permission assignment JSON (*.json)|*.json|All files (*.*)|*.*",
             Title = "Select a permission assignment import",
         };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        return dialog.ShowDialog(this) == DialogResult.OK ? ReadBoundedUtf8File(dialog.FileName) : null;
+    }
 
+    private bool ConfirmImport(string summary) => MessageBox.Show(this, summary, "Confirm permission import",
+        MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+
+    private async Task ImportPermissionFileAsync()
+    {
         try
         {
-            var json = ReadBoundedUtf8File(dialog.FileName);
+            var json = _selectImportJson();
+            if (json == null || _disposed || IsDisposed) return;
             var targetType = string.Equals(_target.SelectedItem as string, "Role", StringComparison.Ordinal)
                 ? PermissionImportTargetTypeDto.Role
                 : PermissionImportTargetTypeDto.User;
@@ -435,8 +484,7 @@ public sealed class SecurityAdministrationControl : UserControl, IActivatableDes
             if (preview.Additions.Count == 0)
                 summary.AppendLine("No new assignments; applying will be a no-op.");
             summary.AppendLine().Append("Continue with this exact preview?");
-            if (MessageBox.Show(this, summary.ToString(), "Confirm permission import",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+            if (_confirmImport(summary.ToString()))
             {
                 await _viewModel.ApplyPermissionImportAsync(json, CancellationToken.None);
             }
