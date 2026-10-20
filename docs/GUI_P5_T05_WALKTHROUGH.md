@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS —44/45 observations PASS;1partially tested UX cell with disclosed limit; final Owner acceptance pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: COMPLETE / OWNER ACCEPTED —44PASS,1PARTIAL with explicit accepted Down exception. REMAIN-P5-GUI-02 PASS within signed scope.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -69,7 +69,7 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 ## Session / artifacts / decision
 
-T05 evidence ledger currently44/45 PASS (27/27 baseline,17/18 supplemental); the remaining Warehouse125Dark cell is PARTIAL solely because Down was not tested. All actual125% observations are Owner-confirmed; no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
+T05 evidence ledger currently44/45 PASS (27/27 baseline,17/18 supplemental); the remaining Warehouse125Dark cell is PARTIAL solely because Down was not tested. All actual125% observations are Owner-confirmed; no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off received2026-10-20 against5ed7bc6, including the explicit Down exception; T05 COMPLETE / REMAIN-P5-GUI-02 PASS within signed scope. T06/overallP5/P6 remain OPEN.
 
 ### Setup attempt1 — FAIL, safely disposed
 
@@ -356,3 +356,9 @@ Owner explicitly confirmed: “xác nhận hai lượt125% Light/Dark đúng nh�
 Concrete acceptance scope for Owner: installed net48/x86 frozen d5207b2 on actual Windows11build26200.9457, SQL2017Developer14.0.2130.4/schema001–009; full100Light functional baseline and100Dark/125Light/Dark supplemental UX; exact original/continuation fixture provenance and preserved failures/qualifications above. Final restricted reconciliation0mismatches, normal process drain, all3T05allocations/9principals disposed,169/169historicalGUIledgersDropped and exactlatest database/principal/process0. Review completed, no material runtime/evidence finding. No new automated pass, T06/fullGUI gate or P6 certification claimed.
 
 Final Owner signature and explicit disposition of the single untestedDown substep remain pending. Proposed decision: accept T05 within the documented observations and accept that narrow observation limit; retain Down as NOT TESTED rather than relabeling itPASS. Only after that explicit decision may T05/REMAIN-P5-GUI-02 close. T06/overallP5/P6 remainOPEN.
+
+### Final T05 Owner sign-off — 2026-10-20 11:45 +07:00
+
+Project Owner explicitly accepted evidence commit5ed7bc6: “Nghiệm thu T05 theo biên bản, chấp nhận giới hạn Down đã ghi”. GUI-P5-T05 COMPLETE / REMAIN-P5-GUI-02 PASS within the documented, Owner-accepted scope. Outcome remains44PASS and1PARTIAL observation cell; the Warehouse125DarkDown substep remains NOT TESTED with an explicit Owner-accepted exception, never converted into a testPASS. The other observed paths and both125Light/Dark groups are confirmed.
+
+Frozen d5207b2 candidate/cohort provenance,80publicimages, independent oracle/reconciliation and final owned cleanup remain as evidenced above. All3T05allocations/9principals disposed,169/169GUIledgersDropped, exactlatest database/principal/process0. This signature changes documentation only; no GUI/SQL/test execution or new automatedpass is claimed. T06, overallP5, REL/P6 G1–G5 and productionreadiness remainOPEN. Historical pending checkpoints above are superseded by this signed decision.
