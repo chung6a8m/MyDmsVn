@@ -760,7 +760,8 @@ internal static class GuiPackageProbe
             throw new InvalidOperationException("Input target is not an owned editor/window.");
         // One activation request, never an input-queue attachment or repeated business action.
         if (IsIconic(window)) ShowWindowAsync(window, 9); // Restore only this owned minimized window.
-        if (GetForegroundWindow() != window) SetForegroundWindow(window);
+        var activationRequested = GetForegroundWindow() != window;
+        var activationGranted = !activationRequested || SetForegroundWindow(window);
         editor.SetFocus();
         try
         {
@@ -777,7 +778,8 @@ internal static class GuiPackageProbe
                 GetWindowThreadProcessId(foreground, out foregroundProcess);
                 Console.WriteLine("OWNED_FOCUS_FAILED=" + input + ";FOREGROUND_OWNED=" +
                     (foregroundProcess == _application.Id) + ";ROOT_FOREGROUND=" + (foreground == window) +
-                    ";EDITOR_FOCUSED=" + editor.Current.HasKeyboardFocus);
+                    ";EDITOR_FOCUSED=" + editor.Current.HasKeyboardFocus +
+                    ";ACTIVATION_REQUESTED=" + activationRequested + ";ACTIVATION_GRANTED=" + activationGranted);
             }
             catch (ElementNotAvailableException) { Console.WriteLine("OWNED_FOCUS_FAILED=element unavailable"); }
             throw;
@@ -848,11 +850,22 @@ internal static class GuiPackageProbe
             new PropertyCondition(AutomationElement.NameProperty, name));
         foreach (AutomationElement named in candidates)
         {
+            // Captions/groups can inherit the same name but contain an unrelated EDIT.
+            // Resolve only semantic input widgets; ambiguity between real inputs still fails.
+            var type = named.Current.ControlType;
+            if (type != ControlType.Edit && type != ControlType.ComboBox && type != ControlType.Spinner) continue;
             var candidate = named.FindFirst(TreeScope.Descendants,
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
             if (candidate == null && named.Current.ControlType == ControlType.Edit) candidate = named;
             if (candidate == null) continue;
-            if (editor != null && !Automation.Compare(editor, candidate)) { _detail = "Ambiguous input selector"; throw new InvalidOperationException(); }
+            if (editor != null && !Automation.Compare(editor, candidate))
+            {
+                _detail = "Ambiguous input selector: " + name + ";first=" + editor.Current.ControlType.ProgrammaticName +
+                    ";next=" + candidate.Current.ControlType.ProgrammaticName +
+                    ";sameNativeHandle=" + (editor.Current.NativeWindowHandle == candidate.Current.NativeWindowHandle) +
+                    ";semantic=" + named.Current.ControlType.ProgrammaticName;
+                throw new InvalidOperationException();
+            }
             editor = candidate;
             semantic = named;
         }

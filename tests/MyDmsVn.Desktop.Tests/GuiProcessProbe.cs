@@ -37,6 +37,11 @@ internal static class GuiProcessProbe
                 target.Controls.Add(lookup);
                 target.Controls.Add(receipt);
                 target.Controls.Add(sink);
+                // Labeled compact groups may share an input name while holding another EDIT.
+                // Only the semantic ComboBox above is the intended input.
+                var captionGroup = new Panel { AccessibleName = "Focus target editor", Dock = DockStyle.Bottom, Height = 25 };
+                captionGroup.Controls.Add(new TextBox { Dock = DockStyle.Fill });
+                target.Controls.Add(captionGroup);
                 target.Shown += (sender, ignored) =>
                 {
                     if (refusing) { sink.Focus(); focusReady.Set(); }
