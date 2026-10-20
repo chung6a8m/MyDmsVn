@@ -1,34 +1,38 @@
-# Execution roadmap — v1a
+# Execution roadmap — v1a-pro
 
-**Updated:** 2026-10-20. This index owns execution order and plan state. **RESP, L2DB and GUI-P5 are complete in their approved scopes**; next is P6 release acceptance (REL), which remains OPEN / NOT READY.
+**Updated:** 2026-10-20. This index is the sole execution queue. The owner selected Business Compact and true inline Goods Receipt editing, and requested removal of every older unimplemented plan. The three completed plans below remain evidence, not active work.
 
-| Order | Plan | Status / source of truth | Next action |
+## Active plan
+
+| Order | Plan | State | Next action |
 |---:|---|---|---|
-| 1 | [RESP — Respawn fixture reuse](20261018-002-respawn-fixture-reuse.md) | **COMPLETE / accepted**: T00–T05; frozen fresh/reuse SQL comparison and ownership evidence in [RESP verification](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up); PR #36 merge `1e24df4` | Preserve accepted fixture/reset/isolation behavior |
-| 2 | [L2DB — net48 LINQ to DB migration](20261018-001-linq2db-net48-persistence-migration.md) | **COMPLETE / accepted in plan scope**: T00–T07; native cutover and clean package/limited real Local smoke in [L2DB verification](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke); PR #37 merge `42d94ba` | Preserve SQL/Application contracts; do not repeat migration work |
-| 3 | [GUI-P5 — full WinForms testing and P5 interactive acceptance](20261019-001-full-winforms-gui-p5-acceptance.md) | **COMPLETE in approved scope**: T00–T06; [final frozen gates/review/cleanup](../GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20), both attended IDs Owner-signed | Preserve productd5207b2 / test12e6a20: Session108, Desktop329 at each100/125, packaged18 separately, allPASS. T05 remains44PASS/1PARTIAL with signed Down NOT TESTED exception. Next REL/P6; historical failures retained |
-| 4 | [REL — P6 Local v1 release acceptance](20261019-002-local-v1-p6-release-acceptance.md) | **NEW / OPEN (planned)**: T00–T06 and G1–G5; NOT READY FOR PRODUCTION | Define supported OS/SQL/legacy/signing/recovery choices; run operational evidence and frozen release gate |
+| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE / PLANNED**; BCI-T00–T06 are all unexecuted | BCI-T00: prove the pinned SourceGrid editor, keyboard and native accessibility path |
 
-Filename prefixes follow creation time. **Follow this table, not filename sorting or historical roadmap instructions.** GUI-P5 completes P5 interaction and full GUI proof. REL-T00–T04 preparatory work may proceed alongside GUI-P5 on separate approved resources; final REL-T05/T06 and G4 need accepted GUI-P5 evidence. Neither new plan is a new framework/runtime/persistence migration.
+Read [BUSINESS_COMPACT_UI](../BUSINESS_COMPACT_UI.md) for the design and [BUSINESS_COMPACT_ACCEPTANCE](../BUSINESS_COMPACT_ACCEPTANCE.md) for required observable outcomes. Supporting specifications are not independent plans. Execute BCI-T00 → T01 → T02 → T03 → T04 → T05 → T06; preparation or parallel work must respect the interfaces and dependencies recorded in that plan.
 
-## Baseline and exact remaining gap
+Creating these documents implements no product feature and supplies no new runtime PASS. The owner-approved direction is documented; actual code, tests, packaged evidence and acceptance remain to be delivered.
 
-- Product and all ten active tests target `net48`; shipped release host is Windows x86 `MyDmsVn.Desktop.App.exe` plus separate net48 x86 admin migrator. AppCore/net8 remains PARKED.
-- The current persistence is **LINQ to DB + typed native SqlClient**; **Respawn 4** is implemented in test-only owned fixtures. DbUp scripts/journal and strict runtime schema `001–009` remain. Do not reintroduce RepoDb/Dapper or the deleted generic SQL runner/test-gates.
-- In L2DB-T07 the nine non-GUI owners had 581 passed invocations; 139 `Desktop.Tests` GUI invocations were conditionally **NOT RUN**. T07's limited packaged Local smoke does not complete full GUI/P5 acceptance or P6 operations.
-- The release-manifest schema8/9 metadata discrepancy is **closed narrowly** by L2DB-T02/clean-commit evidence. Actual install/upgrade, backup/restore, legacy policy, supported environment and G1–G5 are **still OPEN**. Never reopen fixed metadata solely because an older checklist called it open.
+## Completed baselines — retain, do not restart
 
-## Execution and policy
+| Plan | Accepted scope | Evidence to preserve |
+|---|---|---|
+| [RESP — fixture reuse](20261018-002-respawn-fixture-reuse.md) | T00–T05 complete; PR #36 `1e24df4` | [Reset/seed/ownership evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up) |
+| [L2DB — net48 persistence](20261018-001-linq2db-net48-persistence-migration.md) | T00–T07 complete in plan scope; PR #37 `42d94ba` | [Correctness/package/limited Local smoke](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) |
+| [GUI-P5 — GUI acceptance](20261019-001-full-winforms-gui-p5-acceptance.md) | T00–T06 complete in Owner-approved scope; PR #38 `f37038b` | [Final frozen gates](../GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20); T05 retains its signed Warehouse 125% Dark Down NOT TESTED exception |
 
-1. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), this index, the particular task and the sole [TEST_POLICY](../TEST_POLICY.md).
-2. Read [TEST_STRATEGY](../TEST_STRATEGY.md) for required behaviors and [tests/README](../../tests/README.md) for real direct commands. Pick source-verified task-scoped test cases, not automatic full SQL/GUI for every edit; acceptance tasks explicitly require broader matrix.
-3. For GUI test safety use interactive Windows/serialized STA, bounded processes and no modal hangs. For real SQL use an operator-designated test instance, positive database allocation ownership, correct worker disposal and direct sequential project tests. Missing resources/skips are BLOCKED / NOT RUN.
-4. For completed work record revision/package, observed cases and Theory rows, SQL/temp resource cleanup, safe logs/screenshots and tester/date. **Plans only** do not assert PASS; each checkbox needs actual evidence.
+GUI-P5 recorded product/package `d5207b2`, final Desktop test source `12e6a20`, Session build `cb86fbc`, Session 108/108, Desktop 329/329 at each 100%/125%, and a separate packaged 18/18. These are historical external-editor results, not BCI targets or new runs. Reconcile the actual new discovery and execution sets when implementing BCI.
 
-## Outside this queue
+## Retired unimplemented plans
 
-[P7 HTTP/remote, AppCore/net8 reactivation and future modules](../DEFERRED_WORK.md) remain unapproved/deferred. Historical removed framework proposals, permission synchronization and old host dual-TFM checklists are available via [History](../HISTORY.md), not executable instructions. The owner has not authorized an MSI/auto-update feature or schema upgrade from rejected 001–008 prefixes.
+The unexecuted REL/P6 plan and deferred .NET 8 reactivation procedure have been deleted from the working tree. The former P7/net8 checklist is also removed from the deferred-work page. [History](../HISTORY.md#2026-10-20--business-compact-roadmap-reset) preserves the original sources and deletion rationale.
 
-## Handoff
+[Release prerequisites](../DEFERRED_WORK.md#release-prerequisites) remain unaccepted, unscheduled constraints. P7/HTTP, runtime reactivation and new business modules are outside BCI. Removing their plans neither executes their tasks nor waives production release requirements.
 
-State the current task, exact revision/target, changes, verification and counts, remaining risks/resources and next task. Report explicit **GO / NO-GO** only at the milestone for which corresponding evidence exists. GUI-P5 success by itself is not a production release.
+## Execution rules
+
+1. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), this index, the selected task, its spec and the sole [TEST_POLICY](../TEST_POLICY.md).
+2. Keep active product/tests `net48`, Windows x86 packages, pinned vendor references and current business/security contracts unless a task explicitly identifies a narrow required change.
+3. Use focused direct project tests for task work. Run the broader BCI GUI/package matrix only at its named integration milestone or to resolve a concrete regression.
+4. Keep interactive Windows, serialized guarded STA, bounded owned processes, explicit non-production SQL and positive resource ownership. No global runner, approval-file or automatic prefix cleanup.
+5. Record exact revisions, artifacts, commands actually run, discovered/executed outcomes, environment, resource disposal and limitations. Missing or skipped mandatory evidence is NOT RUN/BLOCKED.
+6. Do not infer new UI or production acceptance from this documentation PR, previous test counts, or a successful build.

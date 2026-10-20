@@ -1,5 +1,7 @@
 # GUI-P5 verification
 
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+
 **Current status: GUI-P5-T00–T06 COMPLETE in the approved scope.** Both attended IDs are Owner-signed; T05 retains the accepted Down NOT TESTED exception. [Final T06 acceptance](#final-t06-acceptance--2026-10-20) records the frozen329-row100/125 gates, separate18-row packaged suite, Session108, review correction and final cleanup. REL/P6 G1–G5 and production readiness remain OPEN. Earlier checkpoints below are historical; their original candidate, failures and scope are retained. [Coverage matrix](GUI_P5_COVERAGE_MATRIX.md), [plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [TEST_POLICY](TEST_POLICY.md) govern.
 
 ## GUI-P5-T01 — Bounded GUI reliability foundation
@@ -547,3 +549,4 @@ Deferred minor: historical status headings inside earlier verification/walkthrou
 8. Final review preserves the signed Down exception without relabeling it. Cost if wrong: the same isolated125Dark Down regression can remain.
 9. Reviewer used stored SQL/attended evidence; executor verified final live census separately. Cost if wrong: review is not a second independent live SQL/attended execution.
 Operational handoff note: automatic approval review rejected the combined command containing recursive deletion of this plan's ignored .superpowers scratch directory (reported only 'blocked by policy'). The documentation commit was then executed separately. Scratch is retained; managed worktree and raw ignored TestResults are preserved. This concerns local planning files only; verified SQL/principal/process cleanup above is complete. No integration/push/merge has been performed.
+

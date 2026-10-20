@@ -9,10 +9,11 @@ Resource ownership determines isolation. A project name, SQL category or STA thr
 
 SQL tests use positively owned disposable databases on the explicitly designated non-production instance, finite waits, drained workers and verified cleanup. The local helper verifies live instance/allocation identity before drop. The removed external framework supplies no watchdog, lease or orphan cleanup; interrupted allocations need manual operator review. GUI tests interacting with controls, focus, message loops or input retain serialized resources and deterministic STA disposal. Pure tests without shared mutable state can retain normal xUnit behavior.
 
-## Updated fixture direction
+## Accepted fixture direction
 
-The owner selected **Respawn fixture reuse** for eligible tests. One migrated database belongs to one collection and is reset/seeded before every test. Schema/principal/lifecycle exceptions keep fresh allocations. Existing SQL assembly guards remain; Catalog's new shared fixture must have its own explicit collection because Catalog has no assembly guard today. RESP is not a parallelism rollout.
+The owner selected and accepted **Respawn fixture reuse** for eligible tests in the completed [RESP plan](../plans/20261018-002-respawn-fixture-reuse.md). One migrated database belongs to one collection and is reset/seeded before every test. Schema/principal/lifecycle exceptions keep fresh allocations. Existing SQL assembly guards remain; Catalog's shared fixture uses its explicit serialized collection because Catalog has no assembly guard. RESP is not a parallelism rollout.
 
-The old rejection of reusable fixtures was based on the then-current reset evidence. It is superseded as a future direction; its original measurements remain historical facts in [History](../HISTORY.md). No old dual-TFM stress/benchmark requirement is silently reinstated by this ADR. Current verification and failure handling are defined by [TEST_POLICY](../TEST_POLICY.md) and the [RESP plan](../plans/20261018-002-respawn-fixture-reuse.md).
+The old rejection of reusable fixtures was based on the then-current reset evidence. It is superseded by the accepted reuse strategy; its original measurements remain historical facts in [History](../HISTORY.md). No old dual-TFM stress/benchmark requirement is silently reinstated by this ADR. Current verification and failure handling are defined by [TEST_POLICY](../TEST_POLICY.md) and the completed [RESP evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
 
-Any later SQL parallelism rollout needs its own ownership/capacity/cleanup evidence and scope decision. It is outside the two active plans.
+Any later SQL parallelism rollout needs its own ownership/capacity/cleanup evidence and scope decision. It is outside the sole active [BCI scope](../plans/20261020-001-business-compact-inline-goods-receipt.md).
+

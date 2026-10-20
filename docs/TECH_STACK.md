@@ -1,6 +1,6 @@
 # Technical stack and compatibility baseline
 
-**Current cutover:** L2DB-T00–T07 on net48 accepted in plan scope on 2026-10-19 ([T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); RESP also accepted. Current next work is full [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md), with P5/P6 release gates still OPEN. Historical evidence retains its original provider/revision.
+**Current cutover:** L2DB-T00–T07 on net48 accepted in plan scope on 2026-10-19 ([T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); RESP and GUI-P5 are also accepted in their approved scopes. As of 2026-10-20, [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap on `v1a-pro`; its [Business Compact / SourceGrid inline design](BUSINESS_COMPACT_UI.md) is not implemented. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. Historical evidence retains its original provider/revision.
 
 ## Runtime matrix
 
@@ -62,3 +62,4 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; RESP and L2DB-T00–T07 have scoped evidence; broader release acceptance remains deferred.
 
 Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or pins within RESP/L2DB.
+

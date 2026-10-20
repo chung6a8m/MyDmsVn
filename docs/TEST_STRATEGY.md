@@ -1,6 +1,6 @@
 # Test coverage — MyDmsVn
 
-**Updated:** 2026-10-19. This document owns required behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) has actual commands. Current production persistence is LINQ to DB and typed native SqlClient, with accepted test-only Respawn fixtures. L2DB-T07 accepted scoped correctness/package/limited Local smoke; its 139 Desktop GUI invocations were NOT RUN. Current OPEN acceptance plans are [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md).
+**Updated:** 2026-10-20. This document owns required behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) has actual commands. Current production persistence is LINQ to DB and typed native SqlClient, with accepted test-only Respawn fixtures. L2DB-T07 accepted scoped correctness/package/limited Local smoke; its 139 Desktop GUI invocations were NOT RUN at that frozen revision. Later [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) acceptance is complete in its approved scope, with recorded exceptions retained. [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap and is not implemented; [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md) maps its required new evidence.
 
 ## Coverage owners
 
@@ -47,7 +47,7 @@ Paths are under `tests/`. Product and all ten active test projects use `net48`; 
 - Administration/import preserves target revisions, catalog digest, protected targets, audit and atomic mutations. Stale preview/target changes are rejected.
 - Legacy hash verification uses approved algorithm vectors; rehash and its failure behavior preserve valid credentials without exposing secret material.
 - Local dispatch captures the admitted actor/generation. Logout/expiry and stale completions do not publish another user's state; already admitted operations retain their actor.
-- No permission-sync, startup seeding or retired bootstrap workflow is reintroduced by either active plan.
+- No permission-sync, startup seeding or retired bootstrap workflow is reintroduced by BCI.
 
 ## RESP reset/lifecycle coverage
 
@@ -57,13 +57,14 @@ Paths are under `tests/`. Product and all ten active test projects use `net48`; 
 - The owned reset profile restores/verifies the StockLedger trigger, constraints, sequence contract and baseline identity behavior. Rowversion is treated as opaque and not rewound.
 - Checkpoint belongs to one database/schema profile; metadata drift or unexpected tables/temporal objects reject reuse.
 - Reset/seed/cleanup failure prevents subsequent test bodies from running on a poisoned fixture. Timed-out workers cannot overlap the next test.
-- Independent testhosts allocate distinct owned databases; interrupted allocations require manual operator review. Run SQL projects sequentially and preserve existing assembly guards. Catalog currently has no assembly guard; its new collection must explicitly serialize every shared-fixture consumer. There is no external lease or automatic orphan recovery.
+- Independent testhosts allocate distinct owned databases; interrupted allocations require manual operator review. Run SQL projects sequentially and preserve existing assembly guards. Catalog has no assembly guard; its accepted explicit collection serializes every shared-fixture consumer. There is no external lease or automatic orphan recovery.
 - Every original logical test and Theory row remains accounted for. Dedicated migration/schema/principal/fault tests continue to use fresh databases.
 
 ## Desktop and release
 
 Pure ViewModel/session checks use deterministic data and clocks. Controls/message-loop/focus tests use STA and serialized GUI resources with bounded disposal and exception capture. No headless exception, DataError, printer, login or file dialog may stall the testhost.
 
-Guarded STA/control tests, real-login packaged GUI Automation E2E with independent SQL assertions, and attended P5 walkthroughs are separate evidence. [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) owns the full current GUI inventory, modal/hang/process bounding and both P5 checks. [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md) owns clean-VM install/upgrade, credentials/diagnostics, backup/restore and signed G1–G5 gates. Earlier automated or narrow T07 smoke results do not complete either plan.
+Guarded STA/control tests, real-login packaged GUI Automation E2E with independent SQL assertions, and attended walkthroughs are separate evidence. The completed [GUI-P5 plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md) records historical inventory, bounded process work and both P5 sign-offs, including the T05 Down NOT TESTED exception. The [Business Compact design](BUSINESS_COMPACT_UI.md) and [acceptance specification](BUSINESS_COMPACT_ACCEPTANCE.md) define proposed inline edit, lookup, focus, accessibility, validation, dirty-state, read-only and session/permission coverage; no historical GUI result proves those new behaviors. [TEST_POLICY](TEST_POLICY.md) governs focused work and frozen-candidate native 100%/125% Light/Dark, real-package Login and independent SQL evidence. Clean-VM install/upgrade, credentials/diagnostics, backup/restore and signed G1–G5 remain [unaccepted, unscheduled release prerequisites](DEFERRED_WORK.md#release-prerequisites).
 
-P7 contract/HTTP parity, bearer authentication and modern-target reactivation are future coverage requirements when that scope is activated. Do not create an API host to satisfy a test listed here.
+P7 contract/HTTP parity, bearer authentication and modern-target reactivation remain [out of scope](DEFERRED_WORK.md#out-of-scope-directions). Any future activation needs its own approved scope and coverage decision. Do not create an API host to satisfy a test listed here.
+

@@ -1,6 +1,6 @@
 # Local release matrix
 
-**Current source:** `v1a`, updated 2026-10-19. [Publish-LocalRelease.ps1](Publish-LocalRelease.ps1) emits these two active net48/x86 packages. RESP/L2DB are completed in their scope; clean install, full GUI and P6 release acceptance remain OPEN:
+**Current source:** `v1a-pro`, updated 2026-10-20. [Publish-LocalRelease.ps1](Publish-LocalRelease.ps1) emits these two active net48/x86 packages. RESP, L2DB and GUI-P5 are complete in their approved scopes. [Business Compact and inline Goods Receipt](../../docs/plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap and is not implemented; [production release prerequisites](../../docs/DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
 
 | Directory | Executable | Target / architecture | Deployment |
 |---|---|---|---|
@@ -11,7 +11,7 @@
 
 [global.json](../../global.json) declares SDK `8.0.400` with `rollForward: latestFeature` and no prerelease SDKs. Normal publishing requires a clean committed tree, a new/empty output root, locked restore and the Windows net48 targeting prerequisites. Record the SDK actually selected. Both target packages require .NET Framework 4.8; no .NET 8 product runtime package is currently emitted. There is no MSI, Onova updater or auto-update flow yet.
 
-## Open release metadata blocker
+## Release metadata status and limitations
 
 The script reads schemaSupport minimum/maximum and ordered requiredScripts from **SchemaCompatibilityPolicy.CurrentScripts in the shipped admin Infrastructure.dll**, currently schema9 / scripts001–009. A hidden bounded x86 Windows PowerShell helper handles the net48/x86 DLL even from a 64-bit publisher; missing/empty/unreadable policy rejects manifest generation. Four focused x86 packaging tests and clean-commit d8013030 artifact reconciliation passed: schema9, ordered001–009 and all224 file hashes. [L2DB verification](../../docs/L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed) closes RELEASE-MANIFEST-01 narrowly. Package metadata does not prove runtime startup or release acceptance.
 
@@ -21,4 +21,5 @@ The manifest also records an empty validated SQL-version list and unsigned-relea
 
 Use [LOCAL_RELEASE_PACKAGING](../../docs/LOCAL_RELEASE_PACKAGING.md) for the publish command, prerequisites, artifact handling and install procedure. Run the admin package from its own directory as `& .\MyDmsVn.Server.DbMigrator.exe`; use the [migration runbook](../../docs/SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) and [security administration runbook](../../docs/SECURITY_ADMINISTRATION_RUNBOOK.md) for protected configuration and maintenance commands.
 
-Verification follows the sole [TEST_POLICY](../../docs/TEST_POLICY.md) and the explicitly required GUI/P5 and P6 scope in [GUI-P5](../../docs/plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](../../docs/plans/20261019-002-local-v1-p6-release-acceptance.md). SEC-REBUILD acceptance is recorded in [HISTORY](../../docs/HISTORY.md); pending P5 interactive, P6 clean-install/upgrade/recovery and release sign-off remain open. A documentation refresh or successful publish does not satisfy them. Restore modern packages only through the reviewed [net8 reactivation procedure](../../docs/REACTIVATE_NET8.md).
+Verification follows the sole [TEST_POLICY](../../docs/TEST_POLICY.md). [GUI-P5](../../docs/plans/20261019-001-full-winforms-gui-p5-acceptance.md) retains its completed, candidate-specific acceptance and explicit T05 Down NOT TESTED exception; it does not certify a future BCI package. New UI verification is defined in [Business Compact acceptance](../../docs/BUSINESS_COMPACT_ACCEPTANCE.md). Clean install, upgrade/recovery and production sign-off remain [unaccepted, unscheduled release prerequisites](../../docs/DEFERRED_WORK.md#release-prerequisites); a documentation refresh or successful publish does not satisfy them. Modern product targets remain [out of scope](../../docs/DEFERRED_WORK.md#out-of-scope-directions).
+

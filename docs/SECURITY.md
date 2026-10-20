@@ -6,7 +6,7 @@
 
 Current identity tables include Users, Roles, UserRoles, RolePermissions, UserPermissions, SystemSecuritySettings and SecurityAuditEvents. The checked-in migrations define their constraints/revisions. Preserve `Users.PasswordHash`, `PasswordSalt` and algorithm identity when importing legacy data; a separate salt column is not permission to guess the old algorithm.
 
-New credentials use the configured one-way password hasher. Legacy verification/rehash must use approved specifications and sanitized test vectors, fail closed for unsupported algorithms and preserve valid state on failure. Never log the supplied password, stored hash/salt or raw authentication exceptions. Legacy release support or an owner-approved exclusion/reset procedure remains an explicit [REL-T06 decision](plans/20261019-002-local-v1-p6-release-acceptance.md).
+New credentials use the configured one-way password hasher. Legacy verification/rehash must use approved specifications and sanitized test vectors, fail closed for unsupported algorithms and preserve valid state on failure. Never log the supplied password, stored hash/salt or raw authentication exceptions. Legacy release support or an owner-approved exclusion/reset procedure remains an explicit [unaccepted, unscheduled release prerequisite](DEFERRED_WORK.md#release-prerequisites).
 
 ## 2. Authorization order
 
@@ -44,7 +44,7 @@ Login validates current backend account state before publishing the process-loca
 
 The default idle timeout is 30 minutes on a monotonic clock. Keyboard/mouse activity renews it; background polling/API traffic does not. Local Mode does not issue bearer tokens. A future trusted HTTP host owns its own authentication/session boundary.
 
-P4.1 was owner-accepted with a specific incomplete packaged idle-expiry observation; [History](HISTORY.md) records that qualification. SEC-REBUILD acceptance is complete. Pending P5 GUI/user walkthroughs and P6 operational/release checks are **OPEN** under [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md), not a new permission-rebuild task.
+P4.1 was owner-accepted with a specific incomplete packaged idle-expiry observation; [History](HISTORY.md) records that qualification. SEC-REBUILD and [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) acceptance is complete in the documented scopes. The sole active [BCI roadmap](plans/20261020-001-business-compact-inline-goods-receipt.md) is not implemented and must preserve current authorization, session cleanup and late-result guards. [Production operational/release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**; neither historical acceptance nor UI planning waives them.
 
 ## 6. Trust, audit and tests
 
@@ -53,3 +53,4 @@ Local Mode runs Application code on a client with SQL connectivity. A person con
 Use current audit sinks, safe error mapping and redaction. Workstation log files are not immutable centralized audit. Preserve existing post-commit diagnostics semantics; a log failure does not retroactively roll back committed business data.
 
 [TEST_STRATEGY](TEST_STRATEGY.md) covers active-account/registry/binding checks, direct decisions and roles, protected targets, imports/revisions/audit, legacy boundaries, sessions and unauthorized no-mutation behavior. [TEST_POLICY](TEST_POLICY.md) selects execution scope. Respawn must clear/reseed security state in owned test databases without reintroducing the retired production provisioning workflow.
+

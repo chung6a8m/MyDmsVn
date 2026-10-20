@@ -1,7 +1,9 @@
 # GUI-P5 — Full WinForms GUI testing and P5 interactive acceptance
 
-**Created:** 2026-10-19 · **Branch:** `v1a` · **Status:** COMPLETE in approved GUI-P5 scope — T00–T06 complete; both attended IDs Owner-accepted, with the explicit T05 Down NOT TESTED exception retained. REL/P6 and production readiness remain OPEN.
-**Planning baseline:** merge `42d94baea1655dddbd46f971e806f84401cd1c63`. Follows completed [RESP](20261018-002-respawn-fixture-reuse.md) and [L2DB](20261018-001-linq2db-net48-persistence-migration.md). [REL](20261019-002-local-v1-p6-release-acceptance.md) owns P6 release acceptance.
+> **Historical completed plan:** GUI-P5-T00–T06 are complete in the approved scope. Preserve all candidate-specific results, failed trials, attended sign-offs and the explicit T05 Down NOT TESTED exception. This file is not an active execution queue; use the [current plan index](README.md) for the sole active BCI roadmap. Open-status statements in dated checkpoints below retain their historical meaning.
+
+**Created:** 2026-10-19 · **Branch:** `v1a` · **Status:** COMPLETE in approved GUI-P5 scope — T00–T06 complete; both attended IDs Owner-accepted, with the explicit T05 Down NOT TESTED exception retained. [Production release prerequisites](../DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED.
+**Planning baseline:** merge `42d94baea1655dddbd46f971e806f84401cd1c63`. Follows completed [RESP](20261018-002-respawn-fixture-reuse.md) and [L2DB](20261018-001-linq2db-net48-persistence-migration.md). The [former REL plan](https://github.com/chung6a8m/MyDmsVn/blob/f37038b250821a538b9cdc10a6d6d8b4bc1f386f/docs/plans/20261019-002-local-v1-p6-release-acceptance.md) is linked only as immutable historical provenance; it has been removed from the active roadmap.
 
 ## 1. Objective, authority and scope
 
@@ -133,7 +135,7 @@ For packaged GUI automation, use only a reviewed bounded child-process flow from
 
 ## 6. Explicit non-goals
 
-No AppCore/.NET 8 reactivation, P7/HTTP, new business modules, SQL runner/test-gate rebuild, test-login bypass, production DB reset, secret-in-package or implicit migration. The distribution method is presently a versioned publish-directory, **not** an MSI or auto-updater. Signing, SQL/Windows support decisions, backup/restore and final G1–G5 live in [REL](20261019-002-local-v1-p6-release-acceptance.md).
+No AppCore/.NET 8 reactivation, P7/HTTP, new business modules, SQL runner/test-gate rebuild, test-login bypass, production DB reset, secret-in-package or implicit migration. The distribution method is presently a versioned publish-directory, **not** an MSI or auto-updater. Signing, SQL/Windows support decisions, backup/restore and final G1–G5 remain [unaccepted, unscheduled release prerequisites](../DEFERRED_WORK.md#release-prerequisites). The [former REL plan](https://github.com/chung6a8m/MyDmsVn/blob/f37038b250821a538b9cdc10a6d6d8b4bc1f386f/docs/plans/20261019-002-local-v1-p6-release-acceptance.md) is historical provenance only.
 
 T04 checkpoint: Owner selected full100% Light functional baseline plus supplemental layout/keyboard/errors/popup UX at100% Dark and125% Light/Dark. Customers chapter5 exceeded its5-minute supervisor before complete artifacts; the later30-minute supervised replay now has complete C-C01–04 evidence and Owner confirmation. Test-only RunAttendedAsync adds an explicit30-minute cap using existing cleanup; automated RunAsync retains5minutes. Focused owned-process typed tests passed16/16; product/package02eff22 remains unchanged. T04 and P5 remain OPEN.
 
@@ -148,3 +150,4 @@ T05 current acceptance checkpoint2026-10-20: Owner explicitly confirmed both125L
 Project Owner explicitly accepted evidence commit5ed7bc6: “Nghiệm thu T05 theo biên bản, chấp nhận giới hạn Down đã ghi”. GUI-P5-T05 COMPLETE / REMAIN-P5-GUI-02 PASS within the documented, Owner-accepted scope. Outcome remains44PASS and1PARTIAL observation cell; the Warehouse125DarkDown substep remains NOT TESTED with an explicit Owner-accepted exception, never converted into a testPASS. The other observed paths and both125Light/Dark groups are confirmed.
 
 Frozen d5207b2 candidate/cohort provenance,80publicimages, independent oracle/reconciliation and final owned cleanup remain as evidenced above. All3T05allocations/9principals disposed,169/169GUIledgersDropped, exactlatest database/principal/process0. This signature changes documentation only; no GUI/SQL/test execution or new automatedpass is claimed. T06, overallP5, REL/P6 G1–G5 and productionreadiness remainOPEN. Historical pending checkpoints above are superseded by this signed decision.
+

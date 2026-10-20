@@ -1,10 +1,12 @@
 # ADR 0009 — LINQ to DB persistence, Local v1, active net48
 
 **Date:** 2026-10-18
-**Status:** Owner-approved direction (1A + 2A + 3A); proposed implementation design, NOT IMPLEMENTED.
-**Implementation order:** [RESP](../plans/20261018-002-respawn-fixture-reuse.md), then [L2DB](../plans/20261018-001-linq2db-net48-persistence-migration.md); these are the only active plans.
+**Status:** Accepted decision; L2DB-T00–T07 implemented and accepted in recorded plan scope. [Current evidence](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke).
+**Original implementation order (completed):** [RESP](../plans/20261018-002-respawn-fixture-reuse.md), then [L2DB](../plans/20261018-001-linq2db-net48-persistence-migration.md). [BCI](../plans/README.md) is now the sole active roadmap.
 **Original assessment:** `main` at `8cfa25351338666b1a751ee516d5a479cdb37b7f` (PR #35 merge).
-**Context refresh:** `v1a`, 2026-10-18, including the owner's subsequent removal of the old SQL test framework. LINQ to DB implementation and runtime verification remain pending.
+**Original context refresh:** `v1a`, 2026-10-18, including the owner's subsequent removal of the old SQL test framework. Implementation was pending at that planning checkpoint.
+
+> Historical design context. The original assessment, pilot and rollout text below records the accepted migration rationale; it is not an instruction to repeat completed work. The implementation-status section and linked acceptance evidence supersede its former pending-state statements. Existing architecture/security/UoW decisions remain binding; use the current execution index for new work.
 
 ## Context and authority
 
@@ -91,3 +93,4 @@ External primary references, checked 2026-10-18 (capability documentation, not r
 ## Implementation status — 2026-10-19
 
 L2DB-T01–T06 now deliver the internal session/mapping seam, Catalog/Inventory LINQ/native, Identity/Security/operations native execution and active RepoDb/Dapper dependency/prototype removal. The proposed method shapes above are now implemented; [T06 evidence](../L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) binds the cutover evidence. Historical baseline/decision text remains as provenance. [T07 frozen-revision correctness/package/Local smoke acceptance](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) is complete with verified temporary-resource cleanup; broader release gates remain deferred. No runtime/schema/grant change is implied.
+

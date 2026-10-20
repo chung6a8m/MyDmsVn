@@ -1,5 +1,7 @@
 # L2DB case migration ledger — T00
 
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+
 **Bound source:** `1e24df4c4ad5243963da82d808da19f12278242b`, 2026-10-18. Source inventory only; no discovery or runtime run in T00. All owners target **net48**. [Verification](L2DB_VERIFICATION.md) records provenance and commands; [RESP map](RESPAWN_CASE_MAP.md) retains the fixture/seed classification for the accepted baseline.
 
 ## Identity and preservation rules
@@ -873,3 +875,4 @@ Total **656 logical IDs**. Six SQL owners: **273 methods / 304 invocations**, 20
 ## T07 frozen-revision execution checkpoint
 
 Frozen `de3df037c8af40c23328dcc2f253339055eddc9e`, all active net48 declarations and656 logical IDs /720 source rows unchanged. Unfiltered F61/C19/I42/S60/M65/O57/A157/X12/D108 = **581 passed /0 failed /0 skipped**, with exact method/row sets, no omissions/duplicates/aborts/timeouts. No new/replaced/removed case. W139 source invocations are conditional and NOT RUN; actual clean package publication/hash/policy checks are separate evidence rather than xUnit results. The owner subsequently approved the exact temporary-runtime exception; packaged interactive workflows and guarded cleanup passed. These observations add no xUnit method/row or pass count. [T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) records package, cleanup and rollback boundaries; it closes L2DB plan-specific acceptance while broader P5/P6 release gates remain deferred.
+

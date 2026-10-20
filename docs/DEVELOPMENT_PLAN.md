@@ -1,34 +1,33 @@
-# Development plan — v1a after RESP/L2DB
+# Development status — v1a-pro
 
-**Updated:** 2026-10-19. The authoritative work queue is [docs/plans/README.md](plans/README.md). The accepted persistence/test infrastructure and the remaining product release work are distinct milestones.
+**Updated:** 2026-10-20. [The execution index](plans/README.md) is the sole roadmap. This page distinguishes implemented behavior, accepted evidence and planned UI work; it does not define another task order.
 
-## Current implementation and completed plans
+## Implemented baseline
 
-| Work | State | Meaning |
+| Area | Current state | Scope qualification |
 |---|---|---|
-| P0–P4 foundation and Local Login/session | Implemented; historical scoped exceptions retained | Clean Architecture, Application handlers/authorization, Local adapter, controlled DbUp, net48 WinForms |
-| P5 business code | Implemented, **interactive acceptance OPEN** | Four catalogs, Goods Receipt Draft/Post, stock ledger/balance/card, concurrency and SQL invariants |
-| RESP fixture reuse | **COMPLETE** | Respawn reset/seed/reuse on reviewed real-SQL business cases plus fresh lifecycle/principal/migration exceptions; [accepted evidence](RESPAWN_VERIFICATION.md#pr-36-review-follow-up) |
-| L2DB persistence replacement | **COMPLETE in plan scope** | LINQ to DB for Catalog/Inventory, typed native SqlClient for Identity/Security/operations; T07 correctness/package/limited authenticated Local smoke [accepted](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) |
-| RELEASE-MANIFEST-01 | **CLOSED narrowly** | Shipped schema support metadata reads real policy for 001–009; not clean-install/production acceptance |
+| Foundation, Local Login/session and security | Implemented | Preserve original accepted exceptions and source-defined permissions |
+| Catalogs and Inventory | Implemented | Products, Warehouses, Employees, Customers, Goods Receipt Draft/Post, ledger/balances/card |
+| RESP | Complete in approved scope | [Accepted fixtures and lifecycle](RESPAWN_VERIFICATION.md#pr-36-review-follow-up) |
+| L2DB | Complete in approved scope | [Accepted net48 persistence/package smoke](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) |
+| GUI-P5 | Complete in Owner-approved scope | [Final GUI evidence](GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20); preserve the signed T05 Down exception |
+| Receipt editing | Read-only line grid with external editors | App-local accessibility wrappers, pending-query preservation and uncertain-Post reload lock exist; true inline cells do not yet exist |
+| RELEASE-MANIFEST-01 | Closed narrowly | Metadata reflects schema 9/scripts 001–009; no inference of full installed-release acceptance |
 
-There are ten active net48 test projects and two shipped net48/x86 package directories (desktop and admin migrator). AppCore/net8.0-windows is parked. SQL tests use direct `dotnet test`/Test Explorer with positively owned fresh and Respawn fixtures. The previous standalone SQL framework, runners/manifests/approval files and permission-synchronization workflow are removed.
+Product and all ten active test projects target `net48`. Two shipped package directories are Windows x86 Desktop.App and the separate admin DbMigrator. AppCore/net8 is parked. The active persistence, explicit UoW, SQL fixture ownership and removed-runner boundaries remain unchanged.
 
-## Remaining implementation and acceptance order
+## Current selected change
 
-| Order | Plan | Objective | Required exit |
-|---:|---|---|---|
-| 3 | [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) | Complete unattended STA reliability, all GUI control/test gaps, real packaged-login E2E, attended catalog/lookup and receipt/stock workflows | GUI-P5-T00–T06 evidence; both `REMAIN-P5-GUI-01/02` PASS, exact unfiltered GUI/Session results and resource cleanup |
-| 4 | [REL / P6](plans/20261019-002-local-v1-p6-release-acceptance.md) | Build/test clean release package; verify Windows/SQL topology, principal/config/audit, schema/client skew, controlled upgrade, backup/restore, recovery, full regression and owner decisions | REL-T00–T06, five G1–G5 gates supported by frozen candidate artifacts, actual evidence and named owner sign-off |
+[BCI — Business Compact and inline Goods Receipt](plans/20261020-001-business-compact-inline-goods-receipt.md) is ACTIVE / PLANNED. Its [design](BUSINESS_COMPACT_UI.md) and [acceptance matrix](BUSINESS_COMPACT_ACCEPTANCE.md) define the shell/receipt layout, SourceGrid-hosted lookup/numeric editors, app-owned edit sessions, accessibility and new-candidate evidence.
 
-REL preparation can overlap GUI-P5; the final REL G4 requires GUI-P5. P6 is **NOT READY FOR PRODUCTION** until its full release matrix is accepted. Historical NET8-PAUSE duration waiver and partial P4.1 idle observation do not waive P5/P6 requirements.
+All implementation tasks remain unexecuted. BCI changes desktop presentation and input coordination for existing receipt fields. It does not schedule a persistence migration, new stock fields, HTTP host or runtime reactivation.
 
-## Source of truth and execution
+## Retired scope and production boundary
 
-[TEST_POLICY](TEST_POLICY.md) is the sole execution policy; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage; [tests/README](../tests/README.md) provides direct project commands. Select affected tests during task work; full real SQL/GUI and installed-package scenarios are milestone-specific. Do not revive deleted test-gate tooling or add a global runner/lease. GUI needs interactive Windows; SQL needs explicitly approved non-production resources and verified database ownership. Missing/aborted/skipped mandatory scenarios block acceptance.
+The owner removed the unimplemented REL/P6 plan and deferred modern-runtime procedure on 2026-10-20. The former future-work checklists are retired. See [History](HISTORY.md#2026-10-20--business-compact-roadmap-reset).
 
-Record task, commit, candidate package hashes, Windows/TFM/SQL configuration, actual selected/discovered/executed test cases and Theory rows, PASS/FAIL/SKIP/BLOCKED, UI observations and positively owned cleanup. Accept only evidence from the candidate and scope named by each gate; Markdown-only refresh is not runtime validation.
+Operational support decisions, installation/recovery evidence, legacy credential support and production sign-off remain [unaccepted release prerequisites](DEFERRED_WORK.md#release-prerequisites). Their removal from the roadmap is a scheduling decision, not a PASS or waiver. The current migrator accepts Empty/Compatible schema states; automatic upgrade from an old 001–008 prefix remains unsupported.
 
-## Later backlog
+## Evidence discipline
 
-[P7 HTTP/remote, net8 reactivation and new business modules](DEFERRED_WORK.md) remain deferred. Current schema migration admits only Empty/Compatible; prior prefix 001–008 is not a supported automatic upgrade. Legacy credential support/exclusion, signing and advertised OS/SQL matrix are open explicit release decisions owned by REL-T00/T06.
+[TEST_POLICY](TEST_POLICY.md) owns execution scope; [TEST_STRATEGY](TEST_STRATEGY.md) owns behavior coverage; [tests/README](../tests/README.md) owns direct commands. A documentation-only refresh requires diff/link/status/encoding checks. BCI implementation uses focused tests and its named Windows/package milestone. Historical totals and blocked/skipped scenarios cannot establish a new runtime result.

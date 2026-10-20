@@ -1,31 +1,33 @@
-# Deferred work — outside the active acceptance queue
+# Retired directions and scope boundaries
 
-**Updated:** 2026-10-20. This page contains work outside the approved near-term acceptance queue. [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) is COMPLETE within the Owner-approved scope, including the signed T05 Down NOT TESTED exception. [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md) remains OPEN / NOT READY; GUI acceptance is not a release waiver.
+**Updated:** 2026-10-20. This page is a non-executable scope record. The owner retired all older unimplemented plans and selected [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) as the sole active roadmap. There are no tasks to execute from this page.
 
-Historical original scope remains in the [P5/P6 remainder](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs/plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md) and [P6 operations source](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs/plans/archive/20261008-007-phase-6-local-hardening.md). Current plan IDs preserve `REMAIN-P5-GUI-01/02`, `REMAIN-P6-OPS-01/T05–T08` and G1–G5; older TESTGATE/dual-host/P3.1 command instructions are superseded. [Execution index](plans/README.md) decides order.
+## Release prerequisites
 
-## 1. P7 — HTTP/remote client (DEFERRED / NOT AUTHORIZED)
+Production release acceptance has not been granted. The retired REL/P6 plan was unimplemented; its removal does not turn pending evidence into PASS or authorize production deployment.
 
-- [ ] Select a supported server/runtime matrix and expressly authorize AppCore/.NET 8 reactivation or a separately reviewed modern runtime decision. The currently parked product graph/lock file and an installed .NET 8 SDK do not establish API readiness.
-- [ ] Introduce a trusted Server.Api host with endpoints for current catalogs, Goods Receipts, stock inquiries and identity; reuse accepted Server.Application handlers/contracts and current LINQ/native persistence. Do **not** copy the old RepoDb/Dapper composition instructions from historical P7.
-- [ ] Define HTTPS/Bearer auth, expiration/revocation, 401/403 and enforced Application permissions; no Desktop SQL credential in the HTTP client.
-- [ ] Maintain safe ErrorOr/ApiResponse mapping and OpenAPI for error codes, filters, paging, decimals and UTC contracts.
-- [ ] Add an HttpApiClient with bounded cancellation/network handling and explicit remote-session UX. Run Local/HTTP parity against identical DTO/JSON/permission/validation/draft/Post/stock cases before claiming remote compatibility.
-- [ ] Provide separate server deployment, versioning, logs/correlation, migration compatibility, operator runbook and full security/acceptance tests.
+The following remain facts limiting release claims, without an execution schedule: supported Windows/SQL and legacy-credential decisions; clean-machine installation and compatible package/schema behavior; least-privilege runtime and separate administration; backup/restore and failure recovery; diagnostics/audit behavior; distribution/signing/support decisions; candidate-specific full release evidence and named sign-off. Current [packaging](LOCAL_RELEASE_PACKAGING.md), [SQL configuration](CONFIGURATION_AND_SQL_SECURITY.md) and [schema runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) remain technical references.
 
-[Original P7 design](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs/plans/20261008-008-phase-7-remote-api.md) contains historical provider/runtime assumptions and is **not** executable authority.
+GUI-P5 is complete only in its signed scope, including the Warehouse 125% Dark Down NOT TESTED exception. A future BCI UI acceptance will likewise prove its defined UI behavior, not these unscheduled production prerequisites. A future release initiative requires a new owner-selected plan based on the then-current source; the deleted REL tasks are not implicitly queued.
 
-## 2. Modern product target — net8/AppCore (DEFERRED)
+## Out-of-scope directions
 
-- [ ] Follow [REACTIVATE_NET8](REACTIVATE_NET8.md) only after explicit owner authorization. The net48 product and all ten active tests remain the current release scope; parked AppCore/net8.0-windows is NOT SHIPPED and cannot inherit GUI/release PASS from net48.
-- [ ] Re-evaluate target runtime lifecycle, build/package assets, lock graphs, new DAL compatibility, DI, tests and signed/installed host support if reactivation is selected.
+| Direction | Current boundary |
+|---|---|
+| P7 / HTTP / remote adapter | Not part of BCI; no new API host, remote security boundary or adapter parity claim |
+| AppCore / modern runtime | Parked, not shipped; all active product/tests remain net48. The unimplemented reactivation procedure was deleted; no automatic target/lock/package restoration is authorized |
+| New business modules | Sales/invoicing, returns, valuation/tax, transfers, lots/serials, sync and multi-tenancy are not added by a receipt presentation change |
+| New receipt fields | Supplier/tax/discount/lot or other new business contracts require separate scope; BCI uses the existing receipt and line fields |
+| Distribution tooling | No MSI, auto-updater or new migration framework is scheduled by BCI |
 
-## 3. Future product modules (DEFERRED)
+This table records exclusions, not a backlog or checklist. Any future selection needs a fresh design and evidence boundary.
 
-Outbound sales/invoices, returns/reversal, pricing, valuation/accounting/tax, transfers/reservations, lots/serials, offline sync, multi-tenancy and other non-MVP workflows require separate approved scope. Customers currently remain a master-data catalog, not an invoicing module.
+## RELEASE-MANIFEST-01 — observed schema metadata discrepancy
 
-## 4. Cancelled/superseded tooling — NOT deferred prerequisites
+This historical metadata defect is CLOSED in its narrow scope: the publisher reads the shipped runtime schema policy, and the clean-commit `d8013030` package reconciliation records schema 9 / scripts 001–009. [Accepted repair evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed) retains the original trial and artifact provenance. This heading preserves older evidence links; it introduces no task or renewed blocker. Correct metadata alone does not satisfy the release prerequisites above.
 
-The owner **removed** `tests/test-gates.v1.json`, `SqlTestHarness`, standalone SQL runner and runner tests, related wrappers, legacy execution policies and manifests in October 2026. The unimplemented STAB-T03/T04 manifest-v2/fingerprint tooling is **CANCELLED**, not a prerequisite to GUI-P5, REL or P7. [Original stabilization proposal](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs/plans/20261017-001-testgate-stabilization.md) and [History](HISTORY.md) retain provenance.
+## Removed tooling remains removed
 
-Keep RESP fixture lifecycle inside existing SQL test owners, use direct `dotnet test` and local positively owned database cleanup. A bounded GUI-owned subprocess for fatal modal/hang probes is not permission to recreate the old global runner.
+The former `tests/test-gates.v1.json`, SqlTestHarness, standalone SQL runner/runner tests, approval-file flow and related command wrappers remain removed. STAB-T03/T04 manifest-v2/fingerprint work remains cancelled. Respawn ownership stays inside existing SQL test owners; bounded GUI-owned processes do not recreate a global runner or authorize cleanup by database-name prefix.
+
+[History](HISTORY.md#2026-10-20--business-compact-roadmap-reset) preserves immutable links to the retired plans and earlier decisions. Historical commands are not current execution authority. Use [the active index](plans/README.md) and the sole [TEST_POLICY](TEST_POLICY.md).

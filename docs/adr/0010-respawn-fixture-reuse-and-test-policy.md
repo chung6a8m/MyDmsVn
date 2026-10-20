@@ -1,15 +1,19 @@
 # ADR 0010 — Respawn fixture reuse and replacement test policy
 
-**Status:** Owner-selected direction, accepted 2026-10-18; implementation pending.
-**Scope:** `v1a`, active net48 integration tests.
-**Plan:** [RESP](../plans/20261018-002-respawn-fixture-reuse.md).
+**Status:** Accepted decision, selected 2026-10-18; RESP-T00–T05 implemented and accepted in recorded scope. [Current evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
+**Scope:** Active net48 integration-test fixture policy; originally planned on `v1a`, retained on `v1a-pro`.
+**Completed plan:** [RESP](../plans/20261018-002-respawn-fixture-reuse.md). [BCI](../plans/README.md) is now the sole active roadmap.
 **Execution policy:** [TEST_POLICY](../TEST_POLICY.md).
 
-## Context
+## Original context — 2026-10-18
+
+This paragraph records the pre-implementation state; it is not current product or roadmap status. The completed RESP/L2DB evidence supersedes its pending-state statements.
 
 The owner chose fixture reuse with Respawn and the existing LINQ to DB migration as the two active roadmap plans. The prior fresh-database strategy and test execution rules accumulated duplicate, stale instructions. Current product code still uses RepoDb/Dapper and SQL tests still create fresh allocations. The owner then removed the standalone SQL framework, gate manifest, runner, related tests and wrappers completely. Tests run directly with a local owned-database helper; reuse remains proposed.
 
 ## Decision
+
+The order and acceptance conditions below record the original migration decision, now completed. Retain their ownership/reset/policy invariants; do not restart either plan.
 
 1. Execute RESP first on the current DAL, then execute L2DB using the accepted fixture baseline. Separate reset/provider changes so failures and measurements remain attributable.
 2. Reuse one migrated, owned disposable database within a named xUnit v2 collection. Reset and deterministically seed before every test; dispose test-owned transactions/connections/workers before the next reset.
@@ -42,4 +46,5 @@ Reuse reduces repeated setup for eligible tests but introduces a larger failure 
 
 ## Supersession
 
-This decision supersedes the old rejection of fixture reuse and ADR 0006's execution-policy proposal. The later owner instruction also removes the old executable framework; it is not retained as a transition requirement. [ADR 0005](0005-test-isolation-and-bounded-parallelism.md) retains its resource-isolation principle as refined here. Existing measured results and owner exceptions remain in [History](../HISTORY.md). Deferred P5/P6/P7 requirements remain open.
+This decision supersedes the old rejection of fixture reuse and ADR 0006's execution-policy proposal. The later owner instruction also removes the old executable framework; it is not retained as a transition requirement. [ADR 0005](0005-test-isolation-and-bounded-parallelism.md) retains its resource-isolation principle as refined here. Existing measured results and owner exceptions remain in [History](../HISTORY.md). GUI-P5 later completed its approved scope. [Release prerequisites](../DEFERRED_WORK.md#release-prerequisites) remain unaccepted/unscheduled, and [P7/HTTP](../DEFERRED_WORK.md#out-of-scope-directions) remains out of scope.
+

@@ -1,6 +1,6 @@
 # Schema compatibility và migration runbook
 
-**Hiện trạng:** `v1a`, cập nhật 2026-10-19. SEC-REBUILD/RESP/L2DB đã hoàn thành theo phạm vi đã kiểm chứng; runtime yêu cầu chính xác scripts 001–009. Desktop và DbMigrator phát hành đều `net48`/x86, AppCore parked. DbMigrator là gói admin riêng; desktop không tự chạy DbUp hoặc security bootstrap. Các yêu cầu schema-compatibility, recovery và release **vẫn OPEN**, hiện thuộc [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md), không còn nằm trong deferred backlog.
+**Hiện trạng:** `v1a-pro`, cập nhật 2026-10-20. SEC-REBUILD/RESP/L2DB và GUI-P5 đã hoàn thành theo phạm vi được nghiệm thu; runtime yêu cầu chính xác scripts 001–009. Desktop và DbMigrator phát hành đều `net48`/x86, AppCore parked. DbMigrator là gói admin riêng; desktop không tự chạy DbUp hoặc security bootstrap. [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) là lộ trình duy nhất, chưa triển khai và không thay schema. Các [điều kiện schema-compatibility, recovery và phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**.
 
 ## 1. Runtime schema contract hiện tại
 
@@ -92,5 +92,6 @@ Fresh install hoặc một đường triển khai đã được review dùng sto
 7. Chạy schema preflight, xác nhận binding/configuration, functional smoke và reconciliation.
 8. Mở lại truy cập.
 
-Không chạy client cũ sau khi schema vượt contract của nó; không chạy client mới khi DB còn prefix cũ/partial. Downgrade client không đồng nghĩa downgrade database. Ghi revision/package/SQL version, preflight, exit code, journal/artifact và recovery outcome theo [TEST_POLICY](TEST_POLICY.md); các bài diễn tập P6 và owner release sign-off vẫn [OPEN / DEFERRED](DEFERRED_WORK.md).
+Không chạy client cũ sau khi schema vượt contract của nó; không chạy client mới khi DB còn prefix cũ/partial. Downgrade client không đồng nghĩa downgrade database. Ghi revision/package/SQL version, preflight, exit code, journal/artifact và recovery outcome theo [TEST_POLICY](TEST_POLICY.md); các bài diễn tập recovery và owner release sign-off vẫn là [điều kiện chưa nghiệm thu, chưa xếp lịch](DEFERRED_WORK.md#release-prerequisites).
+
 

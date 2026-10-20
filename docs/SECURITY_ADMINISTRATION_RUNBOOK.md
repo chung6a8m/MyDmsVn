@@ -1,6 +1,6 @@
 # Security administration runbook
 
-**Current source:** `v1a`, updated 2026-10-19. SEC-REBUILD accepted in PR #34: code-defined permissions, deliberate assignments and one configured superuser. [HISTORY](HISTORY.md) retains superseded P3.1 synchronization; [ADR 0007](adr/0007-code-defined-permissions-and-single-superuser.md) owns security design. Pending GUI/P5 and P6 operations/release acceptance are now explicitly planned in [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md), not deferred.
+**Current source:** `v1a-pro`, updated 2026-10-20. SEC-REBUILD accepted in PR #34: code-defined permissions, deliberate assignments and one configured superuser. [HISTORY](HISTORY.md) retains superseded P3.1 synchronization; [ADR 0007](adr/0007-code-defined-permissions-and-single-superuser.md) owns security design. [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) is complete within its approved scope. [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap and is not implemented; [operations/release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
 
 The active packages are `desktop-net48-win-x86` (`MyDmsVn.Desktop.App.exe`) and `admin-migrator-net48-win-x86` (`MyDmsVn.Server.DbMigrator.exe`), both requiring .NET Framework 4.8. AppCore is parked outside the solution/release. Commands below run from the admin package directory in an interactive PowerShell console. Replace every quoted placeholder with its reviewed value.
 
@@ -75,7 +75,7 @@ If recovery fails, stop and preserve the state. Review safe logs and the bound a
 - Login with the configured superuser first, then create an ordinary user and role and grant only the required keys.
 - Test the ordinary account and verify default deny, role grant, and direct Deny behavior.
 - Logout clears the current Local session. Expiry requires reauthentication; verify it with the applicable acceptance walkthrough.
-- Local Mode runs application authorization inside the desktop process while the desktop has SQL connectivity. A person who controls that machine/process can use the runtime SQL credential outside the UI. Least privilege limits the database blast radius but does not create a trusted server boundary. Protect the desktop, runtime connection configuration, SQL network access, and backups. P7 HTTP service is [deferred](DEFERRED_WORK.md#3-p7--http-and-remote-client), not an implemented server-side trust boundary.
+- Local Mode runs application authorization inside the desktop process while the desktop has SQL connectivity. A person who controls that machine/process can use the runtime SQL credential outside the UI. Least privilege limits the database blast radius but does not create a trusted server boundary. Protect the desktop, runtime connection configuration, SQL network access, and backups. P7 HTTP service remains [out of scope](DEFERRED_WORK.md#out-of-scope-directions), not an implemented server-side trust boundary.
 
 ## 5. Audit and evidence
 
@@ -89,4 +89,5 @@ Never publish passwords, password hashes/salts, full connection strings, raw TRX
 - A failed bootstrap or maintenance transaction rolls back. Confirm state with the database owner before another attempt.
 - Keep runtime and migration principals separate. Runtime can read the superuser binding but cannot change it or run migrations.
 - Do not reset a database containing data to preserve. A restore requires owner-approved recovery point/RPO, a verified destination and the reviewed recovery procedure; confirm the consequence for writes after that point.
-- SEC-REBUILD's accepted PR #34 remains historical completed work. RESP/L2DB are also complete in plan scope. Pending installed GUI/permission-user walkthroughs, actual credential rotation, recovery and owner sign-off are **OPEN** under [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md); neither runbook nor earlier test evidence closes those release gates.
+- SEC-REBUILD's accepted PR #34, RESP/L2DB and GUI-P5 remain completed historical work within their recorded scopes and exceptions. BCI must preserve permission/session behavior and obtain fresh evidence for affected UI. Actual credential rotation, recovery and production sign-off remain [unaccepted, unscheduled release prerequisites](DEFERRED_WORK.md#release-prerequisites); neither this runbook nor earlier test evidence closes those gates.
+

@@ -1,5 +1,7 @@
 # GUI-P5 coverage matrix and T00 baseline
 
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+
 **Task:** GUI-P5-T00, [acceptance plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md). **Recorded:** 2026-10-19 (Asia/Bangkok), Codex; Project Owner approved the Minimal Disposable Test Topology and T00 scope in this chat on the same date. **Executable source:** `f275183c8b39dc2b712dc37be7f0f4ac71396357` on `v1a`, isolated implementation branch `codex/gui-p5-t00`; initial inventory/evidence commit `7cfefd4`. Documentation changes do not change the executable candidate.
 
 **Current status: GUI-P5-T00–T06 COMPLETE in the approved scope.** [Final T06 acceptance](GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20) records frozen productd5207b2 / test12e6a20, both unfiltered329-row100/125 gates, Session108, separatepackaged18, review correction and final189DB/567principal cleanup. Both attended IDs are Owner-signed; T05 retains44PASS/1PARTIAL and the accepted Down NOT TESTED exception. REL/P6 G1–G5 and production readiness remain OPEN.
