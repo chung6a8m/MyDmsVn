@@ -71,6 +71,9 @@ public sealed class BusinessCompactLayoutTests
             Assert.InRange(ScreenBounds(receipt.WarehouseLookup).Top - ScreenBounds(caption).Bottom, 0, 8 * receipt.DeviceDpi / 96);
             Assert.True(receipt.LineGrid.Width > receipt.Width / 2);
             Assert.True(receipt.LineGrid.Height >= viewport.ClientSize.Height / 3);
+            for (var parent = receipt.LineGrid.Parent; parent != receipt && parent != null; parent = parent.Parent)
+                if (parent is Panel panel && panel.AutoScroll)
+                    Assert.False(panel.HorizontalScroll.Visible || panel.VerticalScroll.Visible, "Redundant bars: H=" + panel.HorizontalScroll.Visible + ";V=" + panel.VerticalScroll.Visible + ";client=" + panel.ClientSize + ";display=" + panel.DisplayRectangle + ";min=" + panel.AutoScrollMinSize + ";child=" + panel.Controls[0].Bounds);
             foreach (var control in new Control[] { receipt.ReceiptDateEditor, receipt.WarehouseLookup, receipt.EmployeeLookup, receipt.NoteEditor,
                 receipt.SaveButton, receipt.PostButton, receipt.AddLineButton, receipt.RemoveLineButton, receipt.OperationStatusLabel, receipt.TotalLabel })
                 Assert.True(ScreenBounds(viewport).Contains(ScreenBounds(control)), control.GetType().Name + " must be visible: " + ScreenBounds(control));

@@ -826,7 +826,7 @@ namespace MyDmsVn.Desktop.WinForms
             master.Controls.Add(ReceiptGrid); master.Controls.Add(paging); master.Controls.Add(masterBar);
 
             var detail = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
-            var content = new Panel { Location = Point.Empty, TabIndex = 0 };
+            var content = new Panel { Dock = DockStyle.Fill, TabIndex = 0 };
             var metadata = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, TabIndex = 0 };
             metadata.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             metadata.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -860,22 +860,33 @@ namespace MyDmsVn.Desktop.WinForms
                 try
                 {
                     var scale = new Func<int, int>(logical => BusinessCompactAppearance.Scale(this, logical));
-                    var width = Math.Max(scale(400), detail.ClientSize.Width - (detail.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0));
-                    var columns = width < scale(560) ? 1 : 2;
-                    metadata.SuspendLayout();
-                    metadata.ColumnCount = columns;
-                    for (var index = 0; index < fields.Length; index++)
+                    var availableWidth = detail.ClientSize.Width;
+                    var availableHeight = detail.ClientSize.Height;
+                    var minimumHeight = 0;
+                    for (var pass = 0; pass < 3; pass++)
                     {
-                        metadata.SetCellPosition(fields[index], new TableLayoutPanelCellPosition(index % columns, index / columns));
-                        fields[index].MinimumSize = new Size(0, scale(60));
+                        var width = Math.Max(scale(400), availableWidth);
+                        var columns = width < scale(560) ? 1 : 2;
+                        metadata.SuspendLayout();
+                        metadata.ColumnCount = columns;
+                        for (var index = 0; index < fields.Length; index++)
+                        {
+                            metadata.SetCellPosition(fields[index], new TableLayoutPanelCellPosition(index % columns, index / columns));
+                            fields[index].MinimumSize = new Size(0, scale(60));
+                        }
+                        metadata.ResumeLayout();
+                        header.Width = metadata.Width = footer.Width = width;
+                        header.Height = metadata.PreferredSize.Height + _compactTitle.PreferredHeight + state.PreferredSize.Height + scale(8);
+                        OperationStatusLabel.MaximumSize = new Size(Math.Max(1, width - scale(16)), 0);
+                        minimumHeight = header.Height + footer.PreferredSize.Height + scale(200);
+                        availableHeight = detail.ClientSize.Height - (scale(400) > availableWidth ? SystemInformation.HorizontalScrollBarHeight : 0);
+                        availableWidth = detail.ClientSize.Width - (minimumHeight > availableHeight ? SystemInformation.VerticalScrollBarWidth : 0);
                     }
-                    metadata.ResumeLayout();
-                    header.Width = width;
-                    metadata.Width = width;
-                    header.Height = metadata.PreferredSize.Height + _compactTitle.PreferredHeight + state.PreferredSize.Height + scale(8);
-                    OperationStatusLabel.MaximumSize = new Size(Math.Max(1, width - scale(16)), 0);
-                    content.Size = new Size(width, Math.Max(detail.ClientSize.Height, header.Height + footer.PreferredSize.Height + scale(200)));
-                    detail.AutoScrollMinSize = content.Size;
+                    // Docking follows the scrollable display rectangle. Only measured minima
+                    // contribute to the virtual extent, so old viewport bounds cannot keep bars alive.
+                    content.MinimumSize = new Size(scale(400), minimumHeight);
+                    detail.AutoScrollMinSize = content.MinimumSize;
+                    detail.PerformLayout();
                 }
                 finally { layingOut = false; }
             };
