@@ -327,16 +327,15 @@ public sealed class InventoryAccessibilityAcceptanceTests
 
     private static void TabBetween(Control first, Control second)
     {
-        Assert.Same(first.Parent, second.Parent);
         Assert.True(first.TabStop);
         Assert.True(second.TabStop);
         first.Select();
         Assert.True(first.ContainsFocus, "First control must receive actual native focus.");
         Assert.NotNull(first.Parent);
         // Native tab selection uses the siblings' TabIndex/TabStop and skips static labels.
-        Assert.True(first.Parent!.SelectNextControl(first, true, true, false, false));
+        GoodsReceiptInlineEditorTests.Key(Keys.Tab);
         Assert.True(second.ContainsFocus, "Forward tab must focus the next logical input.");
-        Assert.True(second.Parent!.SelectNextControl(second, false, true, false, false));
+        InlineReceiptTestDriver.ShiftTab();
         Assert.True(first.ContainsFocus, "Backward tab must return to the previous logical input.");
     }
 

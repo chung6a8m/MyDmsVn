@@ -464,7 +464,7 @@ public sealed partial class ReceiptAcceptanceTests
         return Assert.IsAssignableFrom<IEnumerable<CatalogLookupOption>>(source);
     }
 
-    private static void Load(GoodsReceiptControl control, CancellationToken token)
+    internal static void Load(GoodsReceiptControl control, CancellationToken token)
     {
         Drain(control.ActivateAsync(token), token);
         Drain(control.SelectReceiptAsync(41, token), token);
@@ -491,7 +491,7 @@ public sealed partial class ReceiptAcceptanceTests
         new[] { new GoodsReceiptLineDto(91, 1, 7, 2.5m, 4m, "P7 - Product", true) },
         "W3 - Warehouse", true, "E5 - Employee", true);
 
-    private sealed class Fixture : IDisposable
+    internal sealed class Fixture : IDisposable
     {
         public Fixture(LookupSource? warehouses = null, LookupSource? employees = null, LookupSource? products = null,
             DesktopNotificationCenter? notifications = null)
@@ -545,7 +545,7 @@ public sealed partial class ReceiptAcceptanceTests
         }
     }
 
-    private sealed class LookupSource : ICatalogLookupSource
+    internal sealed class LookupSource : ICatalogLookupSource
     {
         private readonly int _id;
         public LookupSource(CatalogKind kind, int id) { Kind = kind; _id = id; }
@@ -564,7 +564,7 @@ public sealed partial class ReceiptAcceptanceTests
             Task.FromResult(ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(id, "C" + id, "Choice", Active)));
     }
 
-    private sealed class ReceiptApi : IGoodsReceiptApiClient
+    internal sealed class ReceiptApi : IGoodsReceiptApiClient
     {
         public GoodsReceiptDto Current { get; set; } = Receipt();
         public IList<UpdateGoodsReceiptDraftRequest> Updates { get; } = new List<UpdateGoodsReceiptDraftRequest>();

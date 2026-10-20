@@ -20,8 +20,8 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
     private readonly GoodsReceiptEditorViewModel _editor;
     private readonly Func<bool> _canEdit;
     private readonly BootstrapLookupBoxEditor _product;
-    private readonly BootstrapFormattedTextBoxEditor _quantity;
-    private readonly BootstrapFormattedTextBoxEditor _cost;
+    private readonly ReceiptNumberEditor _quantity;
+    private readonly ReceiptNumberEditor _cost;
     private readonly List<GoodsReceiptLineViewModel> _lines = new List<GoodsReceiptLineViewModel>();
     private readonly List<(Cell Cell, LineController Controller)> _controllers = new List<(Cell, LineController)>();
     private CultureInfo _culture = CultureInfo.ReadOnly((CultureInfo)CultureInfo.CurrentCulture.Clone());
@@ -44,8 +44,8 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _canEdit = canEdit ?? throw new ArgumentNullException(nameof(canEdit));
         _product = grid.BootstrapEditors.CreateLookupBox(typeof(int));
-        _quantity = grid.BootstrapEditors.CreateFormattedTextBox(typeof(decimal));
-        _cost = grid.BootstrapEditors.CreateFormattedTextBox(typeof(decimal));
+        _quantity = new ReceiptNumberEditor();
+        _cost = new ReceiptNumberEditor();
         foreach (var input in Inputs)
         {
             input.EditableMode = EditableMode.F2Key | EditableMode.AnyKey | EditableMode.DoubleClick;
@@ -66,6 +66,9 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         _editor.Lines.CollectionChanged += OnLinesChanged;
         _editor.ProductOptions.PropertyChanged += OnOptionsChanged;
         _grid.Disposed += OnGridDisposed;
+        _grid.SizeChanged += OnAppearanceChanged;
+        _grid.FontChanged += OnAppearanceChanged;
+        MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.ThemeChanged += OnGridThemeChanged;
         _grid.Adapter = this;
         ResetDocument(editor.Lines);
     }
@@ -252,7 +255,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
                 var line = snapshot[index];
                 line.PropertyChanged += OnLineChanged;
                 var row = index + 1;
-                _grid.Rows[row].Height = 42;
+
                 _grid[row, 0] = new Cell(row);
                 _grid[row, 4] = new Cell(line.LineTotal.HasValue ? (object)line.LineTotal.Value : "Amount too large");
                 _grid[row, 0].AddController(Unselectable.Default);
@@ -270,6 +273,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
             _grid.Columns[0].Width = 45;
             _grid.Columns[1].Width = 290;
             for (var column = 2; column < 5; column++) _grid.Columns[column].Width = 145;
+            RefreshAppearance();
             BindProductOptions();
             RefreshEditability();
             _selectionPending = _selectionId.HasValue
@@ -447,6 +451,47 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
     private string ProductCaption(int id) => _editor.ProductOptions.Items.FirstOrDefault(option => option.Id == id)?.DisplayName ??
         _lines.FirstOrDefault(line => line.ProductId == id)?.ProductDisplayName ?? (id == 0 ? "" : id.ToString(_culture));
 
+    private bool _sizing;
+    private void OnAppearanceChanged(object? sender, EventArgs e) => RefreshAppearance();
+    private void OnGridThemeChanged(object? sender, MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeChangedEventArgs e) => Dispatch(RefreshAppearance);
+    private void RefreshAppearance()
+    {
+        if (_disposed || _sizing || _grid.IsDisposed || _grid.ColumnsCount != 5) return;
+        _sizing = true;
+        try
+        {
+            var scale = new Func<int, int>(logical => BusinessCompactAppearance.Scale(_grid, logical));
+            var height = Math.Max(scale(36), System.Windows.Forms.TextRenderer.MeasureText("123", _grid.Font).Height + scale(12));
+            foreach (var input in Inputs)
+            {
+                input.Control.Font = _grid.Font;
+                height = Math.Max(height, Math.Max(input.Control.MinimumSize.Height, input.Control.GetPreferredSize(new System.Drawing.Size(scale(200), 0)).Height) + scale(4));
+            }
+            var width = Math.Max(scale(145), System.Windows.Forms.TextRenderer.MeasureText("999999999999999.9999", _grid.Font).Width + scale(48));
+            _grid.Columns[0].Width = scale(45);
+            for (var column = 2; column < 5; column++) _grid.Columns[column].Width = width;
+            _grid.Columns[1].Width = Math.Max(scale(240), _grid.ClientSize.Width - scale(45) - width * 3 - System.Windows.Forms.SystemInformation.VerticalScrollBarWidth);
+            var dark = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Mode == MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark;
+            for (var row = 0; row < _grid.RowsCount; row++)
+            {
+                _grid.Rows[row].Height = height;
+                for (var column = 0; column < 5; column++)
+                {
+                    var view = new SourceGrid.Cells.Views.Cell
+                    {
+                        Font = _grid.Font,
+                        TextAlignment = column >= 2 ? DevAge.Drawing.ContentAlignment.MiddleRight : DevAge.Drawing.ContentAlignment.MiddleLeft,
+                        BackColor = dark ? System.Drawing.Color.FromArgb(34, 45, 60) : System.Drawing.Color.White,
+                        ForeColor = dark ? System.Drawing.Color.FromArgb(230, 236, 244) : System.Drawing.Color.FromArgb(31, 45, 61),
+                    };
+                    _grid[row, column].View = view;
+                }
+            }
+            _grid.ArrangeLinkedControls();
+        }
+        finally { _sizing = false; }
+    }
+
     private void DisplayProduct(object? sender, DevAge.ComponentModel.ConvertingObjectEventArgs e)
     {
         var id = e.Value is int key ? key : 0;
@@ -508,6 +553,9 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         _editor.Lines.CollectionChanged -= OnLinesChanged;
         _editor.ProductOptions.PropertyChanged -= OnOptionsChanged;
         _grid.Disposed -= OnGridDisposed;
+        _grid.SizeChanged -= OnAppearanceChanged;
+        _grid.FontChanged -= OnAppearanceChanged;
+        MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.ThemeChanged -= OnGridThemeChanged;
         DetachLines();
         foreach (var input in Inputs)
         {
@@ -518,7 +566,8 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         }
         _product.ConvertingValueToDisplayString -= DisplayProduct;
         _grid.Adapter = null;
-        _grid.BootstrapEditors.Dispose(); // Registry is the shared-control owner; grid disposal is idempotent.
+        _grid.BootstrapEditors.Dispose(); // Registry owns the lookup. App owns the two numeric adapters.
+        foreach (var input in new EditorControlBase[] { _quantity, _cost }) { input.Control.Dispose(); input.Dispose(); }
     }
 
     private sealed class Session

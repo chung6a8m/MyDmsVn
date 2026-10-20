@@ -46,6 +46,7 @@ namespace MyDmsVn.Desktop.WinForms
             _editor = editor ?? throw new ArgumentNullException(nameof(editor));
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
             Dock = DockStyle.Fill;
+            AutoScaleMode = AutoScaleMode.Dpi;
 
             SearchBox = new BootstrapTextBox { Dock = DockStyle.Fill, AccessibleName = "Search goods receipts" };
             WarehouseFilterLookup = CreateLookup("Filter by warehouse");
@@ -113,6 +114,7 @@ namespace MyDmsVn.Desktop.WinForms
             };
 
             Controls.Add(CreateLayout());
+            BusinessCompactAppearance.Apply(this);
             _inline.EditStateChanged += OnInlineEditStateChanged;
             foreach (var command in new[] { NewButton, RefreshButton, SaveButton, PostButton, AddLineButton, RemoveLineButton })
                 ((ReceiptCommandButton)command).RetainEditorFocus = () => _inline.HasPendingEdit;
@@ -710,6 +712,7 @@ namespace MyDmsVn.Desktop.WinForms
                 ReceiptDateEditor.Value = _editor.ReceiptDate;
                 NoteEditor.Text = _editor.Note ?? string.Empty;
                 StatusLabel.Text = _editor.Status;
+                if (_compactTitle != null) _compactTitle.Text = _editor.ReceiptNumber ?? "Goods receipt — New";
                 VersionLabel.Text = _editor.Version ?? string.Empty;
                 TotalLabel.Text = _editor.Total.HasValue
                     ? _editor.Total.Value.ToString("0.00")
@@ -724,6 +727,12 @@ namespace MyDmsVn.Desktop.WinForms
                     _editor.ErrorMessage ??
                     _list.ErrorMessage ??
                     (busy ? "Loading..." : "Ready");
+                OperationStatusLabel.AccessibleRole = requiresPostReload || _inline.EditError != null || _editor.ErrorMessage != null || _list.ErrorMessage != null
+                    ? AccessibleRole.Alert : AccessibleRole.StaticText;
+                OperationStatusLabel.ForeColor = OperationStatusLabel.AccessibleRole == AccessibleRole.Alert
+                    ? MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Mode == MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark
+                        ? Color.FromArgb(255, 180, 171) : Color.FromArgb(180, 35, 24)
+                    : ForeColor;
                 ReceiptGrid.Enabled = !busy && !requiresPostReload;
                 LineGrid.Enabled = !busy && !requiresPostReload;
                 RefreshButton.Enabled = !busy;
@@ -773,7 +782,9 @@ namespace MyDmsVn.Desktop.WinForms
                 ReceiptGrid[row, 4] = new SourceGrid.Cells.Cell(item.EmployeeDisplayName ?? item.EmployeeId.ToString());
                 ReceiptGrid[row, 5] = new SourceGrid.Cells.Cell(item.Status);
             }
+            BusinessCompactAppearance.StyleReceiptResults(ReceiptGrid);
             ReceiptGrid.AutoSizeCells();
+            BusinessCompactAppearance.StyleReceiptResults(ReceiptGrid);
         }
 
         private void ApplyErrors()
@@ -798,101 +809,107 @@ namespace MyDmsVn.Desktop.WinForms
             return field.StartsWith("lines[", StringComparison.Ordinal);
         }
 
+        private Label? _compactTitle;
         private Control CreateLayout()
         {
+            Padding = new Padding(16);
+            AutoScroll = true;
+            AutoScrollMinSize = new Size(676, 0);
             var master = new Panel { Dock = DockStyle.Fill };
-            var masterBar = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                WrapContents = true,
-                Padding = new Padding(8),
-            };
-            SearchBox.Dock = DockStyle.None;
-            SearchBox.Width = 180;
-            WarehouseFilterLookup.Dock = DockStyle.None;
-            WarehouseFilterLookup.Width = 190;
-            StatusFilter.Dock = DockStyle.None;
+            var masterBar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 8, 8) };
+            SearchBox.Dock = WarehouseFilterLookup.Dock = StatusFilter.Dock = DockStyle.None;
+            SearchBox.Width = WarehouseFilterLookup.Width = 220;
             StatusFilter.Width = 110;
-            masterBar.Controls.AddRange(new Control[]
+            masterBar.Controls.AddRange(new Control[] { SearchBox, WarehouseFilterLookup, StatusFilter, RefreshButton, NewButton });
+            var paging = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true };
+            paging.Controls.AddRange(new Control[] { PreviousPageButton, PageLabel, NextPageButton });
+            master.Controls.Add(ReceiptGrid); master.Controls.Add(paging); master.Controls.Add(masterBar);
+
+            var detail = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+            var content = new Panel { Location = Point.Empty, TabIndex = 0 };
+            var metadata = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, TabIndex = 0 };
+            metadata.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            metadata.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            var fields = new[] { CompactField("Receipt date", ReceiptDateEditor, 0), CompactField("Warehouse", WarehouseLookup, 1),
+                CompactField("Employee", EmployeeLookup, 2), CompactField("Note", NoteEditor, 3) };
+            for (var index = 0; index < fields.Length; index++) metadata.Controls.Add(fields[index], index % 2, index / 2);
+            _compactTitle = new Label { Name = "CompactHeading", Text = "Goods receipt", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 0, 0, 8) };
+            var state = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 4, 0, 8), TabStop = false };
+            state.Controls.AddRange(new Control[] { new Label { Text = "Status", AutoSize = true }, StatusLabel,
+                new Label { Text = "Version", AutoSize = true }, VersionLabel });
+            VersionLabel.Name = "CompactSecondary";
+            var header = new Panel { Dock = DockStyle.Top, TabIndex = 0 };
+            header.Controls.Add(state); header.Controls.Add(metadata); header.Controls.Add(_compactTitle);
+
+            var commands = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, TabIndex = 0 };
+            commands.Controls.AddRange(new Control[] { SaveButton, PostButton, AddLineButton, RemoveLineButton,
+                new Label { Text = "Total", AutoSize = true, Padding = new Padding(8, 8, 0, 0) }, TotalLabel, BusyIndicator });
+            var footer = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 1, TabIndex = 2, Padding = new Padding(0, 8, 0, 0) };
+            OperationStatusLabel.Name = "CompactSecondary";
+            OperationStatusLabel.Margin = new Padding(0, 4, 0, 0);
+            footer.Controls.Add(commands); footer.Controls.Add(OperationStatusLabel);
+            LineGrid.TabIndex = 1;
+            SaveButton.TabIndex = 0; PostButton.TabIndex = 1; AddLineButton.TabIndex = 2; RemoveLineButton.TabIndex = 3;
+            content.Controls.Add(LineGrid); content.Controls.Add(footer); content.Controls.Add(header);
+            detail.Controls.Add(content);
+            var layingOut = false;
+            Action layout = () =>
             {
-                SearchBox, WarehouseFilterLookup, StatusFilter, RefreshButton, NewButton,
-            });
-            var pagingBar = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Bottom,
-                AutoSize = true,
-                FlowDirection = FlowDirection.LeftToRight,
-                Padding = new Padding(8),
+                if (layingOut || detail.IsDisposed) return;
+                layingOut = true;
+                try
+                {
+                    var scale = new Func<int, int>(logical => BusinessCompactAppearance.Scale(this, logical));
+                    var width = Math.Max(scale(400), detail.ClientSize.Width - (detail.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0));
+                    var columns = width < scale(560) ? 1 : 2;
+                    metadata.SuspendLayout();
+                    metadata.ColumnCount = columns;
+                    for (var index = 0; index < fields.Length; index++)
+                    {
+                        metadata.SetCellPosition(fields[index], new TableLayoutPanelCellPosition(index % columns, index / columns));
+                        fields[index].MinimumSize = new Size(0, scale(60));
+                    }
+                    metadata.ResumeLayout();
+                    header.Width = width;
+                    metadata.Width = width;
+                    header.Height = metadata.PreferredSize.Height + _compactTitle.PreferredHeight + state.PreferredSize.Height + scale(8);
+                    OperationStatusLabel.MaximumSize = new Size(Math.Max(1, width - scale(16)), 0);
+                    content.Size = new Size(width, Math.Max(detail.ClientSize.Height, header.Height + footer.PreferredSize.Height + scale(200)));
+                    detail.AutoScrollMinSize = content.Size;
+                }
+                finally { layingOut = false; }
             };
-            pagingBar.Controls.Add(PreviousPageButton);
-            pagingBar.Controls.Add(PageLabel);
-            pagingBar.Controls.Add(NextPageButton);
-            master.Controls.Add(ReceiptGrid);
-            master.Controls.Add(pagingBar);
-            master.Controls.Add(masterBar);
-
-            var detail = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1 };
-            detail.Panel1MinSize = 300;
-            detail.SizeChanged += (_, __) => KeepReceiptEditorsVisible(detail);
-            detail.Panel1.Controls.Add(CreateHeaderEditor());
-            detail.Panel2.Controls.Add(CreateLineEditor());
-
-            var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
-            split.Panel1.Controls.Add(master);
-            split.Panel2.Controls.Add(detail);
+            detail.SizeChanged += (_, __) => layout();
+            header.FontChanged += (_, __) => layout();
+            OperationStatusLabel.TextChanged += (_, __) => layout();
+            var split = new SplitContainer { Dock = DockStyle.Fill, Size = new Size(1200, 600), FixedPanel = FixedPanel.Panel1, SplitterDistance = 260, Panel1MinSize = 240, Panel2MinSize = 400, MinimumSize = new Size(644, 0) };
+            split.Panel1.Controls.Add(master); split.Panel2.Controls.Add(detail);
+            var initialized = false;
+            split.SizeChanged += (_, __) =>
+            {
+                var available = split.ClientSize.Width - split.SplitterWidth;
+                var minimum = BusinessCompactAppearance.Scale(this, 240);
+                var detailMinimum = BusinessCompactAppearance.Scale(this, 400);
+                if (available >= minimum + detailMinimum)
+                {
+                    var target = initialized ? split.SplitterDistance : BusinessCompactAppearance.Scale(this, 260);
+                    split.SplitterDistance = Math.Max(minimum, Math.Min(target, available - detailMinimum));
+                    initialized = split.IsHandleCreated;
+                }
+                layout();
+            };
+            split.HandleCreated += (_, __) => { initialized = true; layout(); };
             return split;
         }
 
-        private static void KeepReceiptEditorsVisible(SplitContainer split)
+        private static Control CompactField(string caption, Control editor, int order)
         {
-            // A fixed panel can retain its tiny construction-time distance even below Panel1MinSize.
-            var scale = split.DeviceDpi / 96f;
-            var headerMinimum = (int)Math.Ceiling(300 * scale);
-            var linesMinimum = (int)Math.Ceiling(240 * scale);
-            var available = split.ClientSize.Width - split.SplitterWidth;
-            if (available < headerMinimum + linesMinimum)
-                return;
-            var distance = Math.Max(headerMinimum, Math.Min(split.SplitterDistance, available - linesMinimum));
-            if (split.SplitterDistance != distance)
-                split.SplitterDistance = distance;
-        }
-        private Control CreateHeaderEditor()
-        {
-            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 1, Padding = new Padding(8) };
-            AddField(panel, "Receipt date", ReceiptDateEditor);
-            AddField(panel, "Warehouse", WarehouseLookup);
-            AddField(panel, "Employee", EmployeeLookup);
-            AddField(panel, "Note", NoteEditor);
-            AddField(panel, "Status", StatusLabel);
-            AddField(panel, "Version", VersionLabel);
-            var commands = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true };
-            commands.Controls.Add(SaveButton);
-            commands.Controls.Add(PostButton);
-            commands.Controls.Add(new Label { Text = "Total", AutoSize = true, Padding = new Padding(12, 8, 0, 0) });
-            commands.Controls.Add(TotalLabel);
-            commands.Controls.Add(BusyIndicator);
-            panel.Controls.Add(commands);
-            panel.Controls.Add(OperationStatusLabel);
-            return panel;
-        }
-
-        private Control CreateLineEditor()
-        {
-            var panel = new Panel { Dock = DockStyle.Fill };
-            var commands = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
-            commands.Controls.Add(AddLineButton);
-            commands.Controls.Add(RemoveLineButton);
-            panel.Controls.Add(LineGrid);
-            panel.Controls.Add(commands);
-            return panel;
-        }
-
-        private static void AddField(TableLayoutPanel panel, string label, Control editor)
-        {
-            panel.Controls.Add(new Label { Text = label, AutoSize = true });
-            panel.Controls.Add(editor);
+            var group = new Panel { Size = new Size(200, 60), Dock = DockStyle.Fill, Margin = new Padding(0, 0, 8, 8), TabIndex = order };
+            editor.Dock = DockStyle.Top;
+            editor.TabIndex = 0;
+            group.Controls.Add(editor);
+            group.Controls.Add(new Label { Text = caption, Name = "CompactSecondary", Dock = DockStyle.Top, AutoSize = true });
+            return group;
         }
 
         private void CancelEditorLookupEdits()

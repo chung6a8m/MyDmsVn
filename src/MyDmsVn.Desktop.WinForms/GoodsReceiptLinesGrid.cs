@@ -9,7 +9,7 @@ namespace MyDmsVn.Desktop.WinForms;
 
 internal sealed class GoodsReceiptLinesGrid : BootstrapGrid
 {
-    internal GoodsReceiptLinesGrid() { AccessibleName = "Goods receipt lines"; }
+    internal GoodsReceiptLinesGrid() { AccessibleName = "Goods receipt lines"; BusinessCompactAppearance.Apply(this); }
     internal GoodsReceiptLinesGridAdapter? Adapter { get; set; }
     protected override AccessibleObject CreateAccessibilityInstance() => new ReceiptAccessibleObject(this);
 

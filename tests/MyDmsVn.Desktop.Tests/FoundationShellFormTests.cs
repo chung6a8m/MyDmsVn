@@ -94,11 +94,11 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(1, inventory.CardCreateCount);
                         Assert.Contains(
                             shell.Navigation.Items.Cast<object>(),
-                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                            item => item is BusinessCompactNavigationItem sidebarItem &&
                                 string.Equals(sidebarItem.Tag as string, "stock-balances", StringComparison.Ordinal));
                         Assert.Contains(
                             shell.Navigation.Items.Cast<object>(),
-                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                            item => item is BusinessCompactNavigationItem sidebarItem &&
                                 string.Equals(sidebarItem.Tag as string, "stock-card", StringComparison.Ordinal));
                     }
                 },
@@ -546,7 +546,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(1, factory.CreateCount);
                         Assert.Contains(
                             shell.Navigation.Items.Cast<object>(),
-                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                            item => item is BusinessCompactNavigationItem sidebarItem &&
                                 sidebarItem.Text == "Goods Receipts");
 
                         shell.SignOut();
