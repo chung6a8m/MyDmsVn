@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS —16/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: IN PROGRESS —25/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -39,20 +39,20 @@ PASS requires the named actual observation plus any independent oracle and Owner
 | S-01 | Balance filters and visible totals agree with independent stock sum; no mixed-product grand-quantity claim. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
 | S-02 | Card warehouse/product/date filters, order/document identity/visible delta agree with oracle. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
 | S-03 | Empty/invalid filter, safe error and explicit Refresh recovery without stale rows/totals. | PASS — Owner confirmed whole Post/Stock group; native artifacts and restricted oracles detailed below |
-| S-04 | Actual multi-page Balance/Card data when declared, Next/Previous and filter change page1; fixture rows distinguished from attended posts. | NOT RUN |
+| S-04 | Actual multi-page Balance/Card data when declared, Next/Previous and filter change page1; fixture rows distinguished from attended posts. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
 | P-01 | Ordinary Read+Post without Write: read saved Draft, server rejects Save without Write, Post authorized with correct actor and single stock effect. | PASS — Owner confirmed Save denial then Post success; restricted stock/audit oracle |
 | P-02 | Read+Write without Post: Draft write succeeds, Post unavailable/denied; no posted mutation. | PASS — Owner confirmed Save success then server Post denial; Draft/token/stock preserved |
-| P-03 | Post without Read cannot load/post an unseen receipt; no leaked detail or mutation. | NOT RUN |
-| P-04 | Ordinary role Post grant plus direct Post Deny after enabled UI admission; server rejection/input preserved/no mutation, actual assignment snapshot. | NOT RUN |
-| P-05 | Restricted Stock permissions: Balance/Card deny safely and clear rows/totals; no previous actor data. | NOT RUN |
+| P-03 | Post without Read cannot load/post an unseen receipt; no leaked detail or mutation. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
+| P-04 | Ordinary role Post grant plus direct Post Deny after enabled UI admission; server rejection/input preserved/no mutation, actual assignment snapshot. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
+| P-05 | Restricted Stock permissions: Balance/Card deny safely and clear rows/totals; no previous actor data. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
 | P-06 | Disabled user's actual Login denied safely; no admitted application session. | PASS — Owner confirmed actual Login error/still Login; SQL Active=false/nonprotected and inventory unchanged |
-| P-07 | Actor disabled after actual Login: subsequent server operation fails closed/no stock or receipt mutation. | NOT RUN |
+| P-07 | Actor disabled after actual Login: subsequent server operation fails closed/no stock or receipt mutation. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
 | C-01 | Stale Save rowversion loses to controlled accepted winner; safe conflict retains loser input and winner unchanged. | PASS — Owner confirmed safe conflict/loser input retained; restricted oracle preserves controlled SQL winner and stock |
 | C-02 | Stale Post version after winner Draft update is rejected; no ledger/balance and no overwrite. | PASS — Owner confirmed safe conflict/no retry; restricted oracle preserves Draft winner and original-only stock |
-| K-01 | Catalog rename/active change while Receipt/Stock views exist; fresh/historical names and active-only new choices match shipped contracts. | NOT RUN |
-| L-01 | Real logout/other account/restart clears former actor data and reads current persisted Draft/Posted state. | NOT RUN |
-| F-01 | Actual SQL Post timeout observed; safe uncertain outcome and mutation lock; independently establish persisted state after worker drain. | NOT RUN |
-| F-02 | Exact fault removed, explicit read reload resolves status; only then justified single retry, one final stock effect; restart/schema preflight usable. | NOT RUN |
+| K-01 | Catalog rename/active change while Receipt/Stock views exist; fresh/historical names and active-only new choices match shipped contracts. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
+| L-01 | Real logout/other account/restart clears former actor data and reads current persisted Draft/Posted state. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
+| F-01 | Actual SQL Post timeout observed; safe uncertain outcome and mutation lock; independently establish persisted state after worker drain. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
+| F-02 | Exact fault removed, explicit read reload resolves status; only then justified single retry, one final stock effect; restart/schema preflight usable. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
 | O-01 | Independent full-key ledger/balance reconciliation, receipt-line document identity and no denied/failed mutation. | NOT RUN |
 | O-02 | Sanitized screenshot/hash/actor/environment ledger; normal GUI drain and positively owned final DB/principal cleanup/exact census. | NOT RUN |
 
@@ -69,7 +69,7 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 ## Session / artifacts / decision
 
-T05 attended ledger currently16/45 Owner-confirmed PASS (16/27 baseline,0/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
+T05 attended ledger currently25/45 Owner-confirmed PASS (25/27 baseline,0/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
 
 ### Setup attempt1 — FAIL, safely disposed
 
@@ -273,3 +273,26 @@ Chapter2 launched10:53:20+07 (30minute deadline11:23:20). Actual runtime-only st
 
 - [restart-recovery-posted-readonly-100light.jpg](assets/gui-p5-t05/restart-recovery-posted-readonly-100light.jpg), SHA256 CBDD4F8B4F27B271CDBFA8CF3D19E8EDB3ABB049475DE895934A12FBF5295712.
 - [restart-balance27-readback-100light.jpg](assets/gui-p5-t05/restart-balance27-readback-100light.jpg), SHA256 3950B9C9CB41C3C929D6BE87B5CC87EC62A586D2099CCD9A880DC79F24B7CAFE.
+
+### Consolidated baseline observations accepted —2026-10-20
+
+Owner explicitly confirmed directly observing DirectDeny, NoRead, RestrictedStock, revocation, timeout/retry, paging, catalogchanges and restart. P-03/P-04/P-05/P-07/F-01/F-02/S-04/K-01/L-01 nowPASS within their documented scope/fixture/cache/UI qualifications. Baseline25/27PASS; O-01finalindependentreconciliation/O-02finalcleanup pending. Supplemental0/18; total25/45. This is observation acceptance, not finalT05sign-off or overallP5/P6acceptance. Continueactual100%DarkUX on unchangedcandidate.
+
+###100% Dark supplemental UX — executed, confirmation pending
+
+Actual theme toggle/100%desktop; shellDark and nativeReceipteditors/gridsDark inspected, Stockcontrolbody retains current lighter rendering. No claim of universalDark recoloring. Balancewindowed/maximizedlayout, nonexistentProduct999empty/total0, restoredProduct1/Refreshquantity27; SearchTabmovescarettoWarehouse andShiftTabback. StockUIA focused_element sometimes reports priorgridcell while visiblecaret moves ineditors; observationsusefreshrenders rather than stalefocusmetadata. Card1/1datecheckbox/keyboardyearchangeFrom2027>To2026safevalidation/emptydelta0; uncheckboth+Refreshrestores25rowspage1/delta25; windowed/maximizedbounds/controlsinspected, WarehouseTabProduct/ShiftTabback. Globaloldernotificationretained, samequalifiedbehavior.
+
+ReceiptPostedreadonly/windowedthenmaximized, NewSaveemptyrequiredicons/saferequestinvalid/disabledPost; nosavednewreceipt. ActualProductQuantityTab/ShiftTabfocusreturnsverified. ThreepopupsexactT05codesquery1/1,Down/Enterselect,F4reopen,Escclose; popupboundswithinworkareaandselectionfocusreturns. Longnamestruncatewithactualdisplay/accessibilityqualified, notfulltextalwaysvisible. Warehouse set_value tool timedout; freshnativequeryverifiedinputand1/1resultbeforecontinuing,noactionblindlyresent. This is a tooltimingincident, noapplicationhangclaim. NoSave/PostafterUXselection.
+
+Normalclose/discard11:08:24/exit0/CleanupVerified. ExactruntimeDMVrequests0/WAITFOR0; restricted100dark-drainedretains33receipts59lines53ledger27balancekeys/base27,0full-key/line/docmismatches. Current169DBretainedforDPItransition, finaldisposalnotclaimed. All6DarkUXcellsawaitOwnerconfirmation; accepted25/45unchanged. Human125%/1920x1080switchrequestedonlyafterdrain; freshnativeproberequiredbeforelaunch.
+
+- [ux-balance-windowed-100dark.jpg](assets/gui-p5-t05/ux-balance-windowed-100dark.jpg), SHA256 D42A1D6689195B909155C542827A74969F1FF79E430C1A5933EC92848E574385.
+- [ux-balance-recovered-100dark.jpg](assets/gui-p5-t05/ux-balance-recovered-100dark.jpg), SHA256 13FD3C9CA3048B98FB066CF756E2CA3304BC7EE1A1A9F1663E9077915CF30714.
+- [ux-card-invalid-date-100dark.jpg](assets/gui-p5-t05/ux-card-invalid-date-100dark.jpg), SHA256 D5C69FC47CAB75AD3D00564156B5A3453EE2E3A34C26BD1153A27E97418DD6E0.
+- [ux-card-recovered-100dark.jpg](assets/gui-p5-t05/ux-card-recovered-100dark.jpg), SHA256 D7F3156EDAE471716F0F4618C2049B9BE5E0D9EEBFF62CE35A30F45591C14E26.
+- [ux-card-windowed-100dark.jpg](assets/gui-p5-t05/ux-card-windowed-100dark.jpg), SHA256 A9A7E429E776FEA3EAD07A840FDC73315EFE8BFBB1375CBE7841246C0626D9D7.
+- [ux-receipt-posted-windowed-100dark.jpg](assets/gui-p5-t05/ux-receipt-posted-windowed-100dark.jpg), SHA256 79067B732CA17BC91D4D67281C7BDAD08468107AA8EF906530A6E69F59844BCA.
+- [ux-receipt-required-100dark.jpg](assets/gui-p5-t05/ux-receipt-required-100dark.jpg), SHA256 2710F25D3276C56D82690B23EF95EECD0A36BFE1E0D2E5918CC541A0BA4CDFF5.
+- [ux-warehouse-popup-100dark.jpg](assets/gui-p5-t05/ux-warehouse-popup-100dark.jpg), SHA256 D404FB6D47B501741B19ED16E4537D19416EEECA125949F54832A339A0BF56AA.
+- [ux-employee-popup-100dark.jpg](assets/gui-p5-t05/ux-employee-popup-100dark.jpg), SHA256 EE8382D13B48BD4869FF10719F19D8BD04B23B55A4806B40731FBE92786B164A.
+- [ux-product-popup-100dark.jpg](assets/gui-p5-t05/ux-product-popup-100dark.jpg), SHA256 1350E46BDEB9615FD4841260F69C7EDFCEE352744C2E2370B14A89F0BB446C64.
