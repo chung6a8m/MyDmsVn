@@ -1,6 +1,6 @@
 # Test policy — v1a-pro
 
-**Effective:** 2026-10-20 (sole active BCI roadmap; existing execution safeguards retained). **Authority:** the owner's replacement test policy after complete SQL framework removal. This is the sole execution policy; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage and [tests/README](../tests/README.md) owns commands. [RESP, L2DB and GUI-P5 are completed history](plans/README.md); [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap and is not implemented.
+**Effective:** 2026-10-20 (sole active BCI roadmap; existing execution safeguards retained). **Authority:** the owner's replacement test policy after complete SQL framework removal. This is the sole execution policy; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage and [tests/README](../tests/README.md) owns commands. [RESP, L2DB and GUI-P5 are completed history](plans/README.md); [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap; T00–T04 have scoped implementation/evidence, while T05 layout and T06 complete frozen acceptance remain pending.
 
 ## 1. Current execution model
 

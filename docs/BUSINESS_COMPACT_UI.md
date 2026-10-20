@@ -1,6 +1,6 @@
 # Business Compact UI and inline Goods Receipt design
 
-**Direction:** approved; full Business Compact UI acceptance remains unaccepted. The acceptance ledger records the completed T00 proof, T01 scalar parser, T02 projection/session foundation and T03 control-integration scopes.
+**Direction:** approved; full Business Compact UI acceptance remains unaccepted. The acceptance ledger records the completed T00 proof, T01 scalar parser, T02 projection/session foundation, T03 control-integration and T04 editable native-accessibility scopes. T04 includes a focused clean-package probe; full compact/frozen acceptance remains T05–T06.
 **Plan:** [BCI execution plan](plans/20261020-001-business-compact-inline-goods-receipt.md).
 **Acceptance:** [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md).
 **Planning source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).

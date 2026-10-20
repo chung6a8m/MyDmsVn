@@ -1,15 +1,15 @@
 # Business Compact inline Goods Receipt — acceptance specification
 
-**Status:** BCI-T00 proof, T01 scalar parser, T02 projection/session foundation and T03 lookup/command integration complete in their recorded scopes; BCI-T04–T06 remain PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
+**Status:** BCI-T00 proof, T01 scalar parser, T02 projection/session foundation, T03 lookup/command integration and T04 editable native accessibility complete in their recorded scopes; BCI-T05–T06 remain PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
 **Prepared:** 2026-10-20. **Planning baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`.
 
 ## 1. Scope and authority
 
 This specification verifies the [Business Compact design](BUSINESS_COMPACT_UI.md) and [BCI implementation plan](plans/20261020-001-business-compact-inline-goods-receipt.md). It is an acceptance ledger, not an executable test manifest or a replacement for [TEST_POLICY](TEST_POLICY.md).
 The product remains Windows Forms `net48`, with the shipped x86 Desktop and current Local application contracts. SourceGrid owns edit lifecycle; application code owns receipt state, validation presentation and command admission.
-All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; other outcomes remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
-Names outside the retained T00 proof, T01 scalar parser/tests, T02 grid/session code/tests and T03 integration/tests identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
-T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField`; T03 connects them to the receipt controls. T02 implements `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)` as an internal foundation tested against a hosted grid and real VM; T03 now supplies shipping-control command wiring and writable accessibility remains T04 work; their exact contracts are owned by the design and plan.
+All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; A24–A26 have T04 hosted/native and focused package evidence in §8.5; other outcomes remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
+Names outside the retained T00 proof, T01 scalar parser/tests, T02 grid/session code/tests and T03 integration/tests and T04 accessibility/provider/tests identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
+T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField`; T03 connects them to the receipt controls. T02 implements `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)` as an internal foundation tested against a hosted grid and real VM; T03 now supplies shipping-control command wiring and T04 supplies writable accessibility and active real editor reachability; their exact contracts are owned by the design and plan.
 
 ## 2. Accepted historical baseline — external line editors
 
@@ -87,9 +87,9 @@ Each row belongs to its named plan task. BCI-T06 reconciles every row and the af
 
 | ID | Owner | Test anchors | Required observable result | Outcome |
 |---|---|---|---|---|
-| BCI-A24 | BCI-T04 | Existing: E-A/E-U; New: `Accessible_line_cells_expose_correct_editability_and_identity` | Draft input cells expose meaningful row/column/name/value and editability; computed/status/list/Posted cells remain read-only. Cached actions re-resolve valid identity and reject removed or replaced targets. | NOT RUN |
-| BCI-A25 | BCI-T04 | Existing: E-A/E-U/E-P; New: `Native_uia_reaches_the_active_shared_editor` | Cross-process native UIA can find, focus, edit and commit the actual hosted control by semantic identity; reuse across rows updates accessible state. No coordinates, ordinal-only selectors or direct VM write substitutes. | NOT RUN |
-| BCI-A26 | BCI-T04 | Existing: E-A numeric/lookup guards; New: `Accessible_edits_preserve_validation_and_pending_selection_state` | Native Value/selection actions use the same strict numeric and lookup pipeline as keys/mouse; disabled/stale setters cannot mutate, and pending text is distinguishable from a committed key. | NOT RUN |
+| BCI-A24 | BCI-T04 | Existing: E-A/E-U; New: `Accessible_line_cells_expose_correct_editability_and_identity` | Draft input cells expose meaningful row/column/name/value and editability; computed/status/list/Posted cells remain read-only. Cached actions re-resolve valid identity and reject removed or replaced targets. | PASS — T04 scoped native/provider/package evidence (§8.5) |
+| BCI-A25 | BCI-T04 | Existing: E-A/E-U/E-P; New: `Native_uia_reaches_the_active_shared_editor` | Cross-process native UIA can find, focus, edit and commit the actual hosted control by semantic identity; reuse across rows updates accessible state. No coordinates, ordinal-only selectors or direct VM write substitutes. | PASS — T04 scoped native/provider/package evidence (§8.5) |
+| BCI-A26 | BCI-T04 | Existing: E-A numeric/lookup guards; New: `Accessible_edits_preserve_validation_and_pending_selection_state` | Native Value/selection actions use the same strict numeric and lookup pipeline as keys/mouse; disabled/stale setters cannot mutate, and pending text is distinguishable from a committed key. | PASS — T04 scoped native/provider/package evidence (§8.5) |
 | BCI-A27 | BCI-T05 | Existing: E-R layout/E-A tab tests; New: `Compact_shell_retains_visible_fields_and_native_focus_order` | At supported workspace widths, windowed/maximized and Light/Dark, controls/header/footer/errors remain visible; native Tab/Shift+Tab follows the design and read-only computed cells do not trap entry flow. | NOT RUN |
 | BCI-A28 | BCI-T05 | Existing: E-A render/vendor sizing tests; New: `Cell_editors_and_popups_remain_usable_after_scroll_resize_and_theme_change` | Actual 100%/125% Windows scaling preserves editor text/caret/error visibility, row alignment and popup work-area bounds while scrolling/resizing/theme switching; no focus loss silently commits an unintended value. | NOT RUN |
 | BCI-A29 | BCI-T06 | Existing: E-P receipt/invalid/lookup/stale/timeout cases; New: `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` | Actual Login and native inline create/edit/reload/Save/Post flow persists exact decimals and keys; independent SQL proves one movement per line, balance reconciliation and no denied/failed mutation. | NOT RUN |
@@ -430,3 +430,68 @@ Raw TRX/logs remain local. Hosted controls, shared editors and owned UIA clients
 Business Compact acceptance is not production certification. Removing the unimplemented REL plan from the active queue does not satisfy clean-install, backup/restore/recovery, supported OS/SQL, signing, legacy-data or operational sign-off prerequisites.
 Those prerequisites remain documented deferred constraints in the current roadmap and [deferred work](DEFERRED_WORK.md); this acceptance spec schedules no replacement release plan or G1–G5 work.
 HTTP/P7, parked AppCore/net8, new inventory features, migration-policy changes and deployment tooling remain outside BCI scope unless separately authorized.
+
+## 8.5. BCI-T04 editable native accessibility — 2026-10-20
+
+**Boundary:** A24–A26 pass in the focused provider/native-editor and clean-package scope below. This is editable accessibility for the existing receipt layout. T05 compact layout and T06 complete frozen UI/package acceptance remain NOT RUN; no native 125% or production acceptance is implied.
+
+### Source and implementation
+
+Base `8d7f949ce54aed7f5d5d330437d5c3db058337ba`; product and test source `04590b963d6a19d31ec10583f4bed9f68c7f5faf`. Work remains on `codex/bci-t00-native-proof` in the retained managed worktree. Vendor pins are unchanged: BootstrapSourceGrid `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f`, Bootstrap5WinFormUI `aba102e33c48937fd92468791c287afda0a59e77`, SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. No API/DTO/schema/permission/runtime/dependency/module change.
+
+- [GoodsReceiptLinesGrid](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptLinesGrid.cs) owns a Table/Row/Cell provider. Product, Quantity and Unit cost expose writable Value/actions only under full live editability; row number, Total and Posted cells remain read-only. Existing result-list AccessibleActionGrid stays read-only.
+- Cached cells retain document generation plus the actual line reference. Every value/action re-resolves current membership; Remove, New and reload reject obsolete targets, including reloads with the same persisted IDs. Writes marshal to the UI thread, then recheck identity and editability.
+- [Adapter](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptLinesGridAdapter.cs) actions enter the same stock editor and T01 raw conversion/commit pipeline as keyboard input. A virtual Value write commits only the cell, never invokes the Save API. Invalid raw precision remains visible, typed VM values stay unchanged and virtual cell Help reports the error. Product Value denotes its committed key; pending native query text is separately identified in Help and cannot select a key by itself. Fresh option captions take precedence while historical captions remain available.
+- The grid exposes the active **actual shared stock editor** as a child and updates its contextual name at Begin (`Quantity row 1 editor`, etc.). Cross-process UIA finds the virtual cell semantically, invokes it, finds its native EDIT descendant, focuses it and changes/commits through ValuePattern/native keys. ValuePattern and InvokePattern were observed on the cells. Reuse across Quantity rows 1/2, Unit cost and Product is covered.
+- Dynamic Help belongs to virtual cells. The native wrapper description is a snapshot at Begin; no dynamically updated Help on the native inner EDIT is claimed. This app-owned cell bridge plus active editor reachability proved sufficient; no custom editor adapter or vendor seam was needed.
+- [Package probe](../tests/MyDmsVn.Desktop.Tests/GuiPackageProbe.cs) now locates the receipt Table, named field cell and real active native editor. Ambiguous line fields fail instead of selecting an ordinal. Lookup selection still uses the owned popup/native keyboard and committed-key help. No coordinate click, hidden editor or VM injection establishes the new UIA evidence. Package receipt assertions require `INLINE_RECEIPT_NATIVE_EDIT=PASS` and retain ordinary Login, independent SQL and process cleanup.
+
+### Executed scope and provenance
+
+Windows 10.0.26200, SDK 8.0.425, net48 Release/x86; interactive serialized guarded STA, en-US. Native hosted proof measured 96 DPI/100%, 1920x1080 Light. Packaged Light and Dark runs independently reported monitor scale 100 and window/monitor DPI 96. These are not native 125% or attended layout acceptance.
+
+Focused Desktop selection: `GoodsReceiptControlTests|ReceiptAcceptanceTests|GoodsReceiptInlineEditorTests|GoodsReceiptEditorViewModelTests|ReceiptNumericInputTests|InventoryAccessibilityAcceptanceTests|GoodsReceiptInlineAccessibilityTests`. **152/152 PASS**, zero failed/skipped/not-executed: respectively 35, 29, 15, 17, 36, 14 and 6 invocations. The six new Facts include the three exact A24–A26 anchors, UI-thread writes, native invalid/raw/read-only actions and refreshed caption versus pending query. No unchanged Session/SQL owner/full solution suite was rerun for this provider-only change.
+
+Commands use the existing Desktop owner directly:
+
+```powershell
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore -p:PlatformTarget=x86 --filter 'FullyQualifiedName~GoodsReceiptControlTests|FullyQualifiedName~ReceiptAcceptanceTests|FullyQualifiedName~GoodsReceiptInlineEditorTests|FullyQualifiedName~GoodsReceiptEditorViewModelTests|FullyQualifiedName~ReceiptNumericInputTests|FullyQualifiedName~InventoryAccessibilityAcceptanceTests|FullyQualifiedName~GoodsReceiptInlineAccessibilityTests' --logger 'trx;LogFileName=focused.trx' --results-directory TestResults/bci-t04-final-focused -- RunConfiguration.TargetPlatform=x86
+
+./deployment/release/Publish-LocalRelease.ps1 -Version 0.1.0-bci-t04 -OutputRoot artifacts/release/bci-t04-candidate1
+```
+
+Clean candidate `0.1.0-bci-t04`, manifest `sourceTreeDirty=false`, source `04590b9`; separate Desktop and admin migrator net48/x86 packages. No publication or operational-release acceptance occurred. SHA256:
+
+| Artifact | SHA256 |
+|---|---|
+| release-manifest.json | `E978CCCF2DF72517F9F1929C5A92C53C0521615D97B8ADFC9AEC12DE84FA07FD` |
+| packaged Desktop.App.exe | `258A6232BF0A938AFB83B206E9F6EC607EB60739A46DA531A503A4B20E76F568` |
+| packaged Desktop.WinForms.dll | `4D78E2FECA8FC3B1353AAABDEEF4C67A277CE0353AB4634E723B53D132F9FB51` |
+| packaged admin DbMigrator.exe | `204466DFA9E84BD97CDE60ECE8B758A78701E01AF021B944C4B77BC1C0DBAFD5` |
+| test-build Desktop.WinForms.dll | `6D670BB209CCC1E063D182E7366BA62B6D48A149611B86E74EB853CF59A6C0F4` |
+| package-test build Desktop.Tests.dll | `B4018C8156561E81665F3799F0675A3B19BEF349ACB15196E9DCC68BDFC3FE7E` |
+
+The package probe test build reports informational version `1.0.0+04590b963d6a19d31ec10583f4bed9f68c7f5faf`. Product bytes stay frozen in the manifest while test assembly provenance is recorded separately.
+
+With `MYDMSVN_GUI_P5_PACKAGE` pointing to that local candidate and `MYDMSVN_GUI_P5_TEST_REVISION=04590b963d6a19d31ec10583f4bed9f68c7f5faf`, the same net48/x86 direct command selected:
+
+| Filter | Actual rows and outcome | Local TRX |
+|---|---|---|
+| `FullyQualifiedName~Packaged_receipt_draft_reload_edit_post_and_stock_reconcile_with_readonly_sql\|FullyQualifiedName~Invalid_receipt_fields_preserve_input_and_create_no_inventory` | 4/4 PASS: both methods in Light and Dark; 3m40s total | `TestResults/bci-t04-package1/package.trx` |
+| `FullyQualifiedName~Same_process_lookup_messages_preserve_history_reject_inactive_new_choices_and_reopen_fresh` | 2/2 PASS: Light and Dark; 3m53s total | `TestResults/bci-t04-package-lookup/lookup-package.trx` |
+
+**Package total: 6/6 PASS**, zero failed/skipped/aborted/timed-out. Lookup probes additionally confirmed offscreen same-process rename delivery, historical inactive labels, rejection of inactive new choices, actual application restart/reopen and readonly SQL reconciliation. All six resource records ended `DatabaseAndAllPrincipalsDroppedAfterVerifiedDrain`; no uncertain allocation remained.
+
+Receipt probes exercised ordinary Login, native inline lookup/numeric edit, draft Save/reload/edit, second-client duplicate Post rejection, stock balance/card and readonly SQL reconciliation. Invalid input probes preserved user input and independently proved no receipt/line/ledger/balance writes. Each SQL run used the designated non-production master connection only in the owning fixture; runtime, migrator and readonly oracle remained separate.
+
+The final focused replay used the same already-built source `04590b9` and the selector above with `--no-build --no-restore`, `--logger 'trx;LogFileName=verified.trx' --results-directory TestResults/bci-t04-verified`; **152/152 PASS** again. This pins the hosted result to the recorded test-build bytes, which have separate version metadata from the published package. No later product/test edits were made.
+
+### Failure record, review and limits
+
+Actual local TRX trials (PASS/total, all selected rows executed, zero skipped): `red/red.trx` 0/3; `green/green.trx` 2/3; `green2/green.trx` 3/3; `thread-red/thread.trx` 0/1; `focused/focused.trx` 31/33; `focused2/focused.trx` 97/97; `value/value.trx` 18/19; `value2/value.trx` 5/5; `caption-red/caption.trx` 0/1; `final-focused/focused.trx` 152/152; `verified/verified.trx` 152/152. Every directory in this list is prefixed `TestResults/bci-t04-`; package invocations are recorded separately above. These are incremental trials, not an unfiltered Desktop run.
+
+Initial missing-provider RED was 0/3. First native trial passed the two in-process cases but failed compilation of the old managed LegacyIAccessiblePattern assumption; the actual net48 UIA client instead uses the supported Value/Invoke patterns. The UI-thread setter regression failed before marshalling; the caption-refresh regression failed before fresh options were preferred. An intermediate 31/33 trial exposed two stale inventory assertions expecting basic editor names; they now verify contextual names and native F2 entry. The native padding check initially compared decimal display scale as text; it now compares typed decimal equality, with meaningful excess precision still independently rejected. Those failed trials remain local and are not relabeled PASS.
+
+One fresh independent source review found a test-driver loop-capture variable outside scope; it was fixed before the clean candidate commit. No mandatory findings remain. The reviewer did not execute GUI/SQL/tests and did not certify runtime evidence. Its metadata observation is reflected in the virtual Help/native description distinction above.
+
+Raw TRX, SQL allocation/principal identifiers and probe diagnostics stay local. Hosted forms/editors and bounded UIA clients are disposed and drained. The package owner verifies each allocation token and principal identity, drains owned SQL sessions, then records database/principal deletion; uncertainty quarantines and blocks further GUI admission. This focused milestone does not replace T06 full Desktop/Session/package, native 100%/125% Light/Dark or attended visual/keyboard observations. Operational release prerequisites remain unaccepted and unscheduled.
