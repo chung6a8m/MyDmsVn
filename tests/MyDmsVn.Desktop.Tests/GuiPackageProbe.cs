@@ -210,6 +210,7 @@ internal static class GuiPackageProbe
             { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(executable) });
             if (!ready.WaitOne(TimeSpan.FromSeconds(5))) throw new TimeoutException("Owned distraction unavailable.");
             var target = Window("GUI focus target");
+            Find(target, "Focus target editor", ControlType.ComboBox, false);
             var handle = new IntPtr(target.Current.NativeWindowHandle);
             if (refusing)
             {
@@ -594,7 +595,11 @@ internal static class GuiPackageProbe
             new PropertyCondition(AutomationElement.NameProperty, name));
         if (editor.Current.IsPassword != password) throw new InvalidOperationException("Input accessibility semantics missing.");
         Wait(delegate { return editor.Current.IsEnabled; }, "Input disabled.");
-        FocusOwnedEditor(editor);
+        var lookupInput = false;
+        foreach (AutomationElement candidate in candidates)
+            if (candidate.Current.ControlType == ControlType.ComboBox) lookupInput = true;
+        if (lookupInput) FocusOwnedEditor(editor, name);
+        else editor.SetFocus(); // Composite numeric ValuePattern providers need not focus their semantic wrapper.
         ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
         if (password)
         {
@@ -731,7 +736,7 @@ internal static class GuiPackageProbe
             throw new InvalidOperationException("Owned lookup keyboard input failed.");
     }
 
-    private static void FocusOwnedEditor(AutomationElement editor)
+    private static void FocusOwnedEditor(AutomationElement editor, string input = "lookup keyboard")
     {
         var handle = new IntPtr(editor.Current.NativeWindowHandle);
         var window = GetAncestor(handle, 2);
@@ -745,8 +750,26 @@ internal static class GuiPackageProbe
         if (IsIconic(window)) ShowWindowAsync(window, 9); // Restore only this owned minimized window.
         if (GetForegroundWindow() != window) SetForegroundWindow(window);
         editor.SetFocus();
-        Wait(delegate { return GetForegroundWindow() == window && editor.Current.HasKeyboardFocus; },
-            "Owned input window/editor did not receive foreground and keyboard focus.");
+        try
+        {
+            Wait(delegate { return GetForegroundWindow() == window && editor.Current.HasKeyboardFocus; },
+                "Owned input window/editor did not receive foreground and keyboard focus.");
+        }
+        catch (TimeoutException)
+        {
+            // Metadata only: no editor values, credentials, window titles or external process identifiers.
+            try
+            {
+                uint foregroundProcess;
+                var foreground = GetForegroundWindow();
+                GetWindowThreadProcessId(foreground, out foregroundProcess);
+                Console.WriteLine("OWNED_FOCUS_FAILED=" + input + ";FOREGROUND_OWNED=" +
+                    (foregroundProcess == _application.Id) + ";ROOT_FOREGROUND=" + (foreground == window) +
+                    ";EDITOR_FOCUSED=" + editor.Current.HasKeyboardFocus);
+            }
+            catch (ElementNotAvailableException) { Console.WriteLine("OWNED_FOCUS_FAILED=element unavailable"); }
+            throw;
+        }
     }
 
     private static AutomationElement InputEditor(AutomationElement root, string name)

@@ -27,11 +27,14 @@ internal static class GuiProcessProbe
             {
                 var refusing = args.Length > 2 && args[2] == "refuse";
                 var sink = new Button { Text = "Focus sink", Dock = DockStyle.Fill };
-                var editor = new FocusTargetEditor { AccessibleName = "Focus target editor", Dock = DockStyle.Top,
+                var lookup = new Panel { AccessibleName = "Focus target editor", AccessibleRole = AccessibleRole.ComboBox,
+                    Dock = DockStyle.Top, Height = 25 };
+                var editor = new FocusTargetEditor { Dock = DockStyle.Fill,
                     FocusSink = refusing ? sink : null };
                 var receipt = new Label { Text = "Awaiting F4", Dock = DockStyle.Bottom };
                 editor.KeyDown += (sender, key) => { if (key.KeyCode == Keys.F4) receipt.Text = "F4 delivered"; };
-                target.Controls.Add(editor);
+                lookup.Controls.Add(editor);
+                target.Controls.Add(lookup);
                 target.Controls.Add(receipt);
                 target.Controls.Add(sink);
                 target.Shown += (sender, ignored) =>
