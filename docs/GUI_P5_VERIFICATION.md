@@ -356,6 +356,16 @@ Project Owner explicitly accepted evidence commit bd59f6f: “Xác nhận nghi�
 
 ## GUI-P5-T05 — Inventory attended acceptance (IN PROGRESS)
 
+The following setup entries are historical checkpoints; the current evidence status follows below.
+
 The [T05 worksheet](GUI_P5_T05_WALKTHROUGH.md) maps27baseline/18supplemental UX observations, all NOT RUN. Owner approved full100%Light baseline plus UX100%Dark/125%Light/Dark; actual100%/1920x1080 and installed frozen d5207b2 files/hashes verified. First SQL setup failed on identity-collation join before Desktop launch; exact owned cleanup/census0/167Dropped verified. Setup-only correction and fresh retry are recorded in the worksheet. No T05 attended PASS or new automated result is claimed. T04 remains accepted; T05/T06/overallP5/P6 OPEN.
 
 T05 setup retry22:01: corrected seed succeeded,8ordinaryactors/54rolegrants/0protectedmatches; initial7active+1disabled. Fresh restricted oracle0catalogs/receipts/lines/ledger/balances,0reconciliation mismatches; SQL2017Developer14.0.2130.4/current001–009/separatedidentities verified. Chapter1 launched22:01:54, deadline22:31:54; human p5.t05.operator Login pending. Old167ledgersDropped; current168positivelyowned/admitted. No attended case PASS yet. First setup failure preserved; finaldrop pending.
+
+### Current T05 evidence / final teardown —2026-10-20,11:34+07
+
+[T05 worksheet](GUI_P5_T05_WALKTHROUGH.md) is authoritative for exact cases/provenance/qualifications. Current33/45PASS:27baseline including final independentoracle/cleanup, plus6Owner-confirmed100DarkUX. Both125Light/Dark6-cellUXgroups executed on measured125%/1920x1080 with inspected artifacts; explicit Owner observations pending, final signature pending. Source/test/product d5207b2 unchanged; installed133/133files freshly match frozenmanifest. No T05 automatedinvocations added, no T03/T04 result relabeled.
+
+OriginalGUI-createdfunctionalcohort168 and continuation169 are distinct. Original actualSave/Post/Post-only/Write/conflict/DirectDeny evidence preserved. Continuationcatalog/26pagingPostedreceipts are setup-only fixtures; oneactualtimeoutPost rolledback, explicitRefresh/singlejustifiedretryPosted token2031. Currentfinalrestrictedoracle33receipts59lines53ledger27balancekeys/base27,0full-key/line/documentmismatches;15tables unchanged through125UX. OwnedfaultRemoved=true. Disabled/revokedInactive,63ordinaryassignments,0protectedbindings; runtime/admin/oracle separation verified.
+
+Finalchapter4normalclose11:33:51.954/exit0/CleanupVerified; rootDisposed11:33:52.996/exit0/cleanupPASS. Exactinstance-aware census latestdatabase0/principals0/process0;169/169GUIledgersDropped, all3T05allocations/9principalsdisposed.66standardSHA256artifactreferences verified inworksheet; originalsetupfailure/UI/cache/truncation/tooltimingqualifications retained. T05/REMAIN-P5-GUI-02 remainsOPEN pending Owner125UXconfirmation/finalevidencereview/signature; T06/overallP5/P6OPEN, no productionreadinessclaim.

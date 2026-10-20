@@ -60,12 +60,12 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 | Case | Action / required evidence |100% Dark|125% Light|125% Dark|
 |---|---|---|---|---|
-| UX-R | Receipt keyboard/focus/errors, windowed/maximized layout and Posted/busy command states. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
-| UX-B | Balance keyboard/filter/Refresh/error/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
-| UX-S | Stock Card keyboard/date filters/Refresh/errors/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
-| UX-P | Product popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
-| UX-W | Warehouse popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
-| UX-E | Employee popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
+| UX-R | Receipt keyboard/focus/errors, windowed/maximized layout and Posted/busy command states. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
+| UX-B | Balance keyboard/filter/Refresh/error/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
+| UX-S | Stock Card keyboard/date filters/Refresh/errors/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
+| UX-P | Product popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
+| UX-W | Warehouse popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending; Down NOT TESTED, Enter/F4/Esc/filter observed |
+| UX-E | Employee popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
 
 ## Session / artifacts / decision
 
@@ -343,3 +343,8 @@ Both125%UXgroups executed; explicit consolidated Ownerobservation confirmation r
 - [ux-receipt-posted-windowed-125dark.jpg](assets/gui-p5-t05/ux-receipt-posted-windowed-125dark.jpg), SHA256 8D13C9F46846DCBC868D87DFBECBE7E94D4F2150362A636CAC1C6F87901AD771.
 - [ux-receipt-required-125dark.jpg](assets/gui-p5-t05/ux-receipt-required-125dark.jpg), SHA256 48C76FD0738BDBAF8495BFDB342095B3B102262CA2FA8E5950ED7E7695DCFD2D.
 - [ux-warehouse-popup-125dark.jpg](assets/gui-p5-t05/ux-warehouse-popup-125dark.jpg), SHA256 3759CD7BA0233EC82AACACBF2C8E3735F9DB26B6371076F49AE7B7240F54E47C.
+
+
+### Final independent review —2026-10-20
+
+Fresh read-only reviewer checked the T05 branch scope cdfa4b7..8c0cf5d: no material candidate/cohort/oracle/cleanup finding. Verified80unique publicimages against their recorded hashes (inline/table references include duplicates),15-table finalsnapshot equivalence and chapter4/root lifecycle. Corrected stale current summary in GUI_P5_VERIFICATION and12executed-but-NOTRUN125cells. Warehouse125DarkDown remains NOT TESTED; no inference from anotherpopup or general Ownerconfirmation. Filter/Enter/F4/Esc were observed. This narrow observation limit is disclosed for Ownerdecision, not a productfailure or an automatedpass. No productfix/test rerun required for documentation corrections; no secondreview dispatched. T05 stillOPEN pending explicit125observations and finalOwneracceptance.
