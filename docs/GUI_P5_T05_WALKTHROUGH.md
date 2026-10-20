@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS —25/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: IN PROGRESS —31/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -58,18 +58,18 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 ## Supplemental UX ledger (Owner-approved scope)
 
-| Case |100% Dark|125% Light|125% Dark|
-|---|---|---|---|
-| UX-R | Receipt keyboard/focus/errors, windowed/maximized layout and Posted/busy command states. | NOT RUN | NOT RUN | NOT RUN |
-| UX-B | Balance keyboard/filter/Refresh/error/totals/grid/paging bounds and resize. | NOT RUN | NOT RUN | NOT RUN |
-| UX-S | Stock Card keyboard/date filters/Refresh/errors/totals/grid/paging bounds and resize. | NOT RUN | NOT RUN | NOT RUN |
-| UX-P | Product popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | NOT RUN | NOT RUN | NOT RUN |
-| UX-W | Warehouse popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | NOT RUN | NOT RUN | NOT RUN |
-| UX-E | Employee popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | NOT RUN | NOT RUN | NOT RUN |
+| Case | Action / required evidence |100% Dark|125% Light|125% Dark|
+|---|---|---|---|---|
+| UX-R | Receipt keyboard/focus/errors, windowed/maximized layout and Posted/busy command states. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
+| UX-B | Balance keyboard/filter/Refresh/error/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
+| UX-S | Stock Card keyboard/date filters/Refresh/errors/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
+| UX-P | Product popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
+| UX-W | Warehouse popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
+| UX-E | Employee popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | NOT RUN | NOT RUN |
 
 ## Session / artifacts / decision
 
-T05 attended ledger currently25/45 Owner-confirmed PASS (25/27 baseline,0/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
+T05 attended ledger currently31/45 Owner-confirmed PASS (25/27 baseline,6/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
 
 ### Setup attempt1 — FAIL, safely disposed
 
@@ -296,3 +296,27 @@ Normalclose/discard11:08:24/exit0/CleanupVerified. ExactruntimeDMVrequests0/WAIT
 - [ux-warehouse-popup-100dark.jpg](assets/gui-p5-t05/ux-warehouse-popup-100dark.jpg), SHA256 D404FB6D47B501741B19ED16E4537D19416EEECA125949F54832A339A0BF56AA.
 - [ux-employee-popup-100dark.jpg](assets/gui-p5-t05/ux-employee-popup-100dark.jpg), SHA256 EE8382D13B48BD4869FF10719F19D8BD04B23B55A4806B40731FBE92786B164A.
 - [ux-product-popup-100dark.jpg](assets/gui-p5-t05/ux-product-popup-100dark.jpg), SHA256 1350E46BDEB9615FD4841260F69C7EDFCEE352744C2E2370B14A89F0BB446C64.
+
+###125% admission —2026-10-20
+
+After chapter2normalclose/drain, Owner switched WindowsScale125% keeping1920x1080. Fresh x86nativeprobe returnsPrimaryScale125/HRESULT0; CIMphysical1920x1080. SamepositivelyownedretainedcohortsupervisorReady; chapter3launchrequested11:10:37+07, existing30mincap and unchanged133-filemanifest/separationverification. HumanOperatorLogin/Light requested before actual125UX. No125PASSyet;100DarkOwnerconfirmationstillpending. Accepted25/45; T05/P5/P6OPEN.
+
+Owner explicitly confirmed100%DarkUX as observed: all6supplemental100DarkcellsPASS, total31/45. Actual125%humanOperator/Light confirmed;125Light/DarkUXnotyetaccepted.
+
+###125% Light UX — executed, confirmation pending
+
+Owner confirmed actualOperator/Light after measured125%/1920x1080launch. Balancewindowed27keys/toolbarwrap andmaximizedfilter999empty/total0,Product1restoreRefreshquantity27; keyboardnavigation exercised. Card1/1rows/delta25, Fromcheckboxempty0, actualkeyboardyearUp2027withTo2026safeinvalid/clearsrowsdelta0, uncheckboth+Refreshcorrectrows/delta25; windowed/maximizedlayoutinspected. TemporaryOSsnappreviewduringrestorewasnotpublishedasevidence. StockUIA focusmetadatacaveatretained; datekeyboardverifiedbyactualvalue/screenshot.
+
+ReceiptactualgridEnteropensPostedFIX-FAULT/token2031, readonlycontrols/windowed; maximizeNewSaveemptyrequiredvalidation. Each3popupsexactcode1/1,DownEnterselect,F4reopenEscclose,insideworkarea; ProductQuantityTab/ShiftTabverified. Longnamestruncate/currentwindowedlookuparrowrenderqualificationretained; nofulltextvisibilityclaim. Warehousetoolset_valueagainreportedtimeout; freshsnapshotshowedappliedcode/1result, noresend. NoSave/Postafterrequirednegativecase/selection; nolastingnewDraft.
+
+Chapter3normalclose11:20:02/exit0/CleanupVerified, exactruntimeRequests0/WAITFOR0; restricted125light-drainedretains33receipts59lines53ledger27keys/base27/0mismatches. All6cellsawaitOwnerconfirmation. Chapter4launchrequested11:20:10before55minadmissionexpiry, sameownedDB; actualDarkLogin/humanconfirmationpending. Accepted31/45(25baseline+6Dark100UX),0accepted125cells. Finalcleanup/O01O02/sign-offpending.
+
+- [ux-balance-windowed-125light.jpg](assets/gui-p5-t05/ux-balance-windowed-125light.jpg), SHA256 F63E0638F233AFBFD2FBE2EF3F0B8CE59A2D30232C91B2FC582EA9BB6B7DE7AE.
+- [ux-balance-recovered-125light.jpg](assets/gui-p5-t05/ux-balance-recovered-125light.jpg), SHA256 CB757000E5B8A8D71DE821AC06D7B6D44C50A247FA64536C038DB9409A3E1C7C.
+- [ux-card-invalid-date-125light.jpg](assets/gui-p5-t05/ux-card-invalid-date-125light.jpg), SHA256 1CCFFAE0245C6799000DBE15E6BAE2D8A8039834AFEB1D83E44496D17C1E77E2.
+- [ux-card-recovered-125light.jpg](assets/gui-p5-t05/ux-card-recovered-125light.jpg), SHA256 DFBE3CA33468D0F932A05FF76C3FC2E5376FC4F8420789C0CD3666CB4569C5B0.
+- [ux-receipt-posted-windowed-125light.jpg](assets/gui-p5-t05/ux-receipt-posted-windowed-125light.jpg), SHA256 4EFA466E8632C29CD52FBC35CC202BE0E92A6248B65C3486C9A26B26552ACB1D.
+- [ux-receipt-required-125light.jpg](assets/gui-p5-t05/ux-receipt-required-125light.jpg), SHA256 09ABBA68180E3AFC1BA3288007F2D498902274E098621687757A958A3776A6FC.
+- [ux-warehouse-popup-125light.jpg](assets/gui-p5-t05/ux-warehouse-popup-125light.jpg), SHA256 EB16CEAB720F2251429C5640508204F20DA361C0CD033615843D0A0785C86CD3.
+- [ux-employee-popup-125light.jpg](assets/gui-p5-t05/ux-employee-popup-125light.jpg), SHA256 9FF38C43E3C1518A82B8472E6754DFDAACE6BD118025A72842267F6F9D43BC1F.
+- [ux-product-popup-125light.jpg](assets/gui-p5-t05/ux-product-popup-125light.jpg), SHA256 80A143C9683547D9C2659F412BABF02E440AAEA8572863804F38E6365BB971B1.
