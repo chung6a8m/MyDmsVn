@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS —31/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: IN PROGRESS —33/45 observations PASS; both125% UX confirmations and final Owner sign-off pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -53,8 +53,8 @@ PASS requires the named actual observation plus any independent oracle and Owner
 | L-01 | Real logout/other account/restart clears former actor data and reads current persisted Draft/Posted state. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
 | F-01 | Actual SQL Post timeout observed; safe uncertain outcome and mutation lock; independently establish persisted state after worker drain. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
 | F-02 | Exact fault removed, explicit read reload resolves status; only then justified single retry, one final stock effect; restart/schema preflight usable. | PASS — Owner explicitly confirmed consolidated actual observations; scoped artifacts/oracles and qualifications below |
-| O-01 | Independent full-key ledger/balance reconciliation, receipt-line document identity and no denied/failed mutation. | NOT RUN |
-| O-02 | Sanitized screenshot/hash/actor/environment ledger; normal GUI drain and positively owned final DB/principal cleanup/exact census. | NOT RUN |
+| O-01 | Independent full-key ledger/balance reconciliation, receipt-line document identity and no denied/failed mutation. | PASS — final restricted oracle and15-table unchanged comparison;0full-key/line/document mismatches |
+| O-02 | Sanitized screenshot/hash/actor/environment ledger; normal GUI drain and positively owned final DB/principal cleanup/exact census. | PASS — final133-file verification, inspected artifacts, chapter4exit0/CleanupVerified,169/169Dropped/exactcensus0 |
 
 ## Supplemental UX ledger (Owner-approved scope)
 
@@ -69,7 +69,7 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 ## Session / artifacts / decision
 
-T05 attended ledger currently31/45 Owner-confirmed PASS (25/27 baseline,6/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
+T05 evidence ledger currently33/45 PASS (27/27 baseline including final independent oracle/cleanup,6/18 Owner-confirmed supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
 
 ### Setup attempt1 — FAIL, safely disposed
 
@@ -320,3 +320,26 @@ Chapter3normalclose11:20:02/exit0/CleanupVerified, exactruntimeRequests0/WAITFOR
 - [ux-warehouse-popup-125light.jpg](assets/gui-p5-t05/ux-warehouse-popup-125light.jpg), SHA256 EB16CEAB720F2251429C5640508204F20DA361C0CD033615843D0A0785C86CD3.
 - [ux-employee-popup-125light.jpg](assets/gui-p5-t05/ux-employee-popup-125light.jpg), SHA256 9FF38C43E3C1518A82B8472E6754DFDAACE6BD118025A72842267F6F9D43BC1F.
 - [ux-product-popup-125light.jpg](assets/gui-p5-t05/ux-product-popup-125light.jpg), SHA256 80A143C9683547D9C2659F412BABF02E440AAEA8572863804F38E6365BB971B1.
+
+###125% Dark UX and final resource closure —2026-10-20
+
+Owner confirmed actual T05Operator/Dark Login in chapter4 (launch11:20:13,30-minute cap11:50:13). Receipt loading/disabled controls and Posted token2031 readonly state inspected in normal window; maximized New/Saveempty produced safe invalid request/required markers and disabledPost. Each Warehouse/Employee/Product exactfilter returned1/1; Enterselected, F4reopened, Escclosed, selectionfocus returned. Down exercised Employee/Product; Warehouse selection and F4/Esc verified. ProductQuantityTab/ShiftTab exercised with visible caret/selection. Popupbounds remain withinworkarea; known long-name truncation retained. FirstWarehouse set_value reported tooltimeout; initial snapshot still looked blank, later native focus/query showed applied code/1result, no repeated filter submission. No producthang or all-text-visible claim.
+
+Balance normal/maximized toolbar/grid/totals inspected; Product999 empties rows/total0, Product1 restores27.0000, TabfocusRefresh/Enterquery succeeds. Card1/1 shows25page1rows/delta25, keyboardFromyear2027 with checkedTo2026 safely rejects/clearsrowsdelta0; uncheckboth/explicitRefresh recovers25rows/delta25. Normal window wraps toolbar without hiding commands; Tab movesWarehouse→Product. Stockbody retains its existing lighter rendering withinDark shell; oldglobalnotification remains after successfulrefresh. Temporary OSsnapoverlay was not used as app evidence. NoSave/Post of temporaryUXDraft.
+
+Final restricted snapshot final-ux-125dark verifies33receipts (27Posted/6Draft),59lines,53ledger/27balancekeys, baseProduct27.0000. Full-key mismatches0; InvalidPostedLineMovements0; UnexpectedLedgerMovements0. All15oracle tables are byte-equal after normalized JSON serialization to continuation-125light-drained: sixDraft versions/inputs, recoveredPosted token2031/NoteT05 uncertain/actorP5.T05.OPERATOR, catalogChanged/Active flags,63assignments and disabled/revokedInactive remain unchanged. The26setup-only pagingPostedreceipts/52movements remain clearly separate from oneactual continuationPost/1movement; originalGUI-created/Post permission/conflict evidence belongs to disposedcohort168. Exact faultrecord remainsRemoved; no reinstallation.
+
+Chapter4 normalclose/discard11:33:51.954+07, exit0/CleanupVerified. Root admission had expired while waiting current boundedchild; final separation/reconciliation/disposal completed11:33:52.996, ATTENDED_SESSION_CLEANUP=PASS/rootexit0. Fresh exactinstance-aware census:169/169GUI allocationledgersDropped; exactlatest database0/principals0/ownedprocess0. All3T05 allocations/9principals safelydisposed (including initialsetupfailure); no prefixdrop or recoverydatabase sharing. O-01/O-02 PASS. Fresh installed133/133files match frozenmanifest EDB0FE41DAB59FE7F4DEE7F2673815017C056C744E70E9D2E896D50075146101. No new automatedinvocations or product/testbinarychanges.
+
+Both125%UXgroups executed; explicit consolidated Ownerobservation confirmation requested and stillpending. Current33/45PASS=27baseline+6UX100Dark. FinalT05signature remainsPENDING; T05/REMAIN-P5-GUI-02/T06/overallP5/P6OPEN. Do not infer UXacceptance from Loginconfirmation.
+- [ux-balance-recovered-125dark.jpg](assets/gui-p5-t05/ux-balance-recovered-125dark.jpg), SHA256 C9730A3F318AB021BF0F18CCF9898266B303EE3B0F0073700103D4E9558D6E53.
+- [ux-balance-windowed-125dark.jpg](assets/gui-p5-t05/ux-balance-windowed-125dark.jpg), SHA256 E2DE62A30FEE01782274469B62CA0C29770983C161B994E4767F0FEA1AC2F360.
+- [ux-card-invalid-date-125dark.jpg](assets/gui-p5-t05/ux-card-invalid-date-125dark.jpg), SHA256 42916B09BD9AC5EB18F6CD8EF98A37C449FDE60769229ADBFB39114266069B04.
+- [ux-card-recovered-125dark.jpg](assets/gui-p5-t05/ux-card-recovered-125dark.jpg), SHA256 5856B5C5B5F77883691DF80ACEAF32D51390AED29832CA731E28375D89D613EA.
+- [ux-card-windowed-125dark.jpg](assets/gui-p5-t05/ux-card-windowed-125dark.jpg), SHA256 D8E5678B90DB2C0CE3794D778F92BBC4821DF65A2FCEF69B250D735F8D423F03.
+- [ux-employee-popup-125dark.jpg](assets/gui-p5-t05/ux-employee-popup-125dark.jpg), SHA256 B470556BE6D81034791F3D71C8EFBB2DAE7683FB023995A0B9C03F8746328A5C.
+- [ux-product-popup-125dark.jpg](assets/gui-p5-t05/ux-product-popup-125dark.jpg), SHA256 B1025F058E5F9849F211657296C259DC7B5C54D788E30388C3AB4E7180DF5864.
+- [ux-receipt-busy-windowed-125dark.jpg](assets/gui-p5-t05/ux-receipt-busy-windowed-125dark.jpg), SHA256 50DFEE2E49D197C3F4FC764FF46323559AF8B101D36FFA0B146892B3A0AA6F4B.
+- [ux-receipt-posted-windowed-125dark.jpg](assets/gui-p5-t05/ux-receipt-posted-windowed-125dark.jpg), SHA256 8D13C9F46846DCBC868D87DFBECBE7E94D4F2150362A636CAC1C6F87901AD771.
+- [ux-receipt-required-125dark.jpg](assets/gui-p5-t05/ux-receipt-required-125dark.jpg), SHA256 48C76FD0738BDBAF8495BFDB342095B3B102262CA2FA8E5950ED7E7695DCFD2D.
+- [ux-warehouse-popup-125dark.jpg](assets/gui-p5-t05/ux-warehouse-popup-125dark.jpg), SHA256 3759CD7BA0233EC82AACACBF2C8E3735F9DB26B6371076F49AE7B7240F54E47C.
