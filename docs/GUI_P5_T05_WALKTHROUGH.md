@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS —15/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: IN PROGRESS —16/45 attended observations PASS; remaining baseline and supplemental UX pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -45,7 +45,7 @@ PASS requires the named actual observation plus any independent oracle and Owner
 | P-03 | Post without Read cannot load/post an unseen receipt; no leaked detail or mutation. | NOT RUN |
 | P-04 | Ordinary role Post grant plus direct Post Deny after enabled UI admission; server rejection/input preserved/no mutation, actual assignment snapshot. | NOT RUN |
 | P-05 | Restricted Stock permissions: Balance/Card deny safely and clear rows/totals; no previous actor data. | NOT RUN |
-| P-06 | Disabled user's actual Login denied safely; no admitted application session. | NOT RUN |
+| P-06 | Disabled user's actual Login denied safely; no admitted application session. | PASS — Owner confirmed actual Login error/still Login; SQL Active=false/nonprotected and inventory unchanged |
 | P-07 | Actor disabled after actual Login: subsequent server operation fails closed/no stock or receipt mutation. | NOT RUN |
 | C-01 | Stale Save rowversion loses to controlled accepted winner; safe conflict retains loser input and winner unchanged. | PASS — Owner confirmed safe conflict/loser input retained; restricted oracle preserves controlled SQL winner and stock |
 | C-02 | Stale Post version after winner Draft update is rejected; no ledger/balance and no overwrite. | PASS — Owner confirmed safe conflict/no retry; restricted oracle preserves Draft winner and original-only stock |
@@ -69,7 +69,7 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 ## Session / artifacts / decision
 
-T05 attended ledger currently15/45 Owner-confirmed PASS (15/27 baseline,0/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
+T05 attended ledger currently16/45 Owner-confirmed PASS (16/27 baseline,0/18 supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
 
 ### Setup attempt1 — FAIL, safely disposed
 
@@ -219,3 +219,13 @@ Actual human Login label T05 Restricted Reader confirmed. Ordinary actor has onl
 - [restricted-receipt-list-100light.jpg](assets/gui-p5-t05/restricted-receipt-list-100light.jpg), SHA256 5A08925FB7AF2DB01707101DD458D0478614D9C47CCD0184189E3972B03838A6.
 - [restricted-balance-denied-100light.jpg](assets/gui-p5-t05/restricted-balance-denied-100light.jpg), SHA256 5615F7DB530C5986E91FC7A8A659598DD79040C6E13801752D693142623D825E.
 - [restricted-card-denied-100light.jpg](assets/gui-p5-t05/restricted-card-denied-100light.jpg), SHA256 FAB5AB00484EB7DF0D6160A8DC330C56C4D809E4EC724E54239A96F91CB4A5A0.
+
+### Disabled Login — Owner confirmed
+
+Owner performed actual p5.t05.disabled Login using the test password and explicitly confirmed an error with application remaining at Login. Fresh native window inventory returns only MyDmsVn — Đăng nhập, no admitted shell. Authentication controls were not automated or captured. Restricted continuation-disabled-login-denied verifies IsActive=false/nonprotected for disabled actor, existing role grants,7Drafts/0ledger/0balance/0reconciliation mismatches. P-06 PASS; total16/45confirmed observations. Exact error wording was not supplied, so no literal Login-message assertion is made. Actor p5.t05.revoked independently remains Active=true at this snapshot; human Login requested before controlled disable. P-03/P-04/P-05 observation confirmations remain pending. Current chapter1deadline11:01:55/finalcleanup pending.
+
+### Disable after actual Login — executed, confirmation pending
+
+Owner confirmed actual T05 Revoke After Login. While Active, GUI loaded T05-FIX-REVOKED Draft, NoteT05 revoked/token2021/one1@4line, Post enabled. Exact-owned maintenance DisableRevoked control changed only the expected active ordinary nonprotected actor toInactive. Restricted continuation-revoked-disabled verifies that state. One actual Post from the still-open shell then removed that shell and returned to Login; snapshot against old shell reported no screenshot target, fresh window inventory identified only MyDmsVn — Đăng nhập. Do not interpret this as an application crash or claim an unobserved inline error. Restricted continuation-revoked-post-rejected retains targetDraft/Note/token2021,7Drafts/0ledger/0balance/0reconciliation mismatches. Authentication UI was not automated/captured. P-07 human observation confirmation pending. Operator actual Login requested for remaining baseline. P-06 remains confirmed PASS; accepted total16/45; pending P-03/P-04/P-05/P-07 not promoted.
+
+- [revoked-before-disable-100light.jpg](assets/gui-p5-t05/revoked-before-disable-100light.jpg), SHA256 D19E7A7FC7530D25010B29F95436F5C0FF82B5ABE59DF9BE89FC63250DA0816C.
