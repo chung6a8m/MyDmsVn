@@ -6,11 +6,11 @@
 
 | Order | Plan | State | Next action |
 |---:|---|---|---|
-| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE**; BCI-T00 native proof complete; T01–T06 planned | BCI-T01: lossless numeric conversion; retain the T00 decision/evidence |
+| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE**; BCI-T00 proof and T01 scalar parser complete; T02–T06 planned | BCI-T02: stable projection and cell sessions; retain T00/T01 evidence |
 
 Read [BUSINESS_COMPACT_UI](../BUSINESS_COMPACT_UI.md) for the design and [BUSINESS_COMPACT_ACCEPTANCE](../BUSINESS_COMPACT_ACCEPTANCE.md) for required observable outcomes. Supporting specifications are not independent plans. Execute BCI-T00 → T01 → T02 → T03 → T04 → T05 → T06; preparation or parallel work must respect the interfaces and dependencies recorded in that plan.
 
-The planning documents implement no product feature. T00 now supplies the scoped native editor proof recorded in the acceptance ledger; integrated code, package and final UI acceptance still belong to T01–T06.
+The planning documents implement no product feature. T00 now supplies the scoped native editor proof recorded in the acceptance ledger; T01 supplies the scalar numeric parser; grid/session integration, package and final UI acceptance still belong to T02–T06.
 
 ## Completed baselines — retain, do not restart
 

@@ -10,7 +10,7 @@
 
 **Spec:** [BUSINESS_COMPACT_UI.md](../BUSINESS_COMPACT_UI.md). Read with [BUSINESS_COMPACT_ACCEPTANCE.md](../BUSINESS_COMPACT_ACCEPTANCE.md) and the sole [TEST_POLICY](../TEST_POLICY.md).
 
-**Status:** ACTIVE. BCI-T00 native proof complete in its test-host scope; [observed evidence and decision](../BUSINESS_COMPACT_ACCEPTANCE.md#81-bci-t00-native-editor-proof--2026-10-20). BCI-T01–T06 are PLANNED / NOT RUN. No integrated inline product acceptance is implied.
+**Status:** ACTIVE. BCI-T00 native proof complete in its test-host scope; [observed evidence and decision](../BUSINESS_COMPACT_ACCEPTANCE.md#81-bci-t00-native-editor-proof--2026-10-20). BCI-T01 scalar parser complete; [scalar evidence](../BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). BCI-T02–T06 are PLANNED / NOT RUN. No integrated inline product acceptance is implied.
 
 **Planning baseline:** `v1a-pro@f37038b250821a538b9cdc10a6d6d8b4bc1f386f`, assessed 2026-10-20. The owner requested this sole active roadmap and deletion of older unimplemented plans. [Index and retirement record](README.md).
 
@@ -56,7 +56,7 @@ The A-prefix abbreviates BCI-A in the acceptance matrix. T00 is a proof, not a s
 
 Existing production anchors: `src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.cs`, `FoundationShellForm.cs`, `AccessibleActionGrid.cs`, `AccessibleNumericBox.cs`, `AccessibleLookupBox.cs`; `src/MyDmsVn.Desktop.Application/GoodsReceiptEditorViewModel.cs`, `GoodsReceiptLineViewModel.cs`, `GoodsReceiptProductOptionsViewModel.cs`; `src/MyDmsVn.Contracts/InventoryContracts.cs`.
 
-The plan introduces the following app-owned files; these names are proposals, not existing vendor APIs:
+The plan introduces the following app-owned files; `ReceiptNumericInput.cs` is implemented by T01, while the remaining names are proposals. None is an existing vendor API:
 
 | New file under `src/MyDmsVn.Desktop.WinForms/` | Responsibility |
 |---|---|
@@ -106,10 +106,10 @@ For changed behavior in T01–T05, first prove the new observable regression fai
 
 **Interfaces:** Introduce `internal enum ReceiptNumericField { Quantity, UnitCost }` and `internal static bool ReceiptNumericInput.TryParse(string text, ReceiptNumericField field, CultureInfo culture, out decimal value, out string? error)`. Return false with an actionable error for invalid input; caller retains its original text. Use `GoodsReceiptContractLimits` constants, not divergent copies of bounds.
 
-- [ ] Write the failing tests `Extra_fractional_zeros_are_exact_but_meaningful_overprecision_is_rejected`, `Culture_and_paste_preserve_the_same_decimal_value`, and `Field_bounds_and_zero_rules_match_receipt_contracts` with the assertions below.
+- [x] Write the failing tests `Extra_fractional_zeros_are_exact_but_meaningful_overprecision_is_rejected`, `Culture_and_paste_preserve_the_same_decimal_value`, and `Field_bounds_and_zero_rules_match_receipt_contracts` with the assertions below.
 
 ```csharp
-// Proposed test contract; implementation is absent at planning time.
+// Retained test contract; implemented and verified by BCI-T01.
 Assert.True(ReceiptNumericInput.TryParse("1.23000", ReceiptNumericField.Quantity,
     CultureInfo.GetCultureInfo("en-US"), out var value, out _));
 Assert.Equal(1.23m, value);
@@ -119,10 +119,10 @@ Assert.False(ReceiptNumericInput.TryParse("0.00000000000000000000000000000000000
     ReceiptNumericField.UnitCost, CultureInfo.GetCultureInfo("en-US"), out _, out _));
 ```
 
-- [ ] Run the parser-class selection and confirm the expected missing/incorrect behavior, then implement raw lexical checks before decimal conversion: surrounding whitespace allowed, optional leading culture sign, ungrouped digits/culture decimal separator, no exponent/currency/group separator, effective fractional precision at most four. Zero padding beyond four is allowed; meaningful tails are rejected before the parser can round them away.
-- [ ] Add explicit vi-VN `1,23000` and en-US `1.23000` equivalence; reject their wrong/group separators. Assert exact maxima, one unit above each maximum, negative/empty/malformed input, quantity zero rejected and cost zero accepted. A wrong input remains available unchanged to the UI.
-- [ ] Run `FullyQualifiedName~ReceiptNumericInputTests` plus the existing relevant decimal/overflow ViewModel cases, inspecting actual selected names. No GUI/SQL run is required merely for this pure parser unless an actual integration dependency changed.
-- [ ] Commit the parser and meaningful boundary tests. Record scalar evidence; full inline overflow/command behavior remains owned by T03/A07.
+- [x] Run the parser-class selection and confirm the expected missing/incorrect behavior, then implement raw lexical checks before decimal conversion: surrounding whitespace allowed, optional leading culture sign, ungrouped digits/culture decimal separator, no exponent/currency/group separator, effective fractional precision at most four. Zero padding beyond four is allowed; meaningful tails are rejected before the parser can round them away.
+- [x] Add explicit vi-VN `1,23000` and en-US `1.23000` equivalence; reject their wrong/group separators. Assert exact maxima, one unit above each maximum, negative/empty/malformed input, quantity zero rejected and cost zero accepted. A wrong input remains available unchanged to the UI.
+- [x] Run `FullyQualifiedName~ReceiptNumericInputTests` plus the existing relevant decimal/overflow ViewModel cases, inspecting actual selected names. No GUI/SQL run is required merely for this pure parser unless an actual integration dependency changed.
+- [x] Commit the parser and meaningful boundary tests. Record scalar evidence; full inline overflow/command behavior remains owned by T03/A07.
 
 ### BCI-T02 — Stable projection and cell sessions
 

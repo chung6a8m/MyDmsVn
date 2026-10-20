@@ -1,6 +1,6 @@
 # Business Compact UI and inline Goods Receipt design
 
-**Direction:** approved for planning; implementation is planned, not implemented or accepted by this document.
+**Direction:** approved; integrated UI implementation remains planned/unaccepted. The acceptance ledger records the completed T00 proof and T01 scalar parser scopes.
 **Plan:** [BCI execution plan](plans/20261020-001-business-compact-inline-goods-receipt.md).
 **Acceptance:** [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md).
 **Source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).
@@ -84,7 +84,7 @@ Insufficient space must produce reachable scrolling/reflow, not hidden Save/Post
 
 ## 5. Application-owned integration
 
-The following names and members are **proposed new application code**, not APIs available in a vendor today.
+T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField` with scalar tests; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). They are not yet wired to the receipt controls. The remaining names and members below are **proposed new application code**, not APIs available in a vendor today.
 Keep this integration in Desktop.WinForms; do not move grid/control dependencies into Domain or Application.
 
 | Proposed element | Responsibility |
@@ -151,7 +151,7 @@ Use the existing SourceGrid conversion event/validator boundary to reject the ca
 Set range/null configuration and application conversion rules explicitly; do not depend on a numeric editor's implicit defaults.
 A custom `IInputFormatter` is an app-only alternative only when its Format/Unformat round trip preserves candidate information.
 The existing adapter's decimal-separator bridge runs only for Numeral mode; None/Custom raw text passes through unchanged. [Source][formatted-adapter]
-Therefore the proposed parser and editor must agree on the captured raw-text culture; no vendor culture patch is assumed.
+Therefore the scalar parser and planned editor integration must agree on the captured raw-text culture; no vendor culture patch is assumed.
 Validate `vi-VN` and `en-US`, zero padding, wrong/group separators, paste, overflow, and meaningful digits beyond decimal precision.
 
 ## 8. Keyboard and command semantics

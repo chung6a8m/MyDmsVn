@@ -1,15 +1,15 @@
 # Business Compact inline Goods Receipt — acceptance specification
 
-**Status:** BCI-T00 native proof complete in its recorded host scope; BCI-T01–T06 remain PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
+**Status:** BCI-T00 native proof and BCI-T01 scalar parser complete in their recorded scopes; BCI-T02–T06 remain PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
 **Prepared:** 2026-10-20. **Planning baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`.
 
 ## 1. Scope and authority
 
 This specification verifies the [Business Compact design](BUSINESS_COMPACT_UI.md) and [BCI implementation plan](plans/20261020-001-business-compact-inline-goods-receipt.md). It is an acceptance ledger, not an executable test manifest or a replacement for [TEST_POLICY](TEST_POLICY.md).
 The product remains Windows Forms `net48`, with the shipped x86 Desktop and current Local application contracts. SourceGrid owns edit lifecycle; application code owns receipt state, validation presentation and command admission.
-All BCI-A identifiers below are stable obligations. A01–A03 now have T00 proof-host evidence below; other outcomes remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
-Names outside the retained T00 proof identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
-The planned application seams are `ReceiptNumericInput.TryParse`, `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)`; their exact contracts are owned by the design and plan.
+All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence and A04–A06 have T01 scalar evidence below; other outcomes remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
+Names outside the retained T00 proof and T01 scalar parser/tests identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
+T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField`, not yet connected to the receipt controls. `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)` remain planned application seams; their exact contracts are owned by the design and plan.
 
 ## 2. Accepted historical baseline — external line editors
 
@@ -47,7 +47,7 @@ Registry-created vendor editors do not automatically instantiate E-U's applicati
 
 ## 4. Acceptance matrix
 
-`New:` names below are proposed methods except the retained T00 proof in `GoodsReceiptInlineEditorTests` within the existing Desktop test project; numeric pure cases use the proposed `ReceiptNumericInputTests`; accessibility cases use `GoodsReceiptInlineAccessibilityTests`, and layout cases use `BusinessCompactLayoutTests` in that same project. E-* references are existing anchors, not new-result credit.
+`New:` names below are proposed methods except the retained T00 proof in `GoodsReceiptInlineEditorTests` and T01 scalar tests in `ReceiptNumericInputTests` within the existing Desktop test project; numeric pure cases use the proposed `ReceiptNumericInputTests`; accessibility cases use `GoodsReceiptInlineAccessibilityTests`, and layout cases use `BusinessCompactLayoutTests` in that same project. E-* references are existing anchors, not new-result credit.
 Each row belongs to its named plan task. BCI-T06 reconciles every row and the affected existing regressions; it cannot waive an earlier failure by rerunning a narrower successful selection.
 
 ### 4.1. Editor proof and strict numeric input
@@ -57,9 +57,9 @@ Each row belongs to its named plan task. BCI-T06 reconciles every row and the af
 | BCI-A01 | BCI-T00 | Existing: E-G/E-U; New: `Native_cell_entry_uses_registered_bootstrap_editor` | Actual mouse/F2/type entry focuses an editor hosted in the selected line cell; Quantity/Unit cost/Product can be changed without using external line editors. | PASS — T00 host only (§8.1) |
 | BCI-A02 | BCI-T00 | Existing: vendor adapter sources; New: `Logical_values_remain_typed_when_display_changes` | Lookup commits the logical key and formatted input commits typed decimal; display labels/grouping never become DTO values. Cell display remains correct after edit closes. | PASS — T00 host only (§8.1) |
 | BCI-A03 | BCI-T00 | Existing: vendor registry ownership tests; New: `Shared_editors_dispose_with_their_grid` | One editor per grid/configuration is reused sequentially; no per-cell control allocation or cross-grid sharing; never-started and active-popup controls dispose with the workspace. | PASS — T00 host only (§8.1) |
-| BCI-A04 | BCI-T01 | Existing: E-C decimal boundary test; New: `Extra_fractional_zeros_are_exact_but_meaningful_overprecision_is_rejected` | Preserve raw text until validation: `1.23000` is exactly 1.23; `1.23001` and a far-tail nonzero beyond four places fail before decimal parsing can round them away. No meaningful digit is silently truncated. | NOT RUN |
-| BCI-A05 | BCI-T01 | Existing: E-A numeric validation; New: `Culture_and_paste_preserve_the_same_decimal_value` | Exercise vi-VN/en-US decimal separators, typing and paste with the captured culture; accept ungrouped input and reject grouping, wrong/mixed separators, exponent/currency syntax and ambiguity with an actionable error while retaining raw text. Display formatting cannot turn invalid pasted input into a valid different value. | NOT RUN |
-| BCI-A06 | BCI-T01 | Existing: E-C/E-A; New: `Field_bounds_and_zero_rules_match_receipt_contracts` | Quantity must be greater than zero and within its contract maximum; Unit cost may be zero and must not exceed its maximum. Negative, empty, malformed and over-range input is rejected without clamping or VM mutation. | NOT RUN |
+| BCI-A04 | BCI-T01 | Existing: E-C decimal boundary test; New: `Extra_fractional_zeros_are_exact_but_meaningful_overprecision_is_rejected` | Preserve raw text until validation: `1.23000` is exactly 1.23; `1.23001` and a far-tail nonzero beyond four places fail before decimal parsing can round them away. No meaningful digit is silently truncated. | PASS — T01 scalar only (§8.2) |
+| BCI-A05 | BCI-T01 | Existing: E-A numeric validation; New: `Culture_and_paste_preserve_the_same_decimal_value` | Exercise vi-VN/en-US decimal separators, typing and paste with the captured culture; accept ungrouped input and reject grouping, wrong/mixed separators, exponent/currency syntax and ambiguity with an actionable error while retaining raw text. Display formatting cannot turn invalid pasted input into a valid different value. | PASS — T01 scalar only (§8.2) |
+| BCI-A06 | BCI-T01 | Existing: E-C/E-A; New: `Field_bounds_and_zero_rules_match_receipt_contracts` | Quantity must be greater than zero and within its contract maximum; Unit cost may be zero and must not exceed its maximum. Negative, empty, malformed and over-range input is rejected without clamping or VM mutation. | PASS — T01 scalar only (§8.2) |
 | BCI-A07 | BCI-T03 | Existing: E-V overflow methods; New: `Overflow_preserves_input_and_blocks_commands` | Both line multiplication and aggregate overflow remain safe; error state retains entered values, does not display a fabricated total and dispatches no Save/Post. | NOT RUN |
 
 ### 4.2. Stable grid state, lookup and command boundaries
@@ -221,6 +221,46 @@ Local trial1 failed compilation: the proof initially assumed an absent `Format` 
 Independent skill-mandated review identified an Important competing wait/cleanup deadline in the UIA test. The host now pumps until the bounded GuiOwnedProcess task returns, including cancellation, before disposal. A posted-Enter scheduling concern was treated as a reliability issue and fixed with a finite condition wait for numeric edit completion. No process helper execution/cleanup policy was relaxed.
 
 No app command, strict invalid-input setter, Posted/denied/stale accessible target, native popup UIA selection, ordinary Login, SQL persistence, package or attended Business Compact acceptance is established here. These belong to T01–T06. This is a capability/decision checkpoint, with concrete follow-up seams, not production readiness.
+
+## 8.2. BCI-T01 lossless scalar conversion — 2026-10-20
+
+**Boundary:** internal Desktop.WinForms parser and scalar/error-boundary tests only. A04–A06 are PASS in this scope; native typing/paste/caret retention, strict accessible setters, edit-session culture snapshots and Save/Post/grid integration remain T02–T04 obligations. A07 is still NOT RUN for inline command behavior; the existing ViewModel overflow regressions below do not establish that future interaction.
+
+### Source, environment and implementation
+
+- Base `059bb76754d89562607e44d8d039cf703fc2bd34`, same managed worktree/branch as T00. Parser/test commit **`84066f848a0950f213ea8cb935509fff1157f185`** is the source used for the final build/run. The documentation handoff follows that code commit. All three vendor pins retain the exact T00 values above; no dependency, project graph, lock file, public contract, server or schema change.
+- Added [ReceiptNumericInput](../src/MyDmsVn.Desktop.WinForms/ReceiptNumericInput.cs), its internal `ReceiptNumericField` enum and [ReceiptNumericInputTests](../tests/MyDmsVn.Desktop.Tests/ReceiptNumericInputTests.cs). A scoped [friend assembly attribute](../src/MyDmsVn.Desktop.WinForms/Properties/AssemblyInfo.cs) permits direct Desktop tests of the internal API, following the existing repository AssemblyInfo pattern. The parser is not yet called by the shipping receipt control.
+- Windows `10.0.26200`, SDK `8.0.425`, .NET Framework/net48, Release/x86. No form/popup, UIA probe, SQL allocation, package, process launcher or display/theme matrix was exercised for T01. The existing VM class includes a serialized STA synchronization-context regression; this is not native editor acceptance.
+- `TryParse` inspects the complete raw lexical candidate before decimal conversion. It accepts outer whitespace, a culture-leading sign, ASCII digits and the explicit culture decimal separator; it rejects grouping, currency, exponents, mixed separators, embedded whitespace/NUL and malformed/non-ASCII digits. It requires at least one digit, so `.5`/`1.` (or culture equivalents) are valid, but a sign/separator alone is not.
+- Every fractional digit beyond `GoodsReceiptContractLimits.DecimalPlaces` must be zero. Only that proven zero padding is removed from the local parsing candidate. The caller's original string remains available unchanged. Conversion uses explicit culture/styles; success returns the exact decimal and null error, failure returns zero plus a field-specific actionable error. Quantity > 0, UnitCost ≥ 0 and both maxima come directly from `GoodsReceiptContractLimits`. Zero padding is exact even at the contract maxima; no clamp or rounding acceptance is used. Numerical negative zero is zero, so it is allowed only for UnitCost.
+- The future session owner must pass its captured culture; parser tests prove the supplied culture overrides thread culture. Literal custom signs/multicharacter separators have a narrow test; arbitrary custom NumberFormatInfo tokens that conflict with digits/each other are not a supported new product contract. Defensive null-culture/unknown-field checks do not introduce another parsing fallback.
+
+### Executed verification and provenance
+
+```powershell
+dotnet restore tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj --locked-mode
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore -p:PlatformTarget=x86 --filter 'FullyQualifiedName~ReceiptNumericInputTests|FullyQualifiedName~GoodsReceiptEditorViewModelTests' --logger 'trx;LogFileName=final.trx' --results-directory TestResults/bci-t01-final -- RunConfiguration.TargetPlatform=x86
+```
+
+Locked restore succeeded. Baseline used only `FullyQualifiedName~GoodsReceiptEditorViewModelTests`; the RED run selected only `FullyQualifiedName~ReceiptNumericInputTests`. The initial GREEN used the final filter with its own `green.trx`/directory; the final run rebuilt the committed, BOM/CRLF-normalized source. All runs used the direct existing project, net48/Release/x86 flags above; no `--no-build`, zero-match success or skipped mandatory case was credited.
+
+| Local TRX under `TestResults/` | Observed outcomes | SHA256 |
+|---|---|---|
+| `bci-t01-baseline/baseline.trx` | Existing VM 17/17 PASS | `DDA7807B951E284BE8E5244B6F2076995A8F53EBD32BBA9638393781F78963D9` |
+| `bci-t01-red/red.trx` | Parser 12 FAIL / 24 PASS / 0 SKIP | `2073C64410FDF4E16288780FAE0B2A6E6817C6D3C2769DF96C8F7654F46E15FC` |
+| `bci-t01-green/green.trx` | Parser 36 + VM 17 = 53/53 PASS | `C20827E5A8E5900B7C708FC369A500201D87E0EE45270AB9E2B66D87EA7AB3E7` |
+| `bci-t01-final/final.trx` | **53/53 PASS**, 0 FAIL/SKIP/abort/timeout | `BB0BB1A4C38D377BF7292282242948D546FEE2B750284AC699143BAB4EFAB60B` |
+
+Tests were written before behavior. A compile-only scaffold with the planned signature returned `false`, `value = 0` and `Quantity / Unit cost parser is not implemented.`; this made all 12 valid-value test invocations fail their actual acceptance assertions. The 24 malformed rows passed that scaffold only because every candidate was rejected; they earn coverage from GREEN/final, not from the scaffold. No compile error was counted as intended RED. The completed implementation then passed both parser and existing VM scopes.
+
+Final TRX was reconciled against source: the three named plan methods have 4 precision rows, 4 culture rows and 2 field-bound rows; malformed-input Theory has 24 rows; explicit-thread-culture and custom-sign/separator tests are 2 Facts. This is **36 parser invocations across 6 methods**, plus **17 existing VM Facts**. Exact maxima, smallest representable contract step above maxima, one whole unit above maxima, negative/empty/zero, long padding, tiny far-tail nonzero, culture separator equivalence, grouping/pasted syntax and overflow are exercised. Scalar strings model pasted candidates; native clipboard/keyboard actions were not run. The existing VM scope explicitly includes `Boundary_line_amount_overflow_is_safe_and_blocks_save` and `Aggregate_overflow_across_safe_lines_is_safe_and_blocks_save`; their original assertions are unchanged.
+
+Final built DLL SHA256 values (independent of TRX hashes):
+
+- Desktop.WinForms: `19453277908EC22C129C3D1E12DE4D307948B40822EC256C06A171B205F4D1C2`.
+- Desktop.Tests: `45A6886C0B829BAFE4BCB3B4AEA81F48207C51F60D62DCB31D3A423AF18DCF98`.
+
+Raw TRX stays local. No package/EXE hash or SQL/GUI resource cleanup is claimed: none was created by T01. The pure tests completed normally, with thread culture restored in `finally` where changed. An independent read-only code review found no actionable Critical/Important/Minor issue in the three code/test files; it did not execute tests or independently certify TRX. Review limits are the same scalar boundaries above. Static handoff checks cover diff, local links/anchors, planned-versus-implemented names, roadmap and encoding. Next is BCI-T02 stable projection and cell sessions; T00 historical results remain unchanged and no BCI integrated/product release acceptance follows from T01.
 
 ## 9. Deferred production constraints
 
