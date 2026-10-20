@@ -293,13 +293,15 @@ public sealed partial class GoodsReceiptInlineEditorTests
         Assert.Empty(guard.Exceptions);
     }, TimeSpan.FromSeconds(15));
 
-    private sealed class SessionHost : IDisposable
+    internal sealed class SessionHost : IDisposable
     {
         internal readonly GoodsReceiptEditorViewModel Editor;
         internal readonly GoodsReceiptLinesGrid Grid = new GoodsReceiptLinesGrid { Dock = DockStyle.Fill };
         internal readonly GoodsReceiptLinesGridAdapter Adapter;
         private readonly Form _form = new Form { ClientSize = new Size(850, 260), ShowInTaskbar = false };
+        internal IntPtr FormHandle => _form.Handle;
         internal bool CanEdit = true;
+        internal readonly SessionLookup ProductSource = new SessionLookup(CatalogKind.Product);
         internal SessionHost()
         {
             var dispatcher = new ImmediateUiDispatcher();
@@ -309,7 +311,7 @@ public sealed partial class GoodsReceiptInlineEditorTests
             Editor = new GoodsReceiptEditorViewModel(new SessionApi(),
                 new CatalogLookupViewModel(new SessionLookup(CatalogKind.Warehouse), messenger, dispatcher, notifications, delay),
                 new CatalogLookupViewModel(new SessionLookup(CatalogKind.Employee), messenger, dispatcher, notifications, delay),
-                new GoodsReceiptProductOptionsViewModel(new SessionLookup(CatalogKind.Product), messenger, dispatcher, notifications, delay),
+                new GoodsReceiptProductOptionsViewModel(ProductSource, messenger, dispatcher, notifications, delay),
                 dispatcher, notifications);
             Editor.Load(Receipt());
             Editor.ProductOptions.ActivateAsync(CancellationToken.None).GetAwaiter().GetResult();
@@ -318,12 +320,12 @@ public sealed partial class GoodsReceiptInlineEditorTests
             _form.Show();
             Pump();
         }
-        internal static GoodsReceiptDto Receipt(bool savedNewLine = false)
+        internal static GoodsReceiptDto Receipt(bool savedNewLine = false, string status = "Draft")
         {
             var lines = new List<GoodsReceiptLineDto> { new GoodsReceiptLineDto(101, 1, 7, 2.5m, 4m, "P7 - Product", true),
                 new GoodsReceiptLineDto(102, 2, 8, 2m, 3m, "P8 - Product", true) };
             if (savedNewLine) lines.Add(new GoodsReceiptLineDto(103, 3, 9, 12.5m, 0m, "P9 - New", true));
-            return new GoodsReceiptDto(41, "GR41", new DateTime(2026, 10, 20), 3, 5, "Draft", "", null, "AQIDBAUGBwg=", lines);
+            return new GoodsReceiptDto(41, "GR41", new DateTime(2026, 10, 20), 3, 5, status, "", null, "AQIDBAUGBwg=", lines);
         }
         internal SourceGrid.CellContext Context(int row, int column) => new SourceGrid.CellContext(Grid, new SourceGrid.Position(row, column), Grid[row, column]);
         internal void Begin(int row, int column)
@@ -346,12 +348,13 @@ public sealed partial class GoodsReceiptInlineEditorTests
     {
         public Task DelayAsync(TimeSpan interval, CancellationToken token) => Task.CompletedTask;
     }
-    private sealed class SessionLookup : ICatalogLookupSource
+    internal sealed class SessionLookup : ICatalogLookupSource
     {
         internal SessionLookup(CatalogKind kind) { Kind = kind; }
         public CatalogKind Kind { get; }
+        internal string ProductName = "Product";
         public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(CatalogLookupRequest request, CancellationToken token) =>
-            Task.FromResult(ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(new[] { new CatalogLookupDto(7, "P7", "Product", true), new CatalogLookupDto(8, "P8", "Product", true) }));
+            Task.FromResult(ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(new[] { new CatalogLookupDto(7, "P7", ProductName, true), new CatalogLookupDto(8, "P8", "Product", true) }));
         public Task<ApiResponse<CatalogLookupDto>> GetAsync(int id, CancellationToken token) => throw new NotSupportedException();
     }
     private sealed class SessionApi : IGoodsReceiptApiClient

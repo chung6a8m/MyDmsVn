@@ -66,6 +66,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         _editor.Lines.CollectionChanged += OnLinesChanged;
         _editor.ProductOptions.PropertyChanged += OnOptionsChanged;
         _grid.Disposed += OnGridDisposed;
+        _grid.Adapter = this;
         ResetDocument(editor.Lines);
     }
 
@@ -83,6 +84,67 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
             return row > 0 && row <= _lines.Count ? _lines[row - 1] : null;
         }
     }
+    internal long AccessibleGeneration => _generation;
+    internal GoodsReceiptLineViewModel? AccessibleLine(int index)
+    {
+        if (_disposed || _grid.IsDisposed) return null;
+        if (_grid.InvokeRequired) return (GoodsReceiptLineViewModel?)_grid.Invoke(new Func<GoodsReceiptLineViewModel?>(() => AccessibleLine(index)));
+        return index >= 0 && index < _lines.Count ? _lines[index] : null;
+    }
+    internal int AccessibleRow(long generation, GoodsReceiptLineViewModel line)
+    {
+        if (_disposed || _grid.IsDisposed) return -1;
+        if (_grid.InvokeRequired) return (int)_grid.Invoke(new Func<int>(() => AccessibleRow(generation, line)));
+        if (generation != _generation || !_editor.Lines.Any(current => ReferenceEquals(current, line))) return -1;
+        var index = _lines.FindIndex(current => ReferenceEquals(current, line));
+        return index < 0 ? -1 : index + 1;
+    }
+    internal bool CanAccessEdit(long generation, GoodsReceiptLineViewModel line, int column) =>
+        Editable && column >= 1 && column <= 3 && AccessibleRow(generation, line) > 0;
+    internal System.Windows.Forms.Control? ActiveAccessibleEditor => _session != null && Current(_session) && _session.Input.IsEditing ? _session.Input.Control : null;
+    internal string AccessibleValue(long generation, GoodsReceiptLineViewModel line, int column)
+    {
+        if (_disposed || _grid.IsDisposed) return string.Empty;
+        if (_grid.InvokeRequired) return (string)_grid.Invoke(new Func<string>(() => AccessibleValue(generation, line, column)));
+        return AccessibleRow(generation, line) <= 0 ? string.Empty : column == 0 ? AccessibleRow(generation, line).ToString(_culture) :
+            Convert.ToString(LineValue(line, column), _culture) ?? string.Empty;
+    }
+    internal string AccessibleHelp(long generation, GoodsReceiptLineViewModel line, int column)
+    {
+        if (_disposed || _grid.IsDisposed) return "This receipt line is no longer available.";
+        if (_grid.InvokeRequired) return (string)_grid.Invoke(new Func<string>(() => AccessibleHelp(generation, line, column)));
+        var row = AccessibleRow(generation, line);
+        if (row <= 0) return "This receipt line is no longer available.";
+        var field = column == 1 ? "productId" : column == 2 ? "quantity" : "unitCost";
+        var server = string.Join(" ", _editor.GetErrors($"lines[{row - 1}].{field}").Cast<string>());
+        var active = _session != null && ReferenceEquals(_session.Line, line) && _session.Column == column;
+        var state = column == 1 ? $"Committed key: {line.ProductId}; Selected: {ProductCaption(line.ProductId)}" : "Committed value: " + AccessibleValue(generation, line, column);
+        if (active && column == 1 && _product.BootstrapControl.HasPendingText) state = "Pending selection: " + _product.Control.Text + "; " + state;
+        return state + (active && EditError != null ? "; " + EditError : "") + (server.Length > 0 ? "; " + server : "");
+    }
+    internal void BeginAccessibleEdit(long generation, GoodsReceiptLineViewModel line, int column)
+    {
+        if (_grid.InvokeRequired) { _grid.Invoke(new Action(() => BeginAccessibleEdit(generation, line, column))); return; }
+        if (!CanAccessEdit(generation, line, column)) throw new InvalidOperationException("This receipt cell is not editable.");
+        if (_session != null && (!ReferenceEquals(_session.Line, line) || _session.Column != column) &&
+            !TryFinishEdit(ReceiptEditIntent.AddLine)) throw new InvalidOperationException(EditError);
+        if (_session == null) FocusCell(line, column);
+        if (_session == null || !ReferenceEquals(_session.Line, line) || _session.Column != column || !Current(_session))
+            throw new InvalidOperationException("The receipt cell could not enter editing.");
+        FocusActiveEdit();
+    }
+    internal void SetAccessibleValue(long generation, GoodsReceiptLineViewModel line, int column, string raw)
+    {
+        if (_grid.InvokeRequired) { _grid.Invoke(new Action(() => SetAccessibleValue(generation, line, column, raw))); return; }
+        BeginAccessibleEdit(generation, line, column);
+        if (column == 1 && int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var key) && key > 0)
+        {
+            if (!_product.BootstrapControl.SelectValue(key)) _product.Control.Text = raw;
+        }
+        else _session!.Input.Control.Text = raw;
+        if (!TryFinishEdit(ReceiptEditIntent.Save)) throw new ArgumentException(EditError ?? "Invalid receipt cell value.", nameof(raw));
+    }
+
     internal void FocusCell(GoodsReceiptLineViewModel line, int column)
     {
         if (!Editable || !_grid.IsHandleCreated || column < 1 || column > 3) return;
@@ -246,6 +308,9 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         if (controller.Column == 1) BindProductOptions();
         var input = (EditorControlBase)context.Cell.Editor;
         _session = new Session(controller.Line, controller.Column, _generation, context, input, LineValue(controller.Line, controller.Column));
+        input.Control.AccessibleName = (controller.Column == 1 ? "Product" : controller.Column == 2 ? "Quantity" : "Unit cost") +
+            " row " + context.Position.Row + " editor";
+        input.Control.AccessibleDescription = AccessibleHelp(_generation, controller.Line, controller.Column);
         EditError = null;
     }
 
@@ -379,11 +444,13 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         finally { _bindingOptions = false; }
     }
 
+    private string ProductCaption(int id) => _editor.ProductOptions.Items.FirstOrDefault(option => option.Id == id)?.DisplayName ??
+        _lines.FirstOrDefault(line => line.ProductId == id)?.ProductDisplayName ?? (id == 0 ? "" : id.ToString(_culture));
+
     private void DisplayProduct(object? sender, DevAge.ComponentModel.ConvertingObjectEventArgs e)
     {
         var id = e.Value is int key ? key : 0;
-        e.Value = _lines.FirstOrDefault(line => line.ProductId == id)?.ProductDisplayName ??
-            _editor.ProductOptions.Items.FirstOrDefault(option => option.Id == id)?.DisplayName ?? (id == 0 ? "" : id.ToString(_culture));
+        e.Value = ProductCaption(id);
         e.ConvertingStatus = DevAge.ComponentModel.ConvertingStatus.Completed;
     }
     private void OnCandidateChanged(object? sender, EventArgs e)
@@ -450,6 +517,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
             input.Control.TextChanged -= OnCandidateChanged;
         }
         _product.ConvertingValueToDisplayString -= DisplayProduct;
+        _grid.Adapter = null;
         _grid.BootstrapEditors.Dispose(); // Registry is the shared-control owner; grid disposal is idempotent.
     }
 

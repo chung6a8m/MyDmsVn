@@ -112,6 +112,7 @@ public sealed class PackagedGuiAcceptanceTests
             var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("INLINE_RECEIPT_NATIVE_EDIT=PASS", result.StandardOutput);
             Assert.Contains("RECEIPT_POST_STOCK=PASS", result.StandardOutput);
             Assert.Contains("SERVER_DUPLICATE_POST_REJECTED=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);

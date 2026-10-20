@@ -252,8 +252,10 @@ public sealed class InventoryAccessibilityAcceptanceTests
                 Assert.Equal(new SourceGrid.Position(1, 3), fixture.Control.LineGrid.Selection.ActivePosition);
 
                 Named(fixture.Control.ReceiptDateEditor, "Receipt date");
-                Named(fixture.Control.QuantityEditor, "Quantity");
-                Named(fixture.Control.UnitCostEditor, "Unit cost");
+                Named(fixture.Control.QuantityEditor, "Quantity row 1 editor");
+                GoodsReceiptInlineEditorTests.Key(Keys.F2);
+                Assert.True(fixture.Control.UnitCostEditor.ContainsFocus);
+                Named(fixture.Control.UnitCostEditor, "Unit cost row 1 editor");
                 AssertVisibleLayout(fixture.Control.ReceiptGrid);
                 AssertVisibleLayout(fixture.Control.LineGrid);
                 AssertVisibleLayout(fixture.Control.SaveButton);

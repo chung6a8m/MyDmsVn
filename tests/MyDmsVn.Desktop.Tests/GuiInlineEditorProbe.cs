@@ -13,6 +13,9 @@ internal static class GuiInlineEditorProbe
         {
             Console.WriteLine("UIA_CLIENT_BITNESS=" + (IntPtr.Size * 8));
             var root = AutomationElement.FromHandle(new IntPtr(long.Parse(args[0])));
+            if (args[1] == "validate") return Validate(root);
+            if (args[1] == "readonly") return ReadOnly(root);
+            if (args[1].StartsWith("cell:", StringComparison.Ordinal)) return EditCell(root, args[1].Substring(5));
             var named = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, args[1]));
             if (named == null) throw new InvalidOperationException("Named hosted editor absent: " + args[1]);
             var edit = named.FindFirst(TreeScope.Descendants,
@@ -39,4 +42,90 @@ internal static class GuiInlineEditorProbe
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
     }
+    private static AutomationElement Named(AutomationElement root, string name)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (watch.Elapsed < TimeSpan.FromSeconds(8))
+        {
+            var found = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name));
+            if (found != null) return found;
+            System.Threading.Thread.Sleep(25);
+        }
+        throw new InvalidOperationException("Semantic input absent: " + name);
+    }
+    private static void Key(AutomationElement edit, int key)
+    {
+        var handle = new IntPtr(edit.Current.NativeWindowHandle);
+        if (handle == IntPtr.Zero || !PostMessage(handle, 0x0100, new IntPtr(key), IntPtr.Zero) ||
+            !PostMessage(handle, 0x0101, new IntPtr(key), IntPtr.Zero)) throw new InvalidOperationException("Native key dispatch failed.");
+        System.Threading.Thread.Sleep(100);
+    }
+    private static int EditCell(AutomationElement root, string name)
+    {
+        var cell = Named(root, name);
+        foreach (var pattern in cell.GetSupportedPatterns()) Console.WriteLine("CELL_PATTERN=" + pattern.ProgrammaticName);
+        var logical = (ValuePattern)cell.GetCurrentPattern(ValuePattern.Pattern);
+        if (logical.Current.IsReadOnly) throw new InvalidOperationException("Editable cell reported read-only.");
+        ((InvokePattern)cell.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+        var wrapper = Named(root, name + " editor");
+        var input = wrapper.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+        if (input == null) throw new InvalidOperationException("Actual native textbox is absent.");
+        input.SetFocus();
+        if (!input.Current.HasKeyboardFocus) throw new InvalidOperationException("Native editor has no focus.");
+        var value = (ValuePattern)input.GetCurrentPattern(ValuePattern.Pattern);
+        value.SetValue(name.StartsWith("Product", StringComparison.Ordinal) ? "P8" : "6.25");
+        if (name.StartsWith("Product", StringComparison.Ordinal))
+        {
+            Key(input, 0x73);
+            Key(input, 0x28);
+        }
+        Console.WriteLine("CELL=" + name + "; EDITOR=" + wrapper.Current.Name + "; NATIVE_CLASS=" + input.Current.ClassName);
+        Key(input, 0x0d);
+        Console.WriteLine("NATIVE_CELL_PIPELINE=PASS");
+        return 0;
+    }
+
+    private static int Validate(AutomationElement root)
+    {
+        var cell = Named(root, "Quantity row 1");
+        var logical = (ValuePattern)cell.GetCurrentPattern(ValuePattern.Pattern);
+        logical.SetValue("7.25000");
+        if (decimal.Parse(logical.Current.Value, System.Globalization.CultureInfo.CurrentCulture) != 7.25m) throw new InvalidOperationException("Accessible typed commit did not preserve exact padding.");
+        var rejected = false;
+        try { logical.SetValue("8.00001"); }
+        catch (Exception) { rejected = true; }
+        if (!rejected || decimal.Parse(logical.Current.Value, System.Globalization.CultureInfo.CurrentCulture) != 7.25m) throw new InvalidOperationException("Meaningful precision was accepted.");
+        if (!cell.Current.HelpText.Contains("decimal places")) throw new InvalidOperationException("Accessible validation help absent.");
+        var wrapper = Named(root, "Quantity row 1 editor");
+        var input = wrapper.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+        if (((ValuePattern)input.GetCurrentPattern(ValuePattern.Pattern)).Current.Value != "8.00001")
+            throw new InvalidOperationException("Rejected raw input was lost.");
+        input.SetFocus();
+        Key(input, 27);
+        var product = Named(root, "Product row 1");
+        ((InvokePattern)product.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+        var lookup = Named(root, "Product row 1 editor");
+        var native = lookup.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+        native.SetFocus();
+        ((ValuePattern)native.GetCurrentPattern(ValuePattern.Pattern)).SetValue("pending query");
+        if (!product.Current.HelpText.Contains("Pending selection") || !product.Current.HelpText.Contains("Committed key: 7"))
+            throw new InvalidOperationException("Pending versus committed lookup help absent.");
+        Key(native, 27);
+        Key(native, 27);
+        Console.WriteLine("NATIVE_VALUE_GUARDS=PASS");
+        return 0;
+    }
+    private static int ReadOnly(AutomationElement root)
+    {
+        var cell = Named(root, "Quantity row 1");
+        var value = (ValuePattern)cell.GetCurrentPattern(ValuePattern.Pattern);
+        if (!value.Current.IsReadOnly) throw new InvalidOperationException("Posted cell was writable.");
+        var rejected = false;
+        try { value.SetValue("99"); }
+        catch (Exception) { rejected = true; }
+        if (!rejected || value.Current.Value != "2.5") throw new InvalidOperationException("Readonly accessible write was accepted.");
+        Console.WriteLine("NATIVE_READONLY_GUARD=PASS");
+        return 0;
+    }
+
 }
