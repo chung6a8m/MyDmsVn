@@ -74,6 +74,10 @@ public sealed class BusinessCompactLayoutTests
             foreach (var control in new Control[] { receipt.ReceiptDateEditor, receipt.WarehouseLookup, receipt.EmployeeLookup, receipt.NoteEditor,
                 receipt.SaveButton, receipt.PostButton, receipt.AddLineButton, receipt.RemoveLineButton, receipt.OperationStatusLabel, receipt.TotalLabel })
                 Assert.True(ScreenBounds(viewport).Contains(ScreenBounds(control)), control.GetType().Name + " must be visible: " + ScreenBounds(control));
+            var accessible = receipt.LineGrid.AccessibilityObject;
+            var quantityBounds = accessible.GetChild(1)!.GetChild(2)!.Bounds;
+            Assert.True(accessible.GetChild(1)!.Bounds.Contains(quantityBounds), "Accessible row bounds must include its quantity cell.");
+            Assert.Equal("Quantity row 1", accessible.HitTest(quantityBounds.Left + quantityBounds.Width / 2, quantityBounds.Top + quantityBounds.Height / 2)?.Name);
             Assert.Equal(224 * shell.DeviceDpi / 96, shell.Navigation.Width);
             receipt.WarehouseLookup.Focus();
             GoodsReceiptInlineEditorTests.Key(Keys.Tab);
@@ -82,9 +86,17 @@ public sealed class BusinessCompactLayoutTests
             Assert.True(receipt.NoteEditor.ContainsFocus);
             GoodsReceiptInlineEditorTests.Key(Keys.Tab);
             Assert.True(receipt.LineGrid.ContainsFocus);
-            Capture(viewport, mode + "-" + width);
-
             _output.WriteLine("REQUESTED_LOGICAL=" + width + "x" + height + ";THEME=" + mode + ";WINDOW_DPI=" + receipt.DeviceDpi + ";VIEWPORT=" + receipt.ClientSize + ";LINES=" + receipt.LineGrid.Bounds);
+            Capture(viewport, mode + "-" + width);
+            if (width == 1680)
+            {
+                viewport.WindowState = FormWindowState.Maximized; Pump();
+                Assert.True(ScreenBounds(viewport).Contains(ScreenBounds(receipt.SaveButton)));
+                Assert.True(ScreenBounds(viewport).Contains(ScreenBounds(receipt.NoteEditor)));
+                Capture(viewport, "maximized-" + mode);
+                _output.WriteLine("MAXIMIZED_WINDOW_UNITS=" + viewport.ClientSize);
+            }
+
             Assert.Empty(guard.Exceptions);
         }
         finally { BootstrapThemeManager.CurrentTheme = original; }
@@ -102,14 +114,27 @@ public sealed class BusinessCompactLayoutTests
             using var guard = new WinFormsTestGuard();
             using var host = new GoodsReceiptInlineEditorTests.SessionHost();
             host.Grid.FindForm()!.TopMost = true;
-            host.Begin(1, 2);
+            for (var index = 0; index < 12; index++) host.Editor.AddLine();
+            var editedRow = host.Editor.Lines.Count;
+            var editedLine = host.Editor.Lines[editedRow - 1];
+            var originalQuantity = editedLine.Quantity;
+            var rowCount = host.Grid.RowsCount;
+            host.Begin(editedRow, 2);
+            Assert.True(host.Grid.CustomScrollPosition.Y > 0, "Entering a lower row must scroll vertically.");
+            _output.WriteLine("EDITED_ROW=" + editedRow + ";ROW_COUNT=" + rowCount + ";SCROLL=" + host.Grid.CustomScrollPosition);
             var input = host.NativeTextBox();
             Assert.Equal(HorizontalAlignment.Right, input.TextAlign);
             input.Text = "8.00001";
             input.SelectionStart = 2;
             var editor = host.Adapter.QuantityControl;
             host.Grid.FindForm()!.ClientSize = new Size(640, 240);
-            host.Grid.CustomScrollPosition = new Point(1, 0);
+            host.Grid.CustomScrollPosition = new Point(1, host.Grid.CustomScrollPosition.Y);
+            host.Grid.FindForm()!.WindowState = FormWindowState.Maximized;
+            Pump();
+            Assert.Equal("8.00001", input.Text);
+            Assert.Equal(2, input.SelectionStart);
+            host.Grid.FindForm()!.WindowState = FormWindowState.Normal;
+            Pump();
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode == BootstrapThemeMode.Light ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
             Pump();
             Assert.Same(editor, host.Adapter.QuantityControl);
@@ -117,16 +142,18 @@ public sealed class BusinessCompactLayoutTests
             Assert.Equal(2, input.SelectionStart);
             Assert.True(input.ClientRectangle.Height >= TextRenderer.MeasureText("123", input.Font).Height, "Native client=" + input.ClientRectangle + "; font=" + input.Font + "; measured=" + TextRenderer.MeasureText("123", input.Font) + "; row=" + host.Grid.Rows[1].Height + "; wrapper=" + editor.Size);
             GoodsReceiptInlineEditorTests.Key(Keys.Enter);
+            Assert.Equal(originalQuantity, editedLine.Quantity);
             Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
             Assert.NotNull(host.Adapter.EditError);
             GoodsReceiptInlineEditorTests.Key(Keys.Escape);
-            host.Begin(1, 2);
+            host.Begin(editedRow, 2);
             input = host.NativeTextBox();
             input.Text = "7.25";
             GoodsReceiptInlineEditorTests.Key(Keys.Tab);
-            Assert.Equal(7.25m, host.Editor.Lines[0].Quantity);
+            Assert.Equal(7.25m, editedLine.Quantity);
+            Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
             Assert.Equal(3, host.Grid.Selection.ActivePosition.Column);
-            Assert.Equal(3, host.Grid.RowsCount);
+            Assert.Equal(rowCount, host.Grid.RowsCount);
             GoodsReceiptInlineEditorTests.Key(Keys.Escape);
             host.Begin(1, 1);
             host.Adapter.ProductControl.Text = "P8";

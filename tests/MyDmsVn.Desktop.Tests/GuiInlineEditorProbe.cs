@@ -66,6 +66,7 @@ internal static class GuiInlineEditorProbe
             ";WINDOW_DPI=" + GetDpiForWindow(window) + ";PHYSICAL_WINDOW=" + root.Current.BoundingRectangle +
             ";NATIVE_CLIENT=" + (client.Right - client.Left) + "x" + (client.Bottom - client.Top));
         var quantity = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Quantity row 1"));
+        Console.WriteLine("OBSERVED_QUANTITY_CELL=" + (quantity == null ? "absent" : quantity.Current.BoundingRectangle.ToString()));
         if (quantity == null || quantity.Current.BoundingRectangle.Height < 36 * x / 96d)
             throw new InvalidOperationException("Native receipt row is smaller than the scaled target.");
         Console.WriteLine("PHYSICAL_QUANTITY_CELL=" + quantity.Current.BoundingRectangle);

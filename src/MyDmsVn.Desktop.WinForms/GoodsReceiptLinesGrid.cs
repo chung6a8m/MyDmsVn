@@ -2,6 +2,7 @@
 
 using System;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using MyDmsVn.Desktop.Application;
 
@@ -19,8 +20,27 @@ internal sealed class GoodsReceiptLinesGrid : BootstrapGrid
         if (InvokeRequired) return (Rectangle)Invoke(new Func<Rectangle>(() => CellBounds(row, column)));
         if (!Visible || row < 0 || row >= RowsCount || column < 0 || column >= ColumnsCount) return Rectangle.Empty;
         var bounds = Rectangle.Intersect(ClientRectangle, PositionToRectangle(new SourceGrid.Position(row, column)));
-        return bounds.IsEmpty ? Rectangle.Empty : RectangleToScreen(bounds);
+        return bounds.IsEmpty ? Rectangle.Empty : PhysicalScreenBounds(this, bounds);
     }
+
+    // MSAA accLocation/accHitTest use physical screen coordinates even when the shipped
+    // net48 window remains DPI-unaware. Do not change the process's awareness to fix a provider.
+    private static Rectangle PhysicalScreenBounds(Control control, Rectangle clientBounds)
+    {
+        var screen = control.RectangleToScreen(clientBounds);
+        var first = screen.Location;
+        var last = new Point(screen.Right, screen.Bottom);
+        if (!ToPhysical(control.Handle, ref first) || !ToPhysical(control.Handle, ref last)) return Rectangle.Empty;
+        return Rectangle.FromLTRB(first.X, first.Y, last.X, last.Y);
+    }
+    private static bool ToPhysical(IntPtr window, ref Point point)
+    {
+        try { return LogicalToPhysicalPointForPerMonitorDPI(window, ref point); }
+        catch (EntryPointNotFoundException) { return LogicalToPhysicalPoint(window, ref point); }
+    }
+    [DllImport("user32.dll")] private static extern bool LogicalToPhysicalPointForPerMonitorDPI(IntPtr window, ref Point point);
+    // Compatibility path for pre-8.1 Windows; runtime certification remains a release prerequisite.
+    [DllImport("user32.dll")] private static extern bool LogicalToPhysicalPoint(IntPtr window, ref Point point);
 
     private sealed class ReceiptAccessibleObject : ControlAccessibleObject
     {
@@ -45,7 +65,7 @@ internal sealed class GoodsReceiptLinesGrid : BootstrapGrid
         public override AccessibleObject? HitTest(int x, int y)
         {
             var input = _grid.Adapter?.ActiveAccessibleEditor;
-            if (input != null && input.RectangleToScreen(input.ClientRectangle).Contains(x, y)) return input.AccessibilityObject.HitTest(x, y);
+            if (input != null && PhysicalScreenBounds(input, input.ClientRectangle).Contains(x, y)) return input.AccessibilityObject.HitTest(x, y) ?? input.AccessibilityObject;
             for (var row = 0; row < _grid.RowsCount; row++)
                 for (var column = 0; column < _grid.ColumnsCount; column++)
                     if (_grid.CellBounds(row, column).Contains(x, y)) return GetChild(row)?.GetChild(column);
@@ -67,7 +87,19 @@ internal sealed class GoodsReceiptLinesGrid : BootstrapGrid
         public override AccessibleRole Role => AccessibleRole.Row;
         public override string? Name { get => CurrentRow < 0 ? "Unavailable receipt line" : Line == null ? "Columns" : "Line " + CurrentRow + ": " + (Line.ProductDisplayName ?? "New line"); set { } }
         public override AccessibleStates State => CurrentRow < 0 ? AccessibleStates.Unavailable : AccessibleStates.None;
-        public override Rectangle Bounds => Grid.CellBounds(CurrentRow, 1);
+        public override Rectangle Bounds
+        {
+            get
+            {
+                var bounds = Rectangle.Empty;
+                for (var column = 0; column < 5; column++)
+                {
+                    var cell = Grid.CellBounds(CurrentRow, column);
+                    if (!cell.IsEmpty) bounds = bounds.IsEmpty ? cell : Rectangle.Union(bounds, cell);
+                }
+                return bounds;
+            }
+        }
         public override int GetChildCount() => 5;
         public override AccessibleObject? GetChild(int index) => index < 0 || index >= 5 ? null : new CellAccessibleObject(this, index);
     }
