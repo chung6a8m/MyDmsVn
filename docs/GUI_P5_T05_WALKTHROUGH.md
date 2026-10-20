@@ -197,3 +197,17 @@ Chapter3 actual human Login displayed T05 Direct Deny with clean workspace. GUI 
 
 - [direct-deny-before-100light.jpg](assets/gui-p5-t05/direct-deny-before-100light.jpg), SHA256 5D11040D27628F153D0EE244216F1F427A0E92764463EAC8EFE7AD4AC21AA9A9.
 - [direct-deny-rejected-100light.jpg](assets/gui-p5-t05/direct-deny-rejected-100light.jpg), SHA256 90C3DD5BA38EF8C109A38A2ADAC2ABB87AADA41A9989C15589CC232112AE0654.
+
+### Overnight resume —2026-10-20
+
+Owner reported seeing T05 Post Without Read. On resume at10:29+07, actual prior supervisor state is Disposed: chapter3 normal exit0/CleanupVerified at2026-10-19T23:10:13+07, helper disposed23:10:14. Fresh exact census confirms168/168GUI ledgers Dropped, latest database/principal/process counts all0. Therefore the reported actor label alone does not close P-03; no inaccessible old database is reused. Prior15/45confirmed passes remain valid against their captured candidate/cohort. P-04 direct-Deny human observation confirmation remains pending. Fresh bounded password handoff/cohort preparation started for remaining cases only; setup-only replacement references/Drafts must not be relabeled GUI-created evidence. T05/T06/P5/P6 remain OPEN.
+
+### Continuation cohort admission —2026-10-20
+
+Fresh masked handoff completed and supervisor Ready10:30:27+07. Reverified100% native x86 scale/HRESULT0 and physical1920x1080. Existing helper created a new disposable database/current001–009 with separated identities on SQL2017Developer14.0.2130.4; ordinary8actors/63role grants after explicit lookup prerequisite setup. Ownership-checked maintenance seeded three clearly named T05 Continuation catalog references and7separate T05-FIX-* Drafts/lines. These are setup-only replacement fixtures, not GUI creation evidence and not the disposed original GR0000000001. Restricted continuation-admission confirms0ledger/balance,0reconciliation mismatches; denied operations in this cohort must preserve this fresh baseline. Launch requested for actual p5.t05.no-read Login. No new attended PASS or product/test change. Prior15confirmed passes retain their original cohort provenance; final cleanup and sign-off pending.
+
+### Post without Read — continuation cohort, confirmation pending
+
+Owner confirmed actual Login label T05 Post Without Read. Native shell has clean workspace; opening Goods Receipts then actual Refresh each rejects The operation is not permitted. Grid has no receipt rows; Warehouse/Employee/Note/version/lines empty, Post disabled. No detail from a previous actor is displayed. This is blocked GUI admission, not a submitted server Post against an unseen ID. Restricted continuation-no-read-denied oracle independently sees the7setup Drafts/7lines,0ledger/0balances and0full-key/line/document mismatches. Actual actor has only Inventory.GoodsReceipts.Post, no Read/Write/Stock/Catalog grants or direct assignments. P-03 awaits Owner observation confirmation;15/45confirmed count retained. Sign out performed; human p5.t05.restricted Login requested. Current bounded chapter1 launched10:31:55/deadline11:01:55, supervisor58659 remains active; command admission ends11:25:27. Old168ledgers Dropped, current169 allocation retained with final disposal pending.
+
+- [no-read-denied-100light-continuation.jpg](assets/gui-p5-t05/no-read-denied-100light-continuation.jpg), SHA256 76BED9113231402D2B4ED8987FB47CBD062383D34F63E6430FB82CB875610E59.
