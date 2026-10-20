@@ -266,3 +266,10 @@ Restricted continuation-inactive-history/continuation-reactivated-history/before
 - [employee-inactive-new-choice-empty-100light.jpg](assets/gui-p5-t05/employee-inactive-new-choice-empty-100light.jpg), SHA256 589668FDADD57610A7053F5CC72946C5B435036AE694B62D8D67A5719BFD11B8.
 - [product-inactive-new-choice-empty-100light.jpg](assets/gui-p5-t05/product-inactive-new-choice-empty-100light.jpg), SHA256 3135AE70BE32F6C984A19AE83A8098B5F47974D7DB47B67A7249D9C88ECF8147.
 - [reactivated-three-new-selections-100light.jpg](assets/gui-p5-t05/reactivated-three-new-selections-100light.jpg), SHA256 87424B1BF2966D5EFE2C00878DFA985D991F36EA53CD8CC6392C2A57752C8E19.
+
+### Restart / persisted recovery readback — confirmation pending
+
+Chapter2 launched10:53:20+07 (30minute deadline11:23:20). Actual runtime-only startup schema preflight admitted Login; Owner confirmed T05Operator after real Login. Fresh shell workspace empty, no former actor/editor state. GUI reopened T05-FIX-FAULT: Posted/token2031, NoteT05 uncertain, threeChanged reference names, same1@4line/Total4; editor/Save/Post readonly. Actual BalanceProduct1query displays onequantity27.0000row/VisibleTotal27.0000 with ChangedWarehouse/Productnames. Restricted continuation-after-restart-readback matches33receipts/59lines,53ledger/27balancekeys/basequantity27,0full-key/line/document mismatches; recoveredPostedactorP5.T05.OPERATOR/token2031 unchanged. No new writes or fault reinstallation. F-02/L-01 execution complete pending human observations; finalcohortcleanup remains O-02pending. A consolidated humanquestion requests confirmation for P-03/P-04/P-05/P-07/F-01/F-02/S-04/K-01/L-01; accepted count stays16/45 untilreply. Supplemental18UXcells stillNOTRUN.
+
+- [restart-recovery-posted-readonly-100light.jpg](assets/gui-p5-t05/restart-recovery-posted-readonly-100light.jpg), SHA256 CBDD4F8B4F27B271CDBFA8CF3D19E8EDB3ABB049475DE895934A12FBF5295712.
+- [restart-balance27-readback-100light.jpg](assets/gui-p5-t05/restart-balance27-readback-100light.jpg), SHA256 3950B9C9CB41C3C929D6BE87B5CC87EC62A586D2099CCD9A880DC79F24B7CAFE.
