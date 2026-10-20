@@ -12,6 +12,7 @@ internal static class GuiInlineEditorProbe
         try
         {
             Console.WriteLine("UIA_CLIENT_BITNESS=" + (IntPtr.Size * 8));
+            if (args[1] == "measure-window") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]));
             var root = AutomationElement.FromHandle(new IntPtr(long.Parse(args[0])));
             if (args[1] == "validate") return Validate(root);
             if (args[1] == "readonly") return ReadOnly(root);
@@ -42,6 +43,36 @@ internal static class GuiInlineEditorProbe
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
     }
+    [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+    [DllImport("shcore.dll")] private static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint x, out uint y);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+    [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out NativeRectangle rectangle);
+    [StructLayout(LayoutKind.Sequential)] private struct NativeRectangle { public int Left, Top, Right, Bottom; }
+    private static int Measure(IntPtr window, int expectedProcess)
+    {
+        if (!SetProcessDpiAwarenessContext(new IntPtr(-4))) throw new InvalidOperationException("PerMonitorV2 observer unavailable.");
+        uint process;
+        GetWindowThreadProcessId(window, out process);
+        if (process != expectedProcess) throw new InvalidOperationException("Observation target ownership mismatch.");
+        uint x, y;
+        if (GetDpiForMonitor(MonitorFromWindow(window, 2), 0, out x, out y) != 0 || x != y)
+            throw new InvalidOperationException("Monitor DPI unavailable.");
+        NativeRectangle client;
+        if (!GetClientRect(window, out client)) throw new InvalidOperationException("Client measurement unavailable.");
+        var root = AutomationElement.FromHandle(window);
+        Console.WriteLine("OBSERVER_CONTEXT=PerMonitorV2;MONITOR_SCALE=" + (x * 100 / 96) + ";MONITOR_DPI=" + x +
+            ";WINDOW_DPI=" + GetDpiForWindow(window) + ";PHYSICAL_WINDOW=" + root.Current.BoundingRectangle +
+            ";NATIVE_CLIENT=" + (client.Right - client.Left) + "x" + (client.Bottom - client.Top));
+        var quantity = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Quantity row 1"));
+        if (quantity == null || quantity.Current.BoundingRectangle.Height < 36 * x / 96d)
+            throw new InvalidOperationException("Native receipt row is smaller than the scaled target.");
+        Console.WriteLine("PHYSICAL_QUANTITY_CELL=" + quantity.Current.BoundingRectangle);
+        Console.WriteLine("NATIVE_WINDOW_MEASUREMENT=PASS");
+        return 0;
+    }
+
     private static AutomationElement Named(AutomationElement root, string name)
     {
         var watch = System.Diagnostics.Stopwatch.StartNew();

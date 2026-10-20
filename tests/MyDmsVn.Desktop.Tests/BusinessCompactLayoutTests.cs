@@ -44,9 +44,23 @@ public sealed class BusinessCompactLayoutTests
             receipt.Parent = viewport;
             viewport.Show();
             var physical = PhysicalViewport(width, height, viewport.DeviceDpi);
-            viewport.ClientSize = physical;
-            Assert.Equal(physical, viewport.ClientSize);
+            var workArea = Screen.FromControl(viewport).WorkingArea;
+            var fitted = new Size(Math.Min(physical.Width, workArea.Width - 32), Math.Min(physical.Height, workArea.Height - 64));
+            viewport.ClientSize = fitted;
             Pump();
+            Assert.Equal(fitted, viewport.ClientSize);
+            using (var probe = new GuiProcessProbeFixture(package: false, inline: true))
+            {
+                var execution = GuiOwnedProcess.RunAsync(probe.Start(viewport.Handle.ToInt64() + " measure-window " + System.Diagnostics.Process.GetCurrentProcess().Id), TimeSpan.FromSeconds(15), token);
+                while (!execution.IsCompleted) { Pump(); Thread.Yield(); }
+                var result = execution.GetAwaiter().GetResult();
+                Assert.True(result.CleanupVerified);
+                Assert.True(result.ExitCode == 0, result.StandardOutput + result.StandardError);
+                Assert.Contains("NATIVE_WINDOW_MEASUREMENT=PASS", result.StandardOutput);
+                var expected = Environment.GetEnvironmentVariable("MYDMSVN_BCI_EXPECTED_SCALE");
+                if (expected != null) Assert.Contains("MONITOR_SCALE=" + expected + ";", result.StandardOutput);
+                _output.WriteLine(result.StandardOutput);
+            }
             Assert.Equal("Segoe UI", receipt.Font.Name);
             Assert.Equal(10f, receipt.Font.SizeInPoints);
             Assert.Equal(10f, receipt.ReceiptGrid[1, 1].View.Font.SizeInPoints);
@@ -70,7 +84,7 @@ public sealed class BusinessCompactLayoutTests
             Assert.True(receipt.LineGrid.ContainsFocus);
             Capture(viewport, mode + "-" + width);
 
-            _output.WriteLine("DPI=" + receipt.DeviceDpi + ";VIEWPORT=" + receipt.ClientSize + ";LINES=" + receipt.LineGrid.Bounds);
+            _output.WriteLine("REQUESTED_LOGICAL=" + width + "x" + height + ";THEME=" + mode + ";WINDOW_DPI=" + receipt.DeviceDpi + ";VIEWPORT=" + receipt.ClientSize + ";LINES=" + receipt.LineGrid.Bounds);
             Assert.Empty(guard.Exceptions);
         }
         finally { BootstrapThemeManager.CurrentTheme = original; }
@@ -253,7 +267,7 @@ public sealed class BusinessCompactLayoutTests
             try { Assert.True(PrintWindow(form.Handle, dc, 3), "Owned HWND capture failed."); }
             finally { graphics.ReleaseHdc(dc); }
         }
-        bitmap.Save(System.IO.Path.Combine(root, name + "-dpi" + form.DeviceDpi + ".png"));
+        bitmap.Save(System.IO.Path.Combine(root, name + "-scale" + (Environment.GetEnvironmentVariable("MYDMSVN_BCI_EXPECTED_SCALE") ?? "unmeasured") + "-dpi" + form.DeviceDpi + ".png"));
     }
     private static void CapturePopup(Control grid, string name)
     {
@@ -271,7 +285,7 @@ public sealed class BusinessCompactLayoutTests
             try { Assert.True(PrintWindow(window, dc, 2)); }
             finally { graphics.ReleaseHdc(dc); }
         }
-        bitmap.Save(System.IO.Path.Combine(root, name + "-dpi" + grid.DeviceDpi + ".png"));
+        bitmap.Save(System.IO.Path.Combine(root, name + "-scale" + (Environment.GetEnvironmentVariable("MYDMSVN_BCI_EXPECTED_SCALE") ?? "unmeasured") + "-dpi" + grid.DeviceDpi + ".png"));
     }
     [StructLayout(LayoutKind.Sequential)] private struct NativeRectangle { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out NativeRectangle rectangle);
