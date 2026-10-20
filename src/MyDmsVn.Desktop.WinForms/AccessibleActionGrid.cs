@@ -7,7 +7,7 @@ namespace MyDmsVn.Desktop.WinForms;
 
 // Read-only result cells retain their table semantics. A virtual Open button exposes
 // the same row activation as mouse/keyboard, without editing cells or vendor code.
-internal sealed class AccessibleActionGrid : BootstrapGrid
+internal class AccessibleActionGrid : BootstrapGrid
 {
     private Func<int, object?>? _rowKey;
     private Func<int, string>? _rowName;

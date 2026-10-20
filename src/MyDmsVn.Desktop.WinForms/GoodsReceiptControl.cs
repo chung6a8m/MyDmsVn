@@ -20,7 +20,7 @@ namespace MyDmsVn.Desktop.WinForms
         Control Create();
     }
 
-    public sealed class GoodsReceiptControl : UserControl
+    public sealed partial class GoodsReceiptControl : UserControl
     {
         private readonly GoodsReceiptListViewModel _list;
         private readonly GoodsReceiptEditorViewModel _editor;
@@ -62,15 +62,19 @@ namespace MyDmsVn.Desktop.WinForms
             PreviousPageButton = CreateButton("Previous", () => MovePage(-1));
             NextPageButton = CreateButton("Next", () => MovePage(1));
             PageLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
-            ReceiptGrid = new AccessibleActionGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt results" };
+            ReceiptGrid = new ReceiptResultsGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt results", CausesValidation = false };
             ((AccessibleActionGrid)ReceiptGrid).ConfigureRowActions(
                 row => row > 0 && row <= _receiptIds.Count ? (object)_receiptIds[row - 1] : null,
                 row => row > 0 && row < ReceiptGrid.RowsCount ? Convert.ToString(ReceiptGrid[row, 1]?.Value) ?? string.Empty : string.Empty,
                 row =>
                 {
+                    if (IsOperationBusy || _editor.RequiresPostOutcomeReload ||
+                        !CanAbandonEditor(ReceiptEditIntent.SelectReceipt)) return;
                     ReceiptGrid.Selection.Focus(new SourceGrid.Position(row, 1), true);
                     SelectActiveReceipt();
                 });
+            ((ReceiptResultsGrid)ReceiptGrid).AdmitPointerNavigation = () =>
+                !IsOperationBusy && !_editor.RequiresPostOutcomeReload && CanAbandonEditor(ReceiptEditIntent.SelectReceipt);
             ReceiptGrid.DoubleClick += (_, __) => SelectActiveReceipt();
             ReceiptGrid.KeyDown += OnReceiptGridKeyDown;
 
@@ -94,34 +98,8 @@ namespace MyDmsVn.Desktop.WinForms
             SaveButton = CreateButton("Save", () => SetOperation(SaveAsync()));
             PostButton = CreateButton("Post", () => SetOperation(PostAsync()));
 
-            LineGrid = new AccessibleActionGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt lines" };
-            ((AccessibleActionGrid)LineGrid).ConfigureRowActions(
-                row => row > 0 && row <= _editor.Lines.Count ? _editor.Lines[row - 1] : null,
-                row => row > 0 && row <= _editor.Lines.Count ? _editor.Lines[row - 1].ProductDisplayName ?? string.Empty : string.Empty,
-                row =>
-                {
-                    LineGrid.Selection.Focus(new SourceGrid.Position(row, 1), true);
-                    SelectActiveLine();
-                });
-            LineGrid.Click += (_, __) => SelectActiveLine();
-            LineGrid.KeyDown += OnLineGridKeyDown;
-            ProductLookup = CreateLookup("Product");
-            QuantityEditor = new AccessibleNumericBox
-            {
-                Dock = DockStyle.Top,
-                DecimalPlaces = GoodsReceiptContractLimits.DecimalPlaces,
-                Minimum = 0,
-                Maximum = GoodsReceiptContractLimits.MaximumQuantity,
-                AccessibleName = "Quantity",
-            };
-            UnitCostEditor = new AccessibleNumericBox
-            {
-                Dock = DockStyle.Top,
-                DecimalPlaces = GoodsReceiptContractLimits.DecimalPlaces,
-                Minimum = 0,
-                Maximum = GoodsReceiptContractLimits.MaximumUnitCost,
-                AccessibleName = "Unit cost",
-            };
+            LineGrid = new GoodsReceiptLinesGrid { Dock = DockStyle.Fill, TabStop = true, CausesValidation = false };
+            _inline = new GoodsReceiptLinesGridAdapter((GoodsReceiptLinesGrid)LineGrid, _editor, CanEditLines);
             AddLineButton = CreateButton("Add line", AddLine);
             RemoveLineButton = CreateButton("Remove line", RemoveSelectedLine);
 
@@ -135,6 +113,9 @@ namespace MyDmsVn.Desktop.WinForms
             };
 
             Controls.Add(CreateLayout());
+            _inline.EditStateChanged += OnInlineEditStateChanged;
+            foreach (var command in new[] { NewButton, RefreshButton, SaveButton, PostButton, AddLineButton, RemoveLineButton })
+                ((ReceiptCommandButton)command).RetainEditorFocus = () => _inline.HasPendingEdit;
             SearchBox.TextChanged += OnSearchChanged;
             WarehouseFilterLookup.TextChanged += OnWarehouseLookupSearchChanged;
             WarehouseFilterLookup.SelectedValueChanged += OnWarehouseFilterChanged;
@@ -145,10 +126,6 @@ namespace MyDmsVn.Desktop.WinForms
             EmployeeLookup.SelectedValueChanged += OnEmployeeChanged;
             EmployeeLookup.TextChanged += OnEmployeeLookupSearchChanged;
             NoteEditor.TextChanged += OnNoteChanged;
-            ProductLookup.SelectedValueChanged += OnProductChanged;
-            ProductLookup.TextChanged += OnProductLookupSearchChanged;
-            QuantityEditor.ValueChanged += OnQuantityChanged;
-            UnitCostEditor.ValueChanged += OnUnitCostChanged;
             _list.PropertyChanged += OnListViewModelPropertyChanged;
             _editor.PropertyChanged += OnViewModelPropertyChanged;
             _editor.WarehouseLookup.PropertyChanged += OnViewModelPropertyChanged;
@@ -168,10 +145,10 @@ namespace MyDmsVn.Desktop.WinForms
         public BootstrapDatePicker ReceiptDateEditor { get; }
         public BootstrapLookupBox WarehouseLookup { get; }
         public BootstrapLookupBox EmployeeLookup { get; }
-        public BootstrapLookupBox ProductLookup { get; }
+        public BootstrapLookupBox ProductLookup => _inline.ProductControl;
         public BootstrapTextBox NoteEditor { get; }
-        public BootstrapNumericBox QuantityEditor { get; }
-        public BootstrapNumericBox UnitCostEditor { get; }
+        public BootstrapFormattedTextBox QuantityEditor => _inline.QuantityControl;
+        public BootstrapFormattedTextBox UnitCostEditor => _inline.CostControl;
         public BootstrapButton RefreshButton { get; }
         public BootstrapButton PreviousPageButton { get; }
         public BootstrapButton NextPageButton { get; }
@@ -209,7 +186,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             if (TryGetLineErrorControl(field, out control))
             {
-                return _errors.GetError(control);
+                return string.Join(Environment.NewLine, ((IEnumerable)_editor.GetErrors(field)).Cast<string>());
             }
 
             return string.Empty;
@@ -235,10 +212,6 @@ namespace MyDmsVn.Desktop.WinForms
                 EmployeeLookup.SelectedValueChanged -= OnEmployeeChanged;
                 EmployeeLookup.TextChanged -= OnEmployeeLookupSearchChanged;
                 NoteEditor.TextChanged -= OnNoteChanged;
-                ProductLookup.SelectedValueChanged -= OnProductChanged;
-                ProductLookup.TextChanged -= OnProductLookupSearchChanged;
-                QuantityEditor.ValueChanged -= OnQuantityChanged;
-                UnitCostEditor.ValueChanged -= OnUnitCostChanged;
                 _list.PropertyChanged -= OnListViewModelPropertyChanged;
                 _editor.PropertyChanged -= OnViewModelPropertyChanged;
                 _editor.WarehouseLookup.PropertyChanged -= OnViewModelPropertyChanged;
@@ -247,6 +220,8 @@ namespace MyDmsVn.Desktop.WinForms
                 _editor.ErrorsChanged -= OnErrorsChanged;
                 _editor.Lines.CollectionChanged -= OnLinesChanged;
                 UnsubscribeLines();
+                _inline.EditStateChanged -= OnInlineEditStateChanged;
+                _inline.Dispose();
                 _errors.Dispose();
                 _list.Dispose();
                 _editor.Dispose();
@@ -264,7 +239,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task RefreshAsync()
         {
-            if (!CanAbandonEditor())
+            if (IsOperationBusy || !CanAbandonEditor(ReceiptEditIntent.Refresh))
             {
                 return;
             }
@@ -280,6 +255,7 @@ namespace MyDmsVn.Desktop.WinForms
             try
             {
                 await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
+                if (IsDisposed || Disposing) return;
                 if (_list.IsAccessDenied)
                 {
                     EnterAccessDeniedEditorState(false);
@@ -289,6 +265,7 @@ namespace MyDmsVn.Desktop.WinForms
                     if (await _editor.RefreshAsync(CancellationToken.None).ConfigureAwait(true))
                     {
                         RebindSelectedLine(selectedLineId, selectedLineIndex);
+                        _inline.ResetDocument(_editor.Lines);
                     }
                 }
             }
@@ -301,16 +278,18 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task SelectReceiptCoreAsync(long id, CancellationToken cancellationToken)
         {
-            if (_editor.RequiresPostOutcomeReload)
+            if (_editor.RequiresPostOutcomeReload || IsOperationBusy)
             {
                 return;
             }
-            if (!CanAbandonEditor())
+            if (!CanAbandonEditor(ReceiptEditIntent.SelectReceipt))
             {
                 return;
             }
 
+            CancelEditorLookupEdits();
             var selected = await _list.SelectAsync(id, cancellationToken).ConfigureAwait(true);
+            if (IsDisposed || Disposing) return;
             if (selected == null)
             {
                 if (_list.IsAccessDenied)
@@ -325,11 +304,13 @@ namespace MyDmsVn.Desktop.WinForms
             CancelEditorLookupEdits();
             _editor.Load(selected);
             _selectedLine = _editor.Lines.FirstOrDefault();
+            _inline.ResetDocument(_editor.Lines);
             ApplyState();
         }
 
         private async Task SaveAsync()
         {
+            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Save)) return;
             if (ApplyEditorsToViewModel())
             {
                 var selectedLineId = _selectedLine?.Id;
@@ -337,9 +318,11 @@ namespace MyDmsVn.Desktop.WinForms
                     ? -1
                     : _editor.Lines.IndexOf(_selectedLine);
                 var saved = await _editor.SaveAsync(CancellationToken.None).ConfigureAwait(true);
+                if (IsDisposed || Disposing) return;
                 if (saved)
                 {
                     RebindSelectedLine(selectedLineId, selectedLineIndex);
+                    _inline.ResetDocument(_editor.Lines);
                     _workflowMessage = null;
                     await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
                     if (_list.IsAccessDenied)
@@ -349,11 +332,20 @@ namespace MyDmsVn.Desktop.WinForms
                 }
             }
             ApplyState();
+            if (_editor.HasErrors) FocusFirstLineError();
         }
 
         private async Task PostAsync()
         {
+            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Post)) return;
+            if (_editor.IsDirty)
+            {
+                _workflowMessage = "Save the current draft before posting it.";
+                ApplyState();
+                return;
+            }
             var posted = await _editor.PostAsync(CancellationToken.None).ConfigureAwait(true);
+            if (IsDisposed || Disposing) return;
             if (posted)
             {
                 _workflowMessage = null;
@@ -379,11 +371,11 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void BeginNew()
         {
-            if (_editor.RequiresPostOutcomeReload)
+            if (_editor.RequiresPostOutcomeReload || IsOperationBusy)
             {
                 return;
             }
-            if (!CanAbandonEditor())
+            if (!CanAbandonEditor(ReceiptEditIntent.NewReceipt))
             {
                 return;
             }
@@ -394,18 +386,20 @@ namespace MyDmsVn.Desktop.WinForms
             _list.NewDraft();
             _editor.Load(null);
             _selectedLine = null;
+            _inline.ResetDocument(_editor.Lines);
             ApplyState();
         }
 
-        private bool CanAbandonEditor()
+        private bool CanAbandonEditor(ReceiptEditIntent intent)
         {
             if (!_editor.IsDirty)
             {
-                return true;
+                return FinishInline(intent);
             }
 
             _workflowMessage = "Save the current draft before leaving it.";
             ApplyState();
+            _inline.FocusActiveEdit();
             return false;
         }
 
@@ -469,24 +463,19 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void AddLine()
         {
-            if (_editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
-            {
-                return;
-            }
-            ProductLookup.CancelPendingEdit();
+            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.AddLine)) return;
             _selectedLine = _editor.AddLine();
+            LineGrid.Selection.Focus(new SourceGrid.Position(_editor.Lines.IndexOf(_selectedLine) + 1, 1), true);
             ApplyState();
+            LineGrid.Focus();
         }
 
         private void RemoveSelectedLine()
         {
-            if (_selectedLine == null || _editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
-            {
-                return;
-            }
-            ProductLookup.CancelPendingEdit();
-            _editor.RemoveLine(_selectedLine);
-            _selectedLine = _editor.Lines.FirstOrDefault();
+            var target = _inline.SelectedLine;
+            if (target == null || !CanEditLines() || !FinishInline(ReceiptEditIntent.RemoveLine)) return;
+            _editor.RemoveLine(target);
+            _selectedLine = _inline.SelectedLine;
             ApplyState();
         }
 
@@ -498,18 +487,7 @@ namespace MyDmsVn.Desktop.WinForms
             }
             _editor.ReceiptDate = ReceiptDateEditor.Value;
             _editor.Note = NoteEditor.Text;
-            ApplySelectedLineEditors();
             return true;
-        }
-
-        private void ApplySelectedLineEditors()
-        {
-            if (_selectedLine == null || _editor.IsReadOnly || _editor.RequiresPostOutcomeReload)
-            {
-                return;
-            }
-            _selectedLine.Quantity = QuantityEditor.Value;
-            _selectedLine.UnitCost = UnitCostEditor.Value;
         }
 
         private void SelectActiveReceipt()
@@ -521,33 +499,11 @@ namespace MyDmsVn.Desktop.WinForms
             }
         }
 
-        private void SelectActiveLine()
-        {
-            var row = LineGrid.Selection.ActivePosition.Row;
-            if (row > 0 && row - 1 < _editor.Lines.Count)
-            {
-                ProductLookup.CancelPendingEdit();
-                ApplySelectedLineEditors();
-                _selectedLine = _editor.Lines[row - 1];
-                ApplyState();
-            }
-        }
-
         private void OnReceiptGridKeyDown(object? sender, KeyEventArgs eventArgs)
         {
             if (eventArgs.KeyCode == Keys.Enter && eventArgs.Modifiers == Keys.None)
             {
                 SelectActiveReceipt();
-                eventArgs.Handled = true;
-                eventArgs.SuppressKeyPress = true;
-            }
-        }
-
-        private void OnLineGridKeyDown(object? sender, KeyEventArgs eventArgs)
-        {
-            if (eventArgs.KeyCode == Keys.Enter && eventArgs.Modifiers == Keys.None)
-            {
-                SelectActiveLine();
                 eventArgs.Handled = true;
                 eventArgs.SuppressKeyPress = true;
             }
@@ -575,14 +531,6 @@ namespace MyDmsVn.Desktop.WinForms
             if (!_applyingState && EmployeeLookup.HasPendingText)
             {
                 SetOperation(_editor.EmployeeLookup.SetSearch(EmployeeLookup.Text));
-            }
-        }
-
-        private void OnProductLookupSearchChanged(object? sender, EventArgs eventArgs)
-        {
-            if (!_applyingState && ProductLookup.HasPendingText)
-            {
-                SetOperation(_editor.ProductOptions.SetSearch(ProductLookup.Text));
             }
         }
 
@@ -640,35 +588,11 @@ namespace MyDmsVn.Desktop.WinForms
             }
         }
 
-        private void OnProductChanged(object? sender, EventArgs eventArgs)
-        {
-            if (!_applyingState && !_editor.RequiresPostOutcomeReload && _selectedLine != null && TrySelectedOption(ProductLookup, out var option))
-            {
-                _selectedLine.SetProduct(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
-            }
-        }
-
         private void OnNoteChanged(object? sender, EventArgs eventArgs)
         {
             if (!_applyingState && !_editor.IsReadOnly && !_editor.RequiresPostOutcomeReload)
             {
                 _editor.Note = NoteEditor.Text;
-            }
-        }
-
-        private void OnQuantityChanged(object? sender, EventArgs eventArgs)
-        {
-            if (!_applyingState)
-            {
-                ApplySelectedLineEditors();
-            }
-        }
-
-        private void OnUnitCostChanged(object? sender, EventArgs eventArgs)
-        {
-            if (!_applyingState)
-            {
-                ApplySelectedLineEditors();
             }
         }
 
@@ -774,13 +698,13 @@ namespace MyDmsVn.Desktop.WinForms
             try
             {
                 SetReceiptRows();
-                SetLineRows();
+                _selectedLine = _inline.SelectedLine;
+                _inline.RefreshEditability();
                 WarehouseFilterLookup.DataSource = _editor.WarehouseLookup.Items
                     .Where(item => item.IsAvailableForNewSelection)
                     .ToArray();
                 BindEditorLookup(WarehouseLookup, _editor.WarehouseLookup.Items, _editor.WarehouseId);
                 BindEditorLookup(EmployeeLookup, _editor.EmployeeLookup.Items, _editor.EmployeeId);
-                BindEditorLookup(ProductLookup, _editor.ProductOptions.Items, _selectedLine?.ProductId);
                 WarehouseFilterLookup.SelectValue(_warehouseFilterId);
                 StatusFilter.SelectedItem = _statusFilter ?? "All";
                 ReceiptDateEditor.Value = _editor.ReceiptDate;
@@ -790,15 +714,13 @@ namespace MyDmsVn.Desktop.WinForms
                 TotalLabel.Text = _editor.Total.HasValue
                     ? _editor.Total.Value.ToString("0.00")
                     : "Amount too large";
-                QuantityEditor.Value = Clamp(QuantityEditor, _selectedLine?.Quantity ?? 0m);
-                UnitCostEditor.Value = Clamp(UnitCostEditor, _selectedLine?.UnitCost ?? 0m);
 
                 var busy = _isRefreshing || _list.IsLoading || _list.IsBusy || _editor.IsBusy;
                 var requiresPostReload = _editor.RequiresPostOutcomeReload;
                 BusyIndicator.Visible = busy;
                 OperationStatusLabel.Text = requiresPostReload
                     ? "Posting outcome unknown. Refresh to reload the receipt before making further changes. " + _editor.ErrorMessage
-                    : _workflowMessage ??
+                    : _inline.EditError ?? _workflowMessage ??
                     _editor.ErrorMessage ??
                     _list.ErrorMessage ??
                     (busy ? "Loading..." : "Ready");
@@ -825,9 +747,7 @@ namespace MyDmsVn.Desktop.WinForms
                     !_editor.IsDirty;
                 AddLineButton.Enabled = canEdit;
                 RemoveLineButton.Enabled = canEdit && _selectedLine != null;
-                ProductLookup.Enabled = canEdit && _selectedLine != null;
-                QuantityEditor.Enabled = canEdit && _selectedLine != null;
-                UnitCostEditor.Enabled = canEdit && _selectedLine != null;
+                _inline.RefreshEditability();
                 ApplyErrors();
             }
             finally
@@ -856,50 +776,14 @@ namespace MyDmsVn.Desktop.WinForms
             ReceiptGrid.AutoSizeCells();
         }
 
-        private void SetLineRows()
-        {
-            LineGrid.Redim(_editor.Lines.Count + 1, 5);
-            LineGrid.FixedRows = 1;
-            SetHeaders(LineGrid, "#", "Product", "Quantity", "Unit cost", "Total");
-            for (var index = 0; index < _editor.Lines.Count; index++)
-            {
-                var item = _editor.Lines[index];
-                var row = index + 1;
-                LineGrid[row, 0] = new SourceGrid.Cells.Cell(index + 1);
-                LineGrid[row, 1] = new SourceGrid.Cells.Cell(item.ProductDisplayName ?? string.Empty);
-                LineGrid[row, 2] = new SourceGrid.Cells.Cell(item.Quantity);
-                LineGrid[row, 3] = new SourceGrid.Cells.Cell(item.UnitCost);
-                LineGrid[row, 4] = new SourceGrid.Cells.Cell(
-                    item.LineTotal.HasValue
-                        ? (object)item.LineTotal.Value
-                        : "Amount too large");
-            }
-            LineGrid.AutoSizeCells();
-        }
-
         private void ApplyErrors()
         {
-            foreach (var control in _errorControls.Values.Concat(
-                new Control[] { ProductLookup, QuantityEditor, UnitCostEditor }))
-            {
-                _errors.SetError(control, string.Empty);
-            }
-
-            foreach (var field in _errorControls.Keys)
-            {
-                SetError(field, _errorControls[field]);
-            }
-
-            if (_selectedLine != null)
-            {
-                var index = _editor.Lines.IndexOf(_selectedLine);
-                if (index >= 0)
-                {
-                    SetError($"lines[{index}].productId", ProductLookup);
-                    SetError($"lines[{index}].quantity", QuantityEditor);
-                    SetError($"lines[{index}].unitCost", UnitCostEditor);
-                }
-            }
+            foreach (var field in _errorControls.Keys) SetError(field, _errorControls[field]);
+            var messages = Enumerable.Range(0, _editor.Lines.Count)
+                .SelectMany(index => new[] { "productId", "quantity", "unitCost" }
+                    .SelectMany(field => ((IEnumerable)_editor.GetErrors($"lines[{index}].{field}")).Cast<string>()));
+            var error = string.Join(Environment.NewLine, messages);
+            if (!string.IsNullOrEmpty(error)) _errors.SetError(LineGrid, error);
         }
 
         private void SetError(string field, Control control)
@@ -910,23 +794,8 @@ namespace MyDmsVn.Desktop.WinForms
 
         private bool TryGetLineErrorControl(string field, out Control control)
         {
-            if (field.EndsWith(".productId", StringComparison.Ordinal))
-            {
-                control = ProductLookup;
-                return true;
-            }
-            if (field.EndsWith(".quantity", StringComparison.Ordinal))
-            {
-                control = QuantityEditor;
-                return true;
-            }
-            if (field.EndsWith(".unitCost", StringComparison.Ordinal))
-            {
-                control = UnitCostEditor;
-                return true;
-            }
-            control = null!;
-            return false;
+            control = LineGrid;
+            return field.StartsWith("lines[", StringComparison.Ordinal);
         }
 
         private Control CreateLayout()
@@ -1012,18 +881,10 @@ namespace MyDmsVn.Desktop.WinForms
         private Control CreateLineEditor()
         {
             var panel = new Panel { Dock = DockStyle.Fill };
-            var fields = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 3, Padding = new Padding(8) };
-            fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-            fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-            fields.Controls.Add(ProductLookup, 0, 0);
-            fields.Controls.Add(QuantityEditor, 1, 0);
-            fields.Controls.Add(UnitCostEditor, 2, 0);
             var commands = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
             commands.Controls.Add(AddLineButton);
             commands.Controls.Add(RemoveLineButton);
             panel.Controls.Add(LineGrid);
-            panel.Controls.Add(fields);
             panel.Controls.Add(commands);
             return panel;
         }
@@ -1038,7 +899,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             WarehouseLookup.CancelPendingEdit();
             EmployeeLookup.CancelPendingEdit();
-            ProductLookup.CancelPendingEdit();
+            _inline.CancelActiveEdit();
         }
 
         private static void BindEditorLookup(BootstrapLookupBox lookup, IEnumerable<CatalogLookupOption> options, int? selectedId)
@@ -1066,7 +927,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private static BootstrapButton CreateButton(string text, Action action)
         {
-            var button = new BootstrapButton { Text = text, AutoSize = true };
+            var button = new ReceiptCommandButton { Text = text, AutoSize = true, CausesValidation = false };
             button.Click += (_, __) => action();
             return button;
         }
@@ -1083,9 +944,6 @@ namespace MyDmsVn.Desktop.WinForms
             option = selected;
             return true;
         }
-
-        private static decimal Clamp(BootstrapNumericBox editor, decimal value) =>
-            Math.Min(editor.Maximum, Math.Max(editor.Minimum, value));
 
         private static void SetHeaders(BootstrapGrid grid, params string[] headers)
         {

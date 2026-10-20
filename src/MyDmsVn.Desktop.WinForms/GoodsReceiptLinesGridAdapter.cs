@@ -36,6 +36,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
     private bool _resetting;
     private bool _structurePending;
     private bool _disposed;
+    private bool _bindingOptions;
 
     internal GoodsReceiptLinesGridAdapter(GoodsReceiptLinesGrid grid, GoodsReceiptEditorViewModel editor, Func<bool> canEdit)
     {
@@ -52,6 +53,9 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
             input.ConvertingObjectToValue += ConvertCandidate;
             input.Control.TextChanged += OnCandidateChanged;
         }
+        _product.Control.AccessibleName = "Product";
+        _quantity.Control.AccessibleName = "Quantity";
+        _cost.Control.AccessibleName = "Unit cost";
         _product.BootstrapControl.DisplayMember = nameof(CatalogLookupOption.DisplayName);
         _product.BootstrapControl.ValueMember = nameof(CatalogLookupOption.Id);
         _product.BootstrapControl.SearchDebounceMilliseconds = 0;
@@ -68,7 +72,39 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
     private EditorControlBase[] Inputs => new EditorControlBase[] { _product, _quantity, _cost };
     private bool Editable => !_disposed && !_grid.IsDisposed && _grid.Enabled && !_editor.IsReadOnly &&
         !_editor.IsBusy && !_editor.RequiresPostOutcomeReload && _canEdit();
-    internal string? EditError { get; private set; }
+    internal MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapLookupBox ProductControl => _product.BootstrapControl;
+    internal MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapFormattedTextBox QuantityControl => _quantity.BootstrapControl;
+    internal MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapFormattedTextBox CostControl => _cost.BootstrapControl;
+    internal GoodsReceiptLineViewModel? SelectedLine
+    {
+        get
+        {
+            var row = _grid.Selection.ActivePosition.Row > 0 ? _grid.Selection.ActivePosition.Row : _selectionRow;
+            return row > 0 && row <= _lines.Count ? _lines[row - 1] : null;
+        }
+    }
+    internal void FocusCell(GoodsReceiptLineViewModel line, int column)
+    {
+        if (!Editable || !_grid.IsHandleCreated || column < 1 || column > 3) return;
+        var index = _lines.FindIndex(current => ReferenceEquals(current, line));
+        if (index < 0) return;
+        var position = new Position(index + 1, column);
+        _grid.Focus();
+        if (_grid.Selection.Focus(position, true)) new CellContext(_grid, position).StartEdit();
+    }
+    internal void FocusActiveEdit() { if (_session != null && !_session.Input.Control.ContainsFocus) _session.Input.Control.Focus(); }
+    private string? _editError;
+    internal event EventHandler? EditStateChanged;
+    internal string? EditError
+    {
+        get => _editError;
+        private set
+        {
+            if (_editError == value) return;
+            _editError = value;
+            EditStateChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
     internal bool HasPendingEdit => _session != null;
     internal bool HasPendingDataEdit => _session != null && (_session.Column == 1
         ? !Equals(_product.BootstrapControl.SelectedValue, _session.OriginalValue)
@@ -102,6 +138,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         if (session != null && !_grid.IsDisposed && session.Input.IsEditing)
             session.Input.EditCellContext.EndEdit(true);
         EditError = null;
+        if (session?.Column == 1 && !_disposed) _ = _editor.ProductOptions.SetSearch(null);
         if (!_disposed && !_resetting)
         {
             if (_structurePending) Rebuild(_editor.Lines, false);
@@ -156,6 +193,8 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
                 _grid.Rows[row].Height = 42;
                 _grid[row, 0] = new Cell(row);
                 _grid[row, 4] = new Cell(line.LineTotal.HasValue ? (object)line.LineTotal.Value : "Amount too large");
+                _grid[row, 0].AddController(Unselectable.Default);
+                _grid[row, 4].AddController(Unselectable.Default);
                 for (var column = 1; column <= 3; column++)
                 {
                     var input = column == 1 ? (EditorControlBase)_product : column == 2 ? _quantity : _cost;
@@ -191,7 +230,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         if (_disposed || _grid.IsDisposed) return;
         var editable = Editable;
         if (!editable) CancelActiveEdit();
-        foreach (var input in Inputs) input.EnableEdit = editable;
+        foreach (var input in Inputs) { input.EnableEdit = editable; input.Control.Enabled = editable; }
     }
 
     private bool Current(Session session) => Editable && session.Generation == _generation &&
@@ -274,7 +313,13 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
     private void End(LineController controller, CellContext context)
     {
         if (_session != null && _session.CandidateValidated) Commit(controller, context);
-        if (_session != null && controller.Generation == _session.Generation && ReferenceEquals(context.Cell, _session.Context.Cell)) _session = null;
+        if (_session != null && controller.Generation == _session.Generation && ReferenceEquals(context.Cell, _session.Context.Cell))
+        {
+            var wasProduct = _session.Column == 1;
+            _session = null;
+            EditError = null;
+            if (wasProduct && !_disposed) _ = _editor.ProductOptions.SetSearch(null);
+        }
         if (_disposed || _resetting) return;
         if (_structurePending)
         {
@@ -318,12 +363,20 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
 
     private void BindProductOptions()
     {
-        if (_product.IsEditing) return; // Same-context result refresh must not reset raw query/caret.
+        if (_bindingOptions) return;
         var options = _editor.ProductOptions.Items.ToList();
         foreach (var line in _lines.Where(line => line.ProductId > 0))
             if (options.All(option => option.Id != line.ProductId))
                 options.Add(new CatalogLookupOption(line.ProductId, "", "", line.ProductIsAvailable, line.ProductDisplayName));
-        _product.BootstrapControl.DataSource = options.ToArray();
+        var lookup = _product.BootstrapControl;
+        _bindingOptions = true;
+        try
+        {
+            // The pinned lookup reconciles its committed identity on DataSource replacement
+            // without touching pending text/caret. Reselecting here would resolve/reset input.
+            lookup.DataSource = options.ToArray();
+        }
+        finally { _bindingOptions = false; }
     }
 
     private void DisplayProduct(object? sender, DevAge.ComponentModel.ConvertingObjectEventArgs e)
@@ -336,7 +389,11 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
     private void OnCandidateChanged(object? sender, EventArgs e)
     {
         if (_session != null && _session.Input.IsEditing)
+        {
             _session.RawCandidate = _session.Input.Control.Text;
+            if (!_bindingOptions && _session.Column == 1 && _product.BootstrapControl.HasPendingText)
+                _ = _editor.ProductOptions.SetSearch(_session.RawCandidate);
+        }
     }
     private void OnEditException(object sender, ExceptionEventArgs e) => EditError ??= "The cell value could not be committed.";
     private void OnGridDisposed(object? sender, EventArgs e) => Dispose();

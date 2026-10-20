@@ -254,17 +254,18 @@ public sealed partial class GoodsReceiptInlineEditorTests
             .IntersectsWith(editor.RectangleToScreen(editor.ClientRectangle)));
     }
 
+    internal static TextBox FocusedInput() => Assert.IsType<TextBox>(Control.FromHandle(GetFocus()));
     private static void Pump() => System.Windows.Forms.Application.DoEvents();
-    private static void Type(string text)
+    internal static void Type(string text)
     {
         foreach (var ch in text) SendMessage(GetFocus(), 0x0102, new IntPtr(ch), IntPtr.Zero);
         Pump();
     }
-    private static void Key(Keys key)
+    internal static void Key(Keys key)
     {
         // Posted window messages traverse WinForms preprocessing (popup/Enter/Escape routing).
-        Assert.True(PostMessage(GetFocus(), 0x0100, new IntPtr((int)key), IntPtr.Zero));
-        Assert.True(PostMessage(GetFocus(), 0x0101, new IntPtr((int)key), IntPtr.Zero));
+        Assert.True(PostMessage(GetFocus(), 0x0100, new IntPtr((int)key), IntPtr.Zero), "No native keydown focus for " + key + "; focus=" + GetFocus());
+        Assert.True(PostMessage(GetFocus(), 0x0101, new IntPtr((int)key), IntPtr.Zero), "No native keyup focus for " + key + "; focus=" + GetFocus());
         Pump();
     }
     [DllImport("user32.dll")] private static extern IntPtr GetFocus();
