@@ -1,6 +1,6 @@
 # GUI-P5-T05 — Attended Inventory walkthrough
 
-**Status: IN PROGRESS —33/45 observations PASS; both125% UX confirmations and final Owner sign-off pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
+**Status: IN PROGRESS —44/45 observations PASS;1partially tested UX cell with disclosed limit; final Owner acceptance pending. REMAIN-P5-GUI-02 OPEN.** Prepared2026-10-19, Asia/Bangkok, Codex; task base cdfa4b7. T04 accepted at cdfa4b7 is preserved. This worksheet records actual attended observations; existing automated results are separate.
 
 ## Candidate and admission
 
@@ -60,16 +60,16 @@ PASS requires the named actual observation plus any independent oracle and Owner
 
 | Case | Action / required evidence |100% Dark|125% Light|125% Dark|
 |---|---|---|---|---|
-| UX-R | Receipt keyboard/focus/errors, windowed/maximized layout and Posted/busy command states. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
-| UX-B | Balance keyboard/filter/Refresh/error/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
-| UX-S | Stock Card keyboard/date filters/Refresh/errors/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
-| UX-P | Product popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
-| UX-W | Warehouse popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending; Down NOT TESTED, Enter/F4/Esc/filter observed |
-| UX-E | Employee popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | EXECUTED — Owner confirmation pending | EXECUTED — Owner confirmation pending |
+| UX-R | Receipt keyboard/focus/errors, windowed/maximized layout and Posted/busy command states. | PASS — Owner confirmed100Dark observations; scope/qualifications below | PASS — Owner confirmed125% observations; documented qualifications retained | PASS — Owner confirmed125% observations; documented qualifications retained |
+| UX-B | Balance keyboard/filter/Refresh/error/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | PASS — Owner confirmed125% observations; documented qualifications retained | PASS — Owner confirmed125% observations; documented qualifications retained |
+| UX-S | Stock Card keyboard/date filters/Refresh/errors/totals/grid/paging bounds and resize. | PASS — Owner confirmed100Dark observations; scope/qualifications below | PASS — Owner confirmed125% observations; documented qualifications retained | PASS — Owner confirmed125% observations; documented qualifications retained |
+| UX-P | Product popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | PASS — Owner confirmed125% observations; documented qualifications retained | PASS — Owner confirmed125% observations; documented qualifications retained |
+| UX-W | Warehouse popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | PASS — Owner confirmed125% observations; documented qualifications retained | PARTIAL — Owner confirmed observed behavior; Down NOT TESTED, Enter/F4/Esc/filter observed |
+| UX-E | Employee popup F4/filter/arrows/Enter/reopen/Esc, focus/work-area bounds. | PASS — Owner confirmed100Dark observations; scope/qualifications below | PASS — Owner confirmed125% observations; documented qualifications retained | PASS — Owner confirmed125% observations; documented qualifications retained |
 
 ## Session / artifacts / decision
 
-T05 evidence ledger currently33/45 PASS (27/27 baseline including final independent oracle/cleanup,6/18 Owner-confirmed supplemental); no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
+T05 evidence ledger currently44/45 PASS (27/27 baseline,17/18 supplemental); the remaining Warehouse125Dark cell is PARTIAL solely because Down was not tested. All actual125% observations are Owner-confirmed; no automated invocation added. Package, SQL, scale, actor setup, actual observations, oracles, resources and timestamps will be recorded per cohort. Existing T03/T04 tests are not T05 attended passes. Final Owner sign-off PENDING; T05/REMAIN-P5-GUI-02 and T06/overallP5/P6 remain OPEN.
 
 ### Setup attempt1 — FAIL, safely disposed
 
@@ -348,3 +348,11 @@ Both125%UXgroups executed; explicit consolidated Ownerobservation confirmation r
 ### Final independent review —2026-10-20
 
 Fresh read-only reviewer checked the T05 branch scope cdfa4b7..8c0cf5d: no material candidate/cohort/oracle/cleanup finding. Verified80unique publicimages against their recorded hashes (inline/table references include duplicates),15-table finalsnapshot equivalence and chapter4/root lifecycle. Corrected stale current summary in GUI_P5_VERIFICATION and12executed-but-NOTRUN125cells. Warehouse125DarkDown remains NOT TESTED; no inference from anotherpopup or general Ownerconfirmation. Filter/Enter/F4/Esc were observed. This narrow observation limit is disclosed for Ownerdecision, not a productfailure or an automatedpass. No productfix/test rerun required for documentation corrections; no secondreview dispatched. T05 stillOPEN pending explicit125observations and finalOwneracceptance.
+
+### Owner125% observations confirmed / proposed final acceptance —2026-10-20
+
+Owner explicitly confirmed: “xác nhận hai lượt125% Light/Dark đúng như đã quan sát”. This accepts the observed behavior in both contexts; it does not turn the untested Warehouse125DarkDown substep into a test result. Updated canonical ledger:27baselinePASS +17supplementalPASS =44PASS;1supplementalPARTIAL with onlyDown NOT TESTED. No productfailure identified. Other observed keyboard paths in that cell (filter/Enter/F4/Esc/focus/bounds) are confirmed.
+
+Concrete acceptance scope for Owner: installed net48/x86 frozen d5207b2 on actual Windows11build26200.9457, SQL2017Developer14.0.2130.4/schema001–009; full100Light functional baseline and100Dark/125Light/Dark supplemental UX; exact original/continuation fixture provenance and preserved failures/qualifications above. Final restricted reconciliation0mismatches, normal process drain, all3T05allocations/9principals disposed,169/169historicalGUIledgersDropped and exactlatest database/principal/process0. Review completed, no material runtime/evidence finding. No new automated pass, T06/fullGUI gate or P6 certification claimed.
+
+Final Owner signature and explicit disposition of the single untestedDown substep remain pending. Proposed decision: accept T05 within the documented observations and accept that narrow observation limit; retain Down as NOT TESTED rather than relabeling itPASS. Only after that explicit decision may T05/REMAIN-P5-GUI-02 close. T06/overallP5/P6 remainOPEN.
