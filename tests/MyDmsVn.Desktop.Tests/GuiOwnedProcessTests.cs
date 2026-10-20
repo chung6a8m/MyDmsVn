@@ -16,6 +16,33 @@ namespace MyDmsVn.Desktop.Tests
         public GuiOwnedProcessTests(GuiProcessProbeFixture probe) => _probe = probe;
 
         [Fact]
+        public async Task Packaged_lookup_keyboard_recovers_its_owned_window_from_a_background_editor()
+        {
+            using var keyboard = new GuiProcessProbeFixture(package: true);
+            var start = keyboard.Start("\"" + _probe.Start("unused").FileName + "\" keyboard-focus-audit Light");
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_EXPECTED_SCALE"] =
+                Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(25));
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("BACKGROUND_TARGET_OBSERVED=PASS", result.StandardOutput);
+            Assert.Contains("OWNED_LOOKUP_FOREGROUND_RECOVERED=PASS", result.StandardOutput);
+            Assert.True(result.CleanupVerified);
+        }
+
+        [Fact]
+        public async Task Packaged_lookup_input_preserves_value_when_the_editor_refuses_keyboard_focus()
+        {
+            using var keyboard = new GuiProcessProbeFixture(package: true);
+            var start = keyboard.Start("\"" + _probe.Start("unused").FileName + "\" keyboard-focus-refusal-audit Light");
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_EXPECTED_SCALE"] =
+                Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(25));
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("REFUSED_LOOKUP_FOCUS_NO_INPUT=PASS", result.StandardOutput);
+            Assert.True(result.CleanupVerified);
+        }
+
+        [Fact]
         public async Task Large_stdout_and_stderr_are_drained_without_deadlock_and_retention_is_bounded()
         {
             var result = await GuiOwnedProcess.RunAsync(_probe.Start("output"), TimeSpan.FromSeconds(10));

@@ -18,6 +18,9 @@ internal static class GuiPackageProbe
     private sealed class CachedInput { internal AutomationElement Named; internal AutomationElement Editor; }
     private static readonly System.Collections.Generic.Dictionary<string, CachedInput> InputEditors = new System.Collections.Generic.Dictionary<string, CachedInput>();
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool ShowWindowAsync(IntPtr window, int command);
     [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr window, uint flags);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("kernel32.dll")] private static extern uint SetErrorMode(uint mode);
@@ -52,6 +55,11 @@ internal static class GuiPackageProbe
             if ((args.Length != 2 && args.Length != 3) || !Path.IsPathRooted(args[0])) throw new ArgumentException();
             _theme = args.Length == 3 ? args[2] : "Light";
             if (_theme != "Light" && _theme != "Dark") throw new ArgumentException();
+            if (args[1] == "keyboard-focus-audit" || args[1] == "keyboard-focus-refusal-audit")
+            {
+                AuditOwnedKeyboardForeground(args[0], args[1] == "keyboard-focus-refusal-audit");
+                return 0;
+            }
             StartApplication(args[0]);
             if (args[1] == "startup-unavailable")
             {
@@ -190,6 +198,40 @@ internal static class GuiPackageProbe
         foreach (var key in keys)
             if (key.StartsWith("MYDMSVN_GUI_P5_", StringComparison.OrdinalIgnoreCase)) start.EnvironmentVariables.Remove(key);
         _application = Process.Start(start);
+    }
+
+    private static void AuditOwnedKeyboardForeground(string executable, bool refusing)
+    {
+        _stage = "owned-keyboard-foreground";
+        var signal = "Local\\MyDmsVn.GuiFocus." + Guid.NewGuid().ToString("N");
+        using (var ready = new EventWaitHandle(false, EventResetMode.ManualReset, signal))
+        {
+            _application = Process.Start(new ProcessStartInfo(executable, "focus-target " + signal + (refusing ? " refuse" : ""))
+            { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(executable) });
+            if (!ready.WaitOne(TimeSpan.FromSeconds(5))) throw new TimeoutException("Owned distraction unavailable.");
+            var target = Window("GUI focus target");
+            var handle = new IntPtr(target.Current.NativeWindowHandle);
+            if (refusing)
+            {
+                var rejected = false;
+                try { SetInput(target, "Focus target editor", "must not be written", false); }
+                catch (TimeoutException) { rejected = true; }
+                if (!rejected || InputValue(target, "Focus target editor") != "")
+                    throw new InvalidOperationException("Input must reject unavailable focus without changing the editor.");
+                Console.WriteLine("REFUSED_LOOKUP_FOCUS_NO_INPUT=PASS");
+            }
+            else
+            {
+                if (GetForegroundWindow() == handle) throw new InvalidOperationException("Target must start in the background.");
+                Console.WriteLine("BACKGROUND_TARGET_OBSERVED=PASS");
+                SendOwnedLookupKey(InputEditor(target, "Focus target editor"), 0x73);
+                if (GetForegroundWindow() != handle) throw new InvalidOperationException("Keyboard target did not own foreground.");
+                Find(target, "F4 delivered", ControlType.Text, false);
+            }
+            ((WindowPattern)target.GetCurrentPattern(WindowPattern.Pattern)).Close();
+            if (!_application.WaitForExit(5000) || _application.ExitCode != 0) throw new InvalidOperationException("Synthetic focus target did not drain.");
+            Console.WriteLine("OWNED_LOOKUP_FOREGROUND_RECOVERED=PASS");
+        }
     }
 
     private static void Catalog(AutomationElement shell, string title, string code, string name, string[] fields, string[] values)
@@ -552,7 +594,7 @@ internal static class GuiPackageProbe
             new PropertyCondition(AutomationElement.NameProperty, name));
         if (editor.Current.IsPassword != password) throw new InvalidOperationException("Input accessibility semantics missing.");
         Wait(delegate { return editor.Current.IsEnabled; }, "Input disabled.");
-        editor.SetFocus();
+        FocusOwnedEditor(editor);
         ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
         if (password)
         {
@@ -682,16 +724,29 @@ internal static class GuiPackageProbe
     }
     private static void SendOwnedLookupKey(AutomationElement editor, int key)
     {
+        FocusOwnedEditor(editor);
         var handle = new IntPtr(editor.Current.NativeWindowHandle);
-        editor.SetFocus();
-        uint process;
-        GetWindowThreadProcessId(handle, out process);
-        _detail = "Keyboard target must be the focused owned lookup editor.";
-        if (process != _application.Id) throw new InvalidOperationException("Keyboard input target is not an owned editor.");
-        Wait(delegate { return editor.Current.HasKeyboardFocus; }, "Owned lookup editor did not receive keyboard focus.");
         if (!PostMessage(handle, 0x100, new IntPtr(key), new IntPtr(1)) ||
             !PostMessage(handle, 0x101, new IntPtr(key), new IntPtr(unchecked((int)0xC0000001))))
             throw new InvalidOperationException("Owned lookup keyboard input failed.");
+    }
+
+    private static void FocusOwnedEditor(AutomationElement editor)
+    {
+        var handle = new IntPtr(editor.Current.NativeWindowHandle);
+        var window = GetAncestor(handle, 2);
+        uint editorProcess, windowProcess;
+        GetWindowThreadProcessId(handle, out editorProcess);
+        GetWindowThreadProcessId(window, out windowProcess);
+        if (handle == IntPtr.Zero || window == IntPtr.Zero ||
+            editorProcess != _application.Id || windowProcess != _application.Id)
+            throw new InvalidOperationException("Input target is not an owned editor/window.");
+        // One activation request, never an input-queue attachment or repeated business action.
+        if (IsIconic(window)) ShowWindowAsync(window, 9); // Restore only this owned minimized window.
+        if (GetForegroundWindow() != window) SetForegroundWindow(window);
+        editor.SetFocus();
+        Wait(delegate { return GetForegroundWindow() == window && editor.Current.HasKeyboardFocus; },
+            "Owned input window/editor did not receive foreground and keyboard focus.");
     }
 
     private static AutomationElement InputEditor(AutomationElement root, string name)

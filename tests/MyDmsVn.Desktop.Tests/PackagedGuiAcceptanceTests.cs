@@ -356,13 +356,17 @@ public sealed class PackagedGuiAcceptanceTests
         using (var stream = File.OpenRead(manifestPath))
         using (var hash = SHA256.Create())
             _output.WriteLine("MANIFEST_SHA256=" + BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", ""));
+        // Legacy variable name: it pins package provenance; the actual test build is separate below.
         var revision = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_TEST_REVISION");
         if (revision != null && System.Text.RegularExpressions.Regex.IsMatch(revision, "^[a-fA-F0-9]{40}$"))
         {
             Assert.Equal(manifest.Value<string>("sourceCommit"), revision, ignoreCase: true);
-            _output.WriteLine("TEST_SOURCE=" + revision);
+            _output.WriteLine("EXPECTED_PACKAGE_SOURCE=" + revision);
         }
-        else _output.WriteLine("TEST_SOURCE=WORKING_TREE_TRIAL");
+        else _output.WriteLine("EXPECTED_PACKAGE_SOURCE=UNPINNED_TRIAL");
+        // Product bytes can stay frozen while the test-only driver changes.
+        _output.WriteLine("TEST_BUILD_INFORMATIONAL_VERSION=" +
+            typeof(PackagedGuiAcceptanceTests).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
         return root;
     }
     internal static string ValidatedPackage()

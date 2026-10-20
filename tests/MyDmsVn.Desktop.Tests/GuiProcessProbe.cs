@@ -8,6 +8,7 @@ using System.Windows.Forms;
 
 internal static class GuiProcessProbe
 {
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("kernel32.dll")] private static extern uint SetErrorMode(uint mode);
     [DllImport("kernel32.dll")] private static extern int WerSetFlags(uint flags);
 
@@ -17,6 +18,35 @@ internal static class GuiProcessProbe
         SetErrorMode(0x0001 | 0x0002);
         WerSetFlags(0x0002);
         string mode = args[0];
+        if (mode == "focus-target")
+        {
+            using (var target = new Form { Text = "GUI focus target", Width = 480, Height = 200 })
+            using (var other = new Form { Text = "GUI owned distraction", Width = 300, Height = 160 })
+            using (var focusReady = EventWaitHandle.OpenExisting(args[1]))
+            using (var timer = new System.Windows.Forms.Timer { Interval = 25 })
+            {
+                var refusing = args.Length > 2 && args[2] == "refuse";
+                var sink = new Button { Text = "Focus sink", Dock = DockStyle.Fill };
+                var editor = new FocusTargetEditor { AccessibleName = "Focus target editor", Dock = DockStyle.Top,
+                    FocusSink = refusing ? sink : null };
+                var receipt = new Label { Text = "Awaiting F4", Dock = DockStyle.Bottom };
+                editor.KeyDown += (sender, key) => { if (key.KeyCode == Keys.F4) receipt.Text = "F4 delivered"; };
+                target.Controls.Add(editor);
+                target.Controls.Add(receipt);
+                target.Controls.Add(sink);
+                target.Shown += (sender, ignored) =>
+                {
+                    if (refusing) { sink.Focus(); focusReady.Set(); }
+                    else { other.Show(target); other.Activate(); timer.Start(); }
+                };
+                timer.Tick += (sender, ignored) =>
+                {
+                    if (GetForegroundWindow() == other.Handle) { timer.Stop(); focusReady.Set(); }
+                };
+                Application.Run(target);
+            }
+            return 0;
+        }
         if (mode == "draining-child") { Thread.Sleep(150); return 0; }
         if (mode == "draining-parent")
         {
@@ -95,5 +125,15 @@ internal static class GuiProcessProbe
         // Intentionally noncooperative STA: only the owning Windows job can terminate this.
         Thread.Sleep(Timeout.Infinite);
         return 0;
+    }
+
+    private sealed class FocusTargetEditor : TextBox
+    {
+        public Control FocusSink;
+        protected override void OnGotFocus(EventArgs args)
+        {
+            base.OnGotFocus(args);
+            if (FocusSink != null) FocusSink.Focus();
+        }
     }
 }
