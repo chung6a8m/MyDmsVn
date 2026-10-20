@@ -17,6 +17,7 @@ Runtime/build/package/GUI/restoration evidence is recorded in [History](../HISTO
 
 ## Reactivation
 
-Reactivation is [deferred](../DEFERRED_WORK.md). Follow [REACTIVATE_NET8](../REACTIVATE_NET8.md) after the owner activates that scope: restore the coherent project/reference/solution/package graph, dependencies and active case mappings, then obtain fresh evidence for every restored runtime. Preserve net48 unless the owner separately changes that requirement.
+Modern-target reactivation remains an [out-of-scope direction](../DEFERRED_WORK.md#out-of-scope-directions), not an executable backlog or part of BCI. A later owner decision must define a new reviewed plan and its runtime evidence requirements. Preserve net48 unless the owner separately changes that requirement; removing the former reactivation procedure does not reactivate AppCore.
 
 Current new-work testing follows [TEST_POLICY](../TEST_POLICY.md). This accepted pause does not require rerunning its historical acceptance envelope for unrelated documentation or feature changes.
+

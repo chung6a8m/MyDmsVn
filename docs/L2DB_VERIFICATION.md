@@ -1,5 +1,7 @@
 # L2DB verification — T00 baseline binding
 
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+
 **Date:** 2026-10-18. **Scope:** L2DB-T00 only, documentation/static source audit. **Implementation base:** `1e24df4c4ad5243963da82d808da19f12278242b` (merge PR #36). **Branch:** `codex/l2db-t00`. **Worktree:** `C:\Users\pdchung\.codex\worktrees\l2db-t00\CleanArchitecture`. Original `v1a` checkout was clean and is preserved. This record is committed with the T00 inventory; use `git log -- docs/L2DB_VERIFICATION.md` to resolve the evidence commit without a self-referential SHA. No L2DB package/provider code is installed.
 
 ## RESP prerequisite and exact binding
@@ -947,3 +949,4 @@ Full W139 automated GUI invocations remain **NOT RUN (conditional)**: no UI beha
 **Final T07 result:** mandatory correctness581/0/0, clean net48/x86 package205-file integrity, required packaged Local workflows, runtime-principal/schema/grant/history checks and positive owned cleanup passed on frozen de3df037. **L2DB-T00–T07 and plan-specific L2DB acceptance are complete.** No broader release readiness, measured performance improvement, merge, push or deployment is claimed. The containing documentation commit records this approval continuation and final evidence.
 
 Final documentation checks:16 changed Markdown files are UTF-8 without BOM/CRLF,861 local link paths resolve, all seven T07 checkboxes have evidence, final native business/status assertions pass and `git diff --check` is clean. Diff against frozen de3df037 has no product/test-source/package/configuration change; the only changed test-directory file is tests/README.md. The original v1a checkout remains clean.
+

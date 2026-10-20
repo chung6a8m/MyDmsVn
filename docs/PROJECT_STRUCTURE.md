@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment:** `v1a` after PR #37 merge `42d94ba`, refreshed 2026-10-19. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP/L2DB are implemented and plan-specifically accepted; GUI-P5 and REL/P6 are the OPEN execution plans, not new product projects.
+**Assessment:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`, refreshed 2026-10-20. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP, L2DB and GUI-P5 are complete in their approved scopes. [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap and is not implemented; it does not add a new product host.
 
 ## Source projects
 
@@ -18,7 +18,7 @@
 | `MyDmsVn.Desktop.App` | `net48` | Current WinForms host and Local composition root. |
 | `MyDmsVn.Desktop.AppCore` | `net8.0-windows`, parked | Retained source outside active solution/release; not current executable coverage. |
 
-`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. They belong to deferred HTTP v2 work and need a separate runtime decision. Do not create them as part of RESP or L2DB.
+`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. HTTP v2 is [out of scope](DEFERRED_WORK.md#out-of-scope-directions) and needs a separate runtime decision. Do not create these projects as part of BCI.
 
 ## Active test projects
 
@@ -57,12 +57,13 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `MyDmsVn.sln` | Current declared solution graph; parked AppCore is excluded. |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/plans/README.md` | Completed RESP/L2DB; next GUI-P5, then REL/P6 release acceptance. |
+| `docs/plans/README.md` | Sole active BCI roadmap; completed RESP/L2DB/GUI-P5 plans retained as history. |
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
-| `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current status, deferred requirements and historical evidence. |
+| `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current roadmap pointer, unscheduled release constraints/out-of-scope directions and historical evidence. |
 | `tests/README.md`, SQL project-local/linked helpers | Direct `dotnet test`/Test Explorer commands, explicit SQL configuration and positively owned database lifecycle. |
 | `deployment/sql/Provision-MyDmsVnPrincipals.sql` | Explicit runtime/maintenance SQL authority separation. |
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
-Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph; neither GUI-P5 nor REL/P6 performs reactivation or a framework upgrade.
+Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. BCI does not reactivate AppCore or upgrade the framework.
+

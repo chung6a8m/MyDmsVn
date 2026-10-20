@@ -1,5 +1,7 @@
 # Respawn verification — RESP-T00 through RESP-T04
 
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+
 **Date:** 2026-10-18. **Reviewed source revision:** `6383289a2e43e2021abd65048a1e2f3f3838324e` (v1a). **Working branch:** `codex/resp-t00-baseline`. This document and the [case map](RESPAWN_CASE_MAP.md) freeze the source baseline for [RESP-T00](plans/20261018-002-respawn-fixture-reuse.md). This opening inventory describes the T00 audit snapshot. T01 execution evidence below now verifies the pinned reset profile; T02 lifecycle, T03 Catalog adoption and T04 Inventory/Security/default-reuse evidence are appended below. The frozen T04 candidate awaits complete RESP acceptance and speedup comparison (T05).
 
 ## T00 scope and outcome
@@ -633,3 +635,4 @@ Focused unset-mode checks on this final build: parser/scope 19/19, Catalog 3/3, 
 Direct commands are the T05 reproduction commands above with separate `resp-review-final-<mode>-<owner>` TRX folders. Focused selectors are `FullyQualifiedName~Last_scope_rejects`, `FullyQualifiedName~Scenario_failure_preserves_post_body`, `FullyQualifiedName~Cleanup_timeout_quarantines`, `FullyQualifiedName~Cleanup_budget_bounds` and the existing worker probe; defaults use the earlier exact selections. Raw results and SQL allocation identifiers stay ignored/local.
 
 **Accepted repaired RESP baseline:** digest above plus the PR follow-up commit. Preserve pre/post-boundary checks, two-minute cleanup/quarantine behavior, local ownership guards, all case identities/assertions, fresh exceptions and serial net48 commands during L2DB. No L2DB/GUI/P5/P6/P7 implementation or release acceptance follows.
+

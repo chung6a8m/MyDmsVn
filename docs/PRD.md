@@ -1,6 +1,6 @@
 # Product requirements — MyDmsVn
 
-**Current scope:** Local v1 on net48 · **Updated:** 2026-10-19. The initial idea is consolidated into this PRD and current architecture/contracts. [RESP/L2DB](plans/README.md) are completed/accepted in plan scope; [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md) own still-OPEN product/release acceptance.
+**Current scope:** Local v1 on net48 · **Updated:** 2026-10-20 for `v1a-pro`. The initial idea is consolidated into this PRD and current architecture/contracts. RESP, L2DB and GUI-P5 are completed/accepted in their approved scopes. [Business Compact and inline Goods Receipt](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap; the [design](BUSINESS_COMPACT_UI.md) is proposed work, not implemented UI. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
 
 ## 1. Product goal
 
@@ -28,7 +28,7 @@ One account may hold several roles. For ordinary users, an explicit user decisio
 - UTC audit fields, correlated/redacted diagnostics, DbUp migrations and explicit schema/deployment verification.
 - Existing password hash/salt columns and an algorithm-aware legacy boundary; legacy account support requires approved vectors or a separately accepted release exclusion.
 
-Product persistence now uses LINQ to DB and typed native SqlClient after L2DB-T03–T06, preserving workflows and contracts. T07 frozen-revision correctness/package/Local smoke acceptance is complete; broader GUI/P5 and P6 release acceptance remains OPEN under the new plans. Respawn changes test infrastructure only.
+Product persistence now uses LINQ to DB and typed native SqlClient after L2DB-T03–T06, preserving workflows and contracts. T07 frozen-revision correctness/package/Local smoke acceptance and later GUI-P5 acceptance are complete in their recorded scopes. BCI requires fresh inline UI evidence; production release prerequisites remain unaccepted and unscheduled. Respawn changes test infrastructure only.
 
 ## 4. Acceptance behavior
 
@@ -54,12 +54,13 @@ Posting must be all-or-nothing and idempotent within its SQL boundary. Concurren
 
 Keep DB work off the UI thread, with bounded timeouts/cancellation, loading/empty/error states and field validation. Headless GUI failures cannot leave modal dialogs blocking a process. Do not log passwords, hashes, salts, connection strings, raw SQL parameters or authentication material.
 
-Product completion requires behavioral evidence under [TEST_POLICY](TEST_POLICY.md). P5 interactive/full GUI checks remain **OPEN** in [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md); P6 clean install, upgrade/recovery, privilege/credential, diagnostics/audit and release sign-off remain **OPEN** in [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md). A successful developer build is not installed-host evidence. The release schema-metadata discrepancy is already closed **narrowly** (schema9/scripts001–009 from the shipped policy); full packaged install, recovery and G1–G5 are still unaccepted.
+Product completion requires behavioral evidence under [TEST_POLICY](TEST_POLICY.md). [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) is complete within its approved scope, retaining the explicit T05 Down NOT TESTED exception. BCI requires new candidate-specific evidence under [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md). Clean install, upgrade/recovery, privilege/credential, diagnostics/audit and release sign-off remain [unaccepted, unscheduled release prerequisites](DEFERRED_WORK.md#release-prerequisites). A successful developer build is not installed-host evidence. The release schema-metadata discrepancy is already closed **narrowly** (schema9/scripts001–009 from the shipped policy); full packaged install, recovery and G1–G5 are still unaccepted.
 
 ## 7. Deferred scope
 
-HTTP Server.Api/HttpApiClient, bearer authentication and Local/HTTP parity are P7 work after an explicit runtime/release decision. Product .NET 8 reactivation is separate from the current net48 infrastructure roadmap.
+HTTP Server.Api/HttpApiClient, bearer authentication, Local/HTTP parity and product .NET 8 reactivation remain [out of scope](DEFERRED_WORK.md#out-of-scope-directions). They require a separate decision and new approved plan; none belongs to the active net48 BCI roadmap.
 
 Sales orders/invoices, outbound stock, returns/reversal, pricing, accounting/tax/valuation, transfers, reservations, lots/serials, multiple units, multi-tenancy, offline synchronization and distributed transactions require future approved scope. Customers remain a standalone catalog in this foundation.
 
 The future SQL/Windows support topology, legacy-account support or exclusion, signing/distribution and runtime lifecycle decisions belong to release planning. Codex should use the implemented contracts now, rather than reopening resolved P0/P5 design questions.
+

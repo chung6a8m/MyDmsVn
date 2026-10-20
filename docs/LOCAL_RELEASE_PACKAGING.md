@@ -1,6 +1,6 @@
 # Đóng gói và triển khai Local Mode v1
 
-**Hiện trạng:** Nhánh `v1a`, cập nhật 2026-10-19. Package hiện chỉ có desktop và admin migrator `net48`/x86. SEC-REBUILD, RESP và L2DB đã hoàn tất trong phạm vi plan; **GUI/P5** và **P6 release acceptance** vẫn OPEN, đã có [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) và [REL/P6](plans/20261019-002-local-v1-p6-release-acceptance.md). Tài liệu này mô tả cách đóng gói, không chứng nhận clean install, upgrade hay production release.
+**Hiện trạng:** Nhánh `v1a-pro`, cập nhật 2026-10-20. Package hiện chỉ có desktop và admin migrator `net48`/x86. SEC-REBUILD, RESP, L2DB và [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) đã hoàn tất trong phạm vi được nghiệm thu, giữ nguyên ngoại lệ đã ghi. [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) là lộ trình duy nhất, chưa triển khai; [điều kiện phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**. Tài liệu này mô tả cách đóng gói, không chứng nhận clean install, upgrade hay production release.
 
 **RELEASE-MANIFEST-01:** Script đã sửa nguồn metadata: đọc `SchemaCompatibilityPolicy.CurrentScripts` từ DLL admin đã đóng gói qua helper PowerShell x86, thay cho pin `8..8`. Bốn test packaging x86 và đối chiếu artifact từ commit sạch `d8013030` đã đạt: schema9, danh sách001–009, 224 hash file. [L2DB evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed) đóng riêng lỗi metadata này. Chưa có release acceptance.
 
@@ -31,7 +31,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
 | `desktop-net48-win-x86` | `MyDmsVn.Desktop.App.exe` | x86 | publish directory | .NET Framework 4.8 |
 | `admin-migrator-net48-win-x86` | `MyDmsVn.Server.DbMigrator.exe` | x86 | publish directory, admin only | .NET Framework 4.8 |
 
-`MyDmsVn.Desktop.AppCore` / `net8.0-windows` nằm ngoài solution/release và được ghi **PARKED / NOT RUN / NOT SHIPPED**. SDK .NET 8 dùng để build, không phải product package. Việc khôi phục host hiện đại đi qua [REACTIVATE_NET8](REACTIVATE_NET8.md).
+`MyDmsVn.Desktop.AppCore` / `net8.0-windows` nằm ngoài solution/release và được ghi **PARKED / NOT RUN / NOT SHIPPED**. SDK .NET 8 dùng để build, không phải product package. Modern product runtime thuộc [hướng ngoài phạm vi](DEFERRED_WORK.md#out-of-scope-directions), cần quyết định riêng trước khi lập kế hoạch mới.
 
 Native/transitive DLL và cấu hình executable phải đi cùng publish directory. Máy đích cần .NET Framework 4.8, không cần SDK/Visual Studio theo mô hình triển khai dự kiến; clean-machine evidence vẫn phải chứng minh điều đó. Chỉ công bố OS/architecture/runtime được xác nhận trong release matrix P6, không suy diễn support từ build trên developer machine.
 
@@ -54,7 +54,7 @@ Uninstall xóa shortcut và đúng versioned application folder sau khi xác nh�
 
 Từ thư mục `admin-migrator-net48-win-x86`, lệnh migration active là `& .\MyDmsVn.Server.DbMigrator.exe`, dùng migration configuration được bảo vệ. Không chạy DLL bằng `dotnet` như ví dụ của package net8 đã parked.
 
-## Verification bắt buộc còn lại
+## Điều kiện phát hành chưa nghiệm thu
 
 - đối chiếu metadata runtime/package thực tế; `RELEASE-MANIFEST-01` đã đóng riêng phần chênh lệch nguồn;
 - clean install active desktop/admin package trên Windows VM không SDK/Visual Studio;
@@ -62,6 +62,7 @@ Từ thư mục `admin-migrator-net48-win-x86`, lệnh migration active là `& .
 - review đường upgrade được hỗ trợ, preserve config/shared SQL, restart/repair/uninstall; không coi prefix cũ là upgrade path hiện có;
 - limited-user execution và writable log folder;
 - optional signature/trust chain theo owner policy;
-- packaged GUI-P5 full STA, real packaged-login E2E và manual P5; P6 G1–G5 release scenarios còn mở trên host net48 thực sự phát hành.
+- bằng chứng GUI trên đúng candidate phát hành: GUI-P5 giữ nguyên phạm vi nghiệm thu lịch sử; BCI cần kiểm chứng mới theo [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md), và production release vẫn cần G1–G5 trên host net48 thực sự phát hành.
 
-Các mục trên theo [TEST_POLICY](TEST_POLICY.md) và [DEFERRED_WORK](DEFERRED_WORK.md), ghi revision/artifact, Pass/Fail/Blocked/Not run, OS build, architecture, runtime, SQL version, tester và timestamp. Publish-directory output không thay thế VM, GUI, migration/recovery hay owner release evidence. Việc chọn RESP và L2DB làm hai kế hoạch active không đóng các yêu cầu này.
+Các mục trên là điều kiện **UNACCEPTED / UNSCHEDULED** theo [release prerequisites](DEFERRED_WORK.md#release-prerequisites), không phải một kế hoạch thực thi thứ hai. Khi có phạm vi được duyệt, [TEST_POLICY](TEST_POLICY.md) yêu cầu ghi revision/artifact, Pass/Fail/Blocked/Not run, OS build, architecture, runtime, SQL version, tester và timestamp. Publish-directory output không thay thế VM, GUI, migration/recovery hay owner release evidence; việc chọn BCI làm lộ trình duy nhất không đóng hoặc miễn các yêu cầu này.
+

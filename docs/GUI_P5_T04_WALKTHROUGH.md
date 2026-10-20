@@ -1,5 +1,7 @@
 # GUI-P5-T04 — Attended Catalog/Lookup walkthrough
 
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+
 **Status: COMPLETE / OWNER ACCEPTED — baseline49/49 and supplemental24/24 observations PASS; REMAIN-P5-GUI-01 PASS. Owner signature recorded2026-10-19. T05/T06/overallP5/P6 remain OPEN.**
 
 **Plan:** [GUI-P5-T04](plans/20261019-001-full-winforms-gui-p5-acceptance.md#gui-p5-t04--remain-p5-gui-01-attended-cataloglookup-sign-off). **Prepared:** 2026-10-19 (Asia/Bangkok), Codex; documentation base `f33a959`. This is an operator worksheet for actual installed Login-first use. [T03 automated results](GUI_P5_VERIFICATION.md#final-frozen-candidate--gui-p5-t03) remain separate and are not counted as attended passes.
@@ -365,3 +367,4 @@ Final acceptance proposed to the Project Owner:49baseline plus24supplemental obs
 ### Final Owner acceptance —2026-10-19
 
 After the complete evidence/cleanup commit bd59f6f and a plain-chat restatement of the final acceptance question, the Project Owner explicitly replied: “Xác nhận nghiệm thu T04 theo biên bản.” Codex recorded this at21:52 +07:00. This accepts the proposed73/73observations, source boundaries (28historical02eff22,45candidate2d5207b2), approved baseline-plus-UX scope and the recorded UI qualifications. GUI-P5-T04 is COMPLETE; REMAIN-P5-GUI-01 PASS for the sole shipped net48/x86 target under the approved environment. T05/T06, REMAIN-P5-GUI-02, overallP5, REL G1–G5 and production readiness remain OPEN. This signature update changes documentation only; product/package/test bytes and runtime evidence remain unchanged.
+

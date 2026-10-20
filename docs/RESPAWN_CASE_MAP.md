@@ -1,5 +1,7 @@
 # Respawn case map — RESP-T00 baseline and implementation additions
 
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+
 **Source baseline:** `6383289a2e43e2021abd65048a1e2f3f3838324e`, reviewed 2026-10-18. All six owners target `net48`. This is a source inventory, not executed discovery or SQL acceptance. [Verification and comparison protocol](RESPAWN_VERIFICATION.md); [active plan](plans/20261018-002-respawn-fixture-reuse.md).
 
 ## Reading the map
@@ -658,3 +660,4 @@ Foundation adds three dedicated SQL Facts in `ReusableSqlFixtureLifecycleIntegra
 IntegrationTests adds `ReusableSqlFixtureTests.Cleanup_budget_bounds_uncooperative_workers_and_resources`, five local Theory rows: worker, stop-throws, stop-blocks, async-resource, sync-resource. Existing worker probes now await explicit stop notification instead of assuming synchronous invocation; all original drain/nonoverlap/resource assertions remain.
 
 Participating collections keep 75 scenario scopes in 27 TRX results, now with 75 successful `verify-after` checks per complete mode. APP reset boundary and dedicated exception classification are unchanged; the lifecycle now rejects final-case drift and terminally quarantines undrained work. Code/config digest 75f282bc99c0c5d8f5bc04bcd2fe4c75f9f0c650d2ecd2a53203e1c46a79165c is bound by the PR follow-up commit.
+

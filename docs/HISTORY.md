@@ -2,7 +2,7 @@
 
 **Reset date:** 2026-10-18 · **Branch assessed:** `v1a` · **Baseline:** [c7ad32a4b0040f87417973eabd6c12757c54f7d5](https://github.com/chung6a8m/MyDmsVn/commit/c7ad32a4b0040f87417973eabd6c12757c54f7d5).
 
-This page is historical provenance, not an execution queue or a test policy. Current work is [GUI-P5 then REL/P6 after completed RESP/L2DB](plans/README.md). Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
+This page is historical provenance, not an execution queue or a test policy. Current work is [BCI — Business Compact and inline Goods Receipt](plans/README.md), selected on 2026-10-20 after completed RESP/L2DB/GUI-P5. Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
 
 ## Established baseline
 
@@ -28,7 +28,7 @@ Historical totals describe their own revisions and scope. They are not new RESP/
 - Historical verification/benchmark narratives formerly alongside current root `docs` references. Their exact contents remain in the immutable baseline and Git history.
 - The raw [project-idea.md](https://github.com/chung6a8m/MyDmsVn/blob/c7ad32a4b0040f87417973eabd6c12757c54f7d5/project-idea.md), whose outdated examples are superseded by the current PRD, architecture, contracts and ADRs.
 
-Pending requirements were consolidated into [DEFERRED_WORK.md](DEFERRED_WORK.md), with original scope links and unchecked acceptance. Removal from the working tree does not delete Git history, waive unfinished work or revert implemented code. The first documentation reset retained executable test tooling. The owner's subsequent complete framework-removal decision below supersedes that retention; RESP now extends the remaining local helpers directly.
+At the 2026-10-18 reset, pending requirements were consolidated into DEFERRED_WORK.md with unchecked acceptance. The 2026-10-20 decision below removes those old executable checklists; [the current page](DEFERRED_WORK.md) now records scope boundaries only. Removal from the working tree does not delete Git history, waive unfinished work or revert implemented code. The first documentation reset retained executable test tooling. The owner's subsequent complete framework-removal decision below supersedes that retention; RESP now extends the remaining local helpers directly.
 
 ## Subsequent owner decision — complete SQL framework removal
 
@@ -43,7 +43,25 @@ Their [immutable pre-removal tests tree](https://github.com/chung6a8m/MyDmsVn/tr
 
 Business SQL tests and their six module owners remain, alongside Application, Architecture and two Desktop owners: ten active net48 test projects. Direct dotnet test/Test Explorer execution uses a local fresh-database helper with live instance/allocation/marker checks before drop. No approval-file, global lease, external watchdog or automatic orphan recovery service is carried forward. See [current test commands](../tests/README.md).
 
-**Historical state immediately after framework removal (2026-10-18):** two infrastructure plans were then pending, RESP and L2DB. They were implemented/accepted subsequently in PR #36/#37; framework removal **alone** did not implement them or grant release acceptance. The current OPEN acceptance plans are GUI-P5 and REL/P6.
+**Historical state immediately after framework removal (2026-10-18):** two infrastructure plans were then pending, RESP and L2DB. They were implemented/accepted subsequently in PR #36/#37; framework removal **alone** did not implement them or grant release acceptance. GUI-P5 subsequently completed in PR #38; the 2026-10-20 decision below retires the still-unimplemented REL plan and selects BCI.
+
+## 2026-10-20 — Business Compact roadmap reset
+
+**Assessed branch:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`. The owner requested documents for the Business Compact and true inline Goods Receipt proposals, activation as the roadmap, removal of every older unimplemented plan, and a PR targeting `v1a-pro`.
+
+| Disposition | Evidence and reason |
+|---|---|
+| Retain completed RESP | 29 checked / 0 unchecked task steps; PR #36 accepted scope remains in its plan and evidence |
+| Retain completed L2DB | 48 checked / 0 unchecked task steps; PR #37 accepted scope remains in its plan and evidence |
+| Retain completed GUI-P5 | 25 checked / 0 unchecked task steps; PR #38 final accepted scope and signed Down exception remain unchanged |
+| Delete unimplemented REL/P6 plan | 0 checked / 32 unchecked task steps at the assessed source; [immutable retired plan](https://github.com/chung6a8m/MyDmsVn/blob/f37038b250821a538b9cdc10a6d6d8b4bc1f386f/docs/plans/20261019-002-local-v1-p6-release-acceptance.md) |
+| Delete deferred .NET 8 reactivation procedure | No implemented runtime reactivation; [immutable retired procedure](https://github.com/chung6a8m/MyDmsVn/blob/f37038b250821a538b9cdc10a6d6d8b4bc1f386f/docs/REACTIVATE_NET8.md) |
+| Remove old P7/net8 executable checklist | Eight unchecked items were future instructions, not completed work; [original scope page](https://github.com/chung6a8m/MyDmsVn/blob/f37038b250821a538b9cdc10a6d6d8b4bc1f386f/docs/DEFERRED_WORK.md) |
+| Activate BCI | [Single implementation plan](plans/20261020-001-business-compact-inline-goods-receipt.md), [design](BUSINESS_COMPACT_UI.md) and [acceptance matrix](BUSINESS_COMPACT_ACCEPTANCE.md); all new implementation/runtime work remains unexecuted |
+
+Completed plans stay at their existing paths to preserve evidence backlinks; their original task handoffs are historical. Current context/index/policy references are refreshed so no old queue competes with BCI. The large historical checkpoints formerly duplicated in AI_CONTEXT remain in canonical GUI-P5 ledgers and Git history; the handoff now describes the current state concisely.
+
+No product source, test implementation, schema or vendor pin is changed by this reset. Retiring REL/P6 does not approve production release: [release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain unaccepted/unscheduled. The modern host remains parked. This documentation action establishes no new runtime PASS.
 
 ## Recover a historical source
 
