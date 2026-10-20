@@ -14,7 +14,7 @@ using Grid = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSourceGrid;
 
 namespace MyDmsVn.Desktop.Tests;
 
-public sealed class GoodsReceiptInlineEditorTests
+public sealed partial class GoodsReceiptInlineEditorTests
 {
     private readonly ITestOutputHelper _output;
     public GoodsReceiptInlineEditorTests(ITestOutputHelper output) => _output = output;
@@ -46,10 +46,14 @@ public sealed class GoodsReceiptInlineEditorTests
             host.FocusCell(0, 2);
             var bounds = host.Grid.PositionToRectangle(new SourceGrid.Position(0, 2));
             var previousPointer = Cursor.Position;
+            var previousTopMost = host.Form.TopMost;
             var doubleClicks = 0;
             host.Grid.MouseDoubleClick += (_, _) => doubleClicks++;
             try
             {
+                // Keep this owned native mouse target above unrelated desktop overlays.
+                // Foreground and exact hit-window checks below remain mandatory.
+                host.Form.TopMost = true;
                 host.Form.Activate();
                 var foregroundThread = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
                 var currentThread = GetCurrentThreadId();
@@ -84,7 +88,7 @@ public sealed class GoodsReceiptInlineEditorTests
                 AssertHosted(host.Grid, host.Cost.Control);
                 Assert.Equal(1, doubleClicks);
             }
-            finally { Cursor.Position = previousPointer; }
+            finally { Cursor.Position = previousPointer; host.Form.TopMost = previousTopMost; }
             Type("9.75");
             Key(Keys.Enter);
             Assert.Equal(9.75m, Assert.IsType<decimal>(host.Grid[0, 2].Value));
