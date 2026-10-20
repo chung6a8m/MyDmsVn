@@ -6,11 +6,11 @@
 
 | Order | Plan | State | Next action |
 |---:|---|---|---|
-| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE**; BCI-T00–T04 complete in recorded proof/scalar/adapter/control/accessibility scopes; T05–T06 planned | BCI-T05: Business Compact shell and receipt layout; retain T00–T04 evidence |
+| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE**; BCI-T00–T05 complete in recorded proof/scalar/adapter/control/accessibility/layout scopes; T06 planned | BCI-T06: frozen integrated UI/package acceptance; retain T00–T05 scoped evidence |
 
 Read [BUSINESS_COMPACT_UI](../BUSINESS_COMPACT_UI.md) for the design and [BUSINESS_COMPACT_ACCEPTANCE](../BUSINESS_COMPACT_ACCEPTANCE.md) for required observable outcomes. Supporting specifications are not independent plans. Execute BCI-T00 → T01 → T02 → T03 → T04 → T05 → T06; preparation or parallel work must respect the interfaces and dependencies recorded in that plan.
 
-The planning documents implement no product feature. T00 now supplies the scoped native editor proof recorded in the acceptance ledger; T01 supplies the scalar numeric parser; T02 supplies the stable grid/session foundation; T03 integrates lookup and commands into the actual receipt control. T04 supplies editable cell accessibility, real native editor reachability and a focused clean-package probe. Compact layout and complete frozen UI/package acceptance still belong to T05–T06.
+The planning documents implement no product feature. T00 now supplies the scoped native editor proof recorded in the acceptance ledger; T01 supplies the scalar numeric parser; T02 supplies the stable grid/session foundation; T03 integrates lookup and commands into the actual receipt control. T04 supplies editable cell accessibility, real native editor reachability and a focused clean-package probe. T05 supplies compact layout and hosted native 100%/125% measurements; [evidence](../BUSINESS_COMPACT_ACCEPTANCE.md#86-bci-t05-business-compact-layout--2026-10-20). Complete frozen UI/package acceptance remains T06.
 
 ## Completed baselines — retain, do not restart
 

@@ -1,6 +1,6 @@
 # Business Compact UI and inline Goods Receipt design
 
-**Direction:** approved; full Business Compact UI acceptance remains unaccepted. The acceptance ledger records the completed T00 proof, T01 scalar parser, T02 projection/session foundation, T03 control-integration and T04 editable native-accessibility scopes. T04 includes a focused clean-package probe; full compact/frozen acceptance remains T05–T06.
+**Direction:** approved; full Business Compact UI acceptance remains unaccepted. The acceptance ledger records the completed T00 proof, T01 scalar parser, T02 projection/session foundation, T03 control-integration and T04 editable native-accessibility scopes. T04 includes a focused clean-package probe; T05 compact layout has hosted native 100%/125% evidence ([record](BUSINESS_COMPACT_ACCEPTANCE.md#86-bci-t05-business-compact-layout--2026-10-20)). Full frozen UI/package acceptance remains T06.
 **Plan:** [BCI execution plan](plans/20261020-001-business-compact-inline-goods-receipt.md).
 **Acceptance:** [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md).
 **Planning source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).
@@ -34,7 +34,7 @@ The integration [project graph][integration-project] references both pinned vend
 | SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944` |
 
 At the planning baseline, Goods Receipt lines were plain cells, with product/quantity/unit-cost controls in a panel below the grid. T03 has replaced those paths in [GoodsReceiptControl][app-lines] with the adapter; see [current integration evidence](BUSINESS_COMPACT_ACCEPTANCE.md#84-bci-t03-lookup-and-command-integration--2026-10-20).
-The retained result-list accessibility bridge exposes read-only cells plus an Open row action; the new line grid awaits its T04 writable provider. [Source][action-grid]
+The retained result-list accessibility bridge exposes read-only cells plus an Open row action; the line grid has the T04 writable provider and T05 physical screen bounds conversion. [Source][action-grid]
 The integration already supplies real lookup and formatted-text editor adapters; their construction and ownership are reusable. [Source][editor-registry]
 The current accessible numeric wrapper derives from BootstrapNumericBox, not BootstrapFormattedTextBox. [Source][accessible-number]
 These facts justify an application integration task; they do not establish that inline editing or its accessibility is already complete.
@@ -84,7 +84,7 @@ Insufficient space must produce reachable scrolling/reflow, not hidden Save/Post
 
 ## 5. Application-owned integration
 
-T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField` with scalar tests; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). T02 implements `GoodsReceiptLinesGrid`, its adapter and `ReceiptEditIntent` as a tested foundation; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#83-bci-t02-stable-projection-and-cell-sessions--2026-10-20). T03 now wires these internal seams into GoodsReceiptControl and removes the external line panel; [focused evidence](BUSINESS_COMPACT_ACCEPTANCE.md#84-bci-t03-lookup-and-command-integration--2026-10-20). Writable accessibility remains T04; none is a vendor API.
+T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField` with scalar tests; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). T02 implements `GoodsReceiptLinesGrid`, its adapter and `ReceiptEditIntent` as a tested foundation; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#83-bci-t02-stable-projection-and-cell-sessions--2026-10-20). T03 now wires these internal seams into GoodsReceiptControl and removes the external line panel; [focused evidence](BUSINESS_COMPACT_ACCEPTANCE.md#84-bci-t03-lookup-and-command-integration--2026-10-20). T04 supplies writable accessibility. T05 implements BusinessCompactAppearance, BusinessCompactNavigation and ReceiptNumberEditor with explicit ownership; the numeric adapter preserves None-mode raw conversion and keyboard behavior while aligning its protected native input. None is a vendor API; pins are unchanged.
 Keep this integration in Desktop.WinForms; do not move grid/control dependencies into Domain or Application.
 
 | App-owned element | Intended responsibility (scope above governs implementation status) |

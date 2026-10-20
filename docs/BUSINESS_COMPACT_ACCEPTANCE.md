@@ -1,14 +1,14 @@
 # Business Compact inline Goods Receipt — acceptance specification
 
-**Status:** BCI-T00 proof, T01 scalar parser, T02 projection/session foundation, T03 lookup/command integration and T04 editable native accessibility complete in their recorded scopes; BCI-T05–T06 remain PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
+**Status:** BCI-T00 proof, T01 scalar parser, T02 projection/session foundation, T03 lookup/command integration and T04 editable native accessibility and T05 compact layout complete in their recorded scopes; BCI-T06 remains PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
 **Prepared:** 2026-10-20. **Planning baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`.
 
 ## 1. Scope and authority
 
 This specification verifies the [Business Compact design](BUSINESS_COMPACT_UI.md) and [BCI implementation plan](plans/20261020-001-business-compact-inline-goods-receipt.md). It is an acceptance ledger, not an executable test manifest or a replacement for [TEST_POLICY](TEST_POLICY.md).
 The product remains Windows Forms `net48`, with the shipped x86 Desktop and current Local application contracts. SourceGrid owns edit lifecycle; application code owns receipt state, validation presentation and command admission.
-All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; A24–A26 have T04 hosted/native and focused package evidence in §8.5; other outcomes remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
-Names outside the retained T00 proof, T01 scalar parser/tests, T02 grid/session code/tests and T03 integration/tests and T04 accessibility/provider/tests identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
+All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; A24–A26 have T04 hosted/native and focused package evidence in §8.5; A27–A28 have T05 hosted native 100%/125% layout evidence in §8.6; A29–A30 remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
+Names outside the retained T00 proof, T01 scalar parser/tests, T02 grid/session code/tests and T03 integration/tests and T04 accessibility/provider/tests and T05 compact layout/navigation/numeric-adapter/tests identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
 T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField`; T03 connects them to the receipt controls. T02 implements `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)` as an internal foundation tested against a hosted grid and real VM; T03 now supplies shipping-control command wiring and T04 supplies writable accessibility and active real editor reachability; their exact contracts are owned by the design and plan.
 
 ## 2. Accepted historical baseline — external line editors
@@ -90,8 +90,8 @@ Each row belongs to its named plan task. BCI-T06 reconciles every row and the af
 | BCI-A24 | BCI-T04 | Existing: E-A/E-U; New: `Accessible_line_cells_expose_correct_editability_and_identity` | Draft input cells expose meaningful row/column/name/value and editability; computed/status/list/Posted cells remain read-only. Cached actions re-resolve valid identity and reject removed or replaced targets. | PASS — T04 scoped native/provider/package evidence (§8.5) |
 | BCI-A25 | BCI-T04 | Existing: E-A/E-U/E-P; New: `Native_uia_reaches_the_active_shared_editor` | Cross-process native UIA can find, focus, edit and commit the actual hosted control by semantic identity; reuse across rows updates accessible state. No coordinates, ordinal-only selectors or direct VM write substitutes. | PASS — T04 scoped native/provider/package evidence (§8.5) |
 | BCI-A26 | BCI-T04 | Existing: E-A numeric/lookup guards; New: `Accessible_edits_preserve_validation_and_pending_selection_state` | Native Value/selection actions use the same strict numeric and lookup pipeline as keys/mouse; disabled/stale setters cannot mutate, and pending text is distinguishable from a committed key. | PASS — T04 scoped native/provider/package evidence (§8.5) |
-| BCI-A27 | BCI-T05 | Existing: E-R layout/E-A tab tests; New: `Compact_shell_retains_visible_fields_and_native_focus_order` | At supported workspace widths, windowed/maximized and Light/Dark, controls/header/footer/errors remain visible; native Tab/Shift+Tab follows the design and read-only computed cells do not trap entry flow. | NOT RUN |
-| BCI-A28 | BCI-T05 | Existing: E-A render/vendor sizing tests; New: `Cell_editors_and_popups_remain_usable_after_scroll_resize_and_theme_change` | Actual 100%/125% Windows scaling preserves editor text/caret/error visibility, row alignment and popup work-area bounds while scrolling/resizing/theme switching; no focus loss silently commits an unintended value. | NOT RUN |
+| BCI-A27 | BCI-T05 | Existing: E-R layout/E-A tab tests; New: `Compact_shell_retains_visible_fields_and_native_focus_order` | At supported workspace widths, windowed/maximized and Light/Dark, controls/header/footer/errors remain visible; native Tab/Shift+Tab follows the design and read-only computed cells do not trap entry flow. | PASS — T05 scoped hosted native 100%/125%; wide 125% work-area fit recorded (§8.6); full frozen acceptance remains T06 |
+| BCI-A28 | BCI-T05 | Existing: E-A render/vendor sizing tests; New: `Cell_editors_and_popups_remain_usable_after_scroll_resize_and_theme_change` | Actual 100%/125% Windows scaling preserves editor text/caret/error visibility, row alignment and popup work-area bounds while scrolling/resizing/theme switching; no focus loss silently commits an unintended value. | PASS — T05 scoped hosted native 100%/125%; wide 125% work-area fit recorded (§8.6); full frozen acceptance remains T06 |
 | BCI-A29 | BCI-T06 | Existing: E-P receipt/invalid/lookup/stale/timeout cases; New: `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` | Actual Login and native inline create/edit/reload/Save/Post flow persists exact decimals and keys; independent SQL proves one movement per line, balance reconciliation and no denied/failed mutation. | NOT RUN |
 | BCI-A30 | BCI-T06 | Existing: E-P/GUI-P5 cleanup evidence; New: candidate reconciliation record | New frozen source/test/package, all required discovery names/Theory rows, attended observations, exception capture and owned resource cleanup reconcile. No missing/skipped/aborted/timed-out mandatory case is credited as PASS. | NOT RUN |
 
@@ -495,3 +495,110 @@ Initial missing-provider RED was 0/3. First native trial passed the two in-proce
 One fresh independent source review found a test-driver loop-capture variable outside scope; it was fixed before the clean candidate commit. No mandatory findings remain. The reviewer did not execute GUI/SQL/tests and did not certify runtime evidence. Its metadata observation is reflected in the virtual Help/native description distinction above.
 
 Raw TRX, SQL allocation/principal identifiers and probe diagnostics stay local. Hosted forms/editors and bounded UIA clients are disposed and drained. The package owner verifies each allocation token and principal identity, drains owned SQL sessions, then records database/principal deletion; uncertainty quarantines and blocks further GUI admission. This focused milestone does not replace T06 full Desktop/Session/package, native 100%/125% Light/Dark or attended visual/keyboard observations. Operational release prerequisites remain unaccepted and unscheduled.
+
+## 8.6. BCI-T05 Business Compact layout — 2026-10-20
+
+**Boundary:** A27–A28 PASS in the hosted control/native 100%/125% scope below. T00–T05 implementation tasks are complete in their recorded scopes. A29–A30 and T06 complete frozen UI/package acceptance remain NOT RUN; operational release prerequisites remain unaccepted and unscheduled.
+
+### Source, ownership and decisions
+
+Base `61c844983382fb29503675f1ff12955c41a96411`; final product/test source `83e5df2028bfbabdba29d79192bcc3c838993dfb`, branch `codex/bci-t00-native-proof`, retained isolated worktree. Source checkpoints are `4dd4bb5` (layout/appearance/navigation/numeric adapter), `c422603` (native monitor observer), `9bebb37` (physical accessible cell/row bounds and expanded interaction checks), and `83e5df2` (obsolete detail scroll extent repair). Documentation/evidence is committed separately after these frozen product/test bytes.
+
+Vendor pins remain BootstrapSourceGrid `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f`, Bootstrap5WinFormUI `aba102e33c48937fd92468791c287afda0a59e77` and SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. No vendor edit, dependency upgrade, API/DTO/schema/permission/module/runtime or DPI-awareness change.
+
+- [BusinessCompactAppearance](../src/MyDmsVn.Desktop.WinForms/BusinessCompactAppearance.cs) owns Segoe UI 10/14/9pt resources per root and releases them with theme subscription on disposal. It applies the selected workspace/nav palette using public APIs and stops recursion into vendor composite internals. Result-list cell fonts/36-unit row heights are restored after AutoSizeCells.
+- [BusinessCompactNavigation](../src/MyDmsVn.Desktop.WinForms/BusinessCompactNavigation.cs) composes native buttons for independent navy styling, 224/64 widths, full collapsed accessible names, nested navigation, disabled ancestors, native arrow/Home/End input and selection identity removal. FoundationShellForm retains existing catalog/inventory/session actions. No catalog-content redesign.
+- [GoodsReceiptControl](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.cs) puts receipt identity and four metadata fields above the dominant grid, with Save/Post/Add/Remove, total, busy/error/status and uncertain-Post Refresh reachable below/beside it. Spacing is 8/16; metadata reflows when constrained. Initial master width is 260, minimum 240; minimum detail width 400. Below available bounds, explicit scrolling keeps controls reachable. Docked detail minimum size determines the scroll extent instead of stale prior viewport bounds.
+- The pinned sealed numeric adapter has no native TextAlign API. [ReceiptNumberEditor](../src/MyDmsVn.Desktop.WinForms/ReceiptNumberEditor.cs) is an app-owned None-mode equivalent using the formatted input's protected Editor seam, native right alignment and measured text/preferred-height fit. It preserves raw conversion, first-character replacement, selection, rejection and cancellation; adapter owns/disposes the two numeric editors. Product continues through the pinned lookup adapter. No private-child reflection/traversal or vendor patch.
+- [Grid adapter](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptLinesGridAdapter.cs) measures numeric widths and row height against text, editor preferred/minimum size and padding, refreshes existing views/editor bounds on font/size/theme changes, and preserves projection/session identity. It permits horizontal grid scrolling at narrow widths. T03 editability/command/uncertain-Post semantics are retained.
+- Native 125% measurement exposed incorrect accessible bounds: 212x36 unscaled versus a physical 265x45 Quantity cell. [GoodsReceiptLinesGrid](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptLinesGrid.cs) now converts both logical-screen corners to physical screen points, uses that space for active-editor hit testing and unions all visible cells for Row.Bounds. MSAA [accLocation requires physical screen coordinates](https://learn.microsoft.com/en-us/windows/win32/api/oleacc/nf-oleacc-iaccessible-acclocation); the [per-monitor conversion API](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-logicaltophysicalpointforpermonitordpi) supplies that conversion independently of caller awareness. The older API fallback is source compatibility only, NOT runtime-verified legacy-OS support.
+
+The approved design, plan and explicit task request authorize these app-owned seams. The decision is to preserve vendor pins and existing product DPI awareness, then measure actual OS scaling independently; no alternative grid or vendor upgrade was selected.
+
+### Executed tests and native measurements
+
+Windows 10.0.26200, .NET SDK 8.0.425; net48 Release/x86, interactive serialized guarded STA, en-US, physical primary screen 1920x1080. The owner changed Windows Scale to 125%, then restored 100% after the run drained. Expected scale is asserted by the bounded owned external observer; setting an environment variable does not simulate DPI. The observer is PerMonitorV2, verifies window PID ownership and measures monitor DPI, physical window/client and semantic Quantity bounds. Product/test windows remain DPI-unaware at GetDpiForWindow=96, with OS virtualization at 125%; no product per-monitor-awareness claim. See Microsoft's [DPI virtualization guidance](https://learn.microsoft.com/en-us/windows/win32/hidpi/high-dpi-desktop-application-development-on-windows).
+
+Both final runs select the same **179 invocations**: ReceiptNumericInputTests 36; GoodsReceiptControlTests 35; ReceiptAcceptanceTests 29; GoodsReceiptEditorViewModelTests 17; FoundationShellFormTests 16; GoodsReceiptInlineEditorTests 15; InventoryAccessibilityAcceptanceTests 14; BusinessCompactLayoutTests 11; GoodsReceiptInlineAccessibilityTests 6. Both discovered/selected/executed all 179, **179 PASS / 0 FAIL / 0 skipped/not-executed**, no aborted/timed-out run. The 100% replay uses --no-build and the same already-built DLL bytes as final125. No unfiltered/full-solution or unchanged Session/SQL owner total is inferred.
+
+The 11 layout invocations comprise four exact Compact_shell_retains_visible_fields_and_native_focus_order rows (two requested viewports x Light/Dark), two exact Cell_editors_and_popups_remain_usable_after_scroll_resize_and_theme_change rows, two error/uncertain-Post/Posted rows, nested keyboard/removal navigation, minimum splitter reachability, and a pure logical-to-physical viewport math Fact. The math Fact alone is not native DPI evidence.
+
+Checks include native Warehouse → Employee → Note → grid tab flow, existing reverse-tab/inline navigation, measured editor text height, right alignment, raw 8.00001 and caret preservation through resize/maximize/restore/theme switch, rejected Enter and Escape, row-14 vertical scrolling/isolated 7.25 commit, no blank trailing row, pending Product query/actual owned popup, popup work-area bounds, physical cell hit test and row containment, error footer and uncertain-Post authoritative reload. Reduced 620x440 reachability is tested by scrolling; grid horizontal scrolling is intentional.
+
+Measured bounds (same in Light/Dark; window units are the 96-DPI product coordinate space):
+
+| Native scale / monitor DPI | Requested logical viewport | Actual viewport units | Physical client pixels | Quantity physical cell | Maximized viewport units |
+|---|---|---|---|---|---|
+| 100% / 96 | 1680x900 | 1680x900 | 1680x900 | 212x36 | 1920x1009 |
+| 100% / 96 | 944x600 | 944x600 | 944x600 | 212x36 | — |
+| 125% / 120 | 1680x900 | 1504x752 | 1880x940 | 265x45 | 1536x793 |
+| 125% / 120 | 944x600 | 944x600 | 1180x750 | 265x45 | — |
+
+The 125% screen cannot hold a full 1680x900 logical client (2100x1125 physical). The fixture fits that requested case to actual work area before asserting visible bounds: 1504x752 units / 1880x940 physical. **Full 1680x900 logical at 125% is NOT TESTED**; the 100% full viewport and both scales' measured fitted/maximized cases are distinct evidence. This is the plan's measured available-space scope, not a complete T06 display matrix or attended sign-off.
+
+Actual commands (run 125 first, then 100 after confirmed setting change/drain):
+
+```powershell
+$filter = 'FullyQualifiedName~BusinessCompactLayoutTests|FullyQualifiedName~FoundationShellFormTests|FullyQualifiedName~GoodsReceiptControlTests|FullyQualifiedName~ReceiptAcceptanceTests|FullyQualifiedName~GoodsReceiptInlineEditorTests|FullyQualifiedName~GoodsReceiptInlineAccessibilityTests|FullyQualifiedName~InventoryAccessibilityAcceptanceTests|FullyQualifiedName~GoodsReceiptEditorViewModelTests|FullyQualifiedName~ReceiptNumericInputTests'
+$env:MYDMSVN_BCI_EXPECTED_SCALE='125'
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-restore -p:PlatformTarget=x86 --filter $filter --logger 'trx;LogFileName=final125.trx' --results-directory TestResults/bci-t05-final125 -- RunConfiguration.TargetPlatform=x86
+dotnet build src/MyDmsVn.Desktop.App/MyDmsVn.Desktop.App.csproj -c Release --no-restore -p:PlatformTarget=x86
+$env:MYDMSVN_BCI_EXPECTED_SCALE='100'
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-build --no-restore -p:PlatformTarget=x86 --filter $filter --logger 'trx;LogFileName=final100.trx' --results-directory TestResults/bci-t05-verified100 -- RunConfiguration.TargetPlatform=x86
+```
+
+App build: 0 warnings / 0 errors. Build output is not a packaged/accepted candidate. The App build ran after final125 drained and before the no-build 100% replay; loaded test DLL hashes below are unchanged.
+
+| Local artifact | SHA256 |
+|---|---|
+| `tests/MyDmsVn.Desktop.Tests/bin/Release/net48/MyDmsVn.Desktop.Tests.dll` | `D91A822BEBD00BA82ABF159ED7E2F2B13850D84F022D878E91DFC101C0F6468B` |
+| `tests/MyDmsVn.Desktop.Tests/bin/Release/net48/MyDmsVn.Desktop.WinForms.dll` | `A5BA67A387CC1631B9C02AFB5727B2EE6FC97C1BA560669BD65E11D941E81BEB` |
+| `src/MyDmsVn.Desktop.WinForms/bin/Release/net48/MyDmsVn.Desktop.WinForms.dll` | `A5BA67A387CC1631B9C02AFB5727B2EE6FC97C1BA560669BD65E11D941E81BEB` |
+| `src/MyDmsVn.Desktop.App/bin/Release/net48/MyDmsVn.Desktop.App.exe` | `EFF86312A749A0D8D3336DC0253C107930ACDB76E64104A3948D9508EDE7D1A9` |
+| `TestResults/bci-t05-final125/final125.trx` | `214C2F1137E6772933ECC558A8E4247D05BAD1F23B317AF276356309F2CB786E` |
+| `TestResults/bci-t05-verified100/final100.trx` | `98238F6EB6E3CA857B9FCA33A935E37FA970E69E2FF3DA8D36C3915404531036` |
+
+### Images, failures, review and remaining boundary
+
+[Reviewed capture index and per-file hashes](evidence/bci-t05/README.md) retains actual Light/Dark hosted shell/layout, native popup, raw precision/error, uncertain-Post, Posted and maximized states at each native scale. Data is synthetic; the uncertain-Post support correlation is generated test data. These are owned HWND PrintWindow snapshots in the product's 96-DPI coordinate space, not physical desktop rasters or attended package screenshots. Pair their scale labels with the independent physical measurements above. Earlier occluded desktop captures were rejected and stay local. Retained native date/status/lookup accessory colors are visible in the captures; no full glyph/contrast or attended theme certification is inferred.
+
+One fresh independent source review identified splitter-minimum reachability, native button arrow delivery and a logical/physical fixture assumption. Each received a failing regression before repair. Later native 125% observations exposed physical cell/row bounds and redundant detail scrollbars; regression failures preceded the final fixes. No mandatory review finding remains. The reviewer did not run GUI/SQL/tests or certify the runtime result; no second review was spawned.
+
+Incremental TRX trials follow (PASS/total, zero skipped; all selected rows executed). These are development observations, not repeated final acceptance, and earlier source passes do not substitute for final83e5df2. Every path is under local TestResults/; raw TRX/logs and transient process identifiers are not committed.
+
+| Local TRX suffix | PASS/total | SHA256 |
+|---|---|---|
+| `bci-t05-bounds-green/bounds-green.trx` | 11/11 | `BDCC2047BEE17FA94CA0B915760609FD02F46C7CF6C85F08CAC0AB0CDD11C66A` |
+| `bci-t05-bounds-red/bounds.trx` | 0/4 | `C50ACD95E8406AED19B3DE6C776E36E9A738D3F58B7992AC02605D5E01E2C793` |
+| `bci-t05-broad/focused.trx` | 173/175 | `E4B9795E360166ED7F6A4C33DA6C3C423C774CA5FAEAAD5539B81FE0C74207C4` |
+| `bci-t05-contracts-red/contracts.trx` | 2/7 | `4413B3670A7D2C1E38E83ED08556CEBF158CD24B7F574B4EB2F1FF185541672B` |
+| `bci-t05-final100/final100.trx` | 179/179 | `FBB8C6743AF03E3B279942EBF0847A32D938C6A04221755976D842624C9037BE` |
+| `bci-t05-final125/final125.trx` | 179/179 | `214C2F1137E6772933ECC558A8E4247D05BAD1F23B317AF276356309F2CB786E` |
+| `bci-t05-focused/focused.trx` | 47/47 | `3E8B6EB2D8439E70263581D135397625BD959350A997F06641934F388BFCF26F` |
+| `bci-t05-frozen125/frozen125.trx` | 179/179 | `C7DCBC88E5ED27C77BA2DBE5D5559DA20863A3A8252F8C1EC7839E4C4797CC0B` |
+| `bci-t05-geometry125/geometry.trx` | 9/11 | `3AA9F355B33E5049A23D604D66AA9D6B4E1C8B3D883D778FDC9D1A4DFBDE964D` |
+| `bci-t05-green/green.trx` | 4/6 | `DD77CAAF8E40DE0DBF788EE7C811C188CE1C5F7035AA2CF9E5CCEF011AE183FF` |
+| `bci-t05-initial-red/initial.trx` | 0/4 | `4879DAAF35B2FE9DC68220D26EE2D1D7735AD4875F00E1F4291730DF47253B17` |
+| `bci-t05-layout125/layout125.trx` | 11/11 | `09DA27A6F1D132A00E21C106674231B2107CA819CA05C964E311B5C9D6B60D85` |
+| `bci-t05-layout2/layout.trx` | 2/6 | `4067D59E158C1B4E5363AEF58057B3F5A49B72B3B8BBEFD9C0D45295DC21631A` |
+| `bci-t05-measure/measure.trx` | 0/2 | `6DEF8205C86C9FDB3F0FD003682751EA235E52E66BDB7446DCF3D53E6BA0C3F3` |
+| `bci-t05-measured125/measured125.trx` | 11/11 | `40935B5D154488EE5EE2A70918A312F68C818E3F3FC4B516CD25167BF6C18FC4` |
+| `bci-t05-native-popup/popup.trx` | 2/2 | `DB9DDC0586D44544419C11C185FE8E827C823C14F69C83F70EF36A3547908978` |
+| `bci-t05-red/red.trx` | 0/6 | `230D5FF40253C1238A684D77C6900C33A7A3B875CBBADCC5746DD84DB89BDFD1` |
+| `bci-t05-review-green/review-green.trx` | 179/179 | `A427653252FD449FFB1E7218DA4737A3C9A00DD5B7AEEB75BB808A019416314A` |
+| `bci-t05-review-red/review.trx` | 0/3 | `34F0C51EEEA8527FB5239EC2E5C63AF0B6696211A7E4AFECFCF264F856945E60` |
+| `bci-t05-row-red/row.trx` | 5/11 | `2BC20083515A81EF451B95B61EBDC6415A88C869CF16A12F361F08D7C43A0DC9` |
+| `bci-t05-scroll-details/scroll-details.trx` | 2/4 | `630B536CD227FB9783CBB54397C25F308846E1903A5FD037C3DA03D702B1339F` |
+| `bci-t05-scroll-dock/scroll-dock.trx` | 11/11 | `E12A7B94F503AA4FF88BA499242F47FA067D57429F6641F65197C61C4D2D5F6E` |
+| `bci-t05-scroll-green/scroll-green.trx` | 9/11 | `996EC1439A506B572F7FECE9B84C11C726A71158FDE17828681A2FD5FC3431D1` |
+| `bci-t05-scroll-layout/scroll-layout.trx` | 11/11 | `689FC60A4E15A9B3AD02F84EED4DDFECC832EC7440F8EA3FAB7C8CA53485ADC5` |
+| `bci-t05-scroll-red/scroll.trx` | 2/4 | `AE471695D392E4CBE4ADEEEA1385772CB3BCA4064B383A838BCC932135F79C40` |
+| `bci-t05-spacing-red/spacing.trx` | 0/4 | `5B2F27C6CFACBE6F617EE88174FE12F7F57991EA04C91417A6A4AC8BEC997BD1` |
+| `bci-t05-states/states.trx` | 19/23 | `1874E2875B5EA1836E607F878CFBD7CB4B5FBA9C44587CB86516165D30A2D45D` |
+| `bci-t05-verified100/final100.trx` | 179/179 | `98238F6EB6E3CA857B9FCA33A935E37FA970E69E2FF3DA8D36C3915404531036` |
+| `bci-t05-verified125/verified125.trx` | 175/179 | `70419F2B18E2A42F629CC8F7E3E657682B9DF8498CF04D1F3F4A6A7AC4D67C91` |
+| `bci-t05-visual/visual.trx` | 6/6 | `0F404CB959E3D2C34AD36045923DC983C17DBBF2EEDEE0738877966F33D3C0D9` |
+
+Initial REDs establish missing typography/native alignment, list-font/selection behavior, metadata spacing, initial split width and navigation/DPI contracts. An intermediate 173/175 run failed two old same-parent Tab assumptions after deliberate metadata regrouping; they now use native traversal. The 19/23 state run failed four desktop-capture occlusion guards, prompting owned PrintWindow capture. Initial native125 trials without the external observer do not establish monitor scale. The 175/179 and bounds-red trials exposed unscaled physical cell geometry; row-red additionally exposed Row.Bounds containing only Product and a wrong test assumption that a new line starts at zero (actual default is one). Scroll trials retained stale old extents until minimum-size/dock layout was corrected. Failed trials are not relabeled PASS.
+
+Hosted controls, shared editors, bounded observer/UIA clients and testhost are disposed/drained; final owned-process inspection found no probe/testhost/application left. No T05 SQL allocation or package was produced, no ordinary Login executed. T04's clean package is historical source04590b9 and cannot certify T05's changed numeric editor/layout. T06 must freeze the new candidate, rerun its affected integrated Desktop/Session/package/SQL/attended matrix and record current product/test provenance. Production prerequisites and GUI-P5's historical Warehouse125Dark Down NOT TESTED exception remain unchanged.
