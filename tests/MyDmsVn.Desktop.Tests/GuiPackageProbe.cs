@@ -121,6 +121,13 @@ internal static class GuiPackageProbe
                 CloseApplication(shell);
                 Console.WriteLine("SERVER_DIRECT_DENY=PASS");
             }
+            else if (args[1] == "inventory-deny")
+            {
+                var shell = Login("gui.bci.receipt.writer", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), "BCI Receipt Writer");
+                Console.WriteLine("ORDINARY_RECEIPT_ACTOR_LOGIN=PASS");
+                Receipt(shell, args[0], args[1]);
+                CloseApplication(shell);
+            }
             else if (args[1] == "inventory-audit" || args[1] == "inventory-stale" || args[1] == "inventory-fault" || args[1] == "inventory-lookup")
             {
                 var shell = Login();
@@ -342,9 +349,37 @@ internal static class GuiPackageProbe
         SetInput(page, "Quantity", 3.125m.ToString("F4"), false);
         InputEditor(page, "Note").SetFocus();
         Find(page, 12.5m.ToString("F2"), ControlType.Text, false);
+        if (scenario == "inventory-deny")
+        {
+            var committedProduct = InputValue(page, "Product");
+            Signal("receipt-deny-ready");
+            AwaitSignal("allow-denied-save");
+            _stage = "receipt-server-direct-deny";
+            Invoke(Find(page, "Save", ControlType.Button, false));
+            Find(page, "The operation is not permitted.", ControlType.Text, true);
+            if (InputValue(page, "Note") != "GUI edited" || InputValue(page, "Product") != committedProduct ||
+                decimal.Parse(InputValue(page, "Quantity"), System.Globalization.CultureInfo.CurrentCulture) != 3.125m ||
+                decimal.Parse(InputValue(page, "Unit cost"), System.Globalization.CultureInfo.CurrentCulture) != 4m)
+                throw new InvalidOperationException("Denied inline receipt input was lost.");
+            if (Find(page, "Post", ControlType.Button, false).Current.IsEnabled)
+                throw new InvalidOperationException("Denied dirty draft permits Post.");
+            Console.WriteLine("INLINE_RECEIPT_DIRECT_DENY_INPUT_RETAINED=PASS");
+            Signal("receipt-denied");
+            AwaitSignal("allow-explicit-save");
+            _stage = "receipt-explicit-save-after-regrant";
+        }
         Invoke(Find(page, "Save", ControlType.Button, false));
         var post = Find(page, "Post", ControlType.Button, false);
         Wait(delegate { return post.Current.IsEnabled; }, "Saved draft cannot be posted.");
+        if (scenario == "inventory-deny")
+        {
+            Console.WriteLine("INLINE_RECEIPT_EXPLICIT_SAVE_AFTER_REGRANT=PASS");
+            Invoke(post);
+            Find(page, "Posted", ControlType.Text, false);
+            Wait(delegate { return !post.Current.IsEnabled; }, "Actor Posted receipt still permits Post.");
+            Console.WriteLine("INLINE_RECEIPT_ACTOR_POST=PASS");
+            return; // Existing inventory audit scenarios separately retain Balance/Card UI checks.
+        }
         if (scenario == "inventory-lookup")
         {
             ChangedLookupsAndReopen(shell, page, executable, receiptAction);

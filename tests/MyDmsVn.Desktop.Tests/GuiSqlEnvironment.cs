@@ -35,6 +35,78 @@ internal sealed class GuiSqlEnvironment : IDisposable
     public const string OwnerUsername = "gui.p5.owner";
     public string ActorPassword { get; } = Guid.NewGuid().ToString("N") + "aA9!";
 
+    private string? _receiptDenyVersion;
+
+    public async Task SeedReceiptWriterAsync()
+    {
+        await VerifySeparationAsync();
+        using var connection = new SqlConnection(_migration);
+        await connection.OpenAsync();
+        using var command = new SqlCommand(
+            "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm,IsActive) " +
+            "VALUES(N'gui.bci.receipt.writer',N'GUI.BCI.RECEIPT.WRITER',N'BCI Receipt Writer',N'Local',@hash,N'',N'BCrypt',1); " +
+            "DECLARE @user int=SCOPE_IDENTITY(); " +
+            "INSERT dbo.Roles(RoleName,NormalizedRoleName) VALUES(N'BCI Receipt Writer',N'BCI RECEIPT WRITER'); " +
+            "DECLARE @role int=SCOPE_IDENTITY(); INSERT dbo.UserRoles(UserId,RoleId) VALUES(@user,@role); " +
+            "INSERT dbo.RolePermissions(RoleId,PermissionKey) VALUES " +
+            "(@role,N'Catalog.Products.Read'),(@role,N'Catalog.Warehouses.Read'),(@role,N'Catalog.Employees.Read')," +
+            "(@role,N'Inventory.GoodsReceipts.Read'),(@role,N'Inventory.GoodsReceipts.Write'),(@role,N'Inventory.GoodsReceipts.Post'); " +
+            "INSERT dbo.Products(Code,Name,Unit,IsActive) VALUES(N'GUI-PROD',N'UIA Product Updated',N'pcs',1); " +
+            "INSERT dbo.Warehouses(Code,Name,IsActive) VALUES(N'BCI-WH-FIXTURE',N'Inactive fixture',0); " +
+            "INSERT dbo.Warehouses(Code,Name,Address,IsActive) VALUES(N'GUI-WH',N'UIA Warehouse Updated',N'GUI address',1); " +
+            "INSERT dbo.Employees(Code,Name,IsActive) VALUES(N'BCI-EMP-FIXTURE-1',N'Inactive fixture 1',0),(N'BCI-EMP-FIXTURE-2',N'Inactive fixture 2',0); " +
+            "INSERT dbo.Employees(Code,Name,Phone,IsActive) VALUES(N'GUI-EMP',N'UIA Employee Updated',N'0900123456',1);", connection) { CommandTimeout = 15 };
+        command.Parameters.AddWithValue("@hash", new BcryptPasswordHasher(10).Hash(ActorPassword));
+        await command.ExecuteNonQueryAsync();
+        Assert.Equal(0, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.SystemSecuritySettings WHERE BoundNormalizedUsername=N'GUI.BCI.RECEIPT.WRITER';"));
+        // Actual generated keys must differ so swapped metadata/product IDs cannot pass the oracle.
+        Assert.Equal(3, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(DISTINCT Id) FROM (SELECT ProductId Id FROM dbo.Products WHERE Code=N'GUI-PROD' " +
+            "UNION ALL SELECT WarehouseId FROM dbo.Warehouses WHERE Code=N'GUI-WH' " +
+            "UNION ALL SELECT EmployeeId FROM dbo.Employees WHERE Code=N'GUI-EMP') selected;"));
+    }
+
+    private async Task AssertOriginalReceiptDraftAsync()
+    {
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE Status=N'Draft' AND Note=N'GUI draft' AND PostedAtUtc IS NULL;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE Quantity=2.5 AND UnitCost=4;"));
+        foreach (var table in new[] { "StockLedger", "StockBalances" })
+            Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo." + table + ";"));
+    }
+
+    public async Task DenyReceiptWriteAsync()
+    {
+        await VerifySeparationAsync();
+        await AssertOriginalReceiptDraftAsync();
+        _receiptDenyVersion = await ScalarAsync<string>(_oracle,
+            "SELECT CONVERT(varchar(16),RowVersion,2) FROM dbo.GoodsReceipts;");
+        await ExecuteAsync(_migration,
+            "INSERT dbo.UserPermissions(UserId,PermissionKey,Granted) SELECT UserId,N'Inventory.GoodsReceipts.Write',0 " +
+            "FROM dbo.Users WHERE NormalizedUsername=N'GUI.BCI.RECEIPT.WRITER';");
+    }
+
+    public async Task AssertReceiptDeniedAndRestoreWriteAsync()
+    {
+        await VerifySeparationAsync();
+        await AssertOriginalReceiptDraftAsync();
+        Assert.NotNull(_receiptDenyVersion);
+        Assert.Equal(_receiptDenyVersion, await ScalarAsync<string>(_oracle,
+            "SELECT CONVERT(varchar(16),RowVersion,2) FROM dbo.GoodsReceipts;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.Users u JOIN dbo.UserRoles ur ON ur.UserId=u.UserId " +
+            "JOIN dbo.RolePermissions rp ON rp.RoleId=ur.RoleId JOIN dbo.UserPermissions up ON up.UserId=u.UserId " +
+            "AND up.PermissionKey=rp.PermissionKey WHERE u.NormalizedUsername=N'GUI.BCI.RECEIPT.WRITER' AND u.IsActive=1 " +
+            "AND rp.PermissionKey=N'Inventory.GoodsReceipts.Write' AND up.Granted=0;"));
+        await ExecuteAsync(_migration,
+            "DELETE up FROM dbo.UserPermissions up JOIN dbo.Users u ON u.UserId=up.UserId " +
+            "WHERE u.NormalizedUsername=N'GUI.BCI.RECEIPT.WRITER' AND up.PermissionKey=N'Inventory.GoodsReceipts.Write' AND up.Granted=0;");
+    }
+
     public async Task SeedNegativeActorsAsync()
     {
         using var connection = new SqlConnection(_migration);
@@ -301,7 +373,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
         Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
     }
 
-    public async Task AssertPostedReceiptAsync()
+    public async Task AssertPostedReceiptAsync(string normalizedActor = "GUI.P5.OWNER")
     {
         Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
         Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.GoodsReceiptLines;"));
@@ -310,7 +382,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
             "SELECT COUNT(*) FROM dbo.GoodsReceipts r JOIN dbo.Warehouses w ON w.WarehouseId=r.WarehouseId " +
             "JOIN dbo.Employees e ON e.EmployeeId=r.EmployeeId JOIN dbo.Users u ON u.UserId=r.PostedByUserId " +
             "WHERE r.Status=N'Posted' AND r.Note=N'GUI edited' AND w.Code=N'GUI-WH' AND e.Code=N'GUI-EMP' " +
-            "AND u.NormalizedUsername=N'GUI.P5.OWNER' AND r.PostedAtUtc IS NOT NULL;"));
+            "AND u.NormalizedUsername=@actor AND r.PostedAtUtc IS NOT NULL;", new SqlParameter("@actor", normalizedActor)));
         Assert.Equal(1, await ScalarAsync<int>(_oracle,
             "SELECT COUNT(*) FROM dbo.GoodsReceiptLines l JOIN dbo.Products p ON p.ProductId=l.ProductId " +
             "WHERE p.Code=N'GUI-PROD' AND l.Quantity=3.125 AND l.UnitCost=4;"));
