@@ -41,6 +41,23 @@ internal sealed class ReceiptCommandButton : MyDmsVn.Bootstrap5WinFormUI.Control
 {
     internal System.Func<bool>? RetainEditorFocus { get; set; }
     private bool _held;
+    protected override void OnPaint(System.Windows.Forms.PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        if (!Focused || !ShowFocusCues || !Enabled) return;
+
+        // Receipt commands use the primary fill. In Dark the vendor focus token
+        // equals that fill, so add an app-owned contrasting keyboard focus cue.
+        var colors = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Colors;
+        var primary = colors.Primary;
+        var color = primary.R * 299 + primary.G * 587 + primary.B * 114 >= 128000 ? colors.Dark : colors.Light;
+        var inset = System.Math.Max(3, 4 * DeviceDpi / 96);
+        var bounds = new System.Drawing.Rectangle(inset, inset, Width - inset * 2 - 1, Height - inset * 2 - 1);
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        using var pen = new System.Drawing.Pen(color, System.Math.Max(1, DeviceDpi / 96))
+        { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
+        e.Graphics.DrawRectangle(pen, bounds);
+    }
     protected override void WndProc(ref System.Windows.Forms.Message message)
     {
         if (message.Msg == 0x0201 && Enabled && RetainEditorFocus?.Invoke() == true)

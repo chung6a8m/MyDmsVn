@@ -1,14 +1,14 @@
 # Business Compact inline Goods Receipt — acceptance specification
 
-**Status:** BCI-T00 proof, T01 scalar parser, T02 projection/session foundation, T03 lookup/command integration and T04 editable native accessibility and T05 compact layout complete in their recorded scopes; BCI-T06 remains PLANNED / NOT RUN. No integrated Business Compact product behavior is accepted.
+**Status:** BCI-T00 proof, T01 scalar parser, T02 projection/session foundation, T03 lookup/command integration and T04 editable native accessibility and T05 compact layout complete in their recorded scopes; BCI-T06 is IN PROGRESS; see the current frozen evidence in §8.7. No integrated Business Compact product behavior is accepted.
 **Prepared:** 2026-10-20. **Planning baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`.
 
 ## 1. Scope and authority
 
 This specification verifies the [Business Compact design](BUSINESS_COMPACT_UI.md) and [BCI implementation plan](plans/20261020-001-business-compact-inline-goods-receipt.md). It is an acceptance ledger, not an executable test manifest or a replacement for [TEST_POLICY](TEST_POLICY.md).
 The product remains Windows Forms `net48`, with the shipped x86 Desktop and current Local application contracts. SourceGrid owns edit lifecycle; application code owns receipt state, validation presentation and command admission.
-All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; A24–A26 have T04 hosted/native and focused package evidence in §8.5; A27–A28 have T05 hosted native 100%/125% layout evidence in §8.6; A29–A30 remain NOT RUN, including rows that cite an existing regression. Existing means source already exists; it does not mean the new inline implementation has passed it.
-Names outside the retained T00 proof, T01 scalar parser/tests, T02 grid/session code/tests and T03 integration/tests and T04 accessibility/provider/tests and T05 compact layout/navigation/numeric-adapter/tests identify proposed work in existing test projects; those proposed APIs/tests are not already implemented. Retain the obligation ID if a reviewed implementation changes a proposed test name.
+All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; A24–A26 have T04 hosted/native and focused package evidence in §8.5; A27–A28 have T05 hosted native 100%/125% layout evidence in §8.6; A29 has frozen Desktop100/package evidence in §8.7; its remaining contexts and A30 are pending. Historical results do not satisfy the new candidate. Existing means source already exists; it does not mean the new inline implementation has passed it.
+T00–T05 source/test names and T06 `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` are implemented in existing projects. Remaining candidate reconciliation and attended outcomes are evidence obligations, not implemented behavior or inferred PASS. Retain the obligation ID if a reviewed implementation changes a proposed test name.
 T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField`; T03 connects them to the receipt controls. T02 implements `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)` as an internal foundation tested against a hosted grid and real VM; T03 now supplies shipping-control command wiring and T04 supplies writable accessibility and active real editor reachability; their exact contracts are owned by the design and plan.
 
 ## 2. Accepted historical baseline — external line editors
@@ -39,15 +39,15 @@ The earlier 139/282/312/324/326/329 counts describe their own frozen revisions. 
 | E-L | [Product option tests](../tests/MyDmsVn.Desktop.Session.Tests/GoodsReceiptProductOptionsViewModelTests.cs), [list tests](../tests/MyDmsVn.Desktop.Session.Tests/GoodsReceiptListViewModelTests.cs) | Query intent, cancellation, catalog refresh and late-response fencing. |
 | E-P | [PackagedGuiAcceptanceTests](../tests/MyDmsVn.Desktop.Tests/PackagedGuiAcceptanceTests.cs), [GuiPackageProbe](../tests/MyDmsVn.Desktop.Tests/GuiPackageProbe.cs) | Actual Login, receipt/stock reconciliation, stale clients, denial, timeout/reload/retry and owned process cleanup. |
 | E-U | [AccessibleActionGrid](../src/MyDmsVn.Desktop.WinForms/AccessibleActionGrid.cs), [AccessibleNumericBox](../src/MyDmsVn.Desktop.WinForms/AccessibleNumericBox.cs), [AccessibleLookupBox](../src/MyDmsVn.Desktop.WinForms/AccessibleLookupBox.cs) | Existing result cells are deliberately read-only; virtual Open selects external editors. Numeric/lookup accessibility is application-specific. |
-| E-G | [GoodsReceiptControl](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.cs), [line VM](../src/MyDmsVn.Desktop.Application/GoodsReceiptLineViewModel.cs), [editor VM](../src/MyDmsVn.Desktop.Application/GoodsReceiptEditorViewModel.cs) | Current full cell rebuild and external-editor synchronization must become safe for an active grid edit. |
+| E-G | [GoodsReceiptControl](../src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.cs), [line VM](../src/MyDmsVn.Desktop.Application/GoodsReceiptLineViewModel.cs), [editor VM](../src/MyDmsVn.Desktop.Application/GoodsReceiptEditorViewModel.cs) | Current inline adapter must preserve active edits during ordinary state updates and reset only at deliberate document boundaries; T03 replaced the old full rebuild/external-editor path. |
 
 E-R's `Rowversion_conflict_is_inline_and_keeps_dirty_header_line_and_opaque_version` refers to an inline error message, not editing inside a grid cell.
-Keep read-only semantics for result lists and computed cells. E-A's existing line-cell read-only assertion must be deliberately revised for editable Draft fields; deleting it without replacement loses an accepted accessibility boundary.
+Keep read-only semantics for result lists and computed cells. T04 deliberately revised E-A's line-cell read-only assertion for editable Draft fields and retained read-only computed/Posted semantics; preserve those replacement assertions.
 Registry-created vendor editors do not automatically instantiate E-U's application subclasses. Prove the actual hosted editor's native accessible tree and value/selection behavior before declaring compatibility.
 
 ## 4. Acceptance matrix
 
-`New:` names below are proposed methods except the implemented T00–T03 methods recorded in §8.1–§8.4 within the existing Desktop test project; numeric pure cases use the proposed `ReceiptNumericInputTests`; accessibility cases use `GoodsReceiptInlineAccessibilityTests`, and layout cases use `BusinessCompactLayoutTests` in that same project. E-* references are existing anchors, not new-result credit.
+`New:` retains the planning labels for now-implemented A01–A29 method names in the existing Desktop project. Numeric cases use `ReceiptNumericInputTests`, accessibility uses `GoodsReceiptInlineAccessibilityTests`, and layout uses `BusinessCompactLayoutTests`. A30 is a candidate reconciliation/review obligation. E-* references are regression anchors, not new-result credit; §8.1–§8.7 distinguish source and actual scoped execution.
 Each row belongs to its named plan task. BCI-T06 reconciles every row and the affected existing regressions; it cannot waive an earlier failure by rerunning a narrower successful selection.
 
 ### 4.1. Editor proof and strict numeric input
@@ -92,8 +92,8 @@ Each row belongs to its named plan task. BCI-T06 reconciles every row and the af
 | BCI-A26 | BCI-T04 | Existing: E-A numeric/lookup guards; New: `Accessible_edits_preserve_validation_and_pending_selection_state` | Native Value/selection actions use the same strict numeric and lookup pipeline as keys/mouse; disabled/stale setters cannot mutate, and pending text is distinguishable from a committed key. | PASS — T04 scoped native/provider/package evidence (§8.5) |
 | BCI-A27 | BCI-T05 | Existing: E-R layout/E-A tab tests; New: `Compact_shell_retains_visible_fields_and_native_focus_order` | At supported workspace widths, windowed/maximized and Light/Dark, controls/header/footer/errors remain visible; native Tab/Shift+Tab follows the design and read-only computed cells do not trap entry flow. | PASS — T05 scoped hosted native 100%/125%; wide 125% work-area fit recorded (§8.6); full frozen acceptance remains T06 |
 | BCI-A28 | BCI-T05 | Existing: E-A render/vendor sizing tests; New: `Cell_editors_and_popups_remain_usable_after_scroll_resize_and_theme_change` | Actual 100%/125% Windows scaling preserves editor text/caret/error visibility, row alignment and popup work-area bounds while scrolling/resizing/theme switching; no focus loss silently commits an unintended value. | PASS — T05 scoped hosted native 100%/125%; wide 125% work-area fit recorded (§8.6); full frozen acceptance remains T06 |
-| BCI-A29 | BCI-T06 | Existing: E-P receipt/invalid/lookup/stale/timeout cases; New: `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` | Actual Login and native inline create/edit/reload/Save/Post flow persists exact decimals and keys; independent SQL proves one movement per line, balance reconciliation and no denied/failed mutation. | NOT RUN |
-| BCI-A30 | BCI-T06 | Existing: E-P/GUI-P5 cleanup evidence; New: candidate reconciliation record | New frozen source/test/package, all required discovery names/Theory rows, attended observations, exception capture and owned resource cleanup reconcile. No missing/skipped/aborted/timed-out mandatory case is credited as PASS. | NOT RUN |
+| BCI-A29 | BCI-T06 | Existing: E-P receipt/invalid/lookup/stale/timeout cases; New: `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` | Actual Login and native inline create/edit/reload/Save/Post flow persists exact decimals and keys; independent SQL proves one movement per line, balance reconciliation and no denied/failed mutation. | IN PROGRESS — frozen Desktop100 PASS; remaining contexts/review pending (§8.7) |
+| BCI-A30 | BCI-T06 | Existing: E-P/GUI-P5 cleanup evidence; New: candidate reconciliation record | New frozen source/test/package, all required discovery names/Theory rows, attended observations, exception capture and owned resource cleanup reconcile. No missing/skipped/aborted/timed-out mandatory case is credited as PASS. | IN PROGRESS — reconciliation and attended review pending (§8.7) |
 
 ## 5. Cross-cutting acceptance rules
 
@@ -602,3 +602,106 @@ Incremental TRX trials follow (PASS/total, zero skipped; all selected rows execu
 Initial REDs establish missing typography/native alignment, list-font/selection behavior, metadata spacing, initial split width and navigation/DPI contracts. An intermediate 173/175 run failed two old same-parent Tab assumptions after deliberate metadata regrouping; they now use native traversal. The 19/23 state run failed four desktop-capture occlusion guards, prompting owned PrintWindow capture. Initial native125 trials without the external observer do not establish monitor scale. The 175/179 and bounds-red trials exposed unscaled physical cell geometry; row-red additionally exposed Row.Bounds containing only Product and a wrong test assumption that a new line starts at zero (actual default is one). Scroll trials retained stale old extents until minimum-size/dock layout was corrected. Failed trials are not relabeled PASS.
 
 Hosted controls, shared editors, bounded observer/UIA clients and testhost are disposed/drained; final owned-process inspection found no probe/testhost/application left. No T05 SQL allocation or package was produced, no ordinary Login executed. T04's clean package is historical source04590b9 and cannot certify T05's changed numeric editor/layout. T06 must freeze the new candidate, rerun its affected integrated Desktop/Session/package/SQL/attended matrix and record current product/test provenance. Production prerequisites and GUI-P5's historical Warehouse125Dark Down NOT TESTED exception remain unchanged.
+
+## 8.7. BCI-T06 frozen integrated UI acceptance — 2026-10-20
+
+**IN PROGRESS — NOT ACCEPTED.** Runtime gates and attended review below must be completed before changing the milestone status. This record concerns Business Compact and inline Goods Receipt on net48/x86; operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
+
+### Frozen provenance and review
+
+- Same isolated managed worktree/branch as T00–T05. Clean product/package source `09e92d3e7d3d59bd515457de4af034509b348d31`; implementation is unchanged from `83e5df2028bfbabdba29d79192bcc3c838993dfb`. Candidate `0.1.0-bci-t06`, local `artifacts/release/bci-t06-candidate1`, manifest dirty=false. Separate desktop/admin outputs, 205 independently rehashed files (133 desktop +72 admin), schema scripts001–009. This unsigned build candidate is not a production release.
+- Frozen checkpoint Desktop test/driver source `f858ec9024c7f3a507da9b4fb52cd34e79d9ac91`. The intentional difference consists only of semantic input selection/diagnostics and new receipt denial/regrant coverage. Session source/build09e92d3 remains byte-identical; 108 unfiltered cases were executed once. At this checkpoint, product/server/vendor/API/schema/permission definitions and project/lock graph were unchanged by T06. The later app-owned focus-cue correction below requires a new product/package freeze.
+- Vendor pins: BootstrapSourceGrid `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f`; Bootstrap5WinFormUI `aba102e33c48937fd92468791c287afda0a59e77`; SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`.
+- One independent source reviewer covered the complete BCI implementation and narrow T06 addenda; no actionable finding remained. An initial suspected ErrorProvider issue was withdrawn after confirming the existing lines error clears before aggregation. Source review does not certify native focus/DPI/SQL outcomes or attended acceptance. No deferred minor finding remains.
+- Windows11 `10.0.26200`, SDK8.0.425, interactive en-US, Release/net48/x86, physical1920×1080. Actual native monitor scales must be measured at100%/125%; product/test HWNDs remain DPI-unaware96, with OS scaling. No simulated sizing substitutes for native scale.
+
+| Artifact | SHA256 |
+|---|---|
+| Candidate manifest | `A76EBFC45E7C317BF08671B183E73C47C30427EE018F9D122134BCCEE1563221` |
+| Packaged Desktop.App.exe | `2D2EC9058737D668CA70FCF8CF8EA452098CB191F4203A63AB5D8657F511924E` |
+| Packaged Desktop.WinForms.dll | `6F075AB0F621E3ABACFF03576A52889E56ECA6EF11E68AF4F5C0493E25136A8B` |
+| Packaged admin DbMigrator.exe | `304C0070BA5C8609496C812E1F08A7194F0E7A3F69DAD0B233851A2F87186D50` |
+| Frozen checkpoint Desktop.Tests.dll | `0AB1B9AE19ED98DC430D60791F22E714BA3684281A01ED8A707D4FD7E218F54D` |
+| Frozen checkpoint testbin Desktop.WinForms.dll | `4B20A4CB678E419E725830BF394F52A0096610E5B2BBF96C220B179560415C58` |
+| Session.Tests.dll | `5EF7E65A1AF02DFAC32EDE81F6A34639A0B4C7B5549A246AEE337FD07F3F5CF2` |
+
+Package and testbin WinForms are not byte-identical: build/source metadata differ. The shipped candidate is independently frozen and native package probes run that exact directory. Legacy variable `MYDMSVN_GUI_P5_TEST_REVISION` admits product/package09e92d3; it does not rename the actual f858ec9 test build.
+
+### Driver corrections and A29
+
+Initial full100 at09e92d3 executed413 rows:404PASS/9FAIL. Eight package rows encountered ambiguous Warehouse input because the compact labeled group exposed a same-named semantic Pane containing an unrelated EDIT. Driver selection now restricts input candidates to Edit/ComboBox/Spinner, retaining rejection of distinct real inputs. The same-name Pane regression was observed RED before the correction. No ordinal fallback or focus-guard relaxation was added.
+
+The other failed row was the existing owned-window background-focus audit. An independent-distraction experiment did not fix it and was reverted; activation diagnostics add metadata only and preserve one SetForegroundWindow plus actual foreground/editor-focus checks. Its original cause remains unassigned. Subsequent focused1/1, process/receipt23/23 and full413/413 passed; these observations do not establish a root cause. Failed trials remain recorded below.
+
+A29 required receipt-specific denial; the old Catalog-only denial did not satisfy it. New `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` executes Light/Dark using actual Login by an ordinary active writer with six explicit grants. Direct Deny is applied after receipt reopen/edit; the native Save fails while preserving input and dirty Post lock. A separate readonly SQL identity verifies original Draft2.5@4, no ledger/balance, and unchanged opaque RowVersion before the owned Deny is removed. Only explicit Save then Post succeeds; exact generated Product/Warehouse/Employee keys are deliberately pairwise distinct and checked independently, with Quantity3.125, cost4, one ledger movement/balance and the ordinary posted actor. The setup identity seeds reference fixtures and grants; this is not runtime bootstrap or Catalog UI creation evidence.
+
+The new native mode first failed0/2 as an expected RED, then passed2/2. Shared original receipt and Catalog denial cases passed4/4. This change required a new415-row test freeze; old413/18 checkpoint passes do not substitute for its gates.
+
+### Required gates, native observations and cleanup
+
+Final admitted discovery at `f858ec9`: **415 distinct rows / 285 methods**, including **20 package rows**. Raw TRX/Theory values and SQL identities remain local. Unadmitted discovery without the explicit package environment yielded deferred Theory names (406); it was not a test execution and was replaced by admitted discovery before the gate.
+
+| Required gate | Actual result | Local TRX SHA256 |
+|---|---|---|
+| Session unfiltered, source09e92d3 | 108/108 PASS, no FAIL/SKIP | `FE258FF526C9C10232DCCEAA72EDD47AD4C0671ACFC9C2626061509B5F522FDF` |
+| Desktop unfiltered100, testf858ec9 | **415/415 PASS**, no FAIL/SKIP/abort/timeout; 19m58; exact names match discovery | `9D6663108D6AE3612D2614431BD969600858DAC745BCF35930A1F0427D55D46B` |
+| Separate package100, same frozen test bytes | **20/20 PASS**, no FAIL/SKIP/abort/timeout; 18m12; exact package subset matches discovery | `73176556D9387B70A9BFB291543241A9A1F5935DF813BB6084589E89E3A25C2D` |
+| Desktop unfiltered125, same frozen test bytes | NOT RUN | Pending |
+| Attended100 Light/Dark +125 Light/Dark and explicit review | [Worksheet](BUSINESS_COMPACT_WALKTHROUGH.md) — partial100 observations; recovery keyboard review OPEN, retry/Posted and125 NOT RUN | Pending |
+
+Native100 was independently observed at monitor96DPI/100%, HWND96, clients944×600 and1680×900 with physical windows960×639 and1696×939; both themes and maximized1920×1009 window units were measured. These are hosted-layout measurements plus packaged E2E, not attended sign-off. The 125% work-area boundary must be measured in the new run.
+
+All19 allocations from the final full100 gate and19 from the separate package100 gate were positively dropped after process/SQL drain. At that checkpoint, all107 local ledgers were in the verified Dropped state (including6 historicalT04, hence101 T06 allocations/trials); no quarantine or owned app/probe/testhost remains. The new attended-support preflight validated native100, all205 package hashes, bounded compiler30s and readonly observation child15s without SQL allocation or app launch. No attended observation is inferred from that preflight. A30 and the BCI milestone remain incomplete; do not turn this progress checkpoint into acceptance.
+### Attended100 follow-up and Refresh investigation — 2026-10-21
+
+Two owned attended sessions closed normally and positively cleaned up. The first was restarted after credential handoff and earns no Login/flow credit. In the second, the owner confirmed actual Login, Save/New/reopen preserving2.5@4, edit/Save3.125@4 NoteGUIedited, Product keyboard/popup cases, raw precision error retention/caret navigation and layout/scroll/row identity in Light/Dark. Readonly SQL verified the saved Draft and no stock. A controlled Post WAITFOR was observed; mutation/editor locks were confirmed. Reviewed client captures and their geometry/hashes are linked from the [worksheet](BUSINESS_COMPACT_WALKTHROUGH.md).
+
+The owner reported that Tab appeared to skip enabled Refresh in Dark100, and then clarified that the observation was based on the visible focus border; Enter had not been tried. Source investigation found existing focus painting in the pinned BootstrapButton. An in-process status→Tab assertion passed2/2. An owned SendInput Tab audit against the frozen actual package also passed2/2: UIA focused element was Refresh/Button in both themes. These observations do not dismiss the attended report or establish a visual root cause. Native Enter plus focused/unfocused shell captures passed2/2 on candidate1 (`focus-enter2.trx`, SHA256 `ED79291AADA6B29825CDF91366FDC321A59440A2DD4F3E00589848AE0A8FEAC3`): Tab reached Refresh, Enter reloaded Draft, explicit retry produced exactly one SQL effect, app drained. The first capture experiment failed0/2 after Tab reached Refresh because it required a separate button HWND; Enter was not reached. Its owned supervisor verified process cleanup and both SQL allocations were positively dropped. That diagnostic-tool failure is retained and is not a product regression result. The f858ec9 test DLL is archived locally with the recorded hash; its broad gates are a checkpoint, not certification of this new driver delta.
+
+For attended cleanup only, readonly SQL verified unchanged Draft/no stock, the exactly owned fault was removed, and the owner used mouse Refresh to restore Draft before closing normally. Explicit retry/Posted was not attended. After both sessions and the first two native Tab diagnostics,111 local ledgers were positively Dropped (6 historicalT04 +105 T06); no quarantine. The subsequent shell-capture/Enter diagnostic also positively dropped both allocations:115 local ledgers Dropped in total (6 historicalT04 +109 T06), with no owned app/probe remaining. A30 and final acceptance remain pending, including native125.
+
+### App-owned keyboard focus correction — new freeze pending
+
+The [reviewed diagnostic images](evidence/bci-t06/README.md#automated-refresh-focus-diagnostic--native100-2026-10-21) and pinned source identify a visual cause: Dark Primary and Focus tokens both equal `#6EA8FE`; the vendor paints its focus cue inside that fill. Grid selection borders persist after keyboard focus leaves. Keyboard traversal and Enter were functional; this is a focus visibility correction.
+
+`ReceiptCommandButton.OnPaint` now adds a DPI-scaled dotted rectangle in a contrasting Light/Dark token only while Focused, ShowFocusCues and Enabled. It covers existing primary receipt commands without changing command admission, mouse handling, edit buffers, recovery or vendor pins. The packaged timeout driver retains guarded native Tab/Enter and parent assertions; temporary capture code is excluded from the retained driver. The existing hosted uncertain-Post case now compares actual focused/unfocused render pixels with a contrast threshold of3 in Light/Dark.
+
+The initial render-fixture trials had keyboard cues hidden and both failed; they are not valid product RED/GREEN evidence. After explicitly enabling and asserting keyboard cues, the corrected fixture passed2/2 with the fix, then failed2/2 against the old product (zero contrasting pixels). A source restore preserved an older timestamp, so the first broader run used the old incremental-build DLL and failed2/26; the restored source was made newer and rebuilt. The corrected product then passed **26/26** BusinessCompactLayoutTests + GoodsReceiptInlineEditorTests, no skip. These fixture/build mistakes remain retained locally. Independent source review found no actionable issue after restoring the declared C# BOM/CRLF.
+
+Candidate1 and f858ec9 broad gates remain immutable checkpoints. The new source/test/package candidate and its admitted full100/full125/separate package100 gates are **pending**; no old gate is relabeled as evidence of this correction. Attended focus/recovery/Posted confirmation and native125 remain outstanding. Session108 is unaffected by this rendering-only product change.
+
+### Retained development/checkpoint trials
+
+These are separate runs at their recorded revisions, not one aggregate acceptance run. Paths are relative to local `TestResults/`.
+
+| TRX | PASS / total; FAIL | SHA256 |
+|---|---|---|
+| `bci-t06-activation-diagnostic/activation.trx` | 1/1; 0 FAIL | `86FAC73DC9E8CD1A88165AC0FAA0BF1D75FD790E0C975B910990AD8F9171CA3D` |
+| `bci-t06-caption-red/caption-red.trx` | 0/1; 1 FAIL | `D2B33B3B9955BB57DA04BFC77A5140706D90F447FC82EE87318D05F219E2370B` |
+| `bci-t06-desktop100/desktop100.trx` | 404/413; 9 FAIL | `D56756246AF4EFE4FD825FEA7CAD5730CF9A2D910A66AC37D85AA1B0663137A1` |
+| `bci-t06-driver-green/driver-green.trx` | 1/2; 1 FAIL | `F6FF193347C8A1D75AADBCD63FF9B3DB712AE20CC49BA5F2D01072447CCF8874` |
+| `bci-t06-driver-scope/driver-scope.trx` | 23/23; 0 FAIL | `7AE24EDC6CD8A87F0380BACF5740AF4ADF3EDC99AA4847766C95CA79B2C612E6` |
+| `bci-t06-frozen-desktop100/desktop100.trx` | 413/413; 0 FAIL | `F25A3CF9E5717FCE6F542797F971E7B258EF266CB8119B7E247C40343ACB5E0E` |
+| `bci-t06-frozen-package100/package100.trx` | 18/18; 0 FAIL | `E5570C9EFAD076CE2476A69DB74B0586CF441E4A8F0262ED430001B1F5118C0E` |
+| `bci-t06-receipt-deny-green/receipt-deny-green.trx` | 2/2; 0 FAIL | `C43F043C0E047CB09AC1BFA0B173F021E08219FC622CB49DF9E3BD2ADC708736` |
+| `bci-t06-receipt-deny-red/receipt-deny-red.trx` | 0/2; 2 FAIL | `A112B571E1E89E1BC904FF5295BD338F483495C24F68EC17FFEEFA49305467B3` |
+| `bci-t06-receipt-shared/receipt-shared.trx` | 4/4; 0 FAIL | `519DE587B6789E81BB83FADC86302DDC32A50CCD97F786F7F7D21E5153CC61DE` |
+| `bci-t06-selector-diagnostic/selector.trx` | 0/2; 2 FAIL | `BC67795137E6DF3BB0A821D396CE8C5213252A0040F5FB7C5988CA234F4C77B4` |
+| `bci-t06-session/session.trx` | 108/108; 0 FAIL | `FE258FF526C9C10232DCCEAA72EDD47AD4C0671ACFC9C2626061509B5F522FDF` |
+
+The413/18 checkpoint is source `b663e94`; the new receipt-denial RED/GREEN and shared scope preceded `f858ec9`. Session is09e92d3. Initial full/selector diagnostic are09e92d3 plus diagnostic metadata, before the correction. No failed trial is relabeled PASS.
+
+### Retained Refresh diagnostic trials
+
+These uncommitted-development runs precede the new freeze. The hidden-cue and stale-build limitations described above remain part of their interpretation.
+
+| Local TRX | PASS / total; FAIL | SHA256 |
+|---|---|---|
+| `bci-t06-focus-enter/focus-enter.trx` | 0/2; 2 FAIL | `997685CFA38B1E03A5102DC2FCAA8DA220823B3B3AE9346B5C38383B697C53B7` |
+| `bci-t06-focus-enter2/focus-enter2.trx` | 2/2; 0 FAIL | `ED79291AADA6B29825CDF91366FDC321A59440A2DD4F3E00589848AE0A8FEAC3` |
+| `bci-t06-focus-contrast-red/focus-contrast-red.trx` | 0/2; 2 FAIL | `3B6440A26E603ADFA7528DD55F389515A0CF631D4792BC1D59DFC096C187D691` |
+| `bci-t06-focus-contrast-green/focus-contrast-green.trx` | 0/2; 2 FAIL | `137827466D4940083D94B8C52E8154CC928E660A71DABECFA3830736E0ABD635` |
+| `bci-t06-focus-contrast-cues/focus-contrast-cues.trx` | 2/2; 0 FAIL | `104E97F0F2F509DC4FDA6684D820D3ED7ED57E256E7A80C53D31A310D8A23A23` |
+| `bci-t06-focus-contrast-red2/focus-contrast-red2.trx` | 0/2; 2 FAIL | `3701E5FE9573774E7E1FF85ABCDA990115162A1FBA9B9A86F0DE654900614EDF` |
+| `bci-t06-focus-scope/focus-scope.trx` | 24/26; 2 FAIL | `C9E74A5A1A0D02EF8C32773595312C4CBE58590A5DF2A3E324339B86BC55CDC1` |
+| `bci-t06-focus-scope2/focus-scope2.trx` | 26/26; 0 FAIL | `58C2BC67EA4D8BEE96CD8575422388DA70BC10B2A1BAA0A70C78B1410CC37A4B` |

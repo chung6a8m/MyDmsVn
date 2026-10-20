@@ -334,6 +334,8 @@ public sealed class PackagedGuiAcceptanceTests
             if (initial != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(initial).Throw();
             _output.WriteLine(result!.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("RECOVERY_NATIVE_TAB_REACHES_REFRESH=PASS", result.StandardOutput);
+            Assert.Contains("RECOVERY_NATIVE_ENTER_SENT=PASS", result.StandardOutput);
             Assert.Contains("UNCERTAIN_POST_RELOAD_EXPLICIT_RETRY=PASS", result.StandardOutput);
             Assert.Contains("FAULT_REMOVED_STARTUP_REVALIDATED=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);

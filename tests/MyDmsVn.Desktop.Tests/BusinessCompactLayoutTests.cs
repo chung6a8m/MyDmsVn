@@ -205,6 +205,33 @@ public sealed class BusinessCompactLayoutTests
             Assert.True(fixture.Editor.RequiresPostOutcomeReload);
             Assert.False(receipt.SaveButton.Enabled);
             Assert.True(receipt.RefreshButton.Enabled);
+            Assert.True(receipt.StatusFilter.Focus());
+            // Enable the same keyboard focus cues that native Tab enables in the package.
+            SendMessage(form.Handle, 0x0127, new IntPtr(2 | (1 << 16)), IntPtr.Zero);
+            using var unfocusedRefresh = new Bitmap(receipt.RefreshButton.Width, receipt.RefreshButton.Height);
+            receipt.RefreshButton.DrawToBitmap(unfocusedRefresh, receipt.RefreshButton.ClientRectangle);
+            GoodsReceiptInlineEditorTests.Key(Keys.Tab);
+            Assert.True(receipt.RefreshButton.ContainsFocus,
+                "Tab from status must reach Refresh while Post outcome is unknown; active=" + receipt.ActiveControl?.GetType().Name +
+                "; Refresh TabStop=" + receipt.RefreshButton.TabStop + "; TabIndex=" + receipt.RefreshButton.TabIndex +
+                "; CanSelect=" + receipt.RefreshButton.CanSelect + "; CanFocus=" + receipt.RefreshButton.CanFocus);
+            SendMessage(receipt.RefreshButton.Handle, 0x0128, new IntPtr(2 | (1 << 16)), IntPtr.Zero);
+            Assert.True(receipt.RefreshButton.Focused);
+            Assert.True((bool)typeof(Control).GetProperty("ShowFocusCues", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(receipt.RefreshButton)!, "Keyboard focus cues must be enabled before measuring contrast.");
+            using var focusedRefresh = new Bitmap(receipt.RefreshButton.Width, receipt.RefreshButton.Height);
+            receipt.RefreshButton.DrawToBitmap(focusedRefresh, receipt.RefreshButton.ClientRectangle);
+            var contrastingFocusPixels = 0;
+            for (var y = 0; y < focusedRefresh.Height; y++)
+                for (var x = 0; x < focusedRefresh.Width; x++)
+                {
+                    var focused = focusedRefresh.GetPixel(x, y);
+                    var unfocused = unfocusedRefresh.GetPixel(x, y);
+                    var a = RelativeLuminance(focused);
+                    var b = RelativeLuminance(unfocused);
+                    if ((Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05) >= 3) contrastingFocusPixels++;
+                }
+            Assert.True(contrastingFocusPixels >= 20,
+                "Keyboard focus must visibly contrast with the unfocused Refresh surface; theme=" + mode + "; pixels=" + contrastingFocusPixels);
             Assert.Contains("Posting outcome unknown", receipt.OperationStatusLabel.Text);
             Capture(form, "uncertain-" + mode);
             form.ClientSize = new Size(620, 440); Pump();
@@ -322,5 +349,12 @@ public sealed class BusinessCompactLayoutTests
     [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr window, uint flags);
     [DllImport("user32.dll")] private static extern bool PrintWindow(IntPtr window, IntPtr dc, uint flags);
     private static Rectangle ScreenBounds(Control control) => control.RectangleToScreen(control.ClientRectangle);
+    [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    private static double RelativeLuminance(Color color)
+    {
+        double Linear(byte value) { var channel = value / 255d; return channel <= 0.04045 ? channel / 12.92 : Math.Pow((channel + 0.055) / 1.055, 2.4); }
+        return 0.2126 * Linear(color.R) + 0.7152 * Linear(color.G) + 0.0722 * Linear(color.B);
+    }
+
     private static void Pump() { System.Windows.Forms.Application.DoEvents(); }
 }

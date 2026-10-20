@@ -591,6 +591,54 @@ internal static class GuiPackageProbe
         return true;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeKeyboardInput { public ushort Key, Scan; public uint Flags, Time; public UIntPtr ExtraInfo; }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMouseInput { public int X, Y; public uint Data, Flags, Time; public UIntPtr ExtraInfo; }
+    [StructLayout(LayoutKind.Explicit)]
+    private struct NativeInputData
+    {
+        [FieldOffset(0)] public NativeKeyboardInput Keyboard;
+        [FieldOffset(0)] public NativeMouseInput Mouse;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeInput { public uint Type; public NativeInputData Data; }
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, NativeInput[] inputs, int size);
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
+
+    private static void SendOwnedKey(AutomationElement expectedFocus, ushort key)
+    {
+        foreach (var modifier in new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C })
+            if ((GetAsyncKeyState(modifier) & 0x8000) != 0)
+                throw new InvalidOperationException("Native keyboard audit requires released modifier keys.");
+        if (GetForegroundWindow() != MainWindow || expectedFocus.Current.ProcessId != _application.Id || !expectedFocus.Current.HasKeyboardFocus)
+            throw new InvalidOperationException("Native keyboard audit lost its owned focus.");
+        var input = new[] {
+            new NativeInput { Type = 1, Data = new NativeInputData { Keyboard = new NativeKeyboardInput { Key = key } } },
+            new NativeInput { Type = 1, Data = new NativeInputData { Keyboard = new NativeKeyboardInput { Key = key, Flags = 2 } } }
+        };
+        if (SendInput(2, input, Marshal.SizeOf(typeof(NativeInput))) != 2)
+            throw new InvalidOperationException("Native keyboard input was not inserted.");
+    }
+
+    private static void AssertRecoveryKeyboardRoute(AutomationElement page)
+    {
+        _stage = "uncertain-native-tab-route";
+        var status = Find(page, "Filter by status", ControlType.ComboBox, false);
+        var refresh = Find(page, "Refresh", ControlType.Button, false);
+        FocusOwnedEditor(status, "receipt recovery Tab");
+        SendOwnedKey(status, 9);
+        Thread.Sleep(300);
+        var focused = AutomationElement.FocusedElement;
+        if (focused.Current.ProcessId != _application.Id || GetForegroundWindow() != MainWindow)
+            throw new InvalidOperationException("Native Tab focus escaped its owned application.");
+        Console.WriteLine("RECOVERY_TAB_ACTUAL_FOCUS=" + focused.Current.Name + ";TYPE=" + focused.Current.ControlType.ProgrammaticName);
+        Wait(delegate { return refresh.Current.HasKeyboardFocus; }, "Native Tab from status skipped Refresh.", 5);
+        Console.WriteLine("RECOVERY_NATIVE_TAB_REACHES_REFRESH=PASS");
+
+    }
+
     private static void PostAfterUncertainOutcome(AutomationElement page, AutomationElement post)
     {
         _stage = "real-sql-post-timeout";
@@ -602,10 +650,12 @@ internal static class GuiPackageProbe
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled)
                 throw new InvalidOperationException("Uncertain Post permits a mutation.");
         if (InputEditor(page, "Note").Current.IsEnabled) throw new InvalidOperationException("Uncertain editor remained editable.");
+        AssertRecoveryKeyboardRoute(page);
         Signal("uncertain");
         AwaitSignal("allow-reload");
         _stage = "explicit-outcome-reload";
-        Invoke(Find(page, "Refresh", ControlType.Button, false));
+        SendOwnedKey(Find(page, "Refresh", ControlType.Button, false), 13);
+        Console.WriteLine("RECOVERY_NATIVE_ENTER_SENT=PASS");
         Find(page, "Draft", ControlType.Text, false);
         Wait(delegate { return post.Current.IsEnabled; }, "Explicit reload did not restore the persisted Draft.");
         Signal("reloaded");
