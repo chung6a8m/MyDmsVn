@@ -1,6 +1,6 @@
 # GUI-P5 verification
 
-[Coverage matrix](GUI_P5_COVERAGE_MATRIX.md), [plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [TEST_POLICY](TEST_POLICY.md) govern. Current status: T00–T05 COMPLETE, including both Owner-signed attended P5 IDs and the explicit T05 Down exception. T06 and overall P5 remain OPEN pending the current frozen-driver matrix and final review; REL/P6 G1–G5 remain OPEN. Earlier task checkpoints below are historical and retain their exact candidate, failures and scope.
+**Current status: GUI-P5-T00–T06 COMPLETE in the approved scope.** Both attended IDs are Owner-signed; T05 retains the accepted Down NOT TESTED exception. [Final T06 acceptance](#final-t06-acceptance--2026-10-20) records the frozen329-row100/125 gates, separate18-row packaged suite, Session108, review correction and final cleanup. REL/P6 G1–G5 and production readiness remain OPEN. Earlier checkpoints below are historical; their original candidate, failures and scope are retained. [Coverage matrix](GUI_P5_COVERAGE_MATRIX.md), [plan](plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [TEST_POLICY](TEST_POLICY.md) govern.
 
 ## GUI-P5-T01 — Bounded GUI reliability foundation
 
@@ -487,3 +487,62 @@ All17 actualSQL allocations from this run drained/dropped:324/324 historicalGUIl
 ### Final corrected candidate12e6 full100 — 329/329 PASS
 
 Unfiltered current-driver100 completed329/329PASS, zero fail/skip/timeout/abort, in16.4698minutes. All329 unique names exactly match frozen discovery; all18 packaged and3quarantine rows PASS. Raw TRX SHA2563298DEAFF866E5C38D4B3A1C51C50CDE20B05BFED27CD0C4AD6C1A7564486F1F. Both current-candidate full100/125 now pass the same complete329-row set. Full-run allocation cleanup verified341/341historicalGUIledgersDropped, latestexactdatabase/principal/process0; all-T06 exact172DB/516principals remaining0/allDisposed. Standalone current-candidate packaged18-row suite then started at100, same frozen12e6test/oldproductd520, existing classfilter and unique TRX final-packaged100/t06-final-packaged100.trx; resultpending. T06/P5closure waits this suite and finalcensus/handoff; P6OPEN.
+## Final T06 acceptance — 2026-10-20
+
+**GUI-P5-T06 COMPLETE; GUI-P5 COMPLETE within the approved, Owner-signed scope.** This final status supersedes earlier pending checkpoints. Both attended IDs remain Owner-accepted; T05 remains44PASS/1PARTIAL, with Warehouse125Dark Down NOT TESTED explicitly accepted by Owner. REL/P6 G1–G5 and production readiness remain OPEN. No new Owner signature is inferred.
+
+### Frozen artifacts and verified environment
+
+- Product/package source: d5207b2ce1eae09e9317625b3d7d486c994f09fe, clean1.0.0-guip5-t04-c2. Manifest SHA256 EDB0FE41DAB59FE7F4DEE7F2673815017C056C744E70E9D2E896D50075146101. All205 published files rehashed successfully, including133 Desktop files. DesktopEXE SHA256 C068D0F10AAD451AA90F2659EA893A3B8CEE6E456DDDF8E748C850FE65B758EF. No product/deployment changes during T06.
+- Final Desktop test source:12e6a20a7af8e5c0f6bf820f172580f01e44181b; DLL SHA256 CD12D38840C630A8F5B5FC950691ACEBAA3050DA4ACA687F46644C14C2510FF8. Clean Release/net48/x86 build:0warnings/errors. Expected package source and actual test build are logged independently. No matching-revision fiction.
+- Session test build:cb86fbc metadata, DLL23C4C82B1241DC449BBC1DB5F10EA1082FC96F972F2292E3A24E5E5D2C8AB77F. Session source is unchanged between that build, productd520 and final Desktop test source;108 exact discovered names match TRX. No Session result is relabeled as a new build.
+- Actual Windows11 Home Single Language25H2/x64 build26200.9457; interactive desktop1920x1080 at measured100% and125%, Light/Dark packaged rows at each scale; net48/x86/32-bit testhost. Registry runtime4.8.09221/Release533509 is the actual installed runtime; no isolated4.8-only or broader Windows support certification. DPI150 is outside approved matrix. Desktop remains100% after final drain.
+- Actual private, Owner-authorized non-production SQL2017 Developer14.0.2130.4/64-bit, scripts001–009; SQL2022 Developer remains the new-provision target. Provisioning/master, migration, limited MyDmsVnRuntimeRole runtime and read-only oracle identities remain distinct. No production/recovery database or new runner/framework is used.
+
+### Final gate and exact reconciliation
+
+| Direct project scope | Configuration / test source | Executed / PASS | Missing / non-PASS | Raw TRX SHA256 |
+|---|---|---:|---:|---|
+| Desktop.Session unfiltered | Release/net48/x86,cb86fbc |108/108|0/0|21D1E63409A5BDE7369285837903F2B5552D10E2D45474ECD2D3260499141C37|
+| Desktop unfiltered |100%,12e6a20|329/329|0/0|3298DEAFF866E5C38D4B3A1C51C50CDE20B05BFED27CD0C4AD6C1A7564486F1F|
+| Desktop unfiltered |125%,12e6a20|329/329|0/0|B6C603BD0D3C9C3D04B8C097898EC0E75847BF6E6949C93D733DD6DF30974C6D|
+| Separate PackagedGuiAcceptanceTests |100%,12e6a20|18/18|0/0|479F47C77063FF0DB7F109CBF68E7F0DD6BE0CCBE0260AED71421A2961EF00C9|
+
+Desktop source235methods (191Facts/44Theories) discovers329rows. Both full TRX sets contain exactly329 unique discovery names; standalone18 exactly matches the packaged discovery subset. No failed, skipped, aborted, unexpected-timeout or absent mandatory row. Total784 passing invocations /437 distinct obligations, without adding historical trials. Full100 took16.4698minutes, full12516.5708minutes and separate packaged15.1768minutes. Packaged actualLogin, SQL timeout/reload/checkedretry, ReceiptPost/Stock, same-process lookup, invalid input, denial, Catalog, topology and startup rows pass independently at both scales within the full suites. The final separate suite also verifies actual test build12e6 and expected productd520 metadata.
+
+Actual final Desktop invocations (each executed sequentially after fresh scale checks; no rebuild during runs):
+
+~~~powershell
+$env:MYDMSVN_GUI_P5_PACKAGE = Join-Path (Get-Location) 'artifacts/release/gui-p5-t04-candidate2'
+# Legacy variable pins PACKAGE source; actual test build is read from the assembly.
+$env:MYDMSVN_GUI_P5_TEST_REVISION = 'd5207b2ce1eae09e9317625b3d7d486c994f09fe'
+$env:MYDMSVN_GUI_P5_EXPECTED_SCALE = '125'
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-build --no-restore -p:PlatformTarget=x86 --logger 'trx;LogFileName=t06-final-desktop125.trx' --logger 'console;verbosity=normal' --results-directory TestResults/gui-p5-t06/final-desktop125 -- RunConfiguration.TargetPlatform=x86
+# After drain, Owner scale change and fresh native probe:
+$env:MYDMSVN_GUI_P5_EXPECTED_SCALE = '100'
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-build --no-restore -p:PlatformTarget=x86 --logger 'trx;LogFileName=t06-final-desktop100.trx' --logger 'console;verbosity=normal' --results-directory TestResults/gui-p5-t06/final-desktop100 -- RunConfiguration.TargetPlatform=x86
+# After verified full-run cleanup:
+dotnet test tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj -c Release -f net48 --no-build --no-restore -p:PlatformTarget=x86 --filter 'FullyQualifiedName~PackagedGuiAcceptanceTests' --logger 'trx;LogFileName=t06-final-packaged100.trx' --logger 'console;verbosity=normal' --results-directory TestResults/gui-p5-t06/final-packaged100 -- RunConfiguration.TargetPlatform=x86
+~~~
+
+### Review, cleanup and remaining limits
+
+One fresh whole-branch review42d94ba..ea2c194 found no Critical issue and one Important SQL quarantine admission gap. The single fix pass poisoned admission before both quarantine records and preserved original/recording failures. Actual3-row RED→GREEN plus both329-row full gates verify the correction; no second review is claimed. Focus regressions also pass in both final full runs. No T06 business/production/SQL implementation change triggered broader Application/SQL coverage; actual packaged SQL oracles remain independent. Earlier T03/T04 backend and attended evidence retain their own source/scope.
+
+All17 final standalone allocations drained/dropped. Final read-only census:358/358 historical GUI ledgers terminalDropped; all189 captured T06 databases and567 principals checked against the designated instance and exact captured identity names, remaining0/0/allDisposed. Exact latest database/principal counts and owned GUI process count are zero. No prefix-based deletion; synthetic quarantine regression fixtures create no actual SQL allocation. Raw connection/credential/SQL-identity evidence remains ignored. No automatic cleanup of uncertain ownership is permitted. Desktop released only after verified drain.
+
+All failed trials remain above with their actual revisions: old d520 driver first125 failure and full100 failures; rejected2da guard6PASS/12FAIL; correctedfc085 successful gates; regression compile/loader failures and genuine RED. The foreground-loss diagnostic establishes a missing driver precondition, not attribution to a person or external window. Final green does not erase the failures or certify unknown environments.
+
+Deferred minor: historical status headings inside earlier verification/walkthrough/test documentation can still say OPEN/IN PROGRESS; this final section and current roadmap are authoritative. A broad historical wording cleanup is deferred. It does not reopen signed T04/T05 or convert the Down exception to PASS.
+
+### Execution rulings retained for handoff
+
+1. Use the plan checklist and human worksheets instead of fabricating a passing test command for human sign-off. Cost if wrong: sign-off is manually traceable rather than a machine gate.
+2. Preparation-only documentation does not trigger full GUI/SQL reruns; verify package/environment evidence and actual source diff. Cost if wrong: an overlooked runtime change could escape that preparation check.
+3. Attended supervision may use the explicit30-minute bounded path; automated RunAsync remains5minutes. Cost if wrong: an attended hung chapter can consume up to30minutes before forced cleanup.
+4. T05 attended acceptance does not invent TDD or unfiltered reruns for Markdown-only work. Cost if wrong: worksheet mistakes need evidence review rather than an automated assertion.
+5. Retain Warehouse125Dark Down NOT TESTED rather than rerun accepted groups; subsequently explicitly accepted by Owner. Cost if wrong: an isolated Down regression could remain undetected.
+6. P6 install/recovery/signing/support decisions remain REL OPEN. Cost if wrong: GUI acceptance supplies no production certification.
+7. DPI150 remains outside the Owner-approved matrix. Cost if wrong:150% behavior is unverified.
+8. Final review preserves the signed Down exception without relabeling it. Cost if wrong: the same isolated125Dark Down regression can remain.
+9. Reviewer used stored SQL/attended evidence; executor verified final live census separately. Cost if wrong: review is not a second independent live SQL/attended execution.

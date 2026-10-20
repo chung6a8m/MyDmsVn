@@ -1,6 +1,6 @@
 # GUI-P5 — Full WinForms GUI testing and P5 interactive acceptance
 
-**Created:** 2026-10-19 · **Branch:** `v1a` · **Status:** IN PROGRESS — T00–T05 COMPLETE (including Owner-accepted Catalog/Lookup and Inventory walkthroughs); T06 OPEN. This document does not assert full GUI/P5 acceptance.
+**Created:** 2026-10-19 · **Branch:** `v1a` · **Status:** COMPLETE in approved GUI-P5 scope — T00–T06 complete; both attended IDs Owner-accepted, with the explicit T05 Down NOT TESTED exception retained. REL/P6 and production readiness remain OPEN.
 **Planning baseline:** merge `42d94baea1655dddbd46f971e806f84401cd1c63`. Follows completed [RESP](20261018-002-respawn-fixture-reuse.md) and [L2DB](20261018-001-linq2db-net48-persistence-migration.md). [REL](20261019-002-local-v1-p6-release-acceptance.md) owns P6 release acceptance.
 
 ## 1. Objective, authority and scope
@@ -103,10 +103,12 @@ The historical18:42 checkpoint had13T04 allocations/39principals disposed. The s
 **Exit:** `REMAIN-P5-GUI-02` PASS within Owner-signed scope and documented exception.
 ### GUI-P5-T06 — Unfiltered GUI gate and evidence handoff
 
-- [ ] On the **frozen candidate** run unfiltered `MyDmsVn.Desktop.Session.Tests` and `MyDmsVn.Desktop.Tests` on interactive Windows/Release/net48, plus the separate packaged E2E suite and agreed DPI/theme/failure matrix. Reconcile actual TRX Facts/Theory rows and pass/fail/skip/abort with discovered source; skipped/missing mandatory cases are blockers.
-- [ ] Where a GUI defect changed business/SQL behavior, rerun affected Application/SQL coverage under TEST_POLICY. Do not replace real SQL concurrency, permissions or rollback with GUI mock assertions.
-- [ ] Verify process, temporary identity, connection, disposable database, log and resource cleanup; publish sanitized `docs/GUI_P5_VERIFICATION.md` with commands, case ledger, photos/observations, artifact hashes and all outstanding issues.
-- [ ] Check off tasks only with current-revision evidence. P5 completion does not approve the broader P6 release.
+- [x] On the **frozen candidate** run unfiltered `MyDmsVn.Desktop.Session.Tests` and `MyDmsVn.Desktop.Tests` on interactive Windows/Release/net48, plus the separate packaged E2E suite and agreed DPI/theme/failure matrix. Reconcile actual TRX Facts/Theory rows and pass/fail/skip/abort with discovered source; skipped/missing mandatory cases are blockers.
+- [x] Where a GUI defect changed business/SQL behavior, rerun affected Application/SQL coverage under TEST_POLICY. Do not replace real SQL concurrency, permissions or rollback with GUI mock assertions.
+- [x] Verify process, temporary identity, connection, disposable database, log and resource cleanup; publish sanitized `docs/GUI_P5_VERIFICATION.md` with commands, case ledger, photos/observations, artifact hashes and all outstanding issues.
+- [x] Check off tasks only with current-revision evidence. P5 completion does not approve the broader P6 release.
+
+**T06 execution (2026-10-20): COMPLETE.** [Final frozen evidence](../GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20): productd5207b2 / test12e6a20, net48/x86; Session108/108, unfilteredDesktop100%329/329 and125%329/329, separatepackaged18/18, zero missing/skipped/non-PASS rows. Total784PASS invocations /437distinct obligations. One fresh whole-branch review found a SQL-quarantine fail-stop gap, fixed with actual3-rowRED→GREEN and both full gates; no second review claimed. Final exact all-T06 census189DB/567principals absent,358/358historicalledgersDropped/ownedprocess0. T04/T05 signatures and Down exception preserved; historical failed trials retained. T06 changed only test infrastructure, so no additional business/SQL implementation rerun was triggered. P5 is complete within the approved scope; REL/P6 G1–G5 remain OPEN.
 
 **Exit:** both P5 IDs PASS; every mandatory mapped GUI path has appropriate automated + attended proof; unfiltered GUI/Session matrix has no absent/skipped mandatory row and cleanup is verified. Otherwise this plan remains OPEN and P6 G4 remains OPEN.
 
