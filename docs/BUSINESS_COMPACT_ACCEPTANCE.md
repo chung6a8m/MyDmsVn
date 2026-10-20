@@ -660,7 +660,7 @@ The owner reported that Tab appeared to skip enabled Refresh in Dark100, and the
 
 For attended cleanup only, readonly SQL verified unchanged Draft/no stock, the exactly owned fault was removed, and the owner used mouse Refresh to restore Draft before closing normally. Explicit retry/Posted was not attended. After both sessions and the first two native Tab diagnostics,111 local ledgers were positively Dropped (6 historicalT04 +105 T06); no quarantine. The subsequent shell-capture/Enter diagnostic also positively dropped both allocations:115 local ledgers Dropped in total (6 historicalT04 +109 T06), with no owned app/probe remaining. A30 and final acceptance remain pending, including native125.
 
-### App-owned keyboard focus correction — new freeze pending
+### App-owned keyboard focus correction — candidate2 frozen, gates pending
 
 The [reviewed diagnostic images](evidence/bci-t06/README.md#automated-refresh-focus-diagnostic--native100-2026-10-21) and pinned source identify a visual cause: Dark Primary and Focus tokens both equal `#6EA8FE`; the vendor paints its focus cue inside that fill. Grid selection borders persist after keyboard focus leaves. Keyboard traversal and Enter were functional; this is a focus visibility correction.
 
@@ -668,7 +668,21 @@ The [reviewed diagnostic images](evidence/bci-t06/README.md#automated-refresh-fo
 
 The initial render-fixture trials had keyboard cues hidden and both failed; they are not valid product RED/GREEN evidence. After explicitly enabling and asserting keyboard cues, the corrected fixture passed2/2 with the fix, then failed2/2 against the old product (zero contrasting pixels). A source restore preserved an older timestamp, so the first broader run used the old incremental-build DLL and failed2/26; the restored source was made newer and rebuilt. The corrected product then passed **26/26** BusinessCompactLayoutTests + GoodsReceiptInlineEditorTests, no skip. These fixture/build mistakes remain retained locally. Independent source review found no actionable issue after restoring the declared C# BOM/CRLF.
 
-Candidate1 and f858ec9 broad gates remain immutable checkpoints. The new source/test/package candidate and its admitted full100/full125/separate package100 gates are **pending**; no old gate is relabeled as evidence of this correction. Attended focus/recovery/Posted confirmation and native125 remain outstanding. Session108 is unaffected by this rendering-only product change.
+Candidate1 and f858ec9 broad gates remain immutable checkpoints. New source/test/package source is `e20b8c7f43dc73a9613d7f04d0d52158809663cf`, candidate `0.1.0-bci-t06.2` (`artifacts/release/bci-t06-candidate2`), manifest dirty=false. All205 files were independently rehashed and admitted discovery is415 distinct rows /285 methods including20 package rows. Its full100/full125/separate package100 gates are **pending**; no old gate is relabeled as evidence of this correction. Attended focus/recovery/Posted confirmation and native125 remain outstanding. Session108 is unaffected by this rendering-only product change.
+
+
+Candidate2 affected clean-byte gate: **28/28 PASS**, no FAIL/SKIP,4m10, comprising26 hosted layout/editor rows and2 packaged real-SQL uncertain-Post Light/Dark rows. Each package row verifies actual native Tab→Refresh focus, native Enter, readonly Draft after explicit reload, explicit Post retry and exactly one final SQL effect, with normal app drain. TRX SHA256 `2347232DBD506193C2021A4F9F4C5BC725CD1C99293B5B781F70C738B1E6B85C`. All117 local ledgers are positively Dropped at this checkpoint (6 historicalT04 +111 T06); no owned app/probe remains. Attended candidate2 preflight independently admitted native100 and all205 package hashes, without SQL/app allocation. Full required gates and attended review remain pending.
+
+Candidate2 frozen bytes (the earlier candidate1 hash table remains a separate checkpoint):
+
+| Artifact | SHA256 |
+|---|---|
+| `artifacts/release/bci-t06-candidate2/release-manifest.json` | `D2F6284D64B62AC6370A2A5680BA5B0A8F334D2022B4CD3508C8C9DAB65243BC` |
+| `artifacts/release/bci-t06-candidate2/desktop-net48-win-x86/MyDmsVn.Desktop.App.exe` | `B766385F52A44BA29090EE108794C43381542FD10A7FCD5B74FBD5D2C07D4BF2` |
+| `artifacts/release/bci-t06-candidate2/desktop-net48-win-x86/MyDmsVn.Desktop.WinForms.dll` | `A621B888BF77072ED55659FF5DBF3980DD500AC99B5678B439381DC7C46B3D92` |
+| `artifacts/release/bci-t06-candidate2/admin-migrator-net48-win-x86/MyDmsVn.Server.DbMigrator.exe` | `51A89F1C8B782B2C05C94063D99D9693B4866D6DF9779C424548DDC11DEB44AA` |
+| `tests/MyDmsVn.Desktop.Tests/bin/Release/net48/MyDmsVn.Desktop.Tests.dll` | `F8DFC46D56FB9C7BE043C10B415DB00D31C854B2DD34DBC50766C6358CAD4EF2` |
+| `tests/MyDmsVn.Desktop.Tests/bin/Release/net48/MyDmsVn.Desktop.WinForms.dll` | `0E9BE06280DD937581DE2F71BFEADCFD693328900846EE44854BD51AFB5B006B` |
 
 ### Retained development/checkpoint trials
 
