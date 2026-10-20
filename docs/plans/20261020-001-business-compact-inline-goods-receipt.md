@@ -10,7 +10,7 @@
 
 **Spec:** [BUSINESS_COMPACT_UI.md](../BUSINESS_COMPACT_UI.md). Read with [BUSINESS_COMPACT_ACCEPTANCE.md](../BUSINESS_COMPACT_ACCEPTANCE.md) and the sole [TEST_POLICY](../TEST_POLICY.md).
 
-**Status:** ACTIVE. BCI-T00 native proof complete in its test-host scope; [observed evidence and decision](../BUSINESS_COMPACT_ACCEPTANCE.md#81-bci-t00-native-editor-proof--2026-10-20). BCI-T01 scalar parser complete; [scalar evidence](../BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). BCI-T02–T06 are PLANNED / NOT RUN. No integrated inline product acceptance is implied.
+**Status:** ACTIVE. BCI-T00 native proof complete in its test-host scope; [observed evidence and decision](../BUSINESS_COMPACT_ACCEPTANCE.md#81-bci-t00-native-editor-proof--2026-10-20). BCI-T01 scalar parser complete; [scalar evidence](../BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). BCI-T02 projection/session foundation complete; [adapter-host evidence](../BUSINESS_COMPACT_ACCEPTANCE.md#83-bci-t02-stable-projection-and-cell-sessions--2026-10-20). BCI-T03–T06 are PLANNED / NOT RUN. No integrated inline product acceptance is implied.
 
 **Planning baseline:** `v1a-pro@f37038b250821a538b9cdc10a6d6d8b4bc1f386f`, assessed 2026-10-20. The owner requested this sole active roadmap and deletion of older unimplemented plans. [Index and retirement record](README.md).
 
@@ -56,7 +56,7 @@ The A-prefix abbreviates BCI-A in the acceptance matrix. T00 is a proof, not a s
 
 Existing production anchors: `src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.cs`, `FoundationShellForm.cs`, `AccessibleActionGrid.cs`, `AccessibleNumericBox.cs`, `AccessibleLookupBox.cs`; `src/MyDmsVn.Desktop.Application/GoodsReceiptEditorViewModel.cs`, `GoodsReceiptLineViewModel.cs`, `GoodsReceiptProductOptionsViewModel.cs`; `src/MyDmsVn.Contracts/InventoryContracts.cs`.
 
-The plan introduces the following app-owned files; `ReceiptNumericInput.cs` is implemented by T01, while the remaining names are proposals. None is an existing vendor API:
+The plan introduces the following app-owned files; `ReceiptNumericInput.cs` is implemented by T01; `ReceiptEditIntent.cs`, `GoodsReceiptLinesGrid.cs` and `GoodsReceiptLinesGridAdapter.cs` by T02. Remaining file names are proposals. None is an existing vendor API:
 
 | New file under `src/MyDmsVn.Desktop.WinForms/` | Responsibility |
 |---|---|
@@ -130,11 +130,11 @@ Assert.False(ReceiptNumericInput.TryParse("0.00000000000000000000000000000000000
 
 **Interfaces:** `GoodsReceiptLinesGrid : BootstrapSourceGrid`. `GoodsReceiptLinesGridAdapter(GoodsReceiptLinesGrid grid, GoodsReceiptEditorViewModel editor, Func<bool> canEdit)`. Public-to-the-app methods are `bool TryFinishEdit(ReceiptEditIntent intent)`, `void CancelActiveEdit()`, `void ResetDocument(IReadOnlyList<GoodsReceiptLineViewModel> lines)`, `void RefreshEditability()` and `void Dispose()`. The grid is caller-owned; adapter disposal unsubscribes/invalidate sessions and coordinates editor cleanup with the grid registry owner without double ownership.
 
-- [ ] Add failing tests `State_refresh_does_not_replace_the_active_cell`, `Pending_cell_edits_participate_in_dirty_command_guards`, `Unsaved_zero_id_lines_are_distinguished_by_reference` and `Reloaded_line_references_replace_old_edit_targets_safely`. Observe typed VM values, raw input/caret/focus and event count, not only private flags.
-- [ ] Implement document generation plus line reference/local key plus column identity, original value and raw candidate. Revalidate membership/generation/canEdit before any commit or deferred event. Retain one shared editor per grid/column configuration; store ProductId in the editable product cell and configure its label conversion separately.
-- [ ] Implement incremental cell/totals/status updates. Never replace/Redim the active cell in ordinary state notifications. A deliberate ResetDocument resolves/cancels the old session, increments generation and replaces mappings; map selection after Save by valid persisted identity with an explicit new-line fallback.
-- [ ] Exercise cancel without VM mutation, multiple ID-zero rows, remove/reinsert at the same visual index, VM notifications during edit, reload replacing objects, and dispose with an active lookup. Run the inline-class selection plus affected existing control/VM tests.
-- [ ] Commit the adapter/projection work and record its tests. Editable accessibility is not accepted until T04; a partial adapter is not the completed product feature.
+- [x] Add failing tests `State_refresh_does_not_replace_the_active_cell`, `Pending_cell_edits_participate_in_dirty_command_guards`, `Unsaved_zero_id_lines_are_distinguished_by_reference` and `Reloaded_line_references_replace_old_edit_targets_safely`. Observe typed VM values, raw input/caret/focus and event count, not only private flags.
+- [x] Implement document generation plus line reference/local key plus column identity, original value and raw candidate. Revalidate membership/generation/canEdit before any commit or deferred event. Retain one shared editor per grid/column configuration; store ProductId in the editable product cell and configure its label conversion separately.
+- [x] Implement incremental cell/totals/status updates. Never replace/Redim the active cell in ordinary state notifications. A deliberate ResetDocument resolves/cancels the old session, increments generation and replaces mappings; map selection after Save by valid persisted identity with an explicit new-line fallback.
+- [x] Exercise cancel without VM mutation, multiple ID-zero rows, remove/reinsert at the same visual index, VM notifications during edit, reload replacing objects, and dispose with an active lookup. Run the inline-class selection plus affected existing control/VM tests.
+- [x] Commit the adapter/projection work and record its tests. Editable accessibility is not accepted until T04; a partial adapter is not the completed product feature.
 
 ### BCI-T03 — Lookup and command integration
 

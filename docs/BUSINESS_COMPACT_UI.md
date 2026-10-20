@@ -1,6 +1,6 @@
 # Business Compact UI and inline Goods Receipt design
 
-**Direction:** approved; integrated UI implementation remains planned/unaccepted. The acceptance ledger records the completed T00 proof and T01 scalar parser scopes.
+**Direction:** approved; integrated UI implementation remains planned/unaccepted. The acceptance ledger records the completed T00 proof, T01 scalar parser and T02 projection/session foundation scopes.
 **Plan:** [BCI execution plan](plans/20261020-001-business-compact-inline-goods-receipt.md).
 **Acceptance:** [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md).
 **Source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).
@@ -84,10 +84,10 @@ Insufficient space must produce reachable scrolling/reflow, not hidden Save/Post
 
 ## 5. Application-owned integration
 
-T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField` with scalar tests; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). They are not yet wired to the receipt controls. The remaining names and members below are **proposed new application code**, not APIs available in a vendor today.
+T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField` with scalar tests; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). T02 implements `GoodsReceiptLinesGrid`, its adapter and `ReceiptEditIntent` as a tested foundation; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#83-bci-t02-stable-projection-and-cell-sessions--2026-10-20). These internal seams are not yet wired to receipt controls. Full command integration and writable accessibility remain T03/T04; none is a vendor API.
 Keep this integration in Desktop.WinForms; do not move grid/control dependencies into Domain or Application.
 
-| Proposed element | Responsibility |
+| App-owned element | Intended responsibility (scope above governs implementation status) |
 |---|---|
 | `GoodsReceiptLinesGrid` | App-specific editable accessible grid; cell/editor identity, state, and meaningful actions |
 | `GoodsReceiptLinesGridAdapter` | Project line models into cells; own edit sessions, event wiring, and registry/editor lifetime |
@@ -95,8 +95,8 @@ Keep this integration in Desktop.WinForms; do not move grid/control dependencies
 | `ReceiptNumericField` | `Quantity`, `UnitCost` |
 | `ReceiptEditIntent` | `Save`, `Post`, `SelectReceipt`, `NewReceipt`, `Refresh`, `AddLine`, `RemoveLine` |
 
-Proposed adapter construction: `(GoodsReceiptLinesGrid grid, GoodsReceiptEditorViewModel editor, Func<bool> canEdit)`.
-Proposed methods: `TryFinishEdit(ReceiptEditIntent intent): bool`, `CancelActiveEdit(): void`,
+T02 adapter construction: `(GoodsReceiptLinesGrid grid, GoodsReceiptEditorViewModel editor, Func<bool> canEdit)`.
+T02 methods: `TryFinishEdit(ReceiptEditIntent intent): bool`, `CancelActiveEdit(): void`,
 `ResetDocument(IReadOnlyList<GoodsReceiptLineViewModel> lines): void`, `RefreshEditability(): void`, and `Dispose()`.
 `TryFinishEdit` applies the command policy below; it is not an unconditional commit operation.
 The grid remains caller-owned; disposing the adapter must not dispose a caller-owned grid.
