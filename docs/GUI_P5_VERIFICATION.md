@@ -445,3 +445,9 @@ CorrectionnarrowsSetInputactivation/foreground/focusguard to semanticComboBoxloo
 ### Lookup-scoped driver clean freeze —fc0851d
 
 Clean testsourcefc0851d7b0f8e5a207beb38e610d72795e25cb60 built0warnings/errors Release/net48/x86; DesktoptestSHA25624C877E35CC86C2686FD4A1943505BC892E2C7A9C27ECF242BE37AB8DB0BF4AC, archivedlocallyasfrozenfc085-testhost. Discovery326rows; product/deployment source diff versusd5207b2 empty, unchangedpackageEDB0manifest. New18-rowSeparatePackaged100run usesexactfc085testhost/oldproduct, legacyexpectedpackagesourced520, expectedscale100; results pending. No currentmatrixPASS inferredfrom2daoroldD520driver. T06/P5/P6OPEN.
+
+### Scoped driverfc085 SeparatePackaged100 —18/18PASS
+
+Frozenfc085 testhost/unchangedd520product completed18/18PASS/0FAIL/0SKIP in15.3032minutes. Exact18discovery/TRXnames differences0. RawTRXSHA256B85CFFBB59DA84D234A896BCF5C4A6EA827F8ED51563D11B964B5B5C163D2DC8. TRX explicitlyrecords EXPECTED_PACKAGE_SOURCE=d5207b2ce1eae09e9317625b3d7d486c994f09fe and TEST_BUILD_INFORMATIONAL_VERSION=1.0.0+fc0851d7b0f8e5a207beb38e610d72795e25cb60; no matching-sourcefiction. BothallLookup/Receipt/timeout/permission/invalid/realLogin/restart/topology/startupcasesPASS; earlierfailedversions retainedseparately.
+
+All17allocationsdisposed;273/273historicalledgersDropped/exactlatestdatabase-principals-process0. Additionalreadonlycensus selected allT06capturedrecords sincefirstfullrun, validatedeachcapturedinstance againstdesignatedmaster, queriedexactcapturednamesonly:104distinctdatabases/312principals, remaining0/0, allrecordsDisposed. Censuswasread-only/no deletion; setupConnectTimeoutkeyword correctedbeforeSQLquery, not acoveragefailure. Newfull326@100begunafterfreshx86scale100/HRESULT0/hash24C877...verification; full100/125andfinalwhole-planreviewpending. T06/P5/P6OPEN.
