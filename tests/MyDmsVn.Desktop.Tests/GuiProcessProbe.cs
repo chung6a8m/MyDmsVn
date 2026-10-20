@@ -1,4 +1,4 @@
-﻿// Compiled only as a temporary net48/x86 test probe, never into product or testhost.
+// Compiled only as a temporary net48/x86 test probe, never into product or testhost.
 using System;
 using System.Diagnostics;
 using System.Reflection;
@@ -66,6 +66,20 @@ internal static class GuiProcessProbe
                 string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_RUNTIME_SQLSERVER_CONNECTION_STRING"));
             Console.WriteLine("SQL_ENVIRONMENT_EXCLUDED=" + excluded);
             return excluded ? 0 : 1;
+        }
+        if (mode == "sql-quarantine")
+        {
+            AppDomain.CurrentDomain.AssemblyResolve += (sender, resolve) =>
+            {
+                var path = System.IO.Path.Combine(args[3], new AssemblyName(resolve.Name).Name + ".dll");
+                return System.IO.File.Exists(path) ? Assembly.LoadFrom(path) : null;
+            };
+            var tests = Assembly.LoadFrom(args[1]);
+            var task = (System.Threading.Tasks.Task)tests.GetType("MyDmsVn.Desktop.Tests.GuiSqlQuarantineRegression", true)
+                .GetMethod("RunAsync").Invoke(null, new object[] { args[2] });
+            task.GetAwaiter().GetResult();
+            Console.WriteLine("SQL_QUARANTINE_FAIL_STOP=PASS");
+            return 0;
         }
         if (mode == "poison-admission")
         {

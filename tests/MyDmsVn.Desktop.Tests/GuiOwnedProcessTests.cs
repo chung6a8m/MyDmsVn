@@ -83,6 +83,18 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Theory]
+        [InlineData("uncertain")]
+        [InlineData("sql-error")]
+        [InlineData("record-error")]
+        public async Task SQL_quarantine_blocks_next_SQL_and_process_admission(string mode)
+        {
+            var result = await GuiOwnedProcess.RunAsync(_probe.Start("sql-quarantine \"" + Assembly.GetExecutingAssembly().Location + "\" " + mode + " \"" + AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar) + "\""), TimeSpan.FromSeconds(15));
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("SQL_QUARANTINE_FAIL_STOP=PASS", result.StandardOutput);
+            Assert.False(GuiTestSafety.IsPoisoned);
+        }
+
+        [Theory]
         [InlineData("hang")]
         [InlineData("modal")]
         [InlineData("tree")]

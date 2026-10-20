@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
@@ -332,8 +332,9 @@ internal sealed class GuiSqlEnvironment : IDisposable
         if (_disposed) return;
         if (GuiTestSafety.IsPoisoned || _uncertainLogin)
         {
-            Record("QuarantinedOwnershipOrProcessCleanupUncertain");
-            throw new InvalidOperationException("GUI allocation retained: process or principal ownership is uncertain.");
+            var failure = new InvalidOperationException("GUI allocation retained: process or principal ownership is uncertain.");
+            Quarantine(failure, "QuarantinedOwnershipOrProcessCleanupUncertain");
+            throw failure;
         }
         try
         {
@@ -365,10 +366,21 @@ internal sealed class GuiSqlEnvironment : IDisposable
             _disposed = true;
             Record("DatabaseAndAllPrincipalsDroppedAfterVerifiedDrain");
         }
-        catch
+        catch (Exception failure)
         {
-            Record("QuarantinedCleanupFailed");
+            Quarantine(failure, "QuarantinedCleanupFailed");
             throw;
+        }
+    }
+
+    private void Quarantine(Exception failure, string state)
+    {
+        // Stop admission even if writing local quarantine evidence also fails.
+        GuiTestSafety.Poison(failure);
+        try { Record(state); }
+        catch (Exception recording)
+        {
+            throw new AggregateException("GUI cleanup is uncertain and quarantine evidence could not be written.", failure, recording);
         }
     }
 
