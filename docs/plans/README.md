@@ -6,11 +6,11 @@
 
 | Order | Plan | State | Next action |
 |---:|---|---|---|
-| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE / PLANNED**; BCI-T00–T06 are all unexecuted | BCI-T00: prove the pinned SourceGrid editor, keyboard and native accessibility path |
+| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE**; BCI-T00 native proof complete; T01–T06 planned | BCI-T01: lossless numeric conversion; retain the T00 decision/evidence |
 
 Read [BUSINESS_COMPACT_UI](../BUSINESS_COMPACT_UI.md) for the design and [BUSINESS_COMPACT_ACCEPTANCE](../BUSINESS_COMPACT_ACCEPTANCE.md) for required observable outcomes. Supporting specifications are not independent plans. Execute BCI-T00 → T01 → T02 → T03 → T04 → T05 → T06; preparation or parallel work must respect the interfaces and dependencies recorded in that plan.
 
-Creating these documents implements no product feature and supplies no new runtime PASS. The owner-approved direction is documented; actual code, tests, packaged evidence and acceptance remain to be delivered.
+The planning documents implement no product feature. T00 now supplies the scoped native editor proof recorded in the acceptance ledger; integrated code, package and final UI acceptance still belong to T01–T06.
 
 ## Completed baselines — retain, do not restart
 

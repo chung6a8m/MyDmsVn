@@ -10,7 +10,7 @@
 
 **Spec:** [BUSINESS_COMPACT_UI.md](../BUSINESS_COMPACT_UI.md). Read with [BUSINESS_COMPACT_ACCEPTANCE.md](../BUSINESS_COMPACT_ACCEPTANCE.md) and the sole [TEST_POLICY](../TEST_POLICY.md).
 
-**Status:** ACTIVE / PLANNED. All implementation and runtime verification below are unexecuted. Creating this plan is documentation work, not completion of BCI-T00 or acceptance of inline behavior.
+**Status:** ACTIVE. BCI-T00 native proof complete in its test-host scope; [observed evidence and decision](../BUSINESS_COMPACT_ACCEPTANCE.md#81-bci-t00-native-editor-proof--2026-10-20). BCI-T01–T06 are PLANNED / NOT RUN. No integrated inline product acceptance is implied.
 
 **Planning baseline:** `v1a-pro@f37038b250821a538b9cdc10a6d6d8b4bc1f386f`, assessed 2026-10-20. The owner requested this sole active roadmap and deletion of older unimplemented plans. [Index and retirement record](README.md).
 
@@ -94,11 +94,11 @@ For changed behavior in T01–T05, first prove the new observable regression fai
 
 **Interfaces:** Consume `grid.BootstrapEditors.CreateLookupBox(typeof(int))` and `grid.BootstrapEditors.CreateFormattedTextBox(typeof(decimal))` through the existing [public registry property](https://github.com/chung6a8m/MyDmsVn.BootstrapSourceGrid/blob/09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f/src/MyDmsVn.BootstrapSourceGrid/Controls/BootstrapSourceGrid.cs#L69-L73). These are current factory methods; no new factory overload is assumed. Produce a recorded choice of stock adapters plus app accessibility bridge, or a narrowly specified seam with compatibility/ownership requirements. The app class contracts below remain proposed until implemented.
 
-- [ ] Inventory the exact checked-out application and nested vendor pins, current GUI test/package helpers and current read-only accessible-cell behavior; record any delta from the planning baseline before adapting the plan.
-- [ ] Add `Native_cell_entry_uses_registered_bootstrap_editor`, `Logical_values_remain_typed_when_display_changes` and `Shared_editors_dispose_with_their_grid`; assert native focus/input, int/decimal cell values, correct closed-cell labels and disposal without external-editor substitution.
-- [ ] Run those cases with the verification pattern and a bounded native UIA observation of the real hosted editor. Record keyboard/popup/native accessible-tree behavior on net48/x86; do not infer it from API shape or direct VM assignment.
-- [ ] Record the smallest supported implementation path. Default to app-owned grid accessibility and current adapters. If a control factory/alignment seam is needed, identify its exact upstream file/API and tests; any vendor change gets a separate traceable reviewed commit/pin. If native UIA cannot meet the contract, present the measured SourceGrid/DGV trade-off for explicit owner selection before a grid switch.
-- [ ] Commit the retained proof tests and factual decision/evidence. Missing native resources or an unresolved accessibility path leaves T00 incomplete; it does not authorize skipping accessibility or relabeling a mockup as proof.
+- [x] Inventory the exact checked-out application and nested vendor pins, current GUI test/package helpers and current read-only accessible-cell behavior; record any delta from the planning baseline before adapting the plan.
+- [x] Add `Native_cell_entry_uses_registered_bootstrap_editor`, `Logical_values_remain_typed_when_display_changes` and `Shared_editors_dispose_with_their_grid`; assert native focus/input, int/decimal cell values, correct closed-cell labels and disposal without external-editor substitution.
+- [x] Run those cases with the verification pattern and a bounded native UIA observation of the real hosted editor. Record keyboard/popup/native accessible-tree behavior on net48/x86; do not infer it from API shape or direct VM assignment.
+- [x] Record the smallest supported implementation path. Default to app-owned grid accessibility and current adapters. If a control factory/alignment seam is needed, identify its exact upstream file/API and tests; any vendor change gets a separate traceable reviewed commit/pin. If native UIA cannot meet the contract, present the measured SourceGrid/DGV trade-off for explicit owner selection before a grid switch.
+- [x] Commit the retained proof tests and factual decision/evidence. Missing native resources or an unresolved accessibility path leaves T00 incomplete; it does not authorize skipping accessibility or relabeling a mockup as proof.
 
 ### BCI-T01 — Lossless numeric conversion
 
