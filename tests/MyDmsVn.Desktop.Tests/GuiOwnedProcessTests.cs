@@ -262,10 +262,10 @@ namespace MyDmsVn.Desktop.Tests
         {
         }
 
-        internal GuiProcessProbeFixture(bool package)
+        internal GuiProcessProbeFixture(bool package, bool inline = false)
         {
             Directory.CreateDirectory(_directory);
-            var sourceName = package ? "GuiPackageProbe.cs" : "GuiProcessProbe.cs";
+            var sourceName = inline ? "GuiInlineEditorProbe.cs" : package ? "GuiPackageProbe.cs" : "GuiProcessProbe.cs";
             _executable = Path.Combine(_directory, Path.GetFileNameWithoutExtension(sourceName) + ".exe");
             using (var source = Assembly.GetExecutingAssembly().GetManifestResourceStream("MyDmsVn.Desktop.Tests." + sourceName)!)
             using (var reader = new StreamReader(source))
@@ -275,7 +275,7 @@ namespace MyDmsVn.Desktop.Tests
                 var compiler = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
                     "Microsoft.NET", "Framework", "v4.0.30319", "csc.exe");
                 var references = "/reference:System.Windows.Forms.dll /reference:System.Drawing.dll ";
-                if (package)
+                if (package || inline)
                 {
                     foreach (var name in new[] { "UIAutomationClient", "UIAutomationTypes", "WindowsBase" })
                         references += "/reference:\"" + Path.Combine(Path.GetDirectoryName(compiler)!, "WPF", name + ".dll") + "\" ";
