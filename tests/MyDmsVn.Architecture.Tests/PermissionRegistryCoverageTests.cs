@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -65,6 +65,20 @@ public sealed class PermissionRegistryCoverageTests
         Assert.NotEmpty(references);
         Assert.Equal(references, references.Where(declared.Contains));
         Assert.Equal(references, references.Where(key => registry.TryGet(key, out _)));
+    }
+
+    [Fact]
+    public void Sales_contracts_are_provider_free_and_sales_keys_are_active()
+    {
+        var assembly = typeof(MyDmsVn.Contracts.SalesReceiptDto).Assembly;
+        Assert.DoesNotContain(assembly.GetReferencedAssemblies(), name =>
+            name.Name!.Contains("Infrastructure") || name.Name.Contains("Domain") || name.Name.Contains("SqlClient"));
+        var registry = PermissionRegistryComposition.CreateDefault();
+        foreach (var definition in MyDmsVn.Server.Application.Sales.SalesPermissionDefinitions.All)
+        {
+            Assert.True(registry.TryGet(definition.Key, out var composed));
+            Assert.Equal(PermissionLifecycleStatus.Active, composed.LifecycleStatus);
+        }
     }
 
     private static IEnumerable<PermissionDefinition> ReadDefinitions(Type type)

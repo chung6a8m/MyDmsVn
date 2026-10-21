@@ -1,10 +1,13 @@
-using MyDmsVn.Server.Application.Catalog;
+﻿using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Inventory;
 
 namespace MyDmsVn.Server.Application.Security
 {
     public static class PermissionKeys
     {
+        public const string SalesReceiptsRead = Sales.SalesPermissionKeys.ReceiptsRead;
+        public const string SalesReceiptsWrite = Sales.SalesPermissionKeys.ReceiptsWrite;
+        public const string SalesReceiptsPost = Sales.SalesPermissionKeys.ReceiptsPost;
         public const string CatalogProductsRead = CatalogPermissionKeys.ProductsRead;
         public const string CatalogProductsWrite = CatalogPermissionKeys.ProductsWrite;
         public const string CatalogWarehousesRead = CatalogPermissionKeys.WarehousesRead;
