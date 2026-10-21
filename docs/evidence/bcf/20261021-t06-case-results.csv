@@ -1537,3 +1537,4 @@
 "native125-dark-lookup-7518e7b","Passed","MyDmsVn.Desktop.Tests.GoodsReceiptLookupBindingTests.Locked_header_rejects_stale_selection_callbacks(target: ""WarehouseLookup"", state: ""Busy"")","00:00:00.8730000"
 "native125-dark-lookup-7518e7b","Passed","MyDmsVn.Desktop.Tests.GoodsReceiptLookupBindingTests.Late_completion_cannot_publish_after_boundary(target: ""WarehouseFilterLookup"", boundary: ""Select"")","00:00:00.9460000"
 "native125-dark-lookup-7518e7b","Passed","MyDmsVn.Desktop.Tests.GoodsReceiptLookupBindingTests.Save_or_post_resolves_header_before_deciding(target: ""WarehouseLookup"", post: False, pointer: True)","00:00:00.7710000"
+"native125-attended-both-7518e7b","Passed","MyDmsVn.Desktop.Tests.PackagedGuiAcceptanceTests.Bcf_attended_lookup_package_session_keeps_human_input_separate_from_automation","00:10:25.4910000"

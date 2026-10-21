@@ -1,6 +1,6 @@
 # BCF-T06 — frozen integrated comparison and acceptance
 
-**Status: IN PROGRESS.** Automated native matrices are reconciled; native125 attended observations and Owner acceptance are pending. Historical T02 attended reports remain candidate-specific. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
+**Status: IN PROGRESS.** Automated native matrices and current-candidate attended observations are recorded; explicit Owner disposition is pending. Historical T02 attended reports remain candidate-specific. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
 [Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Original reference register](../../design-references/business-compact/README.md)
 
@@ -78,7 +78,7 @@ The native100 full run remains an unfiltered **FAIL**, retained intact. A case-n
 
 Source6e164e8 adds capture-state telemetry only and initially passes4/4 receipt capture rows. Sourceec4a382 corrects the read order: native Capture pumps layout/scroll messages, so provenance is read afterward, with first visible line/column and only visible scroll owners. The corrected x86 invocation passes4/4, zero skipped; TRX SHA-256 `5C4B4342024AF2BC6C8C9808089C1D8C76CCB6B47BC47214E84696A44D30EAF5`. Its preceding command omitted x86 and failed framework assembly loading before GUI/SQL admission; that setup trial remains separate. The24 final state records replace the initial before-Capture offsets; for the1200→944 dirty state they observe selection11;2, line scrollY3/first visible line4 and document scrollY−136. No production behavior change is involved.
 
-Native125 measures monitor120/window96 DPI, physical window1895×1105 and native client1875×1056 for the lookup observer; it is not a DPI-aware product conversion. Light and additional Dark each have116 verified observer-cleanup records. All19 native125 SQL allocations reach terminal verified drain/drop; no owned GUI/test-host process remains before the attended session. The full runnable round takes21m34s, extra Dark1m35s. The case register now contains1538 invocations including overlaps/repair/Session/capture rows, not1538 unique mandatory cases.
+Native125 measures monitor120/window96 DPI, physical window1895×1105 and native client1875×1056 for the lookup observer; it is not a DPI-aware product conversion. Light and additional Dark each have116 verified observer-cleanup records. All19 native125 SQL allocations reach terminal verified drain/drop; no owned GUI/test-host process remains before the attended session. The full runnable round takes21m34s, extra Dark1m35s. The case register now contains1539 invocations including overlaps/repair/Session/capture rows, not1538 unique mandatory cases.
 
 ## Current-candidate attended evidence
 
@@ -97,22 +97,33 @@ Source7518e7b removes automatic query setup keys between human phases. New uses 
 
 Native100 human evidence is therefore composite across r2 and the repaired Detail-only session, not one all-three PASS Fact or an independent SQL no-write certification of r2. Snapshots supplement the reports: Filter Light ends empty/range0+0; Filter Dark ends with its committed label/range0+0. Header snapshots end with committed labels; Dark Warehouse has range0+30. All snapshots report focus false after returning to chat. They are not retroactively described as pending-gui or per-key recordings.
 
-Native125 attended observations remain PENDING. No Save/Post is authorized by a walkthrough; markers coordinate snapshots/session disposal and never supply a human outcome or Owner approval.
+Native125 has one all-three owned session on the same frozen9559107 package and7518e7b driver. Human reports (UTC+07, recorded at the following snapshot acknowledgements) are separate from automation:
+
+| Surface / theme | Human report | Recorded time |
+|---|---|---|
+| Filter / Light | “Filter ổn ở 125% Light” |19:01:33 |
+| Filter / Dark | “Filter ổn ở 125% Dark” |19:02:15 |
+| Warehouse+Employee / Light | “Hai ô ổn ở 125% Light” |19:03:00 |
+| Warehouse+Employee / Dark | “Hai ô ổn ở 125% Dark” |19:04:19 |
+
+The attended case passes1/1, zero skipped, in10m25.491s; raw TRX SHA-256 `EB1DDB02A9FF83DDFDB51E1AC66286BB3B28B284D9062C28001FE5C1852F890A`. Both List and Detail acknowledge actual Light/Dark. The independent `ATTENDED_NO_RECEIPT_OR_INVENTORY_WRITES=PASS`, application/output drain, terminal `DatabaseAndAllPrincipalsDroppedAfterVerifiedDrain` and zero remaining owned GUI/test processes are verified. No keyboard query is injected during the human phase.
+
+Native snapshots supplement these reports: Filter ends with its committed label in both themes; Warehouse/Employee end with committed labels in Light; Dark Warehouse has its committed label and Employee ends empty. All ranges are0+0 and all focus observations are false after returning to chat. These snapshots are not pending-gui or per-key recordings and do not override the separate human typing reports. No Save/Post is authorized by a walkthrough; markers coordinate snapshots/session disposal and never supply a human outcome or Owner approval.
 
 ## Acceptance reconciliation before Owner review
 
 | Obligations | Current-candidate evidence | Remaining boundary |
 |---|---|---|
-| A01–A03 | LookupTyping tests: first character, canceled preceding completion, response between keys, middle insertion and range replacement; native text/caret/focus/committed identity assertions | Native125 automated PASS; attended reports pending |
+| A01–A03 | LookupTyping tests: first character, canceled preceding completion, response between keys, middle insertion and range replacement; native text/caret/focus/committed identity assertions | Native125 automated PASS plus separate all-three human reports |
 | A04–A09 | LookupBinding tests: query versus commit, shared warehouse notifications, historical/active-only choices, cancellation/generation, native popup keys/mouse, query-only and rejected navigation | Native100/125 automated evidence reconciled; no whole-string setup counted as per-key proof |
 | A10–A12 | Binding, inline/accessibility, control and Session cases: Posted/busy/denied/recovery locks, late callbacks/disposal, current identity, raw numeric input and retained row/editor ownership | Discovery/execution names reconciled; no unresolved automated case |
-| A13 | Native100 Light/Dark automated lookup evidence plus the separately documented composite attended observations | Native125 attended observations OPEN; native100 failed-r2/no independent no-write assertion requires explicit final disposition |
+| A13 | Native100 Light/Dark automated lookup evidence plus the separately documented composite attended observations | Native125 all-three attended1/1 PASS; native100 composite failed-r2/no independent no-write assertion requires explicit final disposition |
 | A14–A17 | All three unchanged references and matched Products/receipt images in the comparison index, plus composition/interaction cases | Material hierarchy, breadcrumb, icon, density, palette and command differences require Owner disposition |
 | A18 | Catalog loading/error/cancel, native focus/tab, lookup popup/accessibility, invalid numeric, readonly/recovery and theme-switch cases; corresponding state captures | Graphite native surfaces and deferred T04 error Minor remain explicit visual/behavior boundaries |
 | A19 | Back admission/mouse-down/abandoned-click, pending Warehouse/Employee/Product, Posted/denied/recovery tests; actual package Save/Post/uncertain-reload workflows and independent SQL effects | Native12520 packaged rows PASS with positive owned cleanup |
 | A20 | Measured100/125, logical1200×760 and944×600 state/reachability; native1001680×900 captures | Six strict wide125 rows NOT TESTED; fitted legacy hosts do not substitute |
 | A21 | Heading-derived grid assertions, native tab/accessibility, numeric alignment and actual reviewed images | Typography/icon/spacing and native accessory differences require control-specific Owner disposition |
-| A22 | Frozen package source9559107, distinct test revisions/hashes, actual Login/catalog/receipt/permissions/recovery scenarios, owned resources | Native125 integration PASS; attended completion pending |
+| A22 | Frozen package source9559107, distinct test revisions/hashes, actual Login/catalog/receipt/permissions/recovery scenarios, owned resources | Native125 integration and all-three attended PASS; native100 composite limitation remains explicit |
 | A23 | Sanitized case register, failed trials, source/package distinction, comparison/integrity/state registers | Explicit dated Owner acceptance is absent; T06 remains IN PROGRESS |
 
 ## Comparisons and Owner disposition
