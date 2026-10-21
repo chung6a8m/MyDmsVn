@@ -60,6 +60,8 @@ public sealed class PackagedGuiAcceptanceTests
         Assert.Empty(Directory.GetFileSystemEntries(barrier));
         var theme = Environment.GetEnvironmentVariable("MYDMSVN_BCF_THEME");
         Assert.Contains(theme, new[] { "Light", "Dark" });
+        var scope = Environment.GetEnvironmentVariable("MYDMSVN_BCF_ATTENDED_SCOPE") ?? "both";
+        Assert.Contains(scope, new[] { "both", "detail" });
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             await fixture.SeedReceiptWriterAsync();
@@ -67,10 +69,12 @@ public sealed class PackagedGuiAcceptanceTests
             var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" bcf-lookup-attended " + theme);
             fixture.ConfigureRuntime(start);
             start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
+            start.EnvironmentVariables["MYDMSVN_BCF_ATTENDED_SCOPE"] = scope;
             var result = await GuiOwnedProcess.RunAttendedAsync(start, TimeSpan.FromMinutes(22));
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.CleanupVerified);
             Assert.True(result.ExitCode == 0, result.StandardOutput + result.StandardError);
+            Assert.Contains("ATTENDED_LOOKUP_SCOPE=" + scope, result.StandardOutput);
             Assert.Contains("ATTENDED_LOOKUP_SESSION_DRAINED=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
             await fixture.AssertNoInventoryAsync();

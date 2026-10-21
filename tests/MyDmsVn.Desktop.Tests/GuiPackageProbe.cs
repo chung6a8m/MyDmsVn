@@ -97,13 +97,17 @@ internal static class GuiPackageProbe
                 Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
                 var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
                 var barrier = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER");
-                ObserveAttendedPhase(shell, page, barrier, "list", new[] { "Filter by warehouse" }, "enter-detail");
+                var scope = Environment.GetEnvironmentVariable("MYDMSVN_BCF_ATTENDED_SCOPE") ?? "both";
+                if (scope != "both" && scope != "detail") throw new ArgumentException("Unknown attended scope.");
+                Console.WriteLine("ATTENDED_LOOKUP_SCOPE=" + scope);
+                if (scope == "both")
+                    ObserveAttendedPhase(shell, page, barrier, "list", new[] { "Filter by warehouse" }, "enter-detail");
                 // New admits query-only navigation and cancels the filter presentation.
-                // These committed header values are setup, never credited as human typing.
+                // After a human returns to chat, do not attempt native setup keys:
+                // foreground admission remains strict. The human selects the initial
+                // committed headers before testing them in the next phase.
                 Invoke(Find(page, "New", ControlType.Button, false));
-                SetLookup(page, "Warehouse", "GUI-WH - UIA Warehouse Updated");
-                SetLookup(page, "Employee", "GUI-EMP - UIA Employee Updated");
-                InputEditor(page, "Note").SetFocus();
+                Find(page, "Note", ControlType.Edit, false);
                 var toggle = Find(shell, "Theme toggle", ControlType.Button, false);
                 if (NativeDescription(toggle) != "Current theme: Light") Invoke(toggle);
                 Wait(delegate { return NativeDescription(toggle) == "Current theme: Light"; }, "Detail setup theme unavailable.");
