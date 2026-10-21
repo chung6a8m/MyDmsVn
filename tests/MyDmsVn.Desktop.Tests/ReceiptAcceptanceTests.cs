@@ -14,10 +14,10 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 
-public sealed class ReceiptAcceptanceTests
+public sealed partial class ReceiptAcceptanceTests
 {
     [Fact]
-    public void Rowversion_conflict_is_inline_and_keeps_dirty_header_line_and_opaque_version()
+    public void Conflict_retains_inline_input_and_original_expected_version()
     {
         StaTest.Run(token =>
         {
@@ -26,8 +26,8 @@ public sealed class ReceiptAcceptanceTests
             using var control = fixture.CreateControl();
             Load(control, token);
             control.NoteEditor.Text = "operator correction";
-            control.QuantityEditor.Value = 3.1250m;
-            control.UnitCostEditor.Value = 9.4321m;
+            InlineReceiptTestDriver.SetValue(control, 2, 3.1250m);
+            InlineReceiptTestDriver.SetValue(control, 3, 9.4321m);
             fixture.Api.UpdateError = new ApiError(ApiStatusCode.Conflict,
                 "GoodsReceipt.ConcurrencyConflict", "Receipt changed. Reload before saving.");
             var readsBefore = fixture.Api.GetCalls;
@@ -37,8 +37,8 @@ public sealed class ReceiptAcceptanceTests
 
             Assert.Equal("Receipt changed. Reload before saving.", control.OperationStatusLabel.Text);
             Assert.Equal("operator correction", control.NoteEditor.Text);
-            Assert.Equal(3.1250m, control.QuantityEditor.Value);
-            Assert.Equal(9.4321m, control.UnitCostEditor.Value);
+            Assert.Equal(3.1250m, InlineReceiptTestDriver.Value(control, 2));
+            Assert.Equal(9.4321m, InlineReceiptTestDriver.Value(control, 3));
             Assert.Equal("AQIDBAUGBwg=", control.VersionLabel.Text);
             Assert.Equal("AQIDBAUGBwg=", Assert.Single(fixture.Api.Updates).ExpectedVersion);
             Assert.True(fixture.Editor.IsDirty);
@@ -95,7 +95,7 @@ public sealed class ReceiptAcceptanceTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void Uncertain_post_requires_read_reload_before_another_mutating_command(bool apiFailure, bool committed)
+    public void Uncertain_post_retains_lock_until_authoritative_read(bool apiFailure, bool committed)
     {
         StaTest.Run(token =>
         {
@@ -294,7 +294,7 @@ public sealed class ReceiptAcceptanceTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void Session_switch_disposes_pending_receipt_save_and_old_completion_cannot_reach_next_users_workspace(
+    public void Disposed_or_old_session_completions_cannot_overwrite_current_input(
         bool signOutFirst, bool lateFailure)
     {
         StaTest.Run(token =>
@@ -313,6 +313,8 @@ public sealed class ReceiptAcceptanceTests
             System.Windows.Forms.Application.DoEvents();
             Load(oldControl, token);
             oldControl.NoteEditor.Text = "private first-user draft";
+            var oldContext = BeginReceiptCell(oldControl, 2);
+            ((SourceGrid.Cells.Editors.EditorControlBase)oldContext.Cell.Editor).Control.Text = "7.125";
             oldFixture.Api.PendingUpdate = new TaskCompletionSource<ApiResponse<GoodsReceiptDto>>();
             Assert.True(oldControl.SaveButton.Visible);
             Assert.True(oldControl.SaveButton.Enabled);
@@ -320,7 +322,7 @@ public sealed class ReceiptAcceptanceTests
             var oldSave = oldControl.LastOperation;
             Assert.False(oldSave.IsCompleted);
             Assert.False(oldControl.SaveButton.Enabled);
-            Assert.Single(oldFixture.Api.Updates);
+            Assert.Equal(7.125m, Assert.Single(oldFixture.Api.Updates).Lines[0].Quantity);
             Assert.False(oldFixture.Api.PendingUpdate.Task.IsCompleted);
             var oldReads = oldFixture.Api.GetCalls;
             var oldLists = oldFixture.Api.ListCalls;
@@ -462,7 +464,7 @@ public sealed class ReceiptAcceptanceTests
         return Assert.IsAssignableFrom<IEnumerable<CatalogLookupOption>>(source);
     }
 
-    private static void Load(GoodsReceiptControl control, CancellationToken token)
+    internal static void Load(GoodsReceiptControl control, CancellationToken token)
     {
         Drain(control.ActivateAsync(token), token);
         Drain(control.SelectReceiptAsync(41, token), token);
@@ -489,7 +491,7 @@ public sealed class ReceiptAcceptanceTests
         new[] { new GoodsReceiptLineDto(91, 1, 7, 2.5m, 4m, "P7 - Product", true) },
         "W3 - Warehouse", true, "E5 - Employee", true);
 
-    private sealed class Fixture : IDisposable
+    internal sealed class Fixture : IDisposable
     {
         public Fixture(LookupSource? warehouses = null, LookupSource? employees = null, LookupSource? products = null,
             DesktopNotificationCenter? notifications = null)
@@ -543,7 +545,7 @@ public sealed class ReceiptAcceptanceTests
         }
     }
 
-    private sealed class LookupSource : ICatalogLookupSource
+    internal sealed class LookupSource : ICatalogLookupSource
     {
         private readonly int _id;
         public LookupSource(CatalogKind kind, int id) { Kind = kind; _id = id; }
@@ -562,7 +564,7 @@ public sealed class ReceiptAcceptanceTests
             Task.FromResult(ApiResponse<CatalogLookupDto>.Success(new CatalogLookupDto(id, "C" + id, "Choice", Active)));
     }
 
-    private sealed class ReceiptApi : IGoodsReceiptApiClient
+    internal sealed class ReceiptApi : IGoodsReceiptApiClient
     {
         public GoodsReceiptDto Current { get; set; } = Receipt();
         public IList<UpdateGoodsReceiptDraftRequest> Updates { get; } = new List<UpdateGoodsReceiptDraftRequest>();

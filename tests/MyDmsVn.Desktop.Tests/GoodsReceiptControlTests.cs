@@ -12,7 +12,7 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
 {
-    public sealed class GoodsReceiptControlTests
+    public sealed partial class GoodsReceiptControlTests
     {
         [Fact]
         public void Activation_and_selection_render_master_detail_lookups_total_and_read_only_state()
@@ -30,7 +30,8 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(2, control.ReceiptGrid.RowsCount);
                         Assert.Equal("GR0000000041", control.ReceiptGrid[1, 1].Value);
                         Assert.Equal(2, control.LineGrid.RowsCount);
-                        Assert.Equal("P7 - Product 7", control.LineGrid[1, 1].Value);
+                        Assert.Equal(7, control.LineGrid[1, 1].Value);
+                        Assert.Equal("P7 - Product 7", fixture.Editor.Lines[0].ProductDisplayName);
                         Assert.Equal("10.00", control.TotalLabel.Text);
                         Assert.Equal("Posted", control.StatusLabel.Text);
                         Assert.Equal("AQIDBAUGBwg=", control.VersionLabel.Text);
@@ -129,12 +130,8 @@ namespace MyDmsVn.Desktop.Tests
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
                         control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
 
-                        Assert.Equal(4, control.QuantityEditor.DecimalPlaces);
-                        Assert.Equal(GoodsReceiptContractLimits.MaximumQuantity, control.QuantityEditor.Maximum);
-                        Assert.Equal(1.2345m, control.QuantityEditor.Value);
-                        Assert.Equal(4, control.UnitCostEditor.DecimalPlaces);
-                        Assert.Equal(GoodsReceiptContractLimits.MaximumUnitCost, control.UnitCostEditor.Maximum);
-                        Assert.Equal(0.1234m, control.UnitCostEditor.Value);
+                        Assert.Equal(1.2345m, InlineReceiptTestDriver.Value(control, 2));
+                        Assert.Equal(0.1234m, InlineReceiptTestDriver.Value(control, 3));
 
                         control.SaveButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
@@ -235,6 +232,10 @@ namespace MyDmsVn.Desktop.Tests
                     using (var fixture = new Fixture())
                     using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
                     {
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        using var form = new Form { Size = new System.Drawing.Size(1500, 850) };
+                        form.Controls.Add(control);
+                        form.Show();
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
                         control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
 
@@ -250,6 +251,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal("remote employee", control.EmployeeLookup.Text);
                         Assert.True(control.EmployeeLookup.HasPendingText);
 
+                        BeginInline(control, 1);
                         control.ProductLookup.Text = "remote product";
                         control.LastOperation.GetAwaiter().GetResult();
                         Assert.Equal("remote product", fixture.ProductSource.Requests.Last().Search);
@@ -296,8 +298,8 @@ namespace MyDmsVn.Desktop.Tests
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
                         control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
 
-                        Assert.Equal(99, control.ProductLookup.SelectedValue);
-                        Assert.Equal("P99 - Historical product", control.ProductLookup.CommittedDisplayText);
+                        Assert.Equal(99, control.LineGrid[1, 1].Value);
+                        Assert.Equal("P99 - Historical product", fixture.Editor.Lines[0].ProductDisplayName);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -406,7 +408,7 @@ namespace MyDmsVn.Desktop.Tests
 
                         control.SaveButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
-                        control.QuantityEditor.Value = 9.125m;
+                        InlineReceiptTestDriver.SetValue(control, 2, 9.125m);
                         control.SaveButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
 
@@ -473,7 +475,7 @@ namespace MyDmsVn.Desktop.Tests
 
                         control.RefreshButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
-                        control.UnitCostEditor.Value = 7.4321m;
+                        InlineReceiptTestDriver.SetValue(control, 3, 7.4321m);
                         control.SaveButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
 
@@ -670,7 +672,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
                         Assert.Equal(3, control.WarehouseLookup.SelectedValue);
                         Assert.Equal(5, control.EmployeeLookup.SelectedValue);
-                        Assert.Equal(7, control.ProductLookup.SelectedValue);
+                        Assert.Equal(7, control.LineGrid[1, 1].Value);
 
                         warehouseControl.ActivateButton.PerformClick();
                         warehouseControl.LastOperation.GetAwaiter().GetResult();
@@ -690,7 +692,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
                         Assert.Equal(3, control.WarehouseLookup.SelectedValue);
                         Assert.Equal(5, control.EmployeeLookup.SelectedValue);
-                        Assert.Equal(7, control.ProductLookup.SelectedValue);
+                        Assert.Equal(7, control.LineGrid[1, 1].Value);
                         Assert.Empty(guard.Exceptions);
                     }
                 },
@@ -746,6 +748,8 @@ namespace MyDmsVn.Desktop.Tests
             public LookupSource(CatalogKind kind) => Kind = kind;
             public CatalogKind Kind { get; }
             public bool SelectedIsActive { get; set; } = true;
+            public bool HoldQueries { get; set; }
+            public List<TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>> Pending { get; } = new List<TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>>();
             public IList<CatalogLookupRequest> Requests { get; } = new List<CatalogLookupRequest>();
 
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(
@@ -753,6 +757,12 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken cancellationToken)
             {
                 Requests.Add(request);
+                if (HoldQueries)
+                {
+                    var pending = new TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>();
+                    Pending.Add(pending);
+                    return pending.Task; // Deliberately ignores cancellation to exercise generation fences.
+                }
                 return Task.FromResult(
                     ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(
                         new[] { new CatalogLookupDto(Kind == CatalogKind.Product ? 7 : 3, Kind.ToString(), "Choice", SelectedIsActive) }));

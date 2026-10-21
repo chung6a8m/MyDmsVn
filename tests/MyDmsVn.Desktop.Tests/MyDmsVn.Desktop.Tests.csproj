@@ -6,6 +6,8 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="GuiInlineEditorProbe.cs" />
+    <EmbeddedResource Include="GuiInlineEditorProbe.cs" />
     <Compile Remove="GuiProcessProbe.cs" />
     <EmbeddedResource Include="GuiProcessProbe.cs" />
     <Compile Remove="GuiPackageProbe.cs" />

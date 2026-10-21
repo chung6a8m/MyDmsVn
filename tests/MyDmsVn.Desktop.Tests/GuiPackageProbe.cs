@@ -84,7 +84,7 @@ internal static class GuiPackageProbe
                 SetInput(page, "Quantity", 0m.ToString("F4"), false);
                 SetInput(page, "Note", "GUI invalid input retained", false);
                 Invoke(Find(page, "Save", ControlType.Button, false));
-                Find(page, "The request is invalid.", ControlType.Text, false);
+                Find(page, "Quantity must be greater than zero", ControlType.Text, true);
                 if (InputValue(page, "Note") != "GUI invalid input retained") throw new InvalidOperationException("Invalid draft input was lost.");
                 CloseApplication(shell);
                 Console.WriteLine("INVALID_FIELDS_NO_WRITE=PASS");
@@ -121,6 +121,13 @@ internal static class GuiPackageProbe
                 CloseApplication(shell);
                 Console.WriteLine("SERVER_DIRECT_DENY=PASS");
             }
+            else if (args[1] == "inventory-deny")
+            {
+                var shell = Login("gui.bci.receipt.writer", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), "BCI Receipt Writer");
+                Console.WriteLine("ORDINARY_RECEIPT_ACTOR_LOGIN=PASS");
+                Receipt(shell, args[0], args[1]);
+                CloseApplication(shell);
+            }
             else if (args[1] == "inventory-audit" || args[1] == "inventory-stale" || args[1] == "inventory-fault" || args[1] == "inventory-lookup")
             {
                 var shell = Login();
@@ -136,7 +143,11 @@ internal static class GuiPackageProbe
                     CloseApplication(Login());
                     Console.WriteLine("FAULT_REMOVED_STARTUP_REVALIDATED=PASS");
                 }
-                if (args[1] == "inventory-audit" || args[1] == "inventory-fault") Console.WriteLine("RECEIPT_POST_STOCK=PASS");
+                if (args[1] == "inventory-audit" || args[1] == "inventory-fault")
+                {
+                    Console.WriteLine("INLINE_RECEIPT_NATIVE_EDIT=PASS");
+                    Console.WriteLine("RECEIPT_POST_STOCK=PASS");
+                }
             }
             else if (args[1] == "catalog-audit")
             {
@@ -335,13 +346,40 @@ internal static class GuiPackageProbe
         Wait(delegate { return InputValue(page, "Note") == "GUI draft"; }, "Saved draft did not reload.");
         _stage = "receipt-edit";
         SetInput(page, "Note", "GUI edited", false);
-        Invoke(Find(page, "Open GUI-PROD - UIA Product Updated", ControlType.Button, false));
         SetInput(page, "Quantity", 3.125m.ToString("F4"), false);
         InputEditor(page, "Note").SetFocus();
         Find(page, 12.5m.ToString("F2"), ControlType.Text, false);
+        if (scenario == "inventory-deny")
+        {
+            var committedProduct = InputValue(page, "Product");
+            Signal("receipt-deny-ready");
+            AwaitSignal("allow-denied-save");
+            _stage = "receipt-server-direct-deny";
+            Invoke(Find(page, "Save", ControlType.Button, false));
+            Find(page, "The operation is not permitted.", ControlType.Text, true);
+            if (InputValue(page, "Note") != "GUI edited" || InputValue(page, "Product") != committedProduct ||
+                decimal.Parse(InputValue(page, "Quantity"), System.Globalization.CultureInfo.CurrentCulture) != 3.125m ||
+                decimal.Parse(InputValue(page, "Unit cost"), System.Globalization.CultureInfo.CurrentCulture) != 4m)
+                throw new InvalidOperationException("Denied inline receipt input was lost.");
+            if (Find(page, "Post", ControlType.Button, false).Current.IsEnabled)
+                throw new InvalidOperationException("Denied dirty draft permits Post.");
+            Console.WriteLine("INLINE_RECEIPT_DIRECT_DENY_INPUT_RETAINED=PASS");
+            Signal("receipt-denied");
+            AwaitSignal("allow-explicit-save");
+            _stage = "receipt-explicit-save-after-regrant";
+        }
         Invoke(Find(page, "Save", ControlType.Button, false));
         var post = Find(page, "Post", ControlType.Button, false);
         Wait(delegate { return post.Current.IsEnabled; }, "Saved draft cannot be posted.");
+        if (scenario == "inventory-deny")
+        {
+            Console.WriteLine("INLINE_RECEIPT_EXPLICIT_SAVE_AFTER_REGRANT=PASS");
+            Invoke(post);
+            Find(page, "Posted", ControlType.Text, false);
+            Wait(delegate { return !post.Current.IsEnabled; }, "Actor Posted receipt still permits Post.");
+            Console.WriteLine("INLINE_RECEIPT_ACTOR_POST=PASS");
+            return; // Existing inventory audit scenarios separately retain Balance/Card UI checks.
+        }
         if (scenario == "inventory-lookup")
         {
             ChangedLookupsAndReopen(shell, page, executable, receiptAction);
@@ -414,16 +452,23 @@ internal static class GuiPackageProbe
         Invoke(Find(page, "Add line", ControlType.Button, false));
         for (var index = 0; index < names.Length; index++)
         {
+            var current = index;
             _stage = "inactive-new-selection-" + names[index];
             Console.WriteLine("STAGE=" + _stage + ";MS=" + TraceClock.ElapsedMilliseconds);
             SetInput(page, names[index], codes[index], false);
-            var lookup = Find(page, names[index], ControlType.ComboBox, false);
+            var lookup = names[index] == "Product" ? InlineCell(page, names[index]) : Find(page, names[index], ControlType.ComboBox, false);
             SendOwnedLookupKey(InputEditor(page, names[index]), 0x73); // F4 opens without toggling an already-open popup.
             TraceLookupState(page, names[index], "inactive-open-posted", null);
             VisibleOwnedText("0 / 0");
             Console.WriteLine("INACTIVE_POPUP_EMPTY=" + names[index] + ";MS=" + TraceClock.ElapsedMilliseconds);
+            if (names[index] == "Product")
+            {
+                var inline = InputEditor(page, "Product");
+                SendOwnedLookupKey(inline, 27);
+                SendOwnedLookupKey(inline, 27);
+            }
             InputEditor(page, "Note").SetFocus();
-            Wait(delegate { return lookup.Current.HelpText == "No selection"; }, "Inactive catalog became selectable in a new draft.");
+            Wait(delegate { return names[current] == "Product" ? lookup.Current.HelpText.Contains("Committed key: 0") : lookup.Current.HelpText == "No selection"; }, "Inactive catalog became selectable in a new draft.");
         }
         SetInput(page, "Note", "Inactive references must not persist", false);
         Invoke(Find(page, "Save", ControlType.Button, false));
@@ -546,6 +591,54 @@ internal static class GuiPackageProbe
         return true;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeKeyboardInput { public ushort Key, Scan; public uint Flags, Time; public UIntPtr ExtraInfo; }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMouseInput { public int X, Y; public uint Data, Flags, Time; public UIntPtr ExtraInfo; }
+    [StructLayout(LayoutKind.Explicit)]
+    private struct NativeInputData
+    {
+        [FieldOffset(0)] public NativeKeyboardInput Keyboard;
+        [FieldOffset(0)] public NativeMouseInput Mouse;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeInput { public uint Type; public NativeInputData Data; }
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, NativeInput[] inputs, int size);
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
+
+    private static void SendOwnedKey(AutomationElement expectedFocus, ushort key)
+    {
+        foreach (var modifier in new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C })
+            if ((GetAsyncKeyState(modifier) & 0x8000) != 0)
+                throw new InvalidOperationException("Native keyboard audit requires released modifier keys.");
+        if (GetForegroundWindow() != MainWindow || expectedFocus.Current.ProcessId != _application.Id || !expectedFocus.Current.HasKeyboardFocus)
+            throw new InvalidOperationException("Native keyboard audit lost its owned focus.");
+        var input = new[] {
+            new NativeInput { Type = 1, Data = new NativeInputData { Keyboard = new NativeKeyboardInput { Key = key } } },
+            new NativeInput { Type = 1, Data = new NativeInputData { Keyboard = new NativeKeyboardInput { Key = key, Flags = 2 } } }
+        };
+        if (SendInput(2, input, Marshal.SizeOf(typeof(NativeInput))) != 2)
+            throw new InvalidOperationException("Native keyboard input was not inserted.");
+    }
+
+    private static void AssertRecoveryKeyboardRoute(AutomationElement page)
+    {
+        _stage = "uncertain-native-tab-route";
+        var status = Find(page, "Filter by status", ControlType.ComboBox, false);
+        var refresh = Find(page, "Refresh", ControlType.Button, false);
+        FocusOwnedEditor(status, "receipt recovery Tab");
+        SendOwnedKey(status, 9);
+        Thread.Sleep(300);
+        var focused = AutomationElement.FocusedElement;
+        if (focused.Current.ProcessId != _application.Id || GetForegroundWindow() != MainWindow)
+            throw new InvalidOperationException("Native Tab focus escaped its owned application.");
+        Console.WriteLine("RECOVERY_TAB_ACTUAL_FOCUS=" + focused.Current.Name + ";TYPE=" + focused.Current.ControlType.ProgrammaticName);
+        Wait(delegate { return refresh.Current.HasKeyboardFocus; }, "Native Tab from status skipped Refresh.", 5);
+        Console.WriteLine("RECOVERY_NATIVE_TAB_REACHES_REFRESH=PASS");
+
+    }
+
     private static void PostAfterUncertainOutcome(AutomationElement page, AutomationElement post)
     {
         _stage = "real-sql-post-timeout";
@@ -557,10 +650,12 @@ internal static class GuiPackageProbe
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled)
                 throw new InvalidOperationException("Uncertain Post permits a mutation.");
         if (InputEditor(page, "Note").Current.IsEnabled) throw new InvalidOperationException("Uncertain editor remained editable.");
+        AssertRecoveryKeyboardRoute(page);
         Signal("uncertain");
         AwaitSignal("allow-reload");
         _stage = "explicit-outcome-reload";
-        Invoke(Find(page, "Refresh", ControlType.Button, false));
+        SendOwnedKey(Find(page, "Refresh", ControlType.Button, false), 13);
+        Console.WriteLine("RECOVERY_NATIVE_ENTER_SENT=PASS");
         Find(page, "Draft", ControlType.Text, false);
         Wait(delegate { return post.Current.IsEnabled; }, "Explicit reload did not restore the persisted Draft.");
         Signal("reloaded");
@@ -611,13 +706,15 @@ internal static class GuiPackageProbe
                     throw new InvalidOperationException("Masked wrapper exposes credential.");
             }
         }
+        if (IsLineField(name) && LineGrid(root) != null && name != "Product")
+            SendOwnedLookupKey(editor, 13);
         Console.WriteLine("INPUT_PATTERN=" + name + ":Value");
     }
 
     private static void SetLookup(AutomationElement page, string name, string display)
     {
         SetInput(page, name, display.Substring(0, display.IndexOf(" - ", StringComparison.Ordinal)), false);
-        var lookup = Find(page, name, ControlType.ComboBox, false);
+        var lookup = name == "Product" ? InlineCell(page, name) : Find(page, name, ControlType.ComboBox, false);
         var editor = InputEditor(page, name);
         TraceLookupState(page, name, "before-open", display);
         SendOwnedLookupKey(editor, 0x73); // Typing may already have opened results; F4 is idempotent.
@@ -672,7 +769,7 @@ internal static class GuiPackageProbe
             throw;
         }
         SendOwnedLookupKey(editor, 13);
-        try { Wait(delegate { return lookup.Current.HelpText == "Selected: " + display; }, "Lookup selection did not commit: " + name);
+        try { Wait(delegate { return lookup.Current.HelpText.Contains("Selected: " + display); }, "Lookup selection did not commit: " + name);
             Wait(delegate { return !IsWindowVisible(selectedPopup); }, "Committed lookup popup did not close: " + name);
             Console.WriteLine("LOOKUP_COMMITTED_POPUP_CLOSED=" + name + ";MS=" + TraceClock.ElapsedMilliseconds);
             TraceLookupState(page, name, "committed", display); }
@@ -748,7 +845,8 @@ internal static class GuiPackageProbe
             throw new InvalidOperationException("Input target is not an owned editor/window.");
         // One activation request, never an input-queue attachment or repeated business action.
         if (IsIconic(window)) ShowWindowAsync(window, 9); // Restore only this owned minimized window.
-        if (GetForegroundWindow() != window) SetForegroundWindow(window);
+        var activationRequested = GetForegroundWindow() != window;
+        var activationGranted = !activationRequested || SetForegroundWindow(window);
         editor.SetFocus();
         try
         {
@@ -765,15 +863,57 @@ internal static class GuiPackageProbe
                 GetWindowThreadProcessId(foreground, out foregroundProcess);
                 Console.WriteLine("OWNED_FOCUS_FAILED=" + input + ";FOREGROUND_OWNED=" +
                     (foregroundProcess == _application.Id) + ";ROOT_FOREGROUND=" + (foreground == window) +
-                    ";EDITOR_FOCUSED=" + editor.Current.HasKeyboardFocus);
+                    ";EDITOR_FOCUSED=" + editor.Current.HasKeyboardFocus +
+                    ";ACTIVATION_REQUESTED=" + activationRequested + ";ACTIVATION_GRANTED=" + activationGranted);
             }
             catch (ElementNotAvailableException) { Console.WriteLine("OWNED_FOCUS_FAILED=element unavailable"); }
             throw;
         }
     }
 
+
+    private static bool IsLineField(string name) { return name == "Product" || name == "Quantity" || name == "Unit cost"; }
+    private static AutomationElement LineGrid(AutomationElement root)
+    {
+        return root.FindFirst(TreeScope.Descendants, new AndCondition(
+            new PropertyCondition(AutomationElement.NameProperty, "Goods receipt lines"),
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Table)));
+    }
+    private static AutomationElement InlineCell(AutomationElement root, string field)
+    {
+        var grid = LineGrid(root);
+        if (grid == null) throw new InvalidOperationException("Receipt line table absent.");
+        AutomationElement selected = null;
+        foreach (AutomationElement candidate in grid.FindAll(TreeScope.Descendants, Condition.TrueCondition))
+        {
+            var name = candidate.Current.Name;
+            if (!name.StartsWith(field + " row ", StringComparison.Ordinal) || name.EndsWith(" editor", StringComparison.Ordinal)) continue;
+            if (selected != null) throw new InvalidOperationException("Ambiguous receipt line field: " + field);
+            selected = candidate;
+        }
+        if (selected == null) throw new InvalidOperationException("Receipt line field absent: " + field);
+        return selected;
+    }
+    private static AutomationElement InlineEditor(AutomationElement root, string field)
+    {
+        var cell = InlineCell(root, field);
+        var name = cell.Current.Name + " editor";
+        var wrapper = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name));
+        if (wrapper == null)
+        {
+            ((InvokePattern)cell.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+            Wait(delegate {
+                wrapper = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name));
+                return wrapper != null;
+            }, "Active inline editor unavailable: " + field);
+        }
+        var input = wrapper.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+        if (input == null || input.Current.NativeWindowHandle == 0) throw new InvalidOperationException("Native inline textbox absent.");
+        return input;
+    }
     private static AutomationElement InputEditor(AutomationElement root, string name)
     {
+        if (IsLineField(name) && LineGrid(root) != null) return InlineEditor(root, name);
         var key = _application.Id + ":" + string.Join(".", root.GetRuntimeId()) + ":" + name;
         CachedInput cached;
         if (InputEditors.TryGetValue(key, out cached))
@@ -795,11 +935,22 @@ internal static class GuiPackageProbe
             new PropertyCondition(AutomationElement.NameProperty, name));
         foreach (AutomationElement named in candidates)
         {
+            // Captions/groups can inherit the same name but contain an unrelated EDIT.
+            // Resolve only semantic input widgets; ambiguity between real inputs still fails.
+            var type = named.Current.ControlType;
+            if (type != ControlType.Edit && type != ControlType.ComboBox && type != ControlType.Spinner) continue;
             var candidate = named.FindFirst(TreeScope.Descendants,
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
             if (candidate == null && named.Current.ControlType == ControlType.Edit) candidate = named;
             if (candidate == null) continue;
-            if (editor != null && !Automation.Compare(editor, candidate)) { _detail = "Ambiguous input selector"; throw new InvalidOperationException(); }
+            if (editor != null && !Automation.Compare(editor, candidate))
+            {
+                _detail = "Ambiguous input selector: " + name + ";first=" + editor.Current.ControlType.ProgrammaticName +
+                    ";next=" + candidate.Current.ControlType.ProgrammaticName +
+                    ";sameNativeHandle=" + (editor.Current.NativeWindowHandle == candidate.Current.NativeWindowHandle) +
+                    ";semantic=" + named.Current.ControlType.ProgrammaticName;
+                throw new InvalidOperationException();
+            }
             editor = candidate;
             semantic = named;
         }
@@ -809,6 +960,15 @@ internal static class GuiPackageProbe
     }
     private static string InputValue(AutomationElement root, string name)
     {
+        if (IsLineField(name) && LineGrid(root) != null)
+        {
+            var cell = InlineCell(root, name);
+            if (name != "Product") return ((ValuePattern)cell.GetCurrentPattern(ValuePattern.Pattern)).Current.Value;
+            var help = cell.Current.HelpText;
+            var marker = "Selected: ";
+            var start = help.IndexOf(marker, StringComparison.Ordinal);
+            return start < 0 ? string.Empty : help.Substring(start + marker.Length);
+        }
         var editor = InputEditor(root, name);
         if (editor.Current.IsPassword) throw new InvalidOperationException("Protected value cannot be inspected.");
         return ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).Current.Value;

@@ -199,11 +199,12 @@ namespace MyDmsVn.Desktop.WinForms
                 _notifications.NotificationPublished += OnNotificationPublished;
             }
             BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+            BusinessCompactAppearance.Apply(this);
         }
 
         public FoundationViewModel ViewModel => _viewModel;
 
-        public BootstrapSidebar Navigation { get; }
+        public BusinessCompactNavigation Navigation { get; }
 
         public BootstrapTabControl Workspace { get; }
 
@@ -652,44 +653,44 @@ namespace MyDmsVn.Desktop.WinForms
             _notifications.Publish(new DesktopNotification(kind, message));
         }
 
-        private static BootstrapSidebar CreateNavigation()
+        private static BusinessCompactNavigation CreateNavigation()
         {
-            var navigation = new BootstrapSidebar
+            var navigation = new BusinessCompactNavigation
             {
                 Dock = DockStyle.Left,
-                ExpandedWidth = 240,
+                ExpandedWidth = 224,
                 CollapsedWidth = 64,
             };
             navigation.Items.Add(
-                new BootstrapSidebarItem
+                new BusinessCompactNavigationItem
                 {
                     Text = "Foundation",
                     Tag = "foundation",
                 });
-            navigation.Items.Add(new BootstrapSidebarItem { Text = "Products", Tag = CatalogKind.Product });
-            navigation.Items.Add(new BootstrapSidebarItem { Text = "Warehouses", Tag = CatalogKind.Warehouse });
-            navigation.Items.Add(new BootstrapSidebarItem { Text = "Employees", Tag = CatalogKind.Employee });
-            navigation.Items.Add(new BootstrapSidebarItem { Text = "Customers", Tag = CatalogKind.Customer });
+            navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Products", Tag = CatalogKind.Product });
+            navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Warehouses", Tag = CatalogKind.Warehouse });
+            navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Employees", Tag = CatalogKind.Employee });
+            navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Customers", Tag = CatalogKind.Customer });
             navigation.Items.Add(
-                new BootstrapSidebarItem
+                new BusinessCompactNavigationItem
                 {
                     Text = "Goods Receipts",
                     Tag = "goods-receipts",
                 });
             navigation.Items.Add(
-                new BootstrapSidebarItem
+                new BusinessCompactNavigationItem
                 {
                     Text = "Tồn kho",
                     Tag = "stock-balances",
                 });
             navigation.Items.Add(
-                new BootstrapSidebarItem
+                new BusinessCompactNavigationItem
                 {
                     Text = "Thẻ kho",
                     Tag = "stock-card",
                 });
             navigation.Items.Add(
-                new BootstrapSidebarItem
+                new BusinessCompactNavigationItem
                 {
                     Text = "Security administration",
                     Tag = "security-administration",
@@ -754,6 +755,8 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 Dock = DockStyle.Top,
                 GripStyle = ToolStripGripStyle.Hidden,
+                AutoSize = false,
+                Height = BusinessCompactAppearance.Scale(this, 48),
             };
             var title = new ToolStripLabel("MyDmsVn");
             // A hosted HWND-backed button remains available through native UIA on net48.

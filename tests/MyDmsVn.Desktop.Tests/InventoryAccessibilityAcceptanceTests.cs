@@ -18,7 +18,7 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class InventoryAccessibilityAcceptanceTests
 {
     [Fact]
-    public void Receipt_and_line_accessible_actions_use_existing_selection_and_readonly_columns()
+    public void Receipt_accessible_action_loads_typed_inline_rows()
     {
         StaTest.Run(token =>
         {
@@ -27,57 +27,38 @@ public sealed class InventoryAccessibilityAcceptanceTests
             using var host = Show(fixture.Control);
             fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
             var receipt = AccessibleDescendants(fixture.Control.ReceiptGrid.AccessibilityObject)
-                .SingleOrDefault(item => item.Role == AccessibleRole.PushButton && item.Name == "Open GR0000000041");
-            Assert.NotNull(receipt);
-            receipt!.DoDefaultAction();
+                .Single(item => item.Role == AccessibleRole.PushButton && item.Name == "Open GR0000000041");
+            receipt.DoDefaultAction();
             Assert.True(fixture.Control.LastOperation.Wait(TimeSpan.FromSeconds(3)));
             fixture.Control.LastOperation.GetAwaiter().GetResult();
             Assert.Equal(41, fixture.Editor.Id);
-            var line = AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject)
-                .SingleOrDefault(item => item.Role == AccessibleRole.PushButton && item.Name == "Open P7 - Product");
-            Assert.NotNull(line);
-            line!.DoDefaultAction();
-            Assert.Equal(2.5m, fixture.Control.QuantityEditor.Value);
-            var quantity = AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject)
-                .First(item => item.Role == AccessibleRole.Cell && item.Description == "Quantity");
-            Assert.True((quantity.State & AccessibleStates.ReadOnly) != 0);
-            Assert.Throws<InvalidOperationException>(() => quantity.Value = "999");
-            Assert.Equal(2.5m, fixture.Editor.Lines[0].Quantity);
-            fixture.Control.NewButton.PerformClick();
-            line.DoDefaultAction();
-            Assert.Equal(0m, fixture.Control.QuantityEditor.Value);
-            Assert.True((line.State & AccessibleStates.Unavailable) != 0);
+            Assert.Equal(7, fixture.Control.LineGrid[1, 1].Value);
+            Assert.Equal(2.5m, fixture.Control.LineGrid[1, 2].Value);
+            Assert.NotNull(fixture.Control.LineGrid[1, 2].Editor);
+            // The external Open-line action is removed. T04 supplies writable cell providers.
+            Assert.DoesNotContain(AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject),
+                item => item.Role == AccessibleRole.PushButton && item.Name == "Open P7 - Product");
             Assert.Empty(guard.Exceptions);
         }, TimeSpan.FromSeconds(10));
     }
 
     [Fact]
-    public void Numeric_accessibility_updates_line_with_validation_and_disabled_guards()
+    public void Legacy_numeric_wrapper_retains_its_typed_accessibility_guards()
     {
         StaTest.Run(token =>
         {
             using var guard = new WinFormsTestGuard();
-            using var fixture = new ReceiptFixture("Draft");
-            using var host = Show(fixture.Control);
-            fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
-            AccessibleDescendants(fixture.Control.ReceiptGrid.AccessibilityObject)
-                .Single(item => item.Role == AccessibleRole.PushButton && item.Name == "Open GR0000000041").DoDefaultAction();
-            Assert.True(fixture.Control.LastOperation.Wait(TimeSpan.FromSeconds(3)));
-            fixture.Control.LastOperation.GetAwaiter().GetResult();
-            AccessibleDescendants(fixture.Control.LineGrid.AccessibilityObject)
-                .Single(item => item.Role == AccessibleRole.PushButton && item.Name == "Open P7 - Product").DoDefaultAction();
-            var number = fixture.Control.QuantityEditor.AccessibilityObject;
-            number.Value = 3.125m.ToString("F4");
-            Assert.Equal(3.125m, fixture.Control.QuantityEditor.Value);
-            Assert.Equal(3.125m, fixture.Editor.Lines[0].Quantity);
-            Assert.Equal(3.125m.ToString("F4"), number.Value);
-            Assert.Throws<ArgumentOutOfRangeException>(() => number.Value = "-1");
-            Assert.Throws<ArgumentOutOfRangeException>(() => number.Value = 1.12345m.ToString());
-            Assert.Equal(3.125m, fixture.Control.QuantityEditor.Value);
-            fixture.Control.QuantityEditor.Enabled = false;
-            Assert.Throws<InvalidOperationException>(() => number.Value = "4");
-            Assert.Equal(3.125m, fixture.Control.QuantityEditor.Value);
-            fixture.Control.QuantityEditor.Enabled = true;
+            using var number = new AccessibleNumericBox { DecimalPlaces = 4, Minimum = 0, Maximum = 100 };
+            var accessible = number.AccessibilityObject;
+            accessible.Value = 3.125m.ToString("F4");
+            Assert.Equal(3.125m, number.Value);
+            Assert.Equal(3.125m.ToString("F4"), accessible.Value);
+            Assert.Throws<ArgumentOutOfRangeException>(() => accessible.Value = "-1");
+            Assert.Throws<ArgumentOutOfRangeException>(() => accessible.Value = 1.12345m.ToString());
+            Assert.Equal(3.125m, number.Value);
+            number.Enabled = false;
+            Assert.Throws<InvalidOperationException>(() => accessible.Value = "4");
+            Assert.Equal(3.125m, number.Value);
             Assert.Empty(guard.Exceptions);
         }, TimeSpan.FromSeconds(10));
     }
@@ -260,10 +241,21 @@ public sealed class InventoryAccessibilityAcceptanceTests
                 TabBetween(fixture.Control.WarehouseFilterLookup, fixture.Control.StatusFilter);
                 TabBetween(fixture.Control.WarehouseLookup, fixture.Control.EmployeeLookup);
                 TabBetween(fixture.Control.EmployeeLookup, fixture.Control.NoteEditor);
-                TabBetween(fixture.Control.QuantityEditor, fixture.Control.UnitCostEditor);
+                var position = new SourceGrid.Position(1, 2);
+                fixture.Control.LineGrid.Focus();
+                fixture.Control.LineGrid.Selection.Focus(position, true);
+                var context = new SourceGrid.CellContext(fixture.Control.LineGrid, position);
+                context.StartEdit();
+                Assert.True(context.IsEditing());
+                Assert.True(fixture.Control.QuantityEditor.ContainsFocus);
+                GoodsReceiptInlineEditorTests.Key(Keys.Tab);
+                Assert.Equal(new SourceGrid.Position(1, 3), fixture.Control.LineGrid.Selection.ActivePosition);
+
                 Named(fixture.Control.ReceiptDateEditor, "Receipt date");
-                Named(fixture.Control.QuantityEditor, "Quantity");
-                Named(fixture.Control.UnitCostEditor, "Unit cost");
+                Named(fixture.Control.QuantityEditor, "Quantity row 1 editor");
+                GoodsReceiptInlineEditorTests.Key(Keys.F2);
+                Assert.True(fixture.Control.UnitCostEditor.ContainsFocus);
+                Named(fixture.Control.UnitCostEditor, "Unit cost row 1 editor");
                 AssertVisibleLayout(fixture.Control.ReceiptGrid);
                 AssertVisibleLayout(fixture.Control.LineGrid);
                 AssertVisibleLayout(fixture.Control.SaveButton);
@@ -335,16 +327,15 @@ public sealed class InventoryAccessibilityAcceptanceTests
 
     private static void TabBetween(Control first, Control second)
     {
-        Assert.Same(first.Parent, second.Parent);
         Assert.True(first.TabStop);
         Assert.True(second.TabStop);
         first.Select();
         Assert.True(first.ContainsFocus, "First control must receive actual native focus.");
         Assert.NotNull(first.Parent);
         // Native tab selection uses the siblings' TabIndex/TabStop and skips static labels.
-        Assert.True(first.Parent!.SelectNextControl(first, true, true, false, false));
+        GoodsReceiptInlineEditorTests.Key(Keys.Tab);
         Assert.True(second.ContainsFocus, "Forward tab must focus the next logical input.");
-        Assert.True(second.Parent!.SelectNextControl(second, false, true, false, false));
+        InlineReceiptTestDriver.ShiftTab();
         Assert.True(first.ContainsFocus, "Backward tab must return to the previous logical input.");
     }
 

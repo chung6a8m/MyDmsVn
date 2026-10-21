@@ -30,6 +30,7 @@ namespace MyDmsVn.Desktop.Application
         private bool _requiresPostOutcomeReload;
         private long? _uncertainPostReceiptId;
         private bool _disposed;
+        private long _documentGeneration;
 
         public GoodsReceiptEditorViewModel(
             IGoodsReceiptApiClient apiClient,
@@ -162,6 +163,7 @@ namespace MyDmsVn.Desktop.Application
         public void Load(GoodsReceiptDto? receipt)
         {
             ThrowIfDisposed();
+            Interlocked.Increment(ref _documentGeneration);
             _isApplyingReceipt = true;
             try
             {
@@ -282,6 +284,7 @@ namespace MyDmsVn.Desktop.Application
 
         public async Task<bool> RefreshAsync(CancellationToken cancellationToken)
         {
+            var document = new DocumentDispatch(this);
             ThrowIfDisposed();
             var receiptId = _uncertainPostReceiptId ?? Id;
             if (!receiptId.HasValue)
@@ -318,7 +321,7 @@ namespace MyDmsVn.Desktop.Application
 
                     try
                     {
-                        await _dispatcher.InvokeAsync(
+                        await document.InvokeAsync(
                             () =>
                             {
                                 if (!_disposed)
@@ -334,7 +337,7 @@ namespace MyDmsVn.Desktop.Application
                     return false;
                 }
 
-                if (lifetimeToken.IsCancellationRequested)
+                if (lifetimeToken.IsCancellationRequested || !document.IsCurrent)
                 {
                     return false;
                 }
@@ -342,7 +345,7 @@ namespace MyDmsVn.Desktop.Application
                 var applied = false;
                 try
                 {
-                    await _dispatcher.InvokeAsync(
+                    await document.InvokeAsync(
                         () =>
                         {
                             if (_disposed)
@@ -445,6 +448,7 @@ namespace MyDmsVn.Desktop.Application
             CancellationToken cancellationToken,
             CancellationToken lifetimeToken)
         {
+            var document = new DocumentDispatch(this);
             if (!Id.HasValue ||
                 string.IsNullOrWhiteSpace(Version) ||
                 IsReadOnly ||
@@ -465,7 +469,7 @@ namespace MyDmsVn.Desktop.Application
             {
                 if (!lifetimeToken.IsCancellationRequested)
                 {
-                    await _dispatcher.InvokeAsync(
+                    await document.InvokeAsync(
                         () => RequirePostOutcomeReload(receiptId),
                         lifetimeToken).ConfigureAwait(false);
                 }
@@ -473,7 +477,7 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (Exception exception)
             {
-                await _dispatcher.InvokeAsync(
+                await document.InvokeAsync(
                     () =>
                     {
                         RequirePostOutcomeReload(receiptId);
@@ -484,9 +488,10 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
+            if (!document.IsCurrent) return false;
             if (!response.IsSuccess)
             {
-                await _dispatcher.InvokeAsync(
+                await document.InvokeAsync(
                     () =>
                     {
                         var error = response.Error!;
@@ -501,7 +506,7 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
-            await _dispatcher.InvokeAsync(
+            await document.InvokeAsync(
                 () =>
                 {
                     Status = response.Data!.Status;
@@ -509,9 +514,10 @@ namespace MyDmsVn.Desktop.Application
                 },
                 lifetimeToken).ConfigureAwait(false);
 
+            if (!document.IsCurrent) return false;
             if (cancellationToken.IsCancellationRequested)
             {
-                await PublishPostedWithoutRefreshAsync(lifetimeToken).ConfigureAwait(false);
+                await document.InvokeAsync(() => PublishPostedWithoutRefresh(), lifetimeToken).ConfigureAwait(false);
                 return true;
             }
 
@@ -524,12 +530,12 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                await PublishPostedWithoutRefreshAsync(lifetimeToken).ConfigureAwait(false);
+                await document.InvokeAsync(() => PublishPostedWithoutRefresh(), lifetimeToken).ConfigureAwait(false);
                 return true;
             }
             catch (Exception exception)
             {
-                await _dispatcher.InvokeAsync(
+                await document.InvokeAsync(
                     () =>
                     {
                         ApplyUnexpectedError(exception);
@@ -541,9 +547,10 @@ namespace MyDmsVn.Desktop.Application
                 return true;
             }
 
+            if (!document.IsCurrent) return false;
             if (!refresh.IsSuccess)
             {
-                await _dispatcher.InvokeAsync(
+                await document.InvokeAsync(
                     () =>
                     {
                         ApplyApiError(refresh.Error!);
@@ -555,22 +562,21 @@ namespace MyDmsVn.Desktop.Application
                 return true;
             }
 
-            await _dispatcher.InvokeAsync(
+            var loaded = false;
+            await document.InvokeAsync(
                 () =>
                 {
                     Load(refresh.Data);
+                    loaded = true;
                     PublishNotification(DesktopNotificationKind.Success, "Goods receipt posted.");
                 },
                 lifetimeToken).ConfigureAwait(false);
-            return true;
+            return loaded;
         }
 
-        private Task PublishPostedWithoutRefreshAsync(CancellationToken cancellationToken) =>
-            _dispatcher.InvokeAsync(
-                () => PublishNotification(
-                    DesktopNotificationKind.Warning,
-                    "Goods receipt was posted, but its latest details were not refreshed because the operation was canceled."),
-                cancellationToken);
+        private void PublishPostedWithoutRefresh() =>
+            PublishNotification(DesktopNotificationKind.Warning,
+                "Goods receipt was posted, but its latest details were not refreshed because the operation was canceled.");
 
         private void RequirePostOutcomeReload(long receiptId)
         {
@@ -582,6 +588,7 @@ namespace MyDmsVn.Desktop.Application
             CancellationToken cancellationToken,
             CancellationToken lifetimeToken)
         {
+            var document = new DocumentDispatch(this);
             if (IsReadOnly || !ValidateForSave())
             {
                 return false;
@@ -625,15 +632,16 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (Exception exception)
             {
-                await _dispatcher.InvokeAsync(
+                await document.InvokeAsync(
                     () => ApplyUnexpectedError(exception),
                     lifetimeToken).ConfigureAwait(false);
                 return false;
             }
 
+            if (!document.IsCurrent) return false;
             if (!response.IsSuccess)
             {
-                await _dispatcher.InvokeAsync(
+                await document.InvokeAsync(
                     () => ApplyApiError(response.Error!),
                     cancellationToken).ConfigureAwait(false);
                 return false;
@@ -641,7 +649,7 @@ namespace MyDmsVn.Desktop.Application
 
             var persisted = response.Data!;
             var identityApplied = false;
-            await _dispatcher.InvokeAsync(
+            await document.InvokeAsync(
                 () =>
                 {
                     if (_disposed)
@@ -659,9 +667,10 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
+            if (!document.IsCurrent) return false;
             if (cancellationToken.IsCancellationRequested)
             {
-                await PublishSavedWithoutRefreshAsync(lifetimeToken).ConfigureAwait(false);
+                await document.InvokeAsync(() => PublishSavedWithoutRefresh(), lifetimeToken).ConfigureAwait(false);
                 return true;
             }
 
@@ -674,12 +683,12 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                await PublishSavedWithoutRefreshAsync(lifetimeToken).ConfigureAwait(false);
+                await document.InvokeAsync(() => PublishSavedWithoutRefresh(), lifetimeToken).ConfigureAwait(false);
                 return true;
             }
             catch (Exception exception)
             {
-                await _dispatcher.InvokeAsync(
+                await document.InvokeAsync(
                     () =>
                     {
                         ApplyUnexpectedError(exception);
@@ -691,9 +700,10 @@ namespace MyDmsVn.Desktop.Application
                 return true;
             }
 
+            if (!document.IsCurrent) return false;
             if (!refresh.IsSuccess)
             {
-                await _dispatcher.InvokeAsync(
+                await document.InvokeAsync(
                     () =>
                     {
                         ApplyApiError(refresh.Error!);
@@ -705,22 +715,37 @@ namespace MyDmsVn.Desktop.Application
                 return true;
             }
 
-            await _dispatcher.InvokeAsync(
+            var loaded = false;
+            await document.InvokeAsync(
                 () =>
                 {
                     Load(refresh.Data);
+                    loaded = true;
                     PublishNotification(DesktopNotificationKind.Success, "Goods receipt saved.");
                 },
                 lifetimeToken).ConfigureAwait(false);
-            return true;
+            return loaded;
         }
 
-        private Task PublishSavedWithoutRefreshAsync(CancellationToken cancellationToken) =>
-            _dispatcher.InvokeAsync(
-                () => PublishNotification(
-                    DesktopNotificationKind.Warning,
-                    "Goods receipt was saved, but its latest details were not refreshed because the operation was canceled."),
-                cancellationToken);
+        private void PublishSavedWithoutRefresh() =>
+            PublishNotification(DesktopNotificationKind.Warning,
+                "Goods receipt was saved, but its latest details were not refreshed because the operation was canceled.");
+
+        // A caller may deliberately replace the document while a provider ignores cancellation.
+        // Recheck inside the dispatcher, not only before queueing work on the UI thread.
+        private sealed class DocumentDispatch
+        {
+            private readonly GoodsReceiptEditorViewModel _owner;
+            private readonly long _generation;
+            internal DocumentDispatch(GoodsReceiptEditorViewModel owner)
+            {
+                _owner = owner;
+                _generation = Interlocked.Read(ref owner._documentGeneration);
+            }
+            internal bool IsCurrent => !_owner._disposed && _generation == Interlocked.Read(ref _owner._documentGeneration);
+            internal Task InvokeAsync(Action action, CancellationToken token) =>
+                _owner._dispatcher.InvokeAsync(() => { if (IsCurrent) action(); }, token);
+        }
 
         private void ApplyPersistedIdentity(GoodsReceiptDto receipt)
         {

@@ -1,9 +1,9 @@
 # Business Compact UI and inline Goods Receipt design
 
-**Direction:** approved for planning; implementation is planned, not implemented or accepted by this document.
+**Direction:** approved; frozen Business Compact UI acceptance is COMPLETE / OWNER ACCEPTED on 2026-10-21. The acceptance ledger records the completed T00 proof, T01 scalar parser, T02 projection/session foundation, T03 control-integration and T04 editable native-accessibility scopes. T04 includes a focused clean-package probe; T05 compact layout has hosted native 100%/125% evidence ([record](BUSINESS_COMPACT_ACCEPTANCE.md#86-bci-t05-business-compact-layout--2026-10-20)). T06 completes frozen UI/package acceptance; [final signed scope](BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21) records the accepted candidate and limitations. Operational release prerequisites remain unaccepted/unscheduled.
 **Plan:** [BCI execution plan](plans/20261020-001-business-compact-inline-goods-receipt.md).
 **Acceptance:** [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md).
-**Source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).
+**Planning source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).
 This specification introduces no runtime PASS, completed implementation task, or production-release approval.
 Historical GUI-P5 evidence retains its original candidate, scope, signatures, and exceptions.
 
@@ -22,7 +22,7 @@ The visual proposal is a layout reference, not an additional business contract o
 - Keep existing English UI copy unless a separate localization change defines its labels and acceptance scope.
   Vietnamese text in the conceptual proposal does not authorize wholesale localization.
 
-## 2. Verified starting point
+## 2. Verified planning starting point
 
 The application [project graph][app-project] references BootstrapSourceGrid through the pinned submodule.
 The integration [project graph][integration-project] references both pinned vendors; BCI does not silently advance these pins.
@@ -33,8 +33,8 @@ The integration [project graph][integration-project] references both pinned vend
 | MyDmsVn.Bootstrap5WinFormUI | `aba102e33c48937fd92468791c287afda0a59e77` |
 | SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944` |
 
-Current Goods Receipt lines are [plain cells][app-lines], with product/quantity/unit-cost controls in a [panel below the grid][app-line-panel].
-The application accessibility bridge deliberately exposes read-only cells plus an Open row action. [Source][action-grid]
+At the planning baseline, Goods Receipt lines were plain cells, with product/quantity/unit-cost controls in a panel below the grid. T03 has replaced those paths in [GoodsReceiptControl][app-lines] with the adapter; see [current integration evidence](BUSINESS_COMPACT_ACCEPTANCE.md#84-bci-t03-lookup-and-command-integration--2026-10-20).
+The retained result-list accessibility bridge exposes read-only cells plus an Open row action; the line grid has the T04 writable provider and T05 physical screen bounds conversion. [Source][action-grid]
 The integration already supplies real lookup and formatted-text editor adapters; their construction and ownership are reusable. [Source][editor-registry]
 The current accessible numeric wrapper derives from BootstrapNumericBox, not BootstrapFormattedTextBox. [Source][accessible-number]
 These facts justify an application integration task; they do not establish that inline editing or its accessibility is already complete.
@@ -84,10 +84,10 @@ Insufficient space must produce reachable scrolling/reflow, not hidden Save/Post
 
 ## 5. Application-owned integration
 
-The following names and members are **proposed new application code**, not APIs available in a vendor today.
+T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField` with scalar tests; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#82-bci-t01-lossless-scalar-conversion--2026-10-20). T02 implements `GoodsReceiptLinesGrid`, its adapter and `ReceiptEditIntent` as a tested foundation; see [evidence](BUSINESS_COMPACT_ACCEPTANCE.md#83-bci-t02-stable-projection-and-cell-sessions--2026-10-20). T03 now wires these internal seams into GoodsReceiptControl and removes the external line panel; [focused evidence](BUSINESS_COMPACT_ACCEPTANCE.md#84-bci-t03-lookup-and-command-integration--2026-10-20). T04 supplies writable accessibility. T05 implements BusinessCompactAppearance, BusinessCompactNavigation and ReceiptNumberEditor with explicit ownership; the numeric adapter preserves None-mode raw conversion and keyboard behavior while aligning its protected native input. None is a vendor API; pins are unchanged.
 Keep this integration in Desktop.WinForms; do not move grid/control dependencies into Domain or Application.
 
-| Proposed element | Responsibility |
+| App-owned element | Intended responsibility (scope above governs implementation status) |
 |---|---|
 | `GoodsReceiptLinesGrid` | App-specific editable accessible grid; cell/editor identity, state, and meaningful actions |
 | `GoodsReceiptLinesGridAdapter` | Project line models into cells; own edit sessions, event wiring, and registry/editor lifetime |
@@ -95,8 +95,8 @@ Keep this integration in Desktop.WinForms; do not move grid/control dependencies
 | `ReceiptNumericField` | `Quantity`, `UnitCost` |
 | `ReceiptEditIntent` | `Save`, `Post`, `SelectReceipt`, `NewReceipt`, `Refresh`, `AddLine`, `RemoveLine` |
 
-Proposed adapter construction: `(GoodsReceiptLinesGrid grid, GoodsReceiptEditorViewModel editor, Func<bool> canEdit)`.
-Proposed methods: `TryFinishEdit(ReceiptEditIntent intent): bool`, `CancelActiveEdit(): void`,
+T02 adapter construction: `(GoodsReceiptLinesGrid grid, GoodsReceiptEditorViewModel editor, Func<bool> canEdit)`.
+T02 methods: `TryFinishEdit(ReceiptEditIntent intent): bool`, `CancelActiveEdit(): void`,
 `ResetDocument(IReadOnlyList<GoodsReceiptLineViewModel> lines): void`, `RefreshEditability(): void`, and `Dispose()`.
 `TryFinishEdit` applies the command policy below; it is not an unconditional commit operation.
 The grid remains caller-owned; disposing the adapter must not dispose a caller-owned grid.
@@ -151,7 +151,7 @@ Use the existing SourceGrid conversion event/validator boundary to reject the ca
 Set range/null configuration and application conversion rules explicitly; do not depend on a numeric editor's implicit defaults.
 A custom `IInputFormatter` is an app-only alternative only when its Format/Unformat round trip preserves candidate information.
 The existing adapter's decimal-separator bridge runs only for Numeral mode; None/Custom raw text passes through unchanged. [Source][formatted-adapter]
-Therefore the proposed parser and editor must agree on the captured raw-text culture; no vendor culture patch is assumed.
+Therefore the scalar parser and planned editor integration must agree on the captured raw-text culture; no vendor culture patch is assumed.
 Validate `vi-VN` and `en-US`, zero padding, wrong/group separators, paste, overflow, and meaningful digits beyond decimal precision.
 
 ## 8. Keyboard and command semantics

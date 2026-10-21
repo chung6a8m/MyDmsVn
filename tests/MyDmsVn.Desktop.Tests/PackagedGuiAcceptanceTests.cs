@@ -112,11 +112,66 @@ public sealed class PackagedGuiAcceptanceTests
             var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("INLINE_RECEIPT_NATIVE_EDIT=PASS", result.StandardOutput);
             Assert.Contains("RECEIPT_POST_STOCK=PASS", result.StandardOutput);
             Assert.Contains("SERVER_DUPLICATE_POST_REJECTED=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
             await fixture.AssertPostedReceiptAsync();
+        });
+    }
+
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
+    public async Task Packaged_inline_receipt_flow_reconciles_with_readonly_sql(string theme)
+    {
+        var package = Candidate();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            await fixture.SeedReceiptWriterAsync();
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var barrier = Path.Combine(Path.GetTempPath(), "MyDmsVn.GuiBarrier-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(barrier);
+            using var cancellation = new CancellationTokenSource();
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-deny " + theme);
+            fixture.ConfigureRuntime(start);
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_ACTOR_PASSWORD"] = fixture.ActorPassword;
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
+            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3), cancellation.Token);
+            GuiProcessResult? result = null;
+            Exception? initial = null;
+            try
+            {
+                await WaitForSignalAsync(barrier, "receipt-deny-ready", execution, TimeSpan.FromSeconds(110));
+                await fixture.DenyReceiptWriteAsync();
+                File.WriteAllText(Path.Combine(barrier, "allow-denied-save"), "release");
+                await WaitForSignalAsync(barrier, "receipt-denied", execution, TimeSpan.FromSeconds(25));
+                await fixture.AssertReceiptDeniedAndRestoreWriteAsync();
+                _output.WriteLine("RECEIPT_DENIED_SQL_STATE_AND_ROWVERSION_UNCHANGED=PASS");
+                File.WriteAllText(Path.Combine(barrier, "allow-explicit-save"), "release");
+                result = await execution;
+            }
+            catch (Exception error) { initial = error; }
+            finally
+            {
+                if (!execution.IsCompleted) cancellation.Cancel();
+                try { await execution; }
+                catch (Exception error) { if (!ReferenceEquals(initial, error)) initial = initial == null ? error : new AggregateException(initial, error); }
+                foreach (var name in new[] { "receipt-deny-ready", "allow-denied-save", "receipt-denied", "allow-explicit-save" }) File.Delete(Path.Combine(barrier, name));
+                Directory.Delete(barrier);
+            }
+            if (initial != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(initial).Throw();
+            _output.WriteLine(result!.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("ORDINARY_RECEIPT_ACTOR_LOGIN=PASS", result.StandardOutput);
+            Assert.Contains("INLINE_RECEIPT_DIRECT_DENY_INPUT_RETAINED=PASS", result.StandardOutput);
+            Assert.Contains("INLINE_RECEIPT_EXPLICIT_SAVE_AFTER_REGRANT=PASS", result.StandardOutput);
+            Assert.Contains("INLINE_RECEIPT_ACTOR_POST=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertPostedReceiptAsync("GUI.BCI.RECEIPT.WRITER");
+            _output.WriteLine("INLINE_RECEIPT_READONLY_SQL_RECONCILED=PASS");
         });
     }
 
@@ -279,6 +334,8 @@ public sealed class PackagedGuiAcceptanceTests
             if (initial != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(initial).Throw();
             _output.WriteLine(result!.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("RECOVERY_NATIVE_TAB_REACHES_REFRESH=PASS", result.StandardOutput);
+            Assert.Contains("RECOVERY_NATIVE_ENTER_SENT=PASS", result.StandardOutput);
             Assert.Contains("UNCERTAIN_POST_RELOAD_EXPLICIT_RETRY=PASS", result.StandardOutput);
             Assert.Contains("FAULT_REMOVED_STARTUP_REVALIDATED=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);

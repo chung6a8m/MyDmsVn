@@ -1,16 +1,16 @@
 # Execution roadmap — v1a-pro
 
-**Updated:** 2026-10-20. This index is the sole execution queue. The owner selected Business Compact and true inline Goods Receipt editing, and requested removal of every older unimplemented plan. The three completed plans below remain evidence, not active work.
+**Updated:** 2026-10-21. This index is the sole execution queue. The owner selected Business Compact and true inline Goods Receipt editing, and requested removal of every older unimplemented plan. The three completed plans below remain evidence, not active work.
 
-## Active plan
+## Selected roadmap — completed
 
 | Order | Plan | State | Next action |
 |---:|---|---|---|
-| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **ACTIVE / PLANNED**; BCI-T00–T06 are all unexecuted | BCI-T00: prove the pinned SourceGrid editor, keyboard and native accessibility path |
+| 1 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | **COMPLETE / OWNER ACCEPTED — 2026-10-21**; BCI-T00–T06 complete within the final signed UI scope | Review/integrate PR #40 into `v1a-pro`; no new roadmap selected; [current evidence](../BUSINESS_COMPACT_ACCEPTANCE.md#87-bci-t06-frozen-integrated-ui-acceptance--2026-10-20) |
 
 Read [BUSINESS_COMPACT_UI](../BUSINESS_COMPACT_UI.md) for the design and [BUSINESS_COMPACT_ACCEPTANCE](../BUSINESS_COMPACT_ACCEPTANCE.md) for required observable outcomes. Supporting specifications are not independent plans. Execute BCI-T00 → T01 → T02 → T03 → T04 → T05 → T06; preparation or parallel work must respect the interfaces and dependencies recorded in that plan.
 
-Creating these documents implements no product feature and supplies no new runtime PASS. The owner-approved direction is documented; actual code, tests, packaged evidence and acceptance remain to be delivered.
+The planning documents implement no product feature. T00 now supplies the scoped native editor proof recorded in the acceptance ledger; T01 supplies the scalar numeric parser; T02 supplies the stable grid/session foundation; T03 integrates lookup and commands into the actual receipt control. T04 supplies editable cell accessibility, real native editor reachability and a focused clean-package probe. T05 supplies compact layout and hosted native 100%/125% measurements; [evidence](../BUSINESS_COMPACT_ACCEPTANCE.md#86-bci-t05-business-compact-layout--2026-10-20). T06 completes the frozen UI/package acceptance in its [final signed scope](../BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21); operational release prerequisites remain unaccepted/unscheduled.
 
 ## Completed baselines — retain, do not restart
 
