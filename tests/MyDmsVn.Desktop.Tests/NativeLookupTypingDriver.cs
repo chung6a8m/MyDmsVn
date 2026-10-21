@@ -16,8 +16,11 @@ internal sealed class NativeLookupTypingDriver
     internal NativeLookupTypingDriver(BootstrapLookupBox lookup)
     {
         _lookup = lookup;
-        lookup.Select();
-        lookup.Focus();
+        if (!lookup.ContainsFocus)
+        {
+            lookup.Select();
+            lookup.Focus();
+        }
         System.Windows.Forms.Application.DoEvents();
         AssertFocused();
         _edit = FocusedHandle;

@@ -74,6 +74,7 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
             Assert.False(Control.WarehouseFilterLookup.HasPendingText);
             Assert.False(Control.WarehouseLookup.HasPendingText);
             Assert.False(Control.EmployeeLookup.HasPendingText);
+            if (target == "WarehouseFilterLookup") Assert.True(Control.TryShowReceiptList());
             Lookup = target == "WarehouseFilterLookup" ? Control.WarehouseFilterLookup :
                 target == "WarehouseLookup" ? Control.WarehouseLookup : Control.EmployeeLookup;
             Source = target == "EmployeeLookup" ? _employee : _warehouse;
@@ -104,6 +105,7 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
     internal ControlledSource Source { get; }
     internal ControlledSource WarehouseSource => _warehouse;
     internal ControlledSource EmployeeSource => _employee;
+    internal ControlledSource ProductSource => _product;
     internal CatalogLookupViewModel LookupViewModel => Target == "EmployeeLookup" ? Editor.EmployeeLookup : Editor.WarehouseLookup;
     internal CancellationToken Token => _token;
     internal int DelayCount => _delay.Count;

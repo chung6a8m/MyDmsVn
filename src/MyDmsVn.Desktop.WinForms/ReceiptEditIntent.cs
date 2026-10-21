@@ -1,3 +1,3 @@
 ﻿namespace MyDmsVn.Desktop.WinForms;
 
-internal enum ReceiptEditIntent { Save, Post, SelectReceipt, NewReceipt, Refresh, AddLine, RemoveLine }
+internal enum ReceiptEditIntent { Save, Post, SelectReceipt, NewReceipt, Refresh, AddLine, RemoveLine, ReturnToList }

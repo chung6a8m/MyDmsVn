@@ -434,6 +434,7 @@ public sealed partial class ReceiptAcceptanceTests
                 host.Controls.Add(control);
                 host.Show();
                 Load(control, token);
+                Assert.True(control.TryShowReceiptList());
                 host.PerformLayout();
                 System.Windows.Forms.Application.DoEvents();
                 Assert.True(control.SearchBox.Width >= 100, "Receipt search width=" + control.SearchBox.Width);

@@ -534,6 +534,129 @@ public sealed class GoodsReceiptLookupBindingTests : IClassFixture<LookupGateEnv
         Assert.Equal(0, fixture.Api.PostCalls);
     });
 
+    [Theory]
+    [InlineData("WarehouseLookup")]
+    [InlineData("EmployeeLookup")]
+    public void Allowed_query_only_back_cancels_requests_without_committing(string target) => Run(target, fixture =>
+    {
+        var old = fixture.Type('g');
+        var response = fixture.AdmitSearch(0);
+        Assert.True(fixture.Control.TryShowReceiptList());
+        Assert.Equal("List", fixture.Control.WorkspaceMode.ToString());
+        fixture.Source.Complete(response, new CatalogLookupDto(98, "STALE", "Old detail result", true));
+        fixture.Wait(old);
+        Assert.DoesNotContain(fixture.LookupViewModel.Items, option => option.Id == 98);
+        Assert.False(fixture.Lookup.HasPendingText);
+        AssertIds(fixture, 3, 5, null, false);
+        var reads = fixture.Api.GetCalls;
+        fixture.Control.OpenCurrentReceiptButton.PerformClick();
+        Assert.Equal("Detail", fixture.Control.WorkspaceMode.ToString());
+        Assert.Equal(reads, fixture.Api.GetCalls);
+    });
+
+    [Theory]
+    [InlineData("WarehouseLookup")]
+    [InlineData("EmployeeLookup")]
+    public void Back_click_with_non_first_highlight_preserves_native_range_when_rejected(string target) => Run(target, fixture =>
+    {
+        fixture.Editor.Note = "unsaved";
+        fixture.TypeText("gui");
+        fixture.Driver.Key(Keys.F4);
+        fixture.Driver.Key(Keys.Home);
+        fixture.Driver.Key(Keys.Down);
+        Assert.NotEqual(fixture.Lookup.SelectedValue, Assert.IsType<CatalogLookupOption>(fixture.Lookup.HighlightedItem).Id);
+        fixture.Driver.SelectRange(1, 1);
+        InlineReceiptTestDriver.MouseDown(fixture.Control.BackToReceiptsButton);
+        InlineReceiptTestDriver.MouseUp(fixture.Control.BackToReceiptsButton);
+        Pending(fixture, "gui", 1, 1);
+        Assert.Equal("Detail", fixture.Control.WorkspaceMode.ToString());
+        AssertIds(fixture, 3, 5, null, true);
+    });
+
+    [Fact]
+    public void Back_rejects_busy_and_uncertain_post_and_does_not_restore_denied_rows() => Run("WarehouseLookup", fixture =>
+    {
+        fixture.Api.HoldList = true;
+        var load = fixture.Track(fixture.List.RefreshAsync(fixture.Token));
+        Assert.False(fixture.Control.TryShowReceiptList());
+        Assert.Equal("Detail", fixture.Control.WorkspaceMode.ToString());
+        fixture.Api.HoldList = false;
+        fixture.Api.ReleaseList(); fixture.Wait(load);
+        fixture.WarehouseSource.Hold = fixture.EmployeeSource.Hold = false;
+        fixture.Wait(fixture.Track(fixture.Editor.PostAsync(fixture.Token)));
+        Assert.True(fixture.Editor.RequiresPostOutcomeReload);
+        Assert.False(fixture.Control.TryShowReceiptList());
+        fixture.Api.DenyList = true;
+        fixture.Wait(fixture.Track(fixture.Control.ActivateAsync(fixture.Token)));
+        Assert.False(fixture.Control.TryShowReceiptList()); // Uncertain Post lock survives denial.
+        Assert.Equal(1, fixture.Control.ReceiptGrid.RowsCount);
+        Assert.False(fixture.Control.OpenCurrentReceiptButton.Visible);
+    });
+
+    [Fact]
+    public void Clean_denied_list_back_cannot_restore_cached_receipt() => Run("WarehouseLookup", fixture =>
+    {
+        fixture.WarehouseSource.Hold = fixture.EmployeeSource.Hold = false;
+        fixture.Api.DenyList = true;
+        fixture.Wait(fixture.Track(fixture.Control.ActivateAsync(fixture.Token)));
+        Assert.True(fixture.Control.TryShowReceiptList());
+        Assert.Equal(1, fixture.Control.ReceiptGrid.RowsCount);
+        Assert.Empty(fixture.Editor.Lines);
+        Assert.Null(fixture.Editor.Id);
+        Assert.False(fixture.Control.OpenCurrentReceiptButton.Visible);
+    });
+
+    [Fact]
+    public void Allowed_product_query_only_back_cancels_late_response_without_reloading_document() => Run("WarehouseLookup", fixture =>
+    {
+        fixture.Editor.Load(GoodsReceiptLookupFixture.ReceiptClient.Receipt(line: true));
+        var line = fixture.Editor.Lines[0];
+        var grid = fixture.Control.LineGrid;
+        grid.Focus(); grid.Selection.Focus(new SourceGrid.Position(1, 1), true);
+        GoodsReceiptInlineEditorTests.Key(Keys.F2);
+        var driver = new NativeLookupTypingDriver(fixture.Control.ProductLookup);
+        fixture.ProductSource.Hold = true;
+        driver.SelectRange(0, driver.Text.Length);
+        var pending = fixture.Type(driver, 'g');
+        fixture.CompleteDelay(0);
+        fixture.PumpUntil(() => fixture.ProductSource.Count > 0, "Product query admission");
+        Assert.True(fixture.Control.TryShowReceiptList());
+        fixture.ProductSource.Complete(0, new CatalogLookupDto(98, "STALE", "Old Product query", true));
+        fixture.Wait(pending);
+        Assert.DoesNotContain(fixture.Editor.ProductOptions.Items, option => option.Id == 98);
+        Assert.Equal(7, line.ProductId);
+        Assert.False(fixture.Editor.IsDirty);
+        var reads = fixture.Api.GetCalls;
+        fixture.Wait(fixture.Track(fixture.Control.SelectReceiptAsync(41, fixture.Token)));
+        Assert.Same(line, fixture.Editor.Lines[0]);
+        Assert.Equal(reads, fixture.Api.GetCalls);
+        Assert.False(fixture.Control.ProductLookup.HasPendingText);
+    });
+
+    [Theory]
+    [InlineData("WarehouseLookup")]
+    [InlineData("EmployeeLookup")]
+    public void Pending_header_query_survives_three_two_one_column_reflow(string target) => Run(target, fixture =>
+    {
+        fixture.TypeText("gui");
+        fixture.Driver.SelectRange(1, 1);
+        var window = fixture.Driver.FocusedHandle;
+        var metadata = Assert.Single(Descendants(fixture.Control).OfType<TableLayoutPanel>(), panel => panel.Name == "ReceiptMetadata");
+        Assert.Equal(3, metadata.ColumnCount);
+        fixture.Form.ClientSize = new Size(800, 700);
+        System.Windows.Forms.Application.DoEvents();
+        Assert.Equal(2, metadata.ColumnCount);
+        Pending(fixture, "gui", 1, 1);
+        fixture.Form.ClientSize = new Size(480, 700);
+        System.Windows.Forms.Application.DoEvents();
+        Assert.Equal(1, metadata.ColumnCount);
+        Pending(fixture, "gui", 1, 1);
+        Assert.Equal(window, fixture.Driver.FocusedHandle);
+        Assert.Equal(1, metadata.GetColumnSpan(fixture.Control.NoteEditor.Parent!));
+    });
+
+    private static System.Collections.Generic.IEnumerable<Control> Descendants(Control root) => root.Controls.Cast<Control>().SelectMany(control => new[] { control }.Concat(Descendants(control)));
+
     private void Run(string target, Action<GoodsReceiptLookupFixture> scenario)
     {
         StaTest.Run(token =>

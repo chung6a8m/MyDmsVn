@@ -863,6 +863,7 @@ namespace MyDmsVn.Desktop.Tests
             public ApiError? GetError { get; set; }
             public int GetCalls { get; private set; }
             public GoodsReceiptDto CurrentReceipt { get; set; } = Receipt();
+            public IReadOnlyList<GoodsReceiptDto>? ListRows { get; set; }
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
             public PostGoodsReceiptRequest? LastPost { get; private set; }
             public int CreateCalls { get; private set; }
@@ -882,7 +883,7 @@ namespace MyDmsVn.Desktop.Tests
                         ApiResponse<PagedResult<GoodsReceiptDto>>.Failure(ListError));
                 }
                 var response = ApiResponse<PagedResult<GoodsReceiptDto>>.Success(
-                    new PagedResult<GoodsReceiptDto>(new[] { CurrentReceipt }, request.PageNumber, 25, 30));
+                    new PagedResult<GoodsReceiptDto>(ListRows ?? new[] { CurrentReceipt }, request.PageNumber, 25, 30));
                 if (!ControlListResponse)
                 {
                     return Task.FromResult(response);

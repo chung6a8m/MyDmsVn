@@ -71,6 +71,7 @@ public sealed class InventoryAccessibilityAcceptanceTests
             using var fixture = new ReceiptFixture("Draft", new WaitingDelay());
             using var host = Show(fixture.Control);
             fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
+            fixture.Control.NewButton.PerformClick();
             var lookup = fixture.Control.WarehouseLookup;
             Assert.Equal("No selection", lookup.AccessibilityObject.Help);
             Assert.True(lookup.SelectValue(2));
@@ -90,6 +91,7 @@ public sealed class InventoryAccessibilityAcceptanceTests
             using var fixture = new ReceiptFixture("Draft", new WaitingDelay());
             using var host = Show(fixture.Control);
             fixture.Control.ActivateAsync(token).GetAwaiter().GetResult();
+            fixture.Control.NewButton.PerformClick();
             var lookup = fixture.Control.WarehouseLookup;
             lookup.SearchDebounceMilliseconds = 0;
             lookup.Focus();
@@ -237,8 +239,11 @@ public sealed class InventoryAccessibilityAcceptanceTests
                 host.PerformLayout();
                 System.Windows.Forms.Application.DoEvents();
 
+                Assert.True(fixture.Control.TryShowReceiptList());
                 TabBetween(fixture.Control.SearchBox, fixture.Control.WarehouseFilterLookup);
                 TabBetween(fixture.Control.WarehouseFilterLookup, fixture.Control.StatusFilter);
+                AssertVisibleLayout(fixture.Control.ReceiptGrid);
+                fixture.Control.OpenCurrentReceiptButton.PerformClick();
                 TabBetween(fixture.Control.WarehouseLookup, fixture.Control.EmployeeLookup);
                 TabBetween(fixture.Control.EmployeeLookup, fixture.Control.NoteEditor);
                 var position = new SourceGrid.Position(1, 2);
@@ -256,7 +261,7 @@ public sealed class InventoryAccessibilityAcceptanceTests
                 GoodsReceiptInlineEditorTests.Key(Keys.F2);
                 Assert.True(fixture.Control.UnitCostEditor.ContainsFocus);
                 Named(fixture.Control.UnitCostEditor, "Unit cost row 1 editor");
-                AssertVisibleLayout(fixture.Control.ReceiptGrid);
+                Assert.False(fixture.Control.ReceiptGrid.Visible);
                 AssertVisibleLayout(fixture.Control.LineGrid);
                 AssertVisibleLayout(fixture.Control.SaveButton);
                 Render(fixture.Control);
@@ -298,7 +303,9 @@ public sealed class InventoryAccessibilityAcceptanceTests
                     Assert.False(editor.Enabled);
                     Assert.False(editor.CanFocus);
                 }
+                Assert.True(fixture.Control.TryShowReceiptList());
                 TabBetween(fixture.Control.SearchBox, fixture.Control.WarehouseFilterLookup);
+                fixture.Control.OpenCurrentReceiptButton.PerformClick();
                 Assert.Equal("Posted", fixture.Control.StatusLabel.Text);
                 Assert.Equal("AQIDBAUGBwg=", fixture.Control.VersionLabel.Text);
                 Assert.Equal("10.00", fixture.Control.TotalLabel.Text);

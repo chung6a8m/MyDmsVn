@@ -116,9 +116,11 @@ namespace MyDmsVn.Desktop.WinForms
             };
 
             Controls.Add(CreateLayout());
+            Controls.Add(_workspaceCommands);
+            Controls.Add(_workspaceFooter);
             BusinessCompactAppearance.Apply(this);
             _inline.EditStateChanged += OnInlineEditStateChanged;
-            foreach (var command in new[] { NewButton, RefreshButton, SaveButton, PostButton, AddLineButton, RemoveLineButton })
+            foreach (var command in new[] { NewButton, RefreshButton, SaveButton, PostButton, AddLineButton, RemoveLineButton, BackToReceiptsButton })
                 ((ReceiptCommandButton)command).RetainEditorFocus = () =>
                     _inline.HasPendingEdit || WarehouseLookup.HasPendingText || EmployeeLookup.HasPendingText;
             SearchBox.TextChanged += OnSearchChanged;
@@ -293,6 +295,12 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             CancelEditorLookupEdits();
+            if (_editor.Id == id && !_list.IsAccessDenied && !_isAccessDeniedEditorLocked && _hasDetail)
+            {
+                ShowReceiptDetail();
+                return;
+            }
+
             var selected = await _list.SelectAsync(id, cancellationToken).ConfigureAwait(true);
             if (IsDisposed || Disposing) return;
             if (selected == null)
@@ -310,6 +318,7 @@ namespace MyDmsVn.Desktop.WinForms
             _editor.Load(selected);
             _selectedLine = _editor.Lines.FirstOrDefault();
             _inline.ResetDocument(_editor.Lines);
+            ShowReceiptDetail();
             ApplyState();
         }
 
@@ -394,6 +403,7 @@ namespace MyDmsVn.Desktop.WinForms
             _editor.Load(null);
             _selectedLine = null;
             _inline.ResetDocument(_editor.Lines);
+            ShowReceiptDetail();
             ApplyState();
         }
 
@@ -775,6 +785,7 @@ namespace MyDmsVn.Desktop.WinForms
                 AddLineButton.Enabled = canEdit;
                 RemoveLineButton.Enabled = canEdit && _selectedLine != null;
                 _inline.RefreshEditability();
+                ApplyPresentationState();
                 ApplyErrors();
             }
             finally
@@ -783,8 +794,19 @@ namespace MyDmsVn.Desktop.WinForms
             }
         }
 
+        private GoodsReceiptDto[] _receiptRows = Array.Empty<GoodsReceiptDto>();
         private void SetReceiptRows()
         {
+            var rows = _list.Items;
+            if (ReceiptGrid.RowsCount != 0 && _receiptRows.Length == rows.Count &&
+                _receiptRows.Zip(rows, (a, b) => a.Id == b.Id && a.ReceiptNumber == b.ReceiptNumber &&
+                    a.ReceiptDate == b.ReceiptDate && a.WarehouseId == b.WarehouseId && a.EmployeeId == b.EmployeeId &&
+                    a.WarehouseDisplayName == b.WarehouseDisplayName && a.EmployeeDisplayName == b.EmployeeDisplayName && a.Status == b.Status).All(equal => equal)) return;
+            var active = ReceiptGrid.Selection.ActivePosition;
+            var selectedId = active.Row > 0 && active.Row <= _receiptIds.Count ? (long?)_receiptIds[active.Row - 1] : _list.SelectedReceipt?.Id;
+            var scroll = ReceiptGrid.CustomScrollPosition;
+            ReceiptGrid.Selection.ResetSelection(false);
+            _receiptRows = rows.ToArray();
             _receiptIds = _list.Items.Select(item => item.Id).ToArray();
             ReceiptGrid.Redim(_list.Items.Count + 1, 6);
             ReceiptGrid.FixedRows = 1;
@@ -803,6 +825,8 @@ namespace MyDmsVn.Desktop.WinForms
             BusinessCompactAppearance.StyleReceiptResults(ReceiptGrid);
             ReceiptGrid.AutoSizeCells();
             BusinessCompactAppearance.StyleReceiptResults(ReceiptGrid);
+            ((ReceiptResultsGrid)ReceiptGrid).SynchronizeRow(Array.FindIndex(_receiptRows, row => row.Id == selectedId) + 1, active.Column);
+            ReceiptGrid.CustomScrollPosition = scroll;
         }
 
         private void ApplyErrors()
@@ -825,110 +849,6 @@ namespace MyDmsVn.Desktop.WinForms
         {
             control = LineGrid;
             return field.StartsWith("lines[", StringComparison.Ordinal);
-        }
-
-        private Label? _compactTitle;
-        private Control CreateLayout()
-        {
-            Padding = new Padding(16);
-            AutoScroll = true;
-            AutoScrollMinSize = new Size(676, 0);
-            var master = new Panel { Dock = DockStyle.Fill };
-            var masterBar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 8, 8) };
-            SearchBox.Dock = WarehouseFilterLookup.Dock = StatusFilter.Dock = DockStyle.None;
-            SearchBox.Width = WarehouseFilterLookup.Width = 220;
-            StatusFilter.Width = 110;
-            masterBar.Controls.AddRange(new Control[] { SearchBox, WarehouseFilterLookup, StatusFilter, RefreshButton, NewButton });
-            var paging = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true };
-            paging.Controls.AddRange(new Control[] { PreviousPageButton, PageLabel, NextPageButton });
-            master.Controls.Add(ReceiptGrid); master.Controls.Add(paging); master.Controls.Add(masterBar);
-
-            var detail = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
-            var content = new Panel { Dock = DockStyle.Fill, TabIndex = 0 };
-            var metadata = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, TabIndex = 0 };
-            metadata.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            metadata.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            var fields = new[] { CompactField("Receipt date", ReceiptDateEditor, 0), CompactField("Warehouse", WarehouseLookup, 1),
-                CompactField("Employee", EmployeeLookup, 2), CompactField("Note", NoteEditor, 3) };
-            for (var index = 0; index < fields.Length; index++) metadata.Controls.Add(fields[index], index % 2, index / 2);
-            _compactTitle = new Label { Name = "CompactHeading", Text = "Goods receipt", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 0, 0, 8) };
-            var state = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 4, 0, 8), TabStop = false };
-            state.Controls.AddRange(new Control[] { new Label { Text = "Status", AutoSize = true }, StatusLabel,
-                new Label { Text = "Version", AutoSize = true }, VersionLabel });
-            VersionLabel.Name = "CompactSecondary";
-            var header = new Panel { Dock = DockStyle.Top, TabIndex = 0 };
-            header.Controls.Add(state); header.Controls.Add(metadata); header.Controls.Add(_compactTitle);
-
-            var commands = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, TabIndex = 0 };
-            commands.Controls.AddRange(new Control[] { SaveButton, PostButton, AddLineButton, RemoveLineButton,
-                new Label { Text = "Total", AutoSize = true, Padding = new Padding(8, 8, 0, 0) }, TotalLabel, BusyIndicator });
-            var footer = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 1, TabIndex = 2, Padding = new Padding(0, 8, 0, 0) };
-            OperationStatusLabel.Name = "CompactSecondary";
-            OperationStatusLabel.Margin = new Padding(0, 4, 0, 0);
-            footer.Controls.Add(commands); footer.Controls.Add(OperationStatusLabel);
-            LineGrid.TabIndex = 1;
-            SaveButton.TabIndex = 0; PostButton.TabIndex = 1; AddLineButton.TabIndex = 2; RemoveLineButton.TabIndex = 3;
-            content.Controls.Add(LineGrid); content.Controls.Add(footer); content.Controls.Add(header);
-            detail.Controls.Add(content);
-            var layingOut = false;
-            Action layout = () =>
-            {
-                if (layingOut || detail.IsDisposed) return;
-                layingOut = true;
-                try
-                {
-                    var scale = new Func<int, int>(logical => BusinessCompactAppearance.Scale(this, logical));
-                    var availableWidth = detail.ClientSize.Width;
-                    var availableHeight = detail.ClientSize.Height;
-                    var minimumHeight = 0;
-                    for (var pass = 0; pass < 3; pass++)
-                    {
-                        var width = Math.Max(scale(400), availableWidth);
-                        var columns = width < scale(560) ? 1 : 2;
-                        metadata.SuspendLayout();
-                        metadata.ColumnCount = columns;
-                        for (var index = 0; index < fields.Length; index++)
-                        {
-                            metadata.SetCellPosition(fields[index], new TableLayoutPanelCellPosition(index % columns, index / columns));
-                            fields[index].MinimumSize = new Size(0, scale(60));
-                        }
-                        metadata.ResumeLayout();
-                        header.Width = metadata.Width = footer.Width = width;
-                        header.Height = metadata.PreferredSize.Height + _compactTitle.PreferredHeight + state.PreferredSize.Height + scale(8);
-                        OperationStatusLabel.MaximumSize = new Size(Math.Max(1, width - scale(16)), 0);
-                        minimumHeight = header.Height + footer.PreferredSize.Height + scale(200);
-                        availableHeight = detail.ClientSize.Height - (scale(400) > availableWidth ? SystemInformation.HorizontalScrollBarHeight : 0);
-                        availableWidth = detail.ClientSize.Width - (minimumHeight > availableHeight ? SystemInformation.VerticalScrollBarWidth : 0);
-                    }
-                    // Docking follows the scrollable display rectangle. Only measured minima
-                    // contribute to the virtual extent, so old viewport bounds cannot keep bars alive.
-                    content.MinimumSize = new Size(scale(400), minimumHeight);
-                    detail.AutoScrollMinSize = content.MinimumSize;
-                    detail.PerformLayout();
-                }
-                finally { layingOut = false; }
-            };
-            detail.SizeChanged += (_, __) => layout();
-            header.FontChanged += (_, __) => layout();
-            OperationStatusLabel.TextChanged += (_, __) => layout();
-            var split = new SplitContainer { Dock = DockStyle.Fill, Size = new Size(1200, 600), FixedPanel = FixedPanel.Panel1, SplitterDistance = 260, Panel1MinSize = 240, Panel2MinSize = 400, MinimumSize = new Size(644, 0) };
-            split.Panel1.Controls.Add(master); split.Panel2.Controls.Add(detail);
-            var initialized = false;
-            split.SizeChanged += (_, __) =>
-            {
-                var available = split.ClientSize.Width - split.SplitterWidth;
-                var minimum = BusinessCompactAppearance.Scale(this, 240);
-                var detailMinimum = BusinessCompactAppearance.Scale(this, 400);
-                if (available >= minimum + detailMinimum)
-                {
-                    var target = initialized ? split.SplitterDistance : BusinessCompactAppearance.Scale(this, 260);
-                    split.SplitterDistance = Math.Max(minimum, Math.Min(target, available - detailMinimum));
-                    initialized = split.IsHandleCreated;
-                }
-                layout();
-            };
-            split.HandleCreated += (_, __) => { initialized = true; layout(); };
-            return split;
         }
 
         private static Control CompactField(string caption, Control editor, int order)
