@@ -154,7 +154,9 @@ internal static class GuiPackageProbe
                 Wait(delegate { return File.Exists(Path.Combine(barrier, "release")); }, "Permission update was not released.");
                 _stage = "server-direct-deny";
                 Invoke(save); // Existing UI still grants Write; the actual server must reauthorize this request.
-                Find(shell, "The operation is not permitted.", ControlType.Text, true);
+                // The catalog inline error and shell notification both expose this
+                // text. Require the owned page's error without weakening uniqueness.
+                Find(page, "The operation is not permitted.", ControlType.Text, true);
                 if (InputValue(page, "Code") != "GUI-DENY") throw new InvalidOperationException("Denied edit was lost.");
                 CloseApplication(shell);
                 Console.WriteLine("SERVER_DIRECT_DENY=PASS");

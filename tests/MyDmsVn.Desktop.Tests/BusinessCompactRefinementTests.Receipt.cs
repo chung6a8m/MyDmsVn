@@ -33,6 +33,10 @@ public sealed partial class BusinessCompactRefinementTests
             shell.ClientSize = new Size(width, width == 1680 ? 900 : 760);
             shell.SetCurrentUser("BCF Operator");
             shell.OpenWorkspace("receipts", "Goods Receipts", receipt, shell.WorkspaceSessionVersion);
+            // Match the real navigation state as well as the retained receipt workspace.
+            var selectedNavigation = shell.Navigation.Items.Single(item => Equals(item.Tag, "goods-receipts"));
+            shell.Navigation.SelectedItem = selectedNavigation;
+            Assert.Same(selectedNavigation, shell.Navigation.SelectedItem);
             shell.Show();
             NativeLookupTypingDriver.Activate(shell);
             Assert.Equal(width, shell.ClientSize.Width); // Never call a fitted window a full-width capture.
