@@ -10,7 +10,7 @@
 
 **Spec:** [BCF design](../BUSINESS_COMPACT_REFINEMENT.md). **Acceptance:** [BCF-A01–A23](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). **References:** [three original mockups](../design-references/business-compact/README.md).
 
-**Status:** ACTIVE / PLANNED — 2026-10-21. All implementation tasks are NOT STARTED; all new runtime obligations are NOT RUN.
+**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); A01–A03 RED, no acceptance PASS. T01–T06 NOT STARTED; T02 OPEN.
 
 **Planning baseline:** `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb`, the merge of [PR #40](https://github.com/chung6a8m/MyDmsVn/pull/40). Its product tree matches reviewed head `5ac2bb592aaa947245ea27f9e53b5bc39aaa8ec1`. BCI is completed history; this is the sole active roadmap.
 
@@ -65,7 +65,7 @@ Read `CatalogLookupViewModel.cs`, `DebouncedAsyncAction.cs`, `GoodsReceiptEditor
 | `src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.Presentation.cs` | Proposed partial owning List/Detail presentation and its guarded transitions |
 | `src/MyDmsVn.Desktop.WinForms/ReceiptWorkspaceMode.cs` | Proposed `List`/`Detail` presentation enum |
 
-Names above are proposed, not shipped APIs. Keep test helpers inside the existing Desktop test project. Extract only the layout responsibilities needed to keep the current receipt control understandable; do not perform an unrelated architecture rewrite.
+The native typing driver, fixture and typing tests above are implemented at the T00 checkpoint; the other new files/APIs remain proposed. Keep test helpers inside the existing Desktop test project. Extract only the layout responsibilities needed to keep the current receipt control understandable; do not perform an unrelated architecture rewrite.
 
 ## Verification convention
 
@@ -91,11 +91,13 @@ For T00, the intended product assertions must fail and be recorded; a driver/foc
 
 **Interfaces:** proposed internal `NativeLookupTypingDriver(BootstrapLookupBox lookup)` verifies the real focused native EDIT belongs to that control; `void TypeCharacter(char value)`, `void SelectRange(int start, int length)`, `void Key(Keys key)`, and read-only `Text`, `SelectionStart`, `SelectionLength` expose observable input. Reuse existing native key/mouse primitives and bounded STA pumping. The fixture supplies controlled delay/source barriers rather than sleeping or blocking the UI dispatcher.
 
-- [ ] Add Theory cases for each of the three controls: `First_character_survives_result_and_operation_completion`, `Cancelled_preceding_search_preserves_per_key_order`, and `Rebinding_preserves_mid_string_caret_and_selected_range`.
-- [ ] Make the fixture start with null filter and selected Warehouse/Employee; queue `g`, then `u`, complete the canceled earlier operation while the latest search remains pending, then type `i`. Separately complete a response between two keys. Assert after each step; do not assign the whole query through Text/UIA.
-- [ ] Use exact success assertions such as `Assert.Equal("gui", driver.Text)`, `Assert.Equal(3, driver.SelectionStart)`, `Assert.Equal(0, driver.SelectionLength)`, plus unchanged committed ID, native focus and `HasPendingText`. For range replacement, select `u` in `gui`, type `a`, complete rebind, and assert `gai`, caret 2 and selection length 0.
-- [ ] Run the typing selector against the unmodified product baseline and retain sanitized expected-failure evidence, including failing assertion and source/test revision. Confirm the filter-clear and header-caret defects independently; the broken string need not always equal `igu`.
-- [ ] Commit the test/proof work as a reviewable T00 checkpoint; leave production code unchanged until the failure is explained. Gate status remains OPEN until T01/T02 pass.
+- [x] Add Theory cases for each of the three controls: `First_character_survives_result_and_operation_completion`, `Cancelled_preceding_search_preserves_per_key_order`, and `Rebinding_preserves_mid_string_caret_and_selected_range`.
+- [x] Make the fixture start with null filter and selected Warehouse/Employee; queue `g`, then `u`, complete the canceled earlier operation while the latest search remains pending, then type `i`. Separately complete a response between two keys. Assert after each step; do not assign the whole query through Text/UIA.
+- [x] Use exact success assertions such as `Assert.Equal("gui", driver.Text)`, `Assert.Equal(3, driver.SelectionStart)`, `Assert.Equal(0, driver.SelectionLength)`, plus unchanged committed ID, native focus and `HasPendingText`. For range replacement, select `u` in `gui`, type `a`, complete rebind, and assert `gai`, caret 2 and selection length 0.
+- [x] Run the typing selector against the unmodified product baseline and retain sanitized expected-failure evidence, including failing assertion and source/test revision. Confirm the filter-clear and header-caret defects independently; the broken string need not always equal `igu`.
+- [x] Commit the test/proof work as a reviewable T00 checkpoint; leave production code unchanged until the failure is explained. Gate status remains OPEN until T01/T02 pass.
+
+T00 checkpoint: test commits `845ca0a` and `dbd0798`; final source selects 15 Theory rows (five per target), all fail the intended product assertions with native ownership, STA mutation, guard and drain checks satisfied. [Sanitized evidence and retained invalid attempts](../evidence/bcf/20261021-t00-native-typing.md) distinguish hosted DPI 96 from OS scaling and leave the full T02 matrix uncredited.
 
 ### BCF-T01 — minimal binding repair and boundaries
 
@@ -172,4 +174,4 @@ For T00, the intended product assertions must fail and be recorded; a driver/foc
 
 ## Completion boundary
 
-The planning commit establishes this active queue, source baseline, reference images and unexecuted obligations only. It does not repair lookup behavior, implement the visual refinement, run new GUI/SQL tests or grant release acceptance. Implementation begins at T00; use [the acceptance ledger](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) for actual progress.
+The planning commit established this active queue, source baseline, reference images and unexecuted obligations only. The subsequent T00 test-only checkpoint records intended native-key RED failures; it does not repair lookup behavior, implement visual refinement or grant acceptance. Next implementation task is T01; use [the acceptance ledger](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) for actual progress.

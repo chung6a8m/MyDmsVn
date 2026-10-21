@@ -126,7 +126,7 @@ Add a real `FullyQualifiedName` filter for affected focused work; the example is
 
 BCF-T00–T01 first add deterministic native-key proof and minimally repair binding in `WarehouseFilterLookup`, `WarehouseLookup` and `EmployeeLookup`. The driver must verify the actual native EDIT HWND/focus, type individual characters and observe caret/range across controllable responses and completion of a canceled preceding search. Whole `.Text`, `WM_SETTEXT` and UIA SetValue do not establish that behavior. Retain the intended failing baseline proof separately from later passing runs; compile/focus/driver failures and empty discovery are not the intended regression failure. Inline Product is a reference/regression target.
 
-`GoodsReceiptLookupTypingTests` and `GoodsReceiptLookupBindingTests` are **proposed, not yet implemented**. The following selector is usable only after those classes exist and discovery confirms actual cases; add it to the Desktop command above with `--filter`, and use the explicit x86 parameters described above:
+`GoodsReceiptLookupTypingTests` is implemented: T00 selected/executed 15 Theory rows with expected RED product assertions ([evidence](../docs/evidence/bcf/20261021-t00-native-typing.md)). `GoodsReceiptLookupBindingTests` remains **proposed, not yet implemented** for T01. For T00 use `FullyQualifiedName~GoodsReceiptLookupTypingTests`; the combined selector below becomes meaningful after T01 exists and discovery confirms its cases. Add it to the Desktop command above with `--filter`, using the explicit x86 parameters described above:
 
 ```powershell
 $bcfFilter = 'FullyQualifiedName~GoodsReceiptLookupTypingTests|FullyQualifiedName~GoodsReceiptLookupBindingTests'

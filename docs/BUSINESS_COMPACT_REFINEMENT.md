@@ -1,7 +1,7 @@
 # Business Compact refinement: lookup correctness and visual parity
 
 **Initiative:** BCF — sole active roadmap selected on 2026-10-21.
-**Status:** design and execution requirements recorded; product implementation NOT STARTED.
+**Status:** T00 test-only RED checkpoint COMPLETE; [15 native-key product failures retained](evidence/bcf/20261021-t00-native-typing.md). Product repair T01 NOT STARTED; T02 OPEN. Visual work remains NOT STARTED.
 **Baseline:** merged PR #40, `v1a-pro` at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`.
 **Plan:** [BCF execution plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md).
 **Acceptance:** [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md).
