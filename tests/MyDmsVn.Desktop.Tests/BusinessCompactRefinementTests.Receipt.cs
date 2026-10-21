@@ -46,13 +46,18 @@ public sealed partial class BusinessCompactRefinementTests
             Directory.CreateDirectory(directory);
             void Snapshot(string state)
             {
+                // Capture pumps pending native layout/scroll messages. Read provenance
+                // afterward so the reported offsets describe the rendered frame.
+                var capture = Capture(shell, "t05-" + state + "-" + width, token);
                 var scrollOwners = string.Join(" | ", new Control[] { receipt }.Concat(Descendants(receipt))
-                    .OfType<ScrollableControl>().Where(owner => owner.AutoScroll)
+                    .OfType<ScrollableControl>().Where(owner => owner.AutoScroll && owner.Visible)
                     .Select((owner, index) => index + ":" + owner.GetType().Name + "(" + owner.Name + ")=" + owner.AutoScrollPosition + ";client=" + owner.ClientSize));
                 _output.WriteLine("T06_RECEIPT_CAPTURE_STATE=" + state + "; initialWidth=" + width + "; actualTheme=" + BootstrapThemeManager.CurrentTheme.Mode +
                     "; logicalClient=" + shell.ClientSize + "; mode=" + receipt.WorkspaceMode + "; selectedLine=" + receipt.LineGrid.Selection.ActivePosition +
-                    "; lineScroll=" + receipt.LineGrid.CustomScrollPosition + "; masterScroll=" + receipt.ReceiptGrid.CustomScrollPosition + "; scrollOwners=" + scrollOwners);
-                File.Copy(Capture(shell, "t05-" + state + "-" + width, token), Path.Combine(directory, "receipt-" + width + "-" + mode + "-" + state + ".png"), true);
+                    "; lineScroll=" + receipt.LineGrid.CustomScrollPosition + "; firstVisibleLine=" + receipt.LineGrid.Rows.FirstVisibleScrollableRow +
+                    "; firstVisibleColumn=" + receipt.LineGrid.Columns.FirstVisibleScrollableColumn +
+                    "; masterScroll=" + receipt.ReceiptGrid.CustomScrollPosition + "; scrollOwners=" + scrollOwners);
+                File.Copy(capture, Path.Combine(directory, "receipt-" + width + "-" + mode + "-" + state + ".png"), true);
             }
             Snapshot("list");
             WaitCatalog(receipt.SelectReceiptAsync(41, token));
