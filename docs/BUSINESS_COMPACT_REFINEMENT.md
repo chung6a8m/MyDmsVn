@@ -1,7 +1,7 @@
 # Business Compact refinement: lookup correctness and visual parity
 
 **Initiative:** BCF — sole active roadmap selected on 2026-10-21.
-**Status:** T00 test-only RED checkpoint COMPLETE; [15 native-key product failures retained](evidence/bcf/20261021-t00-native-typing.md). T01 binding repair COMPLETE with [focused hosted Windows evidence](evidence/bcf/20261021-t01-lookup-binding.md); T02 COMPLETE / lookup gate PASS with [four native matrix contexts and attended evidence](evidence/bcf/20261021-t02-lookup-gate.md). T03 shell/theme is implemented with [partial verification](evidence/bcf/20261021-t03-shell-theme.md); native125 at 1680×900 captures and documented native chrome limits remain OPEN. T04–T06 are NOT STARTED; no full visual/Owner acceptance.
+**Status:** T00 test-only RED checkpoint COMPLETE; [15 native-key product failures retained](evidence/bcf/20261021-t00-native-typing.md). T01 binding repair COMPLETE with [focused hosted Windows evidence](evidence/bcf/20261021-t01-lookup-binding.md); T02 COMPLETE / lookup gate PASS with [four native matrix contexts and attended evidence](evidence/bcf/20261021-t02-lookup-gate.md). T03 shell/theme is implemented with [partial verification](evidence/bcf/20261021-t03-chrome-followup.md); native125 at 1680×900 captures and documented native chrome limits remain OPEN. T04–T06 are NOT STARTED; no full visual/Owner acceptance.
 **Baseline:** merged PR #40, `v1a-pro` at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`.
 **Plan:** [BCF execution plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md).
 **Acceptance:** [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md).
@@ -42,8 +42,8 @@ No unrelated module redesign, supplier/tax/discount/unit feature or new document
 ## 3. Fixed architecture and behavior boundaries
 
 - Keep product `net48`, Windows x86 packages and existing DPI awareness.
-- Keep BootstrapSourceGrid `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f`.
-- Keep Bootstrap5WinFormUI `aba102e33c48937fd92468791c287afda0a59e77`.
+- Planning default BootstrapSourceGrid `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f`; T03 narrow candidate `2bd7874f7e80b22ef181763749c2a2938ab7f16e`.
+- Planning default Bootstrap5WinFormUI `aba102e33c48937fd92468791c287afda0a59e77`; T03 narrow candidate `2be9a4d778fda7016207b75470020be6126f2f3f` ([proven private accessory seam, upstream source and compatibility evidence](evidence/bcf/20261021-t03-chrome-followup.md)).
 - Keep SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`.
 - Preserve current application/server interfaces, DTOs, schema, permissions and SQL ownership.
 - Preserve typed decimals, strict raw-input validation, historical selections and accessibility.

@@ -6,7 +6,7 @@
 
 | Order | Plan | State | Next action |
 |---:|---|---|---|
-| 1 | [BCF — lookup correctness and visual parity](20261021-001-business-compact-lookup-and-visual-parity.md) | **ACTIVE**; T00 COMPLETE / RED; T01 COMPLETE; T02 COMPLETE / lookup gate PASS; T03 IMPLEMENTED / verification partial; T04–T06 NOT STARTED | BCF-T03: [native125 wide capture blocker and chrome limits](../evidence/bcf/20261021-t03-shell-theme.md); T02 prerequisite remains satisfied |
+| 1 | [BCF — lookup correctness and visual parity](20261021-001-business-compact-lookup-and-visual-parity.md) | **ACTIVE**; T00 COMPLETE / RED; T01 COMPLETE; T02 COMPLETE / lookup gate PASS; T03 IMPLEMENTED / verification partial; T04–T06 NOT STARTED | BCF-T03: [native125 wide capture blocker and chrome limits](../evidence/bcf/20261021-t03-chrome-followup.md); T02 prerequisite remains satisfied |
 
 Read [BCF design](../BUSINESS_COMPACT_REFINEMENT.md), [BCF acceptance](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) and [three retained references](../design-references/business-compact/README.md). These support the same plan and do not define separate queues. The planning baseline is `6040d7bcfca698fc9daba8268bb94e4454e8eacb`; T00–T02 results belong to their exact candidates and input scope. T02 does not establish visual or release acceptance.
 

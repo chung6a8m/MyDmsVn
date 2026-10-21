@@ -6,7 +6,7 @@
 
 The owner merged PR #40 and selected [BCF — lookup correctness and visual parity](docs/plans/20261021-001-business-compact-lookup-and-visual-parity.md) as the **sole active roadmap**. Read [BCF design](docs/BUSINESS_COMPACT_REFINEMENT.md), [acceptance ledger](docs/BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) and [three unchanged reference images](docs/design-references/business-compact/README.md).
 
-**BCF-T00 is COMPLETE as a test-only RED checkpoint** for `WarehouseFilterLookup`, `WarehouseLookup` and `EmployeeLookup`: [15 intended native-key failures with clean ownership/drain](docs/evidence/bcf/20261021-t00-native-typing.md), test source `dbd079825f00fcf4b96294c90918cbaf712f7606`, unchanged product/vendor. **T01 binding repair is COMPLETE** with [172 focused hosted Windows passes](docs/evidence/bcf/20261021-t01-lookup-binding.md). **T02 is COMPLETE / lookup gate PASS** on frozen `67fff29`: [688 automated invocations across native100/125 Light/Dark, four separate all-three human reports and two clean owned package sessions](docs/evidence/bcf/20261021-t02-lookup-gate.md). A01–A13 are reconciled within that candidate input scope. T03 shared shell/theme is implemented with [partial verification](docs/evidence/bcf/20261021-t03-shell-theme.md); required native125 at 1680×900 captures remain OPEN because Windows clamps the available display, and native chrome limits remain explicit. T04–T06 remain NOT STARTED. The T02 prerequisite is satisfied; full BCF visual/Owner and release acceptance remain ungranted. Subsequent work is T04 Products, T05 receipt detail and T06 frozen comparison/Owner acceptance.
+**BCF-T00 is COMPLETE as a test-only RED checkpoint** for `WarehouseFilterLookup`, `WarehouseLookup` and `EmployeeLookup`: [15 intended native-key failures with clean ownership/drain](docs/evidence/bcf/20261021-t00-native-typing.md), test source `dbd079825f00fcf4b96294c90918cbaf712f7606`, unchanged product/vendor. **T01 binding repair is COMPLETE** with [172 focused hosted Windows passes](docs/evidence/bcf/20261021-t01-lookup-binding.md). **T02 is COMPLETE / lookup gate PASS** on frozen `67fff29`: [688 automated invocations across native100/125 Light/Dark, four separate all-three human reports and two clean owned package sessions](docs/evidence/bcf/20261021-t02-lookup-gate.md). A01–A13 are reconciled within that candidate input scope. T03 shared shell/theme is implemented with [partial verification](docs/evidence/bcf/20261021-t03-chrome-followup.md); required native125 at 1680×900 captures remain OPEN because Windows clamps the available display, and native chrome limits remain explicit. T04–T06 remain NOT STARTED. The T02 prerequisite is satisfied; full BCF visual/Owner and release acceptance remain ungranted. Subsequent work is T04 Products, T05 receipt detail and T06 frozen comparison/Owner acceptance.
 
 The visual phase explicitly includes Product catalog content/inspector and a guarded List/Detail receipt presentation. It expands the old BCI catalog exclusion and permanently visible split-list choice. Preserve established English UI; the three designs set composition and hierarchy, not new fields or localization.
 
@@ -27,9 +27,11 @@ RESP, L2DB and GUI-P5 are also completed baselines. The unimplemented REL/P6 and
 
 | Component | Pin |
 |---|---|
-| MyDmsVn.BootstrapSourceGrid | `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f` |
-| Bootstrap5WinFormUI nested vendor | `aba102e33c48937fd92468791c287afda0a59e77` |
+| MyDmsVn.BootstrapSourceGrid candidate | `2bd7874f7e80b22ef181763749c2a2938ab7f16e` |
+| Bootstrap5WinFormUI nested candidate | `2be9a4d778fda7016207b75470020be6126f2f3f` |
 | SourceGrid nested vendor | `f4e457b43582bf01892f50bdc74aa480531e5944` |
+
+The T03 follow-up uses the proven narrow chevron paint/palette repair in upstream draft PR72 and integration draft PR17; [provenance, dual-TFM compatibility and consumer scope](docs/evidence/bcf/20261021-t03-chrome-followup.md) are separate from historical pins and the frozen T02 package. This is a candidate, not an upstream merge or full visual acceptance.
 
 `GoodsReceiptControl` already hosts inline Product/Quantity/UnitCost through `GoodsReceiptLinesGridAdapter`; the external line panel is removed. App-owned sessions, strict numeric parsing, incremental row projection, writable accessibility, compact navigation/layout and native numeric alignment are implemented. Preserve editor ownership, raw input, historical selections and stable row identity.
 
