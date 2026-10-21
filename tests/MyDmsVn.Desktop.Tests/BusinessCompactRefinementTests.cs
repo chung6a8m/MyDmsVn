@@ -309,9 +309,17 @@ public sealed class BusinessCompactRefinementTests : IClassFixture<RefinementPro
             var selected = paintedHeader;
             var inset = BusinessCompactAppearance.Scale(shell.Workspace, BootstrapThemeManager.CurrentTheme.Metrics.FocusBorderWidth);
             var x = shell.Workspace.Left + selected.Left + selected.Width / 2;
-            var expectedFocus = BootstrapThemeManager.CurrentTheme.Colors.Focus.ToArgb();
-            Assert.Equal(expectedFocus, image.GetPixel(x, shell.Workspace.Top + selected.Top + inset).ToArgb());
-            Assert.Equal(expectedFocus, image.GetPixel(x, shell.Workspace.Top + selected.Bottom - inset - 1).ToArgb());
+            var colors = BootstrapThemeManager.CurrentTheme.Colors;
+            // Native125 virtualization can blend a pen edge; require its semantic
+            // hue and >=3:1 visible contrast, rather than byte-identical raster RGB.
+            foreach (var y in new[] { selected.Top + inset, selected.Bottom - inset - 1 })
+            {
+                var pixel = image.GetPixel(x, shell.Workspace.Top + y);
+                var hueDifference = Math.Abs(pixel.GetHue() - colors.Focus.GetHue());
+                hueDifference = Math.Min(hueDifference, 360f - hueDifference);
+                Assert.True(Contrast(pixel, colors.Surface) >= 3, "Rendered focus edge contrast must be at least3:1; pixel=" + pixel);
+                Assert.InRange(hueDifference, 0f, 15f);
+            }
             Assert.Empty(guard.Exceptions);
         }
         finally { BootstrapThemeManager.CurrentTheme = original; }
