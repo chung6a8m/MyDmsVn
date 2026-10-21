@@ -10,13 +10,13 @@
 
 **Spec:** [DIRECT_SALES](../DIRECT_SALES.md), [DIRECT_SALES_COSTING](../DIRECT_SALES_COSTING.md), [DIRECT_SALES_QUERY_AND_UI](../DIRECT_SALES_QUERY_AND_UI.md), [ADR 0011](../adr/0011-direct-sales-and-moving-average-costing.md) and [SAL acceptance](../DIRECT_SALES_ACCEPTANCE.md).
 
-**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is complete at `47165ded` ([bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([bounded evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is IN PROGRESS. Native GUI execution, package, frozen T08 and Owner acceptance remain **NOT RUN**.
+**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is complete at `47165ded` ([bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([bounded evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is complete at `7eeafa4` ([bounded evidence](../evidence/sal/20261022-t04-atomic-sales-post.md)); T05 is IN PROGRESS. Native GUI execution, package, frozen T08 and Owner acceptance remain **NOT RUN**.
 **Baseline:** `chung6a8m/MyDmsVn`, `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, after PR #41.
 BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is the next active roadmap; it does not reopen BCF or establish production readiness.
 
 ## Global Constraints
 
-- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; T02 receipt/reconciliation/projection interfaces are implemented; T03 Draft/Get interfaces are implemented; later Sales Post/List/keyset/Local/UI interfaces remain proposed. Historical baseline facts are not rewritten.
+- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; T02 receipt/reconciliation/projection interfaces are implemented; T03 Draft/Get interfaces are implemented; T04 Post interfaces are implemented; later List/keyset/Local/UI interfaces remain proposed. Historical baseline facts are not rewritten.
 - One warehouse, customer and responsible employee per receipt; 1–200 lines; Draft → Posted only; no payment, receivable, return, order/POS, tax, discount, multi-unit or printing workflow.
 - Grid order is exactly `STT / Product / Unit / Quantity / UnitPrice / IsGift / LineAmount`; `Quantity` binds to `Qty`; costing stays outside these seven columns.
 - `Qty decimal(18,4) > 0`; `UnitPrice decimal(19,4) >= 0`, including non-gift zero; amounts/value/cost `decimal(28,4)`; `PostedUnitCost decimal(28,8)`; round ties away from zero.
@@ -48,9 +48,9 @@ BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is t
 | SAL-T01 | Atomic schema-10 bootstrap, compatibility, grants and reset metadata | T00 | COMPLETE — bounded evidence | A09–A16 |
 | SAL-T02 | Valued Goods Receipt, shared locks, reconciliation and stock reads | T01 | COMPLETE — bounded evidence | A17–A19, A26–A28, A30 |
 | SAL-T03 | Authorized sales Draft save/detail with stable line identity | T02; consumes T00/T01 | COMPLETE — bounded evidence | A20–A24 |
-| SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | IN PROGRESS | A25–A32 |
-| SAL-T05 | LINQ summary queries and both-way keyset paging | T04; consumes T03 | NOT STARTED / BLOCKED by T04 | A33–A40 |
-| SAL-T06 | Local API, session fencing and sales ViewModels | T04, T05 | NOT STARTED / BLOCKED by T04/T05 | A41–A44 |
+| SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | COMPLETE — bounded evidence | A25–A32 |
+| SAL-T05 | LINQ summary queries and both-way keyset paging | T04; consumes T03 | IN PROGRESS | A33–A40 |
+| SAL-T06 | Local API, session fencing and sales ViewModels | T04, T05 | NOT STARTED / BLOCKED by T05 | A41–A44 |
 | SAL-T07 | Compact seven-column workspace, native keyboard and accessibility | T06 | NOT STARTED / BLOCKED by T06 | A45–A50 |
 | SAL-T08 | Frozen integrated SQL/desktop/package evidence and Owner acceptance | T00–T07 | NOT STARTED / BLOCKED by T00–T07 | A51–A55 |
 
@@ -59,11 +59,11 @@ Dependencies identify required inputs, and no partial writer cutover can be rele
 Each task records meaningful RED → GREEN evidence, focused verification and a scoped commit after review.
 A task exit verifies only that task's portion of an acceptance row. A row spanning tasks closes only after all its required portions have evidence on the accepted candidate.
 Do not substitute a compile error, empty filter, missing dependency or skipped SQL case for the intended RED behavioral failure.
-T00–T03 implemented selectors and actual discovery are recorded in their evidence. Later test names below remain proposed; inspect source before execution.
+T00–T04 implemented selectors and actual discovery are recorded in their evidence. Later test names below remain proposed; inspect source before execution.
 
 ## File map and ownership
 
-Paths are relative to repository root; baseline paths are historical references. T00–T03 source exists as recorded in evidence; later **new** paths remain proposed.
+Paths are relative to repository root; baseline paths are historical references. T00–T04 source exists as recorded in evidence; later **new** paths remain proposed.
 Read the adjacent current implementation before editing. Keep small feature files and avoid a general Goods Receipt/UI rewrite.
 
 | Owner | Existing files to modify or use | New files |
@@ -239,7 +239,7 @@ T03 also exposes same-owned-transaction `LoadLinesAsync` for canonical stored-li
 ### SAL-T04 — Atomic Sales Post and concurrency
 
 **Interfaces:** `PostSalesReceiptCommand(PostSalesReceiptRequest)` returns `PostSalesReceiptResponse`; request contains SaleId and opaque ExpectedVersion.
-Extend the provider-free sales repository with these exact proposed methods:
+The provider-free Sales repository implements these methods:
 
 - `Task<SalesReceiptPostSnapshot> LockPostSnapshotAsync(SalesReceipt,CancellationToken)`: locked ordered lines and current reference/Unit state.
 - `Task<IReadOnlyDictionary<int,StockValuationState>> LockValuationBalancesAsync(int warehouseId,IReadOnlyCollection<int> productIds,CancellationToken)`: sorted locked Q/V snapshots.
@@ -251,15 +251,17 @@ Materialize PostSalesReceiptResponse including the new Version before commit, th
 
 **Test files (new):** `tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/{SalesReceiptPostTests,SalesReceiptConcurrencyTests}.cs`; extend `SalesReceiptApplicationTests.cs`.
 
-- [ ] Add successful/insufficient-stock tests aggregating all duplicate and gift demand per Product; each persisted line has one negative ledger movement and one nonpositive valuation companion (including a required zero-value entry).
-- [ ] Add equal-stock drain, zero-valued stock, tiny residual, cost/amount/stock overflow and Unit mismatch tests; finalized costs remain unchanged after later receipts and backdated documents.
-- [ ] Add same-document double Post and stale Save/Post races; one accepted Post has exactly one effect; a now-Posted header returns SalesReceipt.AlreadyPosted, a stale still-Draft version returns SalesReceipt.ConcurrencyConflict; both require reload without implicit retry.
-- [ ] Add competing different-sales, sale-versus-receipt, reversed-key and absent-key scenarios with deterministic session handshakes; observe legal serial outcomes, no negative stock/lost update and bounded deadlock handling.
-- [ ] Inject failures after status/line-cost/ledger/valuation/balance changes and before commit; verify every participating table, version and audit outcome independently.
-- [ ] Run discovered Inventory/Application selectors; RED must expose the intended invariant or missing feature, with cleanup intact.
-- [ ] Implement gate → header/version → warehouse/employee/customer/sorted Products → all sorted stock keys → validate/compute → persist snapshots/status/ledger/value/balances → commit.
-- [ ] Reject any stale Unit snapshot pending reload and reviewed Save; value at actual successful Post, freeze cost, preserve gift price and return stable conflict/validation outcomes.
-- [ ] Run focused rollback/race/fault coverage and affected ownership regressions, review real lock/SQL evidence, then commit T04.
+- [x] Add successful/insufficient-stock tests aggregating all duplicate and gift demand per Product; each persisted line has one negative ledger movement and one nonpositive valuation companion (including a required zero-value entry).
+- [x] Add equal-stock drain, zero-valued stock, tiny residual, cost/amount/stock overflow and Unit mismatch tests; finalized costs remain unchanged after later receipts and backdated documents.
+- [x] Add same-document double Post and stale Save/Post races; one accepted Post has exactly one effect; a now-Posted header returns SalesReceipt.AlreadyPosted, a stale still-Draft version returns SalesReceipt.ConcurrencyConflict; both require reload without implicit retry.
+- [x] Add competing different-sales, sale-versus-receipt, reversed-key and absent-key scenarios with deterministic session handshakes; observe legal serial outcomes, no negative stock/lost update and bounded deadlock handling.
+- [x] Inject failures after status/line-cost/ledger/valuation/balance changes and before commit; verify every participating table, version and audit outcome independently.
+- [x] Run discovered Inventory/Application selectors; RED must expose the intended invariant or missing feature, with cleanup intact.
+- [x] Implement gate → header/version → warehouse/employee/customer/sorted Products → all sorted stock keys → validate/compute → persist snapshots/status/ledger/value/balances → commit.
+- [x] Reject any stale Unit snapshot pending reload and reviewed Save; value at actual successful Post, freeze cost, preserve gift price and return stable conflict/validation outcomes.
+- [x] Run focused rollback/race/fault coverage and affected ownership regressions, review real lock/SQL evidence, then commit T04.
+
+T04 final candidate2 repairs a test-only unbounded session-publication wait and the existing receipt-read timing/cleanup fixture; product code remains unchanged in that repair. The candidate1 Inventory failure, missing pre-rebuild DLL hash and old reader-drain limitation remain explicit in evidence. Source-level writer/reconciliation coherence does not establish deployability or Local uncertain-outcome recovery.
 
 **Exit:** T04-owned SQL Post/rollback/concurrency portions of A25–A32 and deferred Post portions of A01–A08/A23–A24 are verified; both writers/reconciliation form one coherent protocol. Local uncertainty handling and UI/runtime packaging remain incomplete.
 
@@ -343,5 +345,5 @@ T08 consumes the frozen T00–T07 candidate, implemented case inventory, identic
 
 For each task attach revision, changed behavior, exact command/project/TFM/filter, discovered/executed Facts/Theory rows, pass/fail/skip/not-run, environment and cleanup.
 Keep raw TRX, SQL identities, connection data and proprietary screenshots local; publish sanitized reviewable summaries and resource limitations.
-The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is complete at `47165ded` ([evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is IN PROGRESS. Sales Post/workflow/UI/package obligations and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
+The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is complete at `47165ded` ([evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is complete at `7eeafa4` ([evidence](../evidence/sal/20261022-t04-atomic-sales-post.md)); T05 is IN PROGRESS. List/Local/UI/package obligations and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
 The owner's approval selects this roadmap and costing design; it is not a claim that the application, SQL migration or future package has passed.

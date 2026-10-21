@@ -1,10 +1,12 @@
 # Direct Sales — moving weighted average costing
 
-**Status:** APPROVED DESIGN / BOUNDED CHECKPOINTS VERIFIED / SALES WRITER CUTOVER INCOMPLETE. **Updated:** 2026-10-22.
+**Status:** APPROVED DESIGN / BOUNDED CHECKPOINTS VERIFIED / SOURCE WRITER PROTOCOL IMPLEMENTED / FULL WORKFLOW ACCEPTANCE INCOMPLETE. **Updated:** 2026-10-22.
 **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 The Owner selected moving weighted average per `(WarehouseId, ProductId)`, using actual serialized Post order.
-T00 implements exact math and T01 implements schema/bootstrap/admission/mappings/grants/reset ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 implements valued receipt posting, the shared coordinator, Exclusive reconciliation and stock projections ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). T03 uses T00 revenue math for [reviewed Draft Save/detail](evidence/sal/20261022-t03-sales-draft.md), preserves independent line IDs/current Unit and keeps Draft costs/profit null with no stock movement. Sales Post and later workflows remain under implementation in the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md); the checkpoint is not deployable.
+T00 implements exact math and T01 implements schema/bootstrap/admission/mappings/grants/reset ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 implements valued receipt posting, the shared coordinator, Exclusive reconciliation and stock projections ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). T03 uses T00 revenue math for [reviewed Draft Save/detail](evidence/sal/20261022-t03-sales-draft.md), preserves independent line IDs/current Unit and keeps Draft costs/profit null with no stock movement. T04 Sales Post is implemented; later workflows remain under implementation in the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md); the checkpoint is not deployable.
 [Direct Sales](DIRECT_SALES.md) owns document scope; [query/UI design](DIRECT_SALES_QUERY_AND_UI.md) owns presentation; [acceptance](DIRECT_SALES_ACCEPTANCE.md) owns required evidence.
+
+T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. List/Local/UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
 
 ## 1. Existing implementation and change boundary
 
@@ -155,7 +157,7 @@ These are design examples, not executed test results.
 
 ## 6. One transaction and one locking protocol
 
-T02 receipt/reconciliation extends the existing explicit UoW; Sales Post must adopt it in T04. All participating repositories borrow its current connection/transaction; they never open a hidden connection.
+T02 receipt/reconciliation extends the existing explicit UoW; T04 Sales Post adopts the same coordinator. All participating repositories borrow its current connection/transaction; they never open a hidden connection.
 LINQ to DB owns mapped reads, writes and guarded balance updates wherever the pinned provider can express the required operation safely. Application locks use typed native SqlClient on that same transaction; a key-range/locking escape requires recorded evidence that the required semantics cannot be safely expressed through the pinned LINQ provider.
 Bind precision/scale explicitly, materialize/dispose readers before the next command, and never run parallel commands on a UoW connection.
 

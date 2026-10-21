@@ -14,13 +14,13 @@ Read [SAL design](../DIRECT_SALES.md), [costing](../DIRECT_SALES_COSTING.md), [q
 | SAL-T01 | Atomic schema10, verified schema9 bootstrap/admission and reset profiles | COMPLETE — [bounded evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) |
 | SAL-T02 | Valued receipt posting, shared lock protocol, reconciliation and stock reads | COMPLETE — [bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md) |
 | SAL-T03 | Authorized sales Draft lifecycle and version/line identity | COMPLETE — [bounded evidence](../evidence/sal/20261022-t03-sales-draft.md) |
-| SAL-T04 | Atomic sale Post, cost allocation and stock concurrency | IN PROGRESS — next serial task |
-| SAL-T05 | LINQ filtering and keyset list | NOT STARTED — after T04 |
+| SAL-T04 | Atomic sale Post, cost allocation and stock concurrency | COMPLETE — [bounded evidence](../evidence/sal/20261022-t04-atomic-sales-post.md) |
+| SAL-T05 | LINQ filtering and keyset list | IN PROGRESS — next serial task |
 | SAL-T06 | Local API, ViewModels and session/recovery integration | NOT STARTED — after T05 |
 | SAL-T07 | Compact seven-column UI, native input and accessibility | NOT STARTED — after T06 |
 | SAL-T08 | Frozen integrated SQL/UI/package evidence and Owner disposition | NOT STARTED — after T07 |
 
-T00-owned pure, T01-owned schema/bootstrap and T02-owned receipt/reconciliation/stock-read and T03-owned Draft/detail portions have focused evidence. A01/A21 have bounded T03 PASS and A10–A12 bounded T01 PASS; multi-task rows remain open. The serial order above is the execution queue; the plan records technical dependencies. No task checkpoint is deployable until receipt/sale/reconciliation writers and schema/runtime/reset guards are coherent. The historical baseline supports schema9; development source at `81e8aab` requires schema10, with receipt/reconciliation cutover implemented at `47165ded` and Sales Post still incomplete. Payments, debt, returns, HTTP and framework reactivation are excluded. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
+T00-owned pure, T01-owned schema/bootstrap and T02-owned receipt/reconciliation/stock-read and T03-owned Draft/detail and T04-owned atomic Post/protocol portions have focused evidence. Exact bounded row dispositions are recorded in the [acceptance ledger](../DIRECT_SALES_ACCEPTANCE.md); multi-task rows remain open. The serial order above is the execution queue; the plan records technical dependencies. No task checkpoint is deployable until receipt/sale/reconciliation writers and schema/runtime/reset guards are coherent. The historical baseline supports schema9; development source at `81e8aab` requires schema10, with receipt/reconciliation implemented at `47165ded` and Sales Post at `7eeafa4`. Coherent source protocol does not establish end-to-end runtime/package/Owner acceptance. Payments, debt, returns, HTTP and framework reactivation are excluded. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
 ## Completed baselines — retain, do not restart
 

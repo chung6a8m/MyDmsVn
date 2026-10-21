@@ -6,6 +6,8 @@ This specification supports the sole [SAL execution plan](plans/20261021-002-dir
 Read the [Direct Sales design](DIRECT_SALES.md), [costing rules](DIRECT_SALES_COSTING.md) and [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) together.
 T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 existing Inventory value/average/card projections have [bounded evidence](evidence/sal/20261022-t02-valued-inventory.md). T03 implements [authorized GetById detail](evidence/sal/20261022-t03-sales-draft.md) on one short owned SERIALIZABLE transaction. Sales List/filter/keyset/cursor validation, Local/ViewModels and UI below remain proposed and unverified; the development checkpoint is not deployable.
 
+T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. List/Local/UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
+
 ## 1. Scope and source boundaries
 
 Direct Sales introduces one warehouse, one customer and one responsible employee per receipt, with Draft and Posted states.
@@ -75,7 +77,7 @@ Task<SalesReceiptListPage> ListAsync(SalesReceiptListRequest request, Cancellati
 Task<SalesReceiptDto?> GetByIdAsync(long saleId, CancellationToken cancellationToken);
 ```
 
-T00 registers Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post` without automatic grants. Per-service and Local enforcement remain later tasks.
+T00 registers Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post` without automatic grants. Draft/Get/Post Application enforcement is implemented through T04; List and Local enforcement remain later tasks.
 List/Get require Read, Create/Update require Write, and Post requires Post; the UI requires Read to open and the relevant action key to mutate.
 Read includes the approved persisted cost/profit fields; no separate costing permission is introduced, and command return DTOs follow current authorized-write result semantics.
 Recheck current actor/account and permission state on every request; use the `SalesReceipt.*` prefix for sales business errors.

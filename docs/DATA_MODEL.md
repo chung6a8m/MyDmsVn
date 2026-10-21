@@ -4,15 +4,17 @@
 
 The application now uses LINQ to DB and typed native Microsoft.Data.SqlClient behind Application interfaces. [RESP](plans/20261018-002-respawn-fixture-reuse.md) established the accepted test-fixture baseline; [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) completed its provider conversion and T07 correctness/package/Local smoke acceptance with verified temporary-resource cleanup. [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) is complete in its approved scope. BCI is implemented/accepted historical UI work. The completed [BCF roadmap](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); it preserves this supported schema, DbUp history and business semantics. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. See [PERSISTENCE](PERSISTENCE.md) for provider/transaction ownership and [CONTRACTS](CONTRACTS.md) for public DTO behavior.
 
+T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. List/Local/UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
+
 ## Reviewed schema10 checkpoint and baseline inventory
 
-The schema9 inventory below records the pre-SAL baseline; T01 development source at `81e8aab` implements the schema10 additions below ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). Writer/workflow cutover remains incomplete and this checkpoint is not deployable. [Direct Sales](DIRECT_SALES.md) and [costing](DIRECT_SALES_COSTING.md) define the schema10 requirements under [SAL](plans/20261021-002-direct-sales-and-moving-average-costing.md):
+The schema9 inventory below records the pre-SAL baseline; T01 development source at `81e8aab` implements the schema10 additions below ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). The receipt/sale/reconciliation source protocol is implemented through T04; full workflow acceptance remains incomplete and this checkpoint is not deployable. [Direct Sales](DIRECT_SALES.md) and [costing](DIRECT_SALES_COSTING.md) define the schema10 requirements under [SAL](plans/20261021-002-direct-sales-and-moving-average-costing.md):
 
 | T01 object/change | Storage and remaining workflow invariant |
 |---|---|
 | SalesReceipts | SaleId bigint, unique server SaleNo, date/customer/warehouse/employee, Draft/Posted, audit and rowversion |
 | SalesReceiptLines | SaleLineId and unique (SaleId, LineNo); duplicate Product allowed; Qty18,4, UnitPrice19,4, Unit snapshot, IsGift and persisted LineAmount28,4 |
-| Posted line cost | PostedUnitCost28,8 and CostAmount28,4 have paired nullable/nonnegative storage; T03 guards Draft save/read and rejects Posted updates; Post cost freezing/complete lifecycle remains T04 |
+| Posted line cost | PostedUnitCost28,8 and CostAmount28,4 have paired nullable/nonnegative storage; T03 guards Draft save/read and rejects Posted updates; T04 freezes Post costs; Local/UI lifecycle acceptance remains open |
 | Sales number sequence | Separate bounded non-cycling bigint sequence; T03 assigns immutable SA + ten-digit numbers on the owned transaction, with gaps allowed and no exhaustion fallback |
 | StockValuationEntries | LedgerId PK/FK and signed ValueChange28,4; bootstrap supplies a complete append-only companion for existing ledger rows; ongoing completeness requires the writer cutover |
 | StockBalances.InventoryValue | Value28,4 paired atomically with Quantity; nonnegative quantity/value; zero quantity requires zero value |
@@ -115,7 +117,7 @@ A receipt line produces one ledger movement when successfully posted; this is a 
 
 ## 6. Posting, numbering and concurrency
 
-T02 implements the valued receipt writer described below ([evidence](evidence/sal/20261022-t02-valued-inventory.md)); Sales Post remains T04, so the development checkpoint is not deployable.
+T02 implements the valued receipt writer described below ([evidence](evidence/sal/20261022-t02-valued-inventory.md)); T04 implements sale issues; remaining workflow/frozen acceptance keeps the development checkpoint nondeployable.
 
 Draft receipts are editable and have no posted stock movement. Posting requires an active Warehouse, Employee and Products, a valid nonempty line set and the current opaque receipt version. The public contract accepts 1–200 unique product lines with quantities/costs fitting their SQL decimal types. SQL constraints enforce per-row precision/sign, foreign keys and duplicates; Application validates the aggregate line count and active-state/business rules.
 
@@ -123,7 +125,7 @@ GoodsReceipt Post uses one explicit UoW transaction. It takes Shared MyDmsVn.Inv
 
 The server formats numbers as `GR` plus ten zero-padded digits, from `GR0000000001` through `GR9999999999`, using `dbo.GoodsReceiptNumberSequence`. Sequence gaps after rollback are valid; the application does not recycle allocated values or let clients choose/predict numbers. The unique ReceiptNo index remains the final uniqueness boundary.
 
-`GoodsReceipts.RowVersion` is the aggregate edit/post concurrency token. Contracts expose opaque Base64 `version`, and UpdateDraft/Post send `expectedVersion`. Clients do not interpret token bytes or expose SQL/provider entities. StockBalances.RowVersion does not replace atomic balance updates. No Cancelled/Reversed workflow or implemented Sales Post is established by this checkpoint; exact issue-cost math remains a T00 foundation for T04.
+`GoodsReceipts.RowVersion` is the aggregate edit/post concurrency token. Contracts expose opaque Base64 `version`, and UpdateDraft/Post send `expectedVersion`. Clients do not interpret token bytes or expose SQL/provider entities. StockBalances.RowVersion does not replace atomic balance updates. T04 implements Sales Post using exact T00 issue math and immutable snapshots. No Cancelled/Reversed workflow is introduced.
 
 T03 [Sales Draft/detail](evidence/sal/20261022-t03-sales-draft.md) assigns independent IDs to new duplicate-Product rows, validates retained ownership/canonical order before mutation, removes omitted rows and preserves retained IDs/Created audits while resequencing. Save captures current active Product Unit and exact revenue; Draft costs/profit stay null and stock/value tables are unchanged. Update requires a matching opaque version and rejects Posted/stale changes. Write response construction completes before commit; Get uses one short owned SERIALIZABLE read with historical labels/persisted Unit/cost. List/Post/Local/UI remain later work.
 
@@ -146,7 +148,7 @@ Master-data codes/names and active flags are joined from current catalog rows; t
 
 ## 8. Reconciliation and scope boundaries
 
-T02 implements the Exclusive valuation reconciliation below. It verifies existing source history without repair; seeded sales-source evidence does not implement Sales Post.
+T02 implements the Exclusive valuation reconciliation below. It verifies existing source history without repair; T04 separately implements Sales Post and verifies real sale-source conservation.
 
 [SqlStockReconciliationQueryService](../src/MyDmsVn.Server.Infrastructure/Inventory/SqlStockReconciliationQueryService.cs) owns one explicit `SERIALIZABLE` transaction, takes Exclusive MyDmsVn.InventoryValuation.v1 before table reads, then materializes ledger → valuation → balances → receipt/sale sources. It compares exact signed Q/V totals, counterpart/source identity, receipt rounded values and stored sale cost/gift coherence. Source lines are indexed once; cooperative cancellation spans indexing, grouped analysis and completion while preserving numeric stock-key output order. The gate and owned connection are disposed on cancellation.
 
