@@ -6,6 +6,16 @@
 
 WinForms ViewModels use feature-specific API interfaces in `Desktop.Application/FeatureApiClients.cs`. Current Local adapters invoke Server.Application in-process and return transport-neutral `ApiResponse<T>` values. Future HTTP adapters must keep the same DTO/result semantics. Public DTOs are contracts, not Domain entities or provider objects.
 
+## Approved Sales contracts — proposed, not implemented
+
+[Direct Sales](DIRECT_SALES.md) and [query/UI](DIRECT_SALES_QUERY_AND_UI.md) specify new `SalesContracts.cs` and `ISalesReceiptApiClient`: CreateDraft, UpdateDraft, Post, Get and List through the same immutable ApiResponse/Local boundary. The three proposed code keys are Sales.Receipts.Read/Write/Post. The docs do not register keys or grant roles.
+
+Save carries ordered independent lines with SaleLineId (0 for new), ProductId, Qty, UnitPrice and IsGift; duplicate Products are valid. The server assigns LineNo, Unit, amounts and identifiers. Update/Post require the opaque expectedVersion. Posted cost snapshots and gross profit are read-only; Draft cost/profit are null. DTO SaleNumber maps to SQL SaleNo; sale/unit/decimal and error paths need golden contract tests. A proposed SalesCalendarDateJsonConverter writes SaleDate/FromDate/ToDate as invariant yyyy-MM-dd strings and accepts only valid date-only strings; normalize Local dates without timezone conversion. Scope it to these properties, preserving global ApiJson UTC audit handling and existing module contracts.
+
+`SalesReceiptListRequest`/`SalesReceiptListPage` form a separate cursor contract: optional date/customer/warehouse/employee/status/Product/search, bounded PageSize and validated Cursor; slim Items plus nullable NextCursor/PreviousCursor. Use unique SaleId DESC and Product Any; totals cover all receipt lines. No PageNumber, required TotalCount or reuse of the existing PagedResult offset contract. Cursor encoding is not authorization. Existing catalog/receipt/stock paging remains unchanged unless explicitly extended by SAL.
+
+Future inventory read DTOs add value information and SalesReceipt document-number resolution under the existing Inventory read keys; exact fields are defined in the SAL plan. Schema10 and this extension are NOT IMPLEMENTED. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) supplies new compatibility obligations.
+
 ## Implemented result envelope
 
 The current [ApiResponse](../src/MyDmsVn.Contracts/ApiResponse.cs), [ApiError](../src/MyDmsVn.Contracts/ApiError.cs), [ApiErrorDetail](../src/MyDmsVn.Contracts/ApiErrorDetail.cs) and [ApiJson](../src/MyDmsVn.Contracts/ApiJson.cs) are source-owned contracts. Their properties are immutable; do not replace them with the earlier mutable blueprint.
@@ -88,4 +98,4 @@ Preserve or extend source-owned golden JSON and behavior fixtures for:
 - decimal quantities and UTC timestamps,
 - current catalog, receipt, inventory and security/import DTOs.
 
-The completed RESP/L2DB plans and current GUI-P5/REL acceptance plans preserve Local behavior and contract assertions. A future approved HTTP adapter must run the same behavior/response assertions against Local and HTTP. A contract breaking change requires versioning or an ADR. [TEST_POLICY](TEST_POLICY.md) selects execution scope; this coverage reference does not require a full suite after every change.
+The completed RESP/L2DB/GUI-P5/BCI/BCF plans retain candidate-specific Local behavior evidence; the retired REL plan is not active. SAL must add and verify its new Local contracts without treating those historical results as current acceptance. A future approved HTTP adapter must run the same behavior/response assertions against Local and HTTP. A contract breaking change requires versioning or an ADR. [TEST_POLICY](TEST_POLICY.md) selects execution scope; this coverage reference does not require a full suite after every change.

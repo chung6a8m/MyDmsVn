@@ -1,6 +1,8 @@
 # Technical stack and compatibility baseline
 
-**Current cutover:** L2DB-T00–T07 on net48 accepted in plan scope on 2026-10-19 ([T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); RESP, GUI-P5 and BCI are also implemented/accepted in their approved scopes. As of 2026-10-21, merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`, [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED on the isolated branch in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); runtime/API/schema remain unchanged. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. Historical evidence retains its original provider/revision.
+**Current cutover:** L2DB-T00–T07 on net48 accepted in plan scope on 2026-10-19 ([T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); RESP, GUI-P5 and BCI are also implemented/accepted in their approved scopes. As of 2026-10-21, merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`, [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED and merged through PR #41 in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); runtime/API/schema remain unchanged. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. Historical evidence retains its original provider/revision.
+
+[SAL](DIRECT_SALES.md) is the sole ACTIVE successor, NOT IMPLEMENTED. It retains these runtime/provider/vendor pins and uses existing LINQ to DB 6.3.0. The planned fixed-point valuation arithmetic uses net48 `System.Numerics.BigInteger` with an explicit assembly reference, not a framework upgrade. Schema10 and new Sales contracts are approved work under [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md); no dependency upgrade is required by this documentation PR.
 
 ## Runtime matrix
 
@@ -62,4 +64,3 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; RESP and L2DB-T00–T07 have scoped evidence; broader release acceptance remains deferred.
 
 Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or pins within RESP/L2DB/BCF.
-

@@ -94,4 +94,12 @@ Fresh install hoặc một đường triển khai đã được review dùng sto
 
 Không chạy client cũ sau khi schema vượt contract của nó; không chạy client mới khi DB còn prefix cũ/partial. Downgrade client không đồng nghĩa downgrade database. Ghi revision/package/SQL version, preflight, exit code, journal/artifact và recovery outcome theo [TEST_POLICY](TEST_POLICY.md); các bài diễn tập recovery và owner release sign-off vẫn là [điều kiện chưa nghiệm thu, chưa xếp lịch](DEFERRED_WORK.md#release-prerequisites).
 
+## SAL schema10 — đường chuyển đã duyệt thiết kế, chưa triển khai
 
+[SAL](DIRECT_SALES.md), [đặc tả giá vốn](DIRECT_SALES_COSTING.md) và [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) đề xuất script `010_DirectSalesAndValuation.sql`. Source hiện tại vẫn chỉ hỗ trợ schema9/001–009 như các mục trên; PR tài liệu không sửa migrator, preflight hoặc journal.
+
+Khi triển khai T01, migrator phải phân biệt exact schema9 đã kiểm chứng đầy đủ artifact/journal với các trạng thái TooOld khác; chỉ bổ sung đường nâng9→10, không mở chung prefix001–008. Dừng và drain mọi client cũ, khóa khả năng ghi/kết nối lại trong thời gian nâng, dùng maintenance principal và backup/recovery đã xác minh. Client schema9 đang mở không tự trở nên an toàn nhờ preflight mới.
+
+Trong một transaction của script010, kiểm chứng hai chiều Posted Goods Receipt ↔ StockLedger và quantity balance, tính từng giá trị nguồn bằng quy tắc đã chốt, tạo đầy đủ valuation companions, nạp InventoryValue và bật constraint/index/trigger cuối cùng. Toàn bộ script010 cùng journal phải commit hoặc rollback; không dùng giá vốn0 cho nguồn thiếu/sai, không sửa ledger lịch sử. Thất bại ở script trước010 khi clean install có thể để lại prefix đã commit; vẫn áp dụng chính sách từ chối/recovery có kiểm chứng, không coi cả001–010 là một transaction.
+
+Nghiệm thu SAL yêu cầu clean install001–010, exact9 upgrade bảo toàn dữ liệu, no-op10, từ chối nguồn/schema sai, fault injection xác nhận rollback010/journal, old-client từ chối10 và new-client từ chối9, quyền runtime và reset profile đúng. Receipt Post, sale Post và reconciliation phải cùng dùng giao thức khóa/value mới trước khi phát hành candidate. Các phép kiểm thử feature này không thay thế [nghiệm thu vận hành/phát hành](DEFERRED_WORK.md#release-prerequisites); mọi evidence SAL hiện NOT RUN.

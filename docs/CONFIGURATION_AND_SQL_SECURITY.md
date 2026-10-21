@@ -133,5 +133,20 @@ Các mã startup hiện có liên quan:
 
 Local v1 chạy Application trong process desktop và là triển khai two-tier. Người kiểm soát process hoặc runtime credential có thể gọi SQL trong phạm vi quyền được cấp, vượt qua Application authorization/business workflow. Thu hẹp quyền và procedure giảm phạm vi tác động; chúng không tạo một trusted server boundary hay biến actor ID từ Local client thành bằng chứng mật mã.
 
-HTTP v2/P7 và modern product runtime là các [hướng ngoài phạm vi](DEFERRED_WORK.md#out-of-scope-directions). Các [điều kiện phát hành](DEFERRED_WORK.md#release-prerequisites) chưa được nghiệm thu, chưa xếp lịch và không được coi là hoàn thành/waived khi chọn BCF làm lộ trình duy nhất. Runbook này mô tả khả năng hiện có, giới hạn đã thấy trong source và yêu cầu triển khai; nó không thay thế bằng chứng acceptance thực tế.
+HTTP v2/P7 và modern product runtime là các [hướng ngoài phạm vi](DEFERRED_WORK.md#out-of-scope-directions). Các [điều kiện phát hành](DEFERRED_WORK.md#release-prerequisites) chưa được nghiệm thu, chưa xếp lịch và không được coi là hoàn thành/waived khi chọn SAL làm lộ trình duy nhất. Runbook này mô tả khả năng hiện có, giới hạn đã thấy trong source và yêu cầu triển khai; nó không thay thế bằng chứng acceptance thực tế.
 
+## SAL schema10 — quyền dự kiến, chưa được cấp
+
+[SAL](DIRECT_SALES.md) đề xuất thêm bảng/sequence và valuation; ma trận schema9 ở trên vẫn mô tả source hiện tại. T01 phải sửa provisioning và validator đồng bộ, chỉ sau khi có schema10 hợp lệ. Không cấp quyền toàn schema hoặc db_owner để bỏ qua lỗi.
+
+| Object dự kiến trong dbo | Quyền runtime cần kiểm chứng |
+|---|---|
+| SalesReceipts | SELECT, INSERT, UPDATE; không DELETE |
+| SalesReceiptLines | SELECT, INSERT, UPDATE, DELETE cho lifecycle Draft do Application kiểm soát |
+| SalesReceiptNumberSequence | UPDATE để dùng NEXT VALUE FOR; không quyền đổi sequence |
+| StockValuationEntries | SELECT, INSERT; không UPDATE/DELETE, trigger append-only hoạt động |
+| StockBalances.InventoryValue | Ghi cùng Quantity qua quyền INSERT/UPDATE được kiểm soát; không direct client API |
+
+Giao thức valuation dùng `sys.sp_getapplock` trên cùng runtime connection/transaction, resource `MyDmsVn.InventoryValuation.v1`, principal `public`: Shared cho writer và Exclusive cho reconciliation. Kiểm chứng quyền gọi thực tế bằng principal hạn chế; đây là system procedure, không thêm blanket EXECUTE vào allowlist ba business security procedures. Runtime không được nâng schema hay bootstrap giá trị tồn. Các quyền code Sales.Receipts.Read/Write/Post không tự tạo SQL grant hoặc role assignment.
+
+Kiểm chứng object inventory/VIEW DEFINITION, quyền dữ liệu/sequence, từ chối sửa ledger/value history và tách admin/runtime trên candidate SAL. Giữ nguyên giới hạn trust của Local direct SQL và giới hạn kiểm tra EXECUTE hiện tại đã nêu; tài liệu không tuyên bố đã sửa hay nghiệm thu chúng. Evidence hiện NOT RUN.

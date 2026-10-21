@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment:** `v1a-pro` at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`, refreshed 2026-10-21. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no new product host/runtime/API/schema is introduced.
+**Assessment:** `v1a-pro` at merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`, refreshed 2026-10-21. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no new product host/runtime/API/schema is introduced.
 
 ## Source projects
 
@@ -18,7 +18,7 @@
 | `MyDmsVn.Desktop.App` | `net48` | Current WinForms host and Local composition root. |
 | `MyDmsVn.Desktop.AppCore` | `net8.0-windows`, parked | Retained source outside active solution/release; not current executable coverage. |
 
-`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. HTTP v2 is [out of scope](DEFERRED_WORK.md#out-of-scope-directions) and needs a separate runtime decision. Do not create these projects as part of BCF.
+`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. HTTP v2 is [out of scope](DEFERRED_WORK.md#out-of-scope-directions) and needs a separate runtime decision. Do not create these projects as part of SAL.
 
 ## Active test projects
 
@@ -36,6 +36,12 @@
 | `MyDmsVn.Server.Infrastructure.IntegrationTests` | `net48` | Local owned-database helpers and remaining Operations/Local SQL scenarios; this name no longer means the entire SQL suite. |
 
 There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual owning project and source case rather than a historical proposed path. These are ten current test projects; no standalone SQL support or runner project remains. Each SQL owner has its own csproj; a shared library or test trait does not by itself prove isolation or parallel safety.
+
+## Approved Sales locations — proposed only
+
+SAL uses the existing projects; it adds no HTTP host, ORM or test project. [The plan](plans/20261021-002-direct-sales-and-moving-average-costing.md) gives exact task-owned paths and proposed tests. [Business](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md) and [query/UI](DIRECT_SALES_QUERY_AND_UI.md) define new `Contracts/SalesContracts.cs`, Domain/Application/Infrastructure `Sales/` folders, inventory valuation math/coordinator, a Local sales adapter and sales ViewModels/WinForms controls.
+
+Implementation also updates existing DI/permission/audit registries, receipt/reconciliation/stock read paths, migration/preflight/grants and Respawn metadata. None of those new files or schema10 objects exists merely because this plan is active. Existing source directories below describe the inspected PR #41 baseline.
 
 ## Actual feature directories
 
@@ -58,7 +64,7 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `MyDmsVn.sln` | Current declared solution graph; parked AppCore is excluded. |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/plans/README.md` | No active implementation task; completed BCF/RESP/L2DB/GUI-P5/BCI scopes retained. |
+| `docs/plans/README.md` | Sole ACTIVE SAL queue; T00 READY, implementation NOT STARTED; completed baselines retained. |
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
 | `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current roadmap pointer, unscheduled release constraints/out-of-scope directions and historical evidence. |
@@ -66,5 +72,4 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `deployment/sql/Provision-MyDmsVnPrincipals.sql` | Explicit runtime/maintenance SQL authority separation. |
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
-Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. BCF does not reactivate AppCore or upgrade the framework. Proposed BCF files/interfaces in its plan are not implemented project structure.
-
+Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. BCF does not reactivate AppCore or upgrade the framework. Proposed SAL files/interfaces in its plan are not implemented project structure; BCF files are assessed against the merged source and its recorded evidence.

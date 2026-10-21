@@ -1,18 +1,28 @@
 # MyDmsVn — Current context for Codex
 
-**Branch:** `v1a-pro` · **Updated:** 2026-10-21 · **Planning/source baseline:** `6040d7bcfca698fc9daba8268bb94e4454e8eacb` (PR #40 merge). This handoff records source facts and planned work, not new runtime acceptance.
+**Branch:** `v1a-pro` · **Updated:** 2026-10-21 · **Planning/source baseline:** `35ba2e8a3f37fb07095701eb94f4b56f7941c491` (PR #41 merge). This handoff records source facts and planned work, not new runtime acceptance.
 
 ## Owner decision and next work
 
-**BCF-T00–T06 are COMPLETE / OWNER ACCEPTED — 2026-10-21**, in the [final signed scope](docs/evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). The Owner accepted all three reference comparisons, listed visual differences, six strict wide125 rows remaining NOT TESTED, deferred T04 Minor and native100 composite attended evidence with its failed-session/no-independent-no-write limitation. No new implementation roadmap is selected; the [execution index](docs/plans/README.md) retains completed work and unscheduled release constraints.
+**BCF-T00–T06 are COMPLETE / OWNER ACCEPTED — 2026-10-21**, in the [final signed scope](docs/evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). The Owner accepted all three reference comparisons, listed visual differences, six strict wide125 rows remaining NOT TESTED, deferred T04 Minor and native100 composite attended evidence with its failed-session/no-independent-no-write limitation. The Owner now selected **SAL — Direct Sales with moving weighted average** as the sole ACTIVE roadmap. [The execution index](docs/plans/README.md) controls the new sequence; SAL-T00 is READY, all implementation/runtime evidence is NOT RUN. Completed work and unscheduled release constraints remain separate.
 
-Accepted package source95591071ea214be88813deb5227d216f1b0bca71 has unchanged product behavior from991530f0a3505b10294f2821e8ab434c2f1c8a25. Final Desktop test source7518e7ba9756aadecea6206dd061de24454c4c1b; native100 broad/repair/capture and Session revisions remain distinct in the evidence. Session108 PASS; native100 broad566 PASS/9 FAIL plus49-row repair reconciles575 unique cases, never an unfiltered PASS; extra Dark116 PASS. Native125569 runnable+Dark116 PASS; all-three attended1/1 PASS and positive no-write/drain/SQL cleanup.40 reviewed images and1539 invocation rows preserve overlaps and failures. No push/merge, upstream merge or production release acceptance is implied.
+Accepted package source95591071ea214be88813deb5227d216f1b0bca71 has unchanged product behavior from991530f0a3505b10294f2821e8ab434c2f1c8a25. Final Desktop test source7518e7ba9756aadecea6206dd061de24454c4c1b; native100 broad/repair/capture and Session revisions remain distinct in the evidence. Session108 PASS; native100 broad566 PASS/9 FAIL plus49-row repair reconciles575 unique cases, never an unfiltered PASS; extra Dark116 PASS. Native125569 runnable+Dark116 PASS; all-three attended1/1 PASS and positive no-write/drain/SQL cleanup.40 reviewed images and1539 invocation rows preserve overlaps and failures. Those historical evidence records did not themselves authorize push/merge, upstream merge or production release acceptance. Consumer PR #41 is now merged at the planning baseline above; upstream and production acceptance are not inferred.
 
 The visual phase explicitly includes Product catalog content/inspector and a guarded List/Detail receipt presentation. It expands the old BCI catalog exclusion and permanently visible split-list choice. Preserve established English UI; the three designs set composition and hierarchy, not new fields or localization.
 
-BCI-T00–T06 remain COMPLETE / OWNER ACCEPTED in their [final signed scope](docs/BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21), now merged by PR #40. Its exact app/test/package revisions, failed trials, counts and accepted limitations stay in the original ledger. No historical PASS or GUI-P5 Down exception satisfies a new BCF obligation.
+BCI-T00–T06 remain COMPLETE / OWNER ACCEPTED in their [final signed scope](docs/BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21), now merged by PR #40. Its exact app/test/package revisions, failed trials, counts and accepted limitations stay in the original ledger. No historical PASS or GUI-P5/BCF exception satisfies a new SAL obligation.
 
 RESP, L2DB and GUI-P5 are also completed baselines. The unimplemented REL/P6 and .NET 8 reactivation plans remain deleted. [Release prerequisites](docs/DEFERRED_WORK.md#release-prerequisites) remain unaccepted/unscheduled constraints, not another work queue. [The execution index](docs/plans/README.md) controls order.
+
+## Approved SAL work — not implemented
+
+Read [business design](docs/DIRECT_SALES.md), [costing](docs/DIRECT_SALES_COSTING.md), [query/UI](docs/DIRECT_SALES_QUERY_AND_UI.md), [ADR 0011](docs/adr/0011-direct-sales-and-moving-average-costing.md), [acceptance](docs/DIRECT_SALES_ACCEPTANCE.md) and [the plan](docs/plans/20261021-002-direct-sales-and-moving-average-costing.md). The Owner approved direct receipts, exactly seven line columns, manual price, duplicate Products, gifts, cost tracking, Product filtering, LINQ-first queries and keyset pagination; then selected moving weighted average and asked for active-roadmap documents and a PR.
+
+Draft → Posted deducts stock and freezes cost per warehouse/product at actual Post. Gifts have zero revenue and full cost; duplicate lines remain independent but aggregate for availability and value allocation. Fixed-point arithmetic and cumulative allocation conserve value, including full depletion. Payments, debt, returns, orders/POS, pricing engine and tax remain outside scope.
+
+Proposed schema10 adds SalesReceipts/Lines, StockValuationEntries and InventoryValue. Exact validated schema9 bootstrap, an atomic script010/journal and coordinated receipt/sale/reconciliation locking are mandatory. No existing ledger rewrite or zero-value fallback. New APIs/Active Sales keys/DI/mappings/grants/reset metadata are planned, not present in the inspected source. No automatic role grants.
+
+The sales list is SaleId DESC with filter-bound Next/Previous cursors, Product Any and all-line totals. Native edit/session/recovery behavior inherits BCF contracts but needs new sales evidence. SAL-T00–T08 cover foundation, migration, valued receipt/reconciliation, sales lifecycle/post, query, Local/VM, GUI and frozen acceptance; intermediate commits are not independent deployment candidates.
 
 ## Current source facts
 
@@ -45,10 +55,10 @@ Keep `RequiresPostOutcomeReload` authoritative until successful reload; denied r
 
 ## Execution and evidence rules
 
-Read [AGENTS](AGENTS.md), [active index](docs/plans/README.md), the task/spec, [TEST_POLICY](docs/TEST_POLICY.md), [TEST_STRATEGY](docs/TEST_STRATEGY.md) and [tests/README](tests/README.md). Use focused direct project tests during tasks. T02 is the completed input gate on its recorded candidate; T06 is the broader frozen Session/Desktop/package/visual milestone. No SQL/GUI execution for Markdown-only changes.
+Read [AGENTS](AGENTS.md), [active index](docs/plans/README.md), the task/spec, [TEST_POLICY](docs/TEST_POLICY.md), [TEST_STRATEGY](docs/TEST_STRATEGY.md) and [tests/README](tests/README.md). Use focused direct project tests during tasks. BCF-T02/T06 are completed historical milestones. SAL uses focused behavior/SQL/GUI checks during implementation and SAL-T08 for its frozen integrated candidate. No SQL/GUI execution for Markdown-only changes.
 
 Interactive Windows/net48, serialized STA, WinFormsTestGuard, finite waits, bounded GUI-owned subprocesses and verified disposal are required for GUI evidence. Keep native100/native125 and hosted/package results distinct. Test-session injection does not prove actual Login. Record actual client/work-area geometry and distinguish PrintWindow artifacts from physical display observations.
 
 SQL requires explicitly designated non-production `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` with effective master, sequential owners and positive identity/token checks before cleanup. Preserve reusable fixtures, fresh exceptions, worker drain and terminal quarantine. Do not restore the removed runner, gate manifest, approval-file or prefix-only drop flow.
 
-Report exact source/test/package revisions, actual discovery/execution, environment, sanitized evidence and unresolved resources. Do not carry old test totals forward as expected results. BCF remains unaccepted until its new obligations and all three visual comparisons are reconciled with explicit Owner review; release acceptance remains separate.
+Report exact source/test/package revisions, actual discovery/execution, environment, sanitized evidence and unresolved resources. Do not carry old test totals forward as expected results. BCF is accepted only in its recorded bounded scope. SAL remains NOT IMPLEMENTED / NOT RUN until its new obligations and frozen evidence are reconciled with explicit Owner review; release acceptance remains separate.

@@ -4,6 +4,23 @@
 
 The application now uses LINQ to DB and typed native Microsoft.Data.SqlClient behind Application interfaces. [RESP](plans/20261018-002-respawn-fixture-reuse.md) established the accepted test-fixture baseline; [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) completed its provider conversion and T07 correctness/package/Local smoke acceptance with verified temporary-resource cleanup. [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) is complete in its approved scope. BCI is implemented/accepted historical UI work. The completed [BCF roadmap](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); it preserves this supported schema, DbUp history and business semantics. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. See [PERSISTENCE](PERSISTENCE.md) for provider/transaction ownership and [CONTRACTS](CONTRACTS.md) for public DTO behavior.
 
+## Approved schema10 extension — not implemented
+
+The schema9 inventory below remains the current source contract. [Direct Sales](DIRECT_SALES.md) and [costing](DIRECT_SALES_COSTING.md) define the approved next schema under [SAL](plans/20261021-002-direct-sales-and-moving-average-costing.md):
+
+| Proposed object/change | Required invariant |
+|---|---|
+| SalesReceipts | SaleId bigint, unique server SaleNo, date/customer/warehouse/employee, Draft/Posted, audit and rowversion |
+| SalesReceiptLines | SaleLineId and unique (SaleId, LineNo); duplicate Product allowed; Qty18,4, UnitPrice19,4, Unit snapshot, IsGift and computed LineAmount28,4 |
+| Posted line cost | PostedUnitCost28,8 and CostAmount28,4 are null for Draft and complete/immutable for Posted |
+| Sales number sequence | Separate SA + ten digits, bounded non-cycling bigint sequence |
+| StockValuationEntries | LedgerId PK/FK and signed ValueChange28,4; complete append-only companion for every StockLedger row |
+| StockBalances.InventoryValue | Value28,4 paired atomically with Quantity; nonnegative quantity/value; zero quantity requires zero value |
+
+One new `010_DirectSalesAndValuation.sql` script must validate a complete schema9 baseline, bootstrap value from verified Posted Goods Receipts, and commit with its journal entry atomically. Unknown source movement, mismatched quantity/source, partial state or overflow fails; no historical quantity-ledger rewrite or guessed zero value. Old scripts remain immutable. Sales source links remain polymorphic in StockLedger, so reconciliation and fixture reset must verify them explicitly.
+
+The proposed model does not yet alter the current tables/constraints described below. [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) and the [migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) distinguish accepted design from executable upgrade support.
+
 ## 1. Schema ownership and migration inventory
 
 The authoritative definitions are the embedded [migration scripts](../src/MyDmsVn.Server.DbMigrator/Scripts) and [DatabaseMigrationRunner](../src/MyDmsVn.Server.DbMigrator/DatabaseMigrationRunner.cs). DbUp journals applied scripts in `dbo.SchemaVersions`, serializes migration through the existing application lock and applies each script in its own transaction. The journal is infrastructure metadata, not an application permission catalog.
@@ -123,5 +140,4 @@ Master-data codes/names and active flags are joined from current catalog rows; t
 
 Reconciliation reports ledger-side and balance-side key presence separately before comparing coalesced quantities. A ledger-only key or an extra zero balance is therefore a defect even if both numerical expressions would otherwise become zero. Preserve these checks, not only the final quantity comparison.
 
-Additional document types, negative-stock policy, reversal, costing, sales documents, warehouse transfers or schema changes need separate approved work. They are outside BCF scope. [TEST_POLICY](TEST_POLICY.md) determines focused/shared-change/final execution scope; this model supplies invariants without adding a separate test queue.
-
+Direct sales, no-negative-stock posting and moving-average valuation are now approved SAL work, separate from the implemented schema9/BCF baseline. Reversal, transfers and other unapproved document/costing workflows remain excluded. [TEST_POLICY](TEST_POLICY.md) determines focused/shared-change/final execution scope; this model supplies invariants without adding a separate test queue.

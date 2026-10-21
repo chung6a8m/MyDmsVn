@@ -2,7 +2,15 @@
 
 **Reset date:** 2026-10-18 · **Branch assessed:** `v1a` · **Baseline:** [c7ad32a4b0040f87417973eabd6c12757c54f7d5](https://github.com/chung6a8m/MyDmsVn/commit/c7ad32a4b0040f87417973eabd6c12757c54f7d5).
 
-This page is historical provenance, not an execution queue or a test policy. [The execution index](plans/README.md) records BCF as COMPLETE / OWNER ACCEPTED in its bounded UI scope; no new implementation roadmap is selected. Historical activation checkpoints below retain their original status. Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
+This page is historical provenance, not an execution queue or a test policy. [The execution index](plans/README.md) records BCF as COMPLETE / OWNER ACCEPTED in its bounded UI scope; SAL is now the sole ACTIVE successor, with implementation and runtime evidence NOT RUN. Historical activation checkpoints below retain their original status. Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
+
+## 2026-10-21 — Direct Sales roadmap selected
+
+After PR #41 merged at `35ba2e8a3f37fb07095701eb94f4b56f7941c491`, the Owner selected direct sales receipts, manual price, independent repeated Product lines, gifts, cost tracking, Product filtering, LINQ-first queries and keyset pagination. The Owner then chose moving weighted average and requested design/acceptance/plan documents, activation of that roadmap and a PR into `v1a-pro`.
+
+[ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md), [the business design](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md) record this decision. T00 is READY; no product/schema changes or runtime passes are supplied by the documentation PR. Existing schema9 remains the source fact; schema10/bootstrap and receipt/sale/reconciliation changes are planned.
+
+BCF remains COMPLETE / OWNER ACCEPTED in its original bounded scope, preserving exact candidate revisions, failed trials, NOT TESTED exceptions and Owner dispositions. Earlier completed baselines and retired REL/P6/.NET8 directions are not restarted. Payments, debt, returns and broader production release acceptance remain outside SAL.
 
 ## Established baseline
 
