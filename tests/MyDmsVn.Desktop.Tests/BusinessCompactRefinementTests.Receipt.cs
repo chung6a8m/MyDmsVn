@@ -44,7 +44,16 @@ public sealed partial class BusinessCompactRefinementTests
             WaitCatalog(receipt.ActivateAsync(token));
             var directory = Path.Combine(GuiSqlEnvironment.RepositoryRoot(), "TestResults/bcf-t05-captures/native" + (Environment.GetEnvironmentVariable("MYDMSVN_BCF_EXPECTED_SCALE") ?? "100"));
             Directory.CreateDirectory(directory);
-            void Snapshot(string state) => File.Copy(Capture(shell, "t05-" + state + "-" + width, token), Path.Combine(directory, "receipt-" + width + "-" + mode + "-" + state + ".png"), true);
+            void Snapshot(string state)
+            {
+                var scrollOwners = string.Join(" | ", new Control[] { receipt }.Concat(Descendants(receipt))
+                    .OfType<ScrollableControl>().Where(owner => owner.AutoScroll)
+                    .Select((owner, index) => index + ":" + owner.GetType().Name + "(" + owner.Name + ")=" + owner.AutoScrollPosition + ";client=" + owner.ClientSize));
+                _output.WriteLine("T06_RECEIPT_CAPTURE_STATE=" + state + "; initialWidth=" + width + "; actualTheme=" + BootstrapThemeManager.CurrentTheme.Mode +
+                    "; logicalClient=" + shell.ClientSize + "; mode=" + receipt.WorkspaceMode + "; selectedLine=" + receipt.LineGrid.Selection.ActivePosition +
+                    "; lineScroll=" + receipt.LineGrid.CustomScrollPosition + "; masterScroll=" + receipt.ReceiptGrid.CustomScrollPosition + "; scrollOwners=" + scrollOwners);
+                File.Copy(Capture(shell, "t05-" + state + "-" + width, token), Path.Combine(directory, "receipt-" + width + "-" + mode + "-" + state + ".png"), true);
+            }
             Snapshot("list");
             WaitCatalog(receipt.SelectReceiptAsync(41, token));
 
