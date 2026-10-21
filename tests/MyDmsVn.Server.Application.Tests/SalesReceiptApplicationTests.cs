@@ -12,12 +12,128 @@ using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Sales;
 using MyDmsVn.Server.Application.Security;
+using MyDmsVn.Server.Application.Inventory;
+using MyDmsVn.Server.Domain.Sales;
+using MyDmsVn.Server.Domain.Inventory;
 using Xunit;
 
 namespace MyDmsVn.Server.Application.Tests;
 
 public sealed class SalesReceiptApplicationTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("invalid")]
+    [InlineData("AQ==")]
+    [InlineData("AAAAAAAAAAAA")]
+    public async Task Malformed_post_version_never_opens_uow(string? version)
+    {
+        var factory = new RejectingFactory(); using var provider = Provider(factory, "post");
+        var result = await provider.GetRequiredService<ISender>().Send(new PostSalesReceiptCommand(new PostSalesReceiptRequest(1, version!)));
+        Assert.True(result.IsError); Assert.Contains(result.Errors, error => error.Code == "Validation.InvalidVersion"); Assert.Equal(0, factory.Opened);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Invalid_post_id_never_opens_uow(long id)
+    {
+        var factory = new RejectingFactory(); using var provider = Provider(factory, "post");
+        var result = await provider.GetRequiredService<ISender>().Send(new PostSalesReceiptCommand(new PostSalesReceiptRequest(id, "AAAAAAAAAAA=")));
+        Assert.True(result.IsError); Assert.Equal(ErrorType.Validation, result.FirstError.Type); Assert.Equal(0, factory.Opened);
+    }
+
+    [Theory]
+    [InlineData("read")]
+    [InlineData("write")]
+    [InlineData("deny")]
+    [InlineData("inactive")]
+    public async Task Post_requires_its_independent_permission_and_current_active_actor(string grant)
+    {
+        var factory = new RejectingFactory(); using var provider = Provider(factory, grant);
+        var result = await provider.GetRequiredService<ISender>().Send(new PostSalesReceiptCommand(new PostSalesReceiptRequest(1, "AAAAAAAAAAA=")));
+        Assert.True(result.IsError); Assert.Equal(grant == "inactive" ? ErrorType.Unauthorized : ErrorType.Forbidden, result.FirstError.Type); Assert.Equal(0, factory.Opened);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Post_materializes_authoritative_response_before_commit_and_audits_only_committed_result(bool invalidResponse)
+    {
+        var fixture = new PostFixture { InvalidResponse = invalidResponse };
+        var services = new ServiceCollection(); services.AddServerApplication();
+        services.AddSingleton<IUnitOfWorkFactory>(fixture); services.AddSingleton<ICurrentUserAccessor>(new Actor(true));
+        services.AddSingleton<IPermissionStore>(new Permissions("post")); services.AddSingleton<ISecurityAuditSink>(fixture);
+        using var provider = services.BuildServiceProvider();
+        var result = await provider.GetRequiredService<ISender>().Send(new PostSalesReceiptCommand(new PostSalesReceiptRequest(1, "AAAAAAAAAAA=")));
+        if (invalidResponse) { Assert.True(result.IsError); Assert.DoesNotContain("commit", fixture.Events); Assert.DoesNotContain("audit", fixture.Events); }
+        else
+        {
+            Assert.False(result.IsError); Assert.Equal("AQEBAQEBAQE=", result.Value.Version);
+            Assert.Equal(new[] { "begin", "gate", "header", "snapshot", "balances", "mark", "apply", "commit", "audit", "dispose" }, fixture.Events);
+            Assert.Equal(42, fixture.PostedActor); Assert.Equal(42, fixture.AuditActor);
+        }
+    }
+
+    private sealed class PostFixture : IUnitOfWorkFactory, IUnitOfWork, ISalesReceiptWriteRepository, ISecurityAuditSink
+    {
+        public bool InvalidResponse { get; set; }
+        public string? Failure { get; set; }
+        public int PostedActor { get; private set; }
+        public int? AuditActor { get; private set; }
+        public List<string> Events { get; } = new();
+        public UnitOfWorkState State { get; private set; }
+        public IUnitOfWork Create() => this;
+        public Task<IUnitOfWork> CreateAsync(CancellationToken token) => Task.FromResult<IUnitOfWork>(this);
+        public void BeginTransaction() { Events.Add("begin"); State = UnitOfWorkState.ActiveTransaction; }
+        public T Repository<T>() where T : class => (this as T)!;
+        public void Commit() { Events.Add("commit"); State = UnitOfWorkState.Committed; }
+        public void Rollback() { }
+        public void Dispose() => Events.Add("dispose");
+        public Task AcquirePostingGateAsync(CancellationToken token) { Events.Add("gate"); return Task.CompletedTask; }
+        public Task<SalesReceipt?> LockHeaderAsync(long id, CancellationToken token)
+        { Events.Add("header"); return Task.FromResult<SalesReceipt?>(Failure == "missing" ? null : new SalesReceipt { SaleId = 1, WarehouseId = 1, CustomerId = 1, EmployeeId = 1, Status = Failure == "posted" ? "Posted" : "Draft", Version = Failure == "stale" ? Enumerable.Repeat((byte)1, 8).ToArray() : new byte[8] }); }
+        public Task<SalesReceiptPostSnapshot> LockPostSnapshotAsync(SalesReceipt header, CancellationToken token)
+        {
+            Events.Add("snapshot"); var reference = new SalesCatalogReference(CatalogReferenceState.Active, "Valid");
+            var missing = new SalesCatalogReference(CatalogReferenceState.Missing, null);
+            return Task.FromResult(new SalesReceiptPostSnapshot(new[] { new SalesReceiptLine { SaleId = 1, SaleLineId = 1, LineNo = Failure == "order" ? 2 : 1, ProductId = 1, Unit = "EA", Qty = 1, UnitPrice = 2, LineAmount = 2 } },
+                new SalesReceiptReferenceSnapshot(Failure == "customer" ? missing : reference, Failure == "warehouse" ? missing : reference, Failure == "employee" ? missing : reference,
+                    new Dictionary<int, SalesProductReference> { [1] = new SalesProductReference(Failure == "product" ? CatalogReferenceState.Missing : CatalogReferenceState.Active, "P", "EA") })));
+        }
+        public Task<IReadOnlyDictionary<int, StockValuationState>> LockValuationBalancesAsync(int w, IReadOnlyCollection<int> ids, CancellationToken token)
+        { Events.Add("balances"); return Task.FromResult<IReadOnlyDictionary<int, StockValuationState>>(new Dictionary<int, StockValuationState> { [1] = new StockValuationState(1, 1) }); }
+        public Task<SalesReceipt?> TryMarkPostedAsync(long id, byte[] version, DateTime stamp, int actor, CancellationToken token)
+        { Events.Add("mark"); PostedActor = actor; return Task.FromResult<SalesReceipt?>(new SalesReceipt { SaleId = 1, Status = "Posted", PostedAtUtc = stamp, Version = InvalidResponse ? Array.Empty<byte>() : Enumerable.Repeat((byte)1, 8).ToArray() }); }
+        public Task ApplyPostedInventoryAsync(SalesReceipt h, IReadOnlyList<SalesReceiptLine> lines, IReadOnlyDictionary<int, InventoryIssueCost> costs, DateTime stamp, int actor, CancellationToken token)
+        { Events.Add("apply"); Assert.Equal(42, actor); Assert.Equal(1m, costs[1].CostAmount); return Task.CompletedTask; }
+        public Task WriteAsync(SecurityAuditEntry entry, CancellationToken token)
+        { Assert.Equal(UnitOfWorkState.Committed, State); Assert.False(token.CanBeCanceled); Assert.Equal(SecurityAuditAction.SalesReceiptPost, entry.Action); Assert.Equal(SecurityAuditOutcome.Succeeded, entry.Outcome); AuditActor = entry.UserId; Events.Add("audit"); throw new InvalidOperationException("Expected sink failure after committed business result"); }
+        public Task<SalesReceiptReferenceSnapshot> GetReferenceSnapshotAsync(int c, int w, int e, IReadOnlyCollection<int> p, CancellationToken t) => throw new NotSupportedException();
+        public Task<SalesReceipt> InsertDraftAsync(SalesReceipt h, IReadOnlyList<SalesReceiptLine> l, CancellationToken t) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SalesReceiptLine>> LoadLinesAsync(long id, CancellationToken t) => throw new NotSupportedException();
+        public Task<SalesReceipt> ReplaceDraftAsync(SalesReceipt h, IReadOnlyList<SalesReceiptLine> l, CancellationToken t) => throw new NotSupportedException();
+    }
+
+    [Theory]
+    [InlineData("missing", "SalesReceipt.NotFound")]
+    [InlineData("posted", "SalesReceipt.AlreadyPosted")]
+    [InlineData("stale", "SalesReceipt.ConcurrencyConflict")]
+    [InlineData("customer", "SalesReceipt.CustomerNotFound")]
+    [InlineData("warehouse", "SalesReceipt.WarehouseNotFound")]
+    [InlineData("employee", "SalesReceipt.EmployeeNotFound")]
+    [InlineData("product", "SalesReceipt.ProductNotFound")]
+    [InlineData("order", "SalesReceipt.InvalidStoredLines")]
+    public async Task Post_stops_before_mutation_for_invalid_header_or_missing_references(string failure, string code)
+    {
+        var fixture = new PostFixture { Failure = failure }; var services = new ServiceCollection(); services.AddServerApplication();
+        services.AddSingleton<IUnitOfWorkFactory>(fixture); services.AddSingleton<ICurrentUserAccessor>(new Actor(true));
+        services.AddSingleton<IPermissionStore>(new Permissions("post")); services.AddSingleton<ISecurityAuditSink>(fixture);
+        using var provider = services.BuildServiceProvider();
+        var result = await provider.GetRequiredService<ISender>().Send(new PostSalesReceiptCommand(new PostSalesReceiptRequest(1, "AAAAAAAAAAA=")));
+        Assert.Equal(code, result.FirstError.Code); Assert.DoesNotContain("mark", fixture.Events); Assert.DoesNotContain("apply", fixture.Events); Assert.DoesNotContain("commit", fixture.Events); Assert.DoesNotContain("audit", fixture.Events);
+    }
     // These cases catch a validator that admits invalid buffers and reaches persistence.
     [Theory]
     [InlineData("date")]

@@ -31,6 +31,76 @@ internal sealed class SqlSalesReceiptWriteRepository : ISalesReceiptWriteReposit
 
     public Task AcquirePostingGateAsync(CancellationToken cancellationToken) => _valuation.AcquirePostingGateAsync(cancellationToken);
 
+    public Task<IReadOnlyDictionary<int, StockValuationState>> LockValuationBalancesAsync(int warehouseId,
+        IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) => _valuation.LockBalancesAsync(warehouseId, productIds, cancellationToken);
+
+    public async Task<SalesReceiptPostSnapshot> LockPostSnapshotAsync(SalesReceipt header, CancellationToken cancellationToken)
+    {
+        using var db = _sessions.Borrow(_context, true);
+        var lines = await db.GetTable<SalesReceiptLine>().TableHint("UPDLOCK").TableHint("HOLDLOCK")
+            .Where(row => row.SaleId == header.SaleId).OrderBy(row => row.LineNo).ToArrayAsync(cancellationToken).ConfigureAwait(false);
+        var references = await SalesReferenceLoader.LoadAsync(db, header.CustomerId, header.WarehouseId, header.EmployeeId,
+            lines.Select(line => line.ProductId).ToArray(), cancellationToken).ConfigureAwait(false);
+        return new SalesReceiptPostSnapshot(lines, references);
+    }
+
+    public async Task<SalesReceipt?> TryMarkPostedAsync(long saleId, byte[] expectedVersion, DateTime postedAtUtc,
+        int postedByUserId, CancellationToken cancellationToken)
+    {
+        using var db = _sessions.Borrow(_context, true);
+        var count = await db.GetTable<SalesReceipt>().Where(row => row.SaleId == saleId && row.Status == SalesReceiptStatuses.Draft && row.Version == expectedVersion)
+            .Set(row => row.Status, SalesReceiptStatuses.Posted).Set(row => row.PostedAtUtc, postedAtUtc)
+            .Set(row => row.PostedByUserId, postedByUserId).Set(row => row.UpdatedAtUtc, postedAtUtc)
+            .Set(row => row.UpdatedByUserId, postedByUserId).UpdateAsync(cancellationToken).ConfigureAwait(false);
+        return count == 0 ? null : await db.GetTable<SalesReceipt>().SingleAsync(row => row.SaleId == saleId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task ApplyPostedInventoryAsync(SalesReceipt header, IReadOnlyList<SalesReceiptLine> lines,
+        IReadOnlyDictionary<int, InventoryIssueCost> costsByProductId, DateTime postedAtUtc, int postedByUserId,
+        CancellationToken cancellationToken)
+    {
+        ValidateLines(header.SaleId, lines, create: false);
+        if (lines.Any(line => line.SaleLineId <= 0)) throw new ArgumentException("Persisted line identities are required.", nameof(lines));
+        var groups = lines.GroupBy(line => line.ProductId).OrderBy(group => group.Key).ToArray();
+        var states = _valuation.GetLockedBalances(header.WarehouseId, groups.Select(group => group.Key));
+        if (costsByProductId == null || costsByProductId.Count != groups.Length) throw new ArgumentException("Every Product cost is required.", nameof(costsByProductId));
+        // Validate the complete precomputed allocation against the locked pool before any line or inventory write.
+        foreach (var group in groups)
+        {
+            var state = states[group.Key];
+            var expected = InventoryValuationMath.CalculateIssue(state.Quantity, state.InventoryValue,
+                group.Select(line => new InventoryIssueLine(line.LineNo, line.Qty)).ToArray());
+            if (!costsByProductId.TryGetValue(group.Key, out var cost) || cost.IssueQuantity != expected.IssueQuantity ||
+                cost.CostAmount != expected.CostAmount || cost.PostedUnitCost != expected.PostedUnitCost ||
+                cost.LineCostAmounts.Count != expected.LineCostAmounts.Count || expected.LineCostAmounts.Any(pair =>
+                    !cost.LineCostAmounts.TryGetValue(pair.Key, out var amount) || amount != pair.Value))
+                throw new ArgumentException("The allocation must match the locked stock pool.", nameof(costsByProductId));
+        }
+        InventoryValuationMath.SumAmounts(costsByProductId.Values.Select(cost => cost.CostAmount));
+        using (var db = _sessions.Borrow(_context, true))
+        {
+            foreach (var line in lines)
+            {
+                var cost = costsByProductId[line.ProductId];
+                RequireOne(await db.GetTable<SalesReceiptLine>().Where(row => row.SaleId == header.SaleId && row.SaleLineId == line.SaleLineId && row.PostedUnitCost == null && row.CostAmount == null)
+                    .Set(row => row.PostedUnitCost, cost.PostedUnitCost).Set(row => row.CostAmount, cost.LineCostAmounts[line.LineNo])
+                    .Set(row => row.UpdatedAtUtc, postedAtUtc).Set(row => row.UpdatedByUserId, postedByUserId).UpdateAsync(cancellationToken).ConfigureAwait(false));
+            }
+        }
+        foreach (var line in lines)
+            await _valuation.AppendMovementAsync(new StockLedgerEntry
+            {
+                WarehouseId = header.WarehouseId, ProductId = line.ProductId, DocumentType = "SalesReceipt",
+                DocumentId = header.SaleId, DocumentLineId = line.SaleLineId, QuantityChange = -line.Qty,
+                PostedAtUtc = postedAtUtc, PostedByUserId = postedByUserId
+            }, -costsByProductId[line.ProductId].LineCostAmounts[line.LineNo], cancellationToken).ConfigureAwait(false);
+        foreach (var group in groups)
+        {
+            var cost = costsByProductId[group.Key];
+            await _valuation.ApplyBalanceAsync(header.WarehouseId, group.Key, -cost.IssueQuantity, -cost.CostAmount, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     public async Task<SalesReceiptReferenceSnapshot> GetReferenceSnapshotAsync(int customerId, int warehouseId, int employeeId,
         IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
     {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,6 +11,7 @@ namespace MyDmsVn.Server.Application.Identity
         RoleChanged = 2,
         PermissionChanged = 3,
         GoodsReceiptPost = 4,
+        SalesReceiptPost = 5,
     }
 
     public enum SecurityAuditOutcome
