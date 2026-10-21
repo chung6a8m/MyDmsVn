@@ -36,6 +36,8 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             services.AddTransient<IEmployeeApiClient, LocalEmployeeApiClient>();
             services.AddTransient<ICustomerApiClient, LocalCustomerApiClient>();
             services.AddTransient<IGoodsReceiptApiClient, LocalGoodsReceiptApiClient>();
+            services.AddTransient<ISalesReceiptApiClient, LocalSalesReceiptApiClient>();
+            services.TryAddSingleton<ISalesReceiptPreviewCalculator, LocalSalesReceiptPreviewCalculator>();
             services.AddTransient<IInventoryApiClient, LocalInventoryApiClient>();
             services.AddTransient<ProductCatalogLookupSource>();
             services.AddTransient<WarehouseCatalogLookupSource>();
