@@ -7,7 +7,7 @@
 
 This specification verifies the [Business Compact design](BUSINESS_COMPACT_UI.md) and [BCI implementation plan](plans/20261020-001-business-compact-inline-goods-receipt.md). It is an acceptance ledger, not an executable test manifest or a replacement for [TEST_POLICY](TEST_POLICY.md).
 The product remains Windows Forms `net48`, with the shipped x86 Desktop and current Local application contracts. SourceGrid owns edit lifecycle; application code owns receipt state, validation presentation and command admission.
-All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; A24–A26 have T04 hosted/native and focused package evidence in §8.5; A27–A28 have T05 hosted native 100%/125% layout evidence in §8.6; A29 has candidate1 product09e92d3/testf858ec9 Desktop100/package checkpoint evidence and candidate2 sourcee20b8c7 affected28/28 plus attended follow-up in §8.7; candidate2 Desktop100/125 and separate package100 passed; attended125/final review and A30 are pending. Historical results do not satisfy the new candidate. Existing means source already exists; it does not mean the new inline implementation has passed it.
+All BCI-A identifiers below are stable obligations. A01–A03 have T00 proof-host evidence, A04–A06 have T01 scalar evidence and A08–A11 have T02 adapter-host evidence below; A07/A12–A23 have the focused T03 control evidence in §8.4; A24–A26 have T04 hosted/native and focused package evidence in §8.5; A27–A28 have T05 hosted native 100%/125% layout evidence in §8.6; A29 has candidate1 product09e92d3/testf858ec9 Desktop100/package checkpoint evidence and candidate2 sourcee20b8c7 affected28/28 plus attended follow-up in §8.7; candidate2 Desktop100/125 and separate package100 passed; attended125 replayA+B2 completed normally; final Owner review and A30 sign-off are pending. Historical results do not satisfy the new candidate. Existing means source already exists; it does not mean the new inline implementation has passed it.
 T00–T05 source/test names and T06 `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` are implemented in existing projects. Remaining candidate reconciliation and attended outcomes are evidence obligations, not implemented behavior or inferred PASS. Retain the obligation ID if a reviewed implementation changes a proposed test name.
 T01 implements internal `ReceiptNumericInput.TryParse` and `ReceiptNumericField`; T03 connects them to the receipt controls. T02 implements `GoodsReceiptLinesGrid`, `GoodsReceiptLinesGridAdapter` and `TryFinishEdit(ReceiptEditIntent intent)` as an internal foundation tested against a hosted grid and real VM; T03 now supplies shipping-control command wiring and T04 supplies writable accessibility and active real editor reachability; their exact contracts are owned by the design and plan.
 
@@ -92,8 +92,8 @@ Each row belongs to its named plan task. BCI-T06 reconciles every row and the af
 | BCI-A26 | BCI-T04 | Existing: E-A numeric/lookup guards; New: `Accessible_edits_preserve_validation_and_pending_selection_state` | Native Value/selection actions use the same strict numeric and lookup pipeline as keys/mouse; disabled/stale setters cannot mutate, and pending text is distinguishable from a committed key. | PASS — T04 scoped native/provider/package evidence (§8.5) |
 | BCI-A27 | BCI-T05 | Existing: E-R layout/E-A tab tests; New: `Compact_shell_retains_visible_fields_and_native_focus_order` | At supported workspace widths, windowed/maximized and Light/Dark, controls/header/footer/errors remain visible; native Tab/Shift+Tab follows the design and read-only computed cells do not trap entry flow. | PASS — T05 scoped hosted native 100%/125%; wide 125% work-area fit recorded (§8.6); full frozen acceptance remains T06 |
 | BCI-A28 | BCI-T05 | Existing: E-A render/vendor sizing tests; New: `Cell_editors_and_popups_remain_usable_after_scroll_resize_and_theme_change` | Actual 100%/125% Windows scaling preserves editor text/caret/error visibility, row alignment and popup work-area bounds while scrolling/resizing/theme switching; no focus loss silently commits an unintended value. | PASS — T05 scoped hosted native 100%/125%; wide 125% work-area fit recorded (§8.6); full frozen acceptance remains T06 |
-| BCI-A29 | BCI-T06 | Existing: E-P receipt/invalid/lookup/stale/timeout cases; New: `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` | Actual Login and native inline create/edit/reload/Save/Post flow persists exact decimals and keys; independent SQL proves one movement per line, balance reconciliation and no denied/failed mutation. | PASS — candidate2 automated Desktop100/125 and separate package100 reconcile14 A29 rows per Desktop context; attended100 follow-up PASS; attended125/final review remain A30 (§8.7) |
-| BCI-A30 | BCI-T06 | Existing: E-P/GUI-P5 cleanup evidence; New: candidate reconciliation record | New frozen source/test/package, all required discovery names/Theory rows, attended observations, exception capture and owned resource cleanup reconcile. No missing/skipped/aborted/timed-out mandatory case is credited as PASS. | IN PROGRESS — reconciliation and attended review pending (§8.7) |
+| BCI-A29 | BCI-T06 | Existing: E-P receipt/invalid/lookup/stale/timeout cases; New: `Packaged_inline_receipt_flow_reconciles_with_readonly_sql` | Actual Login and native inline create/edit/reload/Save/Post flow persists exact decimals and keys; independent SQL proves one movement per line, balance reconciliation and no denied/failed mutation. | PASS — candidate2 automated Desktop100/125 and separate package100 reconcile14 A29 rows per Desktop context; attended100 follow-up PASS; attended125 replayA+B2 completed; final Owner review remains A30 (§8.7) |
+| BCI-A30 | BCI-T06 | Existing: E-P/GUI-P5 cleanup evidence; New: candidate reconciliation record | New frozen source/test/package, all required discovery names/Theory rows, attended observations, exception capture and owned resource cleanup reconcile. No missing/skipped/aborted/timed-out mandatory case is credited as PASS. | IN PROGRESS — runtime/artifact reconciliation complete; explicit final Owner review pending (§8.7) |
 
 ## 5. Cross-cutting acceptance rules
 
@@ -668,12 +668,12 @@ The [reviewed diagnostic images](evidence/bci-t06/README.md#automated-refresh-fo
 
 The initial render-fixture trials had keyboard cues hidden and both failed; they are not valid product RED/GREEN evidence. After explicitly enabling and asserting keyboard cues, the corrected fixture passed2/2 with the fix, then failed2/2 against the old product (zero contrasting pixels). A source restore preserved an older timestamp, so the first broader run used the old incremental-build DLL and failed2/26; the restored source was made newer and rebuilt. The corrected product then passed **26/26** BusinessCompactLayoutTests + GoodsReceiptInlineEditorTests, no skip. These fixture/build mistakes remain retained locally. Independent source review found no actionable issue after restoring the declared C# BOM/CRLF.
 
-Candidate1 and f858ec9 broad gates remain immutable checkpoints. New source/test/package source is `e20b8c7f43dc73a9613d7f04d0d52158809663cf`, candidate `0.1.0-bci-t06.2` (`artifacts/release/bci-t06-candidate2`), manifest dirty=false. All205 files were independently rehashed and admitted discovery is415 distinct rows /285 methods including20 package rows. Its full100 and full125 gates each passed415/415 and separate package100 passed20/20; attended125/final review are **pending**; no old gate is relabeled as evidence of this correction. Candidate2 attended100 focus/recovery/Posted follow-up is recorded below; native125 and overall Owner review remain outstanding. Session108 is unaffected by this rendering-only product change.
+Candidate1 and f858ec9 broad gates remain immutable checkpoints. New source/test/package source is `e20b8c7f43dc73a9613d7f04d0d52158809663cf`, candidate `0.1.0-bci-t06.2` (`artifacts/release/bci-t06-candidate2`), manifest dirty=false. All205 files were independently rehashed and admitted discovery is415 distinct rows /285 methods including20 package rows. Its full100 and full125 gates each passed415/415 and separate package100 passed20/20; attended125 replayA+B2 completed normally; explicit final Owner review is **pending**; no old gate is relabeled as evidence of this correction. Candidate2 attended100 follow-up and native125 replayA+B2 are recorded below; overall Owner review remains outstanding. Session108 is unaffected by this rendering-only product change.
 
 
 Candidate2 affected clean-byte gate: **28/28 PASS**, no FAIL/SKIP,4m10, comprising26 hosted layout/editor rows and2 packaged real-SQL uncertain-Post Light/Dark rows. Each package row verifies actual native Tab→Refresh focus, native Enter, readonly Draft after explicit reload, explicit Post retry and exactly one final SQL effect, with normal app drain. TRX SHA256 `2347232DBD506193C2021A4F9F4C5BC725CD1C99293B5B781F70C738B1E6B85C`. All117 local ledgers are positively Dropped at this checkpoint (6 historicalT04 +111 T06); no owned app/probe remains. Attended candidate2 preflight independently admitted native100 and all205 package hashes, without SQL/app allocation. Full required gates and attended review remain pending.
 
-### Candidate2 required gates — in progress
+### Candidate2 required gates — runtime complete, final review pending
 
 | Required gate | Actual result | Local TRX SHA256 |
 |---|---|---|
@@ -681,7 +681,7 @@ Candidate2 affected clean-byte gate: **28/28 PASS**, no FAIL/SKIP,4m10, comprisi
 | Desktop unfiltered100, source/teste20b8c7 | **415/415 PASS**, no FAIL/SKIP/abort/timeout;19m50;415 distinct names exactly match current discovery | `715F5DED3A38657F55A64560D4F541F8087D53F82BA362D075F87A416ED69EA3` |
 | Separate package100, same frozen bytes | **20/20 PASS**, no FAIL/SKIP/abort/timeout;18m17; exact package subset matches current discovery | `27EE07FBD190779174DDD3A33218EDCFFC193148D15B56C9473E3C784E157147` |
 | Desktop unfiltered125, same frozen bytes | **415/415 PASS**, no FAIL/SKIP/abort/timeout;19m56;415 distinct names exactly match current discovery | `E495F222F146D42965529DE297642938D4BBF8C33FE3D897A874A56EFD8F2725` |
-| Attended100 +125, explicit final review | Candidate1 editor/layout and candidate2 focus/recovery/Posted observed100;125/final review pending | See worksheet/captures |
+| Attended100 +125, explicit final review | Candidate1 unchanged editor/layout plus candidate2 focus/recovery/Posted observed100; candidate2 replayA+B2 observed125 with normal exit/cleanup; explicit final review pending | See worksheet/captures |
 
 Candidate2 full100 and full125 actual TRX counters, each: total/executed/passed415; all failed/error/timeout/aborted/inconclusive/passedButRunAborted/notRunnable/notExecuted/disconnected/warning/inProgress/pending zero. A01–A29 anchors all resolve to passed actual rows in each context; A29 has14 rows per context across receipt flow, direct deny, invalid input, stale clients, lookup and controlled timeout. No skipped or missing mandatory row is accepted. Current native100 observations are monitor96DPI/100%, HWND96, clients944×600 and1680×900, physical windows960×639 and1696×939, maximized1920×1009 window units, both themes. The100% measurements do not certify125%.
 
@@ -704,7 +704,7 @@ Owner switched Windows Scale to125 after both100 owners drained. The bounded obs
 
 Both themes measured monitor120DPI/125% and target HWND96. At requested944×600 logical, viewport944×600, native client1180×750 physical and window1200×799. Requested1680×900 cannot fit this1920×1080 work area at125%: actual fitted viewport1504×752, native client1880×940 physical, window1900×989; maximized1536×793 window units. These are actual fitted dimensions, not a claim that1680×900 logical was displayed in full. Frozen hosted editor/popup/focus/readonly/error tests passed in this context; attended125 remains separate.
 
-All19 full125 allocations were positively dropped after process/SQL drain. At the boundary before attended125, all175 resource ledgers were Dropped (6 historicalT04 +169 T06), no quarantine/app/probe remained. The automated milestone gates are complete; missing attended125/final review still leave A30 and T06 incomplete.
+All19 full125 allocations were positively dropped after process/SQL drain. At the boundary before attended125, all175 resource ledgers were Dropped (6 historicalT04 +169 T06), no quarantine/app/probe remained. At that checkpoint the automated milestone gates were complete and attended125/final review were pending. The later replayA+B2 below complete attended125; only explicit final Owner review remains.
 
 ### Candidate2 attended100 recovery / Posted follow-up — 2026-10-21
 
@@ -712,7 +712,7 @@ Owner used actual Login, created/saved2.5@4, New/reopened the saved receipt, edi
 
 Four [reviewed captures](evidence/bci-t06/README.md#candidate2-attended-recovery-and-posted--native100-2026-10-21) record the Recovery/Posted states with measured native100, HWND96, client1184×721 and physical window1200×760. These background client captures do not prove active focus; the visible Dark cue is the Owner's foreground observation plus the separate rendered/native-keyboard regressions. The previous candidate1 editor/layout observations remain attributed to that candidate. This is focused attended follow-up, not a new full100/125 milestone sign-off.
 
-Owner closed by X. The owned attended helper exited0 with `ATTENDED_APP_NORMAL_EXIT_AND_DRAIN=PASS` and `ATTENDED_SQL_POSITIVE_CLEANUP=PASS`. At this boundary all118 local resource ledgers were Dropped (6 historicalT04 +112 T06), no quarantine or owned app/probe remained. The subsequent full100 run on unchanged frozen candidate2 bytes passed415/415. Attended125 and final review remain outstanding.
+Owner closed by X. The owned attended helper exited0 with `ATTENDED_APP_NORMAL_EXIT_AND_DRAIN=PASS` and `ATTENDED_SQL_POSITIVE_CLEANUP=PASS`. At this boundary all118 local resource ledgers were Dropped (6 historicalT04 +112 T06), no quarantine or owned app/probe remained. The subsequent full100 run on unchanged frozen candidate2 bytes passed415/415. At that checkpoint attended125 and final review remained outstanding; later replayA+B2 below complete attended125, leaving final Owner review pending.
 
 ### Retained development/checkpoint trials
 
@@ -749,3 +749,81 @@ These uncommitted-development runs precede the new freeze. The hidden-cue and st
 | `bci-t06-focus-contrast-red2/focus-contrast-red2.trx` | 0/2; 2 FAIL | `3701E5FE9573774E7E1FF85ABCDA990115162A1FBA9B9A86F0DE654900614EDF` |
 | `bci-t06-focus-scope/focus-scope.trx` | 24/26; 2 FAIL | `C9E74A5A1A0D02EF8C32773595312C4CBE58590A5DF2A3E324339B86BC55CDC1` |
 | `bci-t06-focus-scope2/focus-scope2.trx` | 26/26; 0 FAIL | `58C2BC67EA4D8BEE96CD8575422388DA70BC10B2A1BAA0A70C78B1410CC37A4B` |
+
+### Attended125 attempt1 timeout and mandatory replay — 2026-10-21
+
+The first candidate2 attended125 session used the same frozen bytes and actual native125. Owner completed Login/create/Save/reopen/edit, Product keys including explicit Dark Down, numeric8.00001/raw error/caret retention across themes, layout/scroll/temp-row identity, controlled Post timeout/locks/Refresh and final Posted readonly observations. Readonly SQL verified saved Draft/no stock, unchanged Draft/no stock around explicit reload, and one final movement/balance3.125 before the deadline. These are completed **OBSERVED** facts, not a passed full attended session.
+
+The owned30-minute budget expired before normal exit was recorded: `GuiOwnedProcess` returned **TimedOut**, exit-1, cleanup verified=True. The owner later reported closing by X, but the normal-exit marker is absent and is not inferred. The finally block positively dropped the owned database/principals; all176 resource ledgers were Dropped and no app/probe remained. The failed trial remains retained locally, including its reviewed original captures and capture boundary. This timing failure is not credited as PASS.
+
+A proposed45-minute support retry was rejected by the unchanged harness's hard30-minute attended maximum (`ArgumentOutOfRangeException`, timeout). No app launched and no actual Login is credited; the temporary handoff was closed and SQL cleanup passed, taking the boundary to177 Dropped ledgers. The unsupported support configuration is retained as a failed development trial, excluded from acceptance; no harness maximum or product/test/package byte was changed.
+
+Review against TEST_POLICY's frozen-candidate/full-run rule requires rerunning the mandatory attended125 matrix, not replacing the failed full attempt with a short lifecycle-only pass. The replay is explicitly split **before execution** into two owned finite30-minute groups on unchanged candidate2: **A** Login/Save/reopen/edit plus both-theme Product/numeric/caret/layout/scroll/native UIA and Draft/no-stock SQL, then normal close/drain; **B** new Login/Draft setup plus both-theme uncertain-Post locks/focus/Enter/retry/Posted readonly, independent SQL one-effect check, then normal close/drain. Both groups and final Owner review must complete before A30/T06 can pass. Automated gates remain valid and are not repeated for an unchanged source or support-only split.
+
+Local failed trial `bci-t06-attended125-candidate2.log` SHA256: `471079BC56D10DDB6E5707A2E176EFBAC7B39D25C26D96D5EAE27343A5CC58EA`.
+
+Local failed trial `bci-t06-attended125-close-retry.log` SHA256: `226095113B20A111D0860243292588FA3E4E74BEC145BC73D27B2A6F5DD1DE8D`.
+
+### Attended125 replay A — editor/layout complete, 2026-10-21
+
+Fresh original30-minute helper, same frozene20b8c7 product/test/package and measured native125. Owner performed actual Login, GUI Save2.5@4/New/reopen/editSave3.125@4. In Light and Dark, the requested Product F2/F4/query/Down/Up/Enter/Escape-popup/Escape-cell/Tab/ShiftTab checks were completed, plus maximize/restore/narrow/HV scroll, temporary-row last-line identity and removal. Owner completed numeric right alignment, F2 Total readonly, invalid8.00001 Save blocking/raw/error/caret and Light→Dark retention. Both reviewed Invalid captures independently expose native Quantity Edit writable and computed Total readonly; original125 capture padding remains documented.
+
+After restoring oneGUI-PROD3.125@4 NoteGUIedited and Save, readonly SQL verified exact saved Draft/no stock. Owner closed by X without an unsaved warning. The owned helper exited0 with normal-app-exit/drain and SQL-positive-cleanup markers. All178 ledgers were Dropped/no app or probe remained before replayB started. Local log SHA256 `235B86FD8B5FBC1DC7167DF6FD3F1AC98A214233D0FC4EA21106FB1C60105959`. This completes the **editor/layout group only**; recovery/Posted replayB and final review remain pending. No old timed-out trial is relabeled PASS.
+### Attended125 replay B attempt1 — observer failure, 2026-10-21
+
+Same frozen candidate2 bytes and native125. Actual Login/Save/reopen/edit and saved Draft/no-stock SQL passed. Owner explicitly confirmed uncertain-Post mutation locks and visible Status→Tab Refresh focus in Light and Dark; both Recovery captures were reviewed as their actual themes. After the owned fault was removed, explicit Enter reload restored Draft/Post and readonly SQL again verified Draft/no stock. One explicit retry reached Posted: Owner confirmed Dark Posted/F2 Quantity readonly/four mutation buttons locked, and independent SQL verified exactly one movement/balance3.125.
+
+The following Dark Posted capture failed with `System.InvalidOperationException` before a new PNG was written. The support parent cancelled its owned app on the observer exception; normal app exit was not recorded. Positive owned SQL cleanup passed, all179 resource ledgers were Dropped and no owned app remained. This group is **FAILED / cleanup verified**, not PASS; no old Posted capture is credited as this replay. Light Posted and a completed normal lifecycle remain outstanding. Owner explicitly reported keeping the app open on Goods Receipts and only returning to chat. The previous type-only diagnostic cannot assign the root cause; stage-only diagnostics have been added to the ignored observer without changing product/test/package bytes, ownership checks or time budgets.
+
+Local failed log `bci-t06-attended125-B-recovery-posted.log` SHA256: `44A833160EF7A41B37AE3FC4FE1B588CE29081994A4B120B57E2C7570B76728E`. Replay A remains complete within its separate editor/layout scope; B and final Owner review remain pending.
+### Attended125 observer diagnostic — completed, root cause unassigned
+
+A separate short owned session on unchanged candidate2/native125 completed actual Login, saved oneGUI-PROD3.125@4 NoteGUIedited and posted it once. Readonly SQL verified saved Draft/no stock and then exactly one movement/balance3.125. Dark Draft and Dark Posted captures succeeded; after Owner explicitly confirmed F2 Quantity readonly and four mutation buttons locked, a second Dark Posted capture also succeeded. All three images were reviewed locally. This did not reproduce the previous observer exception and does not establish its cause or replace mandatory replayB. Stage-only observer diagnostics preserve the same admission/ownership checks and budgets.
+
+Owner closed normally by X; helper exit0, normal app exit/drain and positive SQL cleanup passed. All180 actual resource ledgers were Dropped; no owned app remained. Diagnostic log SHA256: `968CEBE0C7CC3316D10711C27CF621BFB5C61B8D1CFF58CBDE5B26E4643B647D`.
+
+Support helper v2 isolates only known read-only observer failure stages after child exit1 and verified drain; the failed capture remains explicitly PENDING. Identity/visibility/DPI admission failures, timeout, uncertain cleanup, unexpected exceptions, SQL failures and app failures remain fatal. Each capture attempt uses its own directory and publishes its successful PNG/JSON pair only after all checks. The30-minute app and15-second observer limits remain unchanged. Twelve synthetic classification cases passed (success, four permitted read stages, wrong DPI, exit2, wrong owner, minimized window, timeout, undrained child, unexpected exception), with no SQL allocation/app launch; these are support checks, not additional product Facts or acceptance evidence. Frozen product/test/package bytes are unchanged.
+### Attended125 replay B2 and final reconciliation — 2026-10-21
+
+Fresh helper v2 session began06:46:22+07 and exited0 before06:57:09+07, within the unchanged30-minute limit. Actual Login/Save/New/reopen/edit produced oneGUI-PROD3.125@4 NoteGUIedited. Owner explicitly confirmed uncertain-Post locks and visible Status→Tab Refresh focus in Light and Dark; actual runtime WAITFOR and both reviewed Recovery captures agree with the controlled failure. Readonly SQL verified unchanged Draft/no stock before owned-fault removal and after explicit Status→Tab→Enter reload. Owner confirmed the error cleared/Draft/Post restored, then performed one explicit retry. Independent SQL verified exactly one ledger movement/balance3.125 with expected actor/keys. Owner confirmed Dark Posted/F2 readonly/four mutation locks and completed the same requested Light checks. Both Posted captures expose Product/Quantity/Unit cost/Total ValueReadonlyTrue.
+
+All four [B2 captures](evidence/bci-t06/README.md#candidate2-attended125-replay-b2--completed-recoveryposted-scope) were model-reviewed with their actual themes and distinct successful attempt paths; no stale artifact or failed attempt is used. Native monitor120/125%, HWND96; reported canvas1480×901 and physical window1500×950 remain separate measurements under the documented PrintWindow boundary. B2 has no observer/capture failure marker. Owner closed by X; normal app exit/drain and positive SQL cleanup passed. At the final boundary all181 actual resource ledgers were Dropped (6 historicalT04 +175 T06); no owned app/probe or quarantine remained.
+
+B2 log SHA256: `9F9C22982371C07B4FAD0DC0982C5300D4B4014A9E6C47282A9EE99C847CEF25`. Support-only v2 script SHA256: `4DE4FAE0C30106C213BD598F62E9D39521DBD30691FB4A804D493432029F533A`; stage-diagnostic observer source SHA256: `8B5A2482A4C14BB359286F93C05C4798C858888FD9FF488C855B3B3850D41D18`; actual B2 observer EXE SHA256: `D2005D7ACE97DAEC74972F1F714F52E1670D4A5D878916001375448EB9223D53`;12-case support-check log SHA256: `C7108399D314DC59E9AD7B354EE3867969EA8C5CB72BA3D9EF2C719BD8FC8790`. These local ignored drivers are intentionally distinct from retained product/test source; they only observe the owned app/coordinate existing fixtures. Frozen binaries and mandatory gate results are unchanged.
+
+Final revalidation read actual TRX, exact discovered names and frozen binary hashes; no new product test run is claimed for documentation/support-only work. Session108/108 retains its verified unchanged DLL/TRX; Desktop415/415 at100 and125 plus separate package20/20 remain complete. Each stable A01–A29 anchor below matched these actual passed rows in both contexts. The table is an anchor count, not an additional test total; complete415-row gates include the affected regressions outside these minimal anchors. A30 is documentary reconciliation and direct Owner review, not a zero-row test PASS.
+
+| Acceptance ID | Passed mapped rows, Desktop100 | Passed mapped rows, Desktop125 |
+|---|---|---|
+| BCI-A01 | 1 | 1 |
+| BCI-A02 | 1 | 1 |
+| BCI-A03 | 1 | 1 |
+| BCI-A04 | 4 | 4 |
+| BCI-A05 | 4 | 4 |
+| BCI-A06 | 2 | 2 |
+| BCI-A07 | 1 | 1 |
+| BCI-A08 | 1 | 1 |
+| BCI-A09 | 1 | 1 |
+| BCI-A10 | 1 | 1 |
+| BCI-A11 | 1 | 1 |
+| BCI-A12 | 1 | 1 |
+| BCI-A13 | 1 | 1 |
+| BCI-A14 | 1 | 1 |
+| BCI-A15 | 1 | 1 |
+| BCI-A16 | 1 | 1 |
+| BCI-A17 | 1 | 1 |
+| BCI-A18 | 1 | 1 |
+| BCI-A19 | 1 | 1 |
+| BCI-A20 | 1 | 1 |
+| BCI-A21 | 1 | 1 |
+| BCI-A22 | 4 | 4 |
+| BCI-A23 | 4 | 4 |
+| BCI-A24 | 1 | 1 |
+| BCI-A25 | 1 | 1 |
+| BCI-A26 | 1 | 1 |
+| BCI-A27 | 4 | 4 |
+| BCI-A28 | 2 | 2 |
+| BCI-A29 | 14 | 14 |
+| BCI-A30 | Runtime/artifacts reconciled | Explicit overall Owner review PENDING |
+
+Earlier timed-out/failed trials remain failed with verified cleanup; the diagnostic did not identify the old observer exception's cause. Separate complete replayA+B2 now satisfy the mandatory125 observations without waiving those trials. No unresolved product finding is known from source review or the completed gates. Final BCI UI sign-off remains pending the Owner's explicit review of the completed worksheet; production release prerequisites remain UNACCEPTED / UNSCHEDULED.
