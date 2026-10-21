@@ -4,7 +4,7 @@
 **Source baseline:** `MyDmsVn/v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 This specification supports the sole [SAL execution plan](plans/20261021-002-direct-sales-and-moving-average-costing.md); it is not runtime, UI or release acceptance.
 Read the [Direct Sales design](DIRECT_SALES.md), [costing rules](DIRECT_SALES_COSTING.md) and [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) together.
-T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). Query services, cursor validation, Local/ViewModels and UI below remain proposed and unverified; T01 is not deployable.
+T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 existing Inventory value/average/card projections have [bounded evidence](evidence/sal/20261022-t02-valued-inventory.md). Sales query services, cursor validation, Local/ViewModels and UI below remain proposed and unverified; T01 is not deployable.
 
 ## 1. Scope and source boundaries
 

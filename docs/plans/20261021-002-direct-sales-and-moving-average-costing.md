@@ -10,13 +10,13 @@
 
 **Spec:** [DIRECT_SALES](../DIRECT_SALES.md), [DIRECT_SALES_COSTING](../DIRECT_SALES_COSTING.md), [DIRECT_SALES_QUERY_AND_UI](../DIRECT_SALES_QUERY_AND_UI.md), [ADR 0011](../adr/0011-direct-sales-and-moving-average-costing.md) and [SAL acceptance](../DIRECT_SALES_ACCEPTANCE.md).
 
-**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is IN PROGRESS. GUI, package, frozen T08 and Owner acceptance remain **NOT RUN**.
+**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is complete at `47165ded` ([bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is IN PROGRESS. Native GUI execution, package, frozen T08 and Owner acceptance remain **NOT RUN**.
 **Baseline:** `chung6a8m/MyDmsVn`, `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, after PR #41.
 BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is the next active roadmap; it does not reopen BCF or establish production readiness.
 
 ## Global Constraints
 
-- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; later service/writer/query/Local/UI interfaces remain proposed. Historical baseline facts are not rewritten.
+- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; T02 receipt/reconciliation/projection interfaces are implemented; later Sales service/Post/query/Local/UI interfaces remain proposed. Historical baseline facts are not rewritten.
 - One warehouse, customer and responsible employee per receipt; 1–200 lines; Draft → Posted only; no payment, receivable, return, order/POS, tax, discount, multi-unit or printing workflow.
 - Grid order is exactly `STT / Product / Unit / Quantity / UnitPrice / IsGift / LineAmount`; `Quantity` binds to `Qty`; costing stays outside these seven columns.
 - `Qty decimal(18,4) > 0`; `UnitPrice decimal(19,4) >= 0`, including non-gift zero; amounts/value/cost `decimal(28,4)`; `PostedUnitCost decimal(28,8)`; round ties away from zero.
@@ -46,9 +46,9 @@ BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is t
 |---|---|---|---|---|
 | SAL-T00 | Exact math, contracts, domain and permission definitions | None | COMPLETE — focused evidence | A01–A08, A20 |
 | SAL-T01 | Atomic schema-10 bootstrap, compatibility, grants and reset metadata | T00 | COMPLETE — bounded evidence | A09–A16 |
-| SAL-T02 | Valued Goods Receipt, shared locks, reconciliation and stock reads | T01 | IN PROGRESS | A17–A19, A26–A28, A30 |
-| SAL-T03 | Authorized sales Draft save/detail with stable line identity | T02; consumes T00/T01 | NOT STARTED / BLOCKED by T02 | A20–A24 |
-| SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | NOT STARTED / BLOCKED by T02/T03 | A25–A32 |
+| SAL-T02 | Valued Goods Receipt, shared locks, reconciliation and stock reads | T01 | COMPLETE — bounded evidence | A17–A19, A26–A28, A30 |
+| SAL-T03 | Authorized sales Draft save/detail with stable line identity | T02; consumes T00/T01 | IN PROGRESS | A20–A24 |
+| SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | NOT STARTED / BLOCKED by T03 | A25–A32 |
 | SAL-T05 | LINQ summary queries and both-way keyset paging | T04; consumes T03 | NOT STARTED / BLOCKED by T04 | A33–A40 |
 | SAL-T06 | Local API, session fencing and sales ViewModels | T04, T05 | NOT STARTED / BLOCKED by T04/T05 | A41–A44 |
 | SAL-T07 | Compact seven-column workspace, native keyboard and accessibility | T06 | NOT STARTED / BLOCKED by T06 | A45–A50 |
@@ -59,11 +59,11 @@ Dependencies identify required inputs, and no partial writer cutover can be rele
 Each task records meaningful RED → GREEN evidence, focused verification and a scoped commit after review.
 A task exit verifies only that task's portion of an acceptance row. A row spanning tasks closes only after all its required portions have evidence on the accepted candidate.
 Do not substitute a compile error, empty filter, missing dependency or skipped SQL case for the intended RED behavioral failure.
-T00/T01 implemented selectors and actual discovery are recorded in their evidence. Later test names below remain proposed; inspect source before execution.
+T00–T02 implemented selectors and actual discovery are recorded in their evidence. Later test names below remain proposed; inspect source before execution.
 
 ## File map and ownership
 
-Paths are relative to repository root; baseline paths are historical references. T00/T01 source exists as recorded in evidence; later **new** paths remain proposed.
+Paths are relative to repository root; baseline paths are historical references. T00–T02 source exists as recorded in evidence; later **new** paths remain proposed.
 Read the adjacent current implementation before editing. Keep small feature files and avoid a general Goods Receipt/UI rewrite.
 
 | Owner | Existing files to modify or use | New files |
@@ -188,9 +188,9 @@ Draft cost fields are null; Posted fields required; line identity and `(SaleId,L
 ### SAL-T02 — Shared valuation protocol and valued Goods Receipt
 
 **Interfaces:** New Infrastructure-internal `InventoryValuationCoordinator(ISqlExecutionContext, ILinqToDbSessionFactory)` borrows the caller's transaction.
-Its proposed methods are `Task AcquirePostingGateAsync(CancellationToken)`, `Task<IReadOnlyDictionary<int,StockValuationState>> LockBalancesAsync(int warehouseId,IReadOnlyCollection<int> productIds,CancellationToken)`, `Task AppendMovementAsync(StockLedgerEntry entry,decimal valueChange,CancellationToken)` and `Task ApplyBalanceAsync(int warehouseId,int productId,decimal quantityChange,decimal valueChange,CancellationToken)`.
+Its implemented methods are `Task AcquirePostingGateAsync(CancellationToken)`, `Task<IReadOnlyDictionary<int,StockValuationState>> LockBalancesAsync(int warehouseId,IReadOnlyCollection<int> productIds,CancellationToken)`, `Task AppendMovementAsync(StockLedgerEntry entry,decimal valueChange,CancellationToken)` and `Task ApplyBalanceAsync(int warehouseId,int productId,decimal quantityChange,decimal valueChange,CancellationToken)`.
 `StockValuationState` exposes Quantity/InventoryValue. AppendMovement captures LedgerId and inserts its one companion before returning.
-Add `AcquirePostingGateAsync` to the existing Goods Receipt write interface so its handler calls it immediately after BEGIN.
+The Goods Receipt write interface now exposes `AcquirePostingGateAsync`, `LockValuationBalancesAsync` and `ApplyPostedInventoryAsync`; the handler acquires Shared immediately after BEGIN. The former quantity-only write APIs and callers are removed.
 Application handlers call repository interfaces only; the coordinator remains inaccessible outside Infrastructure.
 Extend `StockBalanceRow` with InventoryValue and nullable AverageUnitCost: null when Q=0, checked round8(V/Q) otherwise.
 Extend `StockCardRow` with ValueChange; DocumentNumber resolves SalesReceipt.SaleNo for sales and existing Goods Receipt numbering for receipts.
@@ -199,15 +199,17 @@ Invalid Q/V state or unrepresentable derived average fails closed; existing inve
 **Test files (new):** `tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/{InventoryValuationWriterTests,InventoryValuationReconciliationTests,InventoryValuationConcurrencyTests}.cs`.
 **Existing coverage:** Goods Receipt command/stock query cases and Foundation ownership/rollback cases affected by the coordinator.
 
-- [ ] Add receipt-value tests for zero-cost stock, individually rounded lines, maximum legal values and overflow rollback; use native SQL oracles independent of calculator and mappings.
-- [ ] Add explicit lock-handshake tests proving Shared gate precedes document/reference/key access, all sorted point/key-range locks precede ledger insertion, and absent rows are protected.
-- [ ] Add reconciliation cases for quantity/value differences, missing/extra keys, missing/extra valuation counterparts, unknown movement types and overflow; verify it never silently repairs corruption.
-- [ ] Add post-versus-reconciliation and reversed-multi-key concurrency cases with independent sessions and finite waits; inspect blockers/order, drain all workers and preserve original failures.
-- [ ] Run discovered Inventory/Foundation selectors and verify intended RED observations.
-- [ ] Implement the common gate using resource `MyDmsVn.InventoryValuation.v1`, owner Transaction, principal public, 15-second acquisition timeout and 30-second command bound; negative return/cancel/deadlock rolls back with no retry.
-- [ ] Route Goods Receipt through shared valuation, lock warehouse/employee/products and all stock keys in canonical order, append quantity+value together and update Q/V atomically.
-- [ ] Acquire Exclusive reconciliation gate before table reads; use ledger → valuation → balances order. Extend stock read DTO/projections and independent value reconciliation under the same ownership contract.
-- [ ] Run focused receipt/ownership/reconciliation/race coverage and affected builds; record raw-SQL escape reasons and generated LINQ checks, then commit T02.
+- [x] Add receipt-value tests for zero-cost stock, individually rounded lines, maximum legal values and overflow rollback; use native SQL oracles independent of calculator and mappings.
+- [x] Add explicit lock-handshake tests proving Shared gate precedes document/reference/key access, all sorted point/key-range locks precede ledger insertion, and absent rows are protected.
+- [x] Add reconciliation cases for quantity/value differences, missing/extra keys, missing/extra valuation counterparts, unknown movement types and overflow; verify it never silently repairs corruption.
+- [x] Add post-versus-reconciliation and reversed-multi-key concurrency cases with independent sessions and finite waits; inspect blockers/order, drain all workers and preserve original failures.
+- [x] Run discovered Inventory/Foundation selectors and verify intended RED observations.
+- [x] Implement the common gate using resource `MyDmsVn.InventoryValuation.v1`, owner Transaction, principal public, 15-second acquisition timeout and 30-second command bound; negative return/cancel/deadlock rolls back with no retry.
+- [x] Route Goods Receipt through shared valuation, lock warehouse/employee/products and all stock keys in canonical order, append quantity+value together and update Q/V atomically.
+- [x] Acquire Exclusive reconciliation gate before table reads; use ledger → valuation → balances order. Extend stock read DTO/projections and independent value reconciliation under the same ownership contract.
+- [x] Run focused receipt/ownership/reconciliation/race coverage and affected builds; record raw-SQL escape reasons and generated LINQ checks, then commit T02.
+
+T02 uses typed LINQ 6.3.0 UPDLOCK/HOLDLOCK/composite-PK point/range locks; the only new native seam is same-transaction `sp_getapplock`. Exact nullable average/signed aggregates and cancellation-aware indexed reconciliation are implemented. GUI constructor adaptations have compile-only evidence.
 
 **Exit:** T02-owned receipt/reconciliation/locking portions of A17–A19/A26–A28/A30 are verified; sale cross-writer and frozen-package portions remain open. Legacy quantity-only writer paths cannot bypass this protocol.
 
@@ -339,5 +341,5 @@ T08 consumes the frozen T00–T07 candidate, implemented case inventory, identic
 
 For each task attach revision, changed behavior, exact command/project/TFM/filter, discovered/executed Facts/Theory rows, pass/fail/skip/not-run, environment and cleanup.
 Keep raw TRX, SQL identities, connection data and proprietary screenshots local; publish sanitized reviewable summaries and resource limitations.
-The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is IN PROGRESS; later writer/workflow/UI/package obligations and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
+The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is complete at `47165ded` ([evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is IN PROGRESS. Sales Post/workflow/UI/package obligations and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
 The owner's approval selects this roadmap and costing design; it is not a claim that the application, SQL migration or future package has passed.

@@ -1,11 +1,11 @@
 # Direct Sales — approved business and architecture design
 
-**Status:** ACTIVE ROADMAP / T00–T01 CHECKPOINTS COMPLETE / FULL SAL INCOMPLETE. **Updated:** 2026-10-22.
+**Status:** ACTIVE ROADMAP / BOUNDED DEVELOPMENT CHECKPOINTS / FULL SAL INCOMPLETE. **Updated:** 2026-10-22.
 **Target:** `v1a-pro`. **Inspected source baseline:** `35ba2e8a3f37fb07095701eb94f4b56f7941c491` (merged PR #41).
 
 The Owner selected direct sales receipts and moving weighted average costing, and requested the necessary documents, an active roadmap and a PR. This document records that decision and implementation rules. Approval of the design does not establish runtime, migration, UI or production acceptance.
 
-The sole queue is [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md), indexed by [plans/README](plans/README.md). Read this design with [costing and persistence](DIRECT_SALES_COSTING.md), [query and desktop interaction](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). Those documents define one roadmap. T00 foundations and T01 schema/bootstrap source are implemented ([T00](evidence/sal/20261022-t00-foundation.md), [T01](evidence/sal/20261022-t01-schema-bootstrap.md)); later writers, services, queries, Local and UI remain proposed. T02 is IN PROGRESS and the checkpoint is not deployable.
+The sole queue is [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md), indexed by [plans/README](plans/README.md). Read this design with [costing and persistence](DIRECT_SALES_COSTING.md), [query and desktop interaction](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). Those documents define one roadmap. T00 foundations and T01 schema/bootstrap source are implemented ([T00](evidence/sal/20261022-t00-foundation.md), [T01](evidence/sal/20261022-t01-schema-bootstrap.md)); T02 receipt/reconciliation/stock reads are implemented ([evidence](evidence/sal/20261022-t02-valued-inventory.md)); Sales Post, services, queries, Local and UI remain incomplete. See the execution index for the active task; the checkpoint is not deployable.
 
 ## 1. Outcome and scope
 
@@ -21,7 +21,7 @@ An authorized user creates a sales Draft, selects a customer, warehouse and resp
 | Filtered receipt list with keyset pagination | Numbered-page jumps, snapshot exports, printing and reporting subsystem |
 | Quantity/value reconciliation and schema9 → schema10 preparation | Multi-currency, unit conversion, reservations, transfers, negative stock and offline/HTTP mode |
 
-The inspected planning baseline has Goods Receipts and quantity-only inventory under scripts001–009. Development source at `81e8aab` adds schema10, Sales persistence shapes and valuation/bootstrap; the running business writer/service cutover is still incomplete. Goods Receipt duplicate-Product restrictions remain specific to Goods Receipts. Preserve the existing net48 product/test graph, Windows x86 Desktop.App and separate DbMigrator, Local adapter and vendor pins. AppCore/.NET 8 remains parked.
+The inspected planning baseline has Goods Receipts and quantity-only inventory under scripts001–009. Development source at `81e8aab` adds schema10, Sales persistence shapes and valuation/bootstrap; T02 adds valued receipt posting, the common coordinator, Exclusive reconciliation and stock projections; Sales Post and the complete service cutover remain incomplete. Goods Receipt duplicate-Product restrictions remain specific to Goods Receipts. Preserve the existing net48 product/test graph, Windows x86 Desktop.App and separate DbMigrator, Local adapter and vendor pins. AppCore/.NET 8 remains parked.
 
 ## 2. Sales receipt behavior
 
@@ -101,7 +101,7 @@ Business audit fields are transactional. Keep existing safe post-commit security
 
 Use SQL CHECK/FK/unique constraints for row-local rules and transactional repository validation for cross-table state/snapshot invariants. Persist server-calculated LineAmount; derive header totals from all lines, avoiding a second independently editable header-total source. Validate total precision before Save/Post and in query mappings. No direct client write API for balances, quantity ledger or valuation ledger.
 
-Extend the existing stock read models without replacing their paging contract: `StockBalanceRow` adds InventoryValue and nullable AverageUnitCost (round8(V/Q) when Q > 0, null when Q = 0); invalid balance states or unrepresentable results fail closed. `StockCardRow` adds ValueChange and resolves sales DocumentNumber from SaleNo as well as existing Goods Receipt numbers. Existing Inventory read permissions apply. The value fields and sales-number resolution are part of SAL-T02 and require new query/contract evidence.
+Extend the existing stock read models without replacing their paging contract: `StockBalanceRow` adds InventoryValue and nullable AverageUnitCost (round8(V/Q) when Q > 0, null when Q = 0); invalid balance states or unrepresentable results fail closed. `StockCardRow` adds ValueChange and resolves sales DocumentNumber from SaleNo as well as existing Goods Receipt numbers. Existing Inventory read permissions apply. T02 implements these value fields and sales-number resolution with [bounded query/contract evidence](evidence/sal/20261022-t02-valued-inventory.md). Existing inventory paging remains unchanged; this does not implement the Sales writer/query/UI.
 
 Indexes must support SaleId seek order, selective header filters and Product membership; the [query specification](DIRECT_SALES_QUERY_AND_UI.md) defines candidate indexes and actual SQL/plan evidence. Do not claim an index eliminates all filtered scanning or create every permutation of filters.
 
@@ -141,7 +141,7 @@ Update schema object inventories, explicit least-privilege provisioning/validati
 
 ## 7. Delivery and evidence
 
-T00 foundations and the [reviewed T01 checkpoint](evidence/sal/20261022-t01-schema-bootstrap.md) are complete; T02 is IN PROGRESS. Full workflows, frozen T08 and Owner acceptance remain incomplete. The [plan](plans/20261021-002-direct-sales-and-moving-average-costing.md) gives dependencies, exact proposed locations, test-first behaviors and focused commands. Intermediate task commits are development checkpoints; schema10 is not deployable until all stock writers, reconciliation, guards and packaging agree on the new contract.
+T00 foundations and the [reviewed T01 checkpoint](evidence/sal/20261022-t01-schema-bootstrap.md) are complete; [T02 valued inventory](evidence/sal/20261022-t02-valued-inventory.md) is also complete. The execution index records T03 IN PROGRESS. Sales Post/full workflows, frozen T08 and Owner acceptance remain incomplete. The [plan](plans/20261021-002-direct-sales-and-moving-average-costing.md) gives dependencies, exact proposed locations, test-first behaviors and focused commands. Intermediate task commits are development checkpoints; schema10 is not deployable until all stock writers, reconciliation, guards and packaging agree on the new contract.
 
 The [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) requires arithmetic/conservation, migration/bootstrap/recovery, atomicity/concurrency, LINQ/keyset, authorization/session, native GUI and frozen package evidence. SQL tests use only explicitly designated non-production infrastructure and verified owned database lifecycle. GUI tests require interactive Windows/net48, serialized guarded STA and bounded cleanup. Preserve the removed runner/approval-file boundary and record actual discovery/results rather than inherited counts.
 

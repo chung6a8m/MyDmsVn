@@ -1,11 +1,11 @@
 # ADR 0011 — Direct sales and moving weighted average costing
 
 - **Date:** 2026-10-21
-- **Status:** Accepted design decision; T00/T01 bounded implementation checkpoints complete (2026-10-22)
+- **Status:** Accepted design decision; bounded implementation checkpoints recorded (2026-10-22)
 - **Target/source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491` (PR #41)
 - **Scope:** Local net48 sales, inventory value and the SAL roadmap; not production release acceptance
 
-Implementation note (2026-10-22): T00 foundations and [T01 schema/bootstrap checkpoint](../evidence/sal/20261022-t01-schema-bootstrap.md) are complete at `b5a2f3f` / `81e8aab`. T02 is IN PROGRESS; coherent writer cutover, later workflows and SAL-T08/Owner acceptance remain incomplete. T01 is not deployable. The decision and baseline context below remain historical.
+Implementation note (2026-10-22): T00 foundations and [T01 schema/bootstrap checkpoint](../evidence/sal/20261022-t01-schema-bootstrap.md) are complete at `b5a2f3f` / `81e8aab`. The [T02 receipt/reconciliation/read checkpoint](../evidence/sal/20261022-t02-valued-inventory.md) is complete at `47165ded`; T03 is IN PROGRESS per the execution index. Sales Post, coherent deployment, later workflows and SAL-T08/Owner acceptance remain incomplete. T01 is not deployable. The decision and baseline context below remain historical.
 
 ## Context
 

@@ -1,9 +1,9 @@
 # Direct Sales — moving weighted average costing
 
-**Status:** APPROVED DESIGN / T00–T01 BOUNDED CHECKPOINTS VERIFIED / WRITER CUTOVER INCOMPLETE. **Updated:** 2026-10-22.
+**Status:** APPROVED DESIGN / BOUNDED CHECKPOINTS VERIFIED / SALES WRITER CUTOVER INCOMPLETE. **Updated:** 2026-10-22.
 **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 The Owner selected moving weighted average per `(WarehouseId, ProductId)`, using actual serialized Post order.
-T00 implements exact math and T01 implements schema/bootstrap/admission/mappings/grants/reset ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). Receipt/sale/reconciliation protocol and later workflows remain under implementation in the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md). T01 is not deployable.
+T00 implements exact math and T01 implements schema/bootstrap/admission/mappings/grants/reset ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 implements valued receipt posting, the shared coordinator, Exclusive reconciliation and stock projections ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). Sales Post and later workflows remain under implementation in the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md); the checkpoint is not deployable.
 [Direct Sales](DIRECT_SALES.md) owns document scope; [query/UI design](DIRECT_SALES_QUERY_AND_UI.md) owns presentation; [acceptance](DIRECT_SALES_ACCEPTANCE.md) owns required evidence.
 
 ## 1. Existing implementation and change boundary
@@ -155,7 +155,7 @@ These are design examples, not executed test results.
 
 ## 6. One transaction and one locking protocol
 
-The proposal extends the existing explicit UoW. All participating repositories borrow its current connection/transaction; they never open a hidden connection.
+T02 receipt/reconciliation extends the existing explicit UoW; Sales Post must adopt it in T04. All participating repositories borrow its current connection/transaction; they never open a hidden connection.
 LINQ to DB owns mapped reads, writes and guarded balance updates wherever the pinned provider can express the required operation safely. Application locks use typed native SqlClient on that same transaction; a key-range/locking escape requires recorded evidence that the required semantics cannot be safely expressed through the pinned LINQ provider.
 Bind precision/scale explicitly, materialize/dispose readers before the next command, and never run parallel commands on a UoW connection.
 
@@ -166,7 +166,7 @@ Every Goods Receipt/Sales Post takes `Shared` immediately after transaction begi
 Reconciliation and authorized inventory maintenance take `Exclusive` immediately after transaction begin and before any table/document lock.
 Acquire once, retain until commit/rollback, and never promote an already-held Shared lock to Exclusive during Post.
 The identical database, principal and resource name are essential: they define the lock's identity.
-Use an explicit finite lock timeout, cancellation and a bounded command timeout; initial proposal is 15 seconds for the application lock and 30 seconds per SQL command.
+Use an explicit finite lock timeout, cancellation and a bounded command timeout; T02 uses 15 seconds for the application lock and 30 seconds per SQL command.
 Accept only nonnegative `sp_getapplock` return codes. Timeout, cancellation, deadlock or call failure terminates/rolls back the owned transaction; no continuation without the barrier.
 Do not assume an application-lock deadlock result automatically rolled the transaction back.
 Verify this path with the actual restricted runtime identity; no `db_owner` grant or alternate connection is permitted as a workaround.
@@ -177,6 +177,8 @@ The Exclusive lock waits for admitted writers to finish and blocks new ones befo
 This prevents the old cycle where a writer held a balance key waiting for ledger access while reconciliation held ledger access waiting for balances.
 Changing only Sales, only Goods Receipt, or only reconciliation would leave an unsafe mixed protocol; deploy all consumers together.
 
+T02 uses typed LINQ UPDLOCK/HOLDLOCK/composite-PK point reads and missing-key range protection; no native balance-lock escape was required. Its provider-free StockValuationState validates Q/V, exact nullable average and signed aggregates use checked coefficient arithmetic. Reconciliation takes Exclusive before ledger/valuation/balance/source reads, indexes receipt/sale lines once and cooperatively checks cancellation through materialized analysis and completion. The final-reader cancellation proof uses existing test tracing, without a production hook. Sales source fixtures verify reconciliation diagnostics, not a completed sale writer.
+
 ### 6.2 Required Post sequence
 
 1. Authorize the current actor; start UoW transaction; acquire the Shared barrier.
@@ -185,7 +187,7 @@ Changing only Sales, only Goods Receipt, or only reconciliation would leave an u
 4. Acquire **all** distinct `(WarehouseId, ProductId)` balance locks in ascending tuple order before writing any ledger row. Use sequential point reads, not an assumption that an `ORDER BY` determines physical lock acquisition.
 5. Point-read balances through their unique composite PK using `UPDLOCK, HOLDLOCK`; retain an absent-key range lock as well. Verify the actual SQL/index path and missing-row concurrency behavior. Never treat an unlocked missing row as zero.
 6. Validate quantities, grouped availability, current value invariants and all numeric bounds; compute every new balance and sale cost allocation. Failure in any key aborts the whole document.
-7. Apply the conditional Draft/expected-version transition and cost snapshots; append per-line quantity/value pairs. Capture each inserted ledger identity and use that exact identity for its companion; the existing Task-only receipt ledger API needs an explicit coordinated extension. Apply sorted quantity **and value** deltas together, checking affected-row counts; insert a missing receipt balance only under its held key-range protection.
+7. Apply the conditional Draft/expected-version transition and cost snapshots; append per-line quantity/value pairs. Capture each inserted ledger identity and use that exact identity for its companion; T02 replaces the quantity-only receipt APIs with gate/balance admission and `ApplyPostedInventoryAsync`; its coordinator captures ledger identity and immediately inserts the companion. Apply sorted quantity **and value** deltas together, checking affected-row counts; insert a missing receipt balance only under its held key-range protection.
 8. Commit once. Dispose/rollback on precommit failure. Return persisted snapshots; later security-audit reporting follows the existing committed-operation semantics and never causes a second Post.
 
 The logical guarded update is `Quantity = Quantity + quantityDelta, InventoryValue = InventoryValue + valueDelta` on the already locked row.

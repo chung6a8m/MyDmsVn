@@ -4,7 +4,7 @@ Windows desktop-first SME business software, beginning with Sales & Inventory Fo
 
 ## Current roadmap — v1a-pro
 
-**Updated:** 2026-10-22. **SAL — Direct Sales with moving weighted average** is the sole ACTIVE roadmap, based on merged PR #41 at `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. T00 foundations and the [reviewed T01 schema/bootstrap checkpoint](docs/evidence/sal/20261022-t01-schema-bootstrap.md) are complete; T02 is IN PROGRESS. Full SAL acceptance remains incomplete.
+**Updated:** 2026-10-22. **SAL — Direct Sales with moving weighted average** is the sole ACTIVE roadmap, based on merged PR #41 at `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. T00 foundations and the [reviewed T01 schema/bootstrap checkpoint](docs/evidence/sal/20261022-t01-schema-bootstrap.md) are complete; [T02 valued inventory](docs/evidence/sal/20261022-t02-valued-inventory.md) is complete and T03 is IN PROGRESS per the [execution index](docs/plans/README.md). Full SAL acceptance remains incomplete.
 
 The approved flow is a direct Draft → Posted sale with manual prices, duplicate Product rows, gifts and stock/cost tracking. The grid has seven columns; the list adds Product filtering and SaleId DESC keyset navigation using LINQ to DB. Cost is moving weighted average per warehouse/product at actual Post. Payments, debt and returns are excluded.
 
@@ -24,7 +24,7 @@ BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in the [final bounded scope](docs
 
 ## Working with Codex
 
-Read [AGENTS.md](AGENTS.md), [AI_CONTEXT.md](AI_CONTEXT.md), the [active plan index](docs/plans/README.md), the SAL design/costing/query/acceptance documents, and the sole [TEST_POLICY.md](docs/TEST_POLICY.md). Use focused tests during implementation; SAL-T08 requires a coherent frozen inventory/sales/schema candidate with new SQL, Windows/UI and package evidence. Development source requires schema10 at T01 commit `81e8aab`; the historical shipped baseline remains schema9. Receipt/sale/reconciliation cutover is incomplete, so this checkpoint is not deployable. Documentation-only changes require document checks, not a new SQL/GUI run.
+Read [AGENTS.md](AGENTS.md), [AI_CONTEXT.md](AI_CONTEXT.md), the [active plan index](docs/plans/README.md), the SAL design/costing/query/acceptance documents, and the sole [TEST_POLICY.md](docs/TEST_POLICY.md). Use focused tests during implementation; SAL-T08 requires a coherent frozen inventory/sales/schema candidate with new SQL, Windows/UI and package evidence. Development source requires schema10 at T01 commit `81e8aab`; the historical shipped baseline remains schema9. Receipt/reconciliation now use the shared valuation protocol; Sales Post and coherent runtime deployment remain incomplete, so this checkpoint is not deployable. Documentation-only changes require document checks, not a new SQL/GUI run.
 
 Completed plans and evidence remain historical references. [Retired/out-of-scope directions](docs/DEFERRED_WORK.md) are not a second execution queue; [History](docs/HISTORY.md) records their provenance.
 

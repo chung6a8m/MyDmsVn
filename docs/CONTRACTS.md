@@ -14,7 +14,7 @@ Save carries ordered independent lines with SaleLineId (0 for new), ProductId, Q
 
 `SalesReceiptListRequest`/`SalesReceiptListPage` form a separate cursor contract: optional date/customer/warehouse/employee/status/Product/search, bounded PageSize and validated Cursor; slim Items plus nullable NextCursor/PreviousCursor. Use unique SaleId DESC and Product Any; totals cover all receipt lines. No PageNumber, required TotalCount or reuse of the existing PagedResult offset contract. Cursor encoding is not authorization. Existing catalog/receipt/stock paging remains unchanged unless explicitly extended by SAL.
 
-Future inventory read DTOs add value information and SalesReceipt document-number resolution under the existing Inventory read keys; exact fields are defined in the SAL plan. T01 schema10/mappings are implemented ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)); this inventory read extension remains NOT IMPLEMENTED. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) supplies new compatibility obligations.
+T02 implements the inventory read extension under existing Inventory read keys ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). `StockBalanceRow` constructors require `InventoryValue` and nullable `AverageUnitCost` (null at Q0, checked round8(V/Q) otherwise); `StockCardRow` requires `ValueChange` and resolves SalesReceipt `SaleNo`. Queries reject invalid Q/V/average or a missing valuation companion. Existing COUNT/OFFSET paging is preserved. Reconciliation retains key-presence fields and adds ledger/balance values and Issues; Sales Post remains T04. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) supplies new compatibility obligations.
 
 ## Implemented result envelope
 
