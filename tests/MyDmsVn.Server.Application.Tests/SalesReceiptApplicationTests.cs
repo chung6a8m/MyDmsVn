@@ -313,6 +313,7 @@ public sealed class SalesReceiptApplicationTests
     }
     private sealed class MissingQuery : ISalesReceiptQueryService
     {
+        public Task<SalesReceiptListPage> ListAsync(SalesReceiptListRequest request, CancellationToken cancellationToken) => Task.FromResult(new SalesReceiptListPage(Array.Empty<SalesReceiptListRow>(), null, null));
         public Task<SalesReceiptDto?> GetByIdAsync(long saleId, CancellationToken cancellationToken) => Task.FromResult<SalesReceiptDto?>(null);
     }
 }
