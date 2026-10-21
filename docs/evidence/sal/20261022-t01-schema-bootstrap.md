@@ -4,6 +4,7 @@
 
 ## Candidate and environment
 
+- Development branch: `codex/sal-direct-sales`; planning branch: `v1a-pro`.
 - Product/test/runbook commit: `81e8aab965e1eebd7b2faa40c05182f6ef8cb8eb`,26 files, from review base `707c522b04b29ed4558f057699a614ba0c5d1847`. T00 foundations remain `b5a2f3f059b301e26e01a83bd2a26490ac60dce9`; planning/shipped pre-SAL baseline remains `35ba2e8a3f37fb07095701eb94f4b56f7941c491` / schema9.
 - Frozen26-file working-byte source manifest SHA256: `D0AD2FCACEA403C1B2B779903D430ECCC4E0F06773314E5135C755C5C410D4D0`. Git normalizes CRLF to LF; this hash identifies the recorded working-byte manifest, not a Git tree hash. Committed files match after that normalization.
 - Script010 final working-byte SHA256: `2D1076EF11A4C17B60F8383341E9EA97D1163D41B2A019DDFEBDE25DB569787F`; final provisioning SQL: `153FA5D3DBEAC36F54BA653382FFFC0192C774D8BE3A5BCAB99ED1C59A3AA43E`.

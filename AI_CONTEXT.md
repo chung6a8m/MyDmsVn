@@ -1,6 +1,6 @@
 # MyDmsVn — Current context for Codex
 
-**Branch:** `v1a-pro` · **Updated:** 2026-10-22 · **Planning baseline:** `35ba2e8a3f37fb07095701eb94f4b56f7941c491` (PR #41 merge). This handoff records source facts and planned work, not new runtime acceptance.
+**Planning branch:** `v1a-pro` · **Development branch:** `codex/sal-direct-sales` · **Updated:** 2026-10-22 · **Planning baseline:** `35ba2e8a3f37fb07095701eb94f4b56f7941c491` (PR #41 merge). This handoff records source facts and planned work, not new runtime acceptance.
 
 ## Owner decision and next work
 
