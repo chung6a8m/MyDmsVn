@@ -187,11 +187,14 @@ public sealed class BusinessCompactRefinementTests : IClassFixture<RefinementPro
         finally { BootstrapThemeManager.CurrentTheme = original; }
     });
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
     private static FoundationShellForm Shell() => new FoundationShellForm(
         new FoundationViewModel(new FoundationShellFormTests.ReadyApiClient(), new DesktopNotificationCenter()));
 
     [Fact]
-    public void Graphite_tab_frame_complement_preserves_logical_caption_padding() => Run((token, guard) =>
+    public void Graphite_tab_headers_render_full_caption_without_bright_bands() => Run((token, guard) =>
     {
         var original = BootstrapThemeManager.CurrentTheme;
         try
@@ -207,20 +210,100 @@ public sealed class BusinessCompactRefinementTests : IClassFixture<RefinementPro
             var path = Capture(shell, "tab-edges", token);
             using var image = new Bitmap(path);
             var failures = new List<string>();
+            using var nativeGraphics = shell.Workspace.CreateGraphics();
+            using var captureGraphics = Graphics.FromImage(image);
             for (var index = 0; index < shell.Workspace.TabCount; index++)
             {
                 var rectangle = shell.Workspace.GetTabRect(index);
                 var textWidth = TextRenderer.MeasureText(shell.Workspace.TabPages[index].Text, shell.Workspace.Font, new Size(10000, 100), TextFormatFlags.SingleLine).Width;
+                var nativeWidth = TextRenderer.MeasureText(nativeGraphics, shell.Workspace.TabPages[index].Text, shell.Workspace.Font, new Size(10000, 100), TextFormatFlags.SingleLine).Width;
+                var bitmapWidth = TextRenderer.MeasureText(captureGraphics, shell.Workspace.TabPages[index].Text, shell.Workspace.Font, new Size(10000, 100), TextFormatFlags.SingleLine).Width;
+                _output.WriteLine("TAB_METRICS=" + shell.Workspace.TabPages[index].Text + ";font=" + shell.Workspace.Font + ";deviceDpi=" + shell.Workspace.DeviceDpi + ";graphicsDpi=" + nativeGraphics.DpiX + ";captureDpi=" + captureGraphics.DpiX + ";bounds=" + rectangle + ";defaultText=" + textWidth + ";nativeText=" + nativeWidth + ";bitmapText=" + bitmapWidth);
                 if (rectangle.Width < textWidth + 24) failures.Add("Caption padding too narrow: " + shell.Workspace.TabPages[index].Text + " bounds=" + rectangle + " text=" + textWidth);
+                if (index != shell.Workspace.SelectedIndex && image.GetPixel(shell.Workspace.Left + rectangle.Left + rectangle.Width / 2, shell.Workspace.Top + rectangle.Bottom - 1).GetBrightness() >= .5f)
+                    failures.Add("Bright native bottom band at tab=" + index);
                 var pixel = image.GetPixel(shell.Workspace.Left + rectangle.Left + 1, shell.Workspace.Top + rectangle.Top + 1);
                 if (pixel.GetBrightness() >= .5f) failures.Add("Bright native tab edge: " + index + " color=" + pixel);
             }
+            var receiptHeader = shell.Workspace.GetTabRect(1);
+            using var expectedCaption = new Bitmap(400, receiptHeader.Height);
+            using (var expectedGraphics = Graphics.FromImage(expectedCaption))
+            {
+                expectedGraphics.Clear(BootstrapThemeManager.CurrentTheme.Colors.Surface);
+                TextRenderer.DrawText(expectedGraphics, "Goods Receipts", shell.Workspace.Font, new Rectangle(0, 0, 400, receiptHeader.Height),
+                    BootstrapThemeManager.CurrentTheme.Colors.MutedText, TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
+            }
+            int Glyphs(Bitmap bitmap, Rectangle area)
+            {
+                var count = 0;
+                for (var y = area.Top + 3; y < area.Bottom - 3; y++)
+                    for (var x = area.Left + 3; x < area.Right - 3; x++)
+                        if (bitmap.GetPixel(x, y).GetBrightness() > .5f) count++;
+                return count;
+            }
+            var actualGlyphs = Glyphs(image, new Rectangle(shell.Workspace.Left + receiptHeader.Left, shell.Workspace.Top + receiptHeader.Top, receiptHeader.Width, receiptHeader.Height));
+            var expectedGlyphs = Glyphs(expectedCaption, new Rectangle(Point.Empty, expectedCaption.Size));
+            _output.WriteLine("CAPTION_GLYPH_PIXELS=actual:" + actualGlyphs + ";fullCaption:" + expectedGlyphs);
+            if (actualGlyphs < expectedGlyphs * .95) failures.Add("Full Goods Receipts caption is not rendered: actual=" + actualGlyphs + ";expected=" + expectedGlyphs);
+            for (var x = 0; x < shell.Workspace.GetTabRect(shell.Workspace.TabCount - 1).Right; x++)
+                if (image.GetPixel(shell.Workspace.Left + x, shell.Workspace.Top).GetBrightness() >= .5f)
+                { failures.Add("Bright native top band at x=" + x); break; }
             Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
             Assert.Empty(guard.Exceptions);
         }
         finally { BootstrapThemeManager.CurrentTheme = original; }
     });
 
+    [Theory]
+    [InlineData(BootstrapThemeMode.Light)]
+    [InlineData(BootstrapThemeMode.Dark)]
+    public void Workspace_tabs_keep_native_keyboard_overflow_and_focus_after_theme_switch(BootstrapThemeMode mode) => Run((token, guard) =>
+    {
+        var original = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+            using var shell = Shell();
+            shell.ClientSize = new Size(944, 600);
+            for (var index = 0; index < 12; index++)
+                shell.OpenWorkspace("page-" + index, "Workspace " + index + " – Tồn kho", new Panel(), shell.WorkspaceSessionVersion);
+            shell.Workspace.SelectedIndex = 0;
+            shell.Show();
+            NativeLookupTypingDriver.Activate(shell);
+            shell.Workspace.Focus();
+            for (var index = 1; index < 12; index++)
+            {
+                GoodsReceiptInlineEditorTests.Key(Keys.Right);
+                Assert.Equal(index, shell.Workspace.SelectedIndex);
+            }
+            var page = shell.Workspace.SelectedTab;
+            var handle = shell.Workspace.Handle;
+            shell.ToggleTheme();
+            System.Windows.Forms.Application.DoEvents();
+            Assert.Same(page, shell.Workspace.SelectedTab);
+            Assert.Equal(handle, shell.Workspace.Handle);
+            Assert.True(shell.Workspace.Focused);
+            GoodsReceiptInlineEditorTests.Key(Keys.Left);
+            Assert.Equal(10, shell.Workspace.SelectedIndex);
+            // Request the same focus cues enabled by native keyboard navigation.
+            SendMessage(shell.Handle, 0x0127, new IntPtr(2 | (1 << 16)), IntPtr.Zero);
+            SendMessage(shell.Workspace.Handle, 0x0128, new IntPtr(2 | (1 << 16)), IntPtr.Zero);
+            Assert.True((bool)typeof(Control).GetProperty("ShowFocusCues", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(shell.Workspace)!);
+            var paintedHeader = Rectangle.Empty;
+            shell.Workspace.DrawItem += (_, args) => { if (args.Index == shell.Workspace.SelectedIndex) paintedHeader = args.Bounds; };
+            var capture = Capture(shell, "overflow-tabs", token);
+            using var image = new Bitmap(capture);
+            Assert.False(paintedHeader.IsEmpty);
+            var selected = paintedHeader;
+            var inset = BusinessCompactAppearance.Scale(shell.Workspace, BootstrapThemeManager.CurrentTheme.Metrics.FocusBorderWidth);
+            var x = shell.Workspace.Left + selected.Left + selected.Width / 2;
+            var expectedFocus = BootstrapThemeManager.CurrentTheme.Colors.Focus.ToArgb();
+            Assert.Equal(expectedFocus, image.GetPixel(x, shell.Workspace.Top + selected.Top + inset).ToArgb());
+            Assert.Equal(expectedFocus, image.GetPixel(x, shell.Workspace.Top + selected.Bottom - inset - 1).ToArgb());
+            Assert.Empty(guard.Exceptions);
+        }
+        finally { BootstrapThemeManager.CurrentTheme = original; }
+    });
     [Fact]
     public void Graphite_styles_application_owned_pages_added_after_shell_creation() => Run((token, guard) =>
     {
