@@ -1,6 +1,12 @@
 # Architecture — MyDmsVn
 
-**Status:** Current Local v1 architecture on `v1a-pro`, reconciled 2026-10-21 at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes, with original evidence and exceptions retained. The completed [BCF roadmap](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED for lookup and shell/Products/receipt refinement; [final scope and explicit exceptions](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) preserve missing/failed evidence. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
+**Status:** Current Local v1 architecture on `v1a-pro`, reconciled 2026-10-21 at merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes, with original evidence and exceptions retained. The completed [BCF roadmap](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED for lookup and shell/Products/receipt refinement; [final scope and explicit exceptions](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) preserve missing/failed evidence. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
+
+## Approved extension — SAL, not implemented
+
+[ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) and [Direct Sales](DIRECT_SALES.md) define the sole ACTIVE [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md). It adds a Sales module inside the existing projects/layers, transport-neutral cursor contracts, explicit Read/Write/Post keys and schema10/value inventory. The inspected source still has schema9 and quantity-only stock; all new acceptance is NOT RUN.
+
+The transaction boundary expands to sale status, immutable line costs, quantity/value ledger pairs and balances. Receipt posting and reconciliation adopt the same lock protocol; the [costing specification](DIRECT_SALES_COSTING.md) owns the exact atomicity/bootstrap/locking rules. The [query/UI specification](DIRECT_SALES_QUERY_AND_UI.md) owns LINQ-first filtering, SaleId keyset navigation and the seven-column editor. No new runtime, provider, HTTP host or composition root is introduced.
 
 ## 1. Current system and approved direction
 
@@ -78,9 +84,8 @@ Desktop.App configures Microsoft DI once. Local mode requires runtime database c
 
 ## 7. Validation and change control
 
-[Test policy](TEST_POLICY.md) owns execution scope. Use focused affected tests at task boundaries; broaden SQL coverage for shared fixture/UoW/migration changes and GUI coverage for changed UI behavior. BCI retains its [accepted historical evidence](BUSINESS_COMPACT_ACCEPTANCE.md); new BCF obligations follow [BCF acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). [TEST_STRATEGY](TEST_STRATEGY.md) describes required behavior coverage, not another execution queue.
+[Test policy](TEST_POLICY.md) owns execution scope. Use focused affected tests at task boundaries; broaden SQL coverage for shared fixture/UoW/migration changes and GUI coverage for changed UI behavior. BCI retains its [accepted historical evidence](BUSINESS_COMPACT_ACCEPTANCE.md); BCF retains its [completed bounded acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md), while new obligations follow [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md). [TEST_STRATEGY](TEST_STRATEGY.md) describes required behavior coverage, not another execution queue.
 
 Keep explicit non-production SQL configuration, local allocation ownership/cleanup, finite waits and independent case evidence. SQL projects execute sequentially; interrupted allocations require manual review because no external lease/watchdog/orphan recovery service remains. RESP fixture reuse and the L2DB conversion are completed; preserve their accepted fixture boundaries, reset behavior and direct test commands. Historical acceptance is retained in [HISTORY](HISTORY.md), with unresolved [release prerequisites](DEFERRED_WORK.md#release-prerequisites) outside the active execution queue.
 
-Changes to runtime, transport contracts, authorization, transaction ownership, password migration or ledger semantics require an explicit decision and corresponding ADR. BCF preserves these architectural boundaries.
-
+Changes to runtime, transport contracts, authorization, transaction ownership, password migration or ledger semantics require an explicit decision and corresponding ADR. BCF preserved these architectural boundaries. ADR 0011 explicitly approves the SAL contract/valuation additions while retaining connection, layer and security ownership.

@@ -2,6 +2,12 @@
 
 **Current implementation:** SEC-REBUILD accepted in PR #34; documentation refreshed 2026-10-18. RESP and L2DB preserve these semantics. [ADR 0007](adr/0007-code-defined-permissions-and-single-superuser.md) records the decision; [security administration runbook](SECURITY_ADMINISTRATION_RUNBOOK.md) owns operator commands.
 
+## Approved Sales authorization extension — not implemented
+
+[SAL](DIRECT_SALES.md) adds code-defined Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post`. Read authorizes List/Get including posted cost/gross profit; Write authorizes Create/Update Draft; Post authorizes the atomic posting command. The UI requires Read to open and the relevant action key for mutation; each service independently validates its own key/current actor. Command result DTOs retain existing authorized-write semantics. No separate costing permission is introduced.
+
+Register definitions and audited Post actions explicitly and extend coverage tests. Do not sync permissions, seed grants, auto-authorize Administrator or alter unknown/deprecated/direct-deny/superuser rules. Reuse Local actor snapshots, session fencing, safe post-commit diagnostics and recovery locks. New schema10 object grants/application-lock use require the explicit [SQL security extension](CONFIGURATION_AND_SQL_SECURITY.md); business permissions do not confer SQL administration. All implementation/unauthorized-no-mutation evidence remains NOT RUN.
+
 ## 1. Identity and password compatibility
 
 Current identity tables include Users, Roles, UserRoles, RolePermissions, UserPermissions, SystemSecuritySettings and SecurityAuditEvents. The checked-in migrations define their constraints/revisions. Preserve `Users.PasswordHash`, `PasswordSalt` and algorithm identity when importing legacy data; a separate salt column is not permission to guess the old algorithm.
@@ -53,4 +59,3 @@ Local Mode runs Application code on a client with SQL connectivity. A person con
 Use current audit sinks, safe error mapping and redaction. Workstation log files are not immutable centralized audit. Preserve existing post-commit diagnostics semantics; a log failure does not retroactively roll back committed business data.
 
 [TEST_STRATEGY](TEST_STRATEGY.md) covers active-account/registry/binding checks, direct decisions and roles, protected targets, imports/revisions/audit, legacy boundaries, sessions and unauthorized no-mutation behavior. [TEST_POLICY](TEST_POLICY.md) selects execution scope. Respawn must clear/reseed security state in owned test databases without reintroducing the retired production provisioning workflow.
-

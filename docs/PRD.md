@@ -1,6 +1,6 @@
 # Product requirements — MyDmsVn
 
-**Current scope:** Local v1 on net48 · **Updated:** 2026-10-21 for `v1a-pro` at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`. The initial idea is consolidated into this PRD and current architecture/contracts. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no runtime/API/schema or business-contract change is included. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
+**Current scope:** Local v1 on net48 · **Updated:** 2026-10-21 for `v1a-pro` at merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. The [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md) is approved and ACTIVE, but not implemented. The initial idea is consolidated into this PRD and current architecture/contracts. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no runtime/API/schema or business-contract change is included. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
 
 ## 1. Product goal
 
@@ -29,6 +29,14 @@ One account may hold several roles. For ordinary users, an explicit user decisio
 - Existing password hash/salt columns and an algorithm-aware legacy boundary; legacy account support requires approved vectors or a separately accepted release exclusion.
 
 Product persistence now uses LINQ to DB and typed native SqlClient after L2DB-T03–T06, preserving workflows and contracts. T07 frozen-revision correctness/package/Local smoke acceptance and later GUI-P5 acceptance are complete in their recorded scopes. BCI inline UI acceptance is complete in its recorded scope; BCF has its separate accepted lookup/presentation evidence and explicit exceptions; production release prerequisites remain unaccepted and unscheduled. Respawn changes test infrastructure only.
+
+## 3.1 Approved next scope — Direct Sales
+
+The Owner selected [direct sales receipts](DIRECT_SALES.md) with Draft → Posted, customer/warehouse/employee, manual selling prices, duplicate Product rows and gifts. The exact grid is STT, Product, Unit, Quantity, UnitPrice, Gift checkbox and Amount. Gift revenue is zero while quantity and cost are fully consumed. Preserve entered price on gift toggle.
+
+Cost is [moving weighted average](DIRECT_SALES_COSTING.md) per warehouse/product at actual Post, with immutable posted line costs, no negative stock and atomic document/quantity/value effects. Add valued receipt posting, reconciliation and a verified schema9 → schema10 bootstrap. Draft cost remains unknown/null. Read-only posted cost/profit stays outside the seven-column grid.
+
+The [list contract](DIRECT_SALES_QUERY_AND_UI.md) adds date/customer/warehouse/employee/status/Product/search filters, LINQ queries and SaleId DESC keyset navigation. Product membership returns each receipt once; totals cover the complete receipt. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) is NOT RUN, and source remains schema9 until implementation.
 
 ## 4. Acceptance behavior
 
@@ -60,7 +68,6 @@ Product completion requires behavioral evidence under [TEST_POLICY](TEST_POLICY.
 
 HTTP Server.Api/HttpApiClient, bearer authentication, Local/HTTP parity and product .NET 8 reactivation remain [out of scope](DEFERRED_WORK.md#out-of-scope-directions). They require a separate decision and new approved plan; none belongs to the completed net48 BCF roadmap.
 
-Sales orders/invoices, outbound stock, returns/reversal, pricing, accounting/tax/valuation, transfers, reservations, lots/serials, multiple units, multi-tenancy, offline synchronization and distributed transactions require future approved scope. Customers remain a standalone catalog in this foundation.
+Sales orders, POS, fiscal/e-invoicing, payments, debt, returns/reversal, automatic pricing/discounts, accounting/tax, FIFO/periodic/revaluation, transfers, reservations, lots/serials, multiple units, multi-currency, multi-tenancy, offline synchronization and distributed transactions remain excluded. Direct sales, their outbound stock and moving-average valuation are now approved SAL work; Customers participate when that work is implemented.
 
 The future SQL/Windows support topology, legacy-account support or exclusion, signing/distribution and runtime lifecycle decisions belong to release planning. Codex should use the implemented contracts now, rather than reopening resolved P0/P5 design questions.
-

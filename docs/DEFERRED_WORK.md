@@ -1,6 +1,10 @@
 # Retired directions and scope boundaries
 
-**Updated:** 2026-10-21 at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`. This page is a non-executable scope record. BCI is implemented/accepted historical work; the owner selected [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) as the then-sole active roadmap. BCF repairs three receipt lookups first, then refines the shared shell, Products content and receipt against all three design references. It is now COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no next roadmap is selected. There are no tasks to execute from this page.
+**Updated:** 2026-10-21 at merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. This page is a non-executable scope record. BCI is implemented/accepted historical work; the owner selected [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) as the then-sole active roadmap. BCF repairs three receipt lookups first, then refines the shared shell, Products content and receipt against all three design references. It is now COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); the Owner has now selected [SAL](plans/20261021-002-direct-sales-and-moving-average-costing.md) as the sole ACTIVE successor, not yet implemented. There are no tasks to execute from this page.
+
+## Active scope is recorded elsewhere
+
+[SAL](DIRECT_SALES.md) schedules direct sales, cost/value inventory, LINQ Product filtering and keyset pages. Its migration/bootstrap and scoped package checks are feature acceptance obligations. This page supplies no task queue; the broader operational rollout, support and recovery acceptance below remains unscheduled and cannot be inferred from a feature test.
 
 ## Release prerequisites
 
@@ -14,11 +18,11 @@ GUI-P5 is complete only in its signed scope, including the Warehouse 125% Dark D
 
 | Direction | Current boundary |
 |---|---|
-| P7 / HTTP / remote adapter | Not part of BCF; no new API host, remote security boundary or adapter parity claim |
+| P7 / HTTP / remote adapter | Not part of SAL; no new API host, remote security boundary or adapter parity claim |
 | AppCore / modern runtime | Parked, not shipped; all active product/tests remain net48. The unimplemented reactivation procedure was deleted; no automatic target/lock/package restoration is authorized |
-| New business modules | Sales/invoicing, returns, valuation/tax, transfers, lots/serials, sync and multi-tenancy are not added by a receipt presentation change |
-| New receipt fields | Supplier/tax/discount/lot or other new business contracts require separate scope; BCF preserves the existing receipt and line fields |
-| Distribution tooling | No MSI, auto-updater or new migration framework is scheduled by BCF |
+| Business scope beyond SAL | Orders/POS, payments, debt, returns/reversal, pricing engine, tax/fiscal invoicing, FIFO/periodic/revaluation, transfers, lots/serials, sync and multi-tenancy remain excluded; direct sales and moving-average valuation are approved in SAL |
+| Unapproved receipt fields | Supplier/tax/discount/lot and other fields beyond the explicit SAL seven-column/header contract remain excluded; Goods Receipt keeps its business fields |
+| Distribution tooling | No MSI, auto-updater or new migration framework is scheduled by SAL |
 
 This table records exclusions, not a backlog or checklist. Any future selection needs a fresh design and evidence boundary.
 

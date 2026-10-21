@@ -4,6 +4,14 @@
 
 **Delivered direction and remaining acceptance:** [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) replaced active RepoDb/Dapper consumers with LINQ to DB plus a documented native SqlClient surface after [RESP](plans/20261018-002-respawn-fixture-reuse.md) established the accepted pre-migration fixture baseline. RESP and L2DB-T00–T07 have scoped evidence, including [frozen-revision correctness/package/Local smoke acceptance](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke). [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) is complete in its approved scope. BCI is implemented/accepted historical UI work. The completed [BCF roadmap](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); it preserves this persistence contract; [production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. [ADR 0009](adr/0009-linq2db-local-net48-persistence.md) owns the provider decision; the ownership and behavior rules below apply throughout.
 
+## Approved SAL extension — not yet in source
+
+[SAL](DIRECT_SALES.md) retains the provider and UoW decisions while adding typed Sales mappings/repositories and value inventory. New sales list/detail/filter/aggregate/write operations prefer LINQ to DB; the [query specification](DIRECT_SALES_QUERY_AND_UI.md) requires Product Any/EXISTS and SaleId DESC keyset paging without OFFSET or compulsory counts. Existing native query surfaces are source facts, not a requirement to copy SQL strings into the new module.
+
+The [costing specification](DIRECT_SALES_COSTING.md) requires one quantity/value companion per Posted source line, exact fixed-point arithmetic, stock-key locks acquired before ledger insertion and a transaction-owned Shared writer / Exclusive reconciliation barrier. Receipt posting, sale posting and reconciliation change together. DbUp/metadata, sequences, application locks and narrowly proven locking seams may use parameterized native SQL on the same owned connection/transaction. No hidden query connection or parallel commands on that connection.
+
+Schema10/bootstrap, runtime grants, mappings, compatibility and owned-fixture reset coverage are planned under [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). Current schema remains9; no migration or concurrency evidence is supplied by these documents.
+
 ## 1. Layer separation
 
 Command handlers depend on business repository interfaces in Server.Application. Dedicated query-service interfaces return materialized Contracts DTOs. SQL implementation, provider mapping, execution contexts and connection ownership adapters stay in Server.Infrastructure.
@@ -122,4 +130,3 @@ RESP may reset data only in explicitly owned, disposable test databases through 
 Required invariants include commit/rollback/dispose-without-commit, two repositories sharing a transaction, same-transaction read visibility, independent UoWs, late transaction binding, resolver/lifetime failures, cancellation/exception cleanup, duplicate/concurrent posting, reconciliation and least-privileged security behavior. Mocks alone cannot prove SQL transaction/locking correctness.
 
 RESP was accepted against the pre-migration RepoDb/Dapper baseline first. L2DB-T00 records that accepted commit and freezes fixture boundaries, reset behavior and direct test commands during DAL conversion. Preserve independent native-SQL setup/assertions so a replacement DAL cannot validate itself. Retain necessary fresh-database exceptions; fixture reuse never relaxes observable isolation. Only verified code cutover allows current implementation documentation to describe LINQ to DB as delivered.
-

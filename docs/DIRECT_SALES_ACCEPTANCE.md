@@ -1,0 +1,185 @@
+# Direct Sales — acceptance and evidence ledger
+
+**Status:** APPROVED DESIGN / IMPLEMENTATION NOT STARTED / ALL EXECUTION EVIDENCE NOT RUN.
+**Updated:** 2026-10-21. **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, merged PR #41.
+**Active roadmap:** [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 is READY; T01–T08 are NOT STARTED behind the serial task queue.
+
+Read this ledger with [DIRECT_SALES](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md).
+The approved business direction is direct sale with perpetual moving weighted average by Warehouse + Product.
+The current baseline still has schema9 and quantity-only inventory. Proposed schema10, sales APIs and test names are not implemented facts.
+Documentation review, a merged documentation PR or an approved plan does not satisfy a runtime acceptance row.
+
+BCF/BCI/GUI-P5/L2DB/RESP remain accepted historical work with their exact revisions, failures and bounded exceptions.
+No BCF exception or old test count transfers automatically to a new sales control, schema, query or package.
+[Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
+
+## 1. How to close an acceptance row
+
+A row closes only against its stated candidate and required behavior, with actual executed evidence.
+A task verifies its owned portion; multi-task rows remain open until every required portion is evidenced on the accepted candidate.
+Use [TEST_POLICY](TEST_POLICY.md), [TEST_STRATEGY](TEST_STRATEGY.md) and [tests/README](../tests/README.md); all ten active test projects target `net48`.
+Start with focused source-verified project/filter cases, then broaden for shared protocol/schema and frozen T08 integration.
+Proposed tests must be implemented and discovered before their selectors can be used. An empty filter, compile failure or missing dependency is not an intended RED proof.
+A successful exit with skipped or absent mandatory rows is not PASS. Source review and mocks cannot prove SQL constraints, locks, privileges or transaction atomicity.
+Record independent quantity/value SQL assertions; the expected-value oracle must not call the production calculator or reuse its mappings.
+Native per-key controls, hosted STA tests, real-Login packaged automation and attended review are distinct evidence types.
+Retain all failed/aborted invocations and the scope of a later repair; do not relabel a focused repair as an unfiltered passing run.
+
+Status values for execution are NOT RUN, BLOCKED, FAIL and PASS; bounded Owner dispositions must be explicit and dated.
+At this documentation checkpoint **every SAL-A row below is NOT RUN**, including future review and Owner acceptance.
+
+## 2. Business, precision and conservation
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A01 | T00/T03 | Required customer/warehouse/employee, calendar SaleDate and 1–200 lines are enforced; zero quantity, negative price, invalid precision and 201 lines fail before writes | Application boundary cases plus independent Draft persistence checks | NOT RUN |
+| SAL-A02 | T00/T03/T07 | Ordinary UnitPrice0 is allowed; IsGift forces revenue0 and retains entered price; unchecking restores the computed revenue; gifts consume full stock/cost | Math, save/reload, Post and checkbox observations | NOT RUN |
+| SAL-A03 | T00/T03/T07 | Same Product may occupy several independent lines with distinct quantities/prices/gift flags and stable persisted/client identity | Duplicate/ID0 save, edit, reorder, delete and reload cases; no Product uniqueness | NOT RUN |
+| SAL-A04 | T00/T02/T04 | Qty18,4, price19,4, money28,4 and cost snapshot28,8 limits are checked; exact wide intermediates prevent premature decimal overflow; all line/group/document/balance overflow fails atomically | Boundary/tie/maximum and over-limit vectors; independent fixed expected values and SQL outcomes | NOT RUN |
+| SAL-A05 | T00/T04 | Q20/V300 with paid qty3@25 plus giftqty2 posts revenue75, costs45+30, totalcost75 and profit0; remaining Q15/V225 | Golden vector and independently observed persisted snapshots/ledger/balance | NOT RUN |
+| SAL-A06 | T00/T04 | Q3/V0.0002, two qty1 lines allocate totalcost0.0001 as0.0001/0 and common unitcost0.00006667; remaining Q1/V0.0001; final issue drains both to0 | Tiny-residual, cumulative LineNo allocation and full-depletion assertions | NOT RUN |
+| SAL-A07 | T00/T02/T04 | Post uses current locked Q/V and actual successful posting order; later receipt5@30 after A05 leaves Q20/V375; backdating does not recalculate prior snapshots | Receipt/sale ordering and immutable-history cases with different document dates | NOT RUN |
+| SAL-A08 | T00/T04/T06 | Draft cost/profit is null; Posted line CostAmount is authoritative and totals/profit reconcile exactly; rounded PostedUnitCost is display information, not a recomputation source | Contract round-trips, exact sums, no draft estimate dependency, detail presentation | NOT RUN |
+
+Gift and zero-value movements still require a valuation companion. A legitimate zero is distinct from missing valuation.
+Use midpoint-away-from-zero and check signed profit/value deltas as well as nonnegative monetary inputs.
+For duplicate Products compute demand and group cost once, allocate in original LineNo order, and keep stored lines unmerged.
+
+## 3. Schema10 bootstrap, admission, privilege and recovery
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A09 | T01/T08 | Empty install completes001–010; exact artifact-validated9 upgrades; complete10 reruns as no-op; new schema10 runtime rejects9/partial until complete10, old schema9 runtime rejects10 | Fresh migration, no-op and Desktop preflight cases with exact journal/artifact inventories | NOT RUN |
+| SAL-A10 | T01 | Prefixes001–008, partial010, unknown/future history, altered9 artifacts and unmanaged objects reject before writes; exact9 admission does not become generic old-prefix support | Dedicated malformed-schema allocations and independent unchanged-state assertions | NOT RUN |
+| SAL-A11 | T01 | Every legacy Posted receipt line maps1:1 to the correct existing ledger identity/key/quantity/audit; bootstrap inserts correct per-line rounded value and reconciles every balance | Both-direction correspondence, row counts/keys and independent exact value checks; historical ledger unchanged | NOT RUN |
+| SAL-A12 | T01 | Unknown/negative movements, orphan/duplicate/missing counterparts, extra balance keys even at0, quantity mismatch or any arithmetic overflow fail closed | Corruption/error-boundary fixtures; no guessed opening value or automatic zero backfill | NOT RUN |
+| SAL-A13 | T01/T08 | Fault anywhere in010, including before journaling, rolls back schema/value/bootstrap/journal together; valid9 can rerun; earlier incomplete install prefixes require explicit recovery | Injected fault stages, exact before/after observations and successful valid9 rerun; stated limits | NOT RUN |
+| SAL-A14 | T01/T08 | Sales constraints/IDs/sequence, Unit snapshots, precision, nullable Draft/required Posted cost, companion PK/FK and both append-only protections match the approved schema | Fresh schema/invariant tests, prohibited updates/deletes, source-script hash and runtime artifact checks | NOT RUN |
+| SAL-A15 | T01/T08 | Least-privilege runtime can perform authorized sales/valuation work without schema/admin privileges; migration identity remains separate; new code keys cause no role grants | Restricted-principal SQL cases, explicit provisioning/validator allowlists and permission inventory | NOT RUN |
+| SAL-A16 | T01/T08 | Respawn reset includes sales, value companions, balances and sequence/trigger metadata; reset/seed verification detects drift and prevents cross-test contamination | First/populated/failing reset and fresh/reuse comparison, ownership/journal preservation and worker drain | NOT RUN |
+
+One `010_DirectSalesAndValuation.sql` contains schema and validated bootstrap under the existing per-script transaction.
+Quiesce old clients before migration; the schema migration lock alone does not stop already-open old business transactions.
+No checkpoint may expose schema10 to a quantity-only writer. No accepted test on a disposable database is production rollout approval.
+
+## 4. Existing inventory integration and reconciliation
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A17 | T02/T08 | Goods Receipt retains its existing business behavior and writes individually rounded incoming value with quantity in one UoW; zero-cost stock is valid | Existing receipt regressions plus independent value/rollback assertions | NOT RUN |
+| SAL-A18 | T02/T08 | Stock balances expose Quantity/InventoryValue and derived AverageUnitCost; average is null at Q0, checked round8(V/Q) otherwise; stock card includes ValueChange and correct SalesReceipt document number | Contract/query cases, inactive history, zero/invalid state and mixed receipt/sale stock cards | NOT RUN |
+| SAL-A19 | T02/T08 | Reconciliation detects quantity/value, missing/extra key/companion, unknown movement and sales-line cost mismatches in one consistent state; it does not silently repair | Independent corrupt-state probes and Exclusive-gate transaction/cleanup evidence | NOT RUN |
+
+Invalid zero-quantity/nonzero-value state and unrepresentable average fail closed; no divide-by-zero or display clamping.
+The existing inventory list contracts keep their current paging semantics; the independent sales list uses cursor paging.
+
+## 5. Authorization, Draft lifecycle and identity
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A20 | T00/T03/T06 | Each service enforces its own Active Read/Write/Post key, current account and protected binding; direct Deny/unknown/deprecated keys fail; Read includes approved cost/profit | Application/Local permission and registry cases; no automatic assignment or UI-only authorization | NOT RUN |
+| SAL-A21 | T03 | Draft Create/Update recomputes server amounts; SaleNo is immutable SA+10digits from the separate noncycling bounded sequence; Note1000/noNUL and Sales-only yyyy-MM-dd JSON date strings hold without timezone conversion or global UTC changes | DTO round-trips, sequence boundaries/gaps, validation and fresh persistence tests | NOT RUN |
+| SAL-A22 | T03/T07 | SaleLineId0 creates distinct rows; a positive ID belongs to the locked Draft, occurs once, retains identity; omitted IDs are removed and LineNo follows submitted order | Foreign/repeated ID rejection and reorder tests without transient uniqueness failure | NOT RUN |
+| SAL-A23 | T03/T04 | Save derives Unit from current Product; Post rejects a changed Unit until explicit reload/review/Save; inactive/missing required references reject; historical Posted display remains available | Locked-reference race and UnitChanged cases, stored immutable Unit and no conversion | NOT RUN |
+| SAL-A24 | T03/T04/T06 | Matching opaque rowversion is required; stale Save/Post never overwrites accepted changes; Posted is immutable; uncertain Create cannot trigger an automatic duplicate Create | Concurrent Draft/save/version and outcome-recovery cases; no stock change on Save | NOT RUN |
+
+Commands never accept client amount, cost, Unit, LineNo, SaleNo, status or actor as authoritative.
+Post response contains SaleId, Posted status, PostedAtUtc and the new opaque Version; authoritative detail/cost follows Get.
+No payment, AR, return, Posted reversal, multi-unit or pricing-engine behavior is added to satisfy these rows.
+
+## 6. Sales Post, transactions and concurrency
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A25 | T04 | One Post atomically commits status/audit, frozen line cost, negative quantity movements, matching negative/zero value companions and Q/V balances | Independent before/after SQL observations for every table and returned version | NOT RUN |
+| SAL-A26 | T02/T04 | Receipt and sales writers acquire transaction Shared `MyDmsVn.InventoryValuation.v1` immediately after BEGIN; reconciliation acquires Exclusive before tables | Independent-session lock handshake/DMV evidence, same resource/principal/owner and exact sequence | NOT RUN |
+| SAL-A27 | T02/T04 | All document/reference locks and all sorted stock-key locks precede ledger inserts; absent keys have range protection; reversed multi-key inputs do not introduce inconsistent acquisition | Controlled blocking and absent-row tests, generated SQL/index inspection and bounded worker drain | NOT RUN |
+| SAL-A28 | T02/T04 | A failure after any status/cost/ledger/value/balance write or before commit rolls the entire operation back; no partial value pair or version survives | Injected fault matrix with independent oracles and separate original/cleanup failures | NOT RUN |
+| SAL-A29 | T04 | Same-document concurrent/repeated Post has exactly one economic effect; a now-Posted header returns SalesReceipt.AlreadyPosted, stale still-Draft returns ConcurrencyConflict; reload without implicit retry | Coordinated separate sessions and exact ledger/valuation/status cardinality | NOT RUN |
+| SAL-A30 | T02/T04 | Different sales, sale-versus-receipt, missing-row creation and reconciliation overlap yield legal serialized Q/V results with no lost update or negative stock | Real SQL session/barrier tests, both relevant orderings, deterministic cleanup and no hidden second UoW | NOT RUN |
+| SAL-A31 | T04 | Duplicate/gift total demand is checked before any stock write; one insufficient Product or range/overflow error rejects the whole receipt | Multi-Product/duplicate aggregate demand and all-table unchanged assertions | NOT RUN |
+| SAL-A32 | T02/T04/T06 | App-lock timeout/cancellation/deadlock and uncertain response never auto-replay Post; rollback/disposal is bounded and successful authoritative reload alone resolves uncertainty | 15s lock/30s command bounds, negative return handling, deadlock/timeout and delayed-completion cases | NOT RUN |
+
+A finite wait is not proof the worker stopped: drain actual SQL work and owned connections before reset/drop.
+Security/diagnostic logging after a committed operation must not convert successful stock posting into permission to post again.
+Canonical lock order is gate → document → warehouse/employee/customer as applicable → sorted Products → all sorted stock keys; reconciliation uses gate → ledger → valuation → balances.
+
+## 7. LINQ query, filters and two-way keyset navigation
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A33 | T05 | Inclusive calendar dates and optional customer/warehouse/employee/status/Product/search combine correctly; invalid dates/IDs/status/Search256/NUL reject before query | Contract normalization plus real-SQL combined/filter-boundary cases | NOT RUN |
+| SAL-A34 | T05 | Product membership uses server-side EXISTS; duplicate lines never duplicate headers; LineCount/TotalAmount include the entire receipt | Duplicate-heavy bills, gift/other Product totals, slim projection and generated SQL | NOT RUN |
+| SAL-A35 | T05 | First/Next use SaleIdDESC and retained last-row anchor, strict < comparison and n+1; PageSize defaults50/max200, including size1/full/partial/empty pages | Exact sequences and boundary assertions with no OFFSET/Skip/count requirement | NOT RUN |
+| SAL-A36 | T05 | Previous uses > anchor ASC n+1, trims before reversing and anchors retained displayed endpoints; direction availability is correct | Round trips across exact boundaries and opposite-direction EXISTS probes | NOT RUN |
+| SAL-A37 | T05 | Missing/deleted/nonmatching anchors remain valid comparisons; inserts/delayed commits/date/status edits follow documented live-membership behavior | Controlled concurrent-change scenarios; no cross-request snapshot promise | NOT RUN |
+| SAL-A38 | T05 | Cursor validates exact schema, version, direction, order, positive anchor, bounded base64url/UTF8/JSON and filter/PageSize fingerprint before SQL | 4096char/3072byte limits, malformed/duplicate/unknown fields and every binding mismatch; no authority from hash | NOT RUN |
+| SAL-A39 | T05 | Page, complete totals and availability share one short SERIALIZABLE owned connection/transaction; cancellation disposes it and UI wait never retains it | Connection/transaction instrumentation, consistency/blocking races and positive disposal | NOT RUN |
+| SAL-A40 | T05/T08 | Typed LINQ executes filters/Any/aggregates/order/Take server-side with bounded list payload; parameterized exceptions are justified; indexes support observed workloads | Actual generated SQL/plans/reads for deep and selective both-direction queries; no N+1/client grouping | NOT RUN |
+
+Search is literal substring over SaleNo, Note and customer Code/Name under the existing collation; include `%`, `_`, `[` and Unicode cases.
+Cursor encoding/hash provides consistency, not secrecy/authentication. Current authorization applies independently to every request.
+Keyset avoids increasing OFFSET skips; arbitrary substring search and residual filters still require measured query evidence.
+
+## 8. Local API, session and ViewModel behavior
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A41 | T06 | Local requests preserve typed response/error parity and admitted actor; logout/expiry/replacement or late completion cannot publish another user's data | Deterministic actor/session-generation and cancellation tests | NOT RUN |
+| SAL-A42 | T06 | First/Refresh/filter/PageSize changes reset cursors; Items/applied filters/cursors publish together; old-generation successes/errors are ignored | List VM race and pending/applied-state tests | NOT RUN |
+| SAL-A43 | T06 | Ordinary failed navigation retains last successful page/selection/cursors; authorization loss invalidates protected state; empty later page permits at most one first-page recovery | Failure, denied state and bounded empty-page recovery tests | NOT RUN |
+| SAL-A44 | T06/T07 | Save/Post resolves raw header/line input before decisions; busy/Posted/denied/uncertain locks apply everywhere; failed reload never unlocks recovery | VM/control command admission and uncertain-Post sequence tests | NOT RUN |
+
+No navigation response uses Product as a row identity or manufactures a cursor from an absent retained row.
+No timeout/cancellation/session loss is interpreted as proof that a mutating command did not commit.
+
+## 9. Native desktop, layout and accessibility
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A45 | T07 | Exactly seven ordered columns STT/Product/Unit/Quantity/UnitPrice/IsGift/LineAmount; correct editability, numeric alignment and stable duplicate/ID0 row ownership | Actual grid/accessibility column inventory and add/edit/remove/reorder operations | NOT RUN |
+| SAL-A46 | T07 | Customer/Warehouse/Employee/inline Product and optional list lookups retain per-key text/caret/range/focus across binding and canceled predecessor completion | Native EDIT HWND ownership, individual characters, middle insertion/replacement and per-control observations | NOT RUN |
+| SAL-A47 | T07 | F4/Up/Down/Enter/Escape/Tab/Shift+Tab, paste/mouse/deactivation and historical selection obey pending/committed semantics without accidental dirty/filter/selection changes | Native-key and mouse workflows, explicit logical-key and focus assertions | NOT RUN |
+| SAL-A48 | T07 | Dirty/invalid/recovery Back rejects without losing raw input; admitted query-only Back cancels; same editor/adapter survives presentation; disposal blocks late callbacks | Guarded List/Detail, abandoned-click, session/disposal and exception/DataError cases | NOT RUN |
+| SAL-A49 | T07/T08 | Light/Dark at native100/native125 remains usable at1680×900/1200×760 and944×600 logical sizes; focus/errors/popups and essential commands are reachable | Measured native DPI/client bounds, same-data screenshots and keyboard use; no inherited size exemption | NOT RUN |
+| SAL-A50 | T07/T08 | Accessible names/roles/read-only/checkbox state and validation are accurate; cost/profit is readable outside seven input columns; Draft null and Posted values are clear | Accessibility setters/locked states and attended cost/profit/navigation review in both themes | NOT RUN |
+
+Whole `.Text`, WM_SETTEXT or UIA SetValue is not native per-key evidence.
+Screenshots cannot prove command admission, focus, popup ownership, cancellation, keyboard or accessibility behavior.
+Unavailable monitor space, native DPI, interactive session or human observation remains NOT RUN/BLOCKED with its actual reason.
+
+## 10. Frozen integration, package and Owner acceptance
+
+| ID | Task | Mandatory observable outcome | Required evidence | Status |
+|---|---|---|---|---|
+| SAL-A51 | T08 | All affected Application/Architecture and six SQL owners are reconciled on one frozen candidate; schema/reset changes have matched fresh/reuse observations | Exact commands/actual rows/TFM, sequential owner runs, unchanged candidate and owned allocation/reset/drain/drop outcomes | NOT RUN |
+| SAL-A52 | T08 | Complete Desktop.Session and required native100/native125 Desktop scope reconcile, including both-theme sales behavior and new native lookup obligations | Per-context discovery/TRX, retained failures/repairs, no copied historical totals | NOT RUN |
+| SAL-A53 | T08 | Frozen Windows x86 package and separate admin migrator perform actual Login, schema9 upgrade with old clients quiesced, least-privilege sales flow and schema10 startup checks | Package/source/test/vendor hashes, exact release command, bounded real-package probes and independent SQL assertions | NOT RUN |
+| SAL-A54 | T08 | Attended user confirms all relevant lookups, duplicate/gift workflow, cost/profit and guarded navigation in required native contexts | Dated per-control human observations distinct from automation, actual resource limitations and verified cleanup | NOT RUN |
+| SAL-A55 | T08 | Every SAL row maps to evidence or explicit bounded disposition; Owner accepts the exact frozen feature scope with residual limits; production readiness remains separate | Final evidence index, candidate/rows/deviation reconciliation, dated Owner acceptance and release boundary | NOT RUN |
+
+A mixed old/new writer protocol, accounting/atomicity failure or uncertain cleanup cannot be labeled feature complete.
+Focused feature migration/package acceptance does not waive clean-VM rollout, backup/restore, support/signing or other unaccepted release prerequisites.
+The documentation PR may complete before these future rows; it delivers the approved design and work queue only.
+
+## 11. Evidence record required for each executed scope
+
+| Field | Required content at execution | Current value |
+|---|---|---|
+| Task/acceptance scope | SAL-T IDs, SAL-A IDs, changed behavior and reason for selected breadth | Plan only; NOT RUN |
+| Revisions | Separate product/source, test and vendor revisions; dirty-worktree statement | Baseline recorded above; no SAL implementation |
+| Package | Exact build source, executable/dependency/script hashes and release command | NOT RUN |
+| Commands | Actual restore/build/discovery/test/package invocations, project, net48, filter and x86 settings | NOT RUN |
+| Rows/outcomes | Actual discovered/selected/executed Facts/Theory rows; pass/fail/skip/not-run and reasons | NOT RUN |
+| Environment | OS/SDK/framework/SQL versions, native monitor/window DPI, theme and measured client bounds | NOT RUN |
+| SQL resources | Designated non-production environment, sanitized allocation/ownership verification, resets/seeds, worker drain and cleanup/quarantine | NOT RUN |
+| GUI resources | STA/guard/exception/DataError observations, process ownership/tree/output drain, cancellation and disposal | NOT RUN |
+| Independent assertions | Quantity/value/status/line/ledger/companion/version checks and source of expected values | NOT RUN |
+| Human observations | Attendee/date/control/context/actions/results; separate from automated driver work | NOT RUN |
+| Failures/limitations | Original failure, repair revision/scope, absent resources, unexecuted cases and bounded dispositions | No execution; all mandatory evidence outstanding |
+| Owner decision | Exact candidate and scope accepted, date, deviations and release exclusions | Design selected; feature/package/production acceptance NOT RUN |
+
+Keep raw TRX, connection values, detailed SQL identities, proprietary data and unreviewed screenshots local.
+Publish sanitized evidence with enough detail to reproduce the selected scope and assess limits.
+Later relevant source/schema/test/fixture/dependency/package changes invalidate only the evidence they can affect; rerun that scope honestly.
+This ledger records no completed implementation, SQL, GUI, package or production acceptance at the documentation checkpoint.

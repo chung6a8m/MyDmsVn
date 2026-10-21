@@ -1,19 +1,26 @@
 # Execution roadmap — v1a-pro
 
-**Updated:** 2026-10-21. This index is the sole execution queue. After merging PR #40, the owner selected lookup correctness first and visual parity with all three mockups second. Completed plans remain evidence; retired directions remain unscheduled.
+**Updated:** 2026-10-21. This index is the sole execution queue. After PR #41, the Owner selected SAL as the sole active implementation roadmap. Completed plans remain evidence; retired directions remain unscheduled.
 
-## Current roadmap — no active implementation task
+## Current roadmap — SAL / ACTIVE
 
-BCF-T00–T06 are COMPLETE / OWNER ACCEPTED on 2026-10-21 in the [final bounded scope](../evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). The Owner accepted visual differences, six strict wide125 rows remaining NOT TESTED, deferred T04 Minor and native100 composite evidence. No next roadmap is selected. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
+The Owner selected **direct sales receipts and moving weighted average costing** on 2026-10-21, with manual selling prices, duplicate Product lines, gifts, cost tracking, Product filtering, LINQ-first queries and keyset pagination. The source baseline is merged PR #41 at `35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 
-Read [BCF design](../BUSINESS_COMPACT_REFINEMENT.md), [BCF acceptance](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) and [three retained references](../design-references/business-compact/README.md). These support the same plan and do not define separate queues. The planning baseline is `6040d7bcfca698fc9daba8268bb94e4454e8eacb`; T00–T02 results belong to their exact candidates and input scope. T02 does not establish visual or release acceptance.
+Read [SAL design](../DIRECT_SALES.md), [costing](../DIRECT_SALES_COSTING.md), [query/UI](../DIRECT_SALES_QUERY_AND_UI.md), [ADR 0011](../adr/0011-direct-sales-and-moving-average-costing.md), [acceptance](../DIRECT_SALES_ACCEPTANCE.md) and the [implementation plan](20261021-002-direct-sales-and-moving-average-costing.md). These documents define one queue; approval is not implementation or runtime acceptance.
 
-| Phase | Order | Exit condition |
+| Task | Outcome | Current state |
 |---|---|---|
-| 1 — correct input | T00 failing per-key proof → T01 binding repair → T02 focused Windows gate | All three targets retain text/caret/range and correct committed state; required native100/125 Light/Dark and attended cases pass |
-| 2 — complete visual design | T03 shell/theme → T04 Products → T05 receipt detail → T06 frozen acceptance | All BCF-A01–A23 reconciled; reviewed actual comparisons against all three mockups and explicit Owner disposition |
+| SAL-T00 | Exact arithmetic, domain/contracts and permission definitions | READY — not started |
+| SAL-T01 | Atomic schema10, verified schema9 bootstrap/admission and reset profiles | NOT STARTED — after T00 |
+| SAL-T02 | Valued receipt posting, shared lock protocol, reconciliation and stock reads | NOT STARTED — after T01 |
+| SAL-T03 | Authorized sales Draft lifecycle and version/line identity | NOT STARTED — after T02 |
+| SAL-T04 | Atomic sale Post, cost allocation and stock concurrency | NOT STARTED — after T03 |
+| SAL-T05 | LINQ filtering and keyset list | NOT STARTED — after T04 |
+| SAL-T06 | Local API, ViewModels and session/recovery integration | NOT STARTED — after T05 |
+| SAL-T07 | Compact seven-column UI, native input and accessibility | NOT STARTED — after T06 |
+| SAL-T08 | Frozen integrated SQL/UI/package evidence and Owner disposition | NOT STARTED — after T07 |
 
-**T02 PASS is mandatory before T03 implementation.** The targets are `WarehouseFilterLookup`, `WarehouseLookup` and `EmployeeLookup`; inline Product remains a regression/reference path. Phase 2 explicitly includes Products content and a guarded receipt List/Detail presentation, expanding the historical BCI visual scope.
+All acceptance rows are NOT RUN. The serial order above is the execution queue; the plan records technical dependencies. No task checkpoint is deployable until receipt/sale/reconciliation writers and schema/runtime/reset guards are coherent. Product source still supports schema9; schema10 is approved future work. Payments, debt, returns, HTTP and framework reactivation are excluded. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
 ## Completed baselines — retain, do not restart
 
@@ -25,19 +32,19 @@ Read [BCF design](../BUSINESS_COMPACT_REFINEMENT.md), [BCF acceptance](../BUSINE
 | [L2DB — net48 persistence](20261018-001-linq2db-net48-persistence-migration.md) | T00–T07 complete in plan scope; PR #37 `42d94ba` | [Correctness/package/limited Local smoke](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) |
 | [GUI-P5 — GUI acceptance](20261019-001-full-winforms-gui-p5-acceptance.md) | T00–T06 complete in Owner-approved scope; PR #38 `f37038b` | [Final frozen gates](../GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20); T05 retains its signed Warehouse 125% Dark Down NOT TESTED exception |
 
-Historical counts, product/test revision distinctions and exceptions stay in their canonical ledgers. Historical baselines do not supply the new BCF results or its explicit Owner dispositions. Reconcile the actual new discovery and execution sets at each named gate.
+Historical counts, product/test revision distinctions and exceptions stay in their canonical ledgers. Historical baselines do not supply SAL results or its explicit Owner dispositions. Reconcile the actual new discovery and execution sets at each named gate.
 
 ## Retired unimplemented plans
 
 The unexecuted REL/P6 plan and deferred .NET 8 reactivation procedure remain deleted. The former P7/net8 checklist remains removed from the deferred-work page. [History](../HISTORY.md#2026-10-20--business-compact-roadmap-reset) preserves the original sources and deletion rationale.
 
-[Release prerequisites](../DEFERRED_WORK.md#release-prerequisites) remain unaccepted, unscheduled constraints. P7/HTTP, runtime reactivation and new business modules are outside BCF. Removing their plans neither executes their tasks nor waives production release requirements.
+[Release prerequisites](../DEFERRED_WORK.md#release-prerequisites) remain unaccepted, unscheduled constraints. P7/HTTP and runtime reactivation remain outside SAL; only the explicitly approved direct-sales/valuation scope is newly scheduled. Removing their plans neither executes their tasks nor waives production release requirements.
 
 ## Execution rules
 
 1. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), this index, the selected task, its spec and the sole [TEST_POLICY](../TEST_POLICY.md).
-2. Keep active product/tests `net48`, Windows x86 packages, pinned vendor references and current business/security contracts. Any proven vendor seam needs narrow compatible implementation and explicit pin provenance.
-3. Use focused direct project tests for task work. T02 is the lookup gate; T06 is the broader frozen GUI/package milestone. Do not repeat the entire SQL/GUI matrix for each binding or layout edit.
+2. Keep active product/tests `net48`, Windows x86 packages, pinned vendor references and security/ownership invariants; implement only the explicitly approved SAL business/schema additions. Any proven vendor seam needs narrow compatible implementation and explicit pin provenance.
+3. Use focused direct project tests for task work. SAL-T08 is the frozen integrated milestone; BCF-T02/T06 are historical gates. Do not repeat the entire SQL/GUI matrix for each binding or layout edit.
 4. Keep interactive Windows, serialized guarded STA, bounded owned processes, explicit non-production SQL and positive resource ownership. No global runner, approval-file or automatic prefix cleanup.
 5. Record exact revisions, artifacts, commands actually run, discovered/executed outcomes, environment, resource disposal and limitations. Missing or skipped mandatory evidence is NOT RUN/BLOCKED.
 6. Do not infer new UI or production acceptance from the planning commit, previous test counts, or a successful build.

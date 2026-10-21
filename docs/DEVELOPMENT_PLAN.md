@@ -17,9 +17,15 @@
 
 Product and all ten active test projects target `net48`. Two shipped package directories are Windows x86 Desktop.App and the separate admin DbMigrator. AppCore/net8 is parked. Persistence, explicit UoW, SQL fixture ownership and removed-runner boundaries remain unchanged.
 
+## Approved next implementation — SAL
+
+[Direct Sales and moving weighted average](DIRECT_SALES.md) is ACTIVE from PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md) cover arithmetic/contracts, schema10/bootstrap, valued receipt/reconciliation, sales Draft/Post, LINQ/keyset, Local/VM, seven-column UI and frozen acceptance. T00 is READY; no implementation task or acceptance case is complete.
+
+Approved additions include manual price, repeated Product rows, gifts, Product filtering and cost/profit snapshots. Payments, debt and returns stay excluded. Source still has schema9 and quantity-only stock; schema10 and the exact verified-schema9 upgrade are proposed. No intermediate task is a standalone deployment candidate. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) is entirely NOT RUN.
+
 ## Completed BCF handoff
 
-BCF-T00–T06 are COMPLETE / OWNER ACCEPTED in the [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). All three reference comparisons, exact source/test/package evidence, visual differences, six wide125 NOT TESTED, deferred T04 Minor and native100 composite limitation have explicit disposition. No next implementation roadmap is selected. Existing English copy, data fields, permissions, Save/Post/recovery, row identity and native inline editing are preserved.
+BCF-T00–T06 are COMPLETE / OWNER ACCEPTED in the [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). All three reference comparisons, exact source/test/package evidence, visual differences, six wide125 NOT TESTED, deferred T04 Minor and native100 composite limitation have explicit disposition. SAL is now the active successor; BCF is not restarted. Existing English copy, data fields, permissions, Save/Post/recovery, row identity and native inline editing are preserved.
 
 ## Retired scope and production boundary
 
@@ -29,4 +35,4 @@ Operational support decisions, installation/recovery evidence, legacy credential
 
 ## Evidence discipline
 
-[TEST_POLICY](TEST_POLICY.md) owns execution scope; [TEST_STRATEGY](TEST_STRATEGY.md) owns behavior coverage; [tests/README](../tests/README.md) owns direct commands. Documentation-only work requires diff/link/status/encoding checks. BCF implementation uses focused tests, its T02 input gate and T06 frozen Windows/package milestone. Historical totals and blocked/skipped scenarios cannot establish a new runtime result.
+[TEST_POLICY](TEST_POLICY.md) owns execution scope; [TEST_STRATEGY](TEST_STRATEGY.md) owns behavior coverage; [tests/README](../tests/README.md) owns direct commands. Documentation-only work requires diff/link/status/encoding checks. SAL implementation uses focused tests and T08 frozen integrated evidence; BCF gates remain historical. Historical totals and blocked/skipped scenarios cannot establish a new runtime result.
