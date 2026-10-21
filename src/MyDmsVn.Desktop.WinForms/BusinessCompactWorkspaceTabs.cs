@@ -71,9 +71,10 @@ internal sealed class BusinessCompactWorkspaceTabs : BootstrapTabControl
                 // Use the actual expanded DrawItem bounds, not GetTabRect.
                 var selected = index == _paintedSelectedIndex && !_paintedSelectedBounds.IsEmpty
                     ? _paintedSelectedBounds : GetTabRect(index);
-                graphics.FillRectangle(surface, selected.Left, selected.Top, selected.Width, 1);
-                graphics.FillRectangle(surface, selected.Left, selected.Top, 1, selected.Height);
-                graphics.FillRectangle(surface, selected.Right - 1, selected.Top, 1, selected.Height);
+                var bevel = Focused && ShowFocusCues ? 1 : 2;
+                graphics.FillRectangle(surface, selected.Left, selected.Top, selected.Width, bevel);
+                graphics.FillRectangle(surface, selected.Left, selected.Top, bevel, selected.Height);
+                graphics.FillRectangle(surface, selected.Right - bevel, selected.Top, bevel, selected.Height);
                 continue;
             }
             var header = GetTabRect(index);

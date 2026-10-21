@@ -102,6 +102,15 @@ public sealed class BusinessCompactRefinementTests : IClassFixture<RefinementPro
             var x = (int)((shell.Workspace.Right - 12) * image.Width / (double)shell.ClientSize.Width);
             var y = (int)((shell.Workspace.Top + 12) * image.Height / (double)shell.ClientSize.Height);
             Assert.True(image.GetPixel(x, y).GetBrightness() < .25f, "Rendered unused workspace header must have a Graphite surface.");
+            var accessory = fixture.Lookup.Controls.Cast<Control>().Single(control => control.AccessibleName == "Open lookup results");
+            var origin = shell.PointToClient(accessory.PointToScreen(Point.Empty));
+            var surface = BootstrapThemeManager.CurrentTheme.Colors.Surface.ToArgb();
+            Assert.Equal(surface, image.GetPixel(origin.X + 1, origin.Y + 1).ToArgb());
+            var glyphPixels = 0;
+            for (var row = 2; row < accessory.Height - 2; row++)
+                for (var column = 2; column < accessory.Width - 2; column++)
+                    if (image.GetPixel(origin.X + column, origin.Y + row).ToArgb() != surface) glyphPixels++;
+            Assert.True(glyphPixels > 5, "The actual lookup must paint a visible chevron on its theme surface.");
         }
         Assert.True(shell.Navigation.BackColor.GetBrightness() < .15f, "Graphite navigation must be quieter than the workspace.");
         Assert.Equal("gui", fixture.Driver.Text);
@@ -207,6 +216,8 @@ public sealed class BusinessCompactRefinementTests : IClassFixture<RefinementPro
             shell.Workspace.SelectedIndex = 0;
             shell.Show();
             NativeLookupTypingDriver.Activate(shell);
+            Assert.True(Descendants(shell.Navigation).OfType<Button>().Single(button => button.Name == "CompactBrand").Focus());
+            Assert.False(shell.Workspace.Focused);
             var path = Capture(shell, "tab-edges", token);
             using var image = new Bitmap(path);
             var failures = new List<string>();
@@ -245,9 +256,10 @@ public sealed class BusinessCompactRefinementTests : IClassFixture<RefinementPro
             var expectedGlyphs = Glyphs(expectedCaption, new Rectangle(Point.Empty, expectedCaption.Size));
             _output.WriteLine("CAPTION_GLYPH_PIXELS=actual:" + actualGlyphs + ";fullCaption:" + expectedGlyphs);
             if (actualGlyphs < expectedGlyphs * .95) failures.Add("Full Goods Receipts caption is not rendered: actual=" + actualGlyphs + ";expected=" + expectedGlyphs);
-            for (var x = 0; x < shell.Workspace.GetTabRect(shell.Workspace.TabCount - 1).Right; x++)
-                if (image.GetPixel(shell.Workspace.Left + x, shell.Workspace.Top).GetBrightness() >= .5f)
-                { failures.Add("Bright native top band at x=" + x); break; }
+            for (var band = 0; band < 2; band++)
+                for (var x = 0; x < shell.Workspace.GetTabRect(shell.Workspace.TabCount - 1).Right; x++)
+                    if (image.GetPixel(shell.Workspace.Left + x, shell.Workspace.Top + band).GetBrightness() >= .5f)
+                    { failures.Add("Bright native top band at x=" + x + ";y=" + band); break; }
             Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
             Assert.Empty(guard.Exceptions);
         }
