@@ -1,12 +1,12 @@
 # Direct Sales — acceptance and evidence ledger
 
-**Status:** APPROVED DESIGN / IMPLEMENTATION NOT STARTED / ALL EXECUTION EVIDENCE NOT RUN.
-**Updated:** 2026-10-21. **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, merged PR #41.
-**Active roadmap:** [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 is READY; T01–T08 are NOT STARTED behind the serial task queue.
+**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation focused-verified; complete acceptance rows remain open.
+**Updated:** 2026-10-22. **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, merged PR #41.
+**Active roadmap:** [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 foundation is complete at `b5a2f3f`; T01 is in progress, T02–T08 remain behind the serial task queue. [T00 evidence](evidence/sal/20261022-t00-foundation.md) records its bounded pure portions.
 
 Read this ledger with [DIRECT_SALES](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md).
 The approved business direction is direct sale with perpetual moving weighted average by Warehouse + Product.
-The current baseline still has schema9 and quantity-only inventory. Proposed schema10, sales APIs and test names are not implemented facts.
+The current baseline still has schema9 and quantity-only inventory. Schema10 and sales workflows remain unimplemented at the T00 checkpoint; the cited evidence distinguishes implemented foundation contracts/tests from later proposals.
 Documentation review, a merged documentation PR or an approved plan does not satisfy a runtime acceptance row.
 
 BCF/BCI/GUI-P5/L2DB/RESP remain accepted historical work with their exact revisions, failures and bounded exceptions.
@@ -26,7 +26,7 @@ Native per-key controls, hosted STA tests, real-Login packaged automation and at
 Retain all failed/aborted invocations and the scope of a later repair; do not relabel a focused repair as an unfiltered passing run.
 
 Status values for execution are NOT RUN, BLOCKED, FAIL and PASS; bounded Owner dispositions must be explicit and dated.
-At this documentation checkpoint **every SAL-A row below is NOT RUN**, including future review and Owner acceptance.
+T00-owned arithmetic/contract/registry portions have [focused evidence](evidence/sal/20261022-t00-foundation.md). **Every complete SAL-A row below remains NOT RUN** until its required later owners and frozen candidate evidence are reconciled.
 
 ## 2. Business, precision and conservation
 
@@ -182,4 +182,4 @@ The documentation PR may complete before these future rows; it delivers the appr
 Keep raw TRX, connection values, detailed SQL identities, proprietary data and unreviewed screenshots local.
 Publish sanitized evidence with enough detail to reproduce the selected scope and assess limits.
 Later relevant source/schema/test/fixture/dependency/package changes invalidate only the evidence they can affect; rerun that scope honestly.
-This ledger records no completed implementation, SQL, GUI, package or production acceptance at the documentation checkpoint.
+This ledger records bounded T00 foundation implementation, without complete SAL-row, SQL, GUI, package or production acceptance.

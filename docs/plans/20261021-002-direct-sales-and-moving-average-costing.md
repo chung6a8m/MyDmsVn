@@ -10,7 +10,7 @@
 
 **Spec:** [DIRECT_SALES](../DIRECT_SALES.md), [DIRECT_SALES_COSTING](../DIRECT_SALES_COSTING.md), [DIRECT_SALES_QUERY_AND_UI](../DIRECT_SALES_QUERY_AND_UI.md), [ADR 0011](../adr/0011-direct-sales-and-moving-average-costing.md) and [SAL acceptance](../DIRECT_SALES_ACCEPTANCE.md).
 
-**Status:** APPROVED DESIGN / IMPLEMENTATION NOT STARTED. SAL-T00 is READY; all execution, SQL, GUI and package evidence is **NOT RUN**.
+**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is in progress; SQL, GUI and package evidence remain **NOT RUN**.
 **Baseline:** `chung6a8m/MyDmsVn`, `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, after PR #41.
 BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is the next active roadmap; it does not reopen BCF or establish production readiness.
 
@@ -44,8 +44,8 @@ BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is t
 
 | Task | Deliverable | Dependencies | Current status | Acceptance |
 |---|---|---|---|---|
-| SAL-T00 | Exact math, contracts, domain and permission definitions | None | READY / NOT STARTED | A01–A08, A20 |
-| SAL-T01 | Atomic schema-10 bootstrap, compatibility, grants and reset metadata | T00 | NOT STARTED / BLOCKED by T00 | A09–A16 |
+| SAL-T00 | Exact math, contracts, domain and permission definitions | None | COMPLETE — focused evidence | A01–A08, A20 |
+| SAL-T01 | Atomic schema-10 bootstrap, compatibility, grants and reset metadata | T00 | IN PROGRESS | A09–A16 |
 | SAL-T02 | Valued Goods Receipt, shared locks, reconciliation and stock reads | T01 | NOT STARTED / BLOCKED by T01 | A17–A19, A26–A28, A30 |
 | SAL-T03 | Authorized sales Draft save/detail with stable line identity | T02; consumes T00/T01 | NOT STARTED / BLOCKED by T02 | A20–A24 |
 | SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | NOT STARTED / BLOCKED by T02/T03 | A25–A32 |
@@ -153,14 +153,14 @@ SaleNo is server-owned SA plus ten digits, separate sequence1..9,999,999,999 wit
 **Test files (new):** `tests/MyDmsVn.Server.Application.Tests/{SalesValuationMathTests,SalesContractTests,SalesPermissionTests}.cs`.
 **Existing test owner to extend:** `tests/MyDmsVn.Architecture.Tests/PermissionRegistryCoverageTests.cs`.
 
-- [ ] Add arithmetic tests with independent expected constants: receipts 10×10 and 10×20 produce Q20/V300; sale quantities 3 and gift2 cost 45/30, revenue75 at price25, remaining Q15/V225; later receipt5×30 leaves Q20/V375 without changing prior costs.
-- [ ] Add residual test Q3/V0.0002, two qty1 lines: issue0.0001, costs0.0001/0, common snapshot0.00006667; final remaining-unit sale drains Q/V exactly to zero.
-- [ ] Add tests for midpoint-away rounding, positive quantity, four-place input bounds, zero price, gift retained price, 200/201 lines, amount/group/document/snapshot overflow and intermediate products larger than `decimal`.
-- [ ] Add contract round-trip and permission tests: opaque version, date-only JSON across cultures/DateTime kinds and rejected timestamps/offsets, nullable Draft versus required Posted cost; separate Read/Write/Post; unknown/deprecated deny, active identity and direct Deny, no automatic grants.
-- [ ] Run implemented T00 selectors with the focused command; verify failures demonstrate missing required behavior.
-- [ ] Implement exact scaled-integer math and checked conversions. Compute C=V for S=Q, otherwise round4(V×S/Q); cumulative allocation uses round4(C×cumulativeQty/S), differencing adjacent totals in LineNo order.
-- [ ] Define contracts/domain types and register only the three code-defined Active sales keys. Do not change inventory permission grants or persistence behavior.
-- [ ] Run focused Application/Architecture cases and affected build; record actual RED/GREEN rows, then commit scoped T00 changes.
+- [x] Add arithmetic tests with independent expected constants: receipts 10×10 and 10×20 produce Q20/V300; sale quantities 3 and gift2 cost 45/30, revenue75 at price25, remaining Q15/V225; later receipt5×30 leaves Q20/V375 without changing prior costs.
+- [x] Add residual test Q3/V0.0002, two qty1 lines: issue0.0001, costs0.0001/0, common snapshot0.00006667; final remaining-unit sale drains Q/V exactly to zero.
+- [x] Add tests for midpoint-away rounding, positive quantity, four-place input bounds, zero price, gift retained price, 200/201 lines, amount/group/document/snapshot overflow and intermediate products larger than `decimal`.
+- [x] Add contract round-trip and permission tests: opaque version, date-only JSON across cultures/DateTime kinds and rejected timestamps/offsets, nullable Draft versus required Posted cost; separate Read/Write/Post; unknown/deprecated deny, active identity and direct Deny, no automatic grants.
+- [x] Run implemented T00 selectors with the focused command; verify failures demonstrate missing required behavior.
+- [x] Implement exact scaled-integer math and checked conversions. Compute C=V for S=Q, otherwise round4(V×S/Q); cumulative allocation uses round4(C×cumulativeQty/S), differencing adjacent totals in LineNo order.
+- [x] Define contracts/domain types and register only the three code-defined Active sales keys. Do not change inventory permission grants or persistence behavior.
+- [x] Run focused Application/Architecture cases and affected build; record actual RED/GREEN rows, then commit scoped T00 changes.
 
 **Exit:** Pure arithmetic/contract portions of A01–A08 and the registry portion of A20 are verified; complete acceptance rows remain open for their later persistence/UI owners. No SQL migration or sales workflow is claimed.
 
@@ -339,5 +339,5 @@ T08 consumes the frozen T00–T07 candidate, implemented case inventory, identic
 
 For each task attach revision, changed behavior, exact command/project/TFM/filter, discovered/executed Facts/Theory rows, pass/fail/skip/not-run, environment and cleanup.
 Keep raw TRX, SQL identities, connection data and proprietary screenshots local; publish sanitized reviewable summaries and resource limitations.
-The baseline contains no Direct Sales runtime. All implementation checkboxes are unchecked and all SAL acceptance rows are NOT RUN at this documentation checkpoint.
+The original baseline contains no Direct Sales runtime. T00 foundation is implemented and focused-tested as recorded above; later workflow/SQL/UI/package obligations and complete SAL acceptance rows remain open.
 The owner's approval selects this roadmap and costing design; it is not a claim that the application, SQL migration or future package has passed.
