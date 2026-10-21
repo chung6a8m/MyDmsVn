@@ -1,11 +1,11 @@
 # Direct Sales — approved business and architecture design
 
-**Status:** APPROVED DIRECTION / ACTIVE ROADMAP / NOT IMPLEMENTED. **Updated:** 2026-10-21.
+**Status:** ACTIVE ROADMAP / T00–T01 CHECKPOINTS COMPLETE / FULL SAL INCOMPLETE. **Updated:** 2026-10-22.
 **Target:** `v1a-pro`. **Inspected source baseline:** `35ba2e8a3f37fb07095701eb94f4b56f7941c491` (merged PR #41).
 
 The Owner selected direct sales receipts and moving weighted average costing, and requested the necessary documents, an active roadmap and a PR. This document records that decision and implementation rules. Approval of the design does not establish runtime, migration, UI or production acceptance.
 
-The sole queue is [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md), indexed by [plans/README](plans/README.md). Read this design with [costing and persistence](DIRECT_SALES_COSTING.md), [query and desktop interaction](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). Those documents define one roadmap. All new types, APIs, paths and database objects below are proposed until implemented.
+The sole queue is [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md), indexed by [plans/README](plans/README.md). Read this design with [costing and persistence](DIRECT_SALES_COSTING.md), [query and desktop interaction](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). Those documents define one roadmap. T00 foundations and T01 schema/bootstrap source are implemented ([T00](evidence/sal/20261022-t00-foundation.md), [T01](evidence/sal/20261022-t01-schema-bootstrap.md)); later writers, services, queries, Local and UI remain proposed. T02 is IN PROGRESS and the checkpoint is not deployable.
 
 ## 1. Outcome and scope
 
@@ -21,14 +21,14 @@ An authorized user creates a sales Draft, selects a customer, warehouse and resp
 | Filtered receipt list with keyset pagination | Numbered-page jumps, snapshot exports, printing and reporting subsystem |
 | Quantity/value reconciliation and schema9 → schema10 preparation | Multi-currency, unit conversion, reservations, transfers, negative stock and offline/HTTP mode |
 
-The current source has Goods Receipts and quantity-only inventory, schema scripts 001–009, no Sales module and no valuation balance. The roadmap extends that baseline; it does not claim those extensions already exist. Goods Receipt duplicate-Product restrictions remain specific to Goods Receipts. Preserve the existing net48 product/test graph, Windows x86 Desktop.App and separate DbMigrator, Local adapter and vendor pins. AppCore/.NET 8 remains parked.
+The inspected planning baseline has Goods Receipts and quantity-only inventory under scripts001–009. Development source at `81e8aab` adds schema10, Sales persistence shapes and valuation/bootstrap; the running business writer/service cutover is still incomplete. Goods Receipt duplicate-Product restrictions remain specific to Goods Receipts. Preserve the existing net48 product/test graph, Windows x86 Desktop.App and separate DbMigrator, Local adapter and vendor pins. AppCore/.NET 8 remains parked.
 
 ## 2. Sales receipt behavior
 
 ### Header and identity
 
 - Required: `SaleDate`, `CustomerId`, `WarehouseId`, `EmployeeId`. One customer and warehouse apply to the whole receipt. Note is optional, at most 1,000 characters, with NUL rejected.
-- `SaleDate` is a business calendar date; normalize the Local request to `DateTime.SpecifyKind(value.Date, DateTimeKind.Unspecified)` without UTC/local conversion. Its JSON wire value is exactly an invariant `yyyy-MM-dd` string, with the same rule for optional FromDate/ToDate. A proposed Sales-only property converter rejects timestamps, offsets and impossible dates and writes date strings; it must bypass the global ApiJson UTC conversion for these properties only. Posting/audit timestamps keep the existing UTC convention. Golden Local/JSON round-trips must preserve the day across cultures, DateTime kinds and client time zones.
+- `SaleDate` is a business calendar date; normalize the Local request to `DateTime.SpecifyKind(value.Date, DateTimeKind.Unspecified)` without UTC/local conversion. Its JSON wire value is exactly an invariant `yyyy-MM-dd` string, with the same rule for optional FromDate/ToDate. The T00 Sales-only property converter rejects timestamps, offsets and impossible dates and writes date strings; it must bypass the global ApiJson UTC conversion for these properties only. Posting/audit timestamps keep the existing UTC convention. Golden Local/JSON round-trips must preserve the day across cultures, DateTime kinds and client time zones.
 - Create assigns an immutable positive `bigint` `SaleId` and server-generated `SaleNo`: `SA` followed by a zero-padded ten-digit sequence value. Sequence starts at 1, does not cycle and stops at 9,999,999,999; gaps are valid. Clients never allocate or predict numbers.
 - Save validates required references and all line Products as active. Posted history remains readable when a catalog item later becomes inactive. Queries use current catalog labels/availability and the persisted line Unit snapshot; this is not a fiscal customer/product-description snapshot feature.
 - Opaque Base64 rowversion is returned as `Version` and required as `ExpectedVersion` for Update and Post. Clients never compare or synthesize its numeric contents.
@@ -88,7 +88,7 @@ Same-document concurrent Post produces one economic effect. Different receipts c
 
 Business audit fields are transactional. Keep existing safe post-commit security/diagnostic logging semantics: logging failure cannot undo a committed sale or invite a second Post. Extend the existing audited-action definitions deliberately when implementing sales; do not invent a second independent security audit subsystem.
 
-## 4. Proposed persistence contract
+## 4. Persistence model and remaining workflow obligations
 
 | Object | Key fields and constraints |
 |---|---|
@@ -105,7 +105,7 @@ Extend the existing stock read models without replacing their paging contract: `
 
 Indexes must support SaleId seek order, selective header filters and Product membership; the [query specification](DIRECT_SALES_QUERY_AND_UI.md) defines candidate indexes and actual SQL/plan evidence. Do not claim an index eliminates all filtered scanning or create every permutation of filters.
 
-Proposed schema10 is one new immutable `010_DirectSalesAndValuation.sql` migration plus code that admits **only an artifact-validated complete schema9 baseline** for this specific upgrade. Empty install and already-compatible no-op remain supported. Prefixes001–008, unknown/partial/future schemas remain rejected. Old scripts001–009 are not rewritten.
+T01 implements schema10 through one new immutable `010_DirectSalesAndValuation.sql` migration plus code that admits **only an artifact-validated complete schema9 baseline** for this specific upgrade. Empty install and already-compatible no-op remain supported. Prefixes001–008, unknown/partial/future schemas remain rejected. Old scripts001–009 are not rewritten.
 
 Before enabling sales, bootstrap value companions and balances from validated historical posted Goods Receipts under the offline admin migration boundary. Verify complete one-to-one receipt-line/quantity-ledger correspondence and quantity reconciliation; fail on unsupported movements, mismatches, negative states or arithmetic overflow. Do not silently assign zero to unknown stock or rewrite historical ledger entries. An atomic migration includes bootstrap and the DbUp journal entry; no partially valued schema10 may open in Desktop. The [costing document](DIRECT_SALES_COSTING.md) defines the exact recovery and arithmetic proof obligations.
 
@@ -141,8 +141,8 @@ Update schema object inventories, explicit least-privilege provisioning/validati
 
 ## 7. Delivery and evidence
 
-SAL-T00 is READY; implementation and acceptance cases remain NOT RUN. The [plan](plans/20261021-002-direct-sales-and-moving-average-costing.md) gives dependencies, exact proposed locations, test-first behaviors and focused commands. Intermediate task commits are development checkpoints; schema10 is not deployable until all stock writers, reconciliation, guards and packaging agree on the new contract.
+T00 foundations and the [reviewed T01 checkpoint](evidence/sal/20261022-t01-schema-bootstrap.md) are complete; T02 is IN PROGRESS. Full workflows, frozen T08 and Owner acceptance remain incomplete. The [plan](plans/20261021-002-direct-sales-and-moving-average-costing.md) gives dependencies, exact proposed locations, test-first behaviors and focused commands. Intermediate task commits are development checkpoints; schema10 is not deployable until all stock writers, reconciliation, guards and packaging agree on the new contract.
 
 The [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) requires arithmetic/conservation, migration/bootstrap/recovery, atomicity/concurrency, LINQ/keyset, authorization/session, native GUI and frozen package evidence. SQL tests use only explicitly designated non-production infrastructure and verified owned database lifecycle. GUI tests require interactive Windows/net48, serialized guarded STA and bounded cleanup. Preserve the removed runner/approval-file boundary and record actual discovery/results rather than inherited counts.
 
-BCF/BCI/GUI-P5/L2DB/RESP remain completed historical baselines with exact revisions, failures and exceptions. Their acceptance does not certify sales. [Operational release prerequisites](DEFERRED_WORK.md#release-prerequisites) stay UNACCEPTED / UNSCHEDULED; the feature's scoped schema9 migration tests do not waive a production rollout/recovery decision. This documentation PR schedules implementation and contains no runtime/schema change or product acceptance claim.
+BCF/BCI/GUI-P5/L2DB/RESP remain completed historical baselines with exact revisions, failures and exceptions. Their acceptance does not certify sales. [Operational release prerequisites](DEFERRED_WORK.md#release-prerequisites) stay UNACCEPTED / UNSCHEDULED; the feature's scoped schema9 migration tests do not waive a production rollout/recovery decision. The T01 source checkpoint includes schema changes and bounded SQL evidence; it does not establish packaged startup/upgrade, feature/Owner or production acceptance.

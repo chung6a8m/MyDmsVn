@@ -2,11 +2,11 @@
 
 **Current implementation:** SEC-REBUILD accepted in PR #34; documentation refreshed 2026-10-18. RESP and L2DB preserve these semantics. [ADR 0007](adr/0007-code-defined-permissions-and-single-superuser.md) records the decision; [security administration runbook](SECURITY_ADMINISTRATION_RUNBOOK.md) owns operator commands.
 
-## Approved Sales authorization extension — not implemented
+## Sales key definitions and pending endpoint enforcement
 
-[SAL](DIRECT_SALES.md) adds code-defined Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post`. Read authorizes List/Get including posted cost/gross profit; Write authorizes Create/Update Draft; Post authorizes the atomic posting command. The UI requires Read to open and the relevant action key for mutation; each service independently validates its own key/current actor. Command result DTOs retain existing authorized-write semantics. No separate costing permission is introduced.
+T00 [SAL](DIRECT_SALES.md) defines code-owned Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post`. Read authorizes List/Get including posted cost/gross profit; Write authorizes Create/Update Draft; Post authorizes the atomic posting command. The UI requires Read to open and the relevant action key for mutation; each service independently validates its own key/current actor. Command result DTOs retain existing authorized-write semantics. No separate costing permission is introduced.
 
-Register definitions and audited Post actions explicitly and extend coverage tests. Do not sync permissions, seed grants, auto-authorize Administrator or alter unknown/deprecated/direct-deny/superuser rules. Reuse Local actor snapshots, session fencing, safe post-commit diagnostics and recovery locks. New schema10 object grants/application-lock use require the explicit [SQL security extension](CONFIGURATION_AND_SQL_SECURITY.md); business permissions do not confer SQL administration. All implementation/unauthorized-no-mutation evidence remains NOT RUN.
+Register definitions and audited Post actions explicitly and extend coverage tests. Do not sync permissions, seed grants, auto-authorize Administrator or alter unknown/deprecated/direct-deny/superuser rules. Reuse Local actor snapshots, session fencing, safe post-commit diagnostics and recovery locks. New schema10 object grants/application-lock use require the explicit [SQL security extension](CONFIGURATION_AND_SQL_SECURITY.md); business permissions do not confer SQL administration. T00 registry/authorization foundation and T01 restricted-principal grants/validator have [bounded evidence](evidence/sal/20261022-t01-schema-bootstrap.md). Sales endpoint enforcement, Local session/no-mutation proof and writer application-lock use remain later tasks; no automatic assignments are added.
 
 ## 1. Identity and password compatibility
 
@@ -30,7 +30,7 @@ Every Application use case enforces authorization; hiding a control does not enf
 
 ## 3. Code-owned catalog and deliberate administration
 
-`PermissionRegistryComposition.CreateDefault()` composes module definitions for Catalog, Inventory and Security. Keys, module/description and Active/Deprecated lifecycle come from code. Malformed definitions, collisions or missing referenced keys are rejected. The code catalog is available through a read-only Application query and offline CLI export.
+`PermissionRegistryComposition.CreateDefault()` composes module definitions for Catalog, Inventory, Sales and Security. Keys, module/description and Active/Deprecated lifecycle come from code. Malformed definitions, collisions or missing referenced keys are rejected. The code catalog is available through a read-only Application query and offline CLI export.
 
 New keys do not create grants or mutate authorization tables. Operators deliberately assign ordinary user/role permissions. There is no persisted catalog synchronization, release activation state, automatic Administrator grants or startup seeding.
 

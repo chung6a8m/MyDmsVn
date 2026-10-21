@@ -1,12 +1,12 @@
 # Direct Sales — acceptance and evidence ledger
 
-**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation focused-verified; complete acceptance rows remain open.
+**Status:** IMPLEMENTATION IN PROGRESS — T00/T01 bounded checkpoints complete; A10–A12 PASS, multi-task acceptance remains open.
 **Updated:** 2026-10-22. **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, merged PR #41.
-**Active roadmap:** [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 foundation is complete at `b5a2f3f`; T01 is in progress, T02–T08 remain behind the serial task queue. [T00 evidence](evidence/sal/20261022-t00-foundation.md) records its bounded pure portions.
+**Active roadmap:** [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 foundation is complete at `b5a2f3f`; reviewed T01 is complete at `81e8aab` ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is IN PROGRESS; T03–T08 remain behind the serial task queue. [T00 evidence](evidence/sal/20261022-t00-foundation.md) records its bounded pure portions.
 
 Read this ledger with [DIRECT_SALES](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md).
 The approved business direction is direct sale with perpetual moving weighted average by Warehouse + Product.
-The current baseline still has schema9 and quantity-only inventory. Schema10 and sales workflows remain unimplemented at the T00 checkpoint; the cited evidence distinguishes implemented foundation contracts/tests from later proposals.
+The planning/shipped baseline has schema9 and quantity-only inventory. T01 development source implements schema10/bootstrap/admission/grants/reset, with SQL-login-only exact9 maintenance and inherited collation portability limits. Receipt/sale/reconciliation cutover and Sales workflows remain incomplete; T01 is not deployable.
 Documentation review, a merged documentation PR or an approved plan does not satisfy a runtime acceptance row.
 
 BCF/BCI/GUI-P5/L2DB/RESP remain accepted historical work with their exact revisions, failures and bounded exceptions.
@@ -26,7 +26,7 @@ Native per-key controls, hosted STA tests, real-Login packaged automation and at
 Retain all failed/aborted invocations and the scope of a later repair; do not relabel a focused repair as an unfiltered passing run.
 
 Status values for execution are NOT RUN, BLOCKED, FAIL and PASS; bounded Owner dispositions must be explicit and dated.
-T00-owned arithmetic/contract/registry portions have [focused evidence](evidence/sal/20261022-t00-foundation.md). **Every complete SAL-A row below remains NOT RUN** until its required later owners and frozen candidate evidence are reconciled.
+T00-owned arithmetic/contract/registry portions have [focused evidence](evidence/sal/20261022-t00-foundation.md). **A10–A12 PASS** against T01 source/test `81e8aab` and its explicit environment/recovery boundaries; frozen T08 revalidation remains open. Multi-task rows remain NOT RUN until their later owners/frozen candidate portions are reconciled; T01-owned portions of A09/A13–A16 are recorded below.
 
 ## 2. Business, precision and conservation
 
@@ -50,9 +50,9 @@ For duplicate Products compute demand and group cost once, allocate in original 
 | ID | Task | Mandatory observable outcome | Required evidence | Status |
 |---|---|---|---|---|
 | SAL-A09 | T01/T08 | Empty install completes001–010; exact artifact-validated9 upgrades; complete10 reruns as no-op; new schema10 runtime rejects9/partial until complete10, old schema9 runtime rejects10 | Fresh migration, no-op and Desktop preflight cases with exact journal/artifact inventories | NOT RUN |
-| SAL-A10 | T01 | Prefixes001–008, partial010, unknown/future history, altered9 artifacts and unmanaged objects reject before writes; exact9 admission does not become generic old-prefix support | Dedicated malformed-schema allocations and independent unchanged-state assertions | NOT RUN |
-| SAL-A11 | T01 | Every legacy Posted receipt line maps1:1 to the correct existing ledger identity/key/quantity/audit; bootstrap inserts correct per-line rounded value and reconciles every balance | Both-direction correspondence, row counts/keys and independent exact value checks; historical ledger unchanged | NOT RUN |
-| SAL-A12 | T01 | Unknown/negative movements, orphan/duplicate/missing counterparts, extra balance keys even at0, quantity mismatch or any arithmetic overflow fail closed | Corruption/error-boundary fixtures; no guessed opening value or automatic zero backfill | NOT RUN |
+| SAL-A10 | T01 | Prefixes001–008, partial010, unknown/future history, altered9 artifacts and unmanaged objects reject before writes; exact9 admission does not become generic old-prefix support | Dedicated malformed-schema allocations and independent unchanged-state assertions | PASS — [T01](evidence/sal/20261022-t01-schema-bootstrap.md) |
+| SAL-A11 | T01 | Every legacy Posted receipt line maps1:1 to the correct existing ledger identity/key/quantity/audit; bootstrap inserts correct per-line rounded value and reconciles every balance | Both-direction correspondence, row counts/keys and independent exact value checks; historical ledger unchanged | PASS — [T01](evidence/sal/20261022-t01-schema-bootstrap.md) |
+| SAL-A12 | T01 | Unknown/negative movements, orphan/duplicate/missing counterparts, extra balance keys even at0, quantity mismatch or any arithmetic overflow fail closed | Corruption/error-boundary fixtures; no guessed opening value or automatic zero backfill | PASS — [T01](evidence/sal/20261022-t01-schema-bootstrap.md) |
 | SAL-A13 | T01/T08 | Fault anywhere in010, including before journaling, rolls back schema/value/bootstrap/journal together; valid9 can rerun; earlier incomplete install prefixes require explicit recovery | Injected fault stages, exact before/after observations and successful valid9 rerun; stated limits | NOT RUN |
 | SAL-A14 | T01/T08 | Sales constraints/IDs/sequence, Unit snapshots, precision, nullable Draft/required Posted cost, companion PK/FK and both append-only protections match the approved schema | Fresh schema/invariant tests, prohibited updates/deletes, source-script hash and runtime artifact checks | NOT RUN |
 | SAL-A15 | T01/T08 | Least-privilege runtime can perform authorized sales/valuation work without schema/admin privileges; migration identity remains separate; new code keys cause no role grants | Restricted-principal SQL cases, explicit provisioning/validator allowlists and permission inventory | NOT RUN |
@@ -61,6 +61,8 @@ For duplicate Products compute demand and group cost once, allocate in original 
 One `010_DirectSalesAndValuation.sql` contains schema and validated bootstrap under the existing per-script transaction.
 Quiesce old clients before migration; the schema migration lock alone does not stop already-open old business transactions.
 No checkpoint may expose schema10 to a quantity-only writer. No accepted test on a disposable database is production rollout approval.
+
+T01-owned evidence: A09 fresh/exact9/no-op and schema policies; A13 four injected stages and exact rollback/rerun; A14 schema constraints/paired cost storage/companion protections; A15 actual restricted-principal grants/denials without automatic business grants; A16 reset14/lifecycle17/mapping3, including explicit Fresh/Reuse contamination. These are bounded portions, not complete multi-task PASS. A14 cross-table Draft/Posted cost lifecycle, coherent writers, packaged preflight/upgrade and the frozen T08 comparison remain open. R3 generic bootstrap diagnostics is a deferred Minor, not silently resolved.
 
 ## 4. Existing inventory integration and reconciliation
 
@@ -166,20 +168,20 @@ The documentation PR may complete before these future rows; it delivers the appr
 
 | Field | Required content at execution | Current value |
 |---|---|---|
-| Task/acceptance scope | SAL-T IDs, SAL-A IDs, changed behavior and reason for selected breadth | Plan only; NOT RUN |
-| Revisions | Separate product/source, test and vendor revisions; dirty-worktree statement | Baseline recorded above; no SAL implementation |
+| Task/acceptance scope | SAL-T IDs, SAL-A IDs, changed behavior and reason for selected breadth | [T00 pure portions](evidence/sal/20261022-t00-foundation.md); [T01 schema/bootstrap portions](evidence/sal/20261022-t01-schema-bootstrap.md); full SAL incomplete |
+| Revisions | Separate product/source, test and vendor revisions; dirty-worktree statement | T00 `b5a2f3f`; T01 `81e8aab`; exact binary/hash/encoding boundaries in evidence |
 | Package | Exact build source, executable/dependency/script hashes and release command | NOT RUN |
-| Commands | Actual restore/build/discovery/test/package invocations, project, net48, filter and x86 settings | NOT RUN |
-| Rows/outcomes | Actual discovered/selected/executed Facts/Theory rows; pass/fail/skip/not-run and reasons | NOT RUN |
-| Environment | OS/SDK/framework/SQL versions, native monitor/window DPI, theme and measured client bounds | NOT RUN |
-| SQL resources | Designated non-production environment, sanitized allocation/ownership verification, resets/seeds, worker drain and cleanup/quarantine | NOT RUN |
+| Commands | Actual restore/build/discovery/test/package invocations, project, net48, filter and x86 settings | T00/T01 actual commands in evidence; package NOT RUN |
+| Rows/outcomes | Actual discovered/selected/executed Facts/Theory rows; pass/fail/skip/not-run and reasons | T00 Application75/Architecture3; T01 pre-BOM Migrations141, final fresh1/exact9upgrade1/Security14/Foundation34; no additive unique total |
+| Environment | OS/SDK/framework/SQL versions, native monitor/window DPI, theme and measured client bounds | Windows/net48/SQL development environment in T01 evidence; SAL native UI NOT RUN |
+| SQL resources | Designated non-production environment, sanitized allocation/ownership verification, resets/seeds, worker drain and cleanup/quarantine | T01 serialized disposable ownership/drain/cleanup verified; no outstanding uncertainty |
 | GUI resources | STA/guard/exception/DataError observations, process ownership/tree/output drain, cancellation and disposal | NOT RUN |
-| Independent assertions | Quantity/value/status/line/ledger/companion/version checks and source of expected values | NOT RUN |
+| Independent assertions | Quantity/value/status/line/ledger/companion/version checks and source of expected values | T00 constant vectors; T01 bootstrap/corruption/rollback and independent integer SQL oracle; later writer proof open |
 | Human observations | Attendee/date/control/context/actions/results; separate from automated driver work | NOT RUN |
-| Failures/limitations | Original failure, repair revision/scope, absent resources, unexecuted cases and bounded dispositions | No execution; all mandatory evidence outstanding |
+| Failures/limitations | Original failure, repair revision/scope, absent resources, unexecuted cases and bounded dispositions | Original failures and scoped repairs retained in evidence; R3 bootstrap diagnostics deferred Minor; SQL-login/collation/trusted-admin limits explicit |
 | Owner decision | Exact candidate and scope accepted, date, deviations and release exclusions | Design selected; feature/package/production acceptance NOT RUN |
 
 Keep raw TRX, connection values, detailed SQL identities, proprietary data and unreviewed screenshots local.
 Publish sanitized evidence with enough detail to reproduce the selected scope and assess limits.
 Later relevant source/schema/test/fixture/dependency/package changes invalidate only the evidence they can affect; rerun that scope honestly.
-This ledger records bounded T00 foundation implementation, without complete SAL-row, SQL, GUI, package or production acceptance.
+This ledger records bounded T00 foundations and T01 SQL/schema checkpoint with A10–A12 PASS. It does not establish full SAL, GUI/package, Owner or production acceptance.

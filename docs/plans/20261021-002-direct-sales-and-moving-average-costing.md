@@ -10,13 +10,13 @@
 
 **Spec:** [DIRECT_SALES](../DIRECT_SALES.md), [DIRECT_SALES_COSTING](../DIRECT_SALES_COSTING.md), [DIRECT_SALES_QUERY_AND_UI](../DIRECT_SALES_QUERY_AND_UI.md), [ADR 0011](../adr/0011-direct-sales-and-moving-average-costing.md) and [SAL acceptance](../DIRECT_SALES_ACCEPTANCE.md).
 
-**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is in progress; SQL, GUI and package evidence remain **NOT RUN**.
+**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is IN PROGRESS. GUI, package, frozen T08 and Owner acceptance remain **NOT RUN**.
 **Baseline:** `chung6a8m/MyDmsVn`, `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, after PR #41.
 BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is the next active roadmap; it does not reopen BCF or establish production readiness.
 
 ## Global Constraints
 
-- Source at the baseline still implements schema **9**, scripts 001–009; schema **10** and every sales interface below are proposed until implemented.
+- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; later service/writer/query/Local/UI interfaces remain proposed. Historical baseline facts are not rewritten.
 - One warehouse, customer and responsible employee per receipt; 1–200 lines; Draft → Posted only; no payment, receivable, return, order/POS, tax, discount, multi-unit or printing workflow.
 - Grid order is exactly `STT / Product / Unit / Quantity / UnitPrice / IsGift / LineAmount`; `Quantity` binds to `Qty`; costing stays outside these seven columns.
 - `Qty decimal(18,4) > 0`; `UnitPrice decimal(19,4) >= 0`, including non-gift zero; amounts/value/cost `decimal(28,4)`; `PostedUnitCost decimal(28,8)`; round ties away from zero.
@@ -45,8 +45,8 @@ BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is t
 | Task | Deliverable | Dependencies | Current status | Acceptance |
 |---|---|---|---|---|
 | SAL-T00 | Exact math, contracts, domain and permission definitions | None | COMPLETE — focused evidence | A01–A08, A20 |
-| SAL-T01 | Atomic schema-10 bootstrap, compatibility, grants and reset metadata | T00 | IN PROGRESS | A09–A16 |
-| SAL-T02 | Valued Goods Receipt, shared locks, reconciliation and stock reads | T01 | NOT STARTED / BLOCKED by T01 | A17–A19, A26–A28, A30 |
+| SAL-T01 | Atomic schema-10 bootstrap, compatibility, grants and reset metadata | T00 | COMPLETE — bounded evidence | A09–A16 |
+| SAL-T02 | Valued Goods Receipt, shared locks, reconciliation and stock reads | T01 | IN PROGRESS | A17–A19, A26–A28, A30 |
 | SAL-T03 | Authorized sales Draft save/detail with stable line identity | T02; consumes T00/T01 | NOT STARTED / BLOCKED by T02 | A20–A24 |
 | SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | NOT STARTED / BLOCKED by T02/T03 | A25–A32 |
 | SAL-T05 | LINQ summary queries and both-way keyset paging | T04; consumes T03 | NOT STARTED / BLOCKED by T04 | A33–A40 |
@@ -59,11 +59,11 @@ Dependencies identify required inputs, and no partial writer cutover can be rele
 Each task records meaningful RED → GREEN evidence, focused verification and a scoped commit after review.
 A task exit verifies only that task's portion of an acceptance row. A row spanning tasks closes only after all its required portions have evidence on the accepted candidate.
 Do not substitute a compile error, empty filter, missing dependency or skipped SQL case for the intended RED behavioral failure.
-The new test names below are proposed selectors, not discovered source facts.
+T00/T01 implemented selectors and actual discovery are recorded in their evidence. Later test names below remain proposed; inspect source before execution.
 
 ## File map and ownership
 
-Paths are relative to repository root; **existing** paths were verified against the baseline tree; **new** paths are proposed.
+Paths are relative to repository root; baseline paths are historical references. T00/T01 source exists as recorded in evidence; later **new** paths remain proposed.
 Read the adjacent current implementation before editing. Keep small feature files and avoid a general Goods Receipt/UI rewrite.
 
 | Owner | Existing files to modify or use | New files |
@@ -91,7 +91,7 @@ A reusable focused command pattern is:
 
 ```powershell
 $project = 'tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj'
-$filter = 'FullyQualifiedName~SalesValuationMathTests' # Proposed; source/discovery must exist first.
+$filter = 'FullyQualifiedName~SalesValuationMathTests' # Implemented T00 selector; inspect current source/discovery before execution.
 $results = 'TestResults/sal-' + [guid]::NewGuid().ToString('N').Substring(0,8)
 dotnet restore $project --locked-mode
 if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed.' }
@@ -167,21 +167,21 @@ SaleNo is server-owned SA plus ten digits, separate sequence1..9,999,999,999 wit
 ### SAL-T01 — Schema 10, validated bootstrap, admission and reset profile
 
 **Interfaces:** Add migration `010_DirectSalesAndValuation.sql` under existing `WithTransactionPerScript()`; schema/bootstrap/010 journal entry share one transaction.
-Propose an explicitly separate migrator admission for the exact validated schema-9 manifest/artifacts; runtime compatibility still requires complete schema10.
+T01 implements a separate migrator admission for the exact validated schema-9 manifest/artifacts under the supported SQL-login/restricted-maintenance boundary; runtime compatibility still requires complete schema10.
 Tables use `SalesReceipts(SaleId,SaleNo,SaleDate,...)`, `SalesReceiptLines(SaleLineId,SaleId,LineNo,...)`, `StockValuationEntries(LedgerId PK/FK,ValueChange)` and `StockBalances.InventoryValue`.
-Draft cost fields are null; Posted fields required; line identity and `(SaleId,LineNo)` unique, Product repeats allowed; preserve existing StockLedger bytes/IDs/audit.
+Draft cost fields are null; Posted fields required; line identity and `(SaleId,LineNo)` unique, Product repeats allowed; preserve existing StockLedger bytes/IDs/audit. T01 proves paired nullable cost storage; cross-table Draft/Posted enforcement remains T03/T04.
 
 **Test files (new):** `tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/{DirectSalesMigrationTests,DirectSalesSchemaCompatibilityTests}.cs`.
 **Existing files to extend:** `tests/MyDmsVn.Server.Infrastructure.Foundation.Tests/ReusableSqlFixtureIntegrationTests.cs` and applicable runtime-principal tests located by source inspection.
 
-- [ ] Add fresh-install, exact9-upgrade, schema10 no-op and schema9/runtime rejection tests; reject prefixes001–008, partial010, drift, unknown/future journals and insufficient migration privileges.
-- [ ] Add independent bootstrap assertions for every historical Posted receipt line, ledger identity, document/line key, audit, quantity and balance key in both directions; validate value equals sum of individually rounded historical purchase lines.
-- [ ] Add fail-closed cases for unknown/negative movements, orphan/duplicate/missing counterparts, extra zero balance keys, quantity mismatch, input/result overflow and missing required metadata; never invent zero opening values.
-- [ ] Add fault tests before/during/after backfill and before010 journal commit. Observe rollback to intact validated9 and successful rerun; preserve earlier-script fresh-install partial failure as recovery-required, not automatic prefix admission.
-- [ ] Discover and run the new Migrations selectors on fresh disposable databases; retain intended failures and independent before/after SQL observations.
-- [ ] Implement atomic010, append-only companion protection, required checks/FKs/indexes, new mappings, exact9 migration admission and complete10 runtime preflight.
-- [ ] Update runtime grant/deny allowlists, schema artifact/invariant detection and Respawn metadata/reset/sequence/trigger ownership together; restore and verify both append-only protections before fixture bodies.
-- [ ] Run focused migration, restricted-principal and fresh/reuse reset contamination cases; verify no orphan companion, journal drift or leaked rows; commit the reviewed T01 scope.
+- [x] Add fresh-install, exact9-upgrade, schema10 no-op and schema9/runtime rejection tests; reject prefixes001–008, partial010, drift, unknown/future journals and insufficient migration privileges.
+- [x] Add independent bootstrap assertions for every historical Posted receipt line, ledger identity, document/line key, audit, quantity and balance key in both directions; validate value equals sum of individually rounded historical purchase lines.
+- [x] Add fail-closed cases for unknown/negative movements, orphan/duplicate/missing counterparts, extra zero balance keys, quantity mismatch, input/result overflow and missing required metadata; never invent zero opening values.
+- [x] Add fault tests before/during/after backfill and before010 journal commit. Observe rollback to intact validated9 and successful rerun; preserve earlier-script fresh-install partial failure as recovery-required, not automatic prefix admission.
+- [x] Discover and run the new Migrations selectors on fresh disposable databases; retain intended failures and independent before/after SQL observations.
+- [x] Implement atomic010, append-only companion protection, required checks/FKs/indexes, new mappings, exact9 migration admission and complete10 runtime preflight.
+- [x] Update runtime grant/deny allowlists, schema artifact/invariant detection and Respawn metadata/reset/sequence/trigger ownership together; restore and verify both append-only protections before fixture bodies.
+- [x] Run focused migration, restricted-principal and fresh/reuse reset contamination cases; verify no orphan companion, journal drift or leaked rows; commit the reviewed T01 scope.
 
 **Exit:** T01-owned schema/bootstrap/reset portions of A09–A16 are verified with exact recovery limits; packaged startup/upgrade and frozen comparison portions remain open. This checkpoint cannot run old inventory writers against schema10.
 
@@ -339,5 +339,5 @@ T08 consumes the frozen T00–T07 candidate, implemented case inventory, identic
 
 For each task attach revision, changed behavior, exact command/project/TFM/filter, discovered/executed Facts/Theory rows, pass/fail/skip/not-run, environment and cleanup.
 Keep raw TRX, SQL identities, connection data and proprietary screenshots local; publish sanitized reviewable summaries and resource limitations.
-The original baseline contains no Direct Sales runtime. T00 foundation is implemented and focused-tested as recorded above; later workflow/SQL/UI/package obligations and complete SAL acceptance rows remain open.
+The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is IN PROGRESS; later writer/workflow/UI/package obligations and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
 The owner's approval selects this roadmap and costing design; it is not a claim that the application, SQL migration or future package has passed.

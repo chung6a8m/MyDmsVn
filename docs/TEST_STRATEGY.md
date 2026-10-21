@@ -2,9 +2,9 @@
 
 **Updated:** 2026-10-21. This document owns required behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) has actual commands. Current production persistence is LINQ to DB and typed native SqlClient, with accepted test-only Respawn fixtures. L2DB-T07 accepted scoped correctness/package/limited Local smoke; its 139 Desktop GUI invocations were NOT RUN at that frozen revision. GUI-P5 and [BCI](BUSINESS_COMPACT_ACCEPTANCE.md) are completed history with their original evidence, exceptions and signed scopes retained. PR #40 is merged at `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb`. [BCF — lookup repair and visual parity](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED; its [acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) and [final record](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) retain exact evidence and bounded exceptions.
 
-## Active SAL coverage — all NOT RUN
+## Active SAL coverage — bounded T00/T01 evidence; later obligations open
 
-[SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) owns traceable rows for the sole [active plan](plans/20261021-002-direct-sales-and-moving-average-costing.md). New tests must establish:
+[SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) owns traceable rows for the sole [active plan](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 pure foundations and [T01 schema/bootstrap](evidence/sal/20261022-t01-schema-bootstrap.md) have scoped evidence; the full coherent writer/workflow and frozen T08 scope remains open. New tests must establish:
 
 - Exact arithmetic at scale/precision limits and midpoint ties, representable results with large intermediates, cumulative duplicate/gift allocation and zero residual at full depletion.
 - Atomic schema10/bootstrap from exact validated schema9, source/ledger/balance bidirectional checks, rollback with journal, clean/no-op install and old/new/unsupported-client refusal.

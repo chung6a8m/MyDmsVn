@@ -1,10 +1,10 @@
 # Direct Sales — query contracts and desktop interaction
 
-**Status:** APPROVED DESIGN / NOT IMPLEMENTED. **Updated:** 2026-10-21.
+**Status:** APPROVED DESIGN / QUERY AND UI NOT IMPLEMENTED. **Updated:** 2026-10-22.
 **Source baseline:** `MyDmsVn/v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 This specification supports the sole [SAL execution plan](plans/20261021-002-direct-sales-and-moving-average-costing.md); it is not runtime, UI or release acceptance.
 Read the [Direct Sales design](DIRECT_SALES.md), [costing rules](DIRECT_SALES_COSTING.md) and [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) together.
-All new names, signatures, paths, SQL shapes and test classes below are proposed until implemented and verified on their recorded candidate.
+T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). Query services, cursor validation, Local/ViewModels and UI below remain proposed and unverified; T01 is not deployable.
 
 ## 1. Scope and source boundaries
 
@@ -39,7 +39,7 @@ Use the established ownership and mapping seams in [PERSISTENCE](PERSISTENCE.md)
 | `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGridAdapter.cs` | Sales-specific Product/numeric/checkbox editing sessions |
 
 Keep provider types, connections, transactions and `IQueryable` inside Infrastructure.
-Proposed tables are `SalesReceipts(SaleId, SaleNo, SaleDate, ...)` and `SalesReceiptLines(SaleLineId, SaleId, LineNo, ...)`; DTO `SaleNumber` maps to SQL `SaleNo`.
+T01 tables are `SalesReceipts(SaleId, SaleNo, SaleDate, ...)` and `SalesReceiptLines(SaleLineId, SaleId, LineNo, ...)`; DTO `SaleNumber` maps to SQL `SaleNo`.
 Exact remaining schema and command ownership follow the main design.
 
 ## 2. Public list and detail contracts
@@ -75,7 +75,7 @@ Task<SalesReceiptListPage> ListAsync(SalesReceiptListRequest request, Cancellati
 Task<SalesReceiptDto?> GetByIdAsync(long saleId, CancellationToken cancellationToken);
 ```
 
-Proposed Active keys are `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post`; this documentation does not register or automatically grant them.
+T00 registers Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post` without automatic grants. Per-service and Local enforcement remain later tasks.
 List/Get require Read, Create/Update require Write, and Post requires Post; the UI requires Read to open and the relevant action key to mutate.
 Read includes the approved persisted cost/profit fields; no separate costing permission is introduced, and command return DTOs follow current authorized-write result semantics.
 Recheck current actor/account and permission state on every request; use the `SalesReceipt.*` prefix for sales business errors.
@@ -98,7 +98,7 @@ Keep search parameterized, with literal `%`, `_` and `[` behavior; use proven LI
 Do not case-fold or alter Unicode silently; matching follows the documented database collation, while cursor binding uses the exact normalized input.
 Combine filters with AND; a search match may come from any approved search field.
 `ProductId` is a receipt-membership test; it does not restrict the lines returned by Get or used in totals.
-The proposed Sales-only `SalesCalendarDateJsonConverter.cs` in Contracts writes SaleDate/FromDate/ToDate as invariant `yyyy-MM-dd` JSON strings and reads only valid date strings (or null for optional filters), rejecting timestamps, offsets and impossible dates. Normalize Local DateTime values to their date component with unspecified kind; never call UTC/local conversion for these fields. Apply the converter to these properties only: current ApiJson globally uses UTC DateTime handling and has no date-only converter. Preserve existing audit timestamp and other module contracts. Golden tests must cover request/result/filter round-trips, cultures and DateTime kinds; no full-text engine is introduced.
+The T00 Sales-only `SalesCalendarDateJsonConverter.cs` in Contracts writes SaleDate/FromDate/ToDate as invariant `yyyy-MM-dd` JSON strings and reads only valid date strings (or null for optional filters), rejecting timestamps, offsets and impossible dates. Normalize Local DateTime values to their date component with unspecified kind; never call UTC/local conversion for these fields. Apply the converter to these properties only: global ApiJson UTC handling remains unchanged while Sales properties use the scoped converter. Preserve existing audit timestamp and other module contracts. Golden tests must cover request/result/filter round-trips, cultures and DateTime kinds; no full-text engine is introduced.
 
 Build a filtered header query first, using `Any`/SQL `EXISTS` for line membership instead of a one-to-many header join.
 A receipt containing three matching Product lines appears once, and its `LineCount` remains three plus any other lines.
@@ -215,7 +215,7 @@ Do not populate selling price from purchase cost, average cost or an unapproved 
 Cost/average/margin information belongs in a clearly read-only detail or summary panel; do not add an eighth input column.
 Draft costs remain null and display as not posted; Posted costs are required frozen snapshots under [DIRECT_SALES_COSTING](DIRECT_SALES_COSTING.md).
 
-The displayed `Quantity` column binds to proposed contract/entity `Qty`; the UI caption does not rename the approved data field.
+The displayed `Quantity` column binds to T00 contract/entity `Qty`; the UI caption does not rename the approved data field.
 Require 1–200 lines and active Customer, Warehouse, Employee and selected Products at Save/Post; retain historical Posted display when references later become inactive.
 `SaveSalesReceiptLineRequest` carries `SaleLineId`, `ProductId`, `Qty`, `UnitPrice` and `IsGift`; it accepts no client amount, cost or Unit.
 `SaleLineId == 0` means a new line; a positive ID must belong to the same editable Draft and must not repeat in the submitted list.

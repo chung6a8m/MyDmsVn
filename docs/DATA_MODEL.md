@@ -1,25 +1,25 @@
-# Current SQL data model — Identity, Catalog and Inventory
+# SQL data model — baseline and schema10 checkpoint
 
-**Status:** Implemented schema at `v1a` commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed from source on 2026-10-18. This is a model of current SQL objects, not a new schema proposal or fresh SQL acceptance result.
+**Status:** Implemented schema at `v1a` commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed from source on 2026-10-18. The baseline descriptions are retained below; the reviewed T01 schema10 additions and bounded SQL evidence are identified separately.
 
 The application now uses LINQ to DB and typed native Microsoft.Data.SqlClient behind Application interfaces. [RESP](plans/20261018-002-respawn-fixture-reuse.md) established the accepted test-fixture baseline; [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) completed its provider conversion and T07 correctness/package/Local smoke acceptance with verified temporary-resource cleanup. [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) is complete in its approved scope. BCI is implemented/accepted historical UI work. The completed [BCF roadmap](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); it preserves this supported schema, DbUp history and business semantics. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. See [PERSISTENCE](PERSISTENCE.md) for provider/transaction ownership and [CONTRACTS](CONTRACTS.md) for public DTO behavior.
 
-## Approved schema10 extension — not implemented
+## Reviewed schema10 checkpoint and baseline inventory
 
-The schema9 inventory below remains the current source contract. [Direct Sales](DIRECT_SALES.md) and [costing](DIRECT_SALES_COSTING.md) define the approved next schema under [SAL](plans/20261021-002-direct-sales-and-moving-average-costing.md):
+The schema9 inventory below records the pre-SAL baseline; T01 development source at `81e8aab` implements the schema10 additions below ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). Writer/workflow cutover remains incomplete and this checkpoint is not deployable. [Direct Sales](DIRECT_SALES.md) and [costing](DIRECT_SALES_COSTING.md) define the schema10 requirements under [SAL](plans/20261021-002-direct-sales-and-moving-average-costing.md):
 
-| Proposed object/change | Required invariant |
+| T01 object/change | Storage and remaining workflow invariant |
 |---|---|
 | SalesReceipts | SaleId bigint, unique server SaleNo, date/customer/warehouse/employee, Draft/Posted, audit and rowversion |
-| SalesReceiptLines | SaleLineId and unique (SaleId, LineNo); duplicate Product allowed; Qty18,4, UnitPrice19,4, Unit snapshot, IsGift and computed LineAmount28,4 |
-| Posted line cost | PostedUnitCost28,8 and CostAmount28,4 are null for Draft and complete/immutable for Posted |
-| Sales number sequence | Separate SA + ten digits, bounded non-cycling bigint sequence |
-| StockValuationEntries | LedgerId PK/FK and signed ValueChange28,4; complete append-only companion for every StockLedger row |
+| SalesReceiptLines | SaleLineId and unique (SaleId, LineNo); duplicate Product allowed; Qty18,4, UnitPrice19,4, Unit snapshot, IsGift and persisted LineAmount28,4 |
+| Posted line cost | PostedUnitCost28,8 and CostAmount28,4 have paired nullable/nonnegative storage; Draft/Posted cross-table lifecycle and immutability enforcement remain T03/T04 |
+| Sales number sequence | Separate bounded non-cycling bigint sequence; SA + ten-digit application allocation remains T03 |
+| StockValuationEntries | LedgerId PK/FK and signed ValueChange28,4; bootstrap supplies a complete append-only companion for existing ledger rows; ongoing completeness requires the writer cutover |
 | StockBalances.InventoryValue | Value28,4 paired atomically with Quantity; nonnegative quantity/value; zero quantity requires zero value |
 
-One new `010_DirectSalesAndValuation.sql` script must validate a complete schema9 baseline, bootstrap value from verified Posted Goods Receipts, and commit with its journal entry atomically. Unknown source movement, mismatched quantity/source, partial state or overflow fails; no historical quantity-ledger rewrite or guessed zero value. Old scripts remain immutable. Sales source links remain polymorphic in StockLedger, so reconciliation and fixture reset must verify them explicitly.
+T01 exact9 preflight validates the baseline definitions; `010_DirectSalesAndValuation.sql` proves historical data, bootstraps value from Posted Goods Receipts and commits atomically with its journal entry. Unknown source movement, mismatched quantity/source, partial state or overflow fails; no historical quantity-ledger rewrite or guessed zero value. Old scripts remain immutable. Sales source links remain polymorphic in StockLedger, so reconciliation and fixture reset must verify them explicitly.
 
-The proposed model does not yet alter the current tables/constraints described below. [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) and the [migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) distinguish accepted design from executable upgrade support.
+The baseline table descriptions below remain useful for001–009;010 adds the objects above and nonnegative quantity/value plus zero-quantity/zero-value balance checks. LineAmount is server-persisted, not a SQL computed column. [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) and the [migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) distinguish accepted design from executable upgrade support.
 
 ## 1. Schema ownership and migration inventory
 
@@ -36,8 +36,9 @@ The authoritative definitions are the embedded [migration scripts](../src/MyDmsV
 | `007_Inventory_Stock.sql` | StockLedger, StockBalances, indexes and append-only ledger trigger. |
 | `008_Security_Administration.sql` | User/role assignment revisions, SecurityAuditEvents and ApplySecurityAdministration. |
 | `009_Security_Permission_Import.sql` | ReadSecurityPermissionImportTarget and ApplySecurityPermissionImport. |
+| `010_DirectSalesAndValuation.sql` | Validated historical bootstrap, Sales headers/lines/sequence, append-only valuation companions and InventoryValue checks. |
 
-Current migration preflight accepts an empty or compatible database and refuses unsupported older, newer, partial or unknown-history states through its documented codes. The earlier unreleased security redesign does not authorize another reset or script rewrite. RESP resets only explicitly owned disposable test data under its reviewed fixture contract; L2DB does not change schema, grants, journal or user assignments. See the [migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md).
+Development runtime requires complete schema10. Migration preflight admits Empty/exact10, plus separately artifact-validated exact9 only under the supported SQL-login/restricted-maintenance boundary; prefixes001–008, newer, partial and unknown-history states remain refused. The earlier unreleased security redesign does not authorize another reset or script rewrite. RESP resets only explicitly owned disposable test data under its reviewed fixture contract; L2DB does not change schema, grants, journal or user assignments. See the [migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md).
 
 ## 2. Identity and security tables
 
@@ -103,6 +104,9 @@ All physical FKs below use the default non-cascading behavior in the current scr
 | `StockLedger.WarehouseId`, `ProductId`, `PostedByUserId` | `Warehouses`, `Products`, `Users` | Required physical FKs. |
 | `StockBalances.WarehouseId` / `ProductId` | `Warehouses` / `Products` | Required physical FKs. |
 | `SecurityAuditEvents.ActorUserId` | `Users.UserId` | Required physical FK. |
+| Sales header customer/warehouse/employee and actor IDs | Catalogs / Users | T01 required reference/creator and optional updater/poster FKs, plus posting-audit check. |
+| Sales line SaleId/ProductId and actor IDs | SalesReceipts / Products / Users | T01 physical FKs; unique SaleId/LineNo allows repeated Product. |
+| StockValuationEntries.LedgerId | StockLedger.LedgerId | T01 companion PK/FK; append-only UPDATE/DELETE protection. |
 | `StockLedger.DocumentId` / `DocumentLineId` | Receipt header/line when DocumentType is GoodsReceipt | **Logical source identity only: no physical receipt/header-line FK.** Application posting and unique ledger source identity enforce the intended linkage. |
 | `SecurityAuditEvents.TargetType` + `TargetId` | User or Role | Logical target identity; no polymorphic FK. |
 | Catalog and identity/RBAC creation/update actor columns | User identity | Stored audit values without actor FKs, except the explicit receipt/ledger/audit-event FKs listed above. |
@@ -110,6 +114,8 @@ All physical FKs below use the default non-cascading behavior in the current scr
 A receipt line produces one ledger movement when successfully posted; this is a transaction/business invariant plus unique source constraint, not a relationship enforced by a GoodsReceiptLines-to-StockLedger FK. Test fixtures must account for these logical links when resetting data; an FK-only deletion order is not a complete isolation contract.
 
 ## 6. Posting, numbering and concurrency
+
+The quantity-only writer description below is the source boundary at T01; T02 is implementing the shared quantity/value cutover. It is not a deployable writer for schema10.
 
 Draft receipts are editable and have no posted stock movement. Posting requires an active Warehouse, Employee and Products, a valid nonempty line set and the current opaque receipt version. The public contract accepts 1–200 unique product lines with quantities/costs fitting their SQL decimal types. SQL constraints enforce per-row precision/sign, foreign keys and duplicates; Application validates the aggregate line count and active-state/business rules.
 
@@ -129,12 +135,16 @@ The server formats numbers as `GR` plus ten zero-padded digits, from `GR00000000
 | StockLedger | Unique source identity; `(WarehouseId, ProductId, PostedAtUtc, LedgerId)` including document/quantity/actor columns; ProductId. |
 | StockBalances | Composite PK `(WarehouseId, ProductId)`; ProductId. |
 | SecurityAuditEvents | `(TargetType, TargetId, AuditEventId DESC)`. |
+| T01 SalesReceipts | Unique SaleNo; `(SaleDate,SaleId)`; `(WarehouseId,SaleDate)`; EmployeeId. |
+| T01 SalesReceiptLines | Unique `(SaleId,LineNo)`; nonunique `(ProductId,SaleId)` membership index. |
 
 Current query services materialize DTOs with parameterized SQL, `COUNT_BIG` totals and long paging offsets. Balance rows include warehouse/product codes, names, active flags and Quantity, ordered by warehouse Code/ID then product Code/ID. StockCardRow includes ledger identity, warehouse/product projections, PostedAtUtc, DocumentType, DocumentId, DocumentNumber and QuantityChange, ordered by `PostedAtUtc, LedgerId`. Its optional UTC date filters apply to posting time. Receipt number is projected through the logical GoodsReceipt join, with a type/ID fallback when no header is found.
 
 Master-data codes/names and active flags are joined from current catalog rows; the model does not store immutable historical name snapshots. StockCardRow currently has no starting/running-balance field. Provider migration must preserve current filtering, ordering, materialization and result/error semantics without inventing reporting features. See [SqlInventoryQueryService](../src/MyDmsVn.Server.Infrastructure/Inventory/SqlInventoryQueryService.cs) and [Inventory contracts](../src/MyDmsVn.Contracts/InventoryContracts.cs).
 
 ## 8. Reconciliation and scope boundaries
+
+The quantity-only reconciliation below is the T01 source boundary. T02 must replace it with the shared Exclusive valuation protocol; the T01 bootstrap proof does not establish ongoing reconciliation.
 
 [SqlStockReconciliationQueryService](../src/MyDmsVn.Server.Infrastructure/Inventory/SqlStockReconciliationQueryService.cs) groups ledger quantities and compares them with balances using a FULL OUTER JOIN inside one explicit `SERIALIZABLE` transaction. It first acquires shared `TABLOCK, HOLDLOCK` locks on StockLedger and then StockBalances, matching the ledger-before-balance posting order. This preserves a consistent state during concurrent Post and avoids an optimizer-selected join order reversing lock acquisition.
 

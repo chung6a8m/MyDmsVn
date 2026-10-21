@@ -1,9 +1,9 @@
 # Direct Sales — moving weighted average costing
 
-**Status:** APPROVED DESIGN / NOT IMPLEMENTED / NOT RUNTIME VERIFIED. **Updated:** 2026-10-21.
+**Status:** APPROVED DESIGN / T00–T01 BOUNDED CHECKPOINTS VERIFIED / WRITER CUTOVER INCOMPLETE. **Updated:** 2026-10-22.
 **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 The Owner selected moving weighted average per `(WarehouseId, ProductId)`, using actual serialized Post order.
-All schema additions, algorithms, interfaces and behavior below are proposals for the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md).
+T00 implements exact math and T01 implements schema/bootstrap/admission/mappings/grants/reset ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). Receipt/sale/reconciliation protocol and later workflows remain under implementation in the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md). T01 is not deployable.
 [Direct Sales](DIRECT_SALES.md) owns document scope; [query/UI design](DIRECT_SALES_QUERY_AND_UI.md) owns presentation; [acceptance](DIRECT_SALES_ACCEPTANCE.md) owns required evidence.
 
 ## 1. Existing implementation and change boundary
@@ -204,7 +204,7 @@ Persisted companions and line costs preserve the result; no later query reruns m
 
 Propose one new DbUp script, **`010_DirectSalesAndValuation.sql`**, with schema-10 runtime support.
 It contains the sales schema, companion table, balance value column, backfill and final constraints/indexes required for a usable state.
-Scripts 001–009 remain immutable. The [current runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) describes schema 9 until implementation changes it.
+Scripts 001–009 remain immutable. The [current runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) describes complete schema10 and narrow exact9 maintenance admission. Baseline schema9 facts above remain historical.
 
 ### 7.1 Admission and deployment prerequisites
 

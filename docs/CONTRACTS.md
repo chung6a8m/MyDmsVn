@@ -6,15 +6,15 @@
 
 WinForms ViewModels use feature-specific API interfaces in `Desktop.Application/FeatureApiClients.cs`. Current Local adapters invoke Server.Application in-process and return transport-neutral `ApiResponse<T>` values. Future HTTP adapters must keep the same DTO/result semantics. Public DTOs are contracts, not Domain entities or provider objects.
 
-## Approved Sales contracts — proposed, not implemented
+## Sales contracts implemented in T00; workflows remain pending
 
-[Direct Sales](DIRECT_SALES.md) and [query/UI](DIRECT_SALES_QUERY_AND_UI.md) specify new `SalesContracts.cs` and `ISalesReceiptApiClient`: CreateDraft, UpdateDraft, Post, Get and List through the same immutable ApiResponse/Local boundary. The three proposed code keys are Sales.Receipts.Read/Write/Post. The docs do not register keys or grant roles.
+[Direct Sales](DIRECT_SALES.md) and [query/UI](DIRECT_SALES_QUERY_AND_UI.md) specify T00 `SalesContracts.cs` and the later `ISalesReceiptApiClient`: CreateDraft, UpdateDraft, Post, Get and List through the same immutable ApiResponse/Local boundary. T00 registers the three Active code keys Sales.Receipts.Read/Write/Post without role grants. Sales services and the Local adapter are not implemented.
 
-Save carries ordered independent lines with SaleLineId (0 for new), ProductId, Qty, UnitPrice and IsGift; duplicate Products are valid. The server assigns LineNo, Unit, amounts and identifiers. Update/Post require the opaque expectedVersion. Posted cost snapshots and gross profit are read-only; Draft cost/profit are null. DTO SaleNumber maps to SQL SaleNo; sale/unit/decimal and error paths need golden contract tests. A proposed SalesCalendarDateJsonConverter writes SaleDate/FromDate/ToDate as invariant yyyy-MM-dd strings and accepts only valid date-only strings; normalize Local dates without timezone conversion. Scope it to these properties, preserving global ApiJson UTC audit handling and existing module contracts.
+Save carries ordered independent lines with SaleLineId (0 for new), ProductId, Qty, UnitPrice and IsGift; duplicate Products are valid. The server assigns LineNo, Unit, amounts and identifiers. Update/Post require the opaque expectedVersion. Posted cost snapshots and gross profit are read-only; Draft cost/profit are null. DTO SaleNumber maps to SQL SaleNo; sale/unit/decimal and error paths need golden contract tests. The T00 SalesCalendarDateJsonConverter writes SaleDate/FromDate/ToDate as invariant yyyy-MM-dd strings and accepts only valid date-only strings; normalize Local dates without timezone conversion. Scope it to these properties, preserving global ApiJson UTC audit handling and existing module contracts.
 
 `SalesReceiptListRequest`/`SalesReceiptListPage` form a separate cursor contract: optional date/customer/warehouse/employee/status/Product/search, bounded PageSize and validated Cursor; slim Items plus nullable NextCursor/PreviousCursor. Use unique SaleId DESC and Product Any; totals cover all receipt lines. No PageNumber, required TotalCount or reuse of the existing PagedResult offset contract. Cursor encoding is not authorization. Existing catalog/receipt/stock paging remains unchanged unless explicitly extended by SAL.
 
-Future inventory read DTOs add value information and SalesReceipt document-number resolution under the existing Inventory read keys; exact fields are defined in the SAL plan. Schema10 and this extension are NOT IMPLEMENTED. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) supplies new compatibility obligations.
+Future inventory read DTOs add value information and SalesReceipt document-number resolution under the existing Inventory read keys; exact fields are defined in the SAL plan. T01 schema10/mappings are implemented ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)); this inventory read extension remains NOT IMPLEMENTED. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) supplies new compatibility obligations.
 
 ## Implemented result envelope
 

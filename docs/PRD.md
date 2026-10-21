@@ -1,6 +1,6 @@
 # Product requirements — MyDmsVn
 
-**Current scope:** Local v1 on net48 · **Updated:** 2026-10-21 for `v1a-pro` at merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. The [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md) is approved and ACTIVE, but not implemented. The initial idea is consolidated into this PRD and current architecture/contracts. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no runtime/API/schema or business-contract change is included. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
+**Current scope:** Local v1 on net48 · **Updated:** 2026-10-21 for `v1a-pro` at merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. The [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md) is ACTIVE with bounded T00/T01 checkpoints complete; the full feature remains incomplete. The initial idea is consolidated into this PRD and current architecture/contracts. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no runtime/API/schema or business-contract change is included. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**.
 
 ## 1. Product goal
 
@@ -36,7 +36,7 @@ The Owner selected [direct sales receipts](DIRECT_SALES.md) with Draft → Poste
 
 Cost is [moving weighted average](DIRECT_SALES_COSTING.md) per warehouse/product at actual Post, with immutable posted line costs, no negative stock and atomic document/quantity/value effects. Add valued receipt posting, reconciliation and a verified schema9 → schema10 bootstrap. Draft cost remains unknown/null. Read-only posted cost/profit stays outside the seven-column grid.
 
-The [list contract](DIRECT_SALES_QUERY_AND_UI.md) adds date/customer/warehouse/employee/status/Product/search filters, LINQ queries and SaleId DESC keyset navigation. Product membership returns each receipt once; totals cover the complete receipt. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) is NOT RUN, and source remains schema9 until implementation.
+The [list contract](DIRECT_SALES_QUERY_AND_UI.md) adds date/customer/warehouse/employee/status/Product/search filters, LINQ queries and SaleId DESC keyset navigation. Product membership returns each receipt once; totals cover the complete receipt. [T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md) records the reviewed schema10/bootstrap checkpoint; T02 is IN PROGRESS. The planning/shipped baseline remains schema9, while writer/workflow cutover, full [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md), package and Owner acceptance remain incomplete. This development checkpoint is not deployable.
 
 ## 4. Acceptance behavior
 

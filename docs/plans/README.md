@@ -11,8 +11,8 @@ Read [SAL design](../DIRECT_SALES.md), [costing](../DIRECT_SALES_COSTING.md), [q
 | Task | Outcome | Current state |
 |---|---|---|
 | SAL-T00 | Exact arithmetic, domain/contracts and permission definitions | COMPLETE — [focused evidence](../evidence/sal/20261022-t00-foundation.md) |
-| SAL-T01 | Atomic schema10, verified schema9 bootstrap/admission and reset profiles | IN PROGRESS |
-| SAL-T02 | Valued receipt posting, shared lock protocol, reconciliation and stock reads | NOT STARTED — after T01 |
+| SAL-T01 | Atomic schema10, verified schema9 bootstrap/admission and reset profiles | COMPLETE — [bounded evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) |
+| SAL-T02 | Valued receipt posting, shared lock protocol, reconciliation and stock reads | IN PROGRESS — next serial task |
 | SAL-T03 | Authorized sales Draft lifecycle and version/line identity | NOT STARTED — after T02 |
 | SAL-T04 | Atomic sale Post, cost allocation and stock concurrency | NOT STARTED — after T03 |
 | SAL-T05 | LINQ filtering and keyset list | NOT STARTED — after T04 |
@@ -20,7 +20,7 @@ Read [SAL design](../DIRECT_SALES.md), [costing](../DIRECT_SALES_COSTING.md), [q
 | SAL-T07 | Compact seven-column UI, native input and accessibility | NOT STARTED — after T06 |
 | SAL-T08 | Frozen integrated SQL/UI/package evidence and Owner disposition | NOT STARTED — after T07 |
 
-T00-owned pure portions have focused evidence; all complete multi-task acceptance rows remain NOT RUN. The serial order above is the execution queue; the plan records technical dependencies. No task checkpoint is deployable until receipt/sale/reconciliation writers and schema/runtime/reset guards are coherent. Product source still supports schema9; schema10 is approved future work. Payments, debt, returns, HTTP and framework reactivation are excluded. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
+T00-owned pure portions and T01-owned schema/bootstrap/admission/grants/reset portions have focused evidence. A10–A12 have bounded T01 PASS; multi-task rows remain open. The serial order above is the execution queue; the plan records technical dependencies. No task checkpoint is deployable until receipt/sale/reconciliation writers and schema/runtime/reset guards are coherent. The historical baseline supports schema9; development source at `81e8aab` requires schema10, with writer cutover still incomplete. Payments, debt, returns, HTTP and framework reactivation are excluded. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
 ## Completed baselines — retain, do not restart
 
