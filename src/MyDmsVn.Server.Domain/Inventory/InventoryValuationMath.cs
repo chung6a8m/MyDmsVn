@@ -41,6 +41,30 @@ public static class InventoryValuationMath
 
     public static decimal CalculateReceiptValue(decimal qty, decimal unitCost) => CalculateRevenue(qty, unitCost, false);
 
+    public static decimal? CalculateAverageUnitCost(decimal quantity, decimal inventoryValue)
+    {
+        var q = Input(quantity, MaximumQuantity, false);
+        var v = Input(inventoryValue, MaximumAmount, false);
+        if (q.IsZero)
+        {
+            if (!v.IsZero) throw new ArgumentException("Zero quantity requires zero inventory value.");
+            return null;
+        }
+        return Convert(Round(v * BigInteger.Pow(10, 8), q), 8, MaximumUnitCost);
+    }
+
+    public static decimal SumSignedAmounts(IEnumerable<decimal> values) => SignedSum(values, MaximumAmount);
+    public static decimal SumSignedQuantities(IEnumerable<decimal> values) => SignedSum(values, MaximumQuantity);
+
+    private static decimal SignedSum(IEnumerable<decimal> values, decimal maximum)
+    {
+        if (values == null) throw new ArgumentNullException(nameof(values));
+        var total = values.Aggregate(BigInteger.Zero, (sum, value) =>
+            sum + (value < 0 ? -Input(-value, maximum, false) : Input(value, maximum, false)));
+        var magnitude = Convert(BigInteger.Abs(total), 4, maximum);
+        return total.Sign < 0 ? -magnitude : magnitude;
+    }
+
     public static InventoryIssueCost CalculateIssue(decimal quantityOnHand, decimal inventoryValue, IReadOnlyList<InventoryIssueLine> lines)
     {
         var q = Input(quantityOnHand, MaximumQuantity, true);
@@ -57,7 +81,7 @@ public static class InventoryValuationMath
         var issueQty = Quantity(sum);
         if (sum > q) throw new ArgumentException("Insufficient stock.", nameof(lines));
         var cost = sum == q ? v : Round(v * sum, q);
-        var snapshot = Convert(Round(v * BigInteger.Pow(10, 8), q), 8, MaximumUnitCost);
+        var snapshot = CalculateAverageUnitCost(quantityOnHand, inventoryValue)!.Value;
         var allocations = new Dictionary<int, decimal>();
         BigInteger cumulative = 0, previous = 0;
         foreach (var line in ordered)

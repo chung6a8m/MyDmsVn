@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -217,7 +217,7 @@ public sealed class InventoryControlTests
                 "P-007",
                 "Archived product",
                 false,
-                12.5m);
+                12.5m, 0m, 0m);
             return Task.FromResult(ApiResponse<PagedResult<StockBalanceRow>>.Success(
                 new PagedResult<StockBalanceRow>(new[] { row }, request.PageNumber, request.PageSize, 1)));
         }
@@ -256,7 +256,7 @@ public sealed class InventoryControlTests
                 "GoodsReceipt",
                 41,
                 "GR0000000041",
-                5m);
+                5m, 0m);
             return Task.FromResult(ApiResponse<PagedResult<StockCardRow>>.Success(
                 new PagedResult<StockCardRow>(new[] { row }, request.PageNumber, request.PageSize, 1)));
         }

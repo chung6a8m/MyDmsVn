@@ -1673,10 +1673,11 @@ public sealed class GoodsReceiptCommandIntegrationTests
         var factory = scope.ServiceProvider.GetRequiredService<IUnitOfWorkFactory>();
         using var unitOfWork = await factory.CreateAsync(cancellationToken);
         unitOfWork.BeginTransaction();
-        await unitOfWork.Repository<IGoodsReceiptWriteRepository>().ApplyStockBalanceDeltasAsync(
-            warehouseId,
-            new Dictionary<int, decimal> { [productId] = delta },
-            cancellationToken);
+        var coordinator = new MyDmsVn.Server.Infrastructure.Inventory.InventoryValuationCoordinator(
+            (ISqlExecutionContext)unitOfWork, scope.ServiceProvider.GetRequiredService<ILinqToDbSessionFactory>());
+        await coordinator.AcquirePostingGateAsync(cancellationToken);
+        await coordinator.LockBalancesAsync(warehouseId, new[] { productId }, cancellationToken);
+        await coordinator.ApplyBalanceAsync(warehouseId, productId, delta, 0m, cancellationToken);
         unitOfWork.Commit();
     }
 

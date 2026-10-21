@@ -55,4 +55,27 @@ public sealed class SalesValuationMathTests
         Assert.ThrowsAny<ArgumentException>(() => InventoryValuationMath.CalculateIssue(1, 0, new[] { new InventoryIssueLine(1, 1), new InventoryIssueLine(2, 1) }));
         Assert.ThrowsAny<ArgumentException>(() => InventoryValuationMath.CalculateIssue(3, 0, new[] { new InventoryIssueLine(1, 1), new InventoryIssueLine(1, 1) }));
     }
+    [Fact]
+    public void Standalone_average_is_nullable_checked_and_rounded_once()
+    {
+        Assert.Null(InventoryValuationMath.CalculateAverageUnitCost(0, 0));
+        Assert.Equal(0m, InventoryValuationMath.CalculateAverageUnitCost(1, 0));
+        Assert.Equal(.00006667m, InventoryValuationMath.CalculateAverageUnitCost(3, .0002m));
+        Assert.Equal(.00000001m, InventoryValuationMath.CalculateAverageUnitCost(20000, .0001m));
+        Assert.ThrowsAny<ArgumentException>(() => InventoryValuationMath.CalculateAverageUnitCost(0, .0001m));
+        Assert.ThrowsAny<ArgumentException>(() => InventoryValuationMath.CalculateAverageUnitCost(-1, 0));
+        Assert.ThrowsAny<ArgumentException>(() => InventoryValuationMath.CalculateAverageUnitCost(1, -.0001m));
+        Assert.Throws<OverflowException>(() => InventoryValuationMath.CalculateAverageUnitCost(.0001m, InventoryValuationMath.MaximumAmount));
+    }
+    [Fact]
+    public void Signed_aggregation_checks_final_sum_after_exact_wide_cancellation()
+    {
+        var positive = Enumerable.Repeat(InventoryValuationMath.MaximumAmount, 100000);
+        var negative = Enumerable.Repeat(-InventoryValuationMath.MaximumAmount, 100000);
+        Assert.Equal(.0001m, InventoryValuationMath.SumSignedAmounts(positive.Concat(negative).Concat(new[] { .0001m })));
+        Assert.Equal(-.0001m, InventoryValuationMath.SumSignedQuantities(new[] { 1m, -1.0001m }));
+        Assert.Throws<OverflowException>(() => InventoryValuationMath.SumSignedAmounts(new[] { InventoryValuationMath.MaximumAmount, .0001m }));
+        Assert.Throws<OverflowException>(() => InventoryValuationMath.SumSignedQuantities(new[] { -InventoryValuationMath.MaximumQuantity, -.0001m }));
+    }
+
 }

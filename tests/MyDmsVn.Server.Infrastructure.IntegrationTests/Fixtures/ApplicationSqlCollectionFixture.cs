@@ -176,7 +176,7 @@ INSERT dbo.GoodsReceiptLines(ReceiptId,[LineNo],ProductId,Quantity,UnitCost,Crea
 VALUES(@g,1,@p,2,3,@u); SET @l=SCOPE_IDENTITY();
 INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId)
 VALUES(@w,@p,'GoodsReceipt',@g,@l,2,SYSUTCDATETIME(),@u);
-INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity) VALUES(@w,@p,2);
+INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@w,@p,2,6);
 INSERT dbo.SecurityAuditEvents(ActorUserId,TargetType,TargetId,Operation,CorrelationId)
 VALUES(@u,N'User',@u,N'Probe',NEWID());
 UPDATE dbo.Users SET AssignmentRevision=7;

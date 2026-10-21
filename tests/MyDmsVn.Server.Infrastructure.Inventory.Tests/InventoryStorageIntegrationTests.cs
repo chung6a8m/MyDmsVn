@@ -104,10 +104,10 @@ public sealed class InventoryStorageIntegrationTests
                     "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) VALUES " +
                     "(@WarehouseId, @LedgerOnlyProductId, 'GoodsReceipt', 200, 2001, 5.0000, SYSUTCDATETIME(), @UserId), " +
                     "(@WarehouseId, @MismatchProductId, 'GoodsReceipt', 201, 2002, 7.0000, SYSUTCDATETIME(), @UserId); " +
-                    "INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity) VALUES " +
-                    "(@WarehouseId, @ZeroBalanceOnlyProductId, 0.0000), " +
-                    "(@WarehouseId, @NonzeroBalanceOnlyProductId, 3.0000), " +
-                    "(@WarehouseId, @MismatchProductId, 6.0000);",
+                    "INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity, InventoryValue) VALUES " +
+                    "(@WarehouseId, @ZeroBalanceOnlyProductId, 0.0000, 0), " +
+                    "(@WarehouseId, @NonzeroBalanceOnlyProductId, 3.0000, 0), " +
+                    "(@WarehouseId, @MismatchProductId, 6.0000, 0);",
                     new
                     {
                         ids.WarehouseId,

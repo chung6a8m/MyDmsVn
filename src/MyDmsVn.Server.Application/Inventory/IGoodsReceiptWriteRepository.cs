@@ -74,18 +74,14 @@ public interface IGoodsReceiptWriteRepository
         int postedByUserId,
         CancellationToken cancellationToken);
 
-    Task AppendStockLedgerAsync(
-        long receiptId,
-        int warehouseId,
-        IReadOnlyList<GoodsReceiptLine> lines,
-        System.DateTime postedAtUtc,
-        int postedByUserId,
-        CancellationToken cancellationToken);
+    Task AcquirePostingGateAsync(CancellationToken cancellationToken);
 
-    Task ApplyStockBalanceDeltasAsync(
-        int warehouseId,
-        IReadOnlyDictionary<int, decimal> deltasByProductId,
-        CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<int, StockValuationState>> LockValuationBalancesAsync(
+        int warehouseId, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+
+    Task ApplyPostedInventoryAsync(
+        GoodsReceipt header, IReadOnlyList<GoodsReceiptLine> lines,
+        System.DateTime postedAtUtc, int postedByUserId, CancellationToken cancellationToken);
 
     Task<GoodsReceipt> ReplaceDraftAsync(
         GoodsReceipt header,

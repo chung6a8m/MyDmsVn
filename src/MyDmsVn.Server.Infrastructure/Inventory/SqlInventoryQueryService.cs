@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application.Inventory;
+using MyDmsVn.Server.Domain.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
 
 namespace MyDmsVn.Server.Infrastructure.Inventory;
@@ -29,6 +30,8 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
         "INNER JOIN dbo.Products product ON product.ProductId = ledger.ProductId " +
         "LEFT JOIN dbo.GoodsReceipts receipt ON ledger.DocumentType = 'GoodsReceipt' " +
         "AND receipt.ReceiptId = ledger.DocumentId " +
+        "LEFT JOIN dbo.SalesReceipts sale ON ledger.DocumentType = 'SalesReceipt' AND sale.SaleId = ledger.DocumentId " +
+        "LEFT JOIN dbo.StockValuationEntries valuation ON valuation.LedgerId = ledger.LedgerId " +
         "WHERE ledger.WarehouseId = @WarehouseId " +
         "AND ledger.ProductId = @ProductId " +
         "AND (@FromUtc IS NULL OR ledger.PostedAtUtc >= @FromUtc) " +
@@ -51,7 +54,7 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
             "SELECT balance.WarehouseId, warehouse.Code AS WarehouseCode, " +
             "warehouse.Name AS WarehouseName, warehouse.IsActive AS WarehouseIsActive, " +
             "balance.ProductId, product.Code AS ProductCode, product.Name AS ProductName, " +
-            "product.IsActive AS ProductIsActive, balance.Quantity" +
+            "product.IsActive AS ProductIsActive, balance.Quantity, balance.InventoryValue" +
             BalanceFromAndFilter +
             "ORDER BY warehouse.Code, balance.WarehouseId, product.Code, balance.ProductId " +
             "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;");
@@ -83,10 +86,10 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
             "warehouse.Name AS WarehouseName, warehouse.IsActive AS WarehouseIsActive, " +
             "ledger.ProductId, product.Code AS ProductCode, product.Name AS ProductName, " +
             "product.IsActive AS ProductIsActive, ledger.PostedAtUtc, ledger.DocumentType, " +
-            "ledger.DocumentId, COALESCE(receipt.ReceiptNo, " +
+            "ledger.DocumentId, COALESCE(receipt.ReceiptNo, sale.SaleNo, " +
             "CONCAT(ledger.DocumentType, '#', CONVERT(varchar(20), ledger.DocumentId)) " +
             "COLLATE Latin1_General_100_CI_AI) AS DocumentNumber, " +
-            "ledger.QuantityChange" + CardFromAndFilter +
+            "ledger.QuantityChange, valuation.ValueChange" + CardFromAndFilter +
             "ORDER BY ledger.PostedAtUtc, ledger.LedgerId " +
             "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;");
         InventorySql.Add(command, "@WarehouseId", SqlDbType.Int, request.WarehouseId);
@@ -115,7 +118,9 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
             row.ProductCode,
             row.ProductName,
             row.ProductIsActive,
-            row.Quantity);
+            row.Quantity,
+            row.InventoryValue,
+            InventoryValuationMath.CalculateAverageUnitCost(row.Quantity, row.InventoryValue));
 
     private static StockCardRow ToContract(CardRow row) =>
         new StockCardRow(
@@ -132,7 +137,7 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
             row.DocumentType,
             row.DocumentId,
             row.DocumentNumber,
-            row.QuantityChange);
+            row.QuantityChange, row.ValueChange);
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
@@ -148,6 +153,7 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
         ProductName = reader.GetString(6),
         ProductIsActive = reader.GetBoolean(7),
         Quantity = reader.GetDecimal(8),
+        InventoryValue = reader.GetDecimal(9),
     };
 
     private static CardRow ReadCard(SqlDataReader reader) => new CardRow
@@ -166,6 +172,7 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
         DocumentId = reader.GetInt64(11),
         DocumentNumber = reader.GetString(12),
         QuantityChange = reader.GetDecimal(13),
+        ValueChange = reader.IsDBNull(14) ? throw new InvalidOperationException("Stock movement has no valuation companion.") : reader.GetDecimal(14),
     };
 
     private sealed class BalanceRow
@@ -179,6 +186,7 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
         public string ProductName { get; set; } = string.Empty;
         public bool ProductIsActive { get; set; }
         public decimal Quantity { get; set; }
+        public decimal InventoryValue { get; set; }
     }
 
     private sealed class CardRow
@@ -197,5 +205,6 @@ internal sealed class SqlInventoryQueryService : IInventoryQueryService
         public long DocumentId { get; set; }
         public string DocumentNumber { get; set; } = string.Empty;
         public decimal QuantityChange { get; set; }
+        public decimal ValueChange { get; set; }
     }
 }
