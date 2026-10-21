@@ -229,6 +229,7 @@ namespace MyDmsVn.Desktop.WinForms
                 UnsubscribeLines();
                 _inline.EditStateChanged -= OnInlineEditStateChanged;
                 _inline.Dispose();
+                VersionLabel.Dispose(); // Retained compatibility control is deliberately outside the visible tree.
                 _errors.Dispose();
                 _list.Dispose();
                 _editor.Dispose();

@@ -600,6 +600,7 @@ namespace MyDmsVn.Desktop.Tests
                     Assert.Equal(2, fixture.Api.ListCalls);
 
                     control.Dispose();
+                    Assert.True(control.VersionLabel.IsDisposed);
 
                     Assert.Throws<ObjectDisposedException>(
                         (Action)(() => _ = fixture.List.RefreshAsync(CancellationToken.None)));

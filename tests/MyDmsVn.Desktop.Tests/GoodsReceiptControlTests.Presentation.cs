@@ -165,6 +165,21 @@ public sealed partial class GoodsReceiptControlTests
         Assert.False(fixture.Editor.IsDirty);
     });
 
+    [Fact]
+    public void Successful_reload_clears_a_rejected_back_buffer_message() => Integrated((fixture, control) =>
+    {
+        BeginInline(control, 2).Text = "8.00001";
+        Assert.False(ReturnToList(control));
+        Assert.Contains("before leaving", control.OperationStatusLabel.Text);
+        GoodsReceiptInlineEditorTests.Key(Keys.Escape);
+        control.RefreshButton.PerformClick();
+        PumpMessagesUntil(() => control.LastOperation.IsCompleted, TimeSpan.FromSeconds(2));
+        control.LastOperation.GetAwaiter().GetResult();
+        Assert.DoesNotContain("before leaving", control.OperationStatusLabel.Text);
+        Assert.Equal(2.5m, fixture.Editor.Lines[0].Quantity);
+        Assert.False(fixture.Editor.IsDirty);
+    });
+
     private static string PresentationMode(GoodsReceiptControl control) => control.WorkspaceMode.ToString();
     private static bool ReturnToList(GoodsReceiptControl control) => control.TryShowReceiptList();
     private static Button PresentationButton(Control root, string name) => Assert.Single(PresentationDescendants(root).OfType<Button>(), c => c.Text == name);

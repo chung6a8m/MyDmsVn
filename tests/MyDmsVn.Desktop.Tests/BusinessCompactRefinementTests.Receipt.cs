@@ -76,7 +76,10 @@ public sealed partial class BusinessCompactRefinementTests
             receipt.NoteEditor.Text = "Unsaved — preserve this text through reflow";
             Assert.False(receipt.TryShowReceiptList());
             Snapshot("dirty-constrained-opposite-theme");
-            fixture.Editor.Load(fixture.Api.Current);
+            // Clear the rejected dirty-navigation message through the real admitted Save
+            // path; direct VM.Load setup would leave an artificial stale presentation error.
+            receipt.SaveButton.PerformClick(); WaitCatalog(receipt.LastOperation);
+            Assert.False(fixture.Editor.IsDirty);
             receipt.LineGrid.Focus(); receipt.LineGrid.Selection.Focus(new SourceGrid.Position(1, 2), true);
             GoodsReceiptInlineEditorTests.Key(Keys.F2);
             receipt.QuantityEditor.Text = "8.00001";
