@@ -18,6 +18,10 @@ namespace MyDmsVn.Desktop.Tests;
 internal sealed class GoodsReceiptLookupFixture : IDisposable
 {
     private readonly CancellationToken _token;
+    private readonly SynchronizationContext? _previousContext = SynchronizationContext.Current;
+    private readonly int _uiThread = Thread.CurrentThread.ManagedThreadId;
+    private readonly List<int> _mutationThreads = new List<int>();
+    private WindowsFormsSynchronizationContext? _context;
     private readonly List<Task> _operations = new List<Task>();
     private readonly ControlledDelay _delay = new ControlledDelay();
     private readonly ControlledSource _warehouse = new ControlledSource(CatalogKind.Warehouse, 3);
@@ -30,9 +34,13 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
         try
         {
             Form = new Form { ClientSize = new Size(1500, 850), StartPosition = FormStartPosition.CenterScreen };
-            // Install the real WinForms dispatcher before creating any asynchronous application owners.
             Form.Show();
-            var dispatcher = new SynchronizationContextUiDispatcher(SynchronizationContext.Current!);
+            ContextBeforeInstallation = SynchronizationContext.Current?.GetType().FullName ?? "null";
+            // xUnit's context can flow into a newly created STA. Form.Show does not
+            // necessarily replace it; explicitly own the UI context for async continuations.
+            _context = new WindowsFormsSynchronizationContext();
+            SynchronizationContext.SetSynchronizationContext(_context);
+            var dispatcher = new SynchronizationContextUiDispatcher(_context);
             var notifications = new DesktopNotificationCenter();
             var messenger = new WeakReferenceMessenger();
             Api = new ReceiptClient();
@@ -42,6 +50,10 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
                 new CatalogLookupViewModel(_employee, messenger, dispatcher, notifications, _delay),
                 new GoodsReceiptProductOptionsViewModel(_product, messenger, dispatcher, notifications, _delay),
                 dispatcher, notifications);
+            Editor.Lines.CollectionChanged += (_, __) =>
+            {
+                lock (_mutationThreads) _mutationThreads.Add(Thread.CurrentThread.ManagedThreadId);
+            };
             Control = new GoodsReceiptControl(List, Editor) { Dock = DockStyle.Fill };
             Form.Controls.Add(Control);
             Wait(Control.ActivateAsync(token));
@@ -50,6 +62,9 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
             Assert.Equal(3, Control.WarehouseLookup.SelectedValue);
             Assert.Equal(5, Control.EmployeeLookup.SelectedValue);
             Assert.False(Editor.IsDirty);
+            Assert.False(Control.WarehouseFilterLookup.HasPendingText);
+            Assert.False(Control.WarehouseLookup.HasPendingText);
+            Assert.False(Control.EmployeeLookup.HasPendingText);
             Lookup = target == "WarehouseFilterLookup" ? Control.WarehouseFilterLookup :
                 target == "WarehouseLookup" ? Control.WarehouseLookup : Control.EmployeeLookup;
             Source = target == "EmployeeLookup" ? _employee : _warehouse;
@@ -58,7 +73,7 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
             InitialText = Driver.Text;
             // Selection is setup only; every query character is sent separately to native EDIT.
             Driver.SelectRange(0, Driver.Text.Length);
-            }
+        }
         catch
         {
             // Failed focus/setup is never RED evidence and must not leave a hosted window.
@@ -67,6 +82,7 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
         }
     }
     internal string Target { get; }
+    internal string ContextBeforeInstallation { get; }
     internal string InitialText { get; }
     internal Form Form { get; }
     internal GoodsReceiptControl Control { get; }
@@ -79,6 +95,7 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
     internal int DelayCount => _delay.Count;
     internal Task Type(char character)
     {
+        AssertUiOwner();
         Driver.TypeCharacter(character);
         var operation = Control.LastOperation;
         _operations.Add(operation);
@@ -96,9 +113,17 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
     }
     internal void Wait(Task operation)
     {
+        AssertUiOwner();
         PumpUntil(() => operation.IsCompleted, "operation completion");
         operation.GetAwaiter().GetResult();
         System.Windows.Forms.Application.DoEvents();
+        AssertUiOwner();
+    }
+    private void AssertUiOwner()
+    {
+        Assert.Equal(_uiThread, Thread.CurrentThread.ManagedThreadId);
+        Assert.IsType<WindowsFormsSynchronizationContext>(SynchronizationContext.Current);
+        lock (_mutationThreads) Assert.All(_mutationThreads, thread => Assert.Equal(_uiThread, thread));
     }
     private void PumpUntil(Func<bool> condition, string boundary, bool cleanup = false)
     {
@@ -123,6 +148,7 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
             _product.ReleaseAll();
             PumpUntil(() => _operations.All(task => task.IsCompleted), "owned operations drain", cleanup: true);
             foreach (var task in _operations) task.GetAwaiter().GetResult();
+            if (_context != null) AssertUiOwner();
             Assert.All(_delay.Entries, entry => Assert.True(entry.Completion.Task.IsCompleted));
             foreach (var source in new[] { _warehouse, _employee, _product })
                 Assert.All(source.PendingTasks, task => Assert.True(task.IsCompleted));
@@ -133,6 +159,8 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
             Editor?.Dispose();
             List?.Dispose();
             Form?.Dispose();
+            SynchronizationContext.SetSynchronizationContext(_previousContext);
+            _context?.Dispose();
         }
     }
     private sealed class ControlledDelay : IAsyncDelay

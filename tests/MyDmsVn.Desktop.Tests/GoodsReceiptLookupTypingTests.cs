@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
+using System.Windows.Forms;
 using MyDmsVn.Desktop.Application;
 using Xunit;
 using Xunit.Abstractions;
@@ -99,22 +101,43 @@ public sealed class GoodsReceiptLookupTypingTests
         StaTest.Run(token =>
         {
             using var guard = new WinFormsTestGuard();
-            var failures = new List<string>();
-            using (var fixture = new GoodsReceiptLookupFixture(target, token))
+            // DoEvents alone enters/exits a temporary loop and can uninstall WinForms'
+            // context. Keep a real outer loop while exercising asynchronous control work.
+            ExceptionDispatchInfo? failure = null;
+            using var loop = new ApplicationContext();
+            using var startup = new Control();
+            startup.CreateControl();
+            startup.BeginInvoke(new Action(() =>
             {
-                Assert.Equal(4, IntPtr.Size);
-                _output.WriteLine("Target=" + target + "; DPI=" + fixture.Form.DeviceDpi +
-                    "; client=" + fixture.Form.ClientSize + "; workArea=" + System.Windows.Forms.Screen.FromControl(fixture.Form).WorkingArea +
-                    "; theme=" + MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Mode);
-                _output.WriteLine("Initial raw='" + fixture.InitialText + "'; filter=null; warehouse=3; employee=5; pending=False; native EDIT=" +
-                    fixture.Driver.FocusedHandle + "; ownedProcessAndThread=True; initial selected range=" + fixture.Driver.SelectionStart + "+" + fixture.Driver.SelectionLength);
-                scenario(fixture, failures);
-            }
-            _output.WriteLine("CLEANUP=drained; form/control/viewmodels disposed; guard exceptions=" + guard.Exceptions.Count);
-            Assert.Empty(guard.Exceptions);
-            // Keep observing later keys even on a broken baseline; every checkpoint retains
-            // independent literal expectations. Native focus/fixture faults fail immediately.
-            Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+                try
+                {
+                    var failures = new List<string>();
+                    using (var fixture = new GoodsReceiptLookupFixture(target, token))
+                    {
+                        Assert.Equal(4, IntPtr.Size);
+                        guard.Attach(fixture.Control.WarehouseFilterLookup.ResultsGrid);
+                        guard.Attach(fixture.Control.WarehouseLookup.ResultsGrid);
+                        guard.Attach(fixture.Control.EmployeeLookup.ResultsGrid);
+                        _output.WriteLine("Setup context before explicit installation=" + fixture.ContextBeforeInstallation +
+                            "; owned WindowsFormsSynchronizationContext installed; STA/collection mutation ownership asserted at every wait");
+                        _output.WriteLine("Target=" + target + "; DPI=" + fixture.Form.DeviceDpi +
+                            "; client=" + fixture.Form.ClientSize + "; workArea=" + System.Windows.Forms.Screen.FromControl(fixture.Form).WorkingArea +
+                            "; theme=" + MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Mode);
+                        _output.WriteLine("Initial raw='" + fixture.InitialText + "'; filter=null; warehouse=3; employee=5; pending=False; native EDIT=" +
+                            fixture.Driver.FocusedHandle + "; ownedProcessAndThread=True; initial selected range=" + fixture.Driver.SelectionStart + "+" + fixture.Driver.SelectionLength);
+                        scenario(fixture, failures);
+                    }
+                    _output.WriteLine("CLEANUP=drained; form/control/viewmodels disposed; guard exceptions=" + guard.Exceptions.Count);
+                    Assert.Empty(guard.Exceptions);
+                    // Keep observing later keys even on a broken baseline; every checkpoint retains
+                    // independent literal expectations. Native focus/fixture faults fail immediately.
+                    Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+                }
+                catch (Exception exception) { failure = ExceptionDispatchInfo.Capture(exception); }
+                finally { loop.ExitThread(); }
+            }));
+            System.Windows.Forms.Application.Run(loop);
+            failure?.Throw();
         }, TimeSpan.FromSeconds(30));
     }
 
