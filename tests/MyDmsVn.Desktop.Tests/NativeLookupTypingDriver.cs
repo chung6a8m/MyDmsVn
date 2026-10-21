@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
@@ -55,6 +56,52 @@ internal sealed class NativeLookupTypingDriver
         AssertFocused();
         GoodsReceiptInlineEditorTests.Key(key);
     }
+    internal void Paste(string text)
+    {
+        AssertFocused();
+        var previous = Clipboard.GetDataObject();
+        try
+        {
+            Clipboard.SetText(text);
+            SendMessage(FocusedHandle, 0x0302, IntPtr.Zero, IntPtr.Zero); // WM_PASTE
+            System.Windows.Forms.Application.DoEvents();
+            AssertFocused();
+        }
+        finally
+        {
+            if (previous == null) Clipboard.Clear();
+            else Clipboard.SetDataObject(previous, true);
+        }
+    }
+    internal static void Click(Control target, Point point)
+    {
+        Assert.True(target.IsHandleCreated && target.ClientRectangle.Contains(point));
+        Assert.Equal(GetCurrentThreadId(), GetWindowThreadProcessId(target.Handle, out var process));
+        Assert.Equal(GetCurrentProcessId(), process);
+        var location = new IntPtr((point.Y << 16) | (point.X & 0xffff));
+        // Owned native window messages, as in InlineReceiptTestDriver.MouseDown/Up.
+        // Coordinates are client pixels: no virtualized screen/cursor conversion.
+        Assert.True(PostMessage(target.Handle, 0x0201, new IntPtr(1), location));
+        Assert.True(PostMessage(target.Handle, 0x0202, IntPtr.Zero, location));
+        System.Windows.Forms.Application.DoEvents();
+    }
+    internal static void Activate(Form form)
+    {
+        var previousTopMost = form.TopMost;
+        try
+        {
+            form.TopMost = true;
+            form.Activate();
+            var foreground = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+            var current = GetCurrentThreadId();
+            var attached = foreground != current && foreground != 0 && AttachThreadInput(current, foreground, true);
+            try { SetForegroundWindow(form.Handle); }
+            finally { if (attached) Assert.True(AttachThreadInput(current, foreground, false)); }
+            Assert.Equal(form.Handle, GetForegroundWindow());
+            System.Windows.Forms.Application.DoEvents();
+        }
+        finally { form.TopMost = previousTopMost; }
+    }
     internal void AssertFocused()
     {
         var handle = FocusedHandle;
@@ -76,6 +123,9 @@ internal sealed class NativeLookupTypingDriver
         return (start, end);
     }
     [DllImport("user32.dll")] private static extern IntPtr GetFocus();
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint first, uint second, bool attach);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentProcessId();
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder text, int count);
@@ -83,5 +133,6 @@ internal sealed class NativeLookupTypingDriver
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextLength(IntPtr window);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", EntryPoint = "SendMessageW")] private static extern IntPtr SendMessageSelection(IntPtr window, uint message, out int start, out int end);
 }

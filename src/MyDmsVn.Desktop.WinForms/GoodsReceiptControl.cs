@@ -37,6 +37,7 @@ namespace MyDmsVn.Desktop.WinForms
         private bool _isRefreshing;
         private bool _isAccessDeniedEditorLocked;
         private bool _applyingState;
+        private int _lookupBoundaryGeneration;
 
         public GoodsReceiptControl(
             GoodsReceiptListViewModel list,
@@ -117,7 +118,8 @@ namespace MyDmsVn.Desktop.WinForms
             BusinessCompactAppearance.Apply(this);
             _inline.EditStateChanged += OnInlineEditStateChanged;
             foreach (var command in new[] { NewButton, RefreshButton, SaveButton, PostButton, AddLineButton, RemoveLineButton })
-                ((ReceiptCommandButton)command).RetainEditorFocus = () => _inline.HasPendingEdit;
+                ((ReceiptCommandButton)command).RetainEditorFocus = () =>
+                    _inline.HasPendingEdit || WarehouseLookup.HasPendingText || EmployeeLookup.HasPendingText;
             SearchBox.TextChanged += OnSearchChanged;
             WarehouseFilterLookup.TextChanged += OnWarehouseLookupSearchChanged;
             WarehouseFilterLookup.SelectedValueChanged += OnWarehouseFilterChanged;
@@ -312,7 +314,8 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task SaveAsync()
         {
-            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Save)) return;
+            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Save) ||
+                !await FinishHeaderLookupsAsync(SaveButton).ConfigureAwait(true)) return;
             if (ApplyEditorsToViewModel())
             {
                 var selectedLineId = _selectedLine?.Id;
@@ -339,7 +342,8 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task PostAsync()
         {
-            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Post)) return;
+            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Post) ||
+                !await FinishHeaderLookupsAsync(PostButton).ConfigureAwait(true)) return;
             if (_editor.IsDirty)
             {
                 _workflowMessage = "Save the current draft before posting it.";
@@ -522,7 +526,8 @@ namespace MyDmsVn.Desktop.WinForms
         private void OnWarehouseLookupSearchChanged(object? sender, EventArgs eventArgs)
         {
             var lookup = (BootstrapLookupBox)sender!;
-            if (!_applyingState && lookup.HasPendingText)
+            var canSearch = ReferenceEquals(lookup, WarehouseFilterLookup) ? !IsOperationBusy : CanEditLines();
+            if (!_applyingState && canSearch && lookup.HasPendingText)
             {
                 SetOperation(_editor.WarehouseLookup.SetSearch(lookup.Text));
             }
@@ -530,7 +535,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnEmployeeLookupSearchChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && EmployeeLookup.HasPendingText)
+            if (!_applyingState && CanEditLines() && EmployeeLookup.HasPendingText)
             {
                 SetOperation(_editor.EmployeeLookup.SetSearch(EmployeeLookup.Text));
             }
@@ -538,16 +543,22 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnWarehouseFilterChanged(object? sender, EventArgs eventArgs)
         {
-            if (_applyingState)
+            if (_applyingState || IsOperationBusy)
             {
                 return;
             }
 
             _warehouseFilterId = WarehouseFilterLookup.SelectedValue as int?;
-            SetOperation(
-                _list.SetWarehouseFilterAsync(
-                    _warehouseFilterId,
-                    CancellationToken.None));
+            SetOperation(ApplyWarehouseFilterAsync(_warehouseFilterId));
+        }
+
+        private async Task ApplyWarehouseFilterAsync(int? warehouseId)
+        {
+            // Let the native lookup finish its commit/Tab traversal before a synchronous
+            // Local list load disables the focused EDIT and changes native focus mid-key.
+            if (WarehouseFilterLookup.ContainsFocus) await Task.Yield();
+            if (IsDisposed || Disposing) return;
+            await _list.SetWarehouseFilterAsync(warehouseId, CancellationToken.None).ConfigureAwait(true);
         }
 
         private void OnStatusFilterChanged(object? sender, EventArgs eventArgs)
@@ -576,7 +587,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnWarehouseChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && !_editor.RequiresPostOutcomeReload && TrySelectedOption(WarehouseLookup, out var option))
+            if (!_applyingState && CanEditLines() && TrySelectedOption(WarehouseLookup, out var option))
             {
                 _editor.SetWarehouse(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -584,7 +595,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnEmployeeChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && !_editor.RequiresPostOutcomeReload && TrySelectedOption(EmployeeLookup, out var option))
+            if (!_applyingState && CanEditLines() && TrySelectedOption(EmployeeLookup, out var option))
             {
                 _editor.SetEmployee(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -702,12 +713,10 @@ namespace MyDmsVn.Desktop.WinForms
                 SetReceiptRows();
                 _selectedLine = _inline.SelectedLine;
                 _inline.RefreshEditability();
-                WarehouseFilterLookup.DataSource = _editor.WarehouseLookup.Items
-                    .Where(item => item.IsAvailableForNewSelection)
-                    .ToArray();
+                BindEditorLookup(WarehouseFilterLookup, _editor.WarehouseLookup.Items
+                    .Where(item => item.IsAvailableForNewSelection), _warehouseFilterId);
                 BindEditorLookup(WarehouseLookup, _editor.WarehouseLookup.Items, _editor.WarehouseId);
                 BindEditorLookup(EmployeeLookup, _editor.EmployeeLookup.Items, _editor.EmployeeId);
-                WarehouseFilterLookup.SelectValue(_warehouseFilterId);
                 StatusFilter.SelectedItem = _statusFilter ?? "All";
                 ReceiptDateEditor.Value = _editor.ReceiptDate;
                 NoteEditor.Text = _editor.Note ?? string.Empty;
@@ -925,19 +934,43 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void CancelEditorLookupEdits()
         {
+            _lookupBoundaryGeneration++;
+            // Only admitted document boundaries reach this method. Invalidate the shared
+            // request generations before clearing presentation so late responses cannot
+            // republish a preceding document's query (including the shared filter host).
+            _editor.WarehouseLookup.Cancel();
+            _editor.EmployeeLookup.Cancel();
             WarehouseLookup.CancelPendingEdit();
             EmployeeLookup.CancelPendingEdit();
             _inline.CancelActiveEdit();
         }
 
+        private async Task<bool> FinishHeaderLookupsAsync(Control command)
+        {
+            if (!WarehouseLookup.HasPendingText && !EmployeeLookup.HasPendingText) return true;
+            var generation = _lookupBoundaryGeneration;
+            // Use the pinned lookup's normal exact-match/cancel policy on native leave,
+            // including accessible/default-action commands that did not move focus.
+            // Do not synthesize Enter: that would commit a merely highlighted result.
+            command.Focus();
+            await Task.Yield();
+            if (IsDisposed || Disposing || generation != _lookupBoundaryGeneration || !CanEditLines()) return false;
+            var pending = WarehouseLookup.HasPendingText ? WarehouseLookup :
+                EmployeeLookup.HasPendingText ? EmployeeLookup : null;
+            if (pending == null) return true;
+            _workflowMessage = "Resolve the pending lookup before saving or posting.";
+            ApplyState();
+            pending.Focus();
+            return false;
+        }
+
         private static void BindEditorLookup(BootstrapLookupBox lookup, IEnumerable<CatalogLookupOption> options, int? selectedId)
         {
             var selection = selectedId > 0 ? selectedId : null;
-            var preservePending = lookup.HasPendingText && Equals(lookup.SelectedValue, selection);
-            var pendingText = lookup.Text;
             lookup.DataSource = options.ToArray();
-            lookup.SelectValue(selection);
-            if (preservePending) lookup.Text = pendingText;
+            // The pinned DataSource reconciliation preserves pending native text/caret.
+            // Reselect only an actual identity transition; selecting the same key resets it.
+            if (!Equals(lookup.SelectedValue, selection)) lookup.SelectValue(selection);
         }
 
         private static BootstrapLookupBox CreateLookup(string accessibleName)
