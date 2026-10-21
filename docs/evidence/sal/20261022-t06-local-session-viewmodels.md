@@ -42,7 +42,39 @@ These are full captured test-output DLL sets, not MyDmsVn-only counts or package
 
 ### Invocation boundary
 
-Complete Session and Architecture were built/discovered, then executed with ordinary `dotnet test -c Release -f net48 --no-build --no-restore` and distinct TRX. Discovery used `--list-tests` for the same complete project scope. Projects are `tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj` and `tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj`. Existing candidate1 Application14 used the exact selector above in `tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj`; it was not rerun after repair. The exact full build invocation/restore flags were NOT CAPTURED in the artifacts available for this checkpoint; no flags are inferred from build output and no rerun was performed to fill this gap. The command forms above and actual scope/log identities are documented, not a reproduction of the missing full build CLI. Local build/discovery/log/source/binary archive and actual TRX records remain retained; raw proprietary artifacts are not committed.
+At the first documentation checkpoint, the available artifacts did not capture the full build CLI; the missing-command limitation was recorded without inferring flags or rerunning work. Subsequently, the execution owner authentically retrieved the original retained `functions.exec → tools.exec_command` PowerShell cmd strings for the three scopes below. Root read/hash-verified retrieval report SHA256 `8F8BF80350B762151E12E911F99D01548444C9F5DC15CC2AD45F39955C53D55E`. This supplements the earlier gap; it does not erase that checkpoint's evidence boundary.
+
+These are verbatim dotnet excerpts of submitted call records, with original argument order, `$p` expressions and redirections; surrounding manifest/archive/exit-check commands are omitted. Workdir was `C:/Users/pdchung/.codex/worktrees/sal-direct-sales/CleanArchitecture`. Each original bundle declared:
+
+```powershell
+$p='.superpowers/sdd/20261021-002-direct-sales-and-moving-average-costing'
+```
+
+Candidate2 complete Session: original result chunk `60a56b`, exit0:
+
+```powershell
+dotnet build tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj -c Release -f net48 --no-restore *> ($p+'/t06-candidate2-session-build.log')
+dotnet test tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj -c Release -f net48 --no-build --no-restore --list-tests *> ($p+'/t06-candidate2-session-discovery.log')
+dotnet test tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj -c Release -f net48 --no-build --no-restore --logger 'trx;LogFileName=t06-candidate2-session.trx' --results-directory ($p+'/t06-candidate2-session-results') *> ($p+'/t06-candidate2-session.log')
+```
+
+Candidate2 complete Architecture: original result chunk `2e790a`, exit0:
+
+```powershell
+dotnet build tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj -c Release -f net48 --no-restore *> ($p+'/t06-candidate2-architecture-build.log')
+dotnet test tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj -c Release -f net48 --no-build --no-restore --list-tests *> ($p+'/t06-candidate2-architecture-discovery.log')
+dotnet test tests/MyDmsVn.Architecture.Tests/MyDmsVn.Architecture.Tests.csproj -c Release -f net48 --no-build --no-restore --logger 'trx;LogFileName=t06-candidate2-architecture.trx' --results-directory ($p+'/t06-candidate2-architecture-results') *> ($p+'/t06-candidate2-architecture.log')
+```
+
+Candidate1 Application preview/math: original build result chunk `2c9be1`, exit0. Discovery/test were a separate retained original call; its result-chunk ID is not asserted. These excerpts are not presented as one reconstructed shell bundle:
+
+```powershell
+dotnet build tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net48 --no-restore *> ($p+'/t06-final-application-build.log')
+dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net48 --no-build --no-restore --list-tests --filter 'FullyQualifiedName~SalesReceiptPreviewTests|FullyQualifiedName~SalesValuationMathTests' *> ($p+'/t06-final-application-discovery.log')
+dotnet test tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj -c Release -f net48 --no-build --no-restore --filter 'FullyQualifiedName~SalesReceiptPreviewTests|FullyQualifiedName~SalesValuationMathTests' --logger 'trx;LogFileName=t06-final-application.trx' --results-directory ($p+'/t06-final-application-results') *> ($p+'/t06-final-application.log')
+```
+
+The exact explicit build/discovery/test CLI is now known for these three specified scopes from retained submitted calls, not inferred from logs. Candidate1 Application14 remains reused byte-identical evidence, **not a new candidate2 run**. No command was rerun for retrieval. No independent OS process argv trace, full restore history, environment snapshot of every variable or recovery of other historical invocations is claimed. The original `$p` expansion is retained rather than reconstructing absolute result arguments. Earlier reports and their provenance limitations remain historical; raw proprietary artifacts stay uncommitted.
 
 This documentation checkpoint executes no build/test/SQL/GUI. Fake credential/account/permission services plus actual Local plumbing prove deterministic session boundaries, not actual Login/runtime SQL identity/native GUI/package/attended evidence. Root reports no process left running; no SQL resource/cleanup proof is invented from this task.
 
