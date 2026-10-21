@@ -10,7 +10,7 @@
 
 **Spec:** [BCF design](../BUSINESS_COMPACT_REFINEMENT.md). **Acceptance:** [BCF-A01–A23](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). **References:** [three original mockups](../design-references/business-compact/README.md).
 
-**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); T01 COMPLETE with [focused hosted Windows GREEN evidence](../evidence/bcf/20261021-t01-lookup-binding.md). T02 COMPLETE / A01–A13 lookup gate PASS on frozen `67fff29` ([native100/125 Light/Dark and attended evidence](../evidence/bcf/20261021-t02-lookup-gate.md)). T03 shell/theme IMPLEMENTED / verification partial ([evidence](../evidence/bcf/20261021-t03-chrome-followup.md)); native125 at 1680×900 Light/Dark captures remain OPEN due to the available display, with native chrome limitations recorded. T04–T06 NOT STARTED. Full visual/Owner and release acceptance are not implied.
+**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); T01 COMPLETE with [focused hosted Windows GREEN evidence](../evidence/bcf/20261021-t01-lookup-binding.md). T02 COMPLETE / A01–A13 lookup gate PASS on frozen `67fff29` ([native100/125 Light/Dark and attended evidence](../evidence/bcf/20261021-t02-lookup-gate.md)). T03 shell/theme IMPLEMENTED / verification partial ([evidence](../evidence/bcf/20261021-t03-chrome-followup.md)); native125 at 1680×900 Light/Dark captures remain OPEN due to the available display, with native chrome limitations recorded. T04 Products is IMPLEMENTED / focused Windows verification PASS; see [T04 evidence](../evidence/bcf/20261021-t04-products-inspector.md). T05–T06 remain NOT STARTED. Full visual/Owner and release acceptance are not implied.
 
 **Planning baseline:** `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb`, the merge of [PR #40](https://github.com/chung6a8m/MyDmsVn/pull/40). Its product tree matches reviewed head `5ac2bb592aaa947245ea27f9e53b5bc39aaa8ec1`. BCI is completed history; this is the sole active roadmap.
 
@@ -66,7 +66,7 @@ Read `CatalogLookupViewModel.cs`, `DebouncedAsyncAction.cs`, `GoodsReceiptEditor
 | `src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.Presentation.cs` | Proposed partial owning List/Detail presentation and its guarded transitions |
 | `src/MyDmsVn.Desktop.WinForms/ReceiptWorkspaceMode.cs` | Proposed `List`/`Detail` presentation enum |
 
-The native typing driver, fixture and typing tests above are implemented at the T00 checkpoint; T01 implements the binding tests and extends the existing driver/fixture. T02 adds test-only `LookupGateEnvironment.cs` and extends the existing embedded observers/package probe for measured native contexts and attended sessions. The refinement tests and presentation files/APIs remain proposed. Keep test helpers inside the existing Desktop test project. Extract only the layout responsibilities needed to keep the current receipt control understandable; do not perform an unrelated architecture rewrite.
+The native typing driver, fixture and typing tests above are implemented at the T00 checkpoint; T01 implements the binding tests and extends the existing driver/fixture. T02 adds test-only `LookupGateEnvironment.cs` and extends the existing embedded observers/package probe for measured native contexts and attended sessions. The refinement tests are implemented by T03/T04, including the Products partial test file. Receipt presentation files/APIs remain proposed for T05. Keep test helpers inside the existing Desktop test project. Extract only the layout responsibilities needed to keep the current receipt control understandable; do not perform an unrelated architecture rewrite.
 
 ## Verification convention
 
@@ -139,7 +139,7 @@ T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, 
 - [x] Verify 224/64 logical navigation widths, keyboard access, accessible names, focus contrast, resize/theme continuity and native editor bounds. Run the focused shell/refinement/layout tests and lookup regression selector.
 - [ ] Capture matched Light/Graphite shell evidence at the specified client sizes with actual DPI metadata. Review composition against references, record remaining native limits and commit.
 
-**T03 checkpoint:** Initial source `a8a535c`; follow-up runtime `064760f` / native125 test oracle `dfd29d2` with traced candidate pins (BootstrapSourceGrid `2bd7874`, Bootstrap5WinFormUI `2be9a4d`, SourceGrid unchanged); [partial verification and reviewed captures](../evidence/bcf/20261021-t03-chrome-followup.md). Required native125 at 1680×900 Light/Dark remains OPEN (monitor limitation confirmed by Owner), and native chrome deviations are explicit. Remaining boxes are not full parity acceptance; T04 has not started.
+**T03 checkpoint:** Initial source `a8a535c`; follow-up runtime `064760f` / native125 test oracle `dfd29d2` with traced candidate pins (BootstrapSourceGrid `2bd7874`, Bootstrap5WinFormUI `2be9a4d`, SourceGrid unchanged); [partial verification and reviewed captures](../evidence/bcf/20261021-t03-chrome-followup.md). Required native125 at 1680×900 Light/Dark remains OPEN (monitor limitation confirmed by Owner), and native chrome deviations are explicit. Remaining boxes are not full parity acceptance. The Owner subsequently requested T04; its separate checkpoint does not waive these T03 obligations.
 
 ### BCF-T04 — Products toolbar, results and inspector
 
@@ -147,11 +147,13 @@ T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, 
 
 **Interfaces:** reuse the existing catalog binding adapter, selected ID, field definitions and New/Save/Cancel/Activate/Deactivate/search/paging commands. Use actual result count; preserve CatalogChangedMessage notifications and open receipt lookup reload behavior. Other catalog kinds retain their fields and workflow.
 
-- [ ] Add `Product_catalog_composition_matches_reference_in_both_themes`, `Catalog_toolbar_preserves_search_paging_and_editor_commands`, and a Theory covering all four catalog kinds for shared layout/validation/activation behavior.
-- [ ] Place Products title/count, search, Refresh and Add product in a coherent toolbar; show a dense grid beside the inspector. Add inspector heading/code, textual status badge, basic-information section, Save/Cancel group and distinct Activate/Deactivate action using existing data.
-- [ ] Preserve selection, explicit create/cancel behavior, server validation, busy/error state and query cancellation. Layout/theme changes must never reset an edit. Retain existing selection/new command semantics; do not silently add a new catalog persistence or discard workflow.
-- [ ] Verify empty/no-selection/loading/error and active/inactive states with multiple pages and long Unicode names. Run catalog/refinement tests plus focused catalog-change/lookup regressions; ensure changes to shared layout do not remove another catalog's fields/actions.
-- [ ] Capture reference 01/03 comparisons with the same synthetic data, selected record, page and viewport. Inspect density, typography, row status/selection and inspector hierarchy; commit the reviewed screen.
+- [x] Add `Product_catalog_composition_matches_reference_in_both_themes`, `Catalog_toolbar_preserves_search_paging_and_editor_commands`, and a Theory covering all four catalog kinds for shared layout/validation/activation behavior.
+- [x] Place Products title/count, search, Refresh and Add product in a coherent toolbar; show a dense grid beside the inspector. Add inspector heading/code, textual status badge, basic-information section, Save/Cancel group and distinct Activate/Deactivate action using existing data.
+- [x] Preserve selection, explicit create/cancel behavior, server validation, busy/error state and query cancellation. Layout/theme changes must never reset an edit. Retain existing selection/new command semantics; do not silently add a new catalog persistence or discard workflow.
+- [x] Verify empty/no-selection/loading/error and active/inactive states with multiple pages and long Unicode names. Run catalog/refinement tests plus focused catalog-change/lookup regressions; ensure changes to shared layout do not remove another catalog's fields/actions.
+- [x] Capture reference 01/03 comparisons with the same synthetic data, selected record, page and viewport. Inspect density, typography, row status/selection and inspector hierarchy; commit the reviewed screen.
+
+**T04 checkpoint:** Source/test `29cd2a1`; [focused Windows evidence, retained RED trials and 14 reviewed captures](../evidence/bcf/20261021-t04-products-inspector.md). Native100 240/240; native125 234+2=236/236 runnable affected rows; extra Dark 122/122 at each scale; Session 43/43. The four strict shell/Products 1680-wide native125 rows remain NOT TESTED; fitted legacy layout passes do not replace them. T03 remains OPEN, one stale-query-error Minor is deferred, and full reference/Owner disposition remains T06. T05 is NOT STARTED.
 
 ### BCF-T05 — guarded detail-focused receipt presentation
 

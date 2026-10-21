@@ -87,3 +87,7 @@ The initial native125 run with the old exact-RGB oracle is retained at bcf-t03-f
 | TestResults/bcf-t03-followup-frozen-dark-native100/lookup.trx | EECBD97D47266C55617F2F75924B9493ECDA46F046542C0014687F14CA5B773A |
 | TestResults/bcf-t03-followup-final-native125/desktop.trx | D3CEF700B77B4D965B604096498E4EE9140A77656F2AD8E9B108BBE435E387D2 |
 | TestResults/bcf-t03-followup-final-dark-native125/lookup.trx | 205B295D77860DD2AF7F482FF298D3D3A50D69316BE50C29840F4EB9440837EA |
+
+## Subsequent Owner-directed work — 2026-10-21
+
+After this partial T03 checkpoint, the Owner explicitly requested T04. Its [separate Products implementation/evidence](20261021-t04-products-inspector.md) does not waive or close the missing T03 native125 wide captures/native chrome obligations. The original T03 results and artifacts above remain unchanged.
