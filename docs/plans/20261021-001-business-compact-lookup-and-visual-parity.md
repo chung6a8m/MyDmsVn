@@ -10,7 +10,7 @@
 
 **Spec:** [BCF design](../BUSINESS_COMPACT_REFINEMENT.md). **Acceptance:** [BCF-A01–A23](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). **References:** [three original mockups](../design-references/business-compact/README.md).
 
-**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); A01–A03 RED, no acceptance PASS. T01–T06 NOT STARTED; T02 OPEN.
+**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); T01 COMPLETE with [focused hosted Windows GREEN evidence](../evidence/bcf/20261021-t01-lookup-binding.md). T02 OPEN; T03–T06 NOT STARTED. Full A01–A13 acceptance awaits T02.
 
 **Planning baseline:** `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb`, the merge of [PR #40](https://github.com/chung6a8m/MyDmsVn/pull/40). Its product tree matches reviewed head `5ac2bb592aaa947245ea27f9e53b5bc39aaa8ec1`. BCI is completed history; this is the sole active roadmap.
 
@@ -65,7 +65,7 @@ Read `CatalogLookupViewModel.cs`, `DebouncedAsyncAction.cs`, `GoodsReceiptEditor
 | `src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.Presentation.cs` | Proposed partial owning List/Detail presentation and its guarded transitions |
 | `src/MyDmsVn.Desktop.WinForms/ReceiptWorkspaceMode.cs` | Proposed `List`/`Detail` presentation enum |
 
-The native typing driver, fixture and typing tests above are implemented at the T00 checkpoint; the other new files/APIs remain proposed. Keep test helpers inside the existing Desktop test project. Extract only the layout responsibilities needed to keep the current receipt control understandable; do not perform an unrelated architecture rewrite.
+The native typing driver, fixture and typing tests above are implemented at the T00 checkpoint; T01 implements the binding tests and extends the existing driver/fixture. The refinement tests and presentation files/APIs remain proposed. Keep test helpers inside the existing Desktop test project. Extract only the layout responsibilities needed to keep the current receipt control understandable; do not perform an unrelated architecture rewrite.
 
 ## Verification convention
 
@@ -105,11 +105,13 @@ T00 checkpoint: test commits `845ca0a` and `dbd0798`; final source selects 15 Th
 
 **Interfaces:** preserve the existing `BindEditorLookup(BootstrapLookupBox lookup, IEnumerable<CatalogLookupOption> options, int? selectedId)` helper contract or a clearly named app-only equivalent used by all three targets. Ordinary result binding synchronizes options and changed committed identity; explicit document transitions separately cancel pending query presentation and invalidate requests.
 
-- [ ] Add focused cases `Same_identity_binding_preserves_pending_text_and_selection`, `Shared_warehouse_results_preserve_each_hosts_role`, `Only_explicit_selection_changes_filter_or_header`, `Historical_selection_survives_search`, and `Late_completion_cannot_publish_after_boundary`.
-- [ ] Remove unconditional reselect-and-restore-text behavior when committed identity is unchanged. Let the pinned DataSource reconciliation retain pending input; use explicit selection only for an actual identity/context transition. Preserve optional active-only filter semantics and historical selected header labels. Do not fix only by moving caret to Text.Length or increasing debounce.
-- [ ] Exercise a canceled operation's ApplyState and an ignored-cancellation late response. Keep UI updates harmless to newer input; narrow irrelevant rebinding/continuations only if needed and proven. Do not split the shared lookup ViewModel solely to mask the binding fault.
-- [ ] Add real F4/Up/Down/Enter/Escape/Tab/Shift+Tab cases, paste and popup mouse/outside-click/deactivation cases, non-first result choice, rejected dirty New/select/Refresh, admitted query-only cancellation, Posted/busy/access/recovery locks, disposal/session replacement and inline Product regression cases. Assert model/filter effects as well as rendered input.
-- [ ] Run the T00/T01 selectors plus affected `GoodsReceiptControlTests`, `GoodsReceiptInlineEditorTests` and `InventoryAccessibilityAcceptanceTests`. Add focused Session lookup cases if their shared logic changes. Inspect TRX, verify no leaks/late callbacks, then commit the repair.
+- [x] Add focused cases `Same_identity_binding_preserves_pending_text_and_selection`, `Shared_warehouse_results_preserve_each_hosts_role`, `Only_explicit_selection_changes_filter_or_header`, `Historical_selection_survives_search`, and `Late_completion_cannot_publish_after_boundary`.
+- [x] Remove unconditional reselect-and-restore-text behavior when committed identity is unchanged. Let the pinned DataSource reconciliation retain pending input; use explicit selection only for an actual identity/context transition. Preserve optional active-only filter semantics and historical selected header labels. Do not fix only by moving caret to Text.Length or increasing debounce.
+- [x] Exercise a canceled operation's ApplyState and an ignored-cancellation late response. Keep UI updates harmless to newer input; narrow irrelevant rebinding/continuations only if needed and proven. Do not split the shared lookup ViewModel solely to mask the binding fault.
+- [x] Add real F4/Up/Down/Enter/Escape/Tab/Shift+Tab cases, paste and popup mouse/outside-click/deactivation cases, non-first result choice, rejected dirty New/select/Refresh, admitted query-only cancellation, Posted/busy/access/recovery locks, disposal/session replacement and inline Product regression cases. Assert model/filter effects as well as rendered input.
+- [x] Run the T00/T01 selectors plus affected `GoodsReceiptControlTests`, `GoodsReceiptInlineEditorTests` and `InventoryAccessibilityAcceptanceTests`. Add focused Session lookup cases if their shared logic changes. Inspect TRX, verify no leaks/late callbacks, then commit the repair.
+
+T01 checkpoint: 172 discovered/executed/passed rows, including 92 binding and the unchanged 15 T00 typing rows. [Evidence](../evidence/bcf/20261021-t01-lookup-binding.md) records exact revisions, failed trials, the independent review/admission repair, native owned-message input limits and scoped verification ruling. This hosted result does not satisfy T02's native100/125 Light/Dark, attended or package obligations.
 
 ### BCF-T02 — close the lookup gate on Windows
 

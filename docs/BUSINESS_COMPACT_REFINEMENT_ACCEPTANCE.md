@@ -1,6 +1,6 @@
 # Business Compact lookup and visual refinement — acceptance
 
-**Status:** T00 COMPLETE / RED proof only; A01–A03 fail on unchanged product. T01 NOT STARTED, T02 OPEN, visual work NOT STARTED. No new acceptance PASS is claimed. See [T00 evidence](evidence/bcf/20261021-t00-native-typing.md).
+**Status:** T00 COMPLETE / RED proof retained; T01 COMPLETE / focused hosted Windows GREEN ([evidence](evidence/bcf/20261021-t01-lookup-binding.md)). T02 OPEN; visual work NOT STARTED. Full A01–A13 acceptance is not yet PASS. The unchanged-product failures remain in [T00 evidence](evidence/bcf/20261021-t00-native-typing.md).
 **Prepared:** 2026-10-21. **Branch:** `v1a-pro`. **Planning baseline:** `6040d7bcfca698fc9daba8268bb94e4454e8eacb` (PR #40 merged).
 
 ## 1. Scope, authority and ordering
@@ -45,7 +45,7 @@ The exact observed `igu` order is timing-dependent. Tests assert correct input `
 
 ## 3. Native-key proof contract
 
-`GoodsReceiptLookupTypingTests`, `NativeLookupTypingDriver` and `GoodsReceiptLookupFixture` are implemented in the existing Desktop test project at `dbd079825f00fcf4b96294c90918cbaf712f7606`. `GoodsReceiptLookupBindingTests` remains **proposed** for T01.
+`GoodsReceiptLookupTypingTests`, `NativeLookupTypingDriver` and `GoodsReceiptLookupFixture` were implemented in the existing Desktop test project at `dbd079825f00fcf4b96294c90918cbaf712f7606`. T01 implements `GoodsReceiptLookupBindingTests` and extends the existing driver/fixture; exact source and output hashes are recorded in its evidence.
 Keep stable BCF-A identifiers if implementation changes the test names. Existing `GoodsReceiptControlTests`, `InventoryAccessibilityAcceptanceTests` and relevant Session lookup tests are regression anchors.
 Use the existing `StaTest`, `WinFormsTestGuard`, bounded message pumping and disposal conventions. No new general-purpose runner, gate manifest or process framework is required.
 
@@ -69,22 +69,22 @@ Compile failures, missing desktop, lost focus, failed ownership checks, hangs an
 
 ## 4. Observable lookup obligations
 
-A01–A03 have T00 **RED** baseline evidence, not acceptance PASS; all other rows remain **NOT RUN**. “All three” means the filter plus Warehouse and Employee headers, with explicit per-control evidence.
+A01–A03 retain T00 **RED** baseline evidence and now have T01 hosted GREEN. A04–A12 have focused T01 hosted evidence, with native message input and synthetic-source limits recorded separately. All A01–A12 remain **T02 OPEN**, not full acceptance PASS. “All three” means the filter plus Warehouse and Employee headers, with explicit per-control evidence.
 
 | ID | Task | Observable acceptance | Required evidence | Status |
 |---|---|---|---|---|
-| BCF-A01 | T00–T02 | A single real character remains pending in each control after response binding and operation completion; null filter stays unselected | Native-key test, Text/selection/committed ID before and after binding | RED — T00; T01/T02 open |
-| BCF-A02 | T00–T02 | Per-key `g`, `u`, `i` produces `gui`, with caret after the last character, when a preceding canceled task completes between keys | Controlled cancellation and bounded pumping; all three controls | RED — T00; T01/T02 open |
-| BCF-A03 | T00–T02 | Middle insertion and selected-range replacement retain exact text, caret and range across response and unrelated state refresh | Native `EM_GETSEL` assertions, not Text-only checks | RED — T00; T01/T02 open |
-| BCF-A04 | T01–T02 | Pending query never commits a new key, clears an existing header key, dirties the receipt by selection, or applies an unintended list filter | Control and VM/list-request assertions before explicit commit | NOT RUN |
-| BCF-A05 | T01–T02 | A slower old response cannot overwrite the latest pending query/results; cancellation completion cannot reset input | Source ignores cancellation deliberately; latest generation wins | NOT RUN |
-| BCF-A06 | T01–T02 | F4 and Up/Down navigate the owned popup without committing; Enter or explicit mouse result selection chooses the intended result once and changes the logical key/list filter exactly once | Owned popup/native keys/mouse and selection/command observations | NOT RUN |
-| BCF-A07 | T01–T02 | Escape restores/cancels presentation according to existing committed-selection policy; Tab and Shift+Tab preserve intended focus order and resolve input without accidental selection | Native keys, paste, outside-click/deactivation, focused HWND and resulting committed/pending state | NOT RUN |
-| BCF-A08 | T01–T02 | Optional null/active-only filter and unchanged header selections survive repeated option notifications; historical inactive selected header values remain visible but unavailable as new choices | Binding tests plus native pending-input checks | NOT RUN |
-| BCF-A09 | T01–T02 | New cancels query only after navigation admission; guarded receipt selection/Refresh retain pending state; admitted boundaries invalidate old results | Dirty guard, query generation and control state observations | NOT RUN |
-| BCF-A10 | T01–T02 | Denied/busy/Posted/RequiresPostOutcomeReload states preserve their existing edit/navigation restrictions; typing repair does not enable forbidden commits | Focused state cases; distinguish usable list filter from read-only header | NOT RUN |
-| BCF-A11 | T01–T02 | Disposal, sign-out/session replacement and document changes reject late lookup publications and cause no disposed-control callback or next-user contamination | Existing guard/lifecycle cases plus late source completion | NOT RUN |
-| BCF-A12 | T01–T02 | Pending/committed accessibility Help, historical labels and inline Product behavior remain correct; ordinary state refresh does not disturb inline editor ownership/input | Relevant existing accessibility/Product tests and focused regression selection | NOT RUN |
+| BCF-A01 | T00–T02 | A single real character remains pending in each control after response binding and operation completion; null filter stays unselected | Native-key test, Text/selection/committed ID before and after binding | T00 RED retained; T01 hosted GREEN; T02 OPEN |
+| BCF-A02 | T00–T02 | Per-key `g`, `u`, `i` produces `gui`, with caret after the last character, when a preceding canceled task completes between keys | Controlled cancellation and bounded pumping; all three controls | T00 RED retained; T01 hosted GREEN; T02 OPEN |
+| BCF-A03 | T00–T02 | Middle insertion and selected-range replacement retain exact text, caret and range across response and unrelated state refresh | Native `EM_GETSEL` assertions, not Text-only checks | T00 RED retained; T01 hosted GREEN; T02 OPEN |
+| BCF-A04 | T01–T02 | Pending query never commits a new key, clears an existing header key, dirties the receipt by selection, or applies an unintended list filter | Control and VM/list-request assertions before explicit commit | T01 focused hosted GREEN; T02 OPEN |
+| BCF-A05 | T01–T02 | A slower old response cannot overwrite the latest pending query/results; cancellation completion cannot reset input | Source ignores cancellation deliberately; latest generation wins | T01 focused hosted GREEN; T02 OPEN |
+| BCF-A06 | T01–T02 | F4 and Up/Down navigate the owned popup without committing; Enter or explicit mouse result selection chooses the intended result once and changes the logical key/list filter exactly once | Owned popup/native keys/mouse and selection/command observations | T01 focused hosted GREEN; T02 OPEN |
+| BCF-A07 | T01–T02 | Escape restores/cancels presentation according to existing committed-selection policy; Tab and Shift+Tab preserve intended focus order and resolve input without accidental selection | Native keys, paste, outside-click/deactivation, focused HWND and resulting committed/pending state | T01 focused hosted GREEN; T02 OPEN |
+| BCF-A08 | T01–T02 | Optional null/active-only filter and unchanged header selections survive repeated option notifications; historical inactive selected header values remain visible but unavailable as new choices | Binding tests plus native pending-input checks | T01 focused hosted GREEN; T02 OPEN |
+| BCF-A09 | T01–T02 | New cancels query only after navigation admission; guarded receipt selection/Refresh retain pending state; admitted boundaries invalidate old results | Dirty guard, query generation and control state observations | T01 focused hosted GREEN; T02 OPEN |
+| BCF-A10 | T01–T02 | Denied/busy/Posted/RequiresPostOutcomeReload states preserve their existing edit/navigation restrictions; typing repair does not enable forbidden commits | Focused state cases; distinguish usable list filter from read-only header | T01 focused hosted GREEN; T02 OPEN |
+| BCF-A11 | T01–T02 | Disposal, sign-out/session replacement and document changes reject late lookup publications and cause no disposed-control callback or next-user contamination | Existing guard/lifecycle cases plus late source completion | T01 focused hosted GREEN; T02 OPEN |
+| BCF-A12 | T01–T02 | Pending/committed accessibility Help, historical labels and inline Product behavior remain correct; ordinary state refresh does not disturb inline editor ownership/input | Relevant existing accessibility/Product tests and focused regression selection | T01 focused hosted GREEN; T02 OPEN |
 | BCF-A13 | T02 | All mandatory native-key/binding rows pass on interactive Windows at native 100% and 125% in Light/Dark; attended per-key smoke covers all three controls; focus/exception/cleanup checks pass | Exact source/test hashes, actual TRX cases, separate attended observations, environment and cleanup | NOT RUN |
 
 BCF-A13 is a hard phase gate. Do not start T03 visual implementation with missing, failed, skipped, timed-out or unexplained lookup cases.
@@ -143,7 +143,7 @@ Replace placeholders with measured values; keep baseline failures and later repa
 | Gate | App/test revision and hashes | Environment / actual selected cases | Result / evidence | Status |
 |---|---|---|---|---|
 | T00 baseline proof | Product/vendor unchanged from PR #40; test `dbd079825f00fcf4b96294c90918cbaf712f7606`; hashes in linked record | Interactive Windows/net48/x86, Light, hosted DPI 96 (OS AppliedDPI 120); 15/15 Theory rows executed | 15 intended product failures, no skip/timeout/abort; 15 clean ownership/STA/guard/drain records; [evidence and failed attempts](evidence/bcf/20261021-t00-native-typing.md) | COMPLETE / RED proof; T02 OPEN |
-| T01 focused repair | TBD | Three controls, affected boundary cases TBD | TRX/hash, failures and repair history TBD | NOT RUN |
+| T01 focused repair | Source/test revisions and output hashes in [T01 evidence](evidence/bcf/20261021-t01-lookup-binding.md); vendor pins unchanged | Interactive Windows/net48/x86; hosted DPI 96, Light for new cases; 172 discovered/executed | 172 PASS, zero skips/failures/timeouts; 107 clean lookup guard/drain records; independent review admission race fixed with 3 RED→GREEN rows | COMPLETE / hosted GREEN; T02 OPEN |
 | T02 lookup gate native100 | TBD | Windows/net48/x86/native100; Light/Dark and attended cases TBD | Per-control A01–A13 reconciliation TBD | NOT RUN |
 | T02 lookup gate native125 | TBD | Windows/net48/x86/native125; Light/Dark and attended cases TBD | Per-control A01–A13 reconciliation TBD | NOT RUN |
 | T03–T05 visual checks | TBD | Both themes; sizes/DPI/data/states TBD | Reference/app comparison index and deviations TBD | NOT RUN |
