@@ -6,7 +6,7 @@ namespace MyDmsVn.Desktop.WinForms;
 public sealed partial class GoodsReceiptControl
 {
     private readonly GoodsReceiptLinesGridAdapter _inline;
-    private bool IsOperationBusy => IsDisposed || Disposing || _isRefreshing || _list.IsLoading || _list.IsBusy || _editor.IsBusy;
+    private bool IsOperationBusy => IsDisposed || Disposing || _isRefreshing || _isApplyingWarehouseFilter || _list.IsLoading || _list.IsBusy || _editor.IsBusy;
     private bool CanEditLines() => !IsOperationBusy && !_editor.IsReadOnly && !_isAccessDeniedEditorLocked && !_editor.RequiresPostOutcomeReload;
 
     private void FocusFirstLineError()

@@ -449,6 +449,32 @@ public sealed class GoodsReceiptLookupBindingTests
     });
 
     [Theory]
+    [InlineData("Select")]
+    [InlineData("Refresh")]
+    [InlineData("New")]
+    public void Focused_filter_commit_reserves_admission_before_dispatcher_yield(string command) => Run("WarehouseFilterLookup", fixture =>
+    {
+        var requests = fixture.Api.Requests.Count;
+        var gets = fixture.Api.GetCalls;
+        fixture.Lookup.SelectValue(13);
+        var filter = fixture.Track(fixture.Control.LastOperation);
+        Assert.False(filter.IsCompleted);
+        if (command == "Select") fixture.Track(fixture.Control.SelectReceiptAsync(42, fixture.Token));
+        else if (command == "Refresh") fixture.Control.RefreshButton.PerformClick();
+        else fixture.Control.NewButton.PerformClick();
+        Assert.Equal(gets, fixture.Api.GetCalls);
+        Assert.Equal(requests, fixture.Api.Requests.Count);
+        Assert.Equal(41L, fixture.Editor.Id);
+        fixture.Wait(filter);
+        Assert.Equal(13, fixture.Api.Requests.Last().WarehouseId);
+        AssertIds(fixture, 3, 5, 13, false);
+        // Once the committed filter finishes, a subsequent command can be admitted.
+        fixture.Api.Current = GoodsReceiptLookupFixture.ReceiptClient.Receipt(42);
+        fixture.Wait(fixture.Control.SelectReceiptAsync(42, fixture.Token));
+        Assert.Equal(42L, fixture.Editor.Id);
+    });
+
+    [Theory]
     [InlineData("WarehouseLookup", false, true)]
     [InlineData("EmployeeLookup", false, true)]
     [InlineData("WarehouseLookup", true, true)]

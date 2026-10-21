@@ -35,6 +35,7 @@ namespace MyDmsVn.Desktop.WinForms
         private string? _statusFilter;
         private string? _workflowMessage;
         private bool _isRefreshing;
+        private bool _isApplyingWarehouseFilter;
         private bool _isAccessDeniedEditorLocked;
         private bool _applyingState;
         private int _lookupBoundaryGeneration;
@@ -458,6 +459,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void MovePage(int offset)
         {
+            if (_isApplyingWarehouseFilter) return;
             var target = _list.PageNumber + offset;
             var pageCount = Math.Max(1, (int)Math.Ceiling(_list.TotalCount / (double)_list.PageSize));
             if (target >= 1 && target <= pageCount)
@@ -517,7 +519,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnSearchChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState)
+            if (!_applyingState && !_isApplyingWarehouseFilter)
             {
                 SetOperation(_list.SetSearch(SearchBox.Text));
             }
@@ -554,16 +556,23 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task ApplyWarehouseFilterAsync(int? warehouseId)
         {
-            // Let the native lookup finish its commit/Tab traversal before a synchronous
-            // Local list load disables the focused EDIT and changes native focus mid-key.
-            if (WarehouseFilterLookup.ContainsFocus) await Task.Yield();
-            if (IsDisposed || Disposing) return;
-            await _list.SetWarehouseFilterAsync(warehouseId, CancellationToken.None).ConfigureAwait(true);
+            // Reserve command admission immediately, but defer disabling the native EDIT
+            // until commit/Tab traversal finishes. A later command must not start a load
+            // that this already-admitted filter continuation would cancel.
+            _isApplyingWarehouseFilter = true;
+            try
+            {
+                if (WarehouseFilterLookup.ContainsFocus) await Task.Yield();
+                if (IsDisposed || Disposing) return;
+                _isApplyingWarehouseFilter = false; // The list now takes admission synchronously.
+                await _list.SetWarehouseFilterAsync(warehouseId, CancellationToken.None).ConfigureAwait(true);
+            }
+            finally { _isApplyingWarehouseFilter = false; }
         }
 
         private void OnStatusFilterChanged(object? sender, EventArgs eventArgs)
         {
-            if (_applyingState)
+            if (_applyingState || _isApplyingWarehouseFilter)
             {
                 return;
             }
