@@ -10,7 +10,7 @@
 
 **Spec:** [BCF design](../BUSINESS_COMPACT_REFINEMENT.md). **Acceptance:** [BCF-A01–A23](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). **References:** [three original mockups](../design-references/business-compact/README.md).
 
-**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); T01 COMPLETE with [focused hosted Windows GREEN evidence](../evidence/bcf/20261021-t01-lookup-binding.md). T02 OPEN; T03–T06 NOT STARTED. Full A01–A13 acceptance awaits T02.
+**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); T01 COMPLETE with [focused hosted Windows GREEN evidence](../evidence/bcf/20261021-t01-lookup-binding.md). T02 COMPLETE / A01–A13 lookup gate PASS on frozen `67fff29` ([native100/125 Light/Dark and attended evidence](../evidence/bcf/20261021-t02-lookup-gate.md)). T03 is next; T03–T06 NOT STARTED. Full visual/Owner and release acceptance are not implied.
 
 **Planning baseline:** `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb`, the merge of [PR #40](https://github.com/chung6a8m/MyDmsVn/pull/40). Its product tree matches reviewed head `5ac2bb592aaa947245ea27f9e53b5bc39aaa8ec1`. BCI is completed history; this is the sole active roadmap.
 
@@ -65,7 +65,7 @@ Read `CatalogLookupViewModel.cs`, `DebouncedAsyncAction.cs`, `GoodsReceiptEditor
 | `src/MyDmsVn.Desktop.WinForms/GoodsReceiptControl.Presentation.cs` | Proposed partial owning List/Detail presentation and its guarded transitions |
 | `src/MyDmsVn.Desktop.WinForms/ReceiptWorkspaceMode.cs` | Proposed `List`/`Detail` presentation enum |
 
-The native typing driver, fixture and typing tests above are implemented at the T00 checkpoint; T01 implements the binding tests and extends the existing driver/fixture. The refinement tests and presentation files/APIs remain proposed. Keep test helpers inside the existing Desktop test project. Extract only the layout responsibilities needed to keep the current receipt control understandable; do not perform an unrelated architecture rewrite.
+The native typing driver, fixture and typing tests above are implemented at the T00 checkpoint; T01 implements the binding tests and extends the existing driver/fixture. T02 adds test-only `LookupGateEnvironment.cs` and extends the existing embedded observers/package probe for measured native contexts and attended sessions. The refinement tests and presentation files/APIs remain proposed. Keep test helpers inside the existing Desktop test project. Extract only the layout responsibilities needed to keep the current receipt control understandable; do not perform an unrelated architecture rewrite.
 
 ## Verification convention
 
@@ -119,10 +119,12 @@ T01 checkpoint: 172 discovered/executed/passed rows, including 92 binding and th
 
 **Interfaces:** consumes T00 native driver/cases and T01 binding semantics; produces candidate-attributed BCF-A01–A13 evidence. It does not create another test runner or claim BCF visual completion.
 
-- [ ] Run the focused native-key/binding matrix at actual 100% and 125%, Light and Dark, one GUI owner at a time. Include the list filter and both headers explicitly; check native focus, caret/range, dropdown, cleanup and committed IDs.
-- [ ] Perform an attended per-key smoke for `g`, `u`, `i`, slow typing, mid-string correction and selection in each control on the built candidate. Record observations independently from automation. Use controlled sources for deterministic timing; use the real Local/package path where required by the acceptance boundary.
-- [ ] Reconcile actual selectors/discovery/TRX, product/test hashes, Windows/monitor scaling, results and disposal. Preserve failing baseline and earlier failed attempts. No unrelated full SQL suite is required for application binding; package smoke uses the existing owned fixture when it needs SQL.
-- [ ] Mark A01–A13 PASS only with their evidence. Missing Windows, mandatory control/theme/scale, exception-free completion or cleanup leaves T02 BLOCKED/OPEN. Commit the ledger; only then admit T03.
+- [x] Run the focused native-key/binding matrix at actual 100% and 125%, Light and Dark, one GUI owner at a time. Include the list filter and both headers explicitly; check native focus, caret/range, dropdown, cleanup and committed IDs.
+- [x] Perform an attended per-key smoke for `g`, `u`, `i`, slow typing, mid-string correction and selection in each control on the built candidate. Record observations independently from automation. Use controlled sources for deterministic timing; use the real Local/package path where required by the acceptance boundary.
+- [x] Reconcile actual selectors/discovery/TRX, product/test hashes, Windows/monitor scaling, results and disposal. Preserve failing baseline and earlier failed attempts. No unrelated full SQL suite is required for application binding; package smoke uses the existing owned fixture when it needs SQL.
+- [x] Mark A01–A13 PASS only with their evidence. Missing Windows, mandatory control/theme/scale, exception-free completion or cleanup leaves T02 BLOCKED/OPEN. Commit the ledger; only then admit T03.
+
+T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, unchanged T01 runtime/vendor trees. Four contexts each discover/execute/pass 172 rows (688 total), with 107 clean independently measured lookup records per context. The human reports all three controls stable in each context; two owned real-package/Login sessions pass, independently assert no receipt/inventory writes, and positively drain/drop all owned resources. [Evidence](../evidence/bcf/20261021-t02-lookup-gate.md) preserves failed preflights, source/test/package distinctions, final snapshot limitations and one deferred Minor observer-budget issue. T03 is eligible, not yet implemented.
 
 ### BCF-T03 — shared shell and Light/Graphite visual system
 
