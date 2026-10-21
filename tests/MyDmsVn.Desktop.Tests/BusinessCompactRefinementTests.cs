@@ -18,7 +18,7 @@ using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests;
 
-public sealed class BusinessCompactRefinementTests : IClassFixture<RefinementProbeFixture>
+public sealed partial class BusinessCompactRefinementTests : IClassFixture<RefinementProbeFixture>
 {
     private readonly ITestOutputHelper _output;
     private readonly RefinementProbeFixture _probe;

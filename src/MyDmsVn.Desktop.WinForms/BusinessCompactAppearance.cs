@@ -80,11 +80,14 @@ internal sealed class BusinessCompactAppearance : IDisposable
     {
         var dark = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Dark;
         var colors = BootstrapThemeManager.CurrentTheme.Colors;
-        control.Font = control.Name == "CompactHeading" ? _heading : control.Name == "CompactBrand" ? _brand : control.Name == "CompactUser" ? _strong : control.Name == "CompactSecondary" || control.Name == "CompactSection" ? _secondary : _body;
+        var typography = control.Tag as string ?? control.Name;
+        control.Font = typography == "CompactHeading" ? _heading : control.Name == "CompactBrand" ? _brand : control.Name == "CompactUser" ? _strong : typography == "CompactSecondary" || typography == "CompactSection" ? _secondary : _body;
         if (control is Panel || control is TabPage || control is Form || control is UserControl || control is Label)
         {
             control.BackColor = colors.Body;
             control.ForeColor = colors.Text;
+            for (var parent = control; parent != null && !(parent is CatalogControl); parent = parent.Parent)
+                if (parent.Name == "CatalogInspector" || parent.Name == "CatalogResultsSurface") { control.BackColor = colors.Surface; break; }
         }
         if (control is TabControl) { control.BackColor = colors.Surface; control.ForeColor = colors.Text; }
         if (control is TextBox || control is ComboBox || control is DateTimePicker)

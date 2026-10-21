@@ -55,6 +55,7 @@ namespace MyDmsVn.Desktop.Application
         protected override Task<ApiResponse<EmployeeDto>> UpdateAsync(int id, CancellationToken cancellationToken) => _userIdInputInvalid ? InvalidUserId() : _client.UpdateAsync(id, new SaveEmployeeRequest(Code, Name, Phone, UserId), cancellationToken);
         protected override Task<ApiResponse<UnitResponse>> SetActiveCoreAsync(int id, bool isActive, CancellationToken cancellationToken) => _client.SetActiveAsync(id, isActive, cancellationToken);
         protected override int GetId(EmployeeDto item) => item.Id;
+        protected override EmployeeDto WithActiveStatus(EmployeeDto item, bool isActive) => new EmployeeDto(item.Id, item.Code, item.Name, item.Phone, item.UserId, isActive);
         protected override void PopulateEditor(EmployeeDto item) { Code = item.Code; Name = item.Name; Phone = item.Phone; UserIdText = item.UserId?.ToString() ?? string.Empty; }
         protected override void ClearEditor() { Code = string.Empty; Name = string.Empty; Phone = null; UserIdText = string.Empty; }
 
