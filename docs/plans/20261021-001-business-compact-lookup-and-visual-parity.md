@@ -10,7 +10,7 @@
 
 **Spec:** [BCF design](../BUSINESS_COMPACT_REFINEMENT.md). **Acceptance:** [BCF-A01–A23](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). **References:** [three original mockups](../design-references/business-compact/README.md).
 
-**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); T01 COMPLETE with [focused hosted Windows GREEN evidence](../evidence/bcf/20261021-t01-lookup-binding.md). T02 COMPLETE / A01–A13 lookup gate PASS on frozen `67fff29` ([native100/125 Light/Dark and attended evidence](../evidence/bcf/20261021-t02-lookup-gate.md)). T03 is next; T03–T06 NOT STARTED. Full visual/Owner and release acceptance are not implied.
+**Status:** ACTIVE — 2026-10-21. BCF-T00 COMPLETE as a test-only RED checkpoint ([evidence](../evidence/bcf/20261021-t00-native-typing.md)); T01 COMPLETE with [focused hosted Windows GREEN evidence](../evidence/bcf/20261021-t01-lookup-binding.md). T02 COMPLETE / A01–A13 lookup gate PASS on frozen `67fff29` ([native100/125 Light/Dark and attended evidence](../evidence/bcf/20261021-t02-lookup-gate.md)). T03 shell/theme IMPLEMENTED / verification partial ([evidence](../evidence/bcf/20261021-t03-shell-theme.md)); native125 at 1680×900 Light/Dark captures remain OPEN due to the available display, with native chrome limitations recorded. T04–T06 NOT STARTED. Full visual/Owner and release acceptance are not implied.
 
 **Planning baseline:** `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb`, the merge of [PR #40](https://github.com/chung6a8m/MyDmsVn/pull/40). Its product tree matches reviewed head `5ac2bb592aaa947245ea27f9e53b5bc39aaa8ec1`. BCI is completed history; this is the sole active roadmap.
 
@@ -132,11 +132,13 @@ T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, 
 
 **Interfaces:** reuse `BusinessCompactAppearance.Apply(Control)` and `Scale(Control,int)`, existing navigation Items/Icon/selection events and shell workspace/session actions. Shared style ownership must not dispose vendor-owned fonts or editors. Any new appearance helpers remain application-owned and documented in their owning file.
 
-- [ ] Add composition/focus cases `Shell_has_grouped_icon_navigation_and_compact_session_actions` and `Graphite_chrome_and_focus_remain_readable_after_theme_switch`; preserve the existing nested/disabled/collapsed navigation checks.
-- [ ] Implement brand area, meaningful module icons, section labels, selected state, user context, compact theme/session controls and integrated tab appearance from references 01/03. Preserve existing module permission and workspace disposal behavior.
+- [x] Add composition/focus cases `Shell_has_grouped_icon_navigation_and_compact_session_actions` and `Graphite_chrome_and_focus_remain_readable_after_theme_switch`; preserve the existing nested/disabled/collapsed navigation checks.
+- [x] Implement brand area, meaningful module icons, section labels, selected state, user context, compact theme/session controls and integrated tab appearance from references 01/03. Preserve existing module permission and workspace disposal behavior.
 - [ ] Apply semantic surface/border/text/selection/focus/error tokens through supported APIs. Resolve bright tab/input/selector islands in Dark; document any unavoidable native chrome precisely instead of silently declaring parity. If a public seam is missing, prove it and scope a compatible traceable upstream change before advancing that pin.
-- [ ] Verify 224/64 logical navigation widths, keyboard access, accessible names, focus contrast, resize/theme continuity and native editor bounds. Run the focused shell/refinement/layout tests and lookup regression selector.
+- [x] Verify 224/64 logical navigation widths, keyboard access, accessible names, focus contrast, resize/theme continuity and native editor bounds. Run the focused shell/refinement/layout tests and lookup regression selector.
 - [ ] Capture matched Light/Graphite shell evidence at the specified client sizes with actual DPI metadata. Review composition against references, record remaining native limits and commit.
+
+**T03 checkpoint:** Source `a8a535c`; [partial verification and reviewed captures](../evidence/bcf/20261021-t03-shell-theme.md). Required native125 at 1680×900 Light/Dark remains OPEN (monitor limitation confirmed by Owner), and native chrome deviations are explicit. Remaining boxes are not full parity acceptance; T04 has not started.
 
 ### BCF-T04 — Products toolbar, results and inspector
 
