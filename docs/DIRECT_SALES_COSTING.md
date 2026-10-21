@@ -3,7 +3,7 @@
 **Status:** APPROVED DESIGN / BOUNDED CHECKPOINTS VERIFIED / SALES WRITER CUTOVER INCOMPLETE. **Updated:** 2026-10-22.
 **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 The Owner selected moving weighted average per `(WarehouseId, ProductId)`, using actual serialized Post order.
-T00 implements exact math and T01 implements schema/bootstrap/admission/mappings/grants/reset ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 implements valued receipt posting, the shared coordinator, Exclusive reconciliation and stock projections ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). Sales Post and later workflows remain under implementation in the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md); the checkpoint is not deployable.
+T00 implements exact math and T01 implements schema/bootstrap/admission/mappings/grants/reset ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 implements valued receipt posting, the shared coordinator, Exclusive reconciliation and stock projections ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). T03 uses T00 revenue math for [reviewed Draft Save/detail](evidence/sal/20261022-t03-sales-draft.md), preserves independent line IDs/current Unit and keeps Draft costs/profit null with no stock movement. Sales Post and later workflows remain under implementation in the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md); the checkpoint is not deployable.
 [Direct Sales](DIRECT_SALES.md) owns document scope; [query/UI design](DIRECT_SALES_QUERY_AND_UI.md) owns presentation; [acceptance](DIRECT_SALES_ACCEPTANCE.md) owns required evidence.
 
 ## 1. Existing implementation and change boundary

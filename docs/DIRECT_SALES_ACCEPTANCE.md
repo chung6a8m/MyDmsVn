@@ -1,12 +1,12 @@
 # Direct Sales — acceptance and evidence ledger
 
-**Status:** IMPLEMENTATION IN PROGRESS — reviewed task checkpoints recorded; A10–A12 PASS, multi-task acceptance remains open.
+**Status:** IMPLEMENTATION IN PROGRESS — reviewed task checkpoints recorded; bounded A01/A10–A12/A21 PASS, multi-task acceptance remains open.
 **Updated:** 2026-10-22. **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, merged PR #41.
-**Active roadmap:** [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 foundation is complete at `b5a2f3f`; reviewed T01 is complete at `81e8aab` ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). Reviewed T02 is complete at `47165ded` ([evidence](evidence/sal/20261022-t02-valued-inventory.md)); T03 is IN PROGRESS and T04–T08 remain behind the serial task queue. [T00 evidence](evidence/sal/20261022-t00-foundation.md) records its bounded pure portions.
+**Active roadmap:** [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 foundation is complete at `b5a2f3f`; reviewed T01 is complete at `81e8aab` ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). Reviewed T02 is complete at `47165ded` ([evidence](evidence/sal/20261022-t02-valued-inventory.md)); reviewed T03 Draft/detail is complete at `1164199` ([evidence](evidence/sal/20261022-t03-sales-draft.md)); T04 is IN PROGRESS and T05–T08 remain behind the serial task queue. [T00 evidence](evidence/sal/20261022-t00-foundation.md) records its bounded pure portions.
 
 Read this ledger with [DIRECT_SALES](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md).
 The approved business direction is direct sale with perpetual moving weighted average by Warehouse + Product.
-The planning/shipped baseline has schema9 and quantity-only inventory. T01 development source implements schema10/bootstrap/admission/grants/reset, with SQL-login-only exact9 maintenance and inherited collation portability limits. T02 implements valued receipt/reconciliation/stock reads. Sales Post and full workflow/deployment cutover remain incomplete; the development checkpoint is not deployable.
+The planning/shipped baseline has schema9 and quantity-only inventory. T01 development source implements schema10/bootstrap/admission/grants/reset, with SQL-login-only exact9 maintenance and inherited collation portability limits. T02 implements valued receipt/reconciliation/stock reads. T03 implements authorized Draft Create/Update/Get. Sales Post and full workflow/deployment cutover remain incomplete; the development checkpoint is not deployable.
 Documentation review, a merged documentation PR or an approved plan does not satisfy a runtime acceptance row.
 
 BCF/BCI/GUI-P5/L2DB/RESP remain accepted historical work with their exact revisions, failures and bounded exceptions.
@@ -26,13 +26,13 @@ Native per-key controls, hosted STA tests, real-Login packaged automation and at
 Retain all failed/aborted invocations and the scope of a later repair; do not relabel a focused repair as an unfiltered passing run.
 
 Status values for execution are NOT RUN, BLOCKED, FAIL and PASS; bounded Owner dispositions must be explicit and dated.
-T00-owned arithmetic/contract/registry portions have [focused evidence](evidence/sal/20261022-t00-foundation.md). **A10–A12 PASS** against T01 source/test `81e8aab` and its explicit environment/recovery boundaries; frozen T08 revalidation remains open. Multi-task rows remain NOT RUN until their later owners/frozen candidate portions are reconciled; T01-owned portions of A09/A13–A16 are recorded below.
+T00-owned arithmetic/contract/registry portions have [focused evidence](evidence/sal/20261022-t00-foundation.md). **A10–A12 PASS** against T01 source/test `81e8aab` and its explicit environment/recovery boundaries; frozen T08 revalidation remains open. A01/A21 PASS against T03 source/test `1164199bb7c7500c61fe41ed21eabb58c7b3a2a7`, executed/reviewed 2026-10-22 ([evidence](evidence/sal/20261022-t03-sales-draft.md)); their calendar/JSON proof is the actual T00 contract rerun within final Application 127, not a new serializer or full Local proof. Frozen T08/Owner acceptance remains open. Other multi-task rows remain NOT RUN until their later owners/frozen candidate portions are reconciled; T01-owned portions of A09/A13–A16 are recorded below.
 
 ## 2. Business, precision and conservation
 
 | ID | Task | Mandatory observable outcome | Required evidence | Status |
 |---|---|---|---|---|
-| SAL-A01 | T00/T03 | Required customer/warehouse/employee, calendar SaleDate and 1–200 lines are enforced; zero quantity, negative price, invalid precision and 201 lines fail before writes | Application boundary cases plus independent Draft persistence checks | NOT RUN |
+| SAL-A01 | T00/T03 | Required customer/warehouse/employee, calendar SaleDate and 1–200 lines are enforced; zero quantity, negative price, invalid precision and 201 lines fail before writes | Application boundary cases plus independent Draft persistence checks | PASS — [T03](evidence/sal/20261022-t03-sales-draft.md) |
 | SAL-A02 | T00/T03/T07 | Ordinary UnitPrice0 is allowed; IsGift forces revenue0 and retains entered price; unchecking restores the computed revenue; gifts consume full stock/cost | Math, save/reload, Post and checkbox observations | NOT RUN |
 | SAL-A03 | T00/T03/T07 | Same Product may occupy several independent lines with distinct quantities/prices/gift flags and stable persisted/client identity | Duplicate/ID0 save, edit, reorder, delete and reload cases; no Product uniqueness | NOT RUN |
 | SAL-A04 | T00/T02/T04 | Qty18,4, price19,4, money28,4 and cost snapshot28,8 limits are checked; exact wide intermediates prevent premature decimal overflow; all line/group/document/balance overflow fails atomically | Boundary/tie/maximum and over-limit vectors; independent fixed expected values and SQL outcomes | NOT RUN |
@@ -82,10 +82,12 @@ T02-owned portions of A17–A19 have [reviewed evidence](evidence/sal/20261022-t
 | ID | Task | Mandatory observable outcome | Required evidence | Status |
 |---|---|---|---|---|
 | SAL-A20 | T00/T03/T06 | Each service enforces its own Active Read/Write/Post key, current account and protected binding; direct Deny/unknown/deprecated keys fail; Read includes approved cost/profit | Application/Local permission and registry cases; no automatic assignment or UI-only authorization | NOT RUN |
-| SAL-A21 | T03 | Draft Create/Update recomputes server amounts; SaleNo is immutable SA+10digits from the separate noncycling bounded sequence; Note1000/noNUL and Sales-only yyyy-MM-dd JSON date strings hold without timezone conversion or global UTC changes | DTO round-trips, sequence boundaries/gaps, validation and fresh persistence tests | NOT RUN |
+| SAL-A21 | T03 | Draft Create/Update recomputes server amounts; SaleNo is immutable SA+10digits from the separate noncycling bounded sequence; Note1000/noNUL and Sales-only yyyy-MM-dd JSON date strings hold without timezone conversion or global UTC changes | DTO round-trips, sequence boundaries/gaps, validation and fresh persistence tests | PASS — [T03](evidence/sal/20261022-t03-sales-draft.md) |
 | SAL-A22 | T03/T07 | SaleLineId0 creates distinct rows; a positive ID belongs to the locked Draft, occurs once, retains identity; omitted IDs are removed and LineNo follows submitted order | Foreign/repeated ID rejection and reorder tests without transient uniqueness failure | NOT RUN |
 | SAL-A23 | T03/T04 | Save derives Unit from current Product; Post rejects a changed Unit until explicit reload/review/Save; inactive/missing required references reject; historical Posted display remains available | Locked-reference race and UnitChanged cases, stored immutable Unit and no conversion | NOT RUN |
 | SAL-A24 | T03/T04/T06 | Matching opaque rowversion is required; stale Save/Post never overwrites accepted changes; Posted is immutable; uncertain Create cannot trigger an automatic duplicate Create | Concurrent Draft/save/version and outcome-recovery cases; no stock change on Save | NOT RUN |
+
+T03-owned Draft/identity/authorization portions of A20/A22–A24 have [reviewed evidence](evidence/sal/20261022-t03-sales-draft.md): independent Write/Get Read, active references, server Unit/revenue, zero/new/retained ID semantics, version/Posted rejection, competing Save and no stock effects. A02/A03/A08 gain bounded Save/detail portions; their Post/client/UI requirements remain open. Post UnitChanged/T04, Local uncertainty/session/T06 and native row identity/T07 are not closed by these tests.
 
 Commands never accept client amount, cost, Unit, LineNo, SaleNo, status or actor as authoritative.
 Post response contains SaleId, Posted status, PostedAtUtc and the new opaque Version; authoritative detail/cost follows Get.
@@ -170,15 +172,15 @@ The documentation PR may complete before these future rows; it delivers the appr
 
 | Field | Required content at execution | Current value |
 |---|---|---|
-| Task/acceptance scope | SAL-T IDs, SAL-A IDs, changed behavior and reason for selected breadth | [T00 pure portions](evidence/sal/20261022-t00-foundation.md); [T01 schema/bootstrap portions](evidence/sal/20261022-t01-schema-bootstrap.md); [T02 inventory portions](evidence/sal/20261022-t02-valued-inventory.md); full SAL incomplete |
-| Revisions | Separate product/source, test and vendor revisions; dirty-worktree statement | T00 `b5a2f3f`; T01 `81e8aab`; T02 `47165ded`; exact binary/hash/encoding boundaries in evidence |
+| Task/acceptance scope | SAL-T IDs, SAL-A IDs, changed behavior and reason for selected breadth | [T00 pure portions](evidence/sal/20261022-t00-foundation.md); [T01 schema/bootstrap portions](evidence/sal/20261022-t01-schema-bootstrap.md); [T02 inventory portions](evidence/sal/20261022-t02-valued-inventory.md); [T03 Draft/detail](evidence/sal/20261022-t03-sales-draft.md); full SAL incomplete |
+| Revisions | Separate product/source, test and vendor revisions; dirty-worktree statement | T00 `b5a2f3f`; T01 `81e8aab`; T02 `47165ded`; T03 `1164199`; exact binary/hash/encoding boundaries in evidence |
 | Package | Exact build source, executable/dependency/script hashes and release command | NOT RUN |
-| Commands | Actual restore/build/discovery/test/package invocations, project, net48, filter and x86 settings | T00–T02 actual commands in evidence; package NOT RUN |
-| Rows/outcomes | Actual discovered/selected/executed Facts/Theory rows; pass/fail/skip/not-run and reasons | T00 Application75/Architecture3; T01 pre-BOM Migrations141, final fresh1/exact9upgrade1/Security14/Foundation34; T02 scopes91/76/32/1/7/13; no additive unique total |
+| Commands | Actual restore/build/discovery/test/package invocations, project, net48, filter and x86 settings | Reviewed checkpoint commands in evidence; package NOT RUN |
+| Rows/outcomes | Actual discovered/selected/executed Facts/Theory rows; pass/fail/skip/not-run and reasons | T00 Application75/Architecture3; T01 pre-BOM Migrations141, final fresh1/exact9upgrade1/Security14/Foundation34; T02 scopes91/76/32/1/7/13; T03 scopes127/118/32/13; no additive unique total |
 | Environment | OS/SDK/framework/SQL versions, native monitor/window DPI, theme and measured client bounds | Windows/net48/SQL development environment in T01 evidence; SAL native UI NOT RUN |
-| SQL resources | Designated non-production environment, sanitized allocation/ownership verification, resets/seeds, worker drain and cleanup/quarantine | T01/T02 serialized disposable ownership/drain/cleanup verified; no outstanding uncertainty |
+| SQL resources | Designated non-production environment, sanitized allocation/ownership verification, resets/seeds, worker drain and cleanup/quarantine | T01–T03 serialized disposable ownership/drain/cleanup verified; no outstanding uncertainty |
 | GUI resources | STA/guard/exception/DataError observations, process ownership/tree/output drain, cancellation and disposal | NOT RUN |
-| Independent assertions | Quantity/value/status/line/ledger/companion/version checks and source of expected values | T00 constant vectors; T01 bootstrap/corruption/rollback and independent integer SQL oracle; T02 receipt/locking/reconciliation oracles; sale writer proof open |
+| Independent assertions | Quantity/value/status/line/ledger/companion/version checks and source of expected values | T00 constant vectors; T01 bootstrap/corruption/rollback and independent integer SQL oracle; T02 receipt/locking/reconciliation and T03 Draft identity/amount/version/no-stock/detail oracles; sale writer proof open |
 | Human observations | Attendee/date/control/context/actions/results; separate from automated driver work | NOT RUN |
 | Failures/limitations | Original failure, repair revision/scope, absent resources, unexecuted cases and bounded dispositions | Original failures and scoped repairs retained in evidence; T02 R1 addressed; T01 R3 bootstrap diagnostics deferred Minor; SQL-login/collation/trusted-admin limits explicit |
 | Owner decision | Exact candidate and scope accepted, date, deviations and release exclusions | Design selected; feature/package/production acceptance NOT RUN |
@@ -186,4 +188,4 @@ The documentation PR may complete before these future rows; it delivers the appr
 Keep raw TRX, connection values, detailed SQL identities, proprietary data and unreviewed screenshots local.
 Publish sanitized evidence with enough detail to reproduce the selected scope and assess limits.
 Later relevant source/schema/test/fixture/dependency/package changes invalidate only the evidence they can affect; rerun that scope honestly.
-This ledger records bounded T00 foundations, T01 SQL/schema checkpoint with A10–A12 PASS, and T02 receipt/reconciliation/read portions. Multi-task T02 rows remain open. It does not establish full SAL, GUI/package, Owner or production acceptance.
+This ledger records bounded T00 foundations, T01 SQL/schema checkpoint with A10–A12 PASS, T02 receipt/reconciliation/read and T03 Draft/detail portions. A01/A21 have bounded T03 PASS; other multi-task rows remain open. It does not establish full SAL, GUI/package, Owner or production acceptance.

@@ -4,7 +4,7 @@
 
 ## Active SAL coverage — bounded checkpoints; later obligations open
 
-[SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) owns traceable rows for the sole [active plan](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 pure foundations and [T01 schema/bootstrap](evidence/sal/20261022-t01-schema-bootstrap.md) have scoped evidence. [T02 valued receipt/reconciliation/read evidence](evidence/sal/20261022-t02-valued-inventory.md) is complete in its owned scope; sale writer/workflow and frozen T08 obligations remain open. New tests must establish:
+[SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) owns traceable rows for the sole [active plan](plans/20261021-002-direct-sales-and-moving-average-costing.md). T00 pure foundations and [T01 schema/bootstrap](evidence/sal/20261022-t01-schema-bootstrap.md) have scoped evidence. [T02 valued receipt/reconciliation/read evidence](evidence/sal/20261022-t02-valued-inventory.md) is complete in its owned scope; [T03 Draft/detail](evidence/sal/20261022-t03-sales-draft.md) adds authorized persistence/identity/consistent-read evidence; sale Post/List/Local/UI and frozen T08 obligations remain open. New tests must establish:
 
 - Exact arithmetic at scale/precision limits and midpoint ties, representable results with large intermediates, cumulative duplicate/gift allocation and zero residual at full depletion.
 - Atomic schema10/bootstrap from exact validated schema9, source/ledger/balance bidirectional checks, rollback with journal, clean/no-op install and old/new/unsupported-client refusal.

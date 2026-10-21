@@ -1,10 +1,10 @@
 # Direct Sales — query contracts and desktop interaction
 
-**Status:** APPROVED DESIGN / QUERY AND UI NOT IMPLEMENTED. **Updated:** 2026-10-22.
+**Status:** APPROVED DESIGN / GET DETAIL IMPLEMENTED / LIST AND UI PENDING. **Updated:** 2026-10-22.
 **Source baseline:** `MyDmsVn/v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 This specification supports the sole [SAL execution plan](plans/20261021-002-direct-sales-and-moving-average-costing.md); it is not runtime, UI or release acceptance.
 Read the [Direct Sales design](DIRECT_SALES.md), [costing rules](DIRECT_SALES_COSTING.md) and [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) together.
-T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 existing Inventory value/average/card projections have [bounded evidence](evidence/sal/20261022-t02-valued-inventory.md). Sales query services, cursor validation, Local/ViewModels and UI below remain proposed and unverified; T01 is not deployable.
+T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 existing Inventory value/average/card projections have [bounded evidence](evidence/sal/20261022-t02-valued-inventory.md). T03 implements [authorized GetById detail](evidence/sal/20261022-t03-sales-draft.md) on one short owned SERIALIZABLE transaction. Sales List/filter/keyset/cursor validation, Local/ViewModels and UI below remain proposed and unverified; the development checkpoint is not deployable.
 
 ## 1. Scope and source boundaries
 
@@ -19,16 +19,16 @@ Their offset paging, complete-detail list DTO and duplicate-Product validation m
 Existing [PagedResult](../src/MyDmsVn.Contracts/PagedResult.cs) remains an offset contract for its current callers; the sales cursor result is independent.
 Use the established ownership and mapping seams in [PERSISTENCE](PERSISTENCE.md), current [CONTRACTS](CONTRACTS.md) and [SECURITY](SECURITY.md).
 
-### Proposed implementation locations
+### Implemented detail and proposed later locations
 
 | Path under the repository root | Responsibility |
 |---|---|
 | `src/MyDmsVn.Contracts/SalesContracts.cs` | Sales request/detail/summary/page DTOs and shared limits |
 | `src/MyDmsVn.Server.Domain/Sales/SalesReceipt.cs` | `SalesReceipt` header; `SalesReceiptLine` in adjacent `SalesReceiptLine.cs` |
-| `src/MyDmsVn.Server.Application/Sales/ISalesReceiptQueryService.cs` | Materialized read interface |
-| `src/MyDmsVn.Server.Application/Sales/SalesReceiptQueries.cs` | Authorized Get/List requests, normalization and validation |
+| `src/MyDmsVn.Server.Application/Sales/ISalesReceiptQueryService.cs` | T03 GetById interface; List remains later work |
+| `src/MyDmsVn.Server.Application/Sales/SalesReceiptQueries.cs` | T03 authorized Get; List normalization/validation remains T05 |
 | `src/MyDmsVn.Server.Application/Sales/SalesReceiptCursor.cs` | Fixed-schema cursor codec and normalized-filter binding |
-| `src/MyDmsVn.Server.Infrastructure/Sales/SqlSalesReceiptQueryService.cs` | LINQ to DB header/detail/summary queries |
+| `src/MyDmsVn.Server.Infrastructure/Sales/SqlSalesReceiptQueryService.cs` | T03 materialized detail; summary/List queries remain T05 |
 | `src/MyDmsVn.Server.Infrastructure/Sales/SalesLinqToDbMapping.cs` | Explicit mappings for `SalesReceipts` and `SalesReceiptLines` |
 | `src/MyDmsVn.Desktop.Application/FeatureApiClients.cs` | Add `ISalesReceiptApiClient` alongside existing feature interfaces |
 | `src/MyDmsVn.Desktop.Infrastructure.Local/LocalSalesReceiptApiClient.cs` | Existing authenticated Local dispatch and response mapping |

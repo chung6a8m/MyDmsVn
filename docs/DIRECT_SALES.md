@@ -5,7 +5,7 @@
 
 The Owner selected direct sales receipts and moving weighted average costing, and requested the necessary documents, an active roadmap and a PR. This document records that decision and implementation rules. Approval of the design does not establish runtime, migration, UI or production acceptance.
 
-The sole queue is [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md), indexed by [plans/README](plans/README.md). Read this design with [costing and persistence](DIRECT_SALES_COSTING.md), [query and desktop interaction](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). Those documents define one roadmap. T00 foundations and T01 schema/bootstrap source are implemented ([T00](evidence/sal/20261022-t00-foundation.md), [T01](evidence/sal/20261022-t01-schema-bootstrap.md)); T02 receipt/reconciliation/stock reads are implemented ([evidence](evidence/sal/20261022-t02-valued-inventory.md)); Sales Post, services, queries, Local and UI remain incomplete. See the execution index for the active task; the checkpoint is not deployable.
+The sole queue is [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md), indexed by [plans/README](plans/README.md). Read this design with [costing and persistence](DIRECT_SALES_COSTING.md), [query and desktop interaction](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). Those documents define one roadmap. T00 foundations and T01 schema/bootstrap source are implemented ([T00](evidence/sal/20261022-t00-foundation.md), [T01](evidence/sal/20261022-t01-schema-bootstrap.md)); T02 receipt/reconciliation/stock reads are implemented ([evidence](evidence/sal/20261022-t02-valued-inventory.md)); T03 Draft Create/Update/Get has [reviewed evidence](evidence/sal/20261022-t03-sales-draft.md); Sales Post, List/keyset, Local and UI remain incomplete. See the execution index for the active task; the checkpoint is not deployable.
 
 ## 1. Outcome and scope
 
@@ -21,7 +21,7 @@ An authorized user creates a sales Draft, selects a customer, warehouse and resp
 | Filtered receipt list with keyset pagination | Numbered-page jumps, snapshot exports, printing and reporting subsystem |
 | Quantity/value reconciliation and schema9 → schema10 preparation | Multi-currency, unit conversion, reservations, transfers, negative stock and offline/HTTP mode |
 
-The inspected planning baseline has Goods Receipts and quantity-only inventory under scripts001–009. Development source at `81e8aab` adds schema10, Sales persistence shapes and valuation/bootstrap; T02 adds valued receipt posting, the common coordinator, Exclusive reconciliation and stock projections; Sales Post and the complete service cutover remain incomplete. Goods Receipt duplicate-Product restrictions remain specific to Goods Receipts. Preserve the existing net48 product/test graph, Windows x86 Desktop.App and separate DbMigrator, Local adapter and vendor pins. AppCore/.NET 8 remains parked.
+The inspected planning baseline has Goods Receipts and quantity-only inventory under scripts001–009. Development source at `81e8aab` adds schema10, Sales persistence shapes and valuation/bootstrap; T02 adds valued receipt posting, the common coordinator, Exclusive reconciliation and stock projections; T03 adds authorized Draft persistence/detail with stable line identity and current Unit snapshots; Sales Post and the complete service cutover remain incomplete. Goods Receipt duplicate-Product restrictions remain specific to Goods Receipts. Preserve the existing net48 product/test graph, Windows x86 Desktop.App and separate DbMigrator, Local adapter and vendor pins. AppCore/.NET 8 remains parked.
 
 ## 2. Sales receipt behavior
 
@@ -109,14 +109,14 @@ T01 implements schema10 through one new immutable `010_DirectSalesAndValuation.s
 
 Before enabling sales, bootstrap value companions and balances from validated historical posted Goods Receipts under the offline admin migration boundary. Verify complete one-to-one receipt-line/quantity-ledger correspondence and quantity reconciliation; fail on unsupported movements, mismatches, negative states or arithmetic overflow. Do not silently assign zero to unknown stock or rewrite historical ledger entries. An atomic migration includes bootstrap and the DbUp journal entry; no partially valued schema10 may open in Desktop. The [costing document](DIRECT_SALES_COSTING.md) defines the exact recovery and arithmetic proof obligations.
 
-## 5. Proposed application boundaries
+## 5. Implemented and planned application boundaries
 
-| Layer | Proposed responsibility |
+| Layer | Responsibility and current boundary |
 |---|---|
-| Contracts | `SalesContracts.cs`: save/update/post/detail DTOs, slim list rows, independent cursor request/page and numeric limits; `SalesCalendarDateJsonConverter.cs` scopes date-only wire handling to Sales calendar properties |
-| Domain | `Sales/SalesReceipt.cs`, `SalesReceiptLine.cs`, statuses; inventory fixed-point moving-average calculator/value types without SQL/UI dependencies |
-| Server.Application | Sales commands/validators/queries, `ISalesReceiptWriteRepository`, `ISalesReceiptQueryService`, code permission definitions, deterministic error mapping |
-| Infrastructure | Explicit LINQ mappings and typed Sales/valuation repositories; owned UoW connection/current transaction; generated SQL and locking verification |
+| Contracts | T00 `SalesContracts.cs`: save/update/post/detail DTOs, slim list rows, independent cursor request/page and numeric limits; `SalesCalendarDateJsonConverter.cs` scopes date-only wire handling to Sales calendar properties |
+| Domain | T00 `Sales/SalesReceipt.cs`, `SalesReceiptLine.cs`, statuses; inventory fixed-point moving-average calculator/value types without SQL/UI dependencies |
+| Server.Application | T03 Draft Create/Update/Get, repository/detail interfaces, validators and errors; T00 permission definitions; Post/List remain later tasks |
+| Infrastructure | T01 mappings, T02 valuation coordinator and T03 Draft/Get LINQ repositories; owned connection/transaction and sequence boundary; Sales Post/List remain later tasks |
 | Local | `LocalSalesReceiptApiClient` using existing actor/session-generation dispatch and response mapper |
 | Desktop.Application | `ISalesReceiptApiClient`; sales list/editor/line ViewModels, cursor state, raw-edit and recovery admission |
 | WinForms | Sales navigation/factory, compact List/Detail control and seven-column grid using established pinned inline sessions |
@@ -141,7 +141,7 @@ Update schema object inventories, explicit least-privilege provisioning/validati
 
 ## 7. Delivery and evidence
 
-T00 foundations and the [reviewed T01 checkpoint](evidence/sal/20261022-t01-schema-bootstrap.md) are complete; [T02 valued inventory](evidence/sal/20261022-t02-valued-inventory.md) is also complete. The execution index records T03 IN PROGRESS. Sales Post/full workflows, frozen T08 and Owner acceptance remain incomplete. The [plan](plans/20261021-002-direct-sales-and-moving-average-costing.md) gives dependencies, exact proposed locations, test-first behaviors and focused commands. Intermediate task commits are development checkpoints; schema10 is not deployable until all stock writers, reconciliation, guards and packaging agree on the new contract.
+T00 foundations and the [reviewed T01 checkpoint](evidence/sal/20261022-t01-schema-bootstrap.md) are complete; [T02 valued inventory](evidence/sal/20261022-t02-valued-inventory.md) is also complete. [T03 Draft/detail](evidence/sal/20261022-t03-sales-draft.md) is complete; the execution index records T04 IN PROGRESS. Sales Post/full workflows, frozen T08 and Owner acceptance remain incomplete. The [plan](plans/20261021-002-direct-sales-and-moving-average-costing.md) gives dependencies, exact proposed locations, test-first behaviors and focused commands. Intermediate task commits are development checkpoints; schema10 is not deployable until all stock writers, reconciliation, guards and packaging agree on the new contract.
 
 The [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) requires arithmetic/conservation, migration/bootstrap/recovery, atomicity/concurrency, LINQ/keyset, authorization/session, native GUI and frozen package evidence. SQL tests use only explicitly designated non-production infrastructure and verified owned database lifecycle. GUI tests require interactive Windows/net48, serialized guarded STA and bounded cleanup. Preserve the removed runner/approval-file boundary and record actual discovery/results rather than inherited counts.
 

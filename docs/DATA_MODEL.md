@@ -12,8 +12,8 @@ The schema9 inventory below records the pre-SAL baseline; T01 development source
 |---|---|
 | SalesReceipts | SaleId bigint, unique server SaleNo, date/customer/warehouse/employee, Draft/Posted, audit and rowversion |
 | SalesReceiptLines | SaleLineId and unique (SaleId, LineNo); duplicate Product allowed; Qty18,4, UnitPrice19,4, Unit snapshot, IsGift and persisted LineAmount28,4 |
-| Posted line cost | PostedUnitCost28,8 and CostAmount28,4 have paired nullable/nonnegative storage; Draft/Posted cross-table lifecycle and immutability enforcement remain T03/T04 |
-| Sales number sequence | Separate bounded non-cycling bigint sequence; SA + ten-digit application allocation remains T03 |
+| Posted line cost | PostedUnitCost28,8 and CostAmount28,4 have paired nullable/nonnegative storage; T03 guards Draft save/read and rejects Posted updates; Post cost freezing/complete lifecycle remains T04 |
+| Sales number sequence | Separate bounded non-cycling bigint sequence; T03 assigns immutable SA + ten-digit numbers on the owned transaction, with gaps allowed and no exhaustion fallback |
 | StockValuationEntries | LedgerId PK/FK and signed ValueChange28,4; bootstrap supplies a complete append-only companion for existing ledger rows; ongoing completeness requires the writer cutover |
 | StockBalances.InventoryValue | Value28,4 paired atomically with Quantity; nonnegative quantity/value; zero quantity requires zero value |
 
@@ -124,6 +124,8 @@ GoodsReceipt Post uses one explicit UoW transaction. It takes Shared MyDmsVn.Inv
 The server formats numbers as `GR` plus ten zero-padded digits, from `GR0000000001` through `GR9999999999`, using `dbo.GoodsReceiptNumberSequence`. Sequence gaps after rollback are valid; the application does not recycle allocated values or let clients choose/predict numbers. The unique ReceiptNo index remains the final uniqueness boundary.
 
 `GoodsReceipts.RowVersion` is the aggregate edit/post concurrency token. Contracts expose opaque Base64 `version`, and UpdateDraft/Post send `expectedVersion`. Clients do not interpret token bytes or expose SQL/provider entities. StockBalances.RowVersion does not replace atomic balance updates. No Cancelled/Reversed workflow or implemented Sales Post is established by this checkpoint; exact issue-cost math remains a T00 foundation for T04.
+
+T03 [Sales Draft/detail](evidence/sal/20261022-t03-sales-draft.md) assigns independent IDs to new duplicate-Product rows, validates retained ownership/canonical order before mutation, removes omitted rows and preserves retained IDs/Created audits while resequencing. Save captures current active Product Unit and exact revenue; Draft costs/profit stay null and stock/value tables are unchanged. Update requires a matching opaque version and rejects Posted/stale changes. Write response construction completes before commit; Get uses one short owned SERIALIZABLE read with historical labels/persisted Unit/cost. List/Post/Local/UI remain later work.
 
 ## 7. Existing indexes and read models
 

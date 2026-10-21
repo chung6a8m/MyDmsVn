@@ -10,13 +10,13 @@
 
 **Spec:** [DIRECT_SALES](../DIRECT_SALES.md), [DIRECT_SALES_COSTING](../DIRECT_SALES_COSTING.md), [DIRECT_SALES_QUERY_AND_UI](../DIRECT_SALES_QUERY_AND_UI.md), [ADR 0011](../adr/0011-direct-sales-and-moving-average-costing.md) and [SAL acceptance](../DIRECT_SALES_ACCEPTANCE.md).
 
-**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is complete at `47165ded` ([bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is IN PROGRESS. Native GUI execution, package, frozen T08 and Owner acceptance remain **NOT RUN**.
+**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is complete at `47165ded` ([bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([bounded evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is IN PROGRESS. Native GUI execution, package, frozen T08 and Owner acceptance remain **NOT RUN**.
 **Baseline:** `chung6a8m/MyDmsVn`, `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, after PR #41.
 BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is the next active roadmap; it does not reopen BCF or establish production readiness.
 
 ## Global Constraints
 
-- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; T02 receipt/reconciliation/projection interfaces are implemented; later Sales service/Post/query/Local/UI interfaces remain proposed. Historical baseline facts are not rewritten.
+- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; T02 receipt/reconciliation/projection interfaces are implemented; T03 Draft/Get interfaces are implemented; later Sales Post/List/keyset/Local/UI interfaces remain proposed. Historical baseline facts are not rewritten.
 - One warehouse, customer and responsible employee per receipt; 1–200 lines; Draft → Posted only; no payment, receivable, return, order/POS, tax, discount, multi-unit or printing workflow.
 - Grid order is exactly `STT / Product / Unit / Quantity / UnitPrice / IsGift / LineAmount`; `Quantity` binds to `Qty`; costing stays outside these seven columns.
 - `Qty decimal(18,4) > 0`; `UnitPrice decimal(19,4) >= 0`, including non-gift zero; amounts/value/cost `decimal(28,4)`; `PostedUnitCost decimal(28,8)`; round ties away from zero.
@@ -47,8 +47,8 @@ BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is t
 | SAL-T00 | Exact math, contracts, domain and permission definitions | None | COMPLETE — focused evidence | A01–A08, A20 |
 | SAL-T01 | Atomic schema-10 bootstrap, compatibility, grants and reset metadata | T00 | COMPLETE — bounded evidence | A09–A16 |
 | SAL-T02 | Valued Goods Receipt, shared locks, reconciliation and stock reads | T01 | COMPLETE — bounded evidence | A17–A19, A26–A28, A30 |
-| SAL-T03 | Authorized sales Draft save/detail with stable line identity | T02; consumes T00/T01 | IN PROGRESS | A20–A24 |
-| SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | NOT STARTED / BLOCKED by T03 | A25–A32 |
+| SAL-T03 | Authorized sales Draft save/detail with stable line identity | T02; consumes T00/T01 | COMPLETE — bounded evidence | A20–A24 |
+| SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | IN PROGRESS | A25–A32 |
 | SAL-T05 | LINQ summary queries and both-way keyset paging | T04; consumes T03 | NOT STARTED / BLOCKED by T04 | A33–A40 |
 | SAL-T06 | Local API, session fencing and sales ViewModels | T04, T05 | NOT STARTED / BLOCKED by T04/T05 | A41–A44 |
 | SAL-T07 | Compact seven-column workspace, native keyboard and accessibility | T06 | NOT STARTED / BLOCKED by T06 | A45–A50 |
@@ -59,11 +59,11 @@ Dependencies identify required inputs, and no partial writer cutover can be rele
 Each task records meaningful RED → GREEN evidence, focused verification and a scoped commit after review.
 A task exit verifies only that task's portion of an acceptance row. A row spanning tasks closes only after all its required portions have evidence on the accepted candidate.
 Do not substitute a compile error, empty filter, missing dependency or skipped SQL case for the intended RED behavioral failure.
-T00–T02 implemented selectors and actual discovery are recorded in their evidence. Later test names below remain proposed; inspect source before execution.
+T00–T03 implemented selectors and actual discovery are recorded in their evidence. Later test names below remain proposed; inspect source before execution.
 
 ## File map and ownership
 
-Paths are relative to repository root; baseline paths are historical references. T00–T02 source exists as recorded in evidence; later **new** paths remain proposed.
+Paths are relative to repository root; baseline paths are historical references. T00–T03 source exists as recorded in evidence; later **new** paths remain proposed.
 Read the adjacent current implementation before editing. Keep small feature files and avoid a general Goods Receipt/UI rewrite.
 
 | Owner | Existing files to modify or use | New files |
@@ -216,21 +216,23 @@ T02 uses typed LINQ 6.3.0 UPDLOCK/HOLDLOCK/composite-PK point/range locks; the o
 ### SAL-T03 — Authorized sales Draft persistence and detail
 
 **Interfaces:** `CreateSalesReceiptDraftCommand(SaveSalesReceiptRequest)` and `UpdateSalesReceiptDraftCommand(UpdateSalesReceiptDraftRequest)` return `SalesReceiptDto` through the existing authorized actor pipeline.
-Proposed `ISalesReceiptWriteRepository` mirrors current receipt ownership with `Task<SalesReceipt> InsertDraftAsync(SalesReceipt,IReadOnlyList<SalesReceiptLine>,CancellationToken)`, `Task<SalesReceipt?> LockHeaderAsync(long,CancellationToken)`, `Task<SalesReceipt> ReplaceDraftAsync(SalesReceipt,IReadOnlyList<SalesReceiptLine>,CancellationToken)` and `Task AcquirePostingGateAsync(CancellationToken)`.
-Add `Task<SalesReceiptReferenceSnapshot> GetReferenceSnapshotAsync(int customerId,int warehouseId,int employeeId,IReadOnlyCollection<int> productIds,CancellationToken)`; the immutable snapshot holds existing CatalogReferenceState values and Product Unit values.
+Implemented `ISalesReceiptWriteRepository` retains explicit UoW ownership with `Task<SalesReceipt> InsertDraftAsync(SalesReceipt,IReadOnlyList<SalesReceiptLine>,CancellationToken)`, `Task<SalesReceipt?> LockHeaderAsync(long,CancellationToken)`, `Task<SalesReceipt> ReplaceDraftAsync(SalesReceipt,IReadOnlyList<SalesReceiptLine>,CancellationToken)` and `Task AcquirePostingGateAsync(CancellationToken)`.
+Implemented `Task<SalesReceiptReferenceSnapshot> GetReferenceSnapshotAsync(int customerId,int warehouseId,int employeeId,IReadOnlyCollection<int> productIds,CancellationToken)`; the immutable snapshot holds existing CatalogReferenceState values and Product Unit values.
 Insert/Replace assign returned IDs to their supplied Domain lines and return the current header/version on the same transaction; materialize the complete response before commit. Do not perform a fallible post-commit fetch to construct a successful write response.
 `ISalesReceiptQueryService.GetByIdAsync(long saleId,CancellationToken)` returns `Task<SalesReceiptDto?>`; implementation uses typed LINQ and materialized results.
 
 **Test files (new):** `tests/MyDmsVn.Server.Application.Tests/SalesReceiptApplicationTests.cs`; `tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/{SalesReceiptDraftTests,SalesReceiptMappingTests}.cs`.
 
-- [ ] Add create/reload/update tests for required active customer/warehouse/employee/products, duplicate Products, non-gift zero price, gifts and recomputed amounts; invalid buffers/precision/201 lines never write.
-- [ ] Add line-ownership tests: multiple SaleLineId0 rows remain distinct; positive IDs must belong to this Draft, cannot repeat and retain identity; server assigns LineNo1..N from submitted order.
-- [ ] Add Unit snapshot/review, missing/inactive references, malformed/stale versions, competing Save and attempted Posted mutation cases; no client Unit, amount or cost is trusted.
-- [ ] Add independent Read/Write/Post permission tests, inactive-session/direct-Deny behavior and historical Posted display; authorized Write response follows current result semantics without creating a new Read bypass.
-- [ ] Run implemented Application/Inventory selectors and record intended failures.
-- [ ] Implement explicit LINQ insert/update/delete allowlists and rowversion-guarded Draft replacement; allocate SA+ten-digit numbers from its separate bounded noncycling sequence, preserve line IDs and validate resequencing before mutation.
-- [ ] Derive Unit from current catalog at Save, calculate revenue using T00, keep Draft cost null and expose complete ordered detail with stable IDs.
-- [ ] Run focused contract/mapping/authorization/draft cases and affected builds; record results and commit T03.
+- [x] Add create/reload/update tests for required active customer/warehouse/employee/products, duplicate Products, non-gift zero price, gifts and recomputed amounts; invalid buffers/precision/201 lines never write.
+- [x] Add line-ownership tests: multiple SaleLineId0 rows remain distinct; positive IDs must belong to this Draft, cannot repeat and retain identity; server assigns LineNo1..N from submitted order.
+- [x] Add Unit snapshot/review, missing/inactive references, malformed/stale versions, competing Save and attempted Posted mutation cases; no client Unit, amount or cost is trusted.
+- [x] Add independent Read/Write/Post permission tests, inactive-session/direct-Deny behavior and historical Posted display; authorized Write response follows current result semantics without creating a new Read bypass.
+- [x] Run implemented Application/Inventory selectors and record intended failures.
+- [x] Implement explicit LINQ insert/update/delete allowlists and rowversion-guarded Draft replacement; allocate SA+ten-digit numbers from its separate bounded noncycling sequence, preserve line IDs and validate resequencing before mutation.
+- [x] Derive Unit from current catalog at Save, calculate revenue using T00, keep Draft cost null and expose complete ordered detail with stable IDs.
+- [x] Run focused contract/mapping/authorization/draft cases and affected builds; record results and commit T03.
+
+T03 also exposes same-owned-transaction `LoadLinesAsync` for canonical stored-line/ownership checks. Reference snapshots include immutable labels/state/Unit. Replacement parks validated retained IDs at positive temporary LineNo 201–400 before final 1–N, preserving identity/Created audits within the same transaction; this does not expand the 200-line business limit. Native sequence allocation is the narrow SQL-specific exception. Post-grant isolation tests do not implement the Post endpoint; Local/List remain later tasks.
 
 **Exit:** T03-owned Draft/identity/authorization portions of A20–A24 are verified; Post, Local and native-UI portions remain open. Draft saves create no stock or valuation movement.
 
@@ -341,5 +343,5 @@ T08 consumes the frozen T00–T07 candidate, implemented case inventory, identic
 
 For each task attach revision, changed behavior, exact command/project/TFM/filter, discovered/executed Facts/Theory rows, pass/fail/skip/not-run, environment and cleanup.
 Keep raw TRX, SQL identities, connection data and proprietary screenshots local; publish sanitized reviewable summaries and resource limitations.
-The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is complete at `47165ded` ([evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is IN PROGRESS. Sales Post/workflow/UI/package obligations and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
+The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is complete at `47165ded` ([evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is IN PROGRESS. Sales Post/workflow/UI/package obligations and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
 The owner's approval selects this roadmap and costing design; it is not a claim that the application, SQL migration or future package has passed.
