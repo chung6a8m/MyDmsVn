@@ -77,7 +77,7 @@ public sealed class PackagedGuiAcceptanceTests
             _output.WriteLine("ATTENDED_NO_RECEIPT_OR_INVENTORY_WRITES=PASS; human outcome recorded separately.");
         });
         // Exact coordination files only; retained on failure for diagnosis, never an approval gate.
-        foreach (var name in new[] { "ready", "observe", "observed", "complete" }) File.Delete(Path.Combine(barrier, name));
+        foreach (var name in new[] { "ready", "observe", "observed", "enter-detail", "complete" }) File.Delete(Path.Combine(barrier, name));
         Directory.Delete(barrier);
     }
     [GuiPackageFact]

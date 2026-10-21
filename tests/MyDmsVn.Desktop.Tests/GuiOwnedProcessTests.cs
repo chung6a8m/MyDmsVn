@@ -274,7 +274,7 @@ namespace MyDmsVn.Desktop.Tests
                 File.WriteAllText(sourcePath, reader.ReadToEnd());
                 var compiler = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
                     "Microsoft.NET", "Framework", "v4.0.30319", "csc.exe");
-                var references = "/reference:System.Windows.Forms.dll /reference:System.Drawing.dll ";
+                var references = "/reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:Accessibility.dll ";
                 if (package || inline)
                 {
                     foreach (var name in new[] { "UIAutomationClient", "UIAutomationTypes", "WindowsBase" })
