@@ -33,6 +33,22 @@ internal static class GuiPackageProbe
     [DllImport("user32.dll")] private static extern int GetAwarenessFromDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr key, IntPtr data);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")] private static extern IntPtr SendMessageSelection(IntPtr window, uint message, out int start, out int end);
+    [DllImport("oleacc.dll")] private static extern int AccessibleObjectFromWindow(IntPtr window, uint objectId, ref Guid interfaceId, [MarshalAs(UnmanagedType.Interface)] out Accessibility.IAccessible accessible);
+
+    private static string NativeDescription(AutomationElement element)
+    {
+        var window = new IntPtr(element.Current.NativeWindowHandle);
+        uint owner;
+        GetWindowThreadProcessId(window, out owner);
+        if (window == IntPtr.Zero || owner != _application.Id) throw new InvalidOperationException("Accessible description HWND ownership mismatch.");
+        var id = typeof(Accessibility.IAccessible).GUID;
+        Accessibility.IAccessible accessible;
+        // Public MSAA client contract: https://learn.microsoft.com/windows/win32/api/oleacc/nf-oleacc-accessibleobjectfromwindow
+        Marshal.ThrowExceptionForHR(AccessibleObjectFromWindow(window, 0xfffffffc, ref id, out accessible)); // OBJID_CLIENT
+        try { return accessible.get_accDescription(0) ?? ""; }
+        finally { if (Marshal.IsComObject(accessible)) Marshal.ReleaseComObject(accessible); }
+    }
 
     [STAThread]
     private static int Main(string[] args)
@@ -74,12 +90,38 @@ internal static class GuiPackageProbe
                     throw new InvalidOperationException("Startup application did not exit safely.");
                 Console.WriteLine("STARTUP_SAFE_ERROR=PASS");
             }
+            else if (args[1] == "bcf-lookup-attended")
+            {
+                _stage = "bcf-attended-setup";
+                var shell = Login();
+                Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+                var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+                var barrier = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER");
+                var scope = Environment.GetEnvironmentVariable("MYDMSVN_BCF_ATTENDED_SCOPE") ?? "both";
+                if (scope != "both" && scope != "detail") throw new ArgumentException("Unknown attended scope.");
+                Console.WriteLine("ATTENDED_LOOKUP_SCOPE=" + scope);
+                if (scope == "both")
+                    ObserveAttendedPhase(shell, page, barrier, "list", new[] { "Filter by warehouse" }, "enter-detail");
+                // New admits query-only navigation and cancels the filter presentation.
+                // After a human returns to chat, do not attempt native setup keys:
+                // foreground admission remains strict. The human selects the initial
+                // committed headers before testing them in the next phase.
+                Invoke(Find(page, "New", ControlType.Button, false));
+                Find(page, "Note", ControlType.Edit, false);
+                var toggle = Find(shell, "Theme toggle", ControlType.Button, false);
+                if (NativeDescription(toggle) != "Current theme: Light") Invoke(toggle);
+                Wait(delegate { return NativeDescription(toggle) == "Current theme: Light"; }, "Detail setup theme unavailable.");
+                ObserveAttendedPhase(shell, page, barrier, "detail", new[] { "Warehouse", "Employee" }, "complete");
+                CloseApplication(shell);
+                Console.WriteLine("ATTENDED_LOOKUP_SESSION_DRAINED=PASS");
+            }
             else if (args[1] == "invalid-audit")
             {
                 var shell = Login();
                 _stage = "receipt-invalid-fields";
                 Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
                 var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+                Invoke(Find(page, "New", ControlType.Button, false));
                 Invoke(Find(page, "Add line", ControlType.Button, false));
                 SetInput(page, "Quantity", 0m.ToString("F4"), false);
                 SetInput(page, "Note", "GUI invalid input retained", false);
@@ -116,7 +158,9 @@ internal static class GuiPackageProbe
                 Wait(delegate { return File.Exists(Path.Combine(barrier, "release")); }, "Permission update was not released.");
                 _stage = "server-direct-deny";
                 Invoke(save); // Existing UI still grants Write; the actual server must reauthorize this request.
-                Find(shell, "The operation is not permitted.", ControlType.Text, true);
+                // The catalog inline error and shell notification both expose this
+                // text. Require the owned page's error without weakening uniqueness.
+                Find(page, "The operation is not permitted.", ControlType.Text, true);
                 if (InputValue(page, "Code") != "GUI-DENY") throw new InvalidOperationException("Denied edit was lost.");
                 CloseApplication(shell);
                 Console.WriteLine("SERVER_DIRECT_DENY=PASS");
@@ -259,7 +303,7 @@ internal static class GuiPackageProbe
         for (var index = 0; index < fields.Length; index++) SetInput(page, fields[index], values[index], false);
         Invoke(Find(page, "Save", ControlType.Button, false));
         Named(results, code);
-        Invoke(Find(page, "New", ControlType.Button, false));
+        Invoke(Find(page, title == "Products" ? "Add product" : "New", ControlType.Button, false));
         _stage = "catalog-select-row-" + title;
         Invoke(Find(page, "Open " + code, ControlType.Button, false));
         Wait(delegate { return InputValue(page, "Code") == code; }, "Selected row did not load editor.");
@@ -271,10 +315,13 @@ internal static class GuiPackageProbe
         Named(results, "Inactive");
         Invoke(Find(page, "Activate", ControlType.Button, false));
         Named(results, "Active");
-        var row = Named(results, "Result " + code);
-        var id = row.FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.HelpTextProperty, "ID"));
-        if (id == null) throw new InvalidOperationException("Catalog ID column inaccessible.");
-        CatalogIds[title] = int.Parse(id.Current.Name, System.Globalization.CultureInfo.InvariantCulture);
+        if (title != "Products")
+        {
+            var row = Named(results, "Result " + code);
+            var id = row.FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.HelpTextProperty, "ID"));
+            if (id == null) throw new InvalidOperationException("Catalog ID column inaccessible.");
+            CatalogIds[title] = int.Parse(id.Current.Name, System.Globalization.CultureInfo.InvariantCulture);
+        }
         Console.WriteLine("CATALOG_FLOW=" + title + ":PASS");
     }
 
@@ -304,8 +351,14 @@ internal static class GuiPackageProbe
         Find(shell, displayName, ControlType.Text, false);
         Dump(shell);
         var theme = Find(shell, "Theme toggle", ControlType.Button, false);
-        if (theme.Current.HelpText != "Current theme: " + _theme) Invoke(theme);
-        Wait(delegate { return theme.Current.HelpText == "Current theme: " + _theme; }, "Theme metadata did not match the requested mode.");
+        // The stock icon button's UIA HelpText is its action tooltip. Current theme
+        // is the native MSAA AccessibleDescription, not that tooltip or a guessed palette.
+        var themeState = NativeDescription(theme);
+        if (themeState != "Current theme: Light" && themeState != "Current theme: Dark")
+            throw new InvalidOperationException("Unrecognized accessible theme state.");
+        if (themeState != "Current theme: " + _theme) Invoke(theme);
+        Wait(delegate { return NativeDescription(theme) == "Current theme: " + _theme; }, "Theme metadata did not match the requested mode.");
+        Console.WriteLine("THEME_STATE_PROVIDER=MSAA.Description");
         Console.WriteLine("APPLICATION_THEME=" + _theme);
         return shell;
     }
@@ -316,17 +369,26 @@ internal static class GuiPackageProbe
         Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
         var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
         Dump(page);
+        Invoke(Find(page, "New", ControlType.Button, false));
         SetLookup(page, "Warehouse", "GUI-WH - UIA Warehouse Updated");
         SetLookup(page, "Employee", "GUI-EMP - UIA Employee Updated");
         SetInput(page, "Note", "GUI draft", false);
         Invoke(Find(page, "Add line", ControlType.Button, false));
         SetLookup(page, "Product", "GUI-PROD - UIA Product Updated");
+        // Products intentionally has no primary ID column. Read the committed inline
+        // selection's semantic key; independent SQL still checks the saved IDs/effects.
+        var productHelp = InlineCell(page, "Product").Current.HelpText;
+        var keyPrefix = "Committed key: ";
+        if (!productHelp.StartsWith(keyPrefix, StringComparison.Ordinal)) throw new InvalidOperationException("Committed Product key unavailable.");
+        CatalogIds["Products"] = int.Parse(productHelp.Substring(keyPrefix.Length).Split(';')[0], System.Globalization.CultureInfo.InvariantCulture);
+        if (CatalogIds["Products"] <= 0) throw new InvalidOperationException("Committed Product key invalid.");
         Dump(page);
         SetInput(page, "Quantity", 2.5m.ToString("F4"), false);
         SetInput(page, "Unit cost", 4m.ToString("F4"), false);
         InputEditor(page, "Note").SetFocus();
         Find(page, 10m.ToString("F2"), ControlType.Text, false);
         Invoke(Find(page, "Save", ControlType.Button, false));
+        Invoke(Find(page, "Back to receipts", ControlType.Button, false));
         var results = Find(page, "Goods receipt results", ControlType.Table, false);
         AutomationElement open = null;
         Wait(delegate
@@ -342,7 +404,9 @@ internal static class GuiPackageProbe
         }, "Saved receipt row unavailable.");
         var receiptAction = open.Current.Name;
         Invoke(Find(page, "New", ControlType.Button, false));
+        Invoke(Find(page, "Back to receipts", ControlType.Button, false));
         Invoke(Find(results, receiptAction, ControlType.Button, false));
+        Find(page, "Note", ControlType.Edit, false); // Open completes asynchronously; List has no editor.
         Wait(delegate { return InputValue(page, "Note") == "GUI draft"; }, "Saved draft did not reload.");
         _stage = "receipt-edit";
         SetInput(page, "Note", "GUI edited", false);
@@ -482,6 +546,7 @@ internal static class GuiPackageProbe
         Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
         page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
         Invoke(Find(page, receiptAction, ControlType.Button, false));
+        Find(page, "Note", ControlType.Edit, false);
         Wait(delegate { return InputValue(page, "Note") == "GUI edited"; }, "Saved historical receipt did not reopen.");
         for (var index = 0; index < names.Length; index++)
         {
@@ -545,6 +610,7 @@ internal static class GuiPackageProbe
         Invoke(Find(otherShell, "Goods Receipts", ControlType.Button, false));
         var otherPage = Find(otherShell, "Goods Receipts", ControlType.TabItem, false);
         Invoke(Find(otherPage, receiptAction, ControlType.Button, false));
+        Find(otherPage, "Note", ControlType.Edit, false);
         Wait(delegate { return InputValue(otherPage, "Note") == "GUI edited"; }, "Second client did not load the saved draft.");
         var otherPost = Find(otherPage, "Post", ControlType.Button, false);
         Wait(delegate { return otherPost.Current.IsEnabled; }, "Second client did not receive the Draft version.");
@@ -625,7 +691,7 @@ internal static class GuiPackageProbe
     private static void AssertRecoveryKeyboardRoute(AutomationElement page)
     {
         _stage = "uncertain-native-tab-route";
-        var status = Find(page, "Filter by status", ControlType.ComboBox, false);
+        var status = Find(page, "Back to receipts", ControlType.Button, false);
         var refresh = Find(page, "Refresh", ControlType.Button, false);
         FocusOwnedEditor(status, "receipt recovery Tab");
         SendOwnedKey(status, 9);
@@ -634,7 +700,7 @@ internal static class GuiPackageProbe
         if (focused.Current.ProcessId != _application.Id || GetForegroundWindow() != MainWindow)
             throw new InvalidOperationException("Native Tab focus escaped its owned application.");
         Console.WriteLine("RECOVERY_TAB_ACTUAL_FOCUS=" + focused.Current.Name + ";TYPE=" + focused.Current.ControlType.ProgrammaticName);
-        Wait(delegate { return refresh.Current.HasKeyboardFocus; }, "Native Tab from status skipped Refresh.", 5);
+        Wait(delegate { return refresh.Current.HasKeyboardFocus; }, "Native Tab from Back skipped Refresh.", 5);
         Console.WriteLine("RECOVERY_NATIVE_TAB_REACHES_REFRESH=PASS");
 
     }
@@ -674,6 +740,46 @@ internal static class GuiPackageProbe
     private static void AwaitSignal(string name)
     {
         Wait(delegate { return File.Exists(Path.Combine(Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER"), name)); }, "Owned test coordination did not release " + name);
+    }
+
+    private static void ObserveAttendedPhase(AutomationElement shell, AutomationElement page, string barrier, string phase, string[] names, string completion)
+    {
+        _stage = "bcf-attended-human-" + phase;
+        File.WriteAllText(Path.Combine(barrier, "ready"), "phase=" + phase + ";" + NativeDescription(Find(shell, "Theme toggle", ControlType.Button, false)));
+        var observedLight = false;
+        var observedDark = false;
+        // No query keys or value assignment during this phase. Markers request native
+        // snapshots; they do not certify the human's per-key outcome or grant approval.
+        Wait(delegate
+        {
+            if (File.Exists(Path.Combine(barrier, "observe")))
+            {
+                if (File.ReadAllText(Path.Combine(barrier, "observe")) != phase)
+                    throw new InvalidOperationException("Attended observation phase mismatch.");
+                var currentTheme = NativeDescription(Find(shell, "Theme toggle", ControlType.Button, false));
+                if (currentTheme != "Current theme: Light" && currentTheme != "Current theme: Dark")
+                    throw new InvalidOperationException("Unknown attended theme.");
+                Console.WriteLine("ATTENDED_OBSERVED_PHASE=" + phase + ";" + currentTheme);
+                foreach (var name in names)
+                {
+                    var edit = InputEditor(page, name);
+                    var handle = new IntPtr(edit.Current.NativeWindowHandle);
+                    uint process;
+                    GetWindowThreadProcessId(handle, out process);
+                    if (handle == IntPtr.Zero || process != _application.Id || edit.Current.IsOffscreen)
+                        throw new InvalidOperationException("Attended visible EDIT ownership mismatch.");
+                    int selectionStart, selectionEnd;
+                    SendMessageSelection(handle, 0x00B0, out selectionStart, out selectionEnd);
+                    Console.WriteLine("ATTENDED_SNAPSHOT=" + phase + ";" + name + ";RAW=" + ((ValuePattern)edit.GetCurrentPattern(ValuePattern.Pattern)).Current.Value +
+                        ";RANGE=" + selectionStart + "+" + (selectionEnd - selectionStart) + ";FOCUS=" + edit.Current.HasKeyboardFocus);
+                }
+                observedLight |= currentTheme == "Current theme: Light";
+                observedDark |= currentTheme == "Current theme: Dark";
+                File.Delete(Path.Combine(barrier, "observe"));
+                File.WriteAllText(Path.Combine(barrier, "observed"), "phase=" + phase + ";" + currentTheme);
+            }
+            return observedLight && observedDark && File.Exists(Path.Combine(barrier, completion));
+        }, "Attended " + phase + " walkthrough was not completed within its owned budget.", 600);
     }
 
     private static void CloseApplication(AutomationElement shell)

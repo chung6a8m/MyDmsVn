@@ -22,7 +22,9 @@ namespace MyDmsVn.Desktop.Tests
             {
                 using var guard = new WinFormsTestGuard();
                 using var scenario = CatalogAcceptanceTests.CreateAccessibilityScenario(kind, out var control);
-                var code = Convert.ToString(control.Grid[1, 1].Value)!;
+                var codeColumn = Assert.Single(Enumerable.Range(0, control.Grid.ColumnsCount),
+                    column => Equals(control.Grid[0, column].Value, "Code"));
+                var code = Convert.ToString(control.Grid[1, codeColumn].Value)!;
                 control.NewButton.PerformClick();
                 var action = AccessibleDescendants(control.Grid.AccessibilityObject)
                     .SingleOrDefault(item => item.Role == AccessibleRole.PushButton && item.Name == "Open " + code);
@@ -37,7 +39,7 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.Equal("Code", cell.Help);
                 Assert.True((cell.State & AccessibleStates.ReadOnly) != 0);
                 Assert.Throws<InvalidOperationException>(() => cell.Value = "MUST NOT CHANGE");
-                Assert.Equal(code, control.Grid[1, 1].Value);
+                Assert.Equal(code, control.Grid[1, codeColumn].Value);
                 control.NewButton.PerformClick();
                 control.Grid.Redim(1, 4);
                 action.DoDefaultAction();

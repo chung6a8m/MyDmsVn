@@ -29,6 +29,7 @@ namespace MyDmsVn.Desktop.WinForms
         private long? _workspaceSessionVersion;
         private bool _openingWorkspace;
         private Button? _themeButton;
+        private Label? _sessionUserLabel;
 
         public FoundationShellForm(FoundationViewModel viewModel)
             : this(viewModel, null, null, null, null, null, null, true)
@@ -149,16 +150,17 @@ namespace MyDmsVn.Desktop.WinForms
             MinimumSize = new Size(900, 600);
             Size = new Size(1200, 760);
             AutoScaleMode = AutoScaleMode.Dpi;
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(BootstrapThemeManager.CurrentTheme.Mode);
 
             Navigation = CreateNavigation();
             Navigation.SelectedItemChanged += OnNavigationSelectedItemChanged;
-            Workspace = new BootstrapTabControl
+            Workspace = new BusinessCompactWorkspaceTabs
             {
                 Dock = DockStyle.Fill,
             };
             Workspace.SelectedIndexChanged += OnWorkspaceSelectedIndexChanged;
 
-            var topBar = CreateTopBar();
+            CreateSessionArea();
             var statusBar = new BootstrapStatusStrip
             {
                 Dock = DockStyle.Bottom,
@@ -169,7 +171,7 @@ namespace MyDmsVn.Desktop.WinForms
                 Spring = true,
                 TextAlign = ContentAlignment.MiddleLeft,
             };
-            _currentUserLabel = new ToolStripStatusLabel("Not signed in");
+            _currentUserLabel = new ToolStripStatusLabel("Not signed in") { Visible = false };
             _busyIndicator = new ToolStripProgressBar
             {
                 Style = ProgressBarStyle.Marquee,
@@ -179,10 +181,10 @@ namespace MyDmsVn.Desktop.WinForms
             statusBar.Items.Add(_statusLabel);
             statusBar.Items.Add(_busyIndicator);
             statusBar.Items.Add(_currentUserLabel);
+            statusBar.Items.Add(new ToolStripStatusLabel("Local mode"));
 
             Controls.Add(Workspace);
             Controls.Add(Navigation);
-            Controls.Add(topBar);
             Controls.Add(statusBar);
 
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
@@ -387,6 +389,12 @@ namespace MyDmsVn.Desktop.WinForms
             _currentUserLabel.Text = string.IsNullOrWhiteSpace(displayName)
                 ? "Not signed in"
                 : displayName;
+            if (_sessionUserLabel != null)
+            {
+                _sessionUserLabel.AccessibleName = _currentUserLabel.Text;
+                _sessionUserLabel.Text = Navigation.Expanded ? _currentUserLabel.Text : "●";
+                Navigation.SetToolTip(_sessionUserLabel, CurrentUserText);
+            }
         }
 
         public void ToggleTheme()
@@ -394,7 +402,7 @@ namespace MyDmsVn.Desktop.WinForms
             var nextMode = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light
                 ? BootstrapThemeMode.Dark
                 : BootstrapThemeMode.Light;
-            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(nextMode);
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(nextMode);
         }
 
         public void SignOut()
@@ -661,40 +669,17 @@ namespace MyDmsVn.Desktop.WinForms
                 ExpandedWidth = 224,
                 CollapsedWidth = 64,
             };
-            navigation.Items.Add(
-                new BusinessCompactNavigationItem
-                {
-                    Text = "Foundation",
-                    Tag = "foundation",
-                });
-            navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Products", Tag = CatalogKind.Product });
-            navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Warehouses", Tag = CatalogKind.Warehouse });
-            navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Employees", Tag = CatalogKind.Employee });
-            navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Customers", Tag = CatalogKind.Customer });
-            navigation.Items.Add(
-                new BusinessCompactNavigationItem
-                {
-                    Text = "Goods Receipts",
-                    Tag = "goods-receipts",
-                });
-            navigation.Items.Add(
-                new BusinessCompactNavigationItem
-                {
-                    Text = "Tồn kho",
-                    Tag = "stock-balances",
-                });
-            navigation.Items.Add(
-                new BusinessCompactNavigationItem
-                {
-                    Text = "Thẻ kho",
-                    Tag = "stock-card",
-                });
-            navigation.Items.Add(
-                new BusinessCompactNavigationItem
-                {
-                    Text = "Security administration",
-                    Tag = "security-administration",
-                });
+            void Add(string text, object tag, string group, string icon) => navigation.Items.Add(
+                new BusinessCompactNavigationItem { Text = text, Tag = tag, Group = group, Icon = BusinessCompactIcons.For(icon) });
+            Add("Products", CatalogKind.Product, "Catalog", "product");
+            Add("Warehouses", CatalogKind.Warehouse, "Catalog", "warehouse");
+            Add("Employees", CatalogKind.Employee, "Catalog", "employee");
+            Add("Customers", CatalogKind.Customer, "Catalog", "customer");
+            Add("Goods Receipts", "goods-receipts", "Inventory", "receipt");
+            Add("Tồn kho", "stock-balances", "Inventory", "balance");
+            Add("Thẻ kho", "stock-card", "Inventory", "card");
+            Add("Foundation", "foundation", "System", "foundation");
+            Add("Security administration", "security-administration", "System", "security");
             return navigation;
         }
 
@@ -749,40 +734,35 @@ namespace MyDmsVn.Desktop.WinForms
             }
         }
 
-        private BootstrapToolStrip CreateTopBar()
+        private void CreateSessionArea()
         {
-            var topBar = new BootstrapToolStrip
-            {
-                Dock = DockStyle.Top,
-                GripStyle = ToolStripGripStyle.Hidden,
-                AutoSize = false,
-                Height = BusinessCompactAppearance.Scale(this, 48),
-            };
-            var title = new ToolStripLabel("MyDmsVn");
-            // A hosted HWND-backed button remains available through native UIA on net48.
-            var themeButton = new BootstrapButton
-            {
-                Text = "Light / Dark",
-                AutoSize = true,
-                Name = "ThemeToggle",
-                AccessibleName = "Theme toggle",
-                AccessibleRole = AccessibleRole.PushButton,
-            };
+            _sessionUserLabel = new Label { Name = "CompactUser", AccessibleName = "Not signed in", AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
+            var themeButton = new BusinessCompactIconButton("theme") { Name = "ThemeToggle", AccessibleName = "Theme toggle", AccessibleRole = AccessibleRole.PushButton };
             _themeButton = themeButton;
             themeButton.Click += (_, _) => ToggleTheme();
-            var signOutButton = new ToolStripButton("Sign out")
-            {
-                Alignment = ToolStripItemAlignment.Right,
-            };
+            var signOutButton = new BusinessCompactIconButton("signout") { AccessibleName = "Sign out" };
             signOutButton.Click += (_, _) => SignOut();
-            topBar.Items.Add(title);
-            topBar.Items.Add(signOutButton);
-            topBar.Items.Add(new ToolStripControlHost(themeButton)
+            Navigation.SessionArea.Controls.Add(_sessionUserLabel);
+            Navigation.SessionArea.Controls.Add(themeButton);
+            Navigation.SessionArea.Controls.Add(signOutButton);
+            Navigation.SetToolTip(themeButton, "Switch Light / Graphite theme");
+            Navigation.SetToolTip(signOutButton, "Sign out");
+            void LayoutSession()
             {
-                Alignment = ToolStripItemAlignment.Right,
-            });
+                var expanded = Navigation.Expanded;
+                int S(int value) => BusinessCompactAppearance.Scale(Navigation, value);
+                Navigation.SessionArea.Height = S(expanded ? 88 : 128);
+                _sessionUserLabel.SetBounds(S(12), S(4), Navigation.Width - S(24), S(30));
+                _sessionUserLabel.Text = expanded ? _sessionUserLabel.AccessibleName : "●";
+                themeButton.SetBounds(S(8), S(40), S(expanded ? 96 : 44), S(32));
+                signOutButton.SetBounds(S(expanded ? 108 : 8), S(expanded ? 40 : 80), S(expanded ? 108 : 44), S(32));
+                themeButton.Text = expanded ? "Theme" : "";
+                signOutButton.Text = expanded ? "Sign out" : "";
+                themeButton.Padding = signOutButton.Padding = new Padding(S(expanded ? 36 : 0), 0, 0, 0);
+            }
+            Navigation.SizeChanged += (_, _) => LayoutSession();
+            LayoutSession();
             UpdateThemeDescription();
-            return topBar;
         }
     }
 }

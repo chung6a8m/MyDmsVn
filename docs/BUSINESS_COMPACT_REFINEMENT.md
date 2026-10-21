@@ -1,7 +1,7 @@
 # Business Compact refinement: lookup correctness and visual parity
 
-**Initiative:** BCF — sole active roadmap selected on 2026-10-21.
-**Status:** design and execution requirements recorded; product implementation NOT STARTED.
+**Initiative:** BCF — selected on 2026-10-21; COMPLETE in its Owner-accepted scope.
+**Status:** BCF-T00–T06 COMPLETE / OWNER ACCEPTED — 2026-10-21. The [final T06 Owner acceptance](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) records all three reference comparisons, exact source/test/package evidence and explicit visual, hardware, T04 Minor and native100 composite dispositions. Six strict wide125 rows remain NOT TESTED; operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
 **Baseline:** merged PR #40, `v1a-pro` at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`.
 **Plan:** [BCF execution plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md).
 **Acceptance:** [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md).
@@ -42,8 +42,8 @@ No unrelated module redesign, supplier/tax/discount/unit feature or new document
 ## 3. Fixed architecture and behavior boundaries
 
 - Keep product `net48`, Windows x86 packages and existing DPI awareness.
-- Keep BootstrapSourceGrid `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f`.
-- Keep Bootstrap5WinFormUI `aba102e33c48937fd92468791c287afda0a59e77`.
+- Planning default BootstrapSourceGrid `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f`; T03 narrow candidate `2bd7874f7e80b22ef181763749c2a2938ab7f16e`.
+- Planning default Bootstrap5WinFormUI `aba102e33c48937fd92468791c287afda0a59e77`; T03 narrow candidate `2be9a4d778fda7016207b75470020be6126f2f3f` ([proven private accessory seam, upstream source and compatibility evidence](evidence/bcf/20261021-t03-chrome-followup.md)).
 - Keep SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`.
 - Preserve current application/server interfaces, DTOs, schema, permissions and SQL ownership.
 - Preserve typed decimals, strict raw-input validation, historical selections and accessibility.
@@ -177,14 +177,15 @@ invalidates their async requests; it never commits a highlighted result. Keep th
 editor and adapter; presentation changes alone do not reload, dispose or implicitly commit data.
 Retain deliberate document boundaries and stale-result fencing for actual New/load operations.
 
-Proposed app-owned contract: `ReceiptWorkspaceMode { List, Detail }`,
+App-owned contract implemented at T05 source/test `991530f`: `ReceiptWorkspaceMode { List, Detail }`,
 `GoodsReceiptControl.TryShowReceiptList(): bool` and `ReceiptEditIntent.ReturnToList`.
-These names are not baseline APIs. Add ReturnToList to the navigation branch of
+These names were absent from the planning baseline. ReturnToList belongs to the navigation branch of
 `GoodsReceiptLinesGridAdapter.TryFinishEdit`, alongside New/Select/Refresh, so it cannot fall
 through to committing `EndEdit(false)`. Route Back through existing navigation guards before
 native focus validation; return false without changing presentation when rejected.
 The mouse-down focus-retention predicate must cover pending Warehouse, Employee and inline
-Product hosts, not only the current inline-session predicate. An abandoned click preserves
+Product hosts. T01 already extended the existing command predicates to header lookups; T05
+applies the same protection to Back. An abandoned click preserves
 query/caret/focus; an admitted click cancels query-only state without committing a highlighted row.
 
 Show business title, receipt number, textual status badge and accurate saved/unsaved/busy state.

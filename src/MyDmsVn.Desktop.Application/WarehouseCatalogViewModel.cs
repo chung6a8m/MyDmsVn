@@ -24,6 +24,7 @@ namespace MyDmsVn.Desktop.Application
         protected override Task<ApiResponse<WarehouseDto>> UpdateAsync(int id, CancellationToken cancellationToken) => _client.UpdateAsync(id, new SaveWarehouseRequest(Code, Name, Address), cancellationToken);
         protected override Task<ApiResponse<UnitResponse>> SetActiveCoreAsync(int id, bool isActive, CancellationToken cancellationToken) => _client.SetActiveAsync(id, isActive, cancellationToken);
         protected override int GetId(WarehouseDto item) => item.Id;
+        protected override WarehouseDto WithActiveStatus(WarehouseDto item, bool isActive) => new WarehouseDto(item.Id, item.Code, item.Name, item.Address, isActive);
         protected override void PopulateEditor(WarehouseDto item) { Code = item.Code; Name = item.Name; Address = item.Address; }
         protected override void ClearEditor() { Code = string.Empty; Name = string.Empty; Address = null; }
     }

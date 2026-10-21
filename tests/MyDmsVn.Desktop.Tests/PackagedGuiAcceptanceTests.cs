@@ -30,6 +30,15 @@ public sealed class GuiPackageTheoryAttribute : TheoryAttribute
     }
 }
 
+public sealed class BcfAttendedLookupFactAttribute : FactAttribute
+{
+    public BcfAttendedLookupFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MYDMSVN_BCF_ATTENDED_DIRECTORY")))
+            Skip = "ATTENDED ONLY: requires an explicitly prepared owned BCF walkthrough directory.";
+    }
+}
+
 public sealed class PackagedGuiAcceptanceTests
 {
     private readonly ITestOutputHelper _output;
@@ -39,6 +48,41 @@ public sealed class PackagedGuiAcceptanceTests
         _output.WriteLine("TESTHOST_BITNESS=" + (IntPtr.Size * 8));
         Assert.Equal(4, IntPtr.Size);
         Assert.True(Environment.Is64BitOperatingSystem);
+    }
+
+    [BcfAttendedLookupFact]
+    [Trait("Category", "GuiSql")]
+    public async Task Bcf_attended_lookup_package_session_keeps_human_input_separate_from_automation()
+    {
+        var package = Candidate();
+        var barrier = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_BCF_ATTENDED_DIRECTORY")!);
+        Assert.True(Directory.Exists(barrier));
+        Assert.Empty(Directory.GetFileSystemEntries(barrier));
+        var theme = Environment.GetEnvironmentVariable("MYDMSVN_BCF_THEME");
+        Assert.Contains(theme, new[] { "Light", "Dark" });
+        var scope = Environment.GetEnvironmentVariable("MYDMSVN_BCF_ATTENDED_SCOPE") ?? "both";
+        Assert.Contains(scope, new[] { "both", "detail" });
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            await fixture.SeedReceiptWriterAsync();
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" bcf-lookup-attended " + theme);
+            fixture.ConfigureRuntime(start);
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
+            start.EnvironmentVariables["MYDMSVN_BCF_ATTENDED_SCOPE"] = scope;
+            var result = await GuiOwnedProcess.RunAttendedAsync(start, TimeSpan.FromMinutes(22));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.CleanupVerified);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + result.StandardError);
+            Assert.Contains("ATTENDED_LOOKUP_SCOPE=" + scope, result.StandardOutput);
+            Assert.Contains("ATTENDED_LOOKUP_SESSION_DRAINED=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertNoInventoryAsync();
+            _output.WriteLine("ATTENDED_NO_RECEIPT_OR_INVENTORY_WRITES=PASS; human outcome recorded separately.");
+        });
+        // Exact coordination files only; retained on failure for diagnosis, never an approval gate.
+        foreach (var name in new[] { "ready", "observe", "observed", "enter-detail", "complete" }) File.Delete(Path.Combine(barrier, name));
+        Directory.Delete(barrier);
     }
     [GuiPackageFact]
     [Trait("Category", "GuiSql")]

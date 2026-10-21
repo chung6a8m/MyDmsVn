@@ -2,15 +2,15 @@
 
 Windows desktop-first SME business software, beginning with Sales & Inventory Foundation. Local v1 invokes Application handlers in process through the Local adapter.
 
-## Active roadmap — v1a-pro
+## Current roadmap — v1a-pro
 
-**Updated:** 2026-10-21. PR #40 is merged at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`. The owner selected **Business Compact refinement (BCF)** as the sole active roadmap: repair manual typing in all three receipt lookups first, then complete the UI against the three retained designs.
+**Updated:** 2026-10-21. PR #40 is merged at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`. **BCF-T00–T06 are COMPLETE / OWNER ACCEPTED** in the [final bounded scope](docs/evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). No new implementation roadmap is selected.
 
-| Active plan | State | Next task |
+| Completed plan | State | Handoff |
 |---|---|---|
-| [Lookup correctness and visual parity](docs/plans/20261021-001-business-compact-lookup-and-visual-parity.md) | ACTIVE / PLANNED; implementation **NOT STARTED** | BCF-T00: deterministic native per-key reproduction for `WarehouseFilterLookup`, `WarehouseLookup` and `EmployeeLookup` |
+| [Lookup correctness and visual parity](docs/plans/20261021-001-business-compact-lookup-and-visual-parity.md) | COMPLETE / OWNER ACCEPTED | Preserve exact candidate evidence, visual differences, six wide125 NOT TESTED, deferred T04 Minor and native100 composite limitation |
 
-[Execution index](docs/plans/README.md) owns order. Read the [BCF design](docs/BUSINESS_COMPACT_REFINEMENT.md), [acceptance ledger](docs/BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) and [three original references](docs/design-references/business-compact/README.md). The focused Windows lookup gate must pass before visual implementation. All new BCF runtime obligations remain NOT RUN.
+[Execution index](docs/plans/README.md) owns order. Read the [BCF design](docs/BUSINESS_COMPACT_REFINEMENT.md), [acceptance ledger](docs/BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) and [three original references](docs/design-references/business-compact/README.md). The focused Windows lookup gate must pass before visual implementation. Final BCF evidence and explicit Owner exceptions are recorded; production release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
 ## Current implementation
 

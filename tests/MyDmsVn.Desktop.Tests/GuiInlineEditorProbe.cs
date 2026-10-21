@@ -13,6 +13,9 @@ internal static class GuiInlineEditorProbe
         {
             Console.WriteLine("UIA_CLIENT_BITNESS=" + (IntPtr.Size * 8));
             if (args[1] == "measure-window") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]));
+            if (args[1] == "measure-lookup") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]), true);
+            if (args[1] == "capture-shell") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]), true, args[3]);
+            if (args[1] == "capture-shell-screen") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]), true, args[3], true);
             var root = AutomationElement.FromHandle(new IntPtr(long.Parse(args[0])));
             if (args[1] == "validate") return Validate(root);
             if (args[1] == "readonly") return ReadOnly(root);
@@ -50,7 +53,14 @@ internal static class GuiInlineEditorProbe
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out NativeRectangle rectangle);
     [StructLayout(LayoutKind.Sequential)] private struct NativeRectangle { public int Left, Top, Right, Bottom; }
-    private static int Measure(IntPtr window, int expectedProcess)
+    [DllImport("user32.dll")] private static extern bool PrintWindow(IntPtr window, IntPtr dc, uint flags);
+    [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr window, ref NativePoint point);
+    [DllImport("user32.dll")] private static extern IntPtr GetTopWindow(IntPtr parent);
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out NativeRectangle rectangle);
+    [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
+    private static int Measure(IntPtr window, int expectedProcess, bool lookup = false, string capturePath = null, bool screen = false)
     {
         if (!SetProcessDpiAwarenessContext(new IntPtr(-4))) throw new InvalidOperationException("PerMonitorV2 observer unavailable.");
         uint process;
@@ -65,6 +75,64 @@ internal static class GuiInlineEditorProbe
         Console.WriteLine("OBSERVER_CONTEXT=PerMonitorV2;MONITOR_SCALE=" + (x * 100 / 96) + ";MONITOR_DPI=" + x +
             ";WINDOW_DPI=" + GetDpiForWindow(window) + ";PHYSICAL_WINDOW=" + root.Current.BoundingRectangle +
             ";NATIVE_CLIENT=" + (client.Right - client.Left) + "x" + (client.Bottom - client.Top));
+        if (lookup)
+        {
+            var expected = Environment.GetEnvironmentVariable("MYDMSVN_BCF_EXPECTED_SCALE");
+            if ((expected != "100" && expected != "125") || x * 100m / 96m != int.Parse(expected))
+                throw new InvalidOperationException("Measured native monitor scale differs from declared BCF context.");
+            if (capturePath != null)
+            {
+                // An unaware target paints WM_PRINT in window-DPI units even when this
+                // observer measures physical bounds. Allocate that content extent directly;
+                // never stretch it or count the larger physical buffer's black padding.
+                var paintDpi = screen ? x : GetDpiForWindow(window);
+                var paintWidth = (int)Math.Round((client.Right - client.Left) * paintDpi / (double)x);
+                var paintHeight = (int)Math.Round((client.Bottom - client.Top) * paintDpi / (double)y);
+                using (var bitmap = new System.Drawing.Bitmap(paintWidth, paintHeight))
+                {
+                    using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                    {
+                        if (screen)
+                        {
+                            var origin = new NativePoint();
+                            if (!ClientToScreen(window, ref origin)) throw new InvalidOperationException("Owned client origin unavailable.");
+                            var capture = new System.Drawing.Rectangle(origin.X, origin.Y, bitmap.Width, bitmap.Height);
+                            if (!System.Windows.Forms.Screen.FromHandle(window).WorkingArea.Contains(capture))
+                                throw new InvalidOperationException("Physical capture requires the complete client within its monitor work area.");
+                            // Same-process popup layers are part of this owned fixture. Reject
+                            // foreign windows so a screen capture never includes another app.
+                            var current = GetTopWindow(IntPtr.Zero);
+                            var overlays = 0;
+                            for (; current != IntPtr.Zero && current != window; current = GetWindow(current, 2))
+                            {
+                                NativeRectangle other;
+                                if (IsWindowVisible(current) && GetWindowRect(current, out other) &&
+                                    capture.IntersectsWith(System.Drawing.Rectangle.FromLTRB(other.Left, other.Top, other.Right, other.Bottom)))
+                                {
+                                    uint owner;
+                                    GetWindowThreadProcessId(current, out owner);
+                                    if (owner != expectedProcess) throw new InvalidOperationException("Owned client is occluded by another process; physical capture refused.");
+                                    overlays++;
+                                }
+                            }
+                            if (current != window) throw new InvalidOperationException("Owned target z-order unavailable.");
+                            Console.WriteLine("OWNED_CLIENT_OVERLAYS=" + overlays);
+                            graphics.CopyFromScreen(origin.X, origin.Y, 0, 0, bitmap.Size);
+                        }
+                        else
+                        {
+                            var dc = graphics.GetHdc();
+                            try { if (!PrintWindow(window, dc, 3)) throw new InvalidOperationException("Owned client capture failed."); }
+                            finally { graphics.ReleaseHdc(dc); }
+                        }
+                    }
+                    bitmap.Save(capturePath, System.Drawing.Imaging.ImageFormat.Png);
+                    Console.WriteLine((screen ? "SCREEN_CLIENT_CAPTURE=" : "PRINTWINDOW_CLIENT_CAPTURE=") + bitmap.Width + "x" + bitmap.Height + ";PAINT_DPI=" + paintDpi + ";PHYSICAL_MONITOR_DPI=" + x);
+                }
+            }
+            Console.WriteLine("NATIVE_LOOKUP_ENVIRONMENT=PASS");
+            return 0;
+        }
         var quantity = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Quantity row 1"));
         Console.WriteLine("OBSERVED_QUANTITY_CELL=" + (quantity == null ? "absent" : quantity.Current.BoundingRectangle.ToString()));
         if (quantity == null || quantity.Current.BoundingRectangle.Height < 36 * x / 96d)

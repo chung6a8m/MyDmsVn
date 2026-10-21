@@ -64,7 +64,7 @@ public sealed class BusinessCompactLayoutTests
             Assert.Equal("Segoe UI", receipt.Font.Name);
             Assert.Equal(10f, receipt.Font.SizeInPoints);
             Assert.Equal(10f, receipt.ReceiptGrid[1, 1].View.Font.SizeInPoints);
-            Assert.Equal(260 * receipt.DeviceDpi / 96, receipt.Controls.OfType<SplitContainer>().Single().Panel1.Width);
+            Assert.True(receipt.Controls.OfType<SplitContainer>().Single().Panel1Collapsed, "T05 detail uses the full workspace; the historical 260-pixel master split is retired.");
             Assert.True(receipt.ReceiptGrid.Rows[1].Height >= 36 * receipt.DeviceDpi / 96);
             Assert.True(ScreenBounds(receipt.WarehouseLookup).Bottom < ScreenBounds(receipt.LineGrid).Top, "Metadata must be above the dominant lines.");
             var caption = receipt.WarehouseLookup.Parent!.Controls.OfType<Label>().Single();
@@ -205,7 +205,7 @@ public sealed class BusinessCompactLayoutTests
             Assert.True(fixture.Editor.RequiresPostOutcomeReload);
             Assert.False(receipt.SaveButton.Enabled);
             Assert.True(receipt.RefreshButton.Enabled);
-            Assert.True(receipt.StatusFilter.Focus());
+            Assert.True(receipt.BackToReceiptsButton.Focus());
             // Enable the same keyboard focus cues that native Tab enables in the package.
             SendMessage(form.Handle, 0x0127, new IntPtr(2 | (1 << 16)), IntPtr.Zero);
             using var unfocusedRefresh = new Bitmap(receipt.RefreshButton.Width, receipt.RefreshButton.Height);
@@ -298,18 +298,18 @@ public sealed class BusinessCompactLayoutTests
     private static Size PhysicalViewport(int width, int height, int dpi) => new Size((int)Math.Ceiling(width * dpi / 96d), (int)Math.Ceiling(height * dpi / 96d));
 
     [Fact]
-    public void Splitter_minimum_preserves_reachable_master_filters() => StaTest.Run(token =>
+    public void List_mode_preserves_reachable_master_filters() => StaTest.Run(token =>
     {
         using var fixture = new ReceiptAcceptanceTests.Fixture();
         using var receipt = fixture.CreateControl();
         using var form = new Form { ClientSize = new Size(944, 600) };
         form.Controls.Add(receipt); form.Show();
         ReceiptAcceptanceTests.Load(receipt, token);
+        Assert.True(receipt.TryShowReceiptList());
         var split = receipt.Controls.OfType<SplitContainer>().Single();
-        split.SplitterDistance = Math.Max(25, split.Panel1MinSize);
         Pump();
         Assert.True(split.Panel1.Width >= receipt.SearchBox.Width + receipt.SearchBox.Margin.Horizontal, "An allowed splitter endpoint must retain the filters.");
-        Assert.True(split.Panel2.Width >= 400 * receipt.DeviceDpi / 96);
+        Assert.True(split.Panel2Collapsed);
     }, TimeSpan.FromSeconds(15));
 
     private static void Capture(Form form, string name)

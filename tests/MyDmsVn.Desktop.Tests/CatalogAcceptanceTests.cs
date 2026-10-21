@@ -33,7 +33,7 @@ namespace MyDmsVn.Desktop.Tests
                     control.SaveButton.PerformClick();
                     Drain(control.LastOperation);
                     Assert.Equal(1, scenario.State.Creates);
-                    Assert.Equal("NEW", control.Grid[2, 1].Value);
+                    Assert.Equal("NEW", CellValue(control, 2, "Code"));
                     AssertEditorMatchesRequest(control, scenario.State.LastSave!);
 
                     Select(control, 2);
@@ -43,17 +43,17 @@ namespace MyDmsVn.Desktop.Tests
                     Drain(control.LastOperation);
                     Assert.Equal(1, scenario.State.Updates);
                     Assert.Equal(2, scenario.State.LastId);
-                    Assert.Equal("EDIT", control.Grid[2, 1].Value);
-                    Assert.Equal("Đã cập nhật", control.Grid[2, 2].Value);
+                    Assert.Equal("EDIT", CellValue(control, 2, "Code"));
+                    Assert.Equal("Đã cập nhật", CellValue(control, 2, "Name"));
                     AssertEditorMatchesRequest(control, scenario.State.LastSave!);
 
                     control.DeactivateButton.PerformClick();
                     Drain(control.LastOperation);
-                    Assert.Equal("Inactive", control.Grid[2, 3].Value);
+                    Assert.Equal("Inactive", CellValue(control, 2, "Status"));
                     Assert.False(scenario.State.ActiveChanges[0]);
                     control.ActivateButton.PerformClick();
                     Drain(control.LastOperation);
-                    Assert.Equal("Active", control.Grid[2, 3].Value);
+                    Assert.Equal("Active", CellValue(control, 2, "Status"));
                     Assert.True(scenario.State.ActiveChanges[1]);
 
                     control.NewButton.PerformClick();
@@ -112,12 +112,12 @@ namespace MyDmsVn.Desktop.Tests
                     scenario.Control.EditorControls["name"].Text = "Unsaved edit";
                     scenario.Control.SaveButton.PerformClick();
                     Drain(scenario.Control.LastOperation);
-                    Assert.Equal("Original", scenario.Control.Grid[1, 2].Value);
+                    Assert.Equal("Original", CellValue(scenario.Control, 1, "Name"));
                     Assert.Equal("Unsaved edit", scenario.Control.EditorControls["name"].Text);
                     Assert.Equal("Operation rejected.", scenario.Notifications.LastNotification!.Message);
                     scenario.Control.DeactivateButton.PerformClick();
                     Drain(scenario.Control.LastOperation);
-                    Assert.Equal("Active", scenario.Control.Grid[1, 3].Value);
+                    Assert.Equal("Active", CellValue(scenario.Control, 1, "Status"));
                     Assert.True(scenario.Control.SaveButton.Enabled);
                     Assert.Single(scenario.State.Requests);
                 }
@@ -211,7 +211,7 @@ namespace MyDmsVn.Desktop.Tests
                     Drain(second);
                     Assert.Equal(2, scenario.State.Requests.Count);
                     Assert.Equal("CODE1", scenario.State.Requests.Last().Search);
-                    Assert.Equal("CODE1", scenario.Control.Grid[1, 1].Value);
+                    Assert.Equal("CODE1", CellValue(scenario.Control, 1, "Code"));
                 }
             });
         }
@@ -231,12 +231,12 @@ namespace MyDmsVn.Desktop.Tests
                     Assert.True(oldResponse.Token.IsCancellationRequested);
                     oldResponse.Complete("STALE");
                     Drain(old);
-                    Assert.Equal("CODE1", scenario.Control.Grid[1, 1].Value);
+                    Assert.Equal("CODE1", CellValue(scenario.Control, 1, "Code"));
                     scenario.Delay.ReleaseLatest();
                     Pump(() => scenario.State.PendingLists.Count == 2);
                     scenario.State.PendingLists[1].Complete("FRESH");
                     Drain(scenario.Control.LastOperation);
-                    Assert.Equal("FRESH", scenario.Control.Grid[1, 1].Value);
+                    Assert.Equal("FRESH", CellValue(scenario.Control, 1, "Code"));
                 }
             });
         }
@@ -274,6 +274,14 @@ namespace MyDmsVn.Desktop.Tests
             return scenario;
         }
 
+        private static object CellValue(CatalogControl control, int row, string heading)
+        {
+            // Products intentionally omits the ID column; assert the public field by
+            // its unique heading without changing the expected row or business value.
+            var column = Assert.Single(Enumerable.Range(0, control.Grid.ColumnsCount),
+                index => Equals(control.Grid[0, index].Value, heading));
+            return control.Grid[row, column].Value;
+        }
         private static void Run(Action action) => StaTest.Run(token =>
         {
             using (var guard = new WinFormsTestGuard()) action();

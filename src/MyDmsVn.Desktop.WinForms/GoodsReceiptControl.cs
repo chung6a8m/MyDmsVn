@@ -35,8 +35,10 @@ namespace MyDmsVn.Desktop.WinForms
         private string? _statusFilter;
         private string? _workflowMessage;
         private bool _isRefreshing;
+        private bool _isApplyingWarehouseFilter;
         private bool _isAccessDeniedEditorLocked;
         private bool _applyingState;
+        private int _lookupBoundaryGeneration;
 
         public GoodsReceiptControl(
             GoodsReceiptListViewModel list,
@@ -114,10 +116,13 @@ namespace MyDmsVn.Desktop.WinForms
             };
 
             Controls.Add(CreateLayout());
+            Controls.Add(_workspaceCommands);
+            Controls.Add(_workspaceFooter);
             BusinessCompactAppearance.Apply(this);
             _inline.EditStateChanged += OnInlineEditStateChanged;
-            foreach (var command in new[] { NewButton, RefreshButton, SaveButton, PostButton, AddLineButton, RemoveLineButton })
-                ((ReceiptCommandButton)command).RetainEditorFocus = () => _inline.HasPendingEdit;
+            foreach (var command in new[] { NewButton, RefreshButton, SaveButton, PostButton, AddLineButton, RemoveLineButton, BackToReceiptsButton })
+                ((ReceiptCommandButton)command).RetainEditorFocus = () =>
+                    _inline.HasPendingEdit || WarehouseLookup.HasPendingText || EmployeeLookup.HasPendingText;
             SearchBox.TextChanged += OnSearchChanged;
             WarehouseFilterLookup.TextChanged += OnWarehouseLookupSearchChanged;
             WarehouseFilterLookup.SelectedValueChanged += OnWarehouseFilterChanged;
@@ -224,6 +229,7 @@ namespace MyDmsVn.Desktop.WinForms
                 UnsubscribeLines();
                 _inline.EditStateChanged -= OnInlineEditStateChanged;
                 _inline.Dispose();
+                VersionLabel.Dispose(); // Retained compatibility control is deliberately outside the visible tree.
                 _errors.Dispose();
                 _list.Dispose();
                 _editor.Dispose();
@@ -290,6 +296,12 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             CancelEditorLookupEdits();
+            if (_editor.Id == id && !_list.IsAccessDenied && !_isAccessDeniedEditorLocked && _hasDetail)
+            {
+                ShowReceiptDetail();
+                return;
+            }
+
             var selected = await _list.SelectAsync(id, cancellationToken).ConfigureAwait(true);
             if (IsDisposed || Disposing) return;
             if (selected == null)
@@ -307,12 +319,14 @@ namespace MyDmsVn.Desktop.WinForms
             _editor.Load(selected);
             _selectedLine = _editor.Lines.FirstOrDefault();
             _inline.ResetDocument(_editor.Lines);
+            ShowReceiptDetail();
             ApplyState();
         }
 
         private async Task SaveAsync()
         {
-            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Save)) return;
+            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Save) ||
+                !await FinishHeaderLookupsAsync(SaveButton).ConfigureAwait(true)) return;
             if (ApplyEditorsToViewModel())
             {
                 var selectedLineId = _selectedLine?.Id;
@@ -339,7 +353,8 @@ namespace MyDmsVn.Desktop.WinForms
 
         private async Task PostAsync()
         {
-            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Post)) return;
+            if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Post) ||
+                !await FinishHeaderLookupsAsync(PostButton).ConfigureAwait(true)) return;
             if (_editor.IsDirty)
             {
                 _workflowMessage = "Save the current draft before posting it.";
@@ -389,6 +404,7 @@ namespace MyDmsVn.Desktop.WinForms
             _editor.Load(null);
             _selectedLine = null;
             _inline.ResetDocument(_editor.Lines);
+            ShowReceiptDetail();
             ApplyState();
         }
 
@@ -454,6 +470,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void MovePage(int offset)
         {
+            if (_isApplyingWarehouseFilter) return;
             var target = _list.PageNumber + offset;
             var pageCount = Math.Max(1, (int)Math.Ceiling(_list.TotalCount / (double)_list.PageSize));
             if (target >= 1 && target <= pageCount)
@@ -513,7 +530,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnSearchChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState)
+            if (!_applyingState && !_isApplyingWarehouseFilter)
             {
                 SetOperation(_list.SetSearch(SearchBox.Text));
             }
@@ -522,7 +539,8 @@ namespace MyDmsVn.Desktop.WinForms
         private void OnWarehouseLookupSearchChanged(object? sender, EventArgs eventArgs)
         {
             var lookup = (BootstrapLookupBox)sender!;
-            if (!_applyingState && lookup.HasPendingText)
+            var canSearch = ReferenceEquals(lookup, WarehouseFilterLookup) ? !IsOperationBusy : CanEditLines();
+            if (!_applyingState && canSearch && lookup.HasPendingText)
             {
                 SetOperation(_editor.WarehouseLookup.SetSearch(lookup.Text));
             }
@@ -530,7 +548,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnEmployeeLookupSearchChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && EmployeeLookup.HasPendingText)
+            if (!_applyingState && CanEditLines() && EmployeeLookup.HasPendingText)
             {
                 SetOperation(_editor.EmployeeLookup.SetSearch(EmployeeLookup.Text));
             }
@@ -538,21 +556,34 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnWarehouseFilterChanged(object? sender, EventArgs eventArgs)
         {
-            if (_applyingState)
+            if (_applyingState || IsOperationBusy)
             {
                 return;
             }
 
             _warehouseFilterId = WarehouseFilterLookup.SelectedValue as int?;
-            SetOperation(
-                _list.SetWarehouseFilterAsync(
-                    _warehouseFilterId,
-                    CancellationToken.None));
+            SetOperation(ApplyWarehouseFilterAsync(_warehouseFilterId));
+        }
+
+        private async Task ApplyWarehouseFilterAsync(int? warehouseId)
+        {
+            // Reserve command admission immediately, but defer disabling the native EDIT
+            // until commit/Tab traversal finishes. A later command must not start a load
+            // that this already-admitted filter continuation would cancel.
+            _isApplyingWarehouseFilter = true;
+            try
+            {
+                if (WarehouseFilterLookup.ContainsFocus) await Task.Yield();
+                if (IsDisposed || Disposing) return;
+                _isApplyingWarehouseFilter = false; // The list now takes admission synchronously.
+                await _list.SetWarehouseFilterAsync(warehouseId, CancellationToken.None).ConfigureAwait(true);
+            }
+            finally { _isApplyingWarehouseFilter = false; }
         }
 
         private void OnStatusFilterChanged(object? sender, EventArgs eventArgs)
         {
-            if (_applyingState)
+            if (_applyingState || _isApplyingWarehouseFilter)
             {
                 return;
             }
@@ -576,7 +607,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnWarehouseChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && !_editor.RequiresPostOutcomeReload && TrySelectedOption(WarehouseLookup, out var option))
+            if (!_applyingState && CanEditLines() && TrySelectedOption(WarehouseLookup, out var option))
             {
                 _editor.SetWarehouse(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -584,7 +615,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnEmployeeChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState && !_editor.RequiresPostOutcomeReload && TrySelectedOption(EmployeeLookup, out var option))
+            if (!_applyingState && CanEditLines() && TrySelectedOption(EmployeeLookup, out var option))
             {
                 _editor.SetEmployee(option.Id, option.DisplayName, option.IsAvailableForNewSelection);
             }
@@ -702,12 +733,10 @@ namespace MyDmsVn.Desktop.WinForms
                 SetReceiptRows();
                 _selectedLine = _inline.SelectedLine;
                 _inline.RefreshEditability();
-                WarehouseFilterLookup.DataSource = _editor.WarehouseLookup.Items
-                    .Where(item => item.IsAvailableForNewSelection)
-                    .ToArray();
+                BindEditorLookup(WarehouseFilterLookup, _editor.WarehouseLookup.Items
+                    .Where(item => item.IsAvailableForNewSelection), _warehouseFilterId);
                 BindEditorLookup(WarehouseLookup, _editor.WarehouseLookup.Items, _editor.WarehouseId);
                 BindEditorLookup(EmployeeLookup, _editor.EmployeeLookup.Items, _editor.EmployeeId);
-                WarehouseFilterLookup.SelectValue(_warehouseFilterId);
                 StatusFilter.SelectedItem = _statusFilter ?? "All";
                 ReceiptDateEditor.Value = _editor.ReceiptDate;
                 NoteEditor.Text = _editor.Note ?? string.Empty;
@@ -757,6 +786,7 @@ namespace MyDmsVn.Desktop.WinForms
                 AddLineButton.Enabled = canEdit;
                 RemoveLineButton.Enabled = canEdit && _selectedLine != null;
                 _inline.RefreshEditability();
+                ApplyPresentationState();
                 ApplyErrors();
             }
             finally
@@ -765,8 +795,19 @@ namespace MyDmsVn.Desktop.WinForms
             }
         }
 
+        private GoodsReceiptDto[] _receiptRows = Array.Empty<GoodsReceiptDto>();
         private void SetReceiptRows()
         {
+            var rows = _list.Items;
+            if (ReceiptGrid.RowsCount != 0 && _receiptRows.Length == rows.Count &&
+                _receiptRows.Zip(rows, (a, b) => a.Id == b.Id && a.ReceiptNumber == b.ReceiptNumber &&
+                    a.ReceiptDate == b.ReceiptDate && a.WarehouseId == b.WarehouseId && a.EmployeeId == b.EmployeeId &&
+                    a.WarehouseDisplayName == b.WarehouseDisplayName && a.EmployeeDisplayName == b.EmployeeDisplayName && a.Status == b.Status).All(equal => equal)) return;
+            var active = ReceiptGrid.Selection.ActivePosition;
+            var selectedId = active.Row > 0 && active.Row <= _receiptIds.Count ? (long?)_receiptIds[active.Row - 1] : _list.SelectedReceipt?.Id;
+            var scroll = ReceiptGrid.CustomScrollPosition;
+            ReceiptGrid.Selection.ResetSelection(false);
+            _receiptRows = rows.ToArray();
             _receiptIds = _list.Items.Select(item => item.Id).ToArray();
             ReceiptGrid.Redim(_list.Items.Count + 1, 6);
             ReceiptGrid.FixedRows = 1;
@@ -785,6 +826,8 @@ namespace MyDmsVn.Desktop.WinForms
             BusinessCompactAppearance.StyleReceiptResults(ReceiptGrid);
             ReceiptGrid.AutoSizeCells();
             BusinessCompactAppearance.StyleReceiptResults(ReceiptGrid);
+            ((ReceiptResultsGrid)ReceiptGrid).SynchronizeRow(Array.FindIndex(_receiptRows, row => row.Id == selectedId) + 1, active.Column);
+            ReceiptGrid.CustomScrollPosition = scroll;
         }
 
         private void ApplyErrors()
@@ -809,110 +852,6 @@ namespace MyDmsVn.Desktop.WinForms
             return field.StartsWith("lines[", StringComparison.Ordinal);
         }
 
-        private Label? _compactTitle;
-        private Control CreateLayout()
-        {
-            Padding = new Padding(16);
-            AutoScroll = true;
-            AutoScrollMinSize = new Size(676, 0);
-            var master = new Panel { Dock = DockStyle.Fill };
-            var masterBar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 8, 8) };
-            SearchBox.Dock = WarehouseFilterLookup.Dock = StatusFilter.Dock = DockStyle.None;
-            SearchBox.Width = WarehouseFilterLookup.Width = 220;
-            StatusFilter.Width = 110;
-            masterBar.Controls.AddRange(new Control[] { SearchBox, WarehouseFilterLookup, StatusFilter, RefreshButton, NewButton });
-            var paging = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true };
-            paging.Controls.AddRange(new Control[] { PreviousPageButton, PageLabel, NextPageButton });
-            master.Controls.Add(ReceiptGrid); master.Controls.Add(paging); master.Controls.Add(masterBar);
-
-            var detail = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
-            var content = new Panel { Dock = DockStyle.Fill, TabIndex = 0 };
-            var metadata = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, TabIndex = 0 };
-            metadata.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            metadata.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            var fields = new[] { CompactField("Receipt date", ReceiptDateEditor, 0), CompactField("Warehouse", WarehouseLookup, 1),
-                CompactField("Employee", EmployeeLookup, 2), CompactField("Note", NoteEditor, 3) };
-            for (var index = 0; index < fields.Length; index++) metadata.Controls.Add(fields[index], index % 2, index / 2);
-            _compactTitle = new Label { Name = "CompactHeading", Text = "Goods receipt", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 0, 0, 8) };
-            var state = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 4, 0, 8), TabStop = false };
-            state.Controls.AddRange(new Control[] { new Label { Text = "Status", AutoSize = true }, StatusLabel,
-                new Label { Text = "Version", AutoSize = true }, VersionLabel });
-            VersionLabel.Name = "CompactSecondary";
-            var header = new Panel { Dock = DockStyle.Top, TabIndex = 0 };
-            header.Controls.Add(state); header.Controls.Add(metadata); header.Controls.Add(_compactTitle);
-
-            var commands = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, TabIndex = 0 };
-            commands.Controls.AddRange(new Control[] { SaveButton, PostButton, AddLineButton, RemoveLineButton,
-                new Label { Text = "Total", AutoSize = true, Padding = new Padding(8, 8, 0, 0) }, TotalLabel, BusyIndicator });
-            var footer = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 1, TabIndex = 2, Padding = new Padding(0, 8, 0, 0) };
-            OperationStatusLabel.Name = "CompactSecondary";
-            OperationStatusLabel.Margin = new Padding(0, 4, 0, 0);
-            footer.Controls.Add(commands); footer.Controls.Add(OperationStatusLabel);
-            LineGrid.TabIndex = 1;
-            SaveButton.TabIndex = 0; PostButton.TabIndex = 1; AddLineButton.TabIndex = 2; RemoveLineButton.TabIndex = 3;
-            content.Controls.Add(LineGrid); content.Controls.Add(footer); content.Controls.Add(header);
-            detail.Controls.Add(content);
-            var layingOut = false;
-            Action layout = () =>
-            {
-                if (layingOut || detail.IsDisposed) return;
-                layingOut = true;
-                try
-                {
-                    var scale = new Func<int, int>(logical => BusinessCompactAppearance.Scale(this, logical));
-                    var availableWidth = detail.ClientSize.Width;
-                    var availableHeight = detail.ClientSize.Height;
-                    var minimumHeight = 0;
-                    for (var pass = 0; pass < 3; pass++)
-                    {
-                        var width = Math.Max(scale(400), availableWidth);
-                        var columns = width < scale(560) ? 1 : 2;
-                        metadata.SuspendLayout();
-                        metadata.ColumnCount = columns;
-                        for (var index = 0; index < fields.Length; index++)
-                        {
-                            metadata.SetCellPosition(fields[index], new TableLayoutPanelCellPosition(index % columns, index / columns));
-                            fields[index].MinimumSize = new Size(0, scale(60));
-                        }
-                        metadata.ResumeLayout();
-                        header.Width = metadata.Width = footer.Width = width;
-                        header.Height = metadata.PreferredSize.Height + _compactTitle.PreferredHeight + state.PreferredSize.Height + scale(8);
-                        OperationStatusLabel.MaximumSize = new Size(Math.Max(1, width - scale(16)), 0);
-                        minimumHeight = header.Height + footer.PreferredSize.Height + scale(200);
-                        availableHeight = detail.ClientSize.Height - (scale(400) > availableWidth ? SystemInformation.HorizontalScrollBarHeight : 0);
-                        availableWidth = detail.ClientSize.Width - (minimumHeight > availableHeight ? SystemInformation.VerticalScrollBarWidth : 0);
-                    }
-                    // Docking follows the scrollable display rectangle. Only measured minima
-                    // contribute to the virtual extent, so old viewport bounds cannot keep bars alive.
-                    content.MinimumSize = new Size(scale(400), minimumHeight);
-                    detail.AutoScrollMinSize = content.MinimumSize;
-                    detail.PerformLayout();
-                }
-                finally { layingOut = false; }
-            };
-            detail.SizeChanged += (_, __) => layout();
-            header.FontChanged += (_, __) => layout();
-            OperationStatusLabel.TextChanged += (_, __) => layout();
-            var split = new SplitContainer { Dock = DockStyle.Fill, Size = new Size(1200, 600), FixedPanel = FixedPanel.Panel1, SplitterDistance = 260, Panel1MinSize = 240, Panel2MinSize = 400, MinimumSize = new Size(644, 0) };
-            split.Panel1.Controls.Add(master); split.Panel2.Controls.Add(detail);
-            var initialized = false;
-            split.SizeChanged += (_, __) =>
-            {
-                var available = split.ClientSize.Width - split.SplitterWidth;
-                var minimum = BusinessCompactAppearance.Scale(this, 240);
-                var detailMinimum = BusinessCompactAppearance.Scale(this, 400);
-                if (available >= minimum + detailMinimum)
-                {
-                    var target = initialized ? split.SplitterDistance : BusinessCompactAppearance.Scale(this, 260);
-                    split.SplitterDistance = Math.Max(minimum, Math.Min(target, available - detailMinimum));
-                    initialized = split.IsHandleCreated;
-                }
-                layout();
-            };
-            split.HandleCreated += (_, __) => { initialized = true; layout(); };
-            return split;
-        }
-
         private static Control CompactField(string caption, Control editor, int order)
         {
             var group = new Panel { Size = new Size(200, 60), Dock = DockStyle.Fill, Margin = new Padding(0, 0, 8, 8), TabIndex = order };
@@ -925,19 +864,43 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void CancelEditorLookupEdits()
         {
+            _lookupBoundaryGeneration++;
+            // Only admitted document boundaries reach this method. Invalidate the shared
+            // request generations before clearing presentation so late responses cannot
+            // republish a preceding document's query (including the shared filter host).
+            _editor.WarehouseLookup.Cancel();
+            _editor.EmployeeLookup.Cancel();
             WarehouseLookup.CancelPendingEdit();
             EmployeeLookup.CancelPendingEdit();
             _inline.CancelActiveEdit();
         }
 
+        private async Task<bool> FinishHeaderLookupsAsync(Control command)
+        {
+            if (!WarehouseLookup.HasPendingText && !EmployeeLookup.HasPendingText) return true;
+            var generation = _lookupBoundaryGeneration;
+            // Use the pinned lookup's normal exact-match/cancel policy on native leave,
+            // including accessible/default-action commands that did not move focus.
+            // Do not synthesize Enter: that would commit a merely highlighted result.
+            command.Focus();
+            await Task.Yield();
+            if (IsDisposed || Disposing || generation != _lookupBoundaryGeneration || !CanEditLines()) return false;
+            var pending = WarehouseLookup.HasPendingText ? WarehouseLookup :
+                EmployeeLookup.HasPendingText ? EmployeeLookup : null;
+            if (pending == null) return true;
+            _workflowMessage = "Resolve the pending lookup before saving or posting.";
+            ApplyState();
+            pending.Focus();
+            return false;
+        }
+
         private static void BindEditorLookup(BootstrapLookupBox lookup, IEnumerable<CatalogLookupOption> options, int? selectedId)
         {
             var selection = selectedId > 0 ? selectedId : null;
-            var preservePending = lookup.HasPendingText && Equals(lookup.SelectedValue, selection);
-            var pendingText = lookup.Text;
             lookup.DataSource = options.ToArray();
-            lookup.SelectValue(selection);
-            if (preservePending) lookup.Text = pendingText;
+            // The pinned DataSource reconciliation preserves pending native text/caret.
+            // Reselect only an actual identity transition; selecting the same key resets it.
+            if (!Equals(lookup.SelectedValue, selection)) lookup.SelectValue(selection);
         }
 
         private static BootstrapLookupBox CreateLookup(string accessibleName)

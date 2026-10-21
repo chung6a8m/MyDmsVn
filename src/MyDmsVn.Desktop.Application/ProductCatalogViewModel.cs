@@ -27,6 +27,7 @@ namespace MyDmsVn.Desktop.Application
         protected override Task<ApiResponse<ProductDto>> UpdateAsync(int id, CancellationToken cancellationToken) => _client.UpdateAsync(id, new SaveProductRequest(Code, Name, Unit), cancellationToken);
         protected override Task<ApiResponse<UnitResponse>> SetActiveCoreAsync(int id, bool isActive, CancellationToken cancellationToken) => _client.SetActiveAsync(id, isActive, cancellationToken);
         protected override int GetId(ProductDto item) => item.Id;
+        protected override ProductDto WithActiveStatus(ProductDto item, bool isActive) => new ProductDto(item.Id, item.Code, item.Name, item.Unit, isActive);
         protected override void PopulateEditor(ProductDto item) { Code = item.Code; Name = item.Name; Unit = item.Unit; }
         protected override void ClearEditor() { Code = string.Empty; Name = string.Empty; Unit = string.Empty; }
     }

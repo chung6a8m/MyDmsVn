@@ -25,6 +25,7 @@ namespace MyDmsVn.Desktop.Application
         private readonly int _pageSize = 25;
         private long _totalCount;
         private int? _selectedId;
+        private TDto? _selectedItem;
         private bool _isLoading;
         private bool _isEditorLoading;
         private bool _disposed;
@@ -93,6 +94,14 @@ namespace MyDmsVn.Desktop.Application
         {
             get => _selectedId;
             protected set => SetProperty(ref _selectedId, value);
+        }
+
+        // Loaded metadata for the inspector, independent of the current result page.
+        // Raw editor fields remain separate, so a list refresh never overwrites an edit.
+        public TDto? SelectedItem
+        {
+            get => _selectedItem;
+            private set => SetProperty(ref _selectedItem, value);
         }
 
         public bool IsLoading
@@ -165,6 +174,7 @@ namespace MyDmsVn.Desktop.Application
             ThrowIfDisposed();
             CancelEditorLoad();
             SelectedId = null;
+            SelectedItem = default;
             ResetValidation();
             ClearEditor();
         }
@@ -244,6 +254,7 @@ namespace MyDmsVn.Desktop.Application
                         {
                             ResetValidation();
                             SelectedId = GetId(response.Data!);
+                            SelectedItem = response.Data;
                             PopulateEditor(response.Data!);
                         }
                         else
@@ -357,6 +368,7 @@ namespace MyDmsVn.Desktop.Application
             CancellationToken cancellationToken);
 
         protected abstract int GetId(TDto item);
+        protected abstract TDto WithActiveStatus(TDto item, bool isActive);
 
         protected abstract void PopulateEditor(TDto item);
 
@@ -398,6 +410,7 @@ namespace MyDmsVn.Desktop.Application
                             if (IsEditorCurrent(editorGeneration))
                             {
                                 SelectedId = entityId;
+                                SelectedItem = response.Data;
                                 PopulateEditor(response.Data!);
                             }
                         },
@@ -456,6 +469,11 @@ namespace MyDmsVn.Desktop.Application
                         Kind,
                         id,
                         CatalogChangeOperation.ActiveStatusChanged));
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    if (SelectedId == id && SelectedItem != null)
+                        SelectedItem = WithActiveStatus(SelectedItem, isActive);
+                }, cancellationToken).ConfigureAwait(false);
                 await LoadAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -572,6 +590,17 @@ namespace MyDmsVn.Desktop.Application
             if (response.IsSuccess)
             {
                 Items = response.Data!.Items;
+                if (SelectedId.HasValue)
+                {
+                    foreach (var item in Items)
+                    {
+                        if (GetId(item) == SelectedId.Value)
+                        {
+                            SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
                 TotalCount = response.Data.TotalCount;
             }
             else

@@ -2,7 +2,7 @@
 
 **Reset date:** 2026-10-18 · **Branch assessed:** `v1a` · **Baseline:** [c7ad32a4b0040f87417973eabd6c12757c54f7d5](https://github.com/chung6a8m/MyDmsVn/commit/c7ad32a4b0040f87417973eabd6c12757c54f7d5).
 
-This page is historical provenance, not an execution queue or a test policy. Current work is [BCF — lookup correctness and visual parity](plans/README.md), selected on 2026-10-21 after PR #40 merged the completed BCI scope. Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
+This page is historical provenance, not an execution queue or a test policy. [The execution index](plans/README.md) records BCF as COMPLETE / OWNER ACCEPTED in its bounded UI scope; no new implementation roadmap is selected. Historical activation checkpoints below retain their original status. Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
 
 ## Established baseline
 
@@ -80,3 +80,7 @@ This activation changes documentation and retained design assets only. It implem
 Use the immutable links above or `git show c7ad32a4b0040f87417973eabd6c12757c54f7d5:<repository-relative-path>`. The full [baseline documentation tree](https://github.com/chung6a8m/MyDmsVn/tree/c7ad32a4b0040f87417973eabd6c12757c54f7d5/docs) remains available. A shallow clone may need that commit fetched before using `git show`.
 
 Read historical imperative text as the policy of its date. Current owner decisions, [AGENTS](../AGENTS.md), the current execution-plan index and TEST_POLICY control new work.
+
+## 2026-10-21 — BCF-T06 Owner acceptance
+
+The Owner explicitly accepted the final interface differences, bounded hardware/Minor exceptions and evidence after review of all three reference comparisons. [The final T06 record](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) freezes package9559107, unchanged product991530f and separate test revisions. Six strict wide125 rows remain NOT TESTED; native100 retains its failed broad run plus repair and composite attended/no-independent-no-write limitation. BCF-T00–T06 are complete in that accepted scope on the isolated branch. No push/merge, upstream merge, production release acceptance or new roadmap is implied.

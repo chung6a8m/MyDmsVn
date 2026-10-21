@@ -181,7 +181,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         if (_session == null) return true;
         if (!Current(_session)) { CancelActiveEdit(); return false; }
         if (intent == ReceiptEditIntent.RemoveLine) { CancelActiveEdit(); return true; }
-        if (intent == ReceiptEditIntent.NewReceipt || intent == ReceiptEditIntent.SelectReceipt || intent == ReceiptEditIntent.Refresh)
+        if (intent == ReceiptEditIntent.NewReceipt || intent == ReceiptEditIntent.SelectReceipt || intent == ReceiptEditIntent.Refresh || intent == ReceiptEditIntent.ReturnToList)
         {
             if (HasPendingDataEdit)
             {
@@ -505,6 +505,7 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
             _session.RawCandidate = _session.Input.Control.Text;
             if (!_bindingOptions && _session.Column == 1 && _product.BootstrapControl.HasPendingText)
                 _ = _editor.ProductOptions.SetSearch(_session.RawCandidate);
+            if (_session.Column != 1) EditStateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
     private void OnEditException(object sender, ExceptionEventArgs e) => EditError ??= "The cell value could not be committed.";

@@ -1,6 +1,6 @@
 # Schema compatibility và migration runbook
 
-**Hiện trạng:** `v1a-pro`, cập nhật 2026-10-21. SEC-REBUILD/RESP/L2DB và GUI-P5 đã hoàn thành theo phạm vi được nghiệm thu; runtime yêu cầu chính xác scripts 001–009. Desktop và DbMigrator phát hành đều `net48`/x86, AppCore parked. DbMigrator là gói admin riêng; desktop không tự chạy DbUp hoặc security bootstrap. BCI đã triển khai/nghiệm thu trong phạm vi UI lịch sử. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) là lộ trình duy nhất, đang PLANNED; implementation NOT STARTED, nghĩa vụ runtime mới NOT RUN và không thay schema. Các [điều kiện schema-compatibility, recovery và phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**.
+**Hiện trạng:** `v1a-pro`, cập nhật 2026-10-21. SEC-REBUILD/RESP/L2DB và GUI-P5 đã hoàn thành theo phạm vi được nghiệm thu; runtime yêu cầu chính xác scripts 001–009. Desktop và DbMigrator phát hành đều `net48`/x86, AppCore parked. DbMigrator là gói admin riêng; desktop không tự chạy DbUp hoặc security bootstrap. BCI đã triển khai/nghiệm thu trong phạm vi UI lịch sử. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) đã COMPLETE / OWNER ACCEPTED trong [phạm vi và ngoại lệ cuối](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) và không thay schema. Các [điều kiện schema-compatibility, recovery và phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**.
 
 ## 1. Runtime schema contract hiện tại
 

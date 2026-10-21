@@ -1,6 +1,6 @@
 # Documentation index — v1a-pro
 
-**Updated:** 2026-10-21. Business Compact refinement (BCF) is the sole active roadmap after PR #40 merged. BCI, RESP, L2DB and GUI-P5 are completed baselines; older unimplemented plans remain retired.
+**Updated:** 2026-10-21. Business Compact refinement (BCF) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no new implementation roadmap is selected. BCI, RESP, L2DB and GUI-P5 are completed baselines; older unimplemented plans remain retired.
 
 ## Current work and Codex entry points
 
@@ -8,10 +8,10 @@
 |---|---|
 | [AGENTS.md](../AGENTS.md) | Repository instructions, invariants and current work |
 | [AI_CONTEXT.md](../AI_CONTEXT.md) | Current source/evidence handoff |
-| [Execution index](plans/README.md) | The single active roadmap and completed/retired classification |
-| [BCF implementation plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md) | Lookup-first tasks, proposed interfaces, visual work and verification gates |
+| [Execution index](plans/README.md) | Current execution state and completed/retired classification |
+| [BCF implementation plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md) | Completed lookup-first sequence, implemented/source distinctions and final bounded acceptance |
 | [BCF design](BUSINESS_COMPACT_REFINEMENT.md) | Three lookup contracts, shell/catalog/receipt composition and guarded navigation |
-| [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) | BCF-A01–A23 and candidate-specific evidence; all new runtime obligations NOT RUN |
+| [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) | BCF-A01–A23 reconciled; exact candidates, failed trials and Owner-accepted exceptions |
 | [Design references](design-references/business-compact/README.md) | The three unchanged Owner mockups, provenance, hashes and interpretation |
 | [Development status](DEVELOPMENT_PLAN.md) | Implemented baseline versus planned refinement |
 | [Test policy](TEST_POLICY.md) | Sole execution policy; focused work versus milestone scope |

@@ -1,6 +1,6 @@
 # Test policy — v1a-pro
 
-**Effective:** 2026-10-21 (BCF sole active roadmap; existing execution safeguards retained). **Authority:** the owner's replacement test policy after complete SQL framework removal. This is the sole execution policy; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage and [tests/README](../tests/README.md) owns commands. RESP, L2DB, GUI-P5 and [BCI](BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21) are completed, candidate-specific history. [BCF — lookup repair and visual parity](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is the sole active roadmap, planned from `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb` after PR #40 merged. Its [acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) starts NOT RUN. Operational release prerequisites remain unaccepted/unscheduled.
+**Effective:** 2026-10-21 (BCF Owner acceptance recorded; existing execution safeguards retained). **Authority:** the owner's replacement test policy after complete SQL framework removal. This is the sole execution policy; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage and [tests/README](../tests/README.md) owns commands. RESP, L2DB, GUI-P5 and [BCI](BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21) are completed, candidate-specific history. [BCF — lookup repair and visual parity](plans/20261021-001-business-compact-lookup-and-visual-parity.md) was selected from `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb` after PR #40 merged. Its [acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) now records COMPLETE / OWNER ACCEPTED in the final bounded scope, retaining failures and NOT TESTED exceptions. Operational release prerequisites remain unaccepted/unscheduled.
 
 ## 1. Current execution model
 
@@ -71,7 +71,7 @@ Schema/history/principal/destructive-lifecycle and unresettable cases retain ded
 
 Respawn 4's reset method has no cancellation-token overload. Its implementation must use finite command timeouts and terminate/drain the actual owned reset operation before releasing fixture access. A timed-out `Task.WhenAny` wait alone does not stop SQL. This requirement does not imply that an external watchdog exists today.
 
-## 6. Historical acceptance and the active BCF milestone
+## 6. Historical acceptance and the completed BCF milestone
 
 RESP, L2DB and [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) are completed within their approved, candidate-specific scopes. Preserve their original counts, failed trials, cleanup evidence, attended sign-offs and explicit exceptions, including GUI-P5-T05 Warehouse125Dark Down NOT TESTED. Those records are historical evidence, not recurring execution queues or proof of a future candidate. The 139 Desktop GUI invocations NOT RUN at L2DB-T07 remain a historical fact; later GUI-P5 evidence does not relabel that old run.
 

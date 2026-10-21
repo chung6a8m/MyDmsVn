@@ -2,13 +2,11 @@
 
 **Updated:** 2026-10-21. This index is the sole execution queue. After merging PR #40, the owner selected lookup correctness first and visual parity with all three mockups second. Completed plans remain evidence; retired directions remain unscheduled.
 
-## Active roadmap — planned
+## Current roadmap — no active implementation task
 
-| Order | Plan | State | Next action |
-|---:|---|---|---|
-| 1 | [BCF — lookup correctness and visual parity](20261021-001-business-compact-lookup-and-visual-parity.md) | **ACTIVE / PLANNED**; T00–T06 NOT STARTED | BCF-T00: reproduce each lookup defect through deterministic native per-key tests on the merged baseline |
+BCF-T00–T06 are COMPLETE / OWNER ACCEPTED on 2026-10-21 in the [final bounded scope](../evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). The Owner accepted visual differences, six strict wide125 rows remaining NOT TESTED, deferred T04 Minor and native100 composite evidence. No next roadmap is selected. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
-Read [BCF design](../BUSINESS_COMPACT_REFINEMENT.md), [BCF acceptance](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) and [three retained references](../design-references/business-compact/README.md). These support the same plan and do not define separate queues. The planning baseline is `6040d7bcfca698fc9daba8268bb94e4454e8eacb`; this documentation commit establishes no product fix or runtime PASS.
+Read [BCF design](../BUSINESS_COMPACT_REFINEMENT.md), [BCF acceptance](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) and [three retained references](../design-references/business-compact/README.md). These support the same plan and do not define separate queues. The planning baseline is `6040d7bcfca698fc9daba8268bb94e4454e8eacb`; T00–T02 results belong to their exact candidates and input scope. T02 does not establish visual or release acceptance.
 
 | Phase | Order | Exit condition |
 |---|---|---|
@@ -21,12 +19,13 @@ Read [BCF design](../BUSINESS_COMPACT_REFINEMENT.md), [BCF acceptance](../BUSINE
 
 | Plan | Accepted scope | Evidence to preserve |
 |---|---|---|
+| [BCF — lookup correctness and visual parity](20261021-001-business-compact-lookup-and-visual-parity.md) | T00–T06 COMPLETE / OWNER ACCEPTED in bounded UI scope | [Final frozen evidence and Owner dispositions](../evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) |
 | [BCI — Business Compact and inline Goods Receipt](20261020-001-business-compact-inline-goods-receipt.md) | T00–T06 complete in final signed UI scope; PR #40 merged at `6040d7b` | [Final signed acceptance](../BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21), exact candidate/test/package evidence and retained failed trials |
 | [RESP — fixture reuse](20261018-002-respawn-fixture-reuse.md) | T00–T05 complete; PR #36 `1e24df4` | [Reset/seed/ownership evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up) |
 | [L2DB — net48 persistence](20261018-001-linq2db-net48-persistence-migration.md) | T00–T07 complete in plan scope; PR #37 `42d94ba` | [Correctness/package/limited Local smoke](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) |
 | [GUI-P5 — GUI acceptance](20261019-001-full-winforms-gui-p5-acceptance.md) | T00–T06 complete in Owner-approved scope; PR #38 `f37038b` | [Final frozen gates](../GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20); T05 retains its signed Warehouse 125% Dark Down NOT TESTED exception |
 
-Historical counts, product/test revision distinctions and exceptions stay in their canonical ledgers. None establishes a BCF PASS or waives new lookup/visual obligations. Reconcile the actual new discovery and execution sets at each named gate.
+Historical counts, product/test revision distinctions and exceptions stay in their canonical ledgers. Historical baselines do not supply the new BCF results or its explicit Owner dispositions. Reconcile the actual new discovery and execution sets at each named gate.
 
 ## Retired unimplemented plans
 
