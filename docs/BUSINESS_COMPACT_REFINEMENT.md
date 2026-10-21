@@ -1,7 +1,7 @@
 # Business Compact refinement: lookup correctness and visual parity
 
-**Initiative:** BCF — sole active roadmap selected on 2026-10-21.
-**Status:** T00 test-only RED checkpoint COMPLETE; [15 native-key product failures retained](evidence/bcf/20261021-t00-native-typing.md). T01 binding repair COMPLETE with [focused hosted Windows evidence](evidence/bcf/20261021-t01-lookup-binding.md); T02 COMPLETE / lookup gate PASS with [four native matrix contexts and attended evidence](evidence/bcf/20261021-t02-lookup-gate.md). T03 shell/theme is implemented with [partial verification](evidence/bcf/20261021-t03-chrome-followup.md); native125 at 1680×900 captures and documented native chrome limits remain OPEN. T04 Products is IMPLEMENTED / focused Windows verification PASS; see [T04 evidence](evidence/bcf/20261021-t04-products-inspector.md). T05 receipt presentation is IMPLEMENTED / focused Windows verification PASS; strict wide native125 captures remain OPEN; T06 remains NOT STARTED; no full visual/Owner acceptance.
+**Initiative:** BCF — selected on 2026-10-21; COMPLETE in its Owner-accepted scope.
+**Status:** BCF-T00–T06 COMPLETE / OWNER ACCEPTED — 2026-10-21. The [final T06 Owner acceptance](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) records all three reference comparisons, exact source/test/package evidence and explicit visual, hardware, T04 Minor and native100 composite dispositions. Six strict wide125 rows remain NOT TESTED; operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
 **Baseline:** merged PR #40, `v1a-pro` at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`.
 **Plan:** [BCF execution plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md).
 **Acceptance:** [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md).

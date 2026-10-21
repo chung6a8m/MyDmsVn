@@ -1,6 +1,6 @@
 # Retired directions and scope boundaries
 
-**Updated:** 2026-10-21 at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`. This page is a non-executable scope record. BCI is implemented/accepted historical work; the owner selected [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) as the sole active roadmap. BCF repairs three receipt lookups first, then refines the shared shell, Products content and receipt against all three design references. Its implementation is NOT STARTED and new runtime obligations are NOT RUN. There are no tasks to execute from this page.
+**Updated:** 2026-10-21 at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`. This page is a non-executable scope record. BCI is implemented/accepted historical work; the owner selected [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) as the then-sole active roadmap. BCF repairs three receipt lookups first, then refines the shared shell, Products content and receipt against all three design references. It is now COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no next roadmap is selected. There are no tasks to execute from this page.
 
 ## Release prerequisites
 
@@ -8,7 +8,7 @@ Production release acceptance has not been granted. The retired REL/P6 plan was 
 
 The following remain facts limiting release claims, without an execution schedule: supported Windows/SQL and legacy-credential decisions; clean-machine installation and compatible package/schema behavior; least-privilege runtime and separate administration; backup/restore and failure recovery; diagnostics/audit behavior; distribution/signing/support decisions; candidate-specific full release evidence and named sign-off. Current [packaging](LOCAL_RELEASE_PACKAGING.md), [SQL configuration](CONFIGURATION_AND_SQL_SECURITY.md) and [schema runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) remain technical references.
 
-GUI-P5 is complete only in its signed scope, including the Warehouse 125% Dark Down NOT TESTED exception. BCI UI acceptance is complete in its signed scope; future BCF acceptance must prove its new lookup/presentation obligations, not these unscheduled production prerequisites. A future release initiative requires a new owner-selected plan based on the then-current source; the deleted REL tasks are not implicitly queued.
+GUI-P5 is complete only in its signed scope, including the Warehouse 125% Dark Down NOT TESTED exception. BCI UI acceptance is complete in its signed scope; BCF acceptance covers its recorded lookup/presentation obligations and explicit exceptions, not these unscheduled production prerequisites. A future release initiative requires a new owner-selected plan based on the then-current source; the deleted REL tasks are not implicitly queued.
 
 ## Out-of-scope directions
 

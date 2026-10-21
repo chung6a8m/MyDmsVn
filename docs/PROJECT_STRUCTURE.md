@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment:** `v1a-pro` at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`, refreshed 2026-10-21. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is the sole active roadmap: three receipt lookup repairs first, then shared shell, Products and receipt refinement against all three references. BCF implementation is **NOT STARTED** and new runtime obligations are **NOT RUN**; no new product host/runtime/API/schema is introduced.
+**Assessment:** `v1a-pro` at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`, refreshed 2026-10-21. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no new product host/runtime/API/schema is introduced.
 
 ## Source projects
 
@@ -58,7 +58,7 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `MyDmsVn.sln` | Current declared solution graph; parked AppCore is excluded. |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/plans/README.md` | Sole active BCF roadmap; completed RESP/L2DB/GUI-P5/BCI plans retained as history. |
+| `docs/plans/README.md` | No active implementation task; completed BCF/RESP/L2DB/GUI-P5/BCI scopes retained. |
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
 | `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current roadmap pointer, unscheduled release constraints/out-of-scope directions and historical evidence. |

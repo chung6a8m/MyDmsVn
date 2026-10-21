@@ -1,6 +1,6 @@
 # BCF-T06 — frozen integrated comparison and acceptance
 
-**Status: IN PROGRESS.** Automated native matrices and current-candidate attended observations are recorded; explicit Owner disposition is pending. Historical T02 attended reports remain candidate-specific. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
+**Status: COMPLETE / OWNER ACCEPTED — 2026-10-21, within the final bounded scope below.** Automated matrices, failed trials, attended observations and explicit exceptions remain separately attributed. Historical T02 attended reports remain candidate-specific. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
 [Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Original reference register](../../design-references/business-compact/README.md)
 
@@ -110,22 +110,42 @@ The attended case passes1/1, zero skipped, in10m25.491s; raw TRX SHA-256 `EB1DDB
 
 Native snapshots supplement these reports: Filter ends with its committed label in both themes; Warehouse/Employee end with committed labels in Light; Dark Warehouse has its committed label and Employee ends empty. All ranges are0+0 and all focus observations are false after returning to chat. These snapshots are not pending-gui or per-key recordings and do not override the separate human typing reports. No Save/Post is authorized by a walkthrough; markers coordinate snapshots/session disposal and never supply a human outcome or Owner approval.
 
-## Acceptance reconciliation before Owner review
+## Acceptance reconciliation and final disposition
 
 | Obligations | Current-candidate evidence | Remaining boundary |
 |---|---|---|
 | A01–A03 | LookupTyping tests: first character, canceled preceding completion, response between keys, middle insertion and range replacement; native text/caret/focus/committed identity assertions | Native125 automated PASS plus separate all-three human reports |
 | A04–A09 | LookupBinding tests: query versus commit, shared warehouse notifications, historical/active-only choices, cancellation/generation, native popup keys/mouse, query-only and rejected navigation | Native100/125 automated evidence reconciled; no whole-string setup counted as per-key proof |
 | A10–A12 | Binding, inline/accessibility, control and Session cases: Posted/busy/denied/recovery locks, late callbacks/disposal, current identity, raw numeric input and retained row/editor ownership | Discovery/execution names reconciled; no unresolved automated case |
-| A13 | Native100 Light/Dark automated lookup evidence plus the separately documented composite attended observations | Native125 all-three attended1/1 PASS; native100 composite failed-r2/no independent no-write assertion requires explicit final disposition |
-| A14–A17 | All three unchanged references and matched Products/receipt images in the comparison index, plus composition/interaction cases | Material hierarchy, breadcrumb, icon, density, palette and command differences require Owner disposition |
+| A13 | Native100 Light/Dark automated lookup evidence plus the separately documented composite attended observations | Native125 all-three attended1/1 PASS; native100 composite failed-r2/no independent no-write assertion is explicitly accepted in the final disposition below |
+| A14–A17 | All three unchanged references and matched Products/receipt images in the comparison index, plus composition/interaction cases | Material hierarchy, breadcrumb, icon, density, palette and command differences are explicitly Owner accepted below |
 | A18 | Catalog loading/error/cancel, native focus/tab, lookup popup/accessibility, invalid numeric, readonly/recovery and theme-switch cases; corresponding state captures | Graphite native surfaces and deferred T04 error Minor remain explicit visual/behavior boundaries |
 | A19 | Back admission/mouse-down/abandoned-click, pending Warehouse/Employee/Product, Posted/denied/recovery tests; actual package Save/Post/uncertain-reload workflows and independent SQL effects | Native12520 packaged rows PASS with positive owned cleanup |
 | A20 | Measured100/125, logical1200×760 and944×600 state/reachability; native1001680×900 captures | Six strict wide125 rows NOT TESTED; fitted legacy hosts do not substitute |
-| A21 | Heading-derived grid assertions, native tab/accessibility, numeric alignment and actual reviewed images | Typography/icon/spacing and native accessory differences require control-specific Owner disposition |
+| A21 | Heading-derived grid assertions, native tab/accessibility, numeric alignment and actual reviewed images | Typography/icon/spacing and native accessory differences are explicitly Owner accepted by control/state below |
 | A22 | Frozen package source9559107, distinct test revisions/hashes, actual Login/catalog/receipt/permissions/recovery scenarios, owned resources | Native125 integration and all-three attended PASS; native100 composite limitation remains explicit |
-| A23 | Sanitized case register, failed trials, source/package distinction, comparison/integrity/state registers | Explicit dated Owner acceptance is absent; T06 remains IN PROGRESS |
+| A23 | Sanitized case register, failed trials, source/package distinction, comparison/integrity/state registers | Explicit Owner acceptance recorded below; T06 COMPLETE in bounded scope |
 
 ## Comparisons and Owner disposition
 
-The [comparison index](20261021-t06-comparisons/README.md) contains40 reviewed images, an exact integrity register and36 after-Capture receipt-state records across both native scales. Hosted production-control captures are labeled separately from actual packaged Login/workflow observations. Owner disposition is PENDING. All three original reference files remain unchanged. Six strict wide125 captures remain NOT TESTED until suitable equipment or explicit bounded Owner exception. Native rendering differences, the deferred T04 query-error Minor and deviations in composition/copy/paging must receive concrete final disposition before A23/T06 closes.
+The [comparison index](20261021-t06-comparisons/README.md) contains40 reviewed images, an exact integrity register and36 after-Capture receipt-state records across both native scales. Hosted production-control captures are labeled separately from actual packaged Login/workflow observations. Owner disposition is recorded below. All three original reference files remain unchanged. Six strict wide125 captures remain NOT TESTED under the explicit bounded Owner exception below. Native rendering differences, the deferred T04 query-error Minor and deviations in composition/copy/paging receive explicit final disposition below; A23/T06 close in that bounded scope.
+
+## Final T06 Owner acceptance — 2026-10-21
+
+The Owner explicitly replied **“Tôi chấp nhận giao diện có sai khác cùng các ngoại lệ và bằng chứng”** after the three final review questions covering all three original designs, bounded exceptions and the native100 composite evidence. This is acceptance of the concrete comparison/evidence at review checkpoint `aee176b`, not an inference from earlier lookup reports. **BCF-T00–T06 are COMPLETE / OWNER ACCEPTED in this bounded UI scope.**
+
+The accepted package source is `95591071ea214be88813deb5227d216f1b0bca71`, with product behavior unchanged from `991530f0a3505b10294f2821e8ab434c2f1c8a25`. Final Desktop test source is `7518e7ba9756aadecea6206dd061de24454c4c1b`; the native100 broad/repair/capture and Session revisions remain individually attributed above. Documentation closure does not rebuild or change the accepted package. All exact runtime/test/package hashes and vendor pins above remain authoritative.
+
+| Reviewed boundary | Explicit Owner disposition |
+|---|---|
+| References01/02/03 and the40 reviewed candidate images | Accept the enumerated differences in hierarchy, native typography/spacing/chrome, missing separate breadcrumb, toolbar/search icons, paging/count/status, command grouping, copy/sample data, constrained reflow and outer showcase frame versus client capture |
+| Graphite native surfaces | Accept the control-specific light DateTimePicker field/drop arrow, list status ComboBox and native scrollbars; this does not claim full palette or pixel identity |
+| Six strict1680×900 logical native125 rows (shared shell, Products and receipt in Light/Dark) | Accept a bounded hardware exception; they remain **NOT TESTED**, never PASS. Native100 wide captures and fitted legacy125 hosts do not replace them |
+| T04 stale-query-error Minor | Accept deferral: generic catalog VM ErrorMessage can remain after a failed query followed by successful Refresh; no repair is claimed |
+| Native100 attended composite | Accept the separate Filter Light/Dark reports from failedr2 plus passing Detail-only header reports. Failedr2 retains its automation-transition failure and lacks an independent no-write assertion; cleanup was verified. No all-three native100 PASS Fact is invented |
+| Native125 attended | Accept the separately reported all-three Light/Dark observations and1/1 owned-session PASS, independent no-write assertion and verified drain/cleanup |
+| Native100 initial broad run | Preserve566 PASS/9 FAIL and subsequent49-row repair. The575 unique-case reconciliation across test revisions is accepted; the original unfiltered run remains FAIL |
+
+A01–A23 are reconciled through their stated evidence and these explicit dispositions. Historical T03–T05 OPEN checkpoints are retained as provenance; this final decision closes their listed visual/evidence boundaries without changing raw outcomes. The1539 sanitized invocation rows include overlaps and retained failures, not1539 unique mandatory passes. No source, screenshot, timing, SQL assertion or missing viewport is fabricated by this acceptance.
+
+This decision does **not** authorize push, merge, production deployment, upstream vendor merge, or operational release acceptance. Release prerequisites remain **UNACCEPTED / UNSCHEDULED**; net48/x86 and the separate admin/runtime identities remain unchanged. No next implementation roadmap is selected.
