@@ -68,14 +68,14 @@ SELECT @RuntimeHasElevatedPermissions = CASE WHEN
                   (objectPermission.permission_name = N'SELECT' AND candidate.name IN
                       (N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions',
                        N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
-                       N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions', N'SystemSecuritySettings')) OR
+                       N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'StockValuationEntries', N'StockLedger', N'StockBalances', N'SchemaVersions', N'SystemSecuritySettings')) OR
                   (objectPermission.permission_name = N'INSERT' AND candidate.name IN
                       (N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
-                       N'GoodsReceiptLines', N'StockLedger', N'StockBalances')) OR
+                       N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'StockValuationEntries', N'StockLedger', N'StockBalances')) OR
                   (objectPermission.permission_name = N'UPDATE' AND candidate.name IN
                       (N'Users', N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
-                       N'GoodsReceiptLines', N'GoodsReceiptNumberSequence', N'StockBalances')) OR
-                  (objectPermission.permission_name = N'DELETE' AND candidate.name = N'GoodsReceiptLines')
+                       N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'SalesReceiptNumberSequence', N'GoodsReceiptNumberSequence', N'StockBalances')) OR
+                  (objectPermission.permission_name = N'DELETE' AND candidate.name IN (N'GoodsReceiptLines', N'SalesReceiptLines'))
               )
           )
     ) OR
@@ -109,11 +109,11 @@ SELECT @RuntimeHasElevatedPermissions = CASE WHEN
                   (checkedPermission.permission_name = N'SELECT' AND ownerTable.name IN
                       (N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions',
                        N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
-                       N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions', N'SystemSecuritySettings')) OR
+                       N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'StockValuationEntries', N'StockLedger', N'StockBalances', N'SchemaVersions', N'SystemSecuritySettings')) OR
                   (checkedPermission.permission_name = N'UPDATE' AND
                       (ownerTable.name IN
                           (N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts',
-                           N'GoodsReceiptLines', N'StockBalances') OR
+                           N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'StockBalances') OR
                        (ownerTable.name = N'Users' AND candidate.name IN
                           (N'PasswordHash', N'PasswordSalt', N'PasswordAlgorithm',
                            N'UpdatedAtUtc', N'UpdatedByUserId'))))
@@ -234,6 +234,13 @@ GRANT VIEW DEFINITION ON OBJECT::dbo.GoodsReceipts TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.GoodsReceiptLines TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.GoodsReceiptLines TO [MyDmsVnRuntimeRole];
 GRANT UPDATE ON OBJECT::dbo.GoodsReceiptNumberSequence TO [MyDmsVnRuntimeRole];
+GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.SalesReceipts TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.SalesReceipts TO [MyDmsVnRuntimeRole];
+GRANT SELECT, INSERT, UPDATE, DELETE ON OBJECT::dbo.SalesReceiptLines TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.SalesReceiptLines TO [MyDmsVnRuntimeRole];
+GRANT UPDATE ON OBJECT::dbo.SalesReceiptNumberSequence TO [MyDmsVnRuntimeRole];
+GRANT SELECT, INSERT ON OBJECT::dbo.StockValuationEntries TO [MyDmsVnRuntimeRole];
+GRANT VIEW DEFINITION ON OBJECT::dbo.StockValuationEntries TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT ON OBJECT::dbo.StockLedger TO [MyDmsVnRuntimeRole];
 GRANT VIEW DEFINITION ON OBJECT::dbo.StockLedger TO [MyDmsVnRuntimeRole];
 GRANT SELECT, INSERT, UPDATE ON OBJECT::dbo.StockBalances TO [MyDmsVnRuntimeRole];

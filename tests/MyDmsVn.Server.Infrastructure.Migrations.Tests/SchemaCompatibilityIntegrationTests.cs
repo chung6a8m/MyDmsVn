@@ -31,7 +31,8 @@ public sealed class SchemaCompatibilityIntegrationTests
                         resourceName.Contains(".Scripts.") &&
                         !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal) &&
                         !resourceName.EndsWith("008_Security_Administration.sql", StringComparison.Ordinal) &&
-                        !resourceName.EndsWith("009_Security_Permission_Import.sql", StringComparison.Ordinal))
+                        !resourceName.EndsWith("009_Security_Permission_Import.sql", StringComparison.Ordinal) &&
+                        !resourceName.EndsWith("010_DirectSalesAndValuation.sql", StringComparison.Ordinal))
                 .JournalToSqlTable("dbo", "SchemaVersions")
                 .WithTransactionPerScript()
                 .LogToNowhere()
@@ -99,7 +100,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             Assert.True(first.IsCompatible);
             Assert.True(second.IsCompatible);
             using var connection = new SqlConnection(database.ConnectionString);
-            Assert.Equal(9, await connection.QuerySingleAsync<int>(
+            Assert.Equal(10, await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
         }
         finally
@@ -358,6 +359,10 @@ public sealed class SchemaCompatibilityIntegrationTests
         {
             using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var saleNumberCheck = await connection.QuerySingleAsync<string>(
+                    "SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.SalesReceipts') AND name=N'CK_SalesReceipts_SaleNo_NoNul';");
+                var saleUnitCheck = await connection.QuerySingleAsync<string>(
+                    "SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.SalesReceiptLines') AND name=N'CK_SalesReceiptLines_Unit';");
                 await connection.ExecuteAsync(
                     "ALTER TABLE dbo.Products DROP CONSTRAINT CK_Products_Code_NoNul, " +
                     "CK_Products_Name_NoNul, CK_Products_Unit_NoNul; " +
@@ -368,6 +373,8 @@ public sealed class SchemaCompatibilityIntegrationTests
                     "ALTER TABLE dbo.Customers DROP CONSTRAINT CK_Customers_Code_NoNul, " +
                     "CK_Customers_Name_NoNul; " +
                     "ALTER TABLE dbo.GoodsReceipts DROP CONSTRAINT CK_GoodsReceipts_ReceiptNo_NoNul; " +
+                    "ALTER TABLE dbo.SalesReceipts DROP CONSTRAINT CK_SalesReceipts_SaleNo_NoNul; " +
+                    "ALTER TABLE dbo.SalesReceiptLines DROP CONSTRAINT CK_SalesReceiptLines_Unit; " +
                     "EXEC(N'ALTER FUNCTION dbo.CatalogTextContainsNul(@Value nvarchar(max)) RETURNS bit " +
                     "WITH SCHEMABINDING AS BEGIN RETURN 0; END;'); " +
                     "ALTER TABLE dbo.Products ADD " +
@@ -385,7 +392,13 @@ public sealed class SchemaCompatibilityIntegrationTests
                     "CONSTRAINT CK_Customers_Name_NoNul CHECK (dbo.CatalogTextContainsNul(Name) = 0); " +
                     "ALTER TABLE dbo.GoodsReceipts ADD " +
                     "CONSTRAINT CK_GoodsReceipts_ReceiptNo_NoNul " +
-                    "CHECK (dbo.CatalogTextContainsNul(ReceiptNo) = 0);");
+                    "CHECK (dbo.CatalogTextContainsNul(ReceiptNo) = 0); " +
+                    "ALTER TABLE dbo.SalesReceipts ADD CONSTRAINT CK_SalesReceipts_SaleNo_NoNul CHECK " + saleNumberCheck + "; " +
+                    "ALTER TABLE dbo.SalesReceiptLines ADD CONSTRAINT CK_SalesReceiptLines_Unit CHECK " + saleUnitCheck + ";");
+                Assert.Equal(saleNumberCheck, await connection.QuerySingleAsync<string>(
+                    "SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.SalesReceipts') AND name=N'CK_SalesReceipts_SaleNo_NoNul';"));
+                Assert.Equal(saleUnitCheck, await connection.QuerySingleAsync<string>(
+                    "SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.SalesReceiptLines') AND name=N'CK_SalesReceiptLines_Unit';"));
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
@@ -617,9 +630,11 @@ public sealed class SchemaCompatibilityIntegrationTests
     [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Clean_known_prefix_is_too_old()
     {
-        var database = await CreateMigratedDatabaseAsync();
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
+            DirectSalesSchemaCompatibilityTests.Install9(database.ConnectionString);
             using (var connection = new SqlConnection(database.ConnectionString))
             {
                 await connection.ExecuteAsync(

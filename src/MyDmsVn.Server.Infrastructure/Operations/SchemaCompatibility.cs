@@ -54,10 +54,18 @@ public static class SchemaCompatibilityPolicy
         "007_Inventory_Stock.sql",
         "008_Security_Administration.sql",
         "009_Security_Permission_Import.sql",
+        "010_DirectSalesAndValuation.sql",
     };
 
     private static readonly SchemaArtifact[] KnownArtifacts =
     {
+        new SchemaArtifact("Invariant:DirectSalesSchema", 10),
+        new SchemaArtifact("Column:StockBalances.InventoryValue", 10),
+        new SchemaArtifact("Table:SalesReceipts", 10),
+        new SchemaArtifact("Table:SalesReceiptLines", 10),
+        new SchemaArtifact("Table:StockValuationEntries", 10),
+        new SchemaArtifact("Sequence:SalesReceiptNumberSequence", 10),
+        new SchemaArtifact("Trigger:TR_StockValuationEntries_AppendOnly", 10),
         new SchemaArtifact("Invariant:PersistenceColumns", 1),
         new SchemaArtifact("Table:Users", 2),
         new SchemaArtifact("Table:Roles", 2),
@@ -105,10 +113,28 @@ public static class SchemaCompatibilityPolicy
         new SchemaArtifact("Trigger:TR_StockLedger_AppendOnly", 7),
     };
 
-    public static SchemaCompatibilityResult Evaluate(
+    // Frozen migration source manifest; never inferred from the runtime manifest length.
+    public static readonly IReadOnlyList<string> Schema9Scripts = new[]
+    {
+        "001_PersistenceFoundation.sql", "002_Identity.sql", "003_Catalog.sql",
+        "004_Catalog_Nul_Constraints.sql", "005_GoodsReceipt.sql",
+        "006_GoodsReceipt_Number_Sequence.sql", "007_Inventory_Stock.sql",
+        "008_Security_Administration.sql", "009_Security_Permission_Import.sql",
+    };
+
+    public static SchemaCompatibilityResult EvaluateSchema9(bool journalExists,
+        IReadOnlyList<string> appliedScripts, ISet<string> existingArtifacts)
+        => EvaluateVersion(journalExists, appliedScripts, existingArtifacts, Schema9Scripts);
+
+    public static SchemaCompatibilityResult Evaluate(bool journalExists,
+        IReadOnlyList<string> appliedScripts, ISet<string> existingArtifacts)
+        => EvaluateVersion(journalExists, appliedScripts, existingArtifacts, CurrentScripts);
+
+    private static SchemaCompatibilityResult EvaluateVersion(
         bool journalExists,
         IReadOnlyList<string> appliedScripts,
-        ISet<string> existingArtifacts)
+        ISet<string> existingArtifacts,
+        IReadOnlyList<string> supportedScripts)
     {
         if (appliedScripts == null)
         {
@@ -145,19 +171,19 @@ public static class SchemaCompatibilityPolicy
             normalizedScripts.Add(normalized);
         }
 
-        var comparableCount = Math.Min(normalizedScripts.Count, CurrentScripts.Count);
+        var comparableCount = Math.Min(normalizedScripts.Count, supportedScripts.Count);
         for (var index = 0; index < comparableCount; index++)
         {
             if (!string.Equals(
                     normalizedScripts[index],
-                    CurrentScripts[index],
+                    supportedScripts[index],
                     StringComparison.Ordinal))
             {
                 return UnknownHistory();
             }
         }
 
-        if (normalizedScripts.Count > CurrentScripts.Count)
+        if (normalizedScripts.Count > supportedScripts.Count)
         {
             return TooNew();
         }
@@ -172,7 +198,7 @@ public static class SchemaCompatibilityPolicy
             return Partial();
         }
 
-        if (normalizedScripts.Count < CurrentScripts.Count)
+        if (normalizedScripts.Count < supportedScripts.Count)
         {
             return normalizedScripts.Count == 0 ? Empty() : TooOld();
         }
