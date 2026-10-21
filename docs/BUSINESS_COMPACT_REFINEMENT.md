@@ -1,7 +1,7 @@
 # Business Compact refinement: lookup correctness and visual parity
 
 **Initiative:** BCF — sole active roadmap selected on 2026-10-21.
-**Status:** T00 test-only RED checkpoint COMPLETE; [15 native-key product failures retained](evidence/bcf/20261021-t00-native-typing.md). T01 binding repair COMPLETE with [focused hosted Windows evidence](evidence/bcf/20261021-t01-lookup-binding.md); T02 COMPLETE / lookup gate PASS with [four native matrix contexts and attended evidence](evidence/bcf/20261021-t02-lookup-gate.md). T03 shell/theme is implemented with [partial verification](evidence/bcf/20261021-t03-chrome-followup.md); native125 at 1680×900 captures and documented native chrome limits remain OPEN. T04 Products is IMPLEMENTED / focused Windows verification PASS; see [T04 evidence](evidence/bcf/20261021-t04-products-inspector.md). T05 receipt presentation is IMPLEMENTED / final focused verification in progress; T06 remains NOT STARTED; no full visual/Owner acceptance.
+**Status:** T00 test-only RED checkpoint COMPLETE; [15 native-key product failures retained](evidence/bcf/20261021-t00-native-typing.md). T01 binding repair COMPLETE with [focused hosted Windows evidence](evidence/bcf/20261021-t01-lookup-binding.md); T02 COMPLETE / lookup gate PASS with [four native matrix contexts and attended evidence](evidence/bcf/20261021-t02-lookup-gate.md). T03 shell/theme is implemented with [partial verification](evidence/bcf/20261021-t03-chrome-followup.md); native125 at 1680×900 captures and documented native chrome limits remain OPEN. T04 Products is IMPLEMENTED / focused Windows verification PASS; see [T04 evidence](evidence/bcf/20261021-t04-products-inspector.md). T05 receipt presentation is IMPLEMENTED / focused Windows verification PASS; strict wide native125 captures remain OPEN; T06 remains NOT STARTED; no full visual/Owner acceptance.
 **Baseline:** merged PR #40, `v1a-pro` at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`.
 **Plan:** [BCF execution plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md).
 **Acceptance:** [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md).
@@ -177,14 +177,15 @@ invalidates their async requests; it never commits a highlighted result. Keep th
 editor and adapter; presentation changes alone do not reload, dispose or implicitly commit data.
 Retain deliberate document boundaries and stale-result fencing for actual New/load operations.
 
-Proposed app-owned contract: `ReceiptWorkspaceMode { List, Detail }`,
+App-owned contract implemented at T05 source/test `991530f`: `ReceiptWorkspaceMode { List, Detail }`,
 `GoodsReceiptControl.TryShowReceiptList(): bool` and `ReceiptEditIntent.ReturnToList`.
-These names are not baseline APIs. Add ReturnToList to the navigation branch of
+These names were absent from the planning baseline. ReturnToList belongs to the navigation branch of
 `GoodsReceiptLinesGridAdapter.TryFinishEdit`, alongside New/Select/Refresh, so it cannot fall
 through to committing `EndEdit(false)`. Route Back through existing navigation guards before
 native focus validation; return false without changing presentation when rejected.
 The mouse-down focus-retention predicate must cover pending Warehouse, Employee and inline
-Product hosts, not only the current inline-session predicate. An abandoned click preserves
+Product hosts. T01 already extended the existing command predicates to header lookups; T05
+applies the same protection to Back. An abandoned click preserves
 query/caret/focus; an admitted click cancels query-only state without committing a highlighted row.
 
 Show business title, receipt number, textual status badge and accurate saved/unsaved/busy state.
