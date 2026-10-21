@@ -1,5 +1,7 @@
 # Business Compact and inline Goods Receipt implementation plan
 
+> **Completed historical baseline — 2026-10-21:** BCI was accepted in its recorded UI scope and merged through PR #40 (`6040d7b`). Current work is [BCF — lookup correctness and visual parity](20261021-001-business-compact-lookup-and-visual-parity.md). Original planning/source references, outcomes and exceptions below remain historical; they do not establish a new BCF PASS.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver the Business Compact WinForms shell/receipt layout and true inline product, quantity and unit-cost editing while preserving the accepted receipt, session and recovery behavior.

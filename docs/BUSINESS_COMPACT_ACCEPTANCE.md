@@ -1,5 +1,7 @@
 # Business Compact inline Goods Receipt — acceptance specification
 
+> **Completed historical baseline — 2026-10-21:** BCI was accepted in its recorded UI scope and merged through PR #40 (`6040d7b`). Current work is [BCF — lookup correctness and visual parity](plans/20261021-001-business-compact-lookup-and-visual-parity.md). Original planning/source references, outcomes and exceptions below remain historical; they do not establish a new BCF PASS.
+
 **Status:** BCI-T00 proof, T01 scalar parser, T02 projection/session foundation, T03 lookup/command integration and T04 editable native accessibility and T05 compact layout complete in their recorded scopes; BCI-T06 is COMPLETE / ACCEPTED in the frozen Business Compact UI scope on 2026-10-21; see §8.7 and its final Owner sign-off. Production release prerequisites remain UNACCEPTED / UNSCHEDULED.
 **Prepared:** 2026-10-20. **Planning baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`.
 

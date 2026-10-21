@@ -15,5 +15,5 @@ The owner selected and accepted **Respawn fixture reuse** for eligible tests in 
 
 The old rejection of reusable fixtures was based on the then-current reset evidence. It is superseded by the accepted reuse strategy; its original measurements remain historical facts in [History](../HISTORY.md). No old dual-TFM stress/benchmark requirement is silently reinstated by this ADR. Current verification and failure handling are defined by [TEST_POLICY](../TEST_POLICY.md) and the completed [RESP evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
 
-Any later SQL parallelism rollout needs its own ownership/capacity/cleanup evidence and scope decision. It is outside the sole active [BCI scope](../plans/20261020-001-business-compact-inline-goods-receipt.md).
+Any later SQL parallelism rollout needs its own ownership/capacity/cleanup evidence and scope decision. It is outside the sole active BCF scope; use the [current execution index](../plans/README.md) for its new lookup and visual obligations.
 

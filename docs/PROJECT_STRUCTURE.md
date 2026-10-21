@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f`, refreshed 2026-10-20. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP, L2DB and GUI-P5 are complete in their approved scopes. [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap and is not implemented; it does not add a new product host.
+**Assessment:** `v1a-pro` at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`, refreshed 2026-10-21. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is the sole active roadmap: three receipt lookup repairs first, then shared shell, Products and receipt refinement against all three references. BCF implementation is **NOT STARTED** and new runtime obligations are **NOT RUN**; no new product host/runtime/API/schema is introduced.
 
 ## Source projects
 
@@ -18,7 +18,7 @@
 | `MyDmsVn.Desktop.App` | `net48` | Current WinForms host and Local composition root. |
 | `MyDmsVn.Desktop.AppCore` | `net8.0-windows`, parked | Retained source outside active solution/release; not current executable coverage. |
 
-`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. HTTP v2 is [out of scope](DEFERRED_WORK.md#out-of-scope-directions) and needs a separate runtime decision. Do not create these projects as part of BCI.
+`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. HTTP v2 is [out of scope](DEFERRED_WORK.md#out-of-scope-directions) and needs a separate runtime decision. Do not create these projects as part of BCF.
 
 ## Active test projects
 
@@ -46,6 +46,7 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | Application persistence contract | `src/MyDmsVn.Server.Application/Persistence/{IUnitOfWork,IUnitOfWorkFactory,UnitOfWorkState}.cs`. |
 | Infrastructure persistence | `src/MyDmsVn.Server.Infrastructure/Persistence/{SqlUnitOfWorkFactory,ISqlExecutionContext,SqlConnectionFactory,SqlPersistenceBuilder,LinqToDbSessionFactory,LinqToDbMappingSchemaProvider}.cs`. |
 | Schema | `src/MyDmsVn.Server.DbMigrator/Scripts/001_PersistenceFoundation.sql` through `009_Security_Permission_Import.sql`; exact names in [PERSISTENCE](PERSISTENCE.md). |
+| Implemented WinForms BCI seams | `BusinessCompactAppearance.cs`, `BusinessCompactNavigation.cs`, `GoodsReceiptLinesGrid.cs`, `GoodsReceiptLinesGridAdapter.cs`, `ReceiptNumericInput.cs` and `ReceiptNumberEditor.cs` in `src/MyDmsVn.Desktop.WinForms/`; existing `CatalogControl.cs` remains shared by four catalogs. |
 | UI dependency | `vendor/MyDmsVn.BootstrapSourceGrid/`, pinned as checked in. |
 
 `Application/Features/...`, `Application/Abstractions/Persistence` and Infrastructure `Persistence/Repositories`/`EntityMaps` were earlier blueprint examples. They are not the current file layout; use source-owned paths when changing code.
@@ -57,7 +58,7 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `MyDmsVn.sln` | Current declared solution graph; parked AppCore is excluded. |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/plans/README.md` | Sole active BCI roadmap; completed RESP/L2DB/GUI-P5 plans retained as history. |
+| `docs/plans/README.md` | Sole active BCF roadmap; completed RESP/L2DB/GUI-P5/BCI plans retained as history. |
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
 | `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current roadmap pointer, unscheduled release constraints/out-of-scope directions and historical evidence. |
@@ -65,5 +66,5 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 | `deployment/sql/Provision-MyDmsVnPrincipals.sql` | Explicit runtime/maintenance SQL authority separation. |
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
-Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. BCI does not reactivate AppCore or upgrade the framework.
+Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. BCF does not reactivate AppCore or upgrade the framework. Proposed BCF files/interfaces in its plan are not implemented project structure.
 

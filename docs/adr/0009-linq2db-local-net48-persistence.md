@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-18
 **Status:** Accepted decision; L2DB-T00–T07 implemented and accepted in recorded plan scope. [Current evidence](../L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke).
-**Original implementation order (completed):** [RESP](../plans/20261018-002-respawn-fixture-reuse.md), then [L2DB](../plans/20261018-001-linq2db-net48-persistence-migration.md). [BCI](../plans/README.md) is now the sole active roadmap.
+**Original implementation order (completed):** [RESP](../plans/20261018-002-respawn-fixture-reuse.md), then [L2DB](../plans/20261018-001-linq2db-net48-persistence-migration.md). The [current execution index](../plans/README.md) now schedules BCF lookup and visual refinement; completed BCI remains historical evidence.
 **Original assessment:** `main` at `8cfa25351338666b1a751ee516d5a479cdb37b7f` (PR #35 merge).
 **Original context refresh:** `v1a`, 2026-10-18, including the owner's subsequent removal of the old SQL test framework. Implementation was pending at that planning checkpoint.
 

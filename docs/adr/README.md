@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. [Execution roadmap](../plans/README.md) records BCI as the sole active plan, with completed RESP/L2DB/GUI-P5 retained as historical baselines; [TEST_POLICY](../TEST_POLICY.md) is the sole test-execution policy.
+Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. [Execution roadmap](../plans/README.md) records BCF as the sole active plan, with completed BCI/RESP/L2DB/GUI-P5 retained as historical baselines; [TEST_POLICY](../TEST_POLICY.md) is the sole test-execution policy.
 
 | ADR | Decision | Current status |
 |---|---|---|

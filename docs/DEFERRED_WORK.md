@@ -1,6 +1,6 @@
 # Retired directions and scope boundaries
 
-**Updated:** 2026-10-20. This page is a non-executable scope record. The owner retired all older unimplemented plans and selected [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) as the sole active roadmap. There are no tasks to execute from this page.
+**Updated:** 2026-10-21 at merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`. This page is a non-executable scope record. BCI is implemented/accepted historical work; the owner selected [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) as the sole active roadmap. BCF repairs three receipt lookups first, then refines the shared shell, Products content and receipt against all three design references. Its implementation is NOT STARTED and new runtime obligations are NOT RUN. There are no tasks to execute from this page.
 
 ## Release prerequisites
 
@@ -8,17 +8,17 @@ Production release acceptance has not been granted. The retired REL/P6 plan was 
 
 The following remain facts limiting release claims, without an execution schedule: supported Windows/SQL and legacy-credential decisions; clean-machine installation and compatible package/schema behavior; least-privilege runtime and separate administration; backup/restore and failure recovery; diagnostics/audit behavior; distribution/signing/support decisions; candidate-specific full release evidence and named sign-off. Current [packaging](LOCAL_RELEASE_PACKAGING.md), [SQL configuration](CONFIGURATION_AND_SQL_SECURITY.md) and [schema runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) remain technical references.
 
-GUI-P5 is complete only in its signed scope, including the Warehouse 125% Dark Down NOT TESTED exception. A future BCI UI acceptance will likewise prove its defined UI behavior, not these unscheduled production prerequisites. A future release initiative requires a new owner-selected plan based on the then-current source; the deleted REL tasks are not implicitly queued.
+GUI-P5 is complete only in its signed scope, including the Warehouse 125% Dark Down NOT TESTED exception. BCI UI acceptance is complete in its signed scope; future BCF acceptance must prove its new lookup/presentation obligations, not these unscheduled production prerequisites. A future release initiative requires a new owner-selected plan based on the then-current source; the deleted REL tasks are not implicitly queued.
 
 ## Out-of-scope directions
 
 | Direction | Current boundary |
 |---|---|
-| P7 / HTTP / remote adapter | Not part of BCI; no new API host, remote security boundary or adapter parity claim |
+| P7 / HTTP / remote adapter | Not part of BCF; no new API host, remote security boundary or adapter parity claim |
 | AppCore / modern runtime | Parked, not shipped; all active product/tests remain net48. The unimplemented reactivation procedure was deleted; no automatic target/lock/package restoration is authorized |
 | New business modules | Sales/invoicing, returns, valuation/tax, transfers, lots/serials, sync and multi-tenancy are not added by a receipt presentation change |
-| New receipt fields | Supplier/tax/discount/lot or other new business contracts require separate scope; BCI uses the existing receipt and line fields |
-| Distribution tooling | No MSI, auto-updater or new migration framework is scheduled by BCI |
+| New receipt fields | Supplier/tax/discount/lot or other new business contracts require separate scope; BCF preserves the existing receipt and line fields |
+| Distribution tooling | No MSI, auto-updater or new migration framework is scheduled by BCF |
 
 This table records exclusions, not a backlog or checklist. Any future selection needs a fresh design and evidence boundary.
 

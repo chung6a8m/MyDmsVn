@@ -1,6 +1,6 @@
 # L2DB case migration ledger — T00
 
-> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCF only; BCI is completed history, and this record does not certify the new lookup/visual obligations or schedule retired plans.
 
 **Bound source:** `1e24df4c4ad5243963da82d808da19f12278242b`, 2026-10-18. Source inventory only; no discovery or runtime run in T00. All owners target **net48**. [Verification](L2DB_VERIFICATION.md) records provenance and commands; [RESP map](RESPAWN_CASE_MAP.md) retains the fixture/seed classification for the accepted baseline.
 

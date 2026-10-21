@@ -1,6 +1,6 @@
 # Technical stack and compatibility baseline
 
-**Current cutover:** L2DB-T00–T07 on net48 accepted in plan scope on 2026-10-19 ([T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); RESP and GUI-P5 are also accepted in their approved scopes. As of 2026-10-20, [BCI](plans/20261020-001-business-compact-inline-goods-receipt.md) is the sole active roadmap on `v1a-pro`; its [Business Compact / SourceGrid inline design](BUSINESS_COMPACT_UI.md) is not implemented. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. Historical evidence retains its original provider/revision.
+**Current cutover:** L2DB-T00–T07 on net48 accepted in plan scope on 2026-10-19 ([T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); RESP, GUI-P5 and BCI are also implemented/accepted in their approved scopes. As of 2026-10-21, merged PR #40 baseline `6040d7bcfca698fc9daba8268bb94e4454e8eacb`, [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is the sole active roadmap on `v1a-pro`: repair three receipt lookups first, then refine shared shell, Products and receipt against all three references. BCF implementation is **NOT STARTED** and new runtime obligations are **NOT RUN**; runtime/API/schema remain unchanged. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. Historical evidence retains its original provider/revision.
 
 ## Runtime matrix
 
@@ -11,7 +11,7 @@
 | SQL integration and other product test projects | All ten active test projects target `net48`; use actual project declarations and source cases. |
 | Desktop.AppCore | Retained `net8.0-windows` source, parked outside the active solution/release. |
 | Historical modern product/SQL/GUI cases | `PARKED / NOT RUN`; no current modern product coverage is claimed. |
-| HTTP v2 and modern product runtime | Deferred backlog requiring a separate runtime decision before implementation. |
+| HTTP v2 and modern product runtime | Out of scope; requires a separate runtime decision and new approved plan before implementation. |
 
 The user retains the repository's current net48 profile. Neither [RESP](plans/20261018-002-respawn-fixture-reuse.md) nor [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) restores net8 product targets or upgrades to .NET 10. Windows verification requires the .NET Framework 4.8 developer targeting pack, the existing .NET 8 SDK for tooling and the repository's pinned source dependencies. [ADR 0008](adr/0008-temporary-net8-target-pause.md) records the runtime pause; [HISTORY](HISTORY.md) retains historical acceptance and the unmeasured duration comparison. No speedup is inferred from that waiver.
 
@@ -61,5 +61,5 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 
 Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; RESP and L2DB-T00–T07 have scoped evidence; broader release acceptance remains deferred.
 
-Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or pins within RESP/L2DB.
+Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or pins within RESP/L2DB/BCF.
 

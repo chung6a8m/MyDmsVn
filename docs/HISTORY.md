@@ -2,7 +2,7 @@
 
 **Reset date:** 2026-10-18 · **Branch assessed:** `v1a` · **Baseline:** [c7ad32a4b0040f87417973eabd6c12757c54f7d5](https://github.com/chung6a8m/MyDmsVn/commit/c7ad32a4b0040f87417973eabd6c12757c54f7d5).
 
-This page is historical provenance, not an execution queue or a test policy. Current work is [BCI — Business Compact and inline Goods Receipt](plans/README.md), selected on 2026-10-20 after completed RESP/L2DB/GUI-P5. Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
+This page is historical provenance, not an execution queue or a test policy. Current work is [BCF — lookup correctness and visual parity](plans/README.md), selected on 2026-10-21 after PR #40 merged the completed BCI scope. Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
 
 ## Established baseline
 
@@ -62,6 +62,18 @@ Business SQL tests and their six module owners remain, alongside Application, Ar
 Completed plans stay at their existing paths to preserve evidence backlinks; their original task handoffs are historical. Current context/index/policy references are refreshed so no old queue competes with BCI. The large historical checkpoints formerly duplicated in AI_CONTEXT remain in canonical GUI-P5 ledgers and Git history; the handoff now describes the current state concisely.
 
 No product source, test implementation, schema or vendor pin is changed by this reset. Retiring REL/P6 does not approve production release: [release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain unaccepted/unscheduled. The modern host remains parked. This documentation action establishes no new runtime PASS.
+
+## 2026-10-21 — PR #40 merged and BCF activated
+
+The owner merged [PR #40](https://github.com/chung6a8m/MyDmsVn/pull/40) into `v1a-pro` at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`, then requested an active roadmap committed to that branch. BCI remains complete in its [final signed UI scope](BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21); its original evidence, failed trials and limitations are retained.
+
+[BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is the sole new active roadmap. T00–T02 first reproduce and repair manual per-key input in the list warehouse filter and header Warehouse/Employee lookups, including caret/selection, canceled-operation completion and committed-value boundaries. These binding paths predate PR #40. A mandatory native100/125 Light/Dark and attended lookup gate precedes visual implementation.
+
+T03–T06 then complete the shared shell, Products content/inspector, detail-focused receipt presentation and Graphite consistency against [all three original designs](design-references/business-compact/README.md), followed by new frozen integrated evidence and Owner comparison. This deliberately expands BCI's catalog exclusion and always-visible receipt list while preserving the established business/security/runtime boundaries and English UI.
+
+The reference PNGs are copied unchanged with original filenames, dimensions and hashes recorded in their index. [The new design](BUSINESS_COMPACT_REFINEMENT.md) and [BCF-A01–A23 ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) separate proposed APIs/tests from the implemented baseline. All BCF implementation tasks are NOT STARTED; runtime obligations are NOT RUN. Entry documents now point to BCF, while completed plans remain historical.
+
+This activation changes documentation and retained design assets only. It implements no lookup fix or visual behavior, runs no new GUI/SQL acceptance, changes no vendor pin/schema and grants no operational release approval.
 
 ## Recover a historical source
 

@@ -1,6 +1,6 @@
 # L2DB verification — T00 baseline binding
 
-> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCI only; this record does not certify the proposed inline UI or schedule retired plans.
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCF lookup and visual refinement; this record does not satisfy its new obligations or schedule retired plans. Completed BCI remains historical evidence for its own accepted scope.
 
 **Date:** 2026-10-18. **Scope:** L2DB-T00 only, documentation/static source audit. **Implementation base:** `1e24df4c4ad5243963da82d808da19f12278242b` (merge PR #36). **Branch:** `codex/l2db-t00`. **Worktree:** `C:\Users\pdchung\.codex\worktrees\l2db-t00\CleanArchitecture`. Original `v1a` checkout was clean and is preserved. This record is committed with the T00 inventory; use `git log -- docs/L2DB_VERIFICATION.md` to resolve the evidence commit without a self-referential SHA. No L2DB package/provider code is installed.
 

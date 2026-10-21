@@ -2,7 +2,7 @@
 
 **Status:** Accepted decision, selected 2026-10-18; RESP-T00–T05 implemented and accepted in recorded scope. [Current evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
 **Scope:** Active net48 integration-test fixture policy; originally planned on `v1a`, retained on `v1a-pro`.
-**Completed plan:** [RESP](../plans/20261018-002-respawn-fixture-reuse.md). [BCI](../plans/README.md) is now the sole active roadmap.
+**Completed plan:** [RESP](../plans/20261018-002-respawn-fixture-reuse.md). The [current execution index](../plans/README.md) now schedules BCF lookup and visual refinement; completed BCI remains historical evidence.
 **Execution policy:** [TEST_POLICY](../TEST_POLICY.md).
 
 ## Original context — 2026-10-18

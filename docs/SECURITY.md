@@ -44,7 +44,7 @@ Login validates current backend account state before publishing the process-loca
 
 The default idle timeout is 30 minutes on a monotonic clock. Keyboard/mouse activity renews it; background polling/API traffic does not. Local Mode does not issue bearer tokens. A future trusted HTTP host owns its own authentication/session boundary.
 
-P4.1 was owner-accepted with a specific incomplete packaged idle-expiry observation; [History](HISTORY.md) records that qualification. SEC-REBUILD and [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) acceptance is complete in the documented scopes. The sole active [BCI roadmap](plans/20261020-001-business-compact-inline-goods-receipt.md) is not implemented and must preserve current authorization, session cleanup and late-result guards. [Production operational/release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**; neither historical acceptance nor UI planning waives them.
+P4.1 was owner-accepted with a specific incomplete packaged idle-expiry observation; [History](HISTORY.md) records that qualification. SEC-REBUILD and [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) acceptance is complete in the documented scopes. BCI is implemented/accepted historical UI work. The sole active [BCF roadmap](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is PLANNED, with implementation NOT STARTED and new runtime obligations NOT RUN; it must preserve current authorization, session cleanup and late-result guards. [Production operational/release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**; neither historical acceptance nor UI planning waives them.
 
 ## 6. Trust, audit and tests
 
