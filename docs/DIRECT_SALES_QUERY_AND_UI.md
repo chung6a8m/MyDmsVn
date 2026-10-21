@@ -1,14 +1,16 @@
 # Direct Sales — query contracts and desktop interaction
 
-**Status:** APPROVED DESIGN / GET AND LIST IMPLEMENTED / LOCAL AND UI PENDING. **Updated:** 2026-10-22.
+**Status:** APPROVED DESIGN / SERVER AND LOCAL/VM IMPLEMENTED / NATIVE UI PENDING. **Updated:** 2026-10-22.
 **Source baseline:** `MyDmsVn/v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 This specification supports the sole [SAL execution plan](plans/20261021-002-direct-sales-and-moving-average-costing.md); it is not runtime, UI or release acceptance.
 Read the [Direct Sales design](DIRECT_SALES.md), [costing rules](DIRECT_SALES_COSTING.md) and [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) together.
-T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 existing Inventory value/average/card projections have [bounded evidence](evidence/sal/20261022-t02-valued-inventory.md). T03 implements [authorized GetById detail](evidence/sal/20261022-t03-sales-draft.md) on one short owned SERIALIZABLE transaction. T05 implements reviewed Sales List/filter/keyset/cursor validation; Local/ViewModels and UI below remain proposed and unverified; the development checkpoint is not deployable.
+T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 existing Inventory value/average/card projections have [bounded evidence](evidence/sal/20261022-t02-valued-inventory.md). T03 implements [authorized GetById detail](evidence/sal/20261022-t03-sales-draft.md) on one short owned SERIALIZABLE transaction. T05 implements reviewed Sales List/filter/keyset/cursor validation; T06 implements reviewed Local/ViewModels; native UI below remains proposed and unverified; the development checkpoint is not deployable.
 
-T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. Local/VM/UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
+T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. Native UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
 
-T05 query checkpoint (2026-10-22, `f9149a6`): [reviewed evidence](evidence/sal/20261022-t05-sales-keyset-queries.md) records independently Read-authorized List, strict normalized-filter-bound cursors, typed LINQ Product membership and all-line slim totals, retained-endpoint two-way keyset paging, and page/aggregate/probe on one short owned SERIALIZABLE transaction. Navigation is live across requests; the cursor grants no authority. Local/VM/UI and frozen T08/package/Owner acceptance remain open.
+T05 query checkpoint (2026-10-22, `f9149a6`): [reviewed evidence](evidence/sal/20261022-t05-sales-keyset-queries.md) records independently Read-authorized List, strict normalized-filter-bound cursors, typed LINQ Product membership and all-line slim totals, retained-endpoint two-way keyset paging, and page/aggregate/probe on one short owned SERIALIZABLE transaction. Navigation is live across requests; the cursor grants no authority. Native UI and frozen T08/package/Owner acceptance remain open.
+
+T06 Local/VM checkpoint (2026-10-22, `5fbd6f5`): [reviewed evidence](evidence/sal/20261022-t06-local-session-viewmodels.md) records all five session-bound Sales API operations, atomic list snapshots and bounded recovery, guarded stable line/editor models, independent Post permission and shared exact preview. Original-owner binding rejects replacement-user service admission; it does not promise zero API method attempts or UI-thread serialization. Denied Post reload hides protected presentation while retaining private same-owner recovery identity. Native control/raw-buffer/UI, frozen T08/package/Owner and release acceptance remain open.
 
 ## 1. Scope and source boundaries
 
@@ -23,7 +25,7 @@ Their offset paging, complete-detail list DTO and duplicate-Product validation m
 Existing [PagedResult](../src/MyDmsVn.Contracts/PagedResult.cs) remains an offset contract for its current callers; the sales cursor result is independent.
 Use the established ownership and mapping seams in [PERSISTENCE](PERSISTENCE.md), current [CONTRACTS](CONTRACTS.md) and [SECURITY](SECURITY.md).
 
-### Implemented detail and proposed later locations
+### Implemented server/Local/VM and proposed native locations
 
 | Path under the repository root | Responsibility |
 |---|---|
@@ -33,14 +35,17 @@ Use the established ownership and mapping seams in [PERSISTENCE](PERSISTENCE.md)
 | `src/MyDmsVn.Server.Application/Sales/SalesReceiptQueries.cs` | T03 authorized Get; T05 authorized List normalization/validation |
 | `src/MyDmsVn.Server.Application/Sales/SalesReceiptCursor.cs` | Fixed-schema cursor codec and normalized-filter binding |
 | `src/MyDmsVn.Server.Infrastructure/Sales/SqlSalesReceiptQueryService.cs` | T03 materialized detail; T05 bounded summary/List queries |
-| `src/MyDmsVn.Server.Infrastructure/Sales/SalesLinqToDbMapping.cs` | Explicit mappings for `SalesReceipts` and `SalesReceiptLines` |
-| `src/MyDmsVn.Desktop.Application/FeatureApiClients.cs` | Add `ISalesReceiptApiClient` alongside existing feature interfaces |
-| `src/MyDmsVn.Desktop.Infrastructure.Local/LocalSalesReceiptApiClient.cs` | Existing authenticated Local dispatch and response mapping |
+| `src/MyDmsVn.Server.Infrastructure/Inventory/InventoryLinqToDbMapping.cs` | Explicit mappings for `SalesReceipts` and `SalesReceiptLines` |
+| `src/MyDmsVn.Desktop.Application/FeatureApiClients.cs` | T06 `ISalesReceiptApiClient`, including immutable ForSession owner binding |
+| `src/MyDmsVn.Desktop.Infrastructure.Local/LocalSalesReceiptApiClient.cs` | T06 authenticated Sales-only session-bound dispatch and response mapping |
 | `src/MyDmsVn.Desktop.Application/SalesReceiptListViewModel.cs` | Applied filters, cursor navigation and generation guards |
 | `src/MyDmsVn.Desktop.Application/SalesReceiptEditorViewModel.cs` | Draft/detail state, per-line identity and command admission |
-| `src/MyDmsVn.Desktop.WinForms/SalesReceiptControl.cs` | Sales List/Detail workspace and header lookups |
-| `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGrid.cs` | Seven-column grid and accessibility surface |
-| `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGridAdapter.cs` | Sales-specific Product/numeric/checkbox editing sessions |
+| `src/MyDmsVn.Desktop.Application/SalesReceiptLineViewModel.cs` | T06 guarded stable row identity and manual price/gift/Unit state |
+| `src/MyDmsVn.Desktop.Application/SalesReceiptPreview.cs` | T06 preview interface and ISalesCommandBufferAdmission; native buffer adapter remains T07 |
+| `src/MyDmsVn.Desktop.Infrastructure.Local/LocalSalesReceiptPreviewCalculator.cs` | T06 adapter to provider-free Server.Application preview facade and existing Domain math |
+| `src/MyDmsVn.Desktop.WinForms/SalesReceiptControl.cs` | Proposed T07 List/Detail workspace and header lookups |
+| `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGrid.cs` | Proposed T07 seven-column grid and accessibility surface |
+| `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGridAdapter.cs` | Proposed T07 Product/numeric/checkbox editing sessions |
 
 Keep provider types, connections, transactions and `IQueryable` inside Infrastructure.
 T01 tables are `SalesReceipts(SaleId, SaleNo, SaleDate, ...)` and `SalesReceiptLines(SaleLineId, SaleId, LineNo, ...)`; DTO `SaleNumber` maps to SQL `SaleNo`.
@@ -64,7 +69,7 @@ Product-filtered results must never display a total calculated only from matchin
 Names and availability follow the existing catalog/historical-reference conventions; selecting an unavailable historical row does not silently reactivate it.
 Client monetary values are previews: server validation and recomputation remain authoritative for saved amounts and Post cost snapshots.
 
-Proposed Desktop API signatures and implemented server query signatures, retaining current transport-neutral `ApiResponse<T>` and cancellation conventions:
+Implemented Desktop API and server query signatures, retaining current transport-neutral `ApiResponse<T>` and cancellation conventions:
 
 ```csharp
 // ISalesReceiptApiClient in Desktop.Application
@@ -79,7 +84,7 @@ Task<SalesReceiptListPage> ListAsync(SalesReceiptListRequest request, Cancellati
 Task<SalesReceiptDto?> GetByIdAsync(long saleId, CancellationToken cancellationToken);
 ```
 
-T00 registers Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post` without automatic grants. Draft/Get/Post Application enforcement is implemented through T04; T05 independently enforces List Read; Local enforcement remains later work.
+T00 registers Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post` without automatic grants. Draft/Get/Post Application enforcement is implemented through T04; T05 independently enforces List Read; T06 implements Sales-only session-bound Local enforcement; native control proof remains later work.
 List/Get require Read, Create/Update require Write, and Post requires Post; the UI requires Read to open and the relevant action key to mutate.
 Read includes the approved persisted cost/profit fields; no separate costing permission is introduced, and command return DTOs follow current authorized-write result semantics.
 Recheck current actor/account and permission state on every request; use the `SalesReceipt.*` prefix for sales business errors.
