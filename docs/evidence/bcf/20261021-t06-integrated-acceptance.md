@@ -1,6 +1,6 @@
 # BCF-T06 — frozen integrated comparison and acceptance
 
-**Status: IN PROGRESS.** Final native matrices, current-candidate attended observations and Owner acceptance are pending. Historical T02 attended reports remain candidate-specific. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
+**Status: IN PROGRESS.** Automated native matrices are reconciled; native125 attended observations and Owner acceptance are pending. Historical T02 attended reports remain candidate-specific. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
 [Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Original reference register](../../design-references/business-compact/README.md)
 
@@ -14,7 +14,7 @@ The isolated branch is `codex/bcf-t00-native-lookup-proof`. T06 starts at `95591
 | Bootstrap5WinFormUI | `2be9a4d778fda7016207b75470020be6126f2f3f` |
 | SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944` |
 
-The clean x86 package was produced through `Publish-LocalRelease.ps1 -Version 1.0.0-bcf-t06 -OutputRoot TestResults/bcf-t06-package-9559107`. Its source is `95591071ea214be88813deb5227d216f1b0bca71`, dirty=false. The manifest contains **205 files: Desktop133 and Admin72**; its SHA-256 is `3376D54C49FAD98152CB5A8BC7F94EDFEF8F7E9D13B15A16A3A126D642347447`. Separate desktop/admin packages and existing secret/configuration checks remain intact. The local manifest and raw logs remain ignored.
+The clean x86 package was produced through `Publish-LocalRelease.ps1 -Version 1.0.0-bcf-t06 -OutputRoot TestResults/bcf-t06-package-9559107`. Its source is `95591071ea214be88813deb5227d216f1b0bca71`, dirty=false. The manifest contains **205 files: Desktop133 and Admin72**; its SHA-256 is `3376D54C49FAD98152CB5A8BC7F94EDFEF8F7E9D13B15A16A3A126D642347447`. Separate desktop/admin packages and existing secret/configuration checks remain intact. The local manifest and raw logs remain ignored. During the final native125 run, all205 manifest entries are rechecked against their actual length and SHA-256, with no drift; the manifest hash is unchanged.
 
 The package source pin and test assembly revision are distinct. `MYDMSVN_GUI_P5_TEST_REVISION` is the existing package-source admission variable despite its historical name; it is not relabeled as the driver source revision.
 
@@ -52,7 +52,7 @@ These trials precede integrated verification and are retained separately. None s
 | Attended legacy driver | List setup failed with Input unavailable: Warehouse;1/1 FAIL | Observe filter in List, then admitted New and committed-header setup, then headers in Detail; human phase sends no automated query keys |
 | Session default test-host platform |107 BadImageFormat failures,1 PASS | Configuration error; complete x86 rerun108/108 PASS, no skip |
 | Boundary command without Release | Debug DLL not found | No test or SQL admission; corrected Release command |
-| Complete native100, CatalogAcceptance | Six Product rows still read old positional Code/Name columns, now Name/Unit after intentional ID removal | Preserve original failures; use unique public headings to assert the same exact expected values, rows and cancellation/error effects; focused repair verification pending |
+| Complete native100, CatalogAcceptance | Six Product rows still read old positional Code/Name columns, now Name/Unit after intentional ID removal | Preserve original failures; use unique public headings to assert the same exact expected values, rows and cancellation/error effects; focused49-row repair verification PASS, with the original failures retained |
 
 Theme/Login Light+Dark2/2, receipt-invalid Light+Dark2/2, catalog Light1/1, full receipt Save/reopen/edit/Post/stock Light1/1, direct-deny Light1/1 and real SQL uncertain-Post/reload/explicit-retry Light1/1 passed in preparation. These are scoped trials, not the final two-DPI integrated matrix. The three-row boundary trial retained its history failure alongside the two passes; the repaired history case later passed separately.
 
@@ -62,7 +62,7 @@ Every completed preparation allocation has terminal `DatabaseAndAllPrincipalsDro
 
 The complete Desktop.Session project discovers108 and executes108/108 PASS at x86, zero skipped. Raw TRX SHA-256: `2A02D336EEF02C01C12A6759E18067E8AA716A04EA0A2A0C2D0DDD8F6C0F7B99`. Its source/build is9559107 before the Desktop-test-only driver changes; no Session source/dependency behavior changed afterward.
 
-Desktop initial discovery contains576 rows:575 automated and one explicitly opt-in attended case. Native125 additionally has six strict wide viewport rows unavailable on the Owner's display. The two fitted legacy Layout rows and four width-labeled ReceiptAcceptance rows remain runnable; they check reachability on the actual fitted host and do not assert an exact1680-wide client or substitute for strict captures. Final discovered/selected/executed reconciliation and raw TRX/artifact hashes will be recorded after execution.
+Desktop initial discovery contains576 rows:575 automated and one explicitly opt-in attended case. Native125 additionally has six strict wide viewport rows unavailable on the Owner's display. The two fitted legacy Layout rows and four width-labeled ReceiptAcceptance rows remain runnable; they check reachability on the actual fitted host and do not assert an exact1680-wide client or substitute for strict captures. Native125 selects/discovers/executes569 rows with no name differences; only the six enumerated strict wide rows are excluded. The extra Dark selector discovers/executes116 with no name differences.
 
 Only the lookup fixture consumes `MYDMSVN_BCF_THEME`; the extra Dark selector is101 binding+15 typing rows. The complete project includes its actual parameterized Light/Dark shell, layout, catalog, receipt and packaged theories. Setting that variable does not relabel every unparameterized control/inline test as Dark. Native-input observations, actual packaged Login and hosted captures remain separate kinds of evidence.
 
@@ -71,11 +71,14 @@ Only the lookup fixture consumes `MYDMSVN_BCF_THEME`; the extra Dark selector is
 | Native100 complete automated selection,9bb2e64 |575 discovered/executed;566 PASS,9 FAIL,0 skipped; discovery/execution name differences0 | `D7481A888F884812B10C7FD54A557E22F4CBF01B86F2EE71C01B0FE366B4B361` |
 | Native100 repaired Catalog/Accessibility/receipt-capture/direct-deny scope,46e52a8 |49/49 PASS,0 skipped; all9 failed names included | `638020C34493DFC3146AA323B1924709F1837FFC586E47009914FC482A854B81` |
 | Native100 additional actual Dark lookup,46e52a8 |116 discovered/executed;116 PASS,0 skipped | `F8D3A7570BF96741CB35DFD6FC0154D0E5726E1B5B855D28E7D785FC0FE8CD74` |
-| Native125 | NOT RUN | PENDING human scale change |
+| Native125 complete runnable selection,7518e7b |569 discovered/executed;569 PASS,0 skipped;20 packaged rows PASS; six strict wide rows NOT TESTED | `20FBEDCDE17CEF0AE8B25364909EE4E0559E1131727590AA9B20CB23F8A11E10` |
+| Native125 additional actual Dark lookup,7518e7b |116 discovered/executed;116 PASS,0 skipped | `2B72F5563BCC61BE93922CE0863683A190D101EE29BC48FE64930CF81FFBFD65` |
 
 The native100 full run remains an unfiltered **FAIL**, retained intact. A case-name join with the49-row repair has575 unique originally selected cases, each with a subsequent applicable PASS, and no unresolved name; it is a **reconciled result across two stated test revisions**, not a new575/575 TRX. Runtime/vendor/package bytes are unchanged across that repair. The20 packaged rows reconcile18 initial PASS plus the two repaired direct-deny PASS. All19 SQL allocations in the complete run and both allocations in each direct-deny repair reached verified terminal cleanup. Native100 Light and Dark each supply116 independent observer-cleanup records. The [sanitized case register](20261021-t06-case-results.csv) contains names/outcomes/durations only, preserving the nine original failures separately from repair rows.
 
 Source6e164e8 adds capture-state telemetry only and initially passes4/4 receipt capture rows. Sourceec4a382 corrects the read order: native Capture pumps layout/scroll messages, so provenance is read afterward, with first visible line/column and only visible scroll owners. The corrected x86 invocation passes4/4, zero skipped; TRX SHA-256 `5C4B4342024AF2BC6C8C9808089C1D8C76CCB6B47BC47214E84696A44D30EAF5`. Its preceding command omitted x86 and failed framework assembly loading before GUI/SQL admission; that setup trial remains separate. The24 final state records replace the initial before-Capture offsets; for the1200→944 dirty state they observe selection11;2, line scrollY3/first visible line4 and document scrollY−136. No production behavior change is involved.
+
+Native125 measures monitor120/window96 DPI, physical window1895×1105 and native client1875×1056 for the lookup observer; it is not a DPI-aware product conversion. Light and additional Dark each have116 verified observer-cleanup records. All19 native125 SQL allocations reach terminal verified drain/drop; no owned GUI/test-host process remains before the attended session. The full runnable round takes21m34s, extra Dark1m35s. The case register now contains1538 invocations including overlaps/repair/Session/capture rows, not1538 unique mandatory cases.
 
 ## Current-candidate attended evidence
 
@@ -96,6 +99,22 @@ Native100 human evidence is therefore composite across r2 and the repaired Detai
 
 Native125 attended observations remain PENDING. No Save/Post is authorized by a walkthrough; markers coordinate snapshots/session disposal and never supply a human outcome or Owner approval.
 
+## Acceptance reconciliation before Owner review
+
+| Obligations | Current-candidate evidence | Remaining boundary |
+|---|---|---|
+| A01–A03 | LookupTyping tests: first character, canceled preceding completion, response between keys, middle insertion and range replacement; native text/caret/focus/committed identity assertions | Native125 automated PASS; attended reports pending |
+| A04–A09 | LookupBinding tests: query versus commit, shared warehouse notifications, historical/active-only choices, cancellation/generation, native popup keys/mouse, query-only and rejected navigation | Native100/125 automated evidence reconciled; no whole-string setup counted as per-key proof |
+| A10–A12 | Binding, inline/accessibility, control and Session cases: Posted/busy/denied/recovery locks, late callbacks/disposal, current identity, raw numeric input and retained row/editor ownership | Discovery/execution names reconciled; no unresolved automated case |
+| A13 | Native100 Light/Dark automated lookup evidence plus the separately documented composite attended observations | Native125 attended observations OPEN; native100 failed-r2/no independent no-write assertion requires explicit final disposition |
+| A14–A17 | All three unchanged references and matched Products/receipt images in the comparison index, plus composition/interaction cases | Material hierarchy, breadcrumb, icon, density, palette and command differences require Owner disposition |
+| A18 | Catalog loading/error/cancel, native focus/tab, lookup popup/accessibility, invalid numeric, readonly/recovery and theme-switch cases; corresponding state captures | Graphite native surfaces and deferred T04 error Minor remain explicit visual/behavior boundaries |
+| A19 | Back admission/mouse-down/abandoned-click, pending Warehouse/Employee/Product, Posted/denied/recovery tests; actual package Save/Post/uncertain-reload workflows and independent SQL effects | Native12520 packaged rows PASS with positive owned cleanup |
+| A20 | Measured100/125, logical1200×760 and944×600 state/reachability; native1001680×900 captures | Six strict wide125 rows NOT TESTED; fitted legacy hosts do not substitute |
+| A21 | Heading-derived grid assertions, native tab/accessibility, numeric alignment and actual reviewed images | Typography/icon/spacing and native accessory differences require control-specific Owner disposition |
+| A22 | Frozen package source9559107, distinct test revisions/hashes, actual Login/catalog/receipt/permissions/recovery scenarios, owned resources | Native125 integration PASS; attended completion pending |
+| A23 | Sanitized case register, failed trials, source/package distinction, comparison/integrity/state registers | Explicit dated Owner acceptance is absent; T06 remains IN PROGRESS |
+
 ## Comparisons and Owner disposition
 
-PENDING. Hosted production-control captures must be labeled separately from actual packaged Login/workflow observations. All three original reference files remain unchanged. Six strict wide125 captures remain NOT TESTED until suitable equipment or explicit bounded Owner exception. Native rendering differences, the deferred T04 query-error Minor and deviations in composition/copy/paging must receive concrete final disposition before A23/T06 closes.
+The [comparison index](20261021-t06-comparisons/README.md) contains40 reviewed images, an exact integrity register and36 after-Capture receipt-state records across both native scales. Hosted production-control captures are labeled separately from actual packaged Login/workflow observations. Owner disposition is PENDING. All three original reference files remain unchanged. Six strict wide125 captures remain NOT TESTED until suitable equipment or explicit bounded Owner exception. Native rendering differences, the deferred T04 query-error Minor and deviations in composition/copy/paging must receive concrete final disposition before A23/T06 closes.
