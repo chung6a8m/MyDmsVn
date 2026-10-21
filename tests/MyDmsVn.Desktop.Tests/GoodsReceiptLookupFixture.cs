@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using CommunityToolkit.Mvvm.Messaging;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
@@ -18,6 +19,7 @@ namespace MyDmsVn.Desktop.Tests;
 internal sealed class GoodsReceiptLookupFixture : IDisposable
 {
     private readonly CancellationToken _token;
+    private readonly BootstrapTheme _previousTheme = BootstrapThemeManager.CurrentTheme;
     private readonly SynchronizationContext? _previousContext = SynchronizationContext.Current;
     private readonly int _uiThread = Thread.CurrentThread.ManagedThreadId;
     private readonly List<int> _mutationThreads = new List<int>();
@@ -33,6 +35,13 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
         Target = target;
         try
         {
+            var theme = Environment.GetEnvironmentVariable("MYDMSVN_BCF_THEME");
+            if (theme != null)
+            {
+                Assert.True(theme == "Light" || theme == "Dark", "Unknown BCF lookup theme.");
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(
+                    theme == "Dark" ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            }
             Form = new Form { ClientSize = new Size(1500, 850), StartPosition = FormStartPosition.CenterScreen };
             Form.Show();
             ContextBeforeInstallation = SynchronizationContext.Current?.GetType().FullName ?? "null";
@@ -207,6 +216,7 @@ internal sealed class GoodsReceiptLookupFixture : IDisposable
             Form?.Dispose();
             SynchronizationContext.SetSynchronizationContext(_previousContext);
             _context?.Dispose();
+            BootstrapThemeManager.CurrentTheme = _previousTheme;
         }
     }
     private sealed class ControlledDelay : IAsyncDelay

@@ -33,6 +33,7 @@ internal static class GuiPackageProbe
     [DllImport("user32.dll")] private static extern int GetAwarenessFromDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr key, IntPtr data);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")] private static extern IntPtr SendMessageSelection(IntPtr window, uint message, out int start, out int end);
 
     [STAThread]
     private static int Main(string[] args)
@@ -73,6 +74,50 @@ internal static class GuiPackageProbe
                 if (!_application.WaitForExit(5000) || _application.ExitCode != 2)
                     throw new InvalidOperationException("Startup application did not exit safely.");
                 Console.WriteLine("STARTUP_SAFE_ERROR=PASS");
+            }
+            else if (args[1] == "bcf-lookup-attended")
+            {
+                _stage = "bcf-attended-setup";
+                var shell = Login();
+                Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+                var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+                SetLookup(page, "Warehouse", "GUI-WH - UIA Warehouse Updated");
+                SetLookup(page, "Employee", "GUI-EMP - UIA Employee Updated");
+                InputEditor(page, "Note").SetFocus();
+                var barrier = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER");
+                File.WriteAllText(Path.Combine(barrier, "ready"), "theme=" + _theme);
+                _stage = "bcf-attended-human-input";
+                // The human types all query characters. This probe only holds the owned
+                // package open and observes native EDIT state when the controller requests it.
+                var observedLight = false;
+                var observedDark = false;
+                Wait(delegate
+                {
+                    if (File.Exists(Path.Combine(barrier, "observe")))
+                    {
+                        var currentTheme = Find(shell, "Theme toggle", ControlType.Button, false).Current.HelpText;
+                        Console.WriteLine("ATTENDED_OBSERVED_THEME=" + currentTheme);
+                        foreach (var name in new[] { "Filter by warehouse", "Warehouse", "Employee" })
+                        {
+                            var edit = InputEditor(page, name);
+                            var handle = new IntPtr(edit.Current.NativeWindowHandle);
+                            uint process;
+                            GetWindowThreadProcessId(handle, out process);
+                            if (process != _application.Id) throw new InvalidOperationException("Attended EDIT ownership mismatch.");
+                            int selectionStart, selectionEnd;
+                            SendMessageSelection(handle, 0x00B0, out selectionStart, out selectionEnd);
+                            Console.WriteLine("ATTENDED_SNAPSHOT=" + name + ";RAW=" + ((ValuePattern)edit.GetCurrentPattern(ValuePattern.Pattern)).Current.Value +
+                                ";RANGE=" + selectionStart + "+" + (selectionEnd - selectionStart) + ";FOCUS=" + edit.Current.HasKeyboardFocus);
+                        }
+                        observedLight |= currentTheme == "Current theme: Light";
+                        observedDark |= currentTheme == "Current theme: Dark";
+                        File.Delete(Path.Combine(barrier, "observe"));
+                        File.WriteAllText(Path.Combine(barrier, "observed"), currentTheme);
+                    }
+                    return observedLight && observedDark && File.Exists(Path.Combine(barrier, "complete"));
+                }, "Attended lookup walkthrough was not completed within its owned budget.", 1200);
+                CloseApplication(shell);
+                Console.WriteLine("ATTENDED_LOOKUP_SESSION_DRAINED=PASS");
             }
             else if (args[1] == "invalid-audit")
             {

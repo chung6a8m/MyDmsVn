@@ -13,10 +13,11 @@ using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests;
 
-public sealed class GoodsReceiptLookupBindingTests
+public sealed class GoodsReceiptLookupBindingTests : IClassFixture<LookupGateEnvironment>
 {
     private readonly ITestOutputHelper _output;
-    public GoodsReceiptLookupBindingTests(ITestOutputHelper output) => _output = output;
+    private readonly LookupGateEnvironment _gate;
+    public GoodsReceiptLookupBindingTests(ITestOutputHelper output, LookupGateEnvironment gate) { _output = output; _gate = gate; }
 
     [Theory]
     [InlineData("WarehouseFilterLookup")]
@@ -553,6 +554,7 @@ public sealed class GoodsReceiptLookupBindingTests
                         guard.Attach(fixture.Control.EmployeeLookup.ResultsGrid);
                         NativeLookupTypingDriver.Activate(fixture.Form);
                         fixture.Driver.AssertFocused();
+                        _output.WriteLine(_gate.Observe(fixture));
                         _output.WriteLine("target=" + target + "; hosted DPI=" + fixture.Form.DeviceDpi + "; x86=" + (IntPtr.Size == 4));
                         scenario(fixture);
                     }

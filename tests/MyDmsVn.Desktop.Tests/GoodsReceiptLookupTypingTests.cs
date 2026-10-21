@@ -8,10 +8,11 @@ using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests;
 
-public sealed class GoodsReceiptLookupTypingTests
+public sealed class GoodsReceiptLookupTypingTests : IClassFixture<LookupGateEnvironment>
 {
     private readonly ITestOutputHelper _output;
-    public GoodsReceiptLookupTypingTests(ITestOutputHelper output) => _output = output;
+    private readonly LookupGateEnvironment _gate;
+    public GoodsReceiptLookupTypingTests(ITestOutputHelper output, LookupGateEnvironment gate) { _output = output; _gate = gate; }
 
     [Theory]
     [InlineData("WarehouseFilterLookup")]
@@ -115,6 +116,7 @@ public sealed class GoodsReceiptLookupTypingTests
                     using (var fixture = new GoodsReceiptLookupFixture(target, token))
                     {
                         Assert.Equal(4, IntPtr.Size);
+                        _output.WriteLine(_gate.Observe(fixture));
                         guard.Attach(fixture.Control.WarehouseFilterLookup.ResultsGrid);
                         guard.Attach(fixture.Control.WarehouseLookup.ResultsGrid);
                         guard.Attach(fixture.Control.EmployeeLookup.ResultsGrid);

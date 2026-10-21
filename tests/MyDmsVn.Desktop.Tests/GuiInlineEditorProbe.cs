@@ -13,6 +13,7 @@ internal static class GuiInlineEditorProbe
         {
             Console.WriteLine("UIA_CLIENT_BITNESS=" + (IntPtr.Size * 8));
             if (args[1] == "measure-window") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]));
+            if (args[1] == "measure-lookup") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]), true);
             var root = AutomationElement.FromHandle(new IntPtr(long.Parse(args[0])));
             if (args[1] == "validate") return Validate(root);
             if (args[1] == "readonly") return ReadOnly(root);
@@ -50,7 +51,7 @@ internal static class GuiInlineEditorProbe
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out NativeRectangle rectangle);
     [StructLayout(LayoutKind.Sequential)] private struct NativeRectangle { public int Left, Top, Right, Bottom; }
-    private static int Measure(IntPtr window, int expectedProcess)
+    private static int Measure(IntPtr window, int expectedProcess, bool lookup = false)
     {
         if (!SetProcessDpiAwarenessContext(new IntPtr(-4))) throw new InvalidOperationException("PerMonitorV2 observer unavailable.");
         uint process;
@@ -65,6 +66,14 @@ internal static class GuiInlineEditorProbe
         Console.WriteLine("OBSERVER_CONTEXT=PerMonitorV2;MONITOR_SCALE=" + (x * 100 / 96) + ";MONITOR_DPI=" + x +
             ";WINDOW_DPI=" + GetDpiForWindow(window) + ";PHYSICAL_WINDOW=" + root.Current.BoundingRectangle +
             ";NATIVE_CLIENT=" + (client.Right - client.Left) + "x" + (client.Bottom - client.Top));
+        if (lookup)
+        {
+            var expected = Environment.GetEnvironmentVariable("MYDMSVN_BCF_EXPECTED_SCALE");
+            if ((expected != "100" && expected != "125") || x * 100m / 96m != int.Parse(expected))
+                throw new InvalidOperationException("Measured native monitor scale differs from declared BCF context.");
+            Console.WriteLine("NATIVE_LOOKUP_ENVIRONMENT=PASS");
+            return 0;
+        }
         var quantity = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Quantity row 1"));
         Console.WriteLine("OBSERVED_QUANTITY_CELL=" + (quantity == null ? "absent" : quantity.Current.BoundingRectangle.ToString()));
         if (quantity == null || quantity.Current.BoundingRectangle.Height < 36 * x / 96d)
