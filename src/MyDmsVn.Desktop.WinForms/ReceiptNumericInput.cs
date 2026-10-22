@@ -4,7 +4,7 @@ using MyDmsVn.Contracts;
 
 namespace MyDmsVn.Desktop.WinForms;
 
-internal enum ReceiptNumericField { Quantity, UnitCost }
+internal enum ReceiptNumericField { Quantity, UnitCost, UnitPrice }
 
 internal static class ReceiptNumericInput
 {
@@ -12,15 +12,15 @@ internal static class ReceiptNumericInput
     {
         if (culture == null) throw new ArgumentNullException(nameof(culture));
         value = 0m;
-        if (field != ReceiptNumericField.Quantity && field != ReceiptNumericField.UnitCost)
+        if (field != ReceiptNumericField.Quantity && field != ReceiptNumericField.UnitCost && field != ReceiptNumericField.UnitPrice)
         {
             error = "Select a supported receipt numeric field.";
             return false;
         }
 
         var quantity = field == ReceiptNumericField.Quantity;
-        var label = quantity ? "Quantity" : "Unit cost";
-        var maximum = quantity ? GoodsReceiptContractLimits.MaximumQuantity : GoodsReceiptContractLimits.MaximumUnitCost;
+        var label = quantity ? "Quantity" : field == ReceiptNumericField.UnitPrice ? "Unit price" : "Unit cost";
+        var maximum = quantity ? GoodsReceiptContractLimits.MaximumQuantity : field == ReceiptNumericField.UnitPrice ? SalesContractLimits.MaximumUnitPrice : GoodsReceiptContractLimits.MaximumUnitCost;
         var candidate = text?.Trim() ?? string.Empty;
         var format = culture.NumberFormat;
         var separator = format.NumberDecimalSeparator;

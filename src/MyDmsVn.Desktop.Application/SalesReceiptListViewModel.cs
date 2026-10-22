@@ -43,6 +43,25 @@ public sealed class SalesReceiptListViewModel : ObservableObject, IDisposable
     public bool CanPrevious => Available && !IsBusy && ReferenceEquals(PendingCriteria, AppliedCriteria) && PreviousCursor != null;
     private bool Available => !_disposed && !IsAccessDenied && _session.IsAuthenticated && _session.Version == _sessionVersion;
 
+    // UI admission only. Each request remains bound to the original session and server authorization.
+    public void SetAccess(bool canRead)
+    {
+        lock (_sync)
+        {
+            if (_disposed || !_session.IsAuthenticated || _session.Version != _sessionVersion) return;
+            if (canRead)
+            {
+                if (!IsAccessDenied) return;
+                IsAccessDenied = false; Error = null; Notify();
+                return;
+            }
+            ++_operation; _active?.Cancel(); _active = null;
+            IsAccessDenied = true; IsBusy = false; _page = PageState.Empty;
+            PendingCriteria = new SalesReceiptListRequest(null, null, null, null, null, null, null, null);
+            _recoveryConsumed = false; Notify();
+        }
+    }
+
     public Task SetCriteriaAsync(SalesReceiptListRequest criteria, CancellationToken token = default)
     {
         if (criteria == null) throw new ArgumentNullException(nameof(criteria));

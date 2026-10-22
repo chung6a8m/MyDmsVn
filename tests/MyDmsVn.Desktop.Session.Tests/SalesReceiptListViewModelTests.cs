@@ -120,6 +120,38 @@ public sealed class SalesReceiptListViewModelTests
         Assert.Empty(vm.Items); Assert.Null(vm.AppliedCriteria); Assert.False(vm.IsBusy);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Explicit_access_revoke_restore_fences_old_transport_and_queued_success_or_error(bool queued, bool error)
+    {
+        var api = new SalesApi(); var ui = new SalesQueuedUi();
+        using var vm = new SalesReceiptListViewModel(api, new SalesSession(), ui);
+        await vm.RefreshAsync(); vm.Select(41);
+        var completion = new TaskCompletionSource<ApiResponse<SalesReceiptListPage>>();
+        api.List = _ => queued ? Task.FromResult(error ? SalesApi.Error<SalesReceiptListPage>(ApiStatusCode.Forbidden) : SalesApi.Ok(SalesApi.Page(1))) : completion.Task;
+        ui.Queue = queued; var old = vm.RefreshAsync();
+        vm.SetAccess(false); Assert.True(vm.IsAccessDenied); Assert.Empty(vm.Items); Assert.Null(vm.SelectedSaleId); Assert.Null(vm.NextCursor); Assert.Null(vm.PreviousCursor); Assert.Null(vm.AppliedCriteria);
+        var calls = api.Lists.Count; await vm.RefreshAsync(); Assert.Equal(calls, api.Lists.Count);
+        vm.SetAccess(true); Assert.False(vm.IsAccessDenied); Assert.Empty(vm.Items); Assert.Equal(calls, api.Lists.Count);
+        ui.Queue = false; ui.Drain();
+        completion.TrySetResult(error ? SalesApi.Error<SalesReceiptListPage>(ApiStatusCode.Forbidden) : SalesApi.Ok(SalesApi.Page(1)));
+        await LocalSalesReceiptApiClientTests.Within(old);
+        Assert.Empty(vm.Items); Assert.Null(vm.Error); Assert.False(vm.IsBusy);
+        api.List = _ => Task.FromResult(SalesApi.Ok(SalesApi.Page(42)));
+        await vm.RefreshAsync(); Assert.Equal(42, Assert.Single(vm.Items).SaleId);
+    }
+    [Fact]
+    public async Task Explicit_read_restore_never_rebinds_replacement_session_or_revives_disposed_vm()
+    {
+        var api = new SalesApi(); var session = new SalesSession();
+        using var vm = new SalesReceiptListViewModel(api, session, new ImmediateUiDispatcher());
+        await vm.RefreshAsync(); vm.SetAccess(false); session.Replace(); vm.SetAccess(true);
+        var calls = api.Lists.Count; await vm.RefreshAsync(); Assert.True(vm.IsAccessDenied); Assert.Empty(vm.Items); Assert.Equal(calls, api.Lists.Count);
+        vm.Dispose(); vm.SetAccess(true); await vm.RefreshAsync(); Assert.Empty(vm.Items); Assert.Equal(calls, api.Lists.Count);
+    }
     private static SalesReceiptListRequest Criteria(int size, string search, string? cursor = null) =>
         new SalesReceiptListRequest(new DateTime(2026, 10, 1), new DateTime(2026, 10, 22), 1, 2, 3, "Draft", 7, search, size, cursor);
 }

@@ -24,6 +24,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ICatalogControlFactory? _catalogControlFactory;
         private readonly IGoodsReceiptControlFactory? _goodsReceiptControlFactory;
         private readonly IInventoryControlFactory? _inventoryControlFactory;
+        private readonly ISalesReceiptControlFactory? _salesReceiptControlFactory;
         private readonly ISecurityAdministrationControlFactory? _securityAdministrationControlFactory;
         private readonly int _uiThreadId;
         private long? _workspaceSessionVersion;
@@ -125,6 +126,14 @@ namespace MyDmsVn.Desktop.WinForms
                 true)
         {
         }
+
+        public FoundationShellForm(FoundationViewModel viewModel, IDesktopSession session,
+            IDesktopNotificationService notifications, ICatalogControlFactory catalogControlFactory,
+            IGoodsReceiptControlFactory goodsReceiptControlFactory, IInventoryControlFactory inventoryControlFactory,
+            ISecurityAdministrationControlFactory securityAdministrationControlFactory, ISalesReceiptControlFactory salesReceiptControlFactory)
+            : this(viewModel, session, notifications, catalogControlFactory, goodsReceiptControlFactory, inventoryControlFactory,
+                securityAdministrationControlFactory)
+        { _salesReceiptControlFactory = salesReceiptControlFactory ?? throw new ArgumentNullException(nameof(salesReceiptControlFactory)); }
 
         private FoundationShellForm(
             FoundationViewModel viewModel,
@@ -249,6 +258,21 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 _openingWorkspace = false;
             }
+        }
+
+        public TabPage? OpenSalesReceipts()
+        {
+            if (_salesReceiptControlFactory == null) return null;
+            const string key = "sales-receipts";
+            _openingWorkspace = true;
+            try
+            {
+                if (_documents.TryGetValue(key, out var existing))
+                { Workspace.SelectedTab = existing; ActivateWorkspace(existing); return existing; }
+                var page = OpenWorkspace(key, "Sales Receipts", _salesReceiptControlFactory.Create(), WorkspaceSessionVersion);
+                ActivateWorkspace(page); return page;
+            }
+            finally { _openingWorkspace = false; }
         }
 
         public TabPage? OpenGoodsReceipts()
@@ -486,6 +510,8 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 OpenCatalog(kind);
             }
+            else if (string.Equals(Navigation.SelectedItem?.Tag as string, "sales-receipts", StringComparison.Ordinal))
+            { OpenSalesReceipts(); }
             else if (string.Equals(
                 Navigation.SelectedItem?.Tag as string,
                 "goods-receipts",
@@ -675,6 +701,7 @@ namespace MyDmsVn.Desktop.WinForms
             Add("Warehouses", CatalogKind.Warehouse, "Catalog", "warehouse");
             Add("Employees", CatalogKind.Employee, "Catalog", "employee");
             Add("Customers", CatalogKind.Customer, "Catalog", "customer");
+            Add("Sales Receipts", "sales-receipts", "Sales", "receipt");
             Add("Goods Receipts", "goods-receipts", "Inventory", "receipt");
             Add("Tồn kho", "stock-balances", "Inventory", "balance");
             Add("Thẻ kho", "stock-card", "Inventory", "card");

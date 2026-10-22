@@ -12,6 +12,8 @@ internal static class GuiInlineEditorProbe
         try
         {
             Console.WriteLine("UIA_CLIENT_BITNESS=" + (IntPtr.Size * 8));
+            if (args[1] == "measure-sales") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]), true, null, false, true);
+            if (args[1] == "capture-sales") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]), true, args[3], true, true);
             if (args[1] == "measure-window") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]));
             if (args[1] == "measure-lookup") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]), true);
             if (args[1] == "capture-shell") return Measure(new IntPtr(long.Parse(args[0])), int.Parse(args[2]), true, args[3]);
@@ -47,6 +49,7 @@ internal static class GuiInlineEditorProbe
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
     }
     [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromPoint(NativePoint point, uint flags);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
     [DllImport("shcore.dll")] private static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint x, out uint y);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
@@ -60,9 +63,16 @@ internal static class GuiInlineEditorProbe
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out NativeRectangle rectangle);
     [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
-    private static int Measure(IntPtr window, int expectedProcess, bool lookup = false, string capturePath = null, bool screen = false)
+    private static int Measure(IntPtr window, int expectedProcess, bool lookup = false, string capturePath = null, bool screen = false, bool sales = false)
     {
         if (!SetProcessDpiAwarenessContext(new IntPtr(-4))) throw new InvalidOperationException("PerMonitorV2 observer unavailable.");
+        foreach (var display in System.Windows.Forms.Screen.AllScreens)
+        {
+            uint displayX, displayY;
+            var center = new NativePoint { X = display.Bounds.Left + display.Bounds.Width / 2, Y = display.Bounds.Top + display.Bounds.Height / 2 };
+            if (GetDpiForMonitor(MonitorFromPoint(center, 2), 0, out displayX, out displayY) != 0) throw new InvalidOperationException("Display DPI inventory unavailable.");
+            Console.WriteLine("AVAILABLE_MONITOR=" + display.DeviceName + ";PRIMARY=" + display.Primary + ";BOUNDS=" + display.Bounds + ";WORKAREA=" + display.WorkingArea + ";DPI=" + displayX + "x" + displayY + ";SCALE=" + (displayX * 100m / 96m));
+        }
         uint process;
         GetWindowThreadProcessId(window, out process);
         if (process != expectedProcess) throw new InvalidOperationException("Observation target ownership mismatch.");
@@ -74,12 +84,12 @@ internal static class GuiInlineEditorProbe
         var root = AutomationElement.FromHandle(window);
         Console.WriteLine("OBSERVER_CONTEXT=PerMonitorV2;MONITOR_SCALE=" + (x * 100 / 96) + ";MONITOR_DPI=" + x +
             ";WINDOW_DPI=" + GetDpiForWindow(window) + ";PHYSICAL_WINDOW=" + root.Current.BoundingRectangle +
-            ";NATIVE_CLIENT=" + (client.Right - client.Left) + "x" + (client.Bottom - client.Top));
+            ";PHYSICAL_WORKAREA=" + System.Windows.Forms.Screen.FromHandle(window).WorkingArea + ";NATIVE_CLIENT=" + (client.Right - client.Left) + "x" + (client.Bottom - client.Top));
         if (lookup)
         {
-            var expected = Environment.GetEnvironmentVariable("MYDMSVN_BCF_EXPECTED_SCALE");
-            if ((expected != "100" && expected != "125") || x * 100m / 96m != int.Parse(expected))
-                throw new InvalidOperationException("Measured native monitor scale differs from declared BCF context.");
+            var expected = Environment.GetEnvironmentVariable(sales ? "MYDMSVN_SAL_EXPECTED_SCALE" : "MYDMSVN_BCF_EXPECTED_SCALE");
+            if ((!sales || expected != null) && ((expected != "100" && expected != "125") || x * 100m / 96m != int.Parse(expected)))
+                throw new InvalidOperationException("Measured native monitor scale differs from declared " + (sales ? "SAL" : "BCF") + " context.");
             if (capturePath != null)
             {
                 // An unaware target paints WM_PRINT in window-DPI units even when this
@@ -130,7 +140,7 @@ internal static class GuiInlineEditorProbe
                     Console.WriteLine((screen ? "SCREEN_CLIENT_CAPTURE=" : "PRINTWINDOW_CLIENT_CAPTURE=") + bitmap.Width + "x" + bitmap.Height + ";PAINT_DPI=" + paintDpi + ";PHYSICAL_MONITOR_DPI=" + x);
                 }
             }
-            Console.WriteLine("NATIVE_LOOKUP_ENVIRONMENT=PASS");
+            Console.WriteLine(sales ? "SAL_NATIVE_ENVIRONMENT=" + (expected == null ? "MEASURED_NO_DECLARED_MATRIX" : "PASS") : "NATIVE_LOOKUP_ENVIRONMENT=PASS");
             return 0;
         }
         var quantity = root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Quantity row 1"));
