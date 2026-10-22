@@ -1,16 +1,18 @@
 # Direct Sales — query contracts and desktop interaction
 
-**Status:** APPROVED DESIGN / SERVER AND LOCAL/VM IMPLEMENTED / NATIVE UI PENDING. **Updated:** 2026-10-22.
+**Status:** APPROVED DESIGN / NATIVE SOURCE IMPLEMENTED / BOUNDED NATIVE100 CHECKPOINT / FULL T07 OPEN. **Updated:** 2026-10-22.
 **Source baseline:** `MyDmsVn/v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 This specification supports the sole [SAL execution plan](plans/20261021-002-direct-sales-and-moving-average-costing.md); it is not runtime, UI or release acceptance.
 Read the [Direct Sales design](DIRECT_SALES.md), [costing rules](DIRECT_SALES_COSTING.md) and [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) together.
-T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 existing Inventory value/average/card projections have [bounded evidence](evidence/sal/20261022-t02-valued-inventory.md). T03 implements [authorized GetById detail](evidence/sal/20261022-t03-sales-draft.md) on one short owned SERIALIZABLE transaction. T05 implements reviewed Sales List/filter/keyset/cursor validation; T06 implements reviewed Local/ViewModels; native UI below remains proposed and unverified; the development checkpoint is not deployable.
+T00 DTO/domain/date-converter/key definitions and T01 schema/mappings are implemented ([T01 evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 existing Inventory value/average/card projections have [bounded evidence](evidence/sal/20261022-t02-valued-inventory.md). T03 implements [authorized GetById detail](evidence/sal/20261022-t03-sales-draft.md) on one short owned SERIALIZABLE transaction. T05 implements reviewed Sales List/filter/keyset/cursor validation; T06 implements reviewed Local/ViewModels; T07 native source below is implemented with bounded native100 evidence; native125/full workflow evidence remains open; the development checkpoint is not deployable.
 
 T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. Native UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
 
 T05 query checkpoint (2026-10-22, `f9149a6`): [reviewed evidence](evidence/sal/20261022-t05-sales-keyset-queries.md) records independently Read-authorized List, strict normalized-filter-bound cursors, typed LINQ Product membership and all-line slim totals, retained-endpoint two-way keyset paging, and page/aggregate/probe on one short owned SERIALIZABLE transaction. Navigation is live across requests; the cursor grants no authority. Native UI and frozen T08/package/Owner acceptance remain open.
 
 T06 Local/VM checkpoint (2026-10-22, `5fbd6f5`): [reviewed evidence](evidence/sal/20261022-t06-local-session-viewmodels.md) records all five session-bound Sales API operations, atomic list snapshots and bounded recovery, guarded stable line/editor models, independent Post permission and shared exact preview. Original-owner binding rejects replacement-user service admission; it does not promise zero API method attempts or UI-thread serialization. Denied Post reload hides protected presentation while retaining private same-owner recovery identity. Native control/raw-buffer/UI, frozen T08/package/Owner and release acceptance remain open.
+
+T07 source checkpoint (2026-10-22, `879ab7b`): [bounded evidence](evidence/sal/20261022-t07-native-sales-workspace.md) records the seven-column native workspace, guarded same-control List/Detail, buffer/lookup/accessibility routes and actual List 401/403 protected-state scrub. The new List `SetAccess(bool)` is UI admission only: restoration requires the original current authenticated session and fresh authorized queries, with no old DTO/session rebinding. Detail activation preserves unadmitted raw input; complete control Busy guards header/date/note/search callbacks. Tested candidate3 passes 110 affected Sales, 55 shared, 174 complete Session and 13 Architecture; final committed candidate4 differs solely by one EOF CRLF in a test file, without a rerun. Full T07 remains IN PROGRESS / OPEN: native125 is RESOURCE BLOCKED and R4 stale numeric validation footer is DEFERRED Minor. T08 remains NOT STARTED; full GUI/package/actual Login/attended/Owner and operational release acceptance remain open.
 
 ## 1. Scope and source boundaries
 
@@ -25,7 +27,7 @@ Their offset paging, complete-detail list DTO and duplicate-Product validation m
 Existing [PagedResult](../src/MyDmsVn.Contracts/PagedResult.cs) remains an offset contract for its current callers; the sales cursor result is independent.
 Use the established ownership and mapping seams in [PERSISTENCE](PERSISTENCE.md), current [CONTRACTS](CONTRACTS.md) and [SECURITY](SECURITY.md).
 
-### Implemented server/Local/VM and proposed native locations
+### Implemented server/Local/VM and native source locations
 
 | Path under the repository root | Responsibility |
 |---|---|
@@ -38,14 +40,15 @@ Use the established ownership and mapping seams in [PERSISTENCE](PERSISTENCE.md)
 | `src/MyDmsVn.Server.Infrastructure/Inventory/InventoryLinqToDbMapping.cs` | Explicit mappings for `SalesReceipts` and `SalesReceiptLines` |
 | `src/MyDmsVn.Desktop.Application/FeatureApiClients.cs` | T06 `ISalesReceiptApiClient`, including immutable ForSession owner binding |
 | `src/MyDmsVn.Desktop.Infrastructure.Local/LocalSalesReceiptApiClient.cs` | T06 authenticated Sales-only session-bound dispatch and response mapping |
-| `src/MyDmsVn.Desktop.Application/SalesReceiptListViewModel.cs` | Applied filters, cursor navigation and generation guards |
+| `src/MyDmsVn.Desktop.Application/SalesReceiptListViewModel.cs` | Applied filters/cursors, generation guards and T07 same-session UI access admission |
 | `src/MyDmsVn.Desktop.Application/SalesReceiptEditorViewModel.cs` | Draft/detail state, per-line identity and command admission |
 | `src/MyDmsVn.Desktop.Application/SalesReceiptLineViewModel.cs` | T06 guarded stable row identity and manual price/gift/Unit state |
-| `src/MyDmsVn.Desktop.Application/SalesReceiptPreview.cs` | T06 preview interface and ISalesCommandBufferAdmission; native buffer adapter remains T07 |
+| `src/MyDmsVn.Desktop.Application/SalesReceiptPreview.cs` | T06 preview interface and ISalesCommandBufferAdmission; T07 native buffer admission is implemented |
 | `src/MyDmsVn.Desktop.Infrastructure.Local/LocalSalesReceiptPreviewCalculator.cs` | T06 adapter to provider-free Server.Application preview facade and existing Domain math |
-| `src/MyDmsVn.Desktop.WinForms/SalesReceiptControl.cs` | Proposed T07 List/Detail workspace and header lookups |
-| `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGrid.cs` | Proposed T07 seven-column grid and accessibility surface |
-| `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGridAdapter.cs` | Proposed T07 Product/numeric/checkbox editing sessions |
+| `src/MyDmsVn.Desktop.WinForms/SalesReceiptControl.cs` | Implemented T07 List/Detail workspace and header lookups |
+| `src/MyDmsVn.Desktop.WinForms/SalesReceiptControlFactory.cs` | T07 catalog/permission/API composition and shell workspace activation |
+| `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGrid.cs` | Implemented T07 seven-column grid and accessibility surface |
+| `src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGridAdapter.cs` | Implemented T07 Product/numeric/checkbox editing sessions |
 
 Keep provider types, connections, transactions and `IQueryable` inside Infrastructure.
 T01 tables are `SalesReceipts(SaleId, SaleNo, SaleDate, ...)` and `SalesReceiptLines(SaleLineId, SaleId, LineNo, ...)`; DTO `SaleNumber` maps to SQL `SaleNo`.
@@ -84,7 +87,7 @@ Task<SalesReceiptListPage> ListAsync(SalesReceiptListRequest request, Cancellati
 Task<SalesReceiptDto?> GetByIdAsync(long saleId, CancellationToken cancellationToken);
 ```
 
-T00 registers Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post` without automatic grants. Draft/Get/Post Application enforcement is implemented through T04; T05 independently enforces List Read; T06 implements Sales-only session-bound Local enforcement; native control proof remains later work.
+T00 registers Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post` without automatic grants. Draft/Get/Post Application enforcement is implemented through T04; T05 independently enforces List Read; T06 implements Sales-only session-bound Local enforcement; T07 has bounded native100 control proof with native125 and frozen obligations open.
 List/Get require Read, Create/Update require Write, and Post requires Post; the UI requires Read to open and the relevant action key to mutate.
 Read includes the approved persisted cost/profit fields; no separate costing permission is introduced, and command return DTOs follow current authorized-write result semantics.
 Recheck current actor/account and permission state on every request; use the `SalesReceipt.*` prefix for sales business errors.
@@ -269,11 +272,11 @@ Authorization/session failures follow the existing security boundary: clear or i
 Give first/previous/next/refresh controls clear accessible names, state and keyboard behavior; no misleading total-page count.
 Expose read-only Unit/LineAmount, editable cells and IsGift checked state correctly to accessibility clients, including validation messages and row identity.
 
-## 9. Future verification and acceptance
+## 9. Verification inventory and remaining acceptance
 
-These are future obligations, not executed tests; [TEST_POLICY](TEST_POLICY.md), [TEST_STRATEGY](TEST_STRATEGY.md) and [tests/README](../tests/README.md) govern their actual execution.
+These implemented test locations have task-specific evidence; the full matrix and frozen obligations remain open; [TEST_POLICY](TEST_POLICY.md), [TEST_STRATEGY](TEST_STRATEGY.md) and [tests/README](../tests/README.md) govern their actual execution.
 
-| Proposed file in an existing test project | Required evidence |
+| Implemented file in an existing test project | Required evidence and remaining scope |
 |---|---|
 | `tests/MyDmsVn.Server.Application.Tests/SalesReceiptQueryContractTests.cs` | Cursor bounds/schema/version/binding, date/ID/search validation, Local DTO/error parity and current authorization |
 | `tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/SalesReceiptQueryTests.cs` | Real-SQL both-direction pages, ties/date edits/delayed commits, all filter combinations, duplicate Product membership and complete totals |

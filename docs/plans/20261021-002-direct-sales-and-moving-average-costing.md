@@ -10,13 +10,13 @@
 
 **Spec:** [DIRECT_SALES](../DIRECT_SALES.md), [DIRECT_SALES_COSTING](../DIRECT_SALES_COSTING.md), [DIRECT_SALES_QUERY_AND_UI](../DIRECT_SALES_QUERY_AND_UI.md), [ADR 0011](../adr/0011-direct-sales-and-moving-average-costing.md) and [SAL acceptance](../DIRECT_SALES_ACCEPTANCE.md).
 
-**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is complete at `47165ded` ([bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([bounded evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is complete at `7eeafa4` ([bounded evidence](../evidence/sal/20261022-t04-atomic-sales-post.md)); T05 is complete at `f9149a6` ([bounded evidence](../evidence/sal/20261022-t05-sales-keyset-queries.md)); T06 is complete at `5fbd6f5` ([bounded evidence](../evidence/sal/20261022-t06-local-session-viewmodels.md)); T07 is IN PROGRESS. Native GUI execution, package, frozen T08 and Owner acceptance remain **NOT RUN**.
+**Status:** IMPLEMENTATION IN PROGRESS — T00 foundation complete at `b5a2f3f`; [focused evidence](../evidence/sal/20261022-t00-foundation.md). T01 is complete at `81e8aab`; [bounded schema/bootstrap evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) records actual SQL results and pre/post-BOM boundaries. T02 is complete at `47165ded` ([bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([bounded evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is complete at `7eeafa4` ([bounded evidence](../evidence/sal/20261022-t04-atomic-sales-post.md)); T05 is complete at `f9149a6` ([bounded evidence](../evidence/sal/20261022-t05-sales-keyset-queries.md)); T06 is complete at `5fbd6f5` ([bounded evidence](../evidence/sal/20261022-t06-local-session-viewmodels.md)); T07 source is implemented at `879ab7b` with [bounded native100 evidence](../evidence/sal/20261022-t07-native-sales-workspace.md), but full T07 remains IN PROGRESS / OPEN: native125 RESOURCE BLOCKED and R4 DEFERRED Minor. T08 is NOT STARTED in the unchanged serial queue. Full GUI/package/actual Login/attended and Owner acceptance remain **NOT RUN**.
 **Baseline:** `chung6a8m/MyDmsVn`, `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`, after PR #41.
 BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is the next active roadmap; it does not reopen BCF or establish production readiness.
 
 ## Global Constraints
 
-- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; T02 receipt/reconciliation/projection interfaces are implemented; T03 Draft/Get interfaces are implemented; T04 Post interfaces are implemented; T05 List/keyset interfaces are implemented; T06 Local/VM interfaces are implemented; later native UI interfaces remain proposed. Historical baseline facts are not rewritten.
+- Source at the baseline still implements schema **9**, scripts 001–009; T00 foundations and reviewed T01 schema **10** are now implemented; T02 receipt/reconciliation/projection interfaces are implemented; T03 Draft/Get interfaces are implemented; T04 Post interfaces are implemented; T05 List/keyset interfaces are implemented; T06 Local/VM interfaces are implemented; T07 native controls are implemented with bounded native100 evidence; complete matrix/frozen evidence remains open. Historical baseline facts are not rewritten.
 - One warehouse, customer and responsible employee per receipt; 1–200 lines; Draft → Posted only; no payment, receivable, return, order/POS, tax, discount, multi-unit or printing workflow.
 - Grid order is exactly `STT / Product / Unit / Quantity / UnitPrice / IsGift / LineAmount`; `Quantity` binds to `Qty`; costing stays outside these seven columns.
 - `Qty decimal(18,4) > 0`; `UnitPrice decimal(19,4) >= 0`, including non-gift zero; amounts/value/cost `decimal(28,4)`; `PostedUnitCost decimal(28,8)`; round ties away from zero.
@@ -51,7 +51,7 @@ BCF-T00–T06 remain COMPLETE / OWNER ACCEPTED in their recorded scope. SAL is t
 | SAL-T04 | Atomic Sales Post and cross-writer concurrency | T02, T03 | COMPLETE — bounded evidence | A25–A32 |
 | SAL-T05 | LINQ summary queries and both-way keyset paging | T04; consumes T03 | COMPLETE — `f9149a6` | A33–A40 |
 | SAL-T06 | Local API, session fencing and sales ViewModels | T04, T05 | COMPLETE — `5fbd6f5` | A41–A44 |
-| SAL-T07 | Compact seven-column workspace, native keyboard and accessibility | T06 | IN PROGRESS | A45–A50 |
+| SAL-T07 | Compact seven-column workspace, native keyboard and accessibility | T06 | IN PROGRESS / OPEN — bounded source `879ab7b`; native125 RESOURCE BLOCKED, R4 deferred | A45–A50 |
 | SAL-T08 | Frozen integrated SQL/desktop/package evidence and Owner acceptance | T00–T07 | NOT STARTED / BLOCKED by T00–T07 | A51–A55 |
 
 The active queue is serial T00 → T08. Tasks may be reviewed separately; independent preparation does not create a second active roadmap.
@@ -59,11 +59,11 @@ Dependencies identify required inputs, and no partial writer cutover can be rele
 Each task records meaningful RED → GREEN evidence, focused verification and a scoped commit after review.
 A task exit verifies only that task's portion of an acceptance row. A row spanning tasks closes only after all its required portions have evidence on the accepted candidate.
 Do not substitute a compile error, empty filter, missing dependency or skipped SQL case for the intended RED behavioral failure.
-T00–T04 implemented selectors and actual discovery are recorded in their evidence. Later test names below remain proposed; inspect source before execution.
+Implemented T00–T07 selectors and actual discovery are recorded in their task evidence; the anchor names below retain their original proposed spelling. Verify actual source names before execution. T08 anchors remain proposed.
 
 ## File map and ownership
 
-Paths are relative to repository root; baseline paths are historical references. T00–T04 source exists as recorded in evidence; later **new** paths remain proposed.
+Paths are relative to repository root; baseline paths are historical references. T00–T07 source exists as recorded in task evidence; the T08 evidence path remains proposed.
 Read the adjacent current implementation before editing. Keep small feature files and avoid a general Goods Receipt/UI rewrite.
 
 | Owner | Existing files to modify or use | New files |
@@ -232,7 +232,7 @@ Insert/Replace assign returned IDs to their supplied Domain lines and return the
 - [x] Derive Unit from current catalog at Save, calculate revenue using T00, keep Draft cost null and expose complete ordered detail with stable IDs.
 - [x] Run focused contract/mapping/authorization/draft cases and affected builds; record results and commit T03.
 
-T03 also exposes same-owned-transaction `LoadLinesAsync` for canonical stored-line/ownership checks. Reference snapshots include immutable labels/state/Unit. Replacement parks validated retained IDs at positive temporary LineNo 201–400 before final 1–N, preserving identity/Created audits within the same transaction; this does not expand the 200-line business limit. Native sequence allocation is the narrow SQL-specific exception. Post-grant isolation tests do not implement the Post endpoint; T05 separately implements List; T06 separately implements Local/VM; native UI remains later work.
+T03 also exposes same-owned-transaction `LoadLinesAsync` for canonical stored-line/ownership checks. Reference snapshots include immutable labels/state/Unit. Replacement parks validated retained IDs at positive temporary LineNo 201–400 before final 1–N, preserving identity/Created audits within the same transaction; this does not expand the 200-line business limit. Native sequence allocation is the narrow SQL-specific exception. Post-grant isolation tests do not implement the Post endpoint; T05 separately implements List; T06 separately implements Local/VM; T07 has bounded native100 evidence; native125/full workflow acceptance remains open.
 
 **Exit:** T03-owned Draft/identity/authorization portions of A20–A24 are verified; later T04 Post and T06 Local portions have their own evidence; native-UI portions remain open. Draft saves create no stock or valuation movement.
 
@@ -309,18 +309,22 @@ SalesReceiptListViewModel owns applied filters/Items/cursors; editor/line VMs re
 **Interfaces:** SalesReceiptControl/Factory compose the T06 VMs; SalesReceiptLinesGrid/Adapter own Product/numeric/checkbox sessions with stable client row keys.
 Retain current pinned lookup/formatted adapters, parser, accessibility and guarded List/Detail presentation; do not replace the grid or clone pending text into committed IDs.
 
-**Test files (new):** `tests/MyDmsVn.Desktop.Tests/{SalesReceiptGridTests,SalesReceiptLookupNativeInputTests,SalesReceiptControlTests,SalesReceiptAccessibilityTests}.cs`.
+**Implemented test files:** `tests/MyDmsVn.Desktop.Tests/{SalesReceiptGridTests,SalesReceiptLookupNativeInputTests,SalesReceiptControlTests,SalesReceiptControlAdmissionTests,SalesReceiptAccessibilityTests,SalesReceiptNativeEnvironmentTests}.cs`; List access-admission regressions also live in Desktop.Session.Tests.
 
-- [ ] Add seven-column order/read-only tests, repeated Product/ID0 row edits/removal, retained gift UnitPrice, strict decimals and stock/cost/profit summary outside the grid.
-- [ ] Add commit-before-Save/Post, dirty/invalid Back admission, canceled boundary queries and all Posted/busy/denied/RequiresPostOutcomeReload interaction routes, including checkbox/accessibility setters.
-- [ ] Add native per-character text/caret/range/focus tests for Customer, Warehouse, Employee and inline Product, plus optional list lookups; include canceled predecessor, middle insertion/replacement, slow responses and unchanged-key rebinding.
-- [ ] Add actual F4/Up/Down/Enter/Escape/Tab/Shift+Tab, paste/mouse/deactivation, historical reference display, accessibility names/checked state, theme changes and disposal/session replacement.
-- [ ] Run focused Desktop selectors on interactive net48/x86 and retain intended behavioral failures; whole Text/UIA SetValue is not per-key proof.
-- [ ] Implement compact List/Detail shell integration and the exact seven-column adapter with current ownership/admission patterns.
+- [x] Add seven-column order/read-only tests, repeated Product/ID0 row edits/removal, retained gift UnitPrice, strict decimals and stock/cost/profit summary outside the grid.
+- [x] Add commit-before-Save/Post, dirty/invalid Back admission, canceled boundary queries and all Posted/busy/denied/RequiresPostOutcomeReload interaction routes, including checkbox/accessibility setters.
+- [x] Add native per-character text/caret/range/focus tests for Customer, Warehouse, Employee and inline Product, plus optional list lookups; include canceled predecessor, middle insertion/replacement, slow responses and unchanged-key rebinding.
+- [x] Add actual F4/Up/Down/Enter/Escape/Tab/Shift+Tab, paste/mouse/deactivation, historical reference display, accessibility names/checked state, theme changes and disposal/session replacement.
+- [x] Run focused Desktop selectors on interactive net48/x86 and retain intended behavioral failures; whole Text/UIA SetValue is not per-key proof.
+- [x] Implement compact List/Detail shell integration and the exact seven-column adapter with current ownership/admission patterns.
 - [ ] Run the affected native100/native125 × Light/Dark matrix; measure actual monitor/window DPI and bounds at 1680×900, 1200×760 and 944×600 logical targets; capture usable focus/errors/popups and essential reachability.
-- [ ] Review same-data captures and keyboard observations; record any unavailable required row as NOT RUN/BLOCKED, never inherit BCF's historical exceptions; commit T07.
+- [x] Review bounded native100 same-data captures and keyboard observations; commit the source checkpoint `879ab7b` with the candidate3-tested/candidate4-format-only boundary recorded.
+- [ ] Complete every mandatory native125 workflow and six size/theme contexts and close the full T07 exit before serial T08. No inherited BCF exception or Owner order change applies.
+- [ ] Keep R4 stale numeric validation footer DEFERRED Minor for final whole-branch triage/disposition before the T08 frozen candidate; A50 validation accuracy remains OPEN. This is not an earlier T08-start or Important-repair gate.
 
-**Exit:** T07-owned control/theme/scale portions of A45–A50 and earlier UI-linked rows have fresh evidence; frozen-package and attended portions remain open for T08. Screenshots alone cannot close interaction rows.
+**Current checkpoint:** [Reviewed bounded evidence](../evidence/sal/20261022-t07-native-sales-workspace.md) proves implemented control/hosted/native100 portions only: 110 affected Sales, 55 shared, 174 complete Session, 13 Architecture; 67 measured native rows plus 43 hosted rows. The six native100 layout rows do not mean every keyboard workflow ran at every size. Native125 remains NOT RUN / RESOURCE BLOCKED on the sole 1920×1080 native 96DPI display/work area 1920×1032; strict wide125 requires 2100×1125 physical client plus chrome. R4 stale numeric footer stays DEFERRED Minor; A44–A50 full rows remain OPEN.
+
+**Exit remains OPEN:** Full T07 requires its missing control/theme/scale portions; frozen-package/attended obligations stay with T08, which is NOT STARTED behind T07. Screenshots alone cannot close interaction rows.
 
 ### SAL-T08 — Frozen integrated candidate and acceptance
 
@@ -345,5 +349,5 @@ T08 consumes the frozen T00–T07 candidate, implemented case inventory, identic
 
 For each task attach revision, changed behavior, exact command/project/TFM/filter, discovered/executed Facts/Theory rows, pass/fail/skip/not-run, environment and cleanup.
 Keep raw TRX, SQL identities, connection data and proprietary screenshots local; publish sanitized reviewable summaries and resource limitations.
-The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is complete at `47165ded` ([evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is complete at `7eeafa4` ([evidence](../evidence/sal/20261022-t04-atomic-sales-post.md)); T05 is complete at `f9149a6` ([bounded evidence](../evidence/sal/20261022-t05-sales-keyset-queries.md)); T06 is complete at `5fbd6f5` ([bounded evidence](../evidence/sal/20261022-t06-local-session-viewmodels.md)); T07 is IN PROGRESS. Native UI/package obligations and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
+The original baseline contains no Direct Sales runtime. T00 is complete at `b5a2f3f`; T01 is reviewed/complete at `81e8aab` ([evidence](../evidence/sal/20261022-t01-schema-bootstrap.md)). T02 is complete at `47165ded` ([evidence](../evidence/sal/20261022-t02-valued-inventory.md)); T03 is complete at `1164199` ([evidence](../evidence/sal/20261022-t03-sales-draft.md)); T04 is complete at `7eeafa4` ([evidence](../evidence/sal/20261022-t04-atomic-sales-post.md)); T05 is complete at `f9149a6` ([bounded evidence](../evidence/sal/20261022-t05-sales-keyset-queries.md)); T06 is complete at `5fbd6f5` ([bounded evidence](../evidence/sal/20261022-t06-local-session-viewmodels.md)); T07 source `879ab7b` has bounded native100 evidence; full T07 remains IN PROGRESS / OPEN with native125 RESOURCE BLOCKED and R4 deferred Minor. T08 stays NOT STARTED; package/attended/Owner and multi-task SAL acceptance rows remain open. T01 is not deployable; R3 generic bootstrap diagnostics remains a deferred Minor.
 The owner's approval selects this roadmap and costing design; it is not a claim that the application, SQL migration or future package has passed.
