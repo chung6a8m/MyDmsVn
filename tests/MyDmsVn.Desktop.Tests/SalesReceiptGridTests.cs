@@ -89,6 +89,28 @@ public sealed class SalesReceiptGridTests
     }
 
     [Fact]
+    public void Document_reset_cancels_pending_numeric_candidate_before_reconfiguring_profile()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var position = new SourceGrid.Position(1, 3);
+            Assert.True(host.Grid.Focus());
+            Assert.True(host.Grid.Selection.Focus(position, true));
+            var context = new SourceGrid.CellContext(host.Grid, position);
+            context.StartEdit();
+            Assert.True(context.IsEditing());
+            adapter.QuantityControl.Text = "4.5";
+            Assert.Equal("4.5", adapter.QuantityControl.PendingText);
+            adapter.ResetDocument(host.Editor.Lines);
+            Assert.False(context.IsEditing());
+            Assert.Equal(1m, host.Editor.Lines[0].Quantity);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+
+    [Fact]
     public void Validated_A_then_native_B_or_failed_revalidation_cannot_change_sales_line()
     {
         StaTest.Run(_ =>

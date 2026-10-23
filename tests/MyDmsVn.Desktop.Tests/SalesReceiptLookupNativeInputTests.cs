@@ -56,6 +56,7 @@ public sealed class SalesReceiptLookupNativeInputTests
             Assert.Equal("1,234", driver.Text);
             Assert.Equal(1m, host.Control.Editor.Lines.Single().Quantity);
             Assert.Empty(host.Api.Updates);
+            _output.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, token));
             _output.WriteLine("UIN_T05_SALES_NUMERIC_NATIVE;theme=" + theme + ";windowDpi=" + host.Form.DeviceDpi + ";actualTestBitness=" + IntPtr.Size * 8);
         });
     }

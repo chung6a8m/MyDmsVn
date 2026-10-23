@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using CommunityToolkit.Mvvm.Messaging;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
@@ -17,8 +18,10 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed partial class GoodsReceiptInlineEditorTests
 {
-    [Fact]
-    public void Native_numeric_grouping_preserves_pending_value_and_rejects_same_display_external_paste()
+    [Theory]
+    [InlineData(BootstrapThemeMode.Light)]
+    [InlineData(BootstrapThemeMode.Dark)]
+    public void Native_numeric_grouping_preserves_pending_value_and_rejects_same_display_external_paste(BootstrapThemeMode theme)
     {
         SessionTest(host =>
         {
@@ -44,8 +47,9 @@ public sealed partial class GoodsReceiptInlineEditorTests
             Assert.False(host.Adapter.TryFinishEdit(ReceiptEditIntent.Save));
             Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
             Assert.Equal("1,234", host.Adapter.QuantityControl.Text);
-            _output.WriteLine("UIN_T05_GOODS_NUMERIC_NATIVE;windowDpi=" + host.WindowDpi + ";actualTestBitness=" + IntPtr.Size * 8);
-        });
+            _output.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, CancellationToken.None));
+            _output.WriteLine("UIN_T05_GOODS_NUMERIC_NATIVE;theme=" + theme + ";windowDpi=" + host.WindowDpi + ";actualTestBitness=" + IntPtr.Size * 8);
+        }, theme);
     }
 
     [Fact]
@@ -352,12 +356,18 @@ public sealed partial class GoodsReceiptInlineEditorTests
         });
     }
 
-    private static void SessionTest(Action<SessionHost> action) => StaTest.Run(_ =>
+    private static void SessionTest(Action<SessionHost> action, BootstrapThemeMode? theme = null) => StaTest.Run(_ =>
     {
-        using var guard = new WinFormsTestGuard();
-        using var host = new SessionHost();
-        action(host);
-        Assert.Empty(guard.Exceptions);
+        var original = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            if (theme.HasValue) BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(theme.Value);
+            using var guard = new WinFormsTestGuard();
+            using var host = new SessionHost();
+            action(host);
+            Assert.Empty(guard.Exceptions);
+        }
+        finally { BootstrapThemeManager.CurrentTheme = original; }
     }, TimeSpan.FromSeconds(15));
 
     internal sealed class SessionHost : IDisposable
@@ -366,6 +376,7 @@ public sealed partial class GoodsReceiptInlineEditorTests
         internal readonly GoodsReceiptLinesGrid Grid = new GoodsReceiptLinesGrid { Dock = DockStyle.Fill };
         internal readonly GoodsReceiptLinesGridAdapter Adapter;
         private readonly Form _form = new Form { ClientSize = new Size(850, 260), ShowInTaskbar = false };
+        internal Form Form => _form;
         internal IntPtr FormHandle => _form.Handle;
         internal int WindowDpi => _form.DeviceDpi;
         internal bool CanEdit = true;
