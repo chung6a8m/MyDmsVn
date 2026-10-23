@@ -1320,9 +1320,12 @@ internal static class GuiPackageProbe
         if (IsIconic(window)) ShowWindowAsync(window, 9); // Restore only this owned minimized window.
         var activationRequested = GetForegroundWindow() != window;
         var activationGranted = !activationRequested || SetForegroundWindow(window);
-        editor.SetFocus();
         try
         {
+            // Cross-input-queue activation completes asynchronously; do not race UIA focus against it.
+            Wait(delegate { return GetForegroundWindow() == window; },
+                "Owned input window did not receive foreground before keyboard focus.", 5);
+            editor.SetFocus();
             Wait(delegate { return GetForegroundWindow() == window && editor.Current.HasKeyboardFocus; },
                 "Owned input window/editor did not receive foreground and keyboard focus.");
         }
