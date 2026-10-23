@@ -261,6 +261,9 @@ namespace MyDmsVn.Desktop.Tests
 
                         control.SaveButton.PerformClick();
 
+                        var busyHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>());
+                        Assert.NotNull(busyHost.Content);
+                        Assert.Contains(control.Grid, ((SplitContainer)busyHost.Content).Panel1.Controls.Cast<Control>());
                         Assert.All(control.EditorControls.Values, editor => Assert.False(editor.Enabled));
 
                         client.CompleteCreate(new ProductDto(1, "P1", "Product", "pcs", true));
@@ -273,6 +276,47 @@ namespace MyDmsVn.Desktop.Tests
                     }
                 },
                 TimeSpan.FromSeconds(10));
+        }
+
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Native_busy_overlay_stays_local_and_releases_after_save(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using var guard = new WinFormsTestGuard();
+                    var client = new ProductClient { ControlCreateResponse = true };
+                    using var viewModel = CreateViewModel(client);
+                    using var control = new CatalogControl(viewModel);
+                    using var form = new Form { ClientSize = new System.Drawing.Size(940, 700), TopMost = true };
+                    form.Controls.Add(control);
+                    form.Show();
+                    control.NewButton.PerformClick();
+                    control.EditorControls["code"].Text = "P1";
+                    control.EditorControls["name"].Text = "Product";
+                    control.EditorControls["unit"].Text = "pcs";
+                    control.SaveButton.PerformClick();
+                    var busyHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>());
+                    var overlay = Assert.Single(busyHost.Controls.OfType<Panel>());
+                    _output.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
+                    PumpMessagesUntil(() => overlay.Visible, TimeSpan.FromSeconds(2));
+                    Assert.True(overlay.Visible);
+                    Assert.False(Assert.Single(overlay.Controls.OfType<Button>()).Visible);
+                    Assert.False(control.SaveButton.Enabled);
+                    Assert.False(busyHost.Contains(control.RefreshButton));
+                    client.CompleteCreate(new ProductDto(1, "P1", "Product", "pcs", true));
+                    PumpMessagesUntil(() => control.LastOperation.IsCompleted && !overlay.Visible, TimeSpan.FromSeconds(2));
+                    control.LastOperation.GetAwaiter().GetResult();
+                    Assert.False(overlay.Visible);
+                    Assert.Empty(guard.Exceptions);
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
+            }, TimeSpan.FromSeconds(20));
         }
 
         [Fact]

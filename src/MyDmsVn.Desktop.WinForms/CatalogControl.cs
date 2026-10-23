@@ -27,6 +27,7 @@ namespace MyDmsVn.Desktop.WinForms
         public WorkspaceFeedbackScope FeedbackScope { get; private set; } = new WorkspaceFeedbackScope();
         internal void AttachFeedback(WorkspaceFeedbackScope scope, WorkspaceFeedbackNotificationService notifications)
         {
+            _busyBinder.ReplaceScope(scope);
             FeedbackScope.Dispose();
             FeedbackScope = scope;
             _feedbackNotifications = notifications;
@@ -40,6 +41,9 @@ namespace MyDmsVn.Desktop.WinForms
             new Dictionary<string, Label>(StringComparer.Ordinal);
         private IReadOnlyList<int> _rowIds = Array.Empty<int>();
         private readonly SplitContainer _split;
+        private readonly BootstrapBusyHost _busyHost;
+        private readonly WorkspaceBusyBinder _busyBinder;
+        private readonly Action _cancelBusyQuery;
         private readonly int _uiThreadId;
         private bool _applyingState;
         private bool _arranging;
@@ -184,6 +188,9 @@ namespace MyDmsVn.Desktop.WinForms
             _split.Panel1.Controls.Add(_resultsState);
             _split.Panel2.Controls.Add(editor);
             _split.SizeChanged += (_, __) => UpdateEditorPanelWidth();
+            _busyHost = new BootstrapBusyHost(_split) { Dock = DockStyle.Fill };
+            _busyBinder = new WorkspaceBusyBinder(FeedbackScope, _busyHost.Begin, DispatchToUi);
+            _cancelBusyQuery = () => _binding.Cancel();
 
             _toolbar = new TableLayoutPanel
             {
@@ -226,7 +233,7 @@ namespace MyDmsVn.Desktop.WinForms
             pagingBar.Controls.Add(NextPageButton);
             pagingBar.Controls.Add(_resultRange);
 
-            Controls.Add(_split);
+            Controls.Add(_busyHost);
             _split.Panel1.Controls.Add(pagingBar);
             Controls.Add(_error);
             Controls.Add(_toolbar);
@@ -308,6 +315,7 @@ namespace MyDmsVn.Desktop.WinForms
                 foreach (var binding in _validationBindings) binding.Dispose();
                 _validationBinder.Dispose();
                 BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+                _busyBinder.Dispose();
                 FeedbackScope.Dispose();
                 _binding.Dispose();
                 _errors.Dispose();
@@ -399,6 +407,9 @@ namespace MyDmsVn.Desktop.WinForms
                 }
 
                 var busy = _binding.IsBusy || _binding.IsLoading || _binding.IsEditorLoading;
+                _busyBinder.Project(_busyBinder.CaptureOwner(), busy,
+                    _binding.IsBusy ? "Saving catalog…" : "Loading catalog…",
+                    !_binding.IsBusy && (_binding.IsLoading || _binding.IsEditorLoading) ? _cancelBusyQuery : null);
                 foreach (var field in _binding.Fields)
                 {
                     var value = field.GetValue();

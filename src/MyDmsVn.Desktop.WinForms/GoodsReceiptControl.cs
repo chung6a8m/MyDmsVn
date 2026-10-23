@@ -25,6 +25,14 @@ namespace MyDmsVn.Desktop.WinForms
     {
         private readonly GoodsReceiptListViewModel _list;
         private readonly GoodsReceiptEditorViewModel _editor;
+        public WorkspaceFeedbackScope FeedbackScope { get; private set; } = new WorkspaceFeedbackScope();
+        internal void AttachFeedback(WorkspaceFeedbackScope scope)
+        {
+            _masterBusyBinder.ReplaceScope(scope);
+            _detailBusyBinder.ReplaceScope(scope);
+            FeedbackScope.Dispose();
+            FeedbackScope = scope;
+        }
         private readonly ErrorProvider _errors;
         private readonly Dictionary<string, Control> _errorControls;
         private readonly List<GoodsReceiptLineViewModel> _subscribedLines =
@@ -239,6 +247,9 @@ namespace MyDmsVn.Desktop.WinForms
                 UnsubscribeLines();
                 _inline.EditStateChanged -= OnInlineEditStateChanged;
                 _inline.Dispose();
+                _masterBusyBinder.Dispose();
+                _detailBusyBinder.Dispose();
+                FeedbackScope.Dispose();
                 VersionLabel.Dispose(); // Retained compatibility control is deliberately outside the visible tree.
                 _errors.Dispose();
                 _list.Dispose();
@@ -328,6 +339,7 @@ namespace MyDmsVn.Desktop.WinForms
             _workflowMessage = null;
             CancelEditorLookupEdits();
             _editor.Load(selected);
+            FeedbackScope.AdvanceDocument();
             BeginReceiptDateSession();
             _selectedLine = _editor.Lines.FirstOrDefault();
             _inline.ResetDocument(_editor.Lines);
@@ -453,6 +465,7 @@ namespace MyDmsVn.Desktop.WinForms
             CancelEditorLookupEdits();
             _list.NewDraft();
             _editor.Load(null);
+            FeedbackScope.AdvanceDocument();
             BeginReceiptDateSession();
             _selectedLine = null;
             _inline.ResetDocument(_editor.Lines);
@@ -480,6 +493,7 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 CancelEditorLookupEdits();
                 _editor.Load(null);
+                FeedbackScope.AdvanceDocument();
                 BeginReceiptDateSession();
                 _selectedLine = null;
             }
@@ -834,6 +848,11 @@ namespace MyDmsVn.Desktop.WinForms
                     : "Amount too large";
 
                 var busy = _isRefreshing || _list.IsLoading || _list.IsBusy || _editor.IsBusy;
+                var owner = _masterBusyBinder.CaptureOwner();
+                _masterBusyBinder.Project(owner, busy && WorkspaceMode == ReceiptWorkspaceMode.List,
+                    "Loading goods receipts…");
+                _detailBusyBinder.Project(owner, busy && WorkspaceMode == ReceiptWorkspaceMode.Detail,
+                    _editor.IsBusy ? "Saving goods receipt…" : "Loading goods receipt…");
                 var requiresPostReload = _editor.RequiresPostOutcomeReload;
                 BusyIndicator.Visible = busy;
                 OperationStatusLabel.Text = requiresPostReload

@@ -8,6 +8,10 @@ namespace MyDmsVn.Desktop.WinForms;
 public sealed partial class GoodsReceiptControl
 {
     private SplitContainer _workspaceSplit = null!;
+    private BootstrapBusyHost _masterBusyHost = null!;
+    private BootstrapBusyHost _detailBusyHost = null!;
+    private WorkspaceBusyBinder _masterBusyBinder = null!;
+    private WorkspaceBusyBinder _detailBusyBinder = null!;
     private FlowLayoutPanel _workspaceCommands = null!;
     private TableLayoutPanel _workspaceFooter = null!;
     private Label _workspaceTitle = null!;
@@ -179,7 +183,11 @@ public sealed partial class GoodsReceiptControl
         header.FontChanged += (_, __) => _layoutReceipt();
         OperationStatusLabel.TextChanged += (_, __) => _layoutReceipt();
         _workspaceSplit = new SplitContainer { Dock = DockStyle.Fill, Size = new Size(1200, 600), SplitterDistance = 260, TabIndex = 1 };
-        _workspaceSplit.Panel1.Controls.Add(master); _workspaceSplit.Panel2.Controls.Add(detail);
+        _masterBusyHost = new BootstrapBusyHost(master) { Dock = DockStyle.Fill };
+        _detailBusyHost = new BootstrapBusyHost(detail) { Dock = DockStyle.Fill };
+        _masterBusyBinder = new WorkspaceBusyBinder(FeedbackScope, _masterBusyHost.Begin, DispatchToUi);
+        _detailBusyBinder = new WorkspaceBusyBinder(FeedbackScope, _detailBusyHost.Begin, DispatchToUi);
+        _workspaceSplit.Panel1.Controls.Add(_masterBusyHost); _workspaceSplit.Panel2.Controls.Add(_detailBusyHost);
         _workspaceSplit.SizeChanged += (_, __) => _layoutReceipt();
         return _workspaceSplit;
     }

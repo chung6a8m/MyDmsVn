@@ -34,6 +34,10 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     private readonly CatalogLookupViewModel _products;
     private readonly Panel _master = new Panel { Dock = DockStyle.Fill };
     private readonly Panel _detail = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+    private BootstrapBusyHost _masterBusyHost = null!;
+    private BootstrapBusyHost _detailBusyHost = null!;
+    private WorkspaceBusyBinder _masterBusyBinder = null!;
+    private WorkspaceBusyBinder _detailBusyBinder = null!;
     private readonly Label _title = new Label { Name = "CompactHeading", AutoSize = true, Text = "Sales receipts" };
     private readonly Label _state = new Label { Name = "CompactSecondary", AutoSize = true };
     private readonly ErrorProvider _errors;
@@ -392,7 +396,11 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         try
         {
             var detail = WorkspaceMode == ReceiptWorkspaceMode.Detail;
-            _master.Visible = !detail; _detail.Visible = detail; _state.Visible = detail;
+            _masterBusyHost.Visible = !detail; _detailBusyHost.Visible = detail; _state.Visible = detail;
+            var owner = _masterBusyBinder.CaptureOwner();
+            _masterBusyBinder.Project(owner, Current && Busy && !detail, "Loading sales receipts…");
+            _detailBusyBinder.Project(owner, Current && Busy && detail,
+                Editor.IsMutationBusy ? "Saving sales receipt…" : "Loading sales receipt…");
             _title.Text = detail ? (Editor.SaleId > 0 ? Editor.SaleNumber : "New sale") : "Sales receipts";
             _state.Text = Editor.RequiresPostOutcomeReload ? "Reload required" : Editor.RequiresCreateOutcomeReview ? "Review Create outcome" : Busy ? "Working…" : Editor.IsDirty || _inline.HasPendingDataEdit || SaleDateEditor.HasPendingEdit ? "Unsaved changes" : Editor.SaleId > 0 ? "Saved · " + Editor.Status : "Not saved";
             BackToReceiptsButton.Visible = detail; OpenCurrentReceiptButton.Visible = !detail && _hasDetail;
@@ -505,7 +513,11 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         var summary = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true }; summary.Controls.AddRange(new Control[] { TotalLabel, CostLabel, ProfitLabel, LineCostLabel, StockLabel });
         _detail.Controls.Add(LineGrid); _detail.Controls.Add(lineCommands); _detail.Controls.Add(metadata); _detail.Controls.Add(summary);
         var status = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true }; status.Controls.Add(OperationStatusLabel); status.Controls.Add(ValidationSummaryButton);
-        Controls.Add(_master); Controls.Add(_detail); Controls.Add(commands); Controls.Add(status);
+        _masterBusyHost = new BootstrapBusyHost(_master) { Dock = DockStyle.Fill };
+        _detailBusyHost = new BootstrapBusyHost(_detail) { Dock = DockStyle.Fill };
+        _masterBusyBinder = new WorkspaceBusyBinder(FeedbackScope, _masterBusyHost.Begin, Dispatch);
+        _detailBusyBinder = new WorkspaceBusyBinder(FeedbackScope, _detailBusyHost.Begin, Dispatch);
+        Controls.Add(_masterBusyHost); Controls.Add(_detailBusyHost); Controls.Add(commands); Controls.Add(status);
     }
     private static Control Field(string label, Control editor)
     {
@@ -595,11 +607,17 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         if (keyData == (Keys.Alt | Keys.Left)) { TryShowReceiptList(); return true; }
         return base.ProcessCmdKey(ref msg, keyData);
     }
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ApplyState();
+    }
     protected override void Dispose(bool disposing)
     {
         if (disposing && !_disposed)
         {
             _disposed = true; _lifetime.Cancel(); _documentCancellation.Cancel(); ++_boundary;
+            _masterBusyBinder.Dispose(); _detailBusyBinder.Dispose();
             FeedbackScope.Dispose();
             _session.SessionChanged -= SessionChanged; Editor.PropertyChanged -= StateChanged; _list.PropertyChanged -= StateChanged;
             _inline.EditStateChanged -= InlineChanged; _inline.LookupOperationStarted -= SetOperation; _inline.ProductCommitted -= ProductCommitted; _inline.Dispose(); _products.Dispose();

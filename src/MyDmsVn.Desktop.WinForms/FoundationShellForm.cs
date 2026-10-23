@@ -405,7 +405,9 @@ namespace MyDmsVn.Desktop.WinForms
             };
             content.Dock = DockStyle.Fill;
             var scope = content is CatalogControl catalogContent ? catalogContent.FeedbackScope :
-                content is SalesReceiptControl salesContent ? salesContent.FeedbackScope : new WorkspaceFeedbackScope(sessionVersion);
+                content is SalesReceiptControl salesContent ? salesContent.FeedbackScope :
+                new WorkspaceFeedbackScope(sessionVersion);
+            if (content is GoodsReceiptControl goodsContent) goodsContent.AttachFeedback(scope);
             var feedbackHost = new WorkspaceFeedbackHost(content, scope) { Dock = DockStyle.Fill };
             feedbackHost.AttentionChanged += (_, __) =>
             {

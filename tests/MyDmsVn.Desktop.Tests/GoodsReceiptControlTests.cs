@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
@@ -225,11 +226,22 @@ namespace MyDmsVn.Desktop.Tests
                 {
                     using (var fixture = new Fixture())
                     using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    using (var form = new Form { ClientSize = new System.Drawing.Size(1000, 700) })
                     {
+                        form.Controls.Add(control);
+                        form.Show();
                         fixture.Api.ControlListResponse = true;
 
                         var activation = control.ActivateAsync(cancellationToken);
 
+                        var split = Assert.Single(control.Controls.OfType<SplitContainer>());
+                        var busyHost = Assert.Single(split.Panel1.Controls.OfType<BootstrapBusyHost>());
+                        Assert.Contains(control.ReceiptGrid, busyHost.Content.Controls.Cast<Control>());
+                        var overlay = Assert.Single(busyHost.Controls.OfType<Panel>(),
+                            item => !ReferenceEquals(item, busyHost.Content));
+                        PumpMessagesUntil(() => overlay.Visible, TimeSpan.FromSeconds(2));
+                        Assert.True(overlay.Visible);
+                        Assert.False(busyHost.Contains(control.RefreshButton));
                         Assert.False(control.RefreshButton.Enabled);
                         Assert.False(control.ReceiptGrid.Enabled);
                         Assert.True(control.BusyIndicator.Visible);
@@ -237,6 +249,7 @@ namespace MyDmsVn.Desktop.Tests
                         PumpMessagesUntil(() => activation.IsCompleted, TimeSpan.FromSeconds(2));
                         activation.GetAwaiter().GetResult();
                         Assert.True(control.RefreshButton.Enabled);
+                        Assert.False(overlay.Visible);
                         Assert.False(control.BusyIndicator.Visible);
                     }
                 },

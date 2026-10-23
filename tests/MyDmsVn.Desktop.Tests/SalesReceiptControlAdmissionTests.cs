@@ -171,6 +171,15 @@ public sealed class SalesReceiptControlAdmissionTests
             var pending = List(host).RefreshAsync();
             try
             {
+                var detailHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>(),
+                    item => item.Content.Controls.Contains(control.LineGrid));
+                Assert.True(detailHost.Visible);
+                var overlay = Assert.Single(detailHost.Controls.OfType<Panel>(),
+                    item => !ReferenceEquals(item, detailHost.Content));
+                var until = DateTime.UtcNow.AddSeconds(2);
+                while (!overlay.Visible && DateTime.UtcNow < until) { System.Windows.Forms.Application.DoEvents(); Thread.Sleep(10); }
+                Assert.True(overlay.Visible);
+                Assert.False(detailHost.Contains(control.SaveButton));
                 Assert.False(control.CustomerLookup.Enabled); Assert.False(control.WarehouseLookup.Enabled); Assert.False(control.EmployeeLookup.Enabled);
                 Assert.False(control.SaleDateEditor.Enabled); Assert.False(control.NoteEditor.Enabled); Assert.False(control.SearchBox.Enabled);
                 Assert.False(control.FromDateEditor.Enabled); Assert.False(control.ToDateEditor.Enabled); Assert.False(control.StatusFilter.Enabled); Assert.False(control.PageSizeEditor.Enabled);
@@ -181,6 +190,10 @@ public sealed class SalesReceiptControlAdmissionTests
                 Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
             }
             finally { completion.TrySetResult(ApiResponse<SalesReceiptListPage>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Test.End", "End"))); host.Wait(pending); }
+            var finishedHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>(),
+                item => item.Content.Controls.Contains(control.LineGrid));
+            Assert.False(Assert.Single(finishedHost.Controls.OfType<Panel>(),
+                item => !ReferenceEquals(item, finishedHost.Content)).Visible);
             Assert.True(control.NoteEditor.Enabled); control.NoteEditor.Text = "allowed"; Assert.Equal("allowed", host.Editor.Note);
         }, TimeSpan.FromSeconds(25));
     }
