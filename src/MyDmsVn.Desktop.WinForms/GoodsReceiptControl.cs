@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using BootstrapGrid = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSourceGrid;
@@ -81,7 +82,11 @@ namespace MyDmsVn.Desktop.WinForms
             ReceiptGrid.DoubleClick += (_, __) => SelectActiveReceipt();
             ReceiptGrid.KeyDown += OnReceiptGridKeyDown;
 
-            ReceiptDateEditor = new BootstrapDatePicker { Dock = DockStyle.Top, AccessibleName = "Receipt date" };
+            ReceiptDateEditor = new BootstrapDateInput
+            {
+                Dock = DockStyle.Top, AccessibleName = "Receipt date",
+                Profile = new DateInputProfile(false, DateTimePicker.MinimumDateTime, DateTimePicker.MaximumDateTime)
+            };
             WarehouseLookup = CreateLookup("Warehouse");
             EmployeeLookup = CreateLookup("Employee");
             NoteEditor = new BootstrapTextBox { Dock = DockStyle.Top, AccessibleName = "Note" };
@@ -128,6 +133,7 @@ namespace MyDmsVn.Desktop.WinForms
             WarehouseFilterLookup.SelectedValueChanged += OnWarehouseFilterChanged;
             StatusFilter.SelectedValueChanged += OnStatusFilterChanged;
             ReceiptDateEditor.ValueChanged += OnReceiptDateChanged;
+            ReceiptDateEditor.PendingTextChanged += OnPendingReceiptDateChanged;
             WarehouseLookup.SelectedValueChanged += OnWarehouseChanged;
             WarehouseLookup.TextChanged += OnWarehouseLookupSearchChanged;
             EmployeeLookup.SelectedValueChanged += OnEmployeeChanged;
@@ -149,7 +155,7 @@ namespace MyDmsVn.Desktop.WinForms
         public ComboBox StatusFilter { get; }
         public BootstrapGrid ReceiptGrid { get; }
         public BootstrapGrid LineGrid { get; }
-        public BootstrapDatePicker ReceiptDateEditor { get; }
+        public BootstrapDateInput ReceiptDateEditor { get; }
         public BootstrapLookupBox WarehouseLookup { get; }
         public BootstrapLookupBox EmployeeLookup { get; }
         public BootstrapLookupBox ProductLookup => _inline.ProductControl;
@@ -214,6 +220,7 @@ namespace MyDmsVn.Desktop.WinForms
                 WarehouseFilterLookup.SelectedValueChanged -= OnWarehouseFilterChanged;
                 StatusFilter.SelectedValueChanged -= OnStatusFilterChanged;
                 ReceiptDateEditor.ValueChanged -= OnReceiptDateChanged;
+                ReceiptDateEditor.PendingTextChanged -= OnPendingReceiptDateChanged;
                 WarehouseLookup.SelectedValueChanged -= OnWarehouseChanged;
                 WarehouseLookup.TextChanged -= OnWarehouseLookupSearchChanged;
                 EmployeeLookup.SelectedValueChanged -= OnEmployeeChanged;
@@ -272,6 +279,7 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     if (await _editor.RefreshAsync(CancellationToken.None).ConfigureAwait(true))
                     {
+                        BeginReceiptDateSession();
                         RebindSelectedLine(selectedLineId, selectedLineIndex);
                         _inline.ResetDocument(_editor.Lines);
                     }
@@ -317,6 +325,7 @@ namespace MyDmsVn.Desktop.WinForms
             _workflowMessage = null;
             CancelEditorLookupEdits();
             _editor.Load(selected);
+            BeginReceiptDateSession();
             _selectedLine = _editor.Lines.FirstOrDefault();
             _inline.ResetDocument(_editor.Lines);
             ShowReceiptDetail();
@@ -327,6 +336,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Save) ||
                 !await FinishHeaderLookupsAsync(SaveButton).ConfigureAwait(true)) return;
+            if (!TryCommitReceiptDate()) return;
             if (ApplyEditorsToViewModel())
             {
                 var selectedLineId = _selectedLine?.Id;
@@ -355,6 +365,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Post) ||
                 !await FinishHeaderLookupsAsync(PostButton).ConfigureAwait(true)) return;
+            if (!TryCommitReceiptDate()) return;
             if (_editor.IsDirty)
             {
                 _workflowMessage = "Save the current draft before posting it.";
@@ -402,6 +413,7 @@ namespace MyDmsVn.Desktop.WinForms
             CancelEditorLookupEdits();
             _list.NewDraft();
             _editor.Load(null);
+            BeginReceiptDateSession();
             _selectedLine = null;
             _inline.ResetDocument(_editor.Lines);
             ShowReceiptDetail();
@@ -410,14 +422,15 @@ namespace MyDmsVn.Desktop.WinForms
 
         private bool CanAbandonEditor(ReceiptEditIntent intent)
         {
-            if (!_editor.IsDirty)
+            if (!_editor.IsDirty && !ReceiptDateEditor.HasPendingEdit)
             {
                 return FinishInline(intent);
             }
 
             _workflowMessage = "Save the current draft before leaving it.";
             ApplyState();
-            _inline.FocusActiveEdit();
+            if (ReceiptDateEditor.HasPendingEdit) ReceiptDateEditor.Focus();
+            else _inline.FocusActiveEdit();
             return false;
         }
 
@@ -427,6 +440,7 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 CancelEditorLookupEdits();
                 _editor.Load(null);
+                BeginReceiptDateSession();
                 _selectedLine = null;
             }
         }
@@ -442,6 +456,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             if (!_editor.Id.HasValue)
             {
+                BeginReceiptDateSession();
                 return;
             }
 
@@ -504,9 +519,32 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 return false;
             }
-            _editor.ReceiptDate = ReceiptDateEditor.Value;
+            if (!ReceiptDateEditor.Value.HasValue) return false;
+            _editor.ReceiptDate = ReceiptDateEditor.Value.Value;
             _editor.Note = NoteEditor.Text;
             return true;
+        }
+
+        private bool TryCommitReceiptDate()
+        {
+            if (!ReceiptDateEditor.HasPendingEdit) return true;
+            if (ReceiptDateEditor.TryCommitPending())
+            {
+                ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
+                if (_workflowMessage == "Enter a valid receipt date (day/month/year).") _workflowMessage = null;
+                return true;
+            }
+            _workflowMessage = "Enter a valid receipt date (day/month/year).";
+            ReceiptDateEditor.ValidationState = BootstrapValidationState.Invalid;
+            ApplyState();
+            ReceiptDateEditor.Focus();
+            return false;
+        }
+
+        private void BeginReceiptDateSession()
+        {
+            ReceiptDateEditor.BeginEditSession(_editor.ReceiptDate);
+            ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
         }
 
         private void SelectActiveReceipt()
@@ -601,8 +639,13 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (!_applyingState && !_editor.IsReadOnly && !_editor.RequiresPostOutcomeReload)
             {
-                _editor.ReceiptDate = ReceiptDateEditor.Value;
+                if (ReceiptDateEditor.Value.HasValue) _editor.ReceiptDate = ReceiptDateEditor.Value.Value;
             }
+        }
+
+        private void OnPendingReceiptDateChanged(object? sender, EventArgs eventArgs)
+        {
+            if (!_applyingState) ApplyState();
         }
 
         private void OnWarehouseChanged(object? sender, EventArgs eventArgs)
@@ -738,7 +781,8 @@ namespace MyDmsVn.Desktop.WinForms
                 BindEditorLookup(WarehouseLookup, _editor.WarehouseLookup.Items, _editor.WarehouseId);
                 BindEditorLookup(EmployeeLookup, _editor.EmployeeLookup.Items, _editor.EmployeeId);
                 StatusFilter.SelectedItem = _statusFilter ?? "All";
-                ReceiptDateEditor.Value = _editor.ReceiptDate;
+                if (ReceiptDateEditor.Value != _editor.ReceiptDate)
+                    ReceiptDateEditor.ProjectAcceptedValue(_editor.ReceiptDate);
                 NoteEditor.Text = _editor.Note ?? string.Empty;
                 StatusLabel.Text = _editor.Status;
                 if (_compactTitle != null) _compactTitle.Text = _editor.ReceiptNumber ?? "Goods receipt — New";

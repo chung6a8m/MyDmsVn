@@ -74,7 +74,7 @@ public sealed partial class GoodsReceiptControl
         TotalLabel.Visible = _totalCaption.Visible = detail;
         _compactTitle!.Visible = detail;
         _workspaceTitle.Text = detail ? "Goods receipt" : "Goods receipts";
-        _savedState.Text = _editor.RequiresPostOutcomeReload ? "Reload required" : _editor.IsBusy ? "Working…" : _editor.IsDirty || _inline.HasPendingDataEdit ? "Unsaved changes" : _editor.Id.HasValue ? "Saved" : "Not saved";
+        _savedState.Text = _editor.RequiresPostOutcomeReload ? "Reload required" : _editor.IsBusy ? "Working…" : _editor.IsDirty || _inline.HasPendingDataEdit || ReceiptDateEditor.HasPendingEdit ? "Unsaved changes" : _editor.Id.HasValue ? "Saved" : "Not saved";
         _lineCount.Text = _editor.Lines.Count + (_editor.Lines.Count == 1 ? " line" : " lines");
         _workspaceCommands.PerformLayout();
         _layoutReceipt();
