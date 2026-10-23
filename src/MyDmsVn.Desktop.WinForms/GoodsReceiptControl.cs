@@ -154,8 +154,8 @@ namespace MyDmsVn.Desktop.WinForms
         public BootstrapLookupBox EmployeeLookup { get; }
         public BootstrapLookupBox ProductLookup => _inline.ProductControl;
         public BootstrapTextBox NoteEditor { get; }
-        public BootstrapFormattedTextBox QuantityEditor => _inline.QuantityControl;
-        public BootstrapFormattedTextBox UnitCostEditor => _inline.CostControl;
+        public BootstrapDecimalInput QuantityEditor => _inline.QuantityControl;
+        public BootstrapDecimalInput UnitCostEditor => _inline.CostControl;
         public BootstrapButton RefreshButton { get; }
         public BootstrapButton PreviousPageButton { get; }
         public BootstrapButton NextPageButton { get; }

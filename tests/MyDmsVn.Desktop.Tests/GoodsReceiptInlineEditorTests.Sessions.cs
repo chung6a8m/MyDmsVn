@@ -18,6 +18,37 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed partial class GoodsReceiptInlineEditorTests
 {
     [Fact]
+    public void Native_numeric_grouping_preserves_pending_value_and_rejects_same_display_external_paste()
+    {
+        SessionTest(host =>
+        {
+            host.Begin(1, 2);
+            var driver = new NativeLookupTypingDriver(host.Adapter.QuantityControl);
+            driver.SelectRange(0, driver.Text.Length);
+            var candidate = string.Empty;
+            foreach (var value in "1234")
+            {
+                driver.TypeCharacter(value);
+                candidate += value;
+                driver.AssertFocused();
+                Assert.Equal(candidate, host.Adapter.QuantityControl.PendingText);
+                Assert.Equal(driver.Text.Length, driver.SelectionStart);
+                Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
+            }
+            Assert.Equal("1,234", driver.Text);
+            Assert.Equal(5, driver.SelectionStart);
+            driver.SelectRange(0, driver.Text.Length);
+            driver.Paste("1,234");
+            Assert.Equal("1,234", driver.Text);
+            Assert.Equal("1,234", host.Adapter.QuantityControl.PendingText);
+            Assert.False(host.Adapter.TryFinishEdit(ReceiptEditIntent.Save));
+            Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("1,234", host.Adapter.QuantityControl.Text);
+            _output.WriteLine("UIN_T05_GOODS_NUMERIC_NATIVE;windowDpi=" + host.WindowDpi + ";actualTestBitness=" + IntPtr.Size * 8);
+        });
+    }
+
+    [Fact]
     public void State_refresh_does_not_replace_the_active_cell()
     {
         SessionTest(host =>
@@ -336,6 +367,7 @@ public sealed partial class GoodsReceiptInlineEditorTests
         internal readonly GoodsReceiptLinesGridAdapter Adapter;
         private readonly Form _form = new Form { ClientSize = new Size(850, 260), ShowInTaskbar = false };
         internal IntPtr FormHandle => _form.Handle;
+        internal int WindowDpi => _form.DeviceDpi;
         internal bool CanEdit = true;
         internal readonly SessionLookup ProductSource = new SessionLookup(CatalogKind.Product);
         internal SessionHost()
