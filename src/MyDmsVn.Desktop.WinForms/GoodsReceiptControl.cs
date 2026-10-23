@@ -85,6 +85,7 @@ namespace MyDmsVn.Desktop.WinForms
             ReceiptDateEditor = new BootstrapDateInput
             {
                 Dock = DockStyle.Top, AccessibleName = "Receipt date",
+                AccessibleDescription = "Type day, day/month or day/month/four-digit-year.",
                 Profile = new DateInputProfile(false, DateTimePicker.MinimumDateTime, DateTimePicker.MaximumDateTime)
             };
             WarehouseLookup = CreateLookup("Warehouse");
@@ -93,7 +94,7 @@ namespace MyDmsVn.Desktop.WinForms
             StatusLabel = new Label { AutoSize = true };
             VersionLabel = new Label { AutoSize = true };
             TotalLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleRight };
-            OperationStatusLabel = new Label { AutoSize = true, Text = "Ready" };
+            OperationStatusLabel = new Label { AutoSize = true, Text = "Ready", AccessibleName = "Goods receipt operation status" };
             BusyIndicator = new BootstrapProgressBar
             {
                 Width = 100,
@@ -800,7 +801,7 @@ namespace MyDmsVn.Desktop.WinForms
                     _editor.ErrorMessage ??
                     _list.ErrorMessage ??
                     (busy ? "Loading..." : "Ready");
-                OperationStatusLabel.AccessibleRole = requiresPostReload || _inline.EditError != null || _editor.ErrorMessage != null || _list.ErrorMessage != null
+                OperationStatusLabel.AccessibleRole = requiresPostReload || _inline.EditError != null || _workflowMessage != null || _editor.ErrorMessage != null || _list.ErrorMessage != null
                     ? AccessibleRole.Alert : AccessibleRole.StaticText;
                 OperationStatusLabel.ForeColor = OperationStatusLabel.AccessibleRole == AccessibleRole.Alert
                     ? MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Mode == MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark
@@ -887,7 +888,15 @@ namespace MyDmsVn.Desktop.WinForms
         private void SetError(string field, Control control)
         {
             var messages = ((IEnumerable)_editor.GetErrors(field)).Cast<string>();
-            _errors.SetError(control, string.Join(Environment.NewLine, messages));
+            var error = string.Join(Environment.NewLine, messages);
+            if (field == "receiptDate")
+            {
+                if (error.Length == 0 && ReceiptDateEditor.ValidationState == BootstrapValidationState.Invalid)
+                    error = "Enter a valid receipt date (day/month/year).";
+                ReceiptDateEditor.AccessibleDescription = error.Length == 0
+                    ? "Type day, day/month or day/month/four-digit-year." : error;
+            }
+            _errors.SetError(control, error);
         }
 
         private bool TryGetLineErrorControl(string field, out Control control)

@@ -76,6 +76,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         SaleDateEditor = new BootstrapDateInput
         {
             AccessibleName = "Sale date", Dock = DockStyle.Top,
+            AccessibleDescription = "Type day, day/month or day/month/four-digit-year.",
             Profile = new DateInputProfile(false, DateTimePicker.MinimumDateTime, DateTimePicker.MaximumDateTime)
         };
         NoteEditor = new BootstrapTextBox { AccessibleName = "Note", Dock = DockStyle.Top };
@@ -399,6 +400,13 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
             OutcomeSaleIdEditor.Visible = ReviewCreateButton.Visible = Editor.RequiresCreateOutcomeReview;
             ReviewCreateButton.Enabled = _read && !Busy;
             OperationStatusLabel.Text = _inline.EditError ?? Editor.Error?.Message ?? _list.Error?.Message ?? _message ?? "Ready";
+            OperationStatusLabel.AccessibleRole = _inline.EditError != null || Editor.Error != null || _list.Error != null || _message != null
+                ? AccessibleRole.Alert : AccessibleRole.StaticText;
+            var dateError = SaleDateEditor.ValidationState == BootstrapValidationState.Invalid
+                ? "Enter a valid sale date (day/month/year)." : "";
+            _errors.SetError(SaleDateEditor, dateError);
+            SaleDateEditor.AccessibleDescription = dateError.Length == 0
+                ? "Type day, day/month or day/month/four-digit-year." : dateError;
             _errors.SetError(LineGrid, _inline.EditError ?? "");
             foreach (var input in new Control[] { ProductLookup, QuantityEditor, UnitPriceEditor }) _errors.SetError(input, "");
             if (_inline.ActiveValidationControl is Control activeInput)

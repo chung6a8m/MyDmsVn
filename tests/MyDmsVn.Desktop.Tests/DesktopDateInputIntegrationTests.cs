@@ -57,6 +57,8 @@ public sealed partial class GoodsReceiptControlTests
             Assert.False(control.TryShowReceiptList());
             control.SaveButton.PerformClick();
             control.LastOperation.GetAwaiter().GetResult();
+            Assert.Equal(AccessibleRole.Alert, control.OperationStatusLabel.AccessibleRole);
+            Assert.Contains("valid receipt date", input.AccessibleDescription);
             control.PostButton.PerformClick();
             control.LastOperation.GetAwaiter().GetResult();
             Assert.Null(fixture.Api.LastUpdate);
@@ -138,6 +140,8 @@ public sealed class DesktopDateInputIntegrationTests
             Assert.Equal("31/11/2026", input.PendingText);
             Assert.False(control.TryShowReceiptList());
             host.CallTask("SaveAsync");
+            Assert.Equal(AccessibleRole.Alert, control.OperationStatusLabel.AccessibleRole);
+            Assert.Contains("valid sale date", input.AccessibleDescription);
             host.CallTask("PostAsync");
             Assert.Empty(host.Api.Updates);
             Assert.Empty(host.Api.Posts);
