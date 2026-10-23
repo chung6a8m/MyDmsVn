@@ -154,6 +154,40 @@ public sealed class SalesReceiptControlTests
             Assert.Equal("ream", host.Editor.Lines.Single().Unit); Assert.Equal(4m, host.Editor.Lines.Single().UnitPrice);
         }, TimeSpan.FromSeconds(20));
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Resolved_numeric_validation_clears_footer_and_provider_without_clearing_operation_feedback(bool saveCorrection)
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var footer = host.Value<Label>("OperationStatusLabel");
+            var grid = host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSourceGrid>("LineGrid");
+            var errors = (ErrorProvider)host.Control.GetType().GetField("_errors", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Control)!;
+            // An unrelated operation message must survive the inline validation lifecycle.
+            const string operationMessage = "An unrelated operation needs review.";
+            host.Control.GetType().GetField("_message", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(host.Control, operationMessage);
+            host.Begin(3); host.Value<Box>("QuantityEditor").Text = "1.00001";
+            host.CallTask("SaveAsync");
+            Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts); Assert.Equal(1m, host.Editor.Lines.Single().Quantity);
+            var validation = errors.GetError(grid); Assert.NotEmpty(validation); Assert.Equal(validation, footer.Text);
+            if (saveCorrection)
+            {
+                host.Value<Box>("QuantityEditor").Text = "2.125";
+                host.Api.NextUpdate = new SalesReceiptDto(41, "SA0000000041", host.Editor.SaleDate, 1, 2, 3, "Draft", "note", null, "AgIDBAUGBwg=",
+                    new[] { new SalesReceiptLineDto(91, 1, 7, "box", 2.125m, 4m, false, 8.5m, null, null, "P7 - Product", true) }, 8.5m, null, null, "C1 - Customer", true, "W2 - Warehouse", true, "E3 - Employee", true);
+                host.CallTask("SaveAsync");
+                Assert.Equal(2.125m, host.Api.Updates.Single().Lines.Single().Qty); Assert.Equal(2.125m, host.Editor.Lines.Single().Quantity); Assert.False(host.Editor.IsDirty);
+            }
+            else
+            {
+                Assert.True(new SourceGrid.CellContext(grid, new SourceGrid.Position(1, 3)).EndEdit(true));
+                Assert.Empty(host.Api.Updates); Assert.Equal(1m, host.Editor.Lines.Single().Quantity); Assert.False(host.Editor.IsDirty);
+            }
+            Assert.Empty(errors.GetError(grid)); Assert.Equal(operationMessage, footer.Text); Assert.Empty(host.Api.Posts);
+        }, TimeSpan.FromSeconds(20));
+    }
     [Fact]
     public void Save_commits_real_numeric_buffer_before_snapshot()
     {

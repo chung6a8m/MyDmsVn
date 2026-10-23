@@ -8,48 +8,113 @@ SELECT @SourceRows = COUNT_BIG(*) FROM dbo.GoodsReceiptLines WITH (TABLOCKX, HOL
 IF ISNULL(TRY_CONVERT(int,SESSION_CONTEXT(N'MyDmsVn.FreshInstall')),0) <> 1 AND
     CONVERT(nvarchar(60), DATABASEPROPERTYEX(DB_NAME(), 'UserAccess')) <> N'RESTRICTED_USER'
     THROW 51010, 'Valuation bootstrap requires restricted maintenance access.', 1;
-IF EXISTS (
-    SELECT 1 FROM dbo.StockLedger AS e
-    LEFT JOIN dbo.GoodsReceiptLines AS l ON l.ReceiptLineId=e.DocumentLineId
-    LEFT JOIN dbo.GoodsReceipts AS h ON h.ReceiptId=l.ReceiptId
-    WHERE e.DocumentType <> 'GoodsReceipt' OR DATALENGTH(e.DocumentType) <> 12 OR e.QuantityChange <= 0
-       OR l.ReceiptLineId IS NULL OR h.ReceiptId IS NULL OR h.Status <> 'Posted'
-       OR e.DocumentId <> h.ReceiptId OR e.WarehouseId <> h.WarehouseId OR e.ProductId <> l.ProductId
-       OR e.QuantityChange <> l.Quantity OR e.PostedAtUtc <> h.PostedAtUtc
-       OR e.PostedByUserId <> h.PostedByUserId OR h.PostedAtUtc IS NULL OR h.PostedByUserId IS NULL
-       OR l.Quantity <= 0 OR l.UnitCost < 0)
-    THROW 51011, 'Historical ledger/source correspondence is invalid.', 1;
+-- Diagnostics contain bounded numeric counts/identities only, never source text.
+DECLARE @InvalidCount bigint, @SampleId bigint, @Diagnostic nvarchar(300),
+    @SampleWarehouse int, @SampleProduct int;
+SELECT e.LedgerId INTO #InvalidCorrespondence
+FROM dbo.StockLedger AS e
+LEFT JOIN dbo.GoodsReceiptLines AS l ON l.ReceiptLineId=e.DocumentLineId
+LEFT JOIN dbo.GoodsReceipts AS h ON h.ReceiptId=l.ReceiptId
+WHERE e.DocumentType <> 'GoodsReceipt' OR DATALENGTH(e.DocumentType) <> 12 OR e.QuantityChange <= 0
+   OR l.ReceiptLineId IS NULL OR h.ReceiptId IS NULL OR h.Status <> 'Posted'
+   OR e.DocumentId <> h.ReceiptId OR e.WarehouseId <> h.WarehouseId OR e.ProductId <> l.ProductId
+   OR e.QuantityChange <> l.Quantity OR e.PostedAtUtc <> h.PostedAtUtc
+   OR e.PostedByUserId <> h.PostedByUserId OR h.PostedAtUtc IS NULL OR h.PostedByUserId IS NULL
+   OR l.Quantity <= 0 OR l.UnitCost < 0;
+SELECT @InvalidCount=COUNT_BIG(*),@SampleId=MIN(LedgerId) FROM #InvalidCorrespondence;
+IF @InvalidCount > 0
+BEGIN
+    SET @Diagnostic=CONCAT(N'Historical ledger/source correspondence is invalid; Count=',@InvalidCount,N'; LedgerId=',@SampleId,N'.');
+    THROW 51011, @Diagnostic, 1;
+END;
 -- Existing GoodsReceiptValidation.MaximumLinesPerReceipt is 200, independently of Sales.
-IF EXISTS (SELECT 1 FROM dbo.GoodsReceipts AS h WHERE h.Status='Posted' AND
-    (SELECT COUNT_BIG(*) FROM dbo.GoodsReceiptLines AS l WHERE l.ReceiptId=h.ReceiptId) NOT BETWEEN 1 AND 200)
-    THROW 51012, 'Posted receipt line count is invalid.', 1;
-IF EXISTS (SELECT 1 FROM dbo.GoodsReceiptLines AS l JOIN dbo.GoodsReceipts AS h ON h.ReceiptId=l.ReceiptId
-    WHERE h.Status='Posted' AND (SELECT COUNT_BIG(*) FROM dbo.StockLedger AS e
+SELECT h.ReceiptId INTO #InvalidLineCount FROM dbo.GoodsReceipts AS h WHERE h.Status='Posted' AND
+    (SELECT COUNT_BIG(*) FROM dbo.GoodsReceiptLines AS l WHERE l.ReceiptId=h.ReceiptId) NOT BETWEEN 1 AND 200;
+SELECT @InvalidCount=COUNT_BIG(*),@SampleId=MIN(ReceiptId) FROM #InvalidLineCount;
+IF @InvalidCount > 0
+BEGIN
+    SET @Diagnostic=CONCAT(N'Posted receipt line count is invalid; Count=',@InvalidCount,N'; ReceiptId=',@SampleId,N'.');
+    THROW 51012, @Diagnostic, 1;
+END;
+SELECT l.ReceiptLineId INTO #InvalidCounterpart
+FROM dbo.GoodsReceiptLines AS l JOIN dbo.GoodsReceipts AS h ON h.ReceiptId=l.ReceiptId
+WHERE h.Status='Posted' AND (SELECT COUNT_BIG(*) FROM dbo.StockLedger AS e
     WHERE e.DocumentType='GoodsReceipt' AND DATALENGTH(e.DocumentType)=12 AND e.DocumentLineId=l.ReceiptLineId
-    AND e.DocumentId=h.ReceiptId) <> 1)
-    THROW 51013, 'Posted source has no unique ledger counterpart.', 1;
+    AND e.DocumentId=h.ReceiptId) <> 1;
+SELECT @InvalidCount=COUNT_BIG(*),@SampleId=MIN(ReceiptLineId) FROM #InvalidCounterpart;
+IF @InvalidCount > 0
+BEGIN
+    SET @Diagnostic=CONCAT(N'Posted source has no unique ledger counterpart; Count=',@InvalidCount,N'; ReceiptLineId=',@SampleId,N'.');
+    THROW 51013, @Diagnostic, 1;
+END;
+-- decimal(18,4) quantities and at most bigint rows fit this widened sum.
 SELECT WarehouseId,ProductId,SUM(CONVERT(decimal(38,4),QuantityChange)) AS Quantity
 INTO #QuantityProof FROM dbo.StockLedger GROUP BY WarehouseId,ProductId;
-IF EXISTS (SELECT 1 FROM #QuantityProof AS p FULL JOIN dbo.StockBalances AS b
+SELECT COALESCE(p.WarehouseId,b.WarehouseId) AS WarehouseId,COALESCE(p.ProductId,b.ProductId) AS ProductId
+INTO #InvalidBalance FROM #QuantityProof AS p FULL JOIN dbo.StockBalances AS b
     ON b.WarehouseId=p.WarehouseId AND b.ProductId=p.ProductId
-    WHERE p.WarehouseId IS NULL OR b.WarehouseId IS NULL OR b.Quantity < 0 OR p.Quantity <> b.Quantity)
-    THROW 51014, 'Historical balance keys or quantities disagree.', 1;
+WHERE p.WarehouseId IS NULL OR b.WarehouseId IS NULL OR b.Quantity < 0 OR p.Quantity <> b.Quantity;
+SELECT @InvalidCount=COUNT_BIG(*) FROM #InvalidBalance;
+IF @InvalidCount > 0
+BEGIN
+    SELECT TOP(1) @SampleWarehouse=WarehouseId,@SampleProduct=ProductId FROM #InvalidBalance ORDER BY WarehouseId,ProductId;
+    SET @Diagnostic=CONCAT(N'Historical balance keys or quantities disagree; Count=',@InvalidCount,N'; WarehouseId=',@SampleWarehouse,N'; ProductId=',@SampleProduct,N'.');
+    THROW 51014, @Diagnostic, 1;
+END;
+-- The exact product fits decimal(38,8). TRY_CONVERT detects only the target range;
+-- an unrepresentable result remains a fatal refusal, never a substituted value.
+SELECT e.LedgerId,e.WarehouseId,e.ProductId,TRY_CONVERT(decimal(28,4),ROUND(l.Quantity*l.UnitCost,4)) AS ValueChange
+INTO #LineValues FROM dbo.StockLedger AS e JOIN dbo.GoodsReceiptLines AS l ON l.ReceiptLineId=e.DocumentLineId;
+SELECT @InvalidCount=COUNT_BIG(*),@SampleId=MIN(LedgerId) FROM #LineValues WHERE ValueChange IS NULL;
+IF @InvalidCount > 0
+BEGIN
+    SET @Diagnostic=CONCAT(N'Historical line amount overflow; Count=',@InvalidCount,N'; LedgerId=',@SampleId,N'.');
+    THROW 51015, @Diagnostic, 1;
+END;
+CREATE CLUSTERED INDEX IX_LineValues_StockKey ON #LineValues(WarehouseId,ProductId,LedgerId);
+CREATE TABLE #ValueProof(WarehouseId int NOT NULL,ProductId int NOT NULL,InventoryValue decimal(28,4) NULL);
+-- Maintenance-only key iteration identifies the exact key even if the widened SUM
+-- itself overflows. All values are nonnegative; no arithmetic is clamped or rounded here.
+DECLARE @InventoryValue decimal(28,4);
+DECLARE ValueKeys CURSOR LOCAL FAST_FORWARD FOR SELECT WarehouseId,ProductId FROM #QuantityProof ORDER BY WarehouseId,ProductId;
+OPEN ValueKeys;
+FETCH NEXT FROM ValueKeys INTO @SampleWarehouse,@SampleProduct;
+WHILE @@FETCH_STATUS=0
+BEGIN
+    BEGIN TRY
+        SELECT @InventoryValue=TRY_CONVERT(decimal(28,4),SUM(CONVERT(decimal(38,4),ValueChange)))
+        FROM #LineValues WHERE WarehouseId=@SampleWarehouse AND ProductId=@SampleProduct;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() <> 8115 THROW;
+        CLOSE ValueKeys;
+        DEALLOCATE ValueKeys;
+        SET @Diagnostic=CONCAT(N'Historical aggregate value overflow; Count>=1; WarehouseId=',@SampleWarehouse,N'; ProductId=',@SampleProduct,N'.');
+        THROW 51016, @Diagnostic, 1;
+    END CATCH;
+    INSERT #ValueProof(WarehouseId,ProductId,InventoryValue) VALUES(@SampleWarehouse,@SampleProduct,@InventoryValue);
+    FETCH NEXT FROM ValueKeys INTO @SampleWarehouse,@SampleProduct;
+END;
+CLOSE ValueKeys;
+DEALLOCATE ValueKeys;
+SELECT @InvalidCount=COUNT_BIG(*) FROM #ValueProof WHERE InventoryValue IS NULL;
+IF @InvalidCount > 0
+BEGIN
+    SELECT TOP(1) @SampleWarehouse=WarehouseId,@SampleProduct=ProductId FROM #ValueProof WHERE InventoryValue IS NULL ORDER BY WarehouseId,ProductId;
+    SET @Diagnostic=CONCAT(N'Historical aggregate value overflow; Count=',@InvalidCount,N'; WarehouseId=',@SampleWarehouse,N'; ProductId=',@SampleProduct,N'.');
+    THROW 51016, @Diagnostic, 1;
+END;
 CREATE TABLE dbo.StockValuationEntries
 (
     LedgerId bigint NOT NULL CONSTRAINT PK_StockValuationEntries PRIMARY KEY,
     ValueChange decimal(28,4) NOT NULL,
     CONSTRAINT FK_StockValuationEntries_StockLedger FOREIGN KEY (LedgerId) REFERENCES dbo.StockLedger(LedgerId)
 );
-INSERT dbo.StockValuationEntries(LedgerId,ValueChange)
-SELECT e.LedgerId, CONVERT(decimal(28,4),ROUND(l.Quantity*l.UnitCost,4))
-FROM dbo.StockLedger AS e JOIN dbo.GoodsReceiptLines AS l ON l.ReceiptLineId=e.DocumentLineId;
+INSERT dbo.StockValuationEntries(LedgerId,ValueChange) SELECT LedgerId,ValueChange FROM #LineValues;
 ALTER TABLE dbo.StockBalances ADD InventoryValue decimal(28,4) NULL;
 GO
-UPDATE b SET InventoryValue=CONVERT(decimal(28,4),p.InventoryValue)
-FROM dbo.StockBalances AS b JOIN
-(SELECT e.WarehouseId,e.ProductId,SUM(CONVERT(decimal(38,4),v.ValueChange)) AS InventoryValue
- FROM dbo.StockLedger AS e JOIN dbo.StockValuationEntries AS v ON v.LedgerId=e.LedgerId
- GROUP BY e.WarehouseId,e.ProductId) AS p ON p.WarehouseId=b.WarehouseId AND p.ProductId=b.ProductId;
+UPDATE b SET InventoryValue=p.InventoryValue
+FROM dbo.StockBalances AS b JOIN #ValueProof AS p ON p.WarehouseId=b.WarehouseId AND p.ProductId=b.ProductId;
 ALTER TABLE dbo.StockBalances ALTER COLUMN InventoryValue decimal(28,4) NOT NULL;
 GO
 ALTER TABLE dbo.StockBalances ADD CONSTRAINT CK_StockBalances_Quantity CHECK (Quantity >= 0),

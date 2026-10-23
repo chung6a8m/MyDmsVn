@@ -19,6 +19,45 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SalesReceiptLookupNativeInputTests
 {
+    [Theory]
+    [InlineData("Light", false)]
+    [InlineData("Dark", false)]
+    [InlineData("Light", true)]
+    [InlineData("Dark", true)]
+    public void Numeric_save_validation_resolves_after_native_Escape_or_corrected_Save(string theme, bool saveCorrection)
+    {
+        SalesNativeHost.Run((token, guard) =>
+        {
+            using var host = new SalesNativeHost("ProductLookup", theme, token, _output.WriteLine); host.AttachGuard(guard);
+            host.Driver.Key(Keys.Escape);
+            var position = new SourceGrid.Position(1, 3); host.Control.LineGrid.Focus(); Assert.True(host.Control.LineGrid.Selection.Focus(position, true));
+            new SourceGrid.CellContext(host.Control.LineGrid, position).StartEdit();
+            var driver = new NativeLookupTypingDriver(host.Control.QuantityEditor); driver.SelectRange(0, driver.Text.Length);
+            foreach (var value in "1.00001") driver.TypeCharacter(value);
+            host.Wait(host.Control.SaveAsync());
+            Assert.Equal("1.00001", driver.Text); Assert.Equal(7, driver.SelectionStart); Assert.Equal(0, driver.SelectionLength); driver.AssertFocused();
+            var errors = (ErrorProvider)typeof(SalesReceiptControl).GetField("_errors", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(host.Control)!;
+            var validation = errors.GetError(host.Control.LineGrid); Assert.NotEmpty(validation); Assert.Equal(validation, host.Control.OperationStatusLabel.Text);
+            Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts); Assert.Equal(1m, host.Control.Editor.Lines.Single().Quantity);
+            if (saveCorrection)
+            {
+                driver.SelectRange(0, driver.Text.Length); foreach (var value in "2.125") driver.TypeCharacter(value);
+                Assert.Equal("2.125", driver.Text); Assert.Equal(5, driver.SelectionStart); Assert.Equal(0, driver.SelectionLength); driver.AssertFocused();
+                host.Api.NextUpdate = new SalesReceiptDto(41, "SA0000000041", host.Control.Editor.SaleDate, 1, 2, 3, "Draft", "note", null, "AgIDBAUGBwg=",
+                    new[] { new SalesReceiptLineDto(91, 1, 7, "box", 2.125m, 4m, false, 8.5m, null, null, "P7 - Product", true) }, 8.5m, null, null, "C1 - Customer", true, "W2 - Warehouse", true, "E3 - Employee", true);
+                host.Wait(host.Control.SaveAsync());
+                Assert.Equal(2.125m, host.Api.Updates.Single().Lines.Single().Qty); Assert.Equal(2.125m, host.Control.Editor.Lines.Single().Quantity);
+            }
+            else
+            {
+                driver.Key(Keys.Escape); host.Pump();
+                Assert.Empty(host.Api.Updates); Assert.Equal(1m, host.Control.Editor.Lines.Single().Quantity);
+            }
+            Assert.Empty(errors.GetError(host.Control.LineGrid)); Assert.Equal("Ready", host.Control.OperationStatusLabel.Text);
+            Assert.False(host.Control.Editor.IsDirty); Assert.Empty(host.Api.Posts);
+            _output.WriteLine("SAL_NUMERIC_VALIDATION_RESOLVED;theme=" + theme + ";boundary=" + (saveCorrection ? "corrected-save" : "native-Escape") + ";windowDpi=" + host.Form.DeviceDpi + ";actualTestBitness=" + IntPtr.Size * 8);
+        });
+    }
     private readonly ITestOutputHelper _output;
     public SalesReceiptLookupNativeInputTests(ITestOutputHelper output) { _output = output; }
     public static IEnumerable<object[]> Targets => new[] { "CustomerLookup", "WarehouseLookup", "EmployeeLookup", "ProductLookup", "CustomerFilterLookup", "WarehouseFilterLookup", "EmployeeFilterLookup", "ProductFilterLookup" }

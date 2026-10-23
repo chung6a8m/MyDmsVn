@@ -69,20 +69,30 @@ public sealed class DirectSalesBootstrapTests
             using var c = new SqlConnection(db.ConnectionString);
             await Seed(c);
             await Corrupt(c, scenario);
+            await c.ExecuteAsync("UPDATE dbo.GoodsReceipts SET Note=N'PRIVATE_DIAGNOSTIC_SENTINEL'; UPDATE dbo.Products SET Name=N'PRIVATE_DIAGNOSTIC_SENTINEL';");
             var before = await Snapshot(c);
             var balanceBefore = await BalanceSnapshot(c);
+            var journalBefore = await JournalAndOwnershipSnapshot(c);
             if (scenario == "duplicate") Assert.Equal("Migration.PartialSchema", Assert.Throws<DatabaseMigrationPreflightException>(() => new DatabaseMigrationRunner().Migrate(db.ConnectionString)).Code);
             var result = Run010(db.ConnectionString, Script());
             Assert.False(result.Successful);
             var error = Assert.IsType<SqlException>(result.Error);
-            var expected = scenario == "line-overflow" || scenario == "sum-overflow" ? 8115 :
+            var expected = scenario == "line-overflow" ? 51015 : scenario == "sum-overflow" ? 51016 :
                 scenario == "empty-posted" || scenario == "too-many-lines" ? 51012 :
                 (scenario == "missing-ledger" || scenario == "duplicate") ? 51013 :
                 scenario == "extra-zero-key" || scenario == "missing-balance" || scenario == "wrong-balance" || scenario == "quantity-overflow" ? 51014 : 51011;
-            Assert.Equal(expected, error.Number);
             Assert.Equal(before, await Snapshot(c));
             Assert.Equal(balanceBefore, await BalanceSnapshot(c));
+            Assert.Equal(journalBefore, await JournalAndOwnershipSnapshot(c));
             await Assert9(c, scenario != "duplicate");
+            Assert.Equal(expected, error.Number);
+            Assert.InRange(error.Message.Length, 1, 300);
+            Assert.DoesNotContain("PRIVATE_DIAGNOSTIC_SENTINEL", error.Message);
+            Assert.Matches(@"^[A-Za-z ./]+; Count(?:=|>=)[0-9]+; (?:LedgerId=[0-9]+|ReceiptId=[0-9]+|ReceiptLineId=[0-9]+|WarehouseId=[0-9]+; ProductId=[0-9]+)\.$", error.Message);
+            var sample = expected == 51012 ? "ReceiptId=" + (scenario == "too-many-lines" ? "3" : "1") :
+                expected == 51013 ? "ReceiptLineId=1" : expected == 51014 || expected == 51016 ?
+                "WarehouseId=1; ProductId=" + (scenario == "extra-zero-key" ? "2" : "1") : "LedgerId=1";
+            Assert.EndsWith("; Count=" + (scenario == "unknown" ? "2" : "1") + "; " + sample + ".", error.Message);
         }
         finally { await db.DisposeAsync(); }
     }
@@ -192,6 +202,9 @@ INSERT dbo.GoodsReceipts(ReceiptNo,ReceiptDate,WarehouseId,EmployeeId,Status,Cre
 INSERT dbo.GoodsReceiptLines(ReceiptId,[LineNo],ProductId,Quantity,UnitCost,CreatedByUserId) VALUES(1,1,1,0.0001,0.5000,1),(2,1,1,0.0001,0.5000,1);
 INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId) VALUES(1,1,'GoodsReceipt',1,1,0.0001,@now,1),(1,1,'GoodsReceipt',2,2,0.0001,@now,1);
 INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity) VALUES(1,1,0.0002);");
+    private static Task<string> JournalAndOwnershipSnapshot(SqlConnection c) => c.QuerySingleAsync<string>(@"
+SELECT (SELECT * FROM dbo.SchemaVersions ORDER BY Id FOR JSON PATH,INCLUDE_NULL_VALUES) +
+(SELECT name,CONVERT(nvarchar(4000),value) AS value FROM sys.extended_properties WHERE name=N'MyDmsVn.TestOwnership' FOR JSON PATH,INCLUDE_NULL_VALUES);");
     private static Task<string> BalanceSnapshot(SqlConnection c) => c.QuerySingleAsync<string>("SELECT (SELECT WarehouseId,ProductId,Quantity,RowVersion FROM dbo.StockBalances ORDER BY WarehouseId,ProductId FOR JSON PATH,INCLUDE_NULL_VALUES);");
     private static Task<string> Snapshot(SqlConnection c) => c.QuerySingleAsync<string>(@"
 SELECT (SELECT * FROM dbo.StockLedger ORDER BY LedgerId FOR JSON PATH,INCLUDE_NULL_VALUES) +
@@ -210,7 +223,7 @@ INSERT dbo.GoodsReceipts(ReceiptNo,ReceiptDate,WarehouseId,EmployeeId,Status,Cre
 INSERT dbo.GoodsReceiptLines(ReceiptId,[LineNo],ProductId,Quantity,UnitCost,CreatedByUserId) SELECT 3,ProductId-2,ProductId,1,1,1 FROM dbo.Products WHERE ProductId>2;
 INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId) SELECT 1,ProductId,'GoodsReceipt',3,ReceiptLineId,1,'20261022',1 FROM dbo.GoodsReceiptLines WHERE ReceiptId=3;
 INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity) SELECT 1,ProductId,1 FROM dbo.Products WHERE ProductId>2;"; break;
-            case "unknown": sql = "UPDATE dbo.StockLedger SET DocumentType='Unknown' WHERE LedgerId=1;"; break;
+            case "unknown": sql = "UPDATE dbo.StockLedger SET DocumentType='Unknown';"; break;
             case "negative": sql = "UPDATE dbo.StockLedger SET QuantityChange=-0.0001 WHERE LedgerId=1;"; break;
             case "wrong-document": sql = "UPDATE dbo.StockLedger SET DocumentId=2 WHERE LedgerId=1;"; break;
             case "wrong-line": sql = "UPDATE dbo.StockLedger SET DocumentLineId=999 WHERE LedgerId=1;"; break;

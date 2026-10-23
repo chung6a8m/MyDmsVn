@@ -212,7 +212,9 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
                 var pending = _lookups.FirstOrDefault(binding => !binding.Filter && binding.Control.HasPendingText);
                 if (pending != null) { _message = "Choose a current header lookup result or cancel the pending query."; pending.Control.Focus(); ApplyState(); return; }
                 result = _inline.TryFinishEdit(intent == SalesCommandIntent.Save ? ReceiptEditIntent.Save : ReceiptEditIntent.Post);
-                if (!result) { _message = _inline.EditError; _inline.FocusActiveEdit(); }
+                // The adapter owns inline validation and clears it on cancel/commit.
+                // Do not overwrite independent operation feedback with a second error copy.
+                if (!result) _inline.FocusActiveEdit();
                 if (result) InvalidateProductRequests();
                 ApplyState();
             }, token);
