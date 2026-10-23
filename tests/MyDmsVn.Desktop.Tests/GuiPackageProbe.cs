@@ -473,14 +473,14 @@ internal static class GuiPackageProbe
         Invoke(Find(page, "Refresh", ControlType.Button, false));
     }
 
-    private static void AddSalesLine(AutomationElement page, int row, decimal quantity, decimal price)
+    private static void AddSalesLine(AutomationElement page, int row, decimal quantity, decimal price, string product = "SAL-P - Sales Product")
     {
         var previousStage = _stage;
         _stage = "sales-line-" + row + "-add";
         Invoke(Find(page, "Add line", ControlType.Button, false));
         _salesRow = row;
         _stage = "sales-line-" + row + "-product";
-        SetLookup(page, "Product", "SAL-P - Sales Product");
+        SetLookup(page, "Product", product);
         _stage = "sales-line-" + row + "-quantity";
         SetInput(page, "Quantity", quantity.ToString("F4"), false);
         _stage = "sales-line-" + row + "-price";
@@ -533,37 +533,73 @@ internal static class GuiPackageProbe
         AssertSalesCell(page, "Unit price", 40m);
     }
 
+    private static string[] SalesActionNames(AutomationElement page)
+    {
+        var table = Find(page, "Sales receipt results", ControlType.Table, false);
+        var names = new System.Collections.Generic.List<string>();
+        foreach (AutomationElement item in table.FindAll(TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button)))
+            if (item.Current.Name.StartsWith("Open ", StringComparison.Ordinal)) names.Add(item.Current.Name);
+        return names.ToArray();
+    }
+
+    private static void AssertSalesPage(AutomationElement page, string action, decimal total)
+    {
+        Wait(delegate { return SalesOpenAction(page).Current.Name == action; }, "Filtered Sales header/order differs.");
+        ReadOnlyValue(Find(page, "Sales receipt results", ControlType.Table, false), total.ToString("N4"));
+    }
+
     private static void SalesKeyset(AutomationElement page)
     {
+        _stage = "sales-list-distinct-product-fixtures";
         Invoke(Find(page, "Back to sales", ControlType.Button, false));
         var golden = SalesOpenAction(page).Current.Name;
-        for (var index = 0; index < 2; index++)
+        var known = new System.Collections.Generic.List<string>(); known.Add(golden);
+        var added = new string[3];
+        for (var index = 0; index < 3; index++)
         {
             Invoke(Find(page, "New", ControlType.Button, false));
             SetLookup(page, "Customer", "SAL-C - Sales Customer");
             SetLookup(page, "Warehouse", "SAL-W - Sales Warehouse");
             SetLookup(page, "Employee", "SAL-E - Sales Employee");
-            SetInput(page, "Note", "SAL list " + index, false);
-            AddSalesLine(page, 1, 1m, index + 1);
+            SetInput(page, "Note", index == 0 ? "SAL list pure" : index == 1 ? "SAL list mixed" : "SAL list other-only", false);
+            if (index == 0) AddSalesLine(page, 1, 1m, 3m);
+            else if (index == 1)
+            {
+                AddSalesLine(page, 1, 1m, 2m);
+                AddSalesLine(page, 2, 2m, 7m, "SAL-X - Other Sales Product"); // Whole bill16; matching subtotal2.
+            }
+            else AddSalesLine(page, 1, 1m, 11m, "SAL-X - Other Sales Product"); // Newest header must be excluded.
             Invoke(Find(page, "Save", ControlType.Button, false));
             Find(page, "Saved · Draft", ControlType.Text, false);
             Invoke(Find(page, "Back to sales", ControlType.Button, false));
+            Invoke(Find(page, "Refresh", ControlType.Button, false));
+            Wait(delegate { return SalesActionNames(page).Length == known.Count + 1; }, "New Sales list fixture missing.");
+            foreach (var name in SalesActionNames(page)) if (!known.Contains(name))
+            {
+                if (added[index] != null) throw new InvalidOperationException("Ambiguous new Sales fixture.");
+                added[index] = name;
+            }
+            if (added[index] == null) throw new InvalidOperationException("New Sales fixture identity unavailable.");
+            known.Add(added[index]);
         }
         SetSalesPageSize(page, 1);
         SetLookup(page, "Filter by product", "SAL-P - Sales Product");
         Invoke(Find(page, "Apply filters", ControlType.Button, false));
+        _stage = "sales-list-filtered-exact-headers-totals";
+        AssertSalesPage(page, added[1], 16m);
         var first = SalesOpenAction(page).Current.Name;
         Invoke(Find(page, "Next", ControlType.Button, false));
-        Wait(delegate { return SalesOpenAction(page).Current.Name != first; }, "Next Sales cursor repeated first row.");
+        AssertSalesPage(page, added[0], 3m);
         var second = SalesOpenAction(page).Current.Name;
         Invoke(Find(page, "Next", ControlType.Button, false));
-        Wait(delegate { return SalesOpenAction(page).Current.Name == golden; }, "Duplicate Product membership repeated/skipped Sales header.");
-        ReadOnlyValue(Find(page, "Sales receipt results", ControlType.Table, false), 75m.ToString("N4"));
-        if (Find(page, "Next", ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Last Sales page allows Next.");
+        AssertSalesPage(page, golden, 75m);
+        if (Find(page, "Next", ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Last filtered Sales page allows Next.");
+        Console.WriteLine("SALES_FILTERED_ACTIONS=" + string.Join("|", new[] { first, second, golden }));
         Invoke(Find(page, "Previous", ControlType.Button, false));
-        Wait(delegate { return SalesOpenAction(page).Current.Name == second; }, "Previous Sales cursor differs.");
+        AssertSalesPage(page, added[0], 3m);
         Invoke(Find(page, "First", ControlType.Button, false));
-        Wait(delegate { return SalesOpenAction(page).Current.Name == first; }, "First Sales cursor did not reset.");
+        AssertSalesPage(page, added[1], 16m);
         if (Find(page, "Previous", ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("First Sales page allows Previous.");
         Console.WriteLine("SALES_KEYSET_PRODUCT_TOTALS=PASS");
     }

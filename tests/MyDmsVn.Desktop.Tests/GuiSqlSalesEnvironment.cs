@@ -118,6 +118,34 @@ INSERT dbo.Customers(Code,Name) VALUES(N'SAL-C',N'Sales Customer');
         else Assert.Equal(20m, await ScalarAsync<decimal>(_oracle, "SELECT Quantity FROM dbo.StockBalances;"));
     }
 
+    internal Task SeedSalesListProductAsync() => ExecuteAsync(_migration,
+        "INSERT dbo.Products(Code,Name,Unit) VALUES(N'SAL-X',N'Other Sales Product',N'pcs');");
+
+    internal async Task AssertSalesListFixtureAsync(string output)
+    {
+        Assert.Equal(4, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.SalesReceipts;"));
+        Assert.Equal(3, await ScalarAsync<int>(_oracle, @"
+SELECT COUNT(*) FROM dbo.SalesReceipts h WHERE EXISTS
+(SELECT 1 FROM dbo.SalesReceiptLines l JOIN dbo.Products p ON p.ProductId=l.ProductId WHERE l.SaleId=h.SaleId AND p.Code=N'SAL-P');"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle, @"
+SELECT COUNT(*) FROM dbo.SalesReceipts h WHERE h.Note=N'SAL list other-only' AND h.Status='Draft'
+AND (SELECT COUNT(*) FROM dbo.SalesReceiptLines l WHERE l.SaleId=h.SaleId)=1
+AND EXISTS(SELECT 1 FROM dbo.SalesReceiptLines l JOIN dbo.Products p ON p.ProductId=l.ProductId
+ WHERE l.SaleId=h.SaleId AND p.Code=N'SAL-X' AND l.Qty=1 AND l.UnitPrice=11 AND l.LineAmount=11 AND l.IsGift=0);"));
+        Assert.Equal(2, await ScalarAsync<int>(_oracle, @"
+SELECT COUNT(*) FROM dbo.SalesReceiptLines l JOIN dbo.SalesReceipts h ON h.SaleId=l.SaleId
+JOIN dbo.Products p ON p.ProductId=l.ProductId WHERE h.Note=N'SAL list mixed' AND h.Status='Draft' AND l.IsGift=0
+AND ((p.Code=N'SAL-P' AND l.Qty=1 AND l.UnitPrice=2 AND l.LineAmount=2)
+ OR (p.Code=N'SAL-X' AND l.Qty=2 AND l.UnitPrice=7 AND l.LineAmount=14));"));
+        Assert.Equal(16m, await ScalarAsync<decimal>(_oracle, "SELECT SUM(l.LineAmount) FROM dbo.SalesReceiptLines l JOIN dbo.SalesReceipts h ON h.SaleId=l.SaleId WHERE h.Note=N'SAL list mixed';"));
+        Assert.Equal(3m, await ScalarAsync<decimal>(_oracle, "SELECT SUM(l.LineAmount) FROM dbo.SalesReceiptLines l JOIN dbo.SalesReceipts h ON h.SaleId=l.SaleId WHERE h.Note=N'SAL list pure';"));
+        var expected = await ScalarAsync<string>(_oracle, @"
+SELECT STUFF((SELECT N'|Open '+SaleNo FROM dbo.SalesReceipts
+WHERE Note IN(N'SAL list mixed',N'SAL list pure',N'SAL golden') ORDER BY SaleId DESC
+FOR XML PATH(''),TYPE).value('.','nvarchar(max)'),1,1,N'');");
+        Assert.Contains("SALES_FILTERED_ACTIONS=" + expected, output);
+    }
+
     // Consistent administrative fixture: every opening/later inflow has its Posted
     // source, exact audit, quantity movement and valuation companion. No orphan Q/V.
     internal Task AddOwnedSalesStockAsync(bool later) => ExecuteAsync(_migration, @"

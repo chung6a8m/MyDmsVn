@@ -57,6 +57,7 @@ public sealed partial class PackagedGuiAcceptanceTests
         await GuiSqlEnvironment.RunAsync(package, async fixture =>
         {
             await fixture.SeedSalesWriterAsync();
+            await fixture.SeedSalesListProductAsync();
             using var probe = new GuiProcessProbeFixture(package: true);
             PreserveSalesProbe(probe);
             var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" sales-audit " + theme);
@@ -70,6 +71,7 @@ public sealed partial class PackagedGuiAcceptanceTests
             Assert.True(result.ExitCode == 0, result.StandardOutput + result.StandardError);
             foreach (var marker in new[] { "SALES_ACTUAL_LOGIN", "SALES_DUPLICATE_GIFT_RELOAD", "SALES_POSTED_IMMUTABLE", "SALES_KEYSET_PRODUCT_TOTALS", "APPLICATION_DRAINED" })
                 Assert.Contains(marker + "=PASS", result.StandardOutput);
+            await fixture.AssertSalesListFixtureAsync(result.StandardOutput);
             await fixture.AssertSalesGoldenAsync();
             await fixture.AddOwnedSalesStockAsync(true);
             await fixture.AssertSalesGoldenAsync(later: true);
@@ -213,13 +215,17 @@ public sealed partial class PackagedGuiAcceptanceTests
             await GuiSqlEnvironment.RunSchemaTransitionAsync(package, schema9, async fixture =>
             {
                 await fixture.SeedSalesWriterAsync();
+                await fixture.CaptureLegacySchema9Async();
                 await AssertPackagedSchemaRefusalAsync(fixture, package, "Schema.TooOld", theme);
+                await fixture.AssertLegacyPreservedAsync(upgraded: false);
                 await fixture.AddPartial010Async();
                 await AssertPackagedSchemaRefusalAsync(fixture, package, "Schema.PartialMigration", theme);
                 var partial = await fixture.RunPackagedMigratorAsync(package);
                 Assert.NotEqual(0, partial.ExitCode);
                 Assert.Contains("Migration.PartialSchema", partial.StandardError + partial.StandardOutput);
                 await fixture.AssertPartial010UnchangedAsync();
+                await fixture.AssertLegacyPreservedAsync(upgraded: false);
+                _output.WriteLine("PACKAGED_SCHEMA9_PARTIAL_REFUSAL_IMMUTABLE=PASS");
             });
             // A partial state is retained for diagnosis and owned cleanup. A second,
             // pristine exact9 allocation proves upgrade; never heuristically repair
@@ -228,12 +234,16 @@ public sealed partial class PackagedGuiAcceptanceTests
             {
                 await fixture.SeedSalesWriterAsync();
                 await fixture.UpgradeOwnedSchema9Async(package);
+                _output.WriteLine("PACKAGED_LEGACY_SOURCE_LEDGER_JOURNAL_PRESERVED=PASS");
+                _output.WriteLine("PACKAGED_SCHEMA10_NOOP_ROWS_TOKENS_JOURNAL_ZERO_SCRIPTS=PASS");
+                var beforeRuntimeRefusal = await fixture.ReadSchema10SnapshotAsync();
                 var refused = await fixture.RunPackagedMigratorAsync(package, runtime: true);
                 Assert.NotEqual(0, refused.ExitCode);
                 Assert.Contains("Migration.InsufficientPrivileges", refused.StandardError + refused.StandardOutput);
                 // This is the genuine historical schema9 executable, with its own
                 // original validated bytes, observing current schema10 read-only.
                 await AssertPackagedSchemaRefusalAsync(fixture, schema9, "Schema.TooNew", theme);
+                Assert.Equal(beforeRuntimeRefusal, await fixture.ReadSchema10SnapshotAsync());
                 await fixture.ApplySchema10RuntimeGrantsAsync();
                 using var probe = new GuiProcessProbeFixture(package: true);
                 PreserveSalesProbe(probe);
