@@ -27,8 +27,11 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ISalesReceiptControlFactory? _salesReceiptControlFactory;
         private readonly ISecurityAdministrationControlFactory? _securityAdministrationControlFactory;
         private readonly int _uiThreadId;
+        private readonly WorkspaceCloseCoordinator _closeCoordinator;
+        private CancellationTokenSource _workspaceCloseLifetime = new CancellationTokenSource();
         private long? _workspaceSessionVersion;
         private bool _openingWorkspace;
+        private bool _disposedResources;
         private Button? _themeButton;
         private Label? _sessionUserLabel;
 
@@ -153,6 +156,15 @@ namespace MyDmsVn.Desktop.WinForms
             _inventoryControlFactory = inventoryControlFactory;
             _securityAdministrationControlFactory = securityAdministrationControlFactory;
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
+            _closeCoordinator = new WorkspaceCloseCoordinator((state, token) => ClosePrompt!(state, token));
+            ClosePrompt = (state, token) =>
+            {
+                if (token.IsCancellationRequested) return System.Threading.Tasks.Task.FromResult(WorkspaceCloseChoice.Cancel);
+                var answer = MessageBox.Show(this, "Save changes before closing this workspace?", "Close workspace",
+                    MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button3);
+                return System.Threading.Tasks.Task.FromResult(answer == DialogResult.Yes ? WorkspaceCloseChoice.Save :
+                    answer == DialogResult.No ? WorkspaceCloseChoice.Discard : WorkspaceCloseChoice.Cancel);
+            };
 
             Text = "MyDmsVn";
             StartPosition = FormStartPosition.CenterScreen;
@@ -168,6 +180,7 @@ namespace MyDmsVn.Desktop.WinForms
                 Dock = DockStyle.Fill,
             };
             Workspace.SelectedIndexChanged += OnWorkspaceSelectedIndexChanged;
+            Workspace.TabCloseRequested += OnTabCloseRequested;
 
             CreateSessionArea();
             var statusBar = new BootstrapStatusStrip
@@ -226,6 +239,8 @@ namespace MyDmsVn.Desktop.WinForms
         public bool BusyIndicatorVisible => _busyIndicator.Available;
 
         public long WorkspaceSessionVersion => _session?.Version ?? 0;
+
+        internal Func<WorkspaceCloseState, CancellationToken, System.Threading.Tasks.Task<WorkspaceCloseChoice>> ClosePrompt { get; set; }
 
         public TabPage? OpenCatalog(CatalogKind kind)
         {
@@ -401,6 +416,7 @@ namespace MyDmsVn.Desktop.WinForms
             page.Controls.Add(feedbackHost);
             _documents.Add(key, page);
             Workspace.TabPages.Add(page);
+            Workspace.SetTabClosable(page, true);
             Workspace.SelectedTab = page;
 
             if (!IsWorkspaceRequestCurrent(sessionVersion))
@@ -473,12 +489,17 @@ namespace MyDmsVn.Desktop.WinForms
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
+            if (disposing && !_disposedResources)
             {
+                _disposedResources = true;
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
                 BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
                 Navigation.SelectedItemChanged -= OnNavigationSelectedItemChanged;
                 Workspace.SelectedIndexChanged -= OnWorkspaceSelectedIndexChanged;
+                Workspace.TabCloseRequested -= OnTabCloseRequested;
+                CloseAllWorkspaces();
+                _workspaceCloseLifetime.Cancel();
+                _workspaceCloseLifetime.Dispose();
                 if (_session != null)
                 {
                     _session.SessionChanged -= OnSessionChanged;
@@ -557,6 +578,54 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 ActivateWorkspace(Workspace.SelectedTab);
             }
+        }
+
+        private void OnTabCloseRequested(object? sender, TabCloseRequestedEventArgs request)
+        {
+            _ = RequestWorkspaceCloseAsync(request.Page);
+        }
+
+        internal async System.Threading.Tasks.Task RequestWorkspaceCloseAsync(TabPage page)
+        {
+            if (page == null || IsDisposed || Disposing) return;
+            var key = page.Name;
+            if (!_documents.TryGetValue(key, out var current) || !ReferenceEquals(current, page)) return;
+            var sessionVersion = WorkspaceSessionVersion;
+            var token = _workspaceCloseLifetime.Token;
+            var content = WorkspaceContent(page);
+            WorkspaceCloseDecision decision;
+            if (content is IWorkspaceCloseParticipant participant)
+                decision = await _closeCoordinator.RequestCloseAsync(participant, token);
+            else
+                decision = token.IsCancellationRequested ? WorkspaceCloseDecision.KeepOpen : WorkspaceCloseDecision.Admitted;
+            if (decision != WorkspaceCloseDecision.Admitted || token.IsCancellationRequested) return;
+            await InvokeOnUiAsync(() =>
+            {
+                if (IsDisposed || Disposing || token.IsCancellationRequested || !IsWorkspaceRequestCurrent(sessionVersion) ||
+                    !_documents.TryGetValue(key, out var stillOpen) || !ReferenceEquals(stillOpen, page)) return;
+                _documents.Remove(key);
+                Workspace.TabPages.Remove(page);
+                page.Dispose();
+            }, token);
+        }
+
+        private async System.Threading.Tasks.Task InvokeOnUiAsync(Action action, CancellationToken token)
+        {
+            if (Thread.CurrentThread.ManagedThreadId == _uiThreadId) { action(); return; }
+            if (!IsHandleCreated || IsDisposed || Disposing) return;
+            var done = new System.Threading.Tasks.TaskCompletionSource<bool>(
+                System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+            using var registration = token.Register(() => done.TrySetResult(false));
+            try
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    try { if (!IsDisposed && !Disposing) action(); done.TrySetResult(true); }
+                    catch (Exception error) { done.TrySetException(error); }
+                }));
+            }
+            catch (InvalidOperationException) { done.TrySetResult(false); }
+            await done.Task.ConfigureAwait(false);
         }
 
         private static Control? WorkspaceContent(TabPage? page) => page?.Controls.Count > 0 ?
@@ -672,6 +741,10 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void CloseAllWorkspaces()
         {
+            var previousLifetime = _workspaceCloseLifetime;
+            _workspaceCloseLifetime = new CancellationTokenSource();
+            previousLifetime.Cancel();
+            previousLifetime.Dispose();
             var pages = new TabPage[_documents.Count];
             _documents.Values.CopyTo(pages, 0);
             Workspace.TabPages.Clear();

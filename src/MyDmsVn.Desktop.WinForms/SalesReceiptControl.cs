@@ -18,7 +18,7 @@ namespace MyDmsVn.Desktop.WinForms;
 
 public interface ISalesReceiptControlFactory { Control Create(); }
 
-public sealed class SalesReceiptControl : UserControl, IActivatableDesktopControl, ISalesCommandBufferAdmission
+public sealed class SalesReceiptControl : UserControl, IActivatableDesktopControl, ISalesCommandBufferAdmission, IWorkspaceCloseParticipant
 {
     private readonly IDesktopSession _session;
     private readonly long _sessionVersion;
@@ -48,6 +48,8 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     private bool _criteriaDirty;
     private string? _message;
     private long _boundary;
+    private long _closeBufferRevision;
+    private long _saveSubmittedBufferRevision;
     private long _activation;
     private IReadOnlyList<SalesReceiptListRow>? _projectedItems;
     private IReadOnlyList<long> _saleIds = Array.Empty<long>();
@@ -123,7 +125,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         _errors = new ErrorProvider { ContainerControl = this, BlinkStyle = ErrorBlinkStyle.NeverBlink };
         CreateLayout(); BusinessCompactAppearance.Apply(this);
         SaleDateEditor.ValueChanged += (_, __) => { if (!_applying && CanEditHeader && SaleDateEditor.Value.HasValue) Editor.SaleDate = SaleDateEditor.Value.Value; };
-        SaleDateEditor.PendingTextChanged += (_, __) => { if (!_applying) ApplyState(); };
+        SaleDateEditor.PendingTextChanged += (_, __) => { if (!_applying) { ++_closeBufferRevision; ApplyState(); } };
         NoteEditor.TextChanged += (_, __) => { if (!_applying && CanEditHeader) Editor.Note = NoteEditor.Text; };
         SearchBox.TextChanged += PendingFilterChanged; FromDateEditor.ValueChanged += PendingFilterChanged;
         ToDateEditor.ValueChanged += PendingFilterChanged; StatusFilter.SelectedValueChanged += PendingFilterChanged; PageSizeEditor.ValueChanged += PendingFilterChanged;
@@ -215,6 +217,33 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         }
         return Editor.SaveAsync(_lifetime.Token, sink);
     }
+    internal WorkspaceCloseState CaptureCloseState()
+    {
+        var pending = WorkspaceMode == ReceiptWorkspaceMode.Detail &&
+            (_inline.HasPendingDataEdit || SaleDateEditor.HasPendingEdit ||
+             _lookups.Any(binding => !binding.Filter && binding.Control.HasPendingText));
+        return new WorkspaceCloseState(Editor.EditorIdentity, Editor.EditRevision + _closeBufferRevision,
+            WorkspaceMode == ReceiptWorkspaceMode.Detail && (Editor.IsDirty || pending),
+            Editor.IsMutationBusy, Editor.RequiresCreateOutcomeReview || Editor.RequiresPostOutcomeReload,
+            Current && WorkspaceMode == ReceiptWorkspaceMode.Detail && _read && _write && Editor.CanEdit && !Busy);
+    }
+    WorkspaceCloseState IWorkspaceCloseParticipant.CaptureCloseState() => CaptureCloseState();
+
+    internal async Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token)
+    {
+        var before = CaptureCloseState();
+        if (!before.CanSave || token.IsCancellationRequested)
+            return new WorkspaceSaveOutcome(WorkspaceSaveStatus.CanceledBeforeMutation, before.EditorIdentity, before.Revision);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _lifetime.Token);
+        _saveSubmittedBufferRevision = _closeBufferRevision;
+        var sink = FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-save", WorkspaceOperationKind.Write));
+        // The VM's shared CommandAsync calls this control's TryCommitPendingEditsAsync
+        // before it captures and dispatches the Save request.
+        var outcome = await Editor.SaveForCloseAsync(linked.Token, sink);
+        var submittedRevision = outcome.SubmittedRevision + _saveSubmittedBufferRevision;
+        return new WorkspaceSaveOutcome(outcome.Status, outcome.EditorIdentity, submittedRevision, outcome.RefreshFailed);
+    }
+    Task<WorkspaceSaveOutcome> IWorkspaceCloseParticipant.SaveForCloseAsync(CancellationToken token) => SaveForCloseAsync(token);
     public Task PostAsync()
     {
         if (!Current || Busy) return Task.CompletedTask;
@@ -270,6 +299,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
                 // Do not overwrite independent operation feedback with a second error copy.
                 if (!result) _inline.FocusActiveEdit();
                 if (result) InvalidateProductRequests();
+                if (result && intent == SalesCommandIntent.Save) _saveSubmittedBufferRevision = _closeBufferRevision;
                 ApplyState();
             }, token);
             return result;
@@ -332,7 +362,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         var lookup = new AccessibleLookupBox { AccessibleName = name, DisplayMember = nameof(CatalogLookupOption.DisplayName), ValueMember = nameof(CatalogLookupOption.Id), Width = 220, Dock = DockStyle.Top, SearchDebounceMilliseconds = 0 };
         lookup.SearchMembers.Add(nameof(CatalogLookupOption.DisplayName));
         var binding = new LookupBinding(lookup, vm, filter); _lookups.Add(binding);
-        lookup.TextChanged += (_, __) => { if (!_applying && Current && !Busy && lookup.Enabled && (filter || CanEditHeader) && lookup.HasPendingText) SetOperation(vm.SetSearch(lookup.Text)); };
+        lookup.TextChanged += (_, __) => { if (!_applying && Current && !Busy && lookup.Enabled && (filter || CanEditHeader) && lookup.HasPendingText) { if (!filter) ++_closeBufferRevision; SetOperation(vm.SetSearch(lookup.Text)); } };
         lookup.SelectedValueChanged += (_, __) =>
         {
             if (_applying || !Current || Busy || !lookup.Enabled || lookup.HasPendingText) return;
@@ -520,7 +550,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         }, CancellationToken.None).ConfigureAwait(false);
     }
     private void PendingFilterChanged(object? sender, EventArgs args) { if (!_applying && Current && _read && !Busy) { _criteriaDirty = true; ApplyState(); } }
-    private void InlineChanged(object? sender, EventArgs e) => ApplyState();
+    private void InlineChanged(object? sender, EventArgs e) { ++_closeBufferRevision; ApplyState(); }
     private void StateChanged(object? sender, PropertyChangedEventArgs e) => Dispatch(() =>
     {
         if (_read && ((ReferenceEquals(sender, _list) && _list.IsAccessDenied) ||

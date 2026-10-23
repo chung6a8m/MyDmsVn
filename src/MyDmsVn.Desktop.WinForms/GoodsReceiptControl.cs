@@ -21,7 +21,7 @@ namespace MyDmsVn.Desktop.WinForms
         Control Create();
     }
 
-    public sealed partial class GoodsReceiptControl : UserControl
+    public sealed partial class GoodsReceiptControl : UserControl, IWorkspaceCloseParticipant
     {
         private readonly GoodsReceiptListViewModel _list;
         private readonly GoodsReceiptEditorViewModel _editor;
@@ -40,6 +40,8 @@ namespace MyDmsVn.Desktop.WinForms
         private bool _isAccessDeniedEditorLocked;
         private bool _applyingState;
         private int _lookupBoundaryGeneration;
+        private long _closeBufferRevision;
+        private bool _projectingSavedReceipt;
 
         public GoodsReceiptControl(
             GoodsReceiptListViewModel list,
@@ -333,34 +335,71 @@ namespace MyDmsVn.Desktop.WinForms
             ApplyState();
         }
 
-        private async Task SaveAsync()
+        private async Task SaveAsync() => await SaveCoreAsync(CancellationToken.None, false).ConfigureAwait(true);
+
+        internal WorkspaceCloseState CaptureCloseState()
         {
+            var pending = WorkspaceMode == ReceiptWorkspaceMode.Detail &&
+                (_inline.HasPendingDataEdit || ReceiptDateEditor.HasPendingEdit ||
+                 WarehouseLookup.HasPendingText || EmployeeLookup.HasPendingText);
+            return new WorkspaceCloseState(_editor.EditorIdentity, _editor.EditRevision + _closeBufferRevision,
+                WorkspaceMode == ReceiptWorkspaceMode.Detail && (_editor.IsDirty || pending),
+                _editor.IsMutationBusy, _editor.RequiresPostOutcomeReload,
+                WorkspaceMode == ReceiptWorkspaceMode.Detail && !IsOperationBusy &&
+                !_editor.IsReadOnly && !_isAccessDeniedEditorLocked);
+        }
+        WorkspaceCloseState IWorkspaceCloseParticipant.CaptureCloseState() => CaptureCloseState();
+
+        internal Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token) => SaveCoreAsync(token, true);
+
+        private async Task<WorkspaceSaveOutcome> SaveCoreAsync(CancellationToken token, bool forClose)
+        {
+            var before = CaptureCloseState();
+            if (!before.CanSave || token.IsCancellationRequested)
+                return new WorkspaceSaveOutcome(WorkspaceSaveStatus.CanceledBeforeMutation, before.EditorIdentity, before.Revision);
             if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Save) ||
-                !await FinishHeaderLookupsAsync(SaveButton).ConfigureAwait(true)) return;
-            if (!TryCommitReceiptDate()) return;
+                !await FinishHeaderLookupsAsync(SaveButton).ConfigureAwait(true))
+                return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected, before.EditorIdentity, before.Revision);
+            if (!TryCommitReceiptDate())
+                return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected, before.EditorIdentity, before.Revision);
             if (ApplyEditorsToViewModel())
             {
                 var selectedLineId = _selectedLine?.Id;
                 var selectedLineIndex = _selectedLine == null
                     ? -1
                     : _editor.Lines.IndexOf(_selectedLine);
-                var saved = await _editor.SaveAsync(CancellationToken.None).ConfigureAwait(true);
-                if (IsDisposed || Disposing) return;
-                if (saved)
+                var submittedRevision = _editor.EditRevision + _closeBufferRevision;
+                var outcome = await _editor.SaveForCloseAsync(token).ConfigureAwait(true);
+                if (IsDisposed || Disposing) return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Unknown, before.EditorIdentity, submittedRevision);
+                var refreshFailed = outcome.RefreshFailed;
+                if (outcome.Status == WorkspaceSaveStatus.Saved && !_editor.IsDirty)
                 {
-                    RebindSelectedLine(selectedLineId, selectedLineIndex);
-                    _inline.ResetDocument(_editor.Lines);
+                    _projectingSavedReceipt = true;
+                    try
+                    {
+                        RebindSelectedLine(selectedLineId, selectedLineIndex);
+                        _inline.ResetDocument(_editor.Lines);
+                    }
+                    finally { _projectingSavedReceipt = false; }
                     _workflowMessage = null;
-                    await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
+                    if (!outcome.RefreshFailed || !forClose) await _list.RefreshAsync(token).ConfigureAwait(true);
                     if (_list.IsAccessDenied)
                     {
                         EnterAccessDeniedEditorState(true);
+                        refreshFailed = true;
                     }
+                    else if (_list.ErrorMessage != null) refreshFailed = true;
                 }
+                ApplyState();
+                if (_editor.HasErrors) FocusFirstLineError();
+                return new WorkspaceSaveOutcome(outcome.Status, before.EditorIdentity,
+                    submittedRevision, refreshFailed);
             }
             ApplyState();
             if (_editor.HasErrors) FocusFirstLineError();
+            return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected, before.EditorIdentity, before.Revision);
         }
+        Task<WorkspaceSaveOutcome> IWorkspaceCloseParticipant.SaveForCloseAsync(CancellationToken token) => SaveForCloseAsync(token);
 
         private async Task PostAsync()
         {
@@ -581,6 +620,7 @@ namespace MyDmsVn.Desktop.WinForms
             var canSearch = ReferenceEquals(lookup, WarehouseFilterLookup) ? !IsOperationBusy : CanEditLines();
             if (!_applyingState && canSearch && lookup.HasPendingText)
             {
+                if (!ReferenceEquals(lookup, WarehouseFilterLookup)) ++_closeBufferRevision;
                 SetOperation(_editor.WarehouseLookup.SetSearch(lookup.Text));
             }
         }
@@ -589,6 +629,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (!_applyingState && CanEditLines() && EmployeeLookup.HasPendingText)
             {
+                ++_closeBufferRevision;
                 SetOperation(_editor.EmployeeLookup.SetSearch(EmployeeLookup.Text));
             }
         }
@@ -646,7 +687,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void OnPendingReceiptDateChanged(object? sender, EventArgs eventArgs)
         {
-            if (!_applyingState) ApplyState();
+            if (!_applyingState) { ++_closeBufferRevision; ApplyState(); }
         }
 
         private void OnWarehouseChanged(object? sender, EventArgs eventArgs)

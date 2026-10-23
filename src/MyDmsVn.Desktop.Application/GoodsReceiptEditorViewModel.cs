@@ -31,6 +31,15 @@ namespace MyDmsVn.Desktop.Application
         private long? _uncertainPostReceiptId;
         private bool _disposed;
         private long _documentGeneration;
+        private Guid _editorIdentity = Guid.NewGuid();
+        private long _editRevision;
+        private WorkspaceSaveStatus _lastSaveStatus = WorkspaceSaveStatus.CanceledBeforeMutation;
+        private bool _lastSaveRefreshFailed;
+        private bool _preserveCloseIdentityForSaveRefresh;
+
+        public Guid EditorIdentity => _editorIdentity;
+        public long EditRevision => Interlocked.Read(ref _editRevision);
+        public bool IsMutationBusy => Volatile.Read(ref _saveInFlight) != 0 || Volatile.Read(ref _postInFlight) != 0;
 
         public GoodsReceiptEditorViewModel(
             IGoodsReceiptApiClient apiClient,
@@ -163,6 +172,11 @@ namespace MyDmsVn.Desktop.Application
         public void Load(GoodsReceiptDto? receipt)
         {
             ThrowIfDisposed();
+            if (!_preserveCloseIdentityForSaveRefresh)
+            {
+                _editorIdentity = Guid.NewGuid();
+                Interlocked.Increment(ref _editRevision);
+            }
             Interlocked.Increment(ref _documentGeneration);
             _isApplyingReceipt = true;
             try
@@ -389,6 +403,8 @@ namespace MyDmsVn.Desktop.Application
             {
                 return false;
             }
+            _lastSaveStatus = WorkspaceSaveStatus.CanceledBeforeMutation;
+            _lastSaveRefreshFailed = false;
 
             var lifetimeToken = _lifetimeCancellation.Token;
             using (var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -409,6 +425,15 @@ namespace MyDmsVn.Desktop.Application
                     Volatile.Write(ref _saveInFlight, 0);
                 }
             }
+        }
+
+        public async Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken cancellationToken)
+        {
+            var identity = EditorIdentity;
+            var revision = EditRevision;
+            try { await SaveAsync(cancellationToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+            return new WorkspaceSaveOutcome(_lastSaveStatus, identity, revision, _lastSaveRefreshFailed);
         }
 
         public async Task<bool> PostAsync(CancellationToken cancellationToken)
@@ -591,6 +616,7 @@ namespace MyDmsVn.Desktop.Application
             var document = new DocumentDispatch(this);
             if (IsReadOnly || !ValidateForSave())
             {
+                _lastSaveStatus = WorkspaceSaveStatus.Rejected;
                 return false;
             }
 
@@ -598,9 +624,11 @@ namespace MyDmsVn.Desktop.Application
                 line.ProductId,
                 line.Quantity,
                 line.UnitCost)).ToArray();
+            var submittedRevision = EditRevision;
             ApiResponse<GoodsReceiptDto> response;
             try
             {
+                _lastSaveStatus = WorkspaceSaveStatus.Unknown;
                 if (Id.HasValue)
                 {
                     response = await _apiClient.UpdateDraftAsync(
@@ -641,6 +669,8 @@ namespace MyDmsVn.Desktop.Application
             if (!document.IsCurrent) return false;
             if (!response.IsSuccess)
             {
+                _lastSaveStatus = response.Error!.Status == ApiStatusCode.InternalServerError
+                    ? WorkspaceSaveStatus.Unknown : WorkspaceSaveStatus.Rejected;
                 await document.InvokeAsync(
                     () => ApplyApiError(response.Error!),
                     cancellationToken).ConfigureAwait(false);
@@ -658,7 +688,8 @@ namespace MyDmsVn.Desktop.Application
                     }
 
                     ApplyPersistedIdentity(persisted);
-                    IsDirty = false;
+                    IsDirty = EditRevision != submittedRevision;
+                    _lastSaveStatus = WorkspaceSaveStatus.Saved;
                     identityApplied = true;
                 },
                 lifetimeToken).ConfigureAwait(false);
@@ -667,9 +698,18 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
+            if (IsDirty)
+            {
+                _lastSaveRefreshFailed = true;
+                await document.InvokeAsync(() => PublishNotification(DesktopNotificationKind.Warning,
+                    "Goods receipt was saved. Newer edits remain unsaved; refresh was deferred."), lifetimeToken).ConfigureAwait(false);
+                return true;
+            }
+
             if (!document.IsCurrent) return false;
             if (cancellationToken.IsCancellationRequested)
             {
+                _lastSaveRefreshFailed = true;
                 await document.InvokeAsync(() => PublishSavedWithoutRefresh(), lifetimeToken).ConfigureAwait(false);
                 return true;
             }
@@ -683,11 +723,13 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                _lastSaveRefreshFailed = true;
                 await document.InvokeAsync(() => PublishSavedWithoutRefresh(), lifetimeToken).ConfigureAwait(false);
                 return true;
             }
             catch (Exception exception)
             {
+                _lastSaveRefreshFailed = true;
                 await document.InvokeAsync(
                     () =>
                     {
@@ -703,6 +745,7 @@ namespace MyDmsVn.Desktop.Application
             if (!document.IsCurrent) return false;
             if (!refresh.IsSuccess)
             {
+                _lastSaveRefreshFailed = true;
                 await document.InvokeAsync(
                     () =>
                     {
@@ -719,7 +762,9 @@ namespace MyDmsVn.Desktop.Application
             await document.InvokeAsync(
                 () =>
                 {
-                    Load(refresh.Data);
+                    _preserveCloseIdentityForSaveRefresh = true;
+                    try { Load(refresh.Data); }
+                    finally { _preserveCloseIdentityForSaveRefresh = false; }
                     loaded = true;
                     PublishNotification(DesktopNotificationKind.Success, "Goods receipt saved.");
                 },
@@ -871,6 +916,7 @@ namespace MyDmsVn.Desktop.Application
         {
             if (!_isApplyingReceipt)
             {
+                Interlocked.Increment(ref _editRevision);
                 IsDirty = true;
             }
         }

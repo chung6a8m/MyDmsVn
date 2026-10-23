@@ -23,7 +23,11 @@ public sealed partial class GoodsReceiptControl
         }
     }
 
-    private void OnInlineEditStateChanged(object? sender, System.EventArgs args) => DispatchToUi(ApplyState);
+    private void OnInlineEditStateChanged(object? sender, System.EventArgs args)
+    {
+        if (!_projectingSavedReceipt) ++_closeBufferRevision;
+        DispatchToUi(ApplyState);
+    }
 
     private bool FinishInline(ReceiptEditIntent intent)
     {

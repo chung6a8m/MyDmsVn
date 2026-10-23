@@ -14,6 +14,102 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SalesReceiptControlAdmissionTests
 {
+    [Fact]
+    public void Close_state_tracks_unsaved_receipt_and_clean_posted_inspection()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var control = (SalesReceiptControl)host.Control;
+            Assert.False(control.CaptureCloseState().IsDirty);
+            host.Editor.Note = "unsaved";
+            var dirty = control.CaptureCloseState();
+            Assert.True(dirty.IsDirty);
+            Assert.True(dirty.CanSave);
+            Assert.False(dirty.IsMutationBusy);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+
+    [Fact]
+    public void Save_for_close_returns_confirmed_sales_write_with_submitted_editor_revision()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var control = (SalesReceiptControl)host.Control;
+            host.Editor.Note = "changed";
+            var task = control.SaveForCloseAsync(CancellationToken.None);
+            host.Wait(task);
+            var outcome = task.GetAwaiter().GetResult();
+            Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+            Assert.Equal(control.CaptureCloseState().Revision, outcome.SubmittedRevision);
+            Assert.False(control.CaptureCloseState().IsDirty);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+
+    [Fact]
+    public void Close_save_commits_native_pending_quantity_before_submitting_and_tracks_committed_revision()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var control = (SalesReceiptControl)host.Control;
+            host.Begin(3);
+            var quantity = host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDecimalInput>("QuantityEditor");
+            var native = new NativeLookupTypingDriver(quantity);
+            native.SelectRange(0, native.Text.Length);
+            foreach (var character in "2.125") native.TypeCharacter(character);
+            Assert.Equal("2.125", native.Text);
+            Assert.Equal(5, native.SelectionStart);
+            host.Api.NextUpdate = new SalesReceiptDto(41, "SA0000000041", host.Editor.SaleDate, 1, 2, 3,
+                "Draft", "note", null, "AgIDBAUGBwg=",
+                new[] { new SalesReceiptLineDto(91, 1, 7, "box", 2.125m, 4m, false, 8.5m,
+                    null, null, "P7 - Product", true) }, 8.5m, null, null,
+                "C1 - Customer", true, "W2 - Warehouse", true, "E3 - Employee", true);
+
+            var pending = control.SaveForCloseAsync(CancellationToken.None);
+            host.Wait(pending);
+            var outcome = pending.GetAwaiter().GetResult();
+
+            Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+            Assert.Equal(2.125m, host.Api.Updates.Single().Lines.Single().Qty);
+            Assert.Equal(2.125m, host.Editor.Lines.Single().Quantity);
+            Assert.Equal(control.CaptureCloseState().Revision, outcome.SubmittedRevision);
+            Assert.False(control.CaptureCloseState().IsDirty);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Close_save_rejects_invalid_native_quantity_without_dispatch_or_losing_raw_text()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var control = (SalesReceiptControl)host.Control;
+            host.Begin(3);
+            var quantity = host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDecimalInput>("QuantityEditor");
+            var native = new NativeLookupTypingDriver(quantity);
+            native.SelectRange(0, native.Text.Length);
+            foreach (var character in "1.00001") native.TypeCharacter(character);
+            Assert.Equal("1.00001", native.Text);
+            Assert.Equal(7, native.SelectionStart);
+
+            var pending = control.SaveForCloseAsync(CancellationToken.None);
+            host.Wait(pending);
+            var outcome = pending.GetAwaiter().GetResult();
+
+            Assert.NotEqual(WorkspaceSaveStatus.Saved, outcome.Status);
+            Assert.Empty(host.Api.Updates);
+            Assert.Equal("1.00001", quantity.Text);
+            Assert.Equal(1m, host.Editor.Lines.Single().Quantity);
+            Assert.True(control.CaptureCloseState().IsDirty);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
     [Theory]
     [InlineData(ApiStatusCode.Forbidden, false)]
     [InlineData(ApiStatusCode.Unauthorized, false)]

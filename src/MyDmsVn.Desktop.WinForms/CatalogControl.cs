@@ -20,7 +20,7 @@ namespace MyDmsVn.Desktop.WinForms
         Control Create(CatalogKind kind);
     }
 
-    public sealed class CatalogControl : UserControl
+    public sealed class CatalogControl : UserControl, IWorkspaceCloseParticipant
     {
         private readonly CatalogBinding _binding;
         private WorkspaceFeedbackNotificationService? _feedbackNotifications;
@@ -57,6 +57,25 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly Label _error;
         private readonly Label _validationSummary;
         private readonly BootstrapButton _firstErrorButton;
+
+        WorkspaceCloseState IWorkspaceCloseParticipant.CaptureCloseState()
+        {
+            // Native text is the submitted buffer. TextChanged normally synchronizes it
+            // immediately; this also covers a pending native edit at close admission.
+            foreach (var field in _binding.Fields)
+            {
+                var raw = _editorControls[field.Key].Text;
+                if (!string.Equals(raw, field.GetValue(), StringComparison.Ordinal))
+                    field.SetValue(raw);
+            }
+            var snapshot = _binding.CaptureEditSnapshot();
+            return new WorkspaceCloseState(snapshot.EditorIdentity, snapshot.Revision,
+                snapshot.IsDirty, _binding.IsBusy, false,
+                !IsDisposed && !Disposing && !_binding.IsBusy && !_binding.IsEditorLoading);
+        }
+
+        Task<WorkspaceSaveOutcome> IWorkspaceCloseParticipant.SaveForCloseAsync(
+            CancellationToken cancellationToken) => _binding.SaveForCloseAsync(cancellationToken);
 
         public CatalogControl(ProductCatalogViewModel viewModel)
             : this(CreateBinding(viewModel))
@@ -687,6 +706,8 @@ namespace MyDmsVn.Desktop.WinForms
             private readonly Func<string?, Task> _setSearch;
             private readonly Func<int, CancellationToken, Task> _select;
             private readonly Func<CancellationToken, Task> _save;
+            private readonly Func<CancellationToken, Task<WorkspaceSaveOutcome>> _saveForClose;
+            private readonly Func<CatalogEditSnapshot> _captureEditSnapshot;
             private readonly Func<int, bool, CancellationToken, Task> _setActive;
             private readonly Func<int, CancellationToken, Task> _moveToPage;
             private readonly Action _beginCreate;
@@ -713,6 +734,8 @@ namespace MyDmsVn.Desktop.WinForms
                 Func<string?, Task> setSearch,
                 Func<int, CancellationToken, Task> select,
                 Func<CancellationToken, Task> save,
+                Func<CancellationToken, Task<WorkspaceSaveOutcome>> saveForClose,
+                Func<CatalogEditSnapshot> captureEditSnapshot,
                 Func<int, bool, CancellationToken, Task> setActive,
                 Func<int, CancellationToken, Task> moveToPage,
                 Action beginCreate,
@@ -736,6 +759,8 @@ namespace MyDmsVn.Desktop.WinForms
                 _setSearch = setSearch;
                 _select = select;
                 _save = save;
+                _saveForClose = saveForClose;
+                _captureEditSnapshot = captureEditSnapshot;
                 _setActive = setActive;
                 _moveToPage = moveToPage;
                 _beginCreate = beginCreate;
@@ -785,6 +810,9 @@ namespace MyDmsVn.Desktop.WinForms
             public Task SetSearch(string? search) => _setSearch(search);
             public Task SelectAsync(int id, CancellationToken token) => _select(id, token);
             public Task SaveAsync(CancellationToken token) => _save(token);
+            public Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token) =>
+                _saveForClose(token);
+            public CatalogEditSnapshot CaptureEditSnapshot() => _captureEditSnapshot();
             public Task SetActiveAsync(int id, bool active, CancellationToken token) => _setActive(id, active, token);
             public Task MoveToPageAsync(int pageNumber, CancellationToken token) => _moveToPage(pageNumber, token);
             public void BeginCreate() => _beginCreate();
@@ -808,6 +836,8 @@ namespace MyDmsVn.Desktop.WinForms
                     viewModel.SetSearch,
                     viewModel.SelectAsync,
                     viewModel.SaveAsync,
+                    viewModel.SaveForCloseAsync,
+                    viewModel.CaptureEditSnapshot,
                     viewModel.SetActiveAsync,
                     viewModel.MoveToPageAsync,
                     viewModel.BeginCreate,

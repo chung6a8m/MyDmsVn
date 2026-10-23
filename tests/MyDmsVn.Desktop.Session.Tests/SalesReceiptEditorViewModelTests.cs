@@ -12,6 +12,23 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class SalesReceiptEditorViewModelTests
 {
     [Fact]
+    public async Task Save_for_close_reports_unknown_create_after_transport_failure_and_keeps_review_lock()
+    {
+        var api = new SalesApi { Create = _ => throw new InvalidOperationException("ambiguous") };
+        using var vm = Editor(api);
+        Valid(vm);
+        var row = vm.AddLine()!;
+        row.ProductId = 7;
+
+        var outcome = await vm.SaveForCloseAsync();
+
+        Assert.Equal(WorkspaceSaveStatus.Unknown, outcome.Status);
+        Assert.True(vm.RequiresCreateOutcomeReview);
+        Assert.Equal(vm.EditorIdentity, outcome.EditorIdentity);
+        Assert.Single(api.Creates);
+    }
+
+    [Fact]
     public async Task Server_line_details_follow_submitted_reordered_references_and_leave_unknown_fields_unbound()
     {
         var api = new SalesApi();

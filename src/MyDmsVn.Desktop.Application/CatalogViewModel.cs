@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Messaging;
@@ -41,6 +42,11 @@ namespace MyDmsVn.Desktop.Application
         private long _editorGeneration;
         private long _messageReloadGeneration;
         private bool _ignoreNextRelevantMessage;
+        private Guid _editorIdentity = Guid.NewGuid();
+        private long _editorRevision;
+        private bool _projectingEditor;
+        private IReadOnlyDictionary<string, string> _acceptedFields =
+            new Dictionary<string, string>(StringComparer.Ordinal);
 
         protected CatalogViewModel(
             CatalogKind kind,
@@ -125,6 +131,19 @@ namespace MyDmsVn.Desktop.Application
             private set => SetProperty(ref _isEditorLoading, value);
         }
 
+        public long EditorRevision => _editorRevision;
+
+        public bool IsDirty => _acceptedFields.Count != 0 &&
+            !FieldsEqual(_acceptedFields, CaptureEditorFields());
+
+        public CatalogEditSnapshot CaptureEditSnapshot()
+        {
+            ThrowIfDisposed();
+            return new CatalogEditSnapshot(_editorIdentity, SelectedId, _editorRevision,
+                IsDirty, _acceptedFields.ToDictionary(pair => pair.Key, pair => pair.Value,
+                    StringComparer.Ordinal));
+        }
+
         public Task ActivateAsync(CancellationToken cancellationToken) =>
             RefreshAsync(cancellationToken);
 
@@ -183,13 +202,39 @@ namespace MyDmsVn.Desktop.Application
             ThrowIfDisposed();
             _feedback?.Scope.AdvanceDocument();
             CancelEditorLoad();
+            _editorIdentity = Guid.NewGuid();
             SelectedId = null;
             SelectedItem = default;
             ResetValidation();
-            ClearEditor();
+            _projectingEditor = true;
+            try { ClearEditor(); }
+            finally { _projectingEditor = false; }
+            AcceptEditor();
         }
 
         public Task SaveAsync(CancellationToken cancellationToken) => WithFeedback("save", WorkspaceOperationKind.Write, () => SaveWithFeedbackAsync(cancellationToken));
+
+        public async Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken cancellationToken)
+        {
+            var snapshot = CaptureEditSnapshot();
+            if (IsBusy)
+                return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected,
+                    snapshot.EditorIdentity, snapshot.Revision);
+            WorkspaceSaveOutcome? result = null;
+            await WithFeedback("save", WorkspaceOperationKind.Write, async () =>
+            {
+                using (var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken, _lifetimeCancellation.Token))
+                {
+                    await ExecuteBusyAsync(async token =>
+                    {
+                        result = await SaveCoreAsync(token, snapshot).ConfigureAwait(false);
+                    }, linked.Token, () => !IsDisposed()).ConfigureAwait(false);
+                }
+            }).ConfigureAwait(false);
+            return result ?? new WorkspaceSaveOutcome(WorkspaceSaveStatus.CanceledBeforeMutation,
+                snapshot.EditorIdentity, snapshot.Revision);
+        }
 
         private async Task SaveWithFeedbackAsync(CancellationToken cancellationToken)
         {
@@ -199,7 +244,7 @@ namespace MyDmsVn.Desktop.Application
                 _lifetimeCancellation.Token))
             {
                 await ExecuteBusyAsync(
-                    SaveCoreAsync,
+                    async token => { await SaveCoreAsync(token, CaptureEditSnapshot()).ConfigureAwait(false); },
                     linked.Token,
                     () => !IsDisposed()).ConfigureAwait(false);
             }
@@ -228,6 +273,7 @@ namespace MyDmsVn.Desktop.Application
         public Task SelectAsync(int id, CancellationToken cancellationToken)
         {
             _feedback?.Scope.AdvanceDocument();
+            _editorIdentity = Guid.NewGuid();
             return WithFeedback("select", WorkspaceOperationKind.Query, () => SelectWithFeedbackAsync(id, cancellationToken));
         }
 
@@ -274,9 +320,13 @@ namespace MyDmsVn.Desktop.Application
                         if (response.IsSuccess)
                         {
                             ResetValidation();
+                            _editorIdentity = Guid.NewGuid();
                             SelectedId = GetId(response.Data!);
                             SelectedItem = response.Data;
-                            PopulateEditor(response.Data!);
+                            _projectingEditor = true;
+                            try { PopulateEditor(response.Data!); }
+                            finally { _projectingEditor = false; }
+                            AcceptEditor();
                         }
                         else
                         {
@@ -396,8 +446,37 @@ namespace MyDmsVn.Desktop.Application
 
         protected abstract void ClearEditor();
 
+        protected abstract IReadOnlyDictionary<string, string> CaptureEditorFields();
+        protected abstract IReadOnlyDictionary<string, string> CaptureAcceptedFields(TDto item);
+
+        protected void InitializeAcceptedEditor() => AcceptEditor();
+
+        private void AcceptEditor()
+        {
+            _acceptedFields = CaptureEditorFields().ToDictionary(pair => pair.Key,
+                pair => pair.Value, StringComparer.Ordinal);
+            OnPropertyChanged(nameof(IsDirty));
+        }
+
+        private static bool FieldsEqual(IReadOnlyDictionary<string, string> left,
+            IReadOnlyDictionary<string, string> right)
+        {
+            if (left.Count != right.Count) return false;
+            foreach (var pair in left)
+                if (!right.TryGetValue(pair.Key, out var value) ||
+                    !string.Equals(pair.Value, value, StringComparison.Ordinal)) return false;
+            return true;
+        }
+
         protected override void OnPropertyChanged(PropertyChangedEventArgs e)
         {
+            if (!_projectingEditor && !string.IsNullOrEmpty(e.PropertyName) &&
+                _acceptedFields.ContainsKey(e.PropertyName!))
+            {
+                _editorRevision++;
+                base.OnPropertyChanged(new PropertyChangedEventArgs(nameof(EditorRevision)));
+                base.OnPropertyChanged(new PropertyChangedEventArgs(nameof(IsDirty)));
+            }
             if (!string.IsNullOrEmpty(e.PropertyName))
             {
                 ClearFieldError(ApiJson.ResolvePropertyName(e.PropertyName!));
@@ -406,7 +485,8 @@ namespace MyDmsVn.Desktop.Application
             base.OnPropertyChanged(e);
         }
 
-        private async Task SaveCoreAsync(CancellationToken cancellationToken)
+        private async Task<WorkspaceSaveOutcome> SaveCoreAsync(
+            CancellationToken cancellationToken, CatalogEditSnapshot snapshot)
         {
             long editorGeneration;
             lock (_sync)
@@ -414,18 +494,24 @@ namespace MyDmsVn.Desktop.Application
                 editorGeneration = _editorGeneration;
             }
 
+            var mutationStarted = false;
+            var saved = false;
+            WorkspaceSaveOutcome Outcome(WorkspaceSaveStatus status, bool refreshFailed = false) =>
+                new WorkspaceSaveOutcome(status, snapshot.EditorIdentity,
+                    snapshot.Revision, refreshFailed);
+
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var selectedId = SelectedId;
+                var selectedId = snapshot.SelectedId;
                 var operation = selectedId.HasValue
                     ? CatalogChangeOperation.Updated
                     : CatalogChangeOperation.Created;
+                mutationStarted = true;
                 var response = selectedId.HasValue
                     ? await UpdateAsync(selectedId.Value, cancellationToken).ConfigureAwait(false)
                     : await CreateAsync(cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
                 if (!response.IsSuccess)
                 {
                     await _dispatcher.InvokeAsync(
@@ -436,10 +522,11 @@ namespace MyDmsVn.Desktop.Application
                                 ApplyApiError(response.Error!);
                             }
                         },
-                        cancellationToken).ConfigureAwait(false);
-                    return;
+                        CancellationToken.None).ConfigureAwait(false);
+                    return Outcome(WorkspaceSaveStatus.Rejected);
                 }
 
+                saved = true;
                 var entityId = GetId(response.Data!);
                 if (IsEditorCurrent(editorGeneration))
                 {
@@ -450,27 +537,47 @@ namespace MyDmsVn.Desktop.Application
                             {
                                 SelectedId = entityId;
                                 SelectedItem = response.Data;
-                                PopulateEditor(response.Data!);
+                                _acceptedFields = CaptureAcceptedFields(response.Data!).ToDictionary(
+                                    pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+                                if (_editorIdentity == snapshot.EditorIdentity &&
+                                    _editorRevision == snapshot.Revision)
+                                {
+                                    _projectingEditor = true;
+                                    try { PopulateEditor(response.Data!); }
+                                    finally { _projectingEditor = false; }
+                                }
+                                OnPropertyChanged(nameof(IsDirty));
                                 PublishNotification(DesktopNotificationKind.Success, "Saved successfully.");
                             }
                         },
-                        cancellationToken).ConfigureAwait(false);
+                    CancellationToken.None).ConfigureAwait(false);
                 }
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!IsEditorCurrent(editorGeneration)) return;
+                if (!IsEditorCurrent(editorGeneration) || cancellationToken.IsCancellationRequested)
+                    return Outcome(WorkspaceSaveStatus.Saved, refreshFailed: true);
                 _ignoreNextRelevantMessage = true;
                 Messenger.Send(new CatalogChangedMessage(Kind, entityId, operation));
-                await LoadAsync(cancellationToken).ConfigureAwait(false);
+                var refreshed = await RefreshAfterSaveAsync(cancellationToken).ConfigureAwait(false);
+                if (!refreshed && IsEditorCurrent(editorGeneration))
+                    await _dispatcher.InvokeAsync(() =>
+                    {
+                        if (IsEditorCurrent(editorGeneration))
+                            PublishNotification(DesktopNotificationKind.Warning,
+                                "Catalog item was saved, but the list could not be refreshed.");
+                    }, CancellationToken.None).ConfigureAwait(false);
+                return Outcome(WorkspaceSaveStatus.Saved, !refreshed);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                throw;
+                return Outcome(saved ? WorkspaceSaveStatus.Saved : mutationStarted
+                    ? WorkspaceSaveStatus.Unknown : WorkspaceSaveStatus.CanceledBeforeMutation,
+                    refreshFailed: saved);
             }
             catch (Exception exception)
             {
                 if (cancellationToken.IsCancellationRequested || !IsEditorCurrent(editorGeneration))
                 {
-                    return;
+                    return Outcome(saved ? WorkspaceSaveStatus.Saved : WorkspaceSaveStatus.Unknown,
+                        refreshFailed: saved);
                 }
 
                 await _dispatcher.InvokeAsync(
@@ -482,6 +589,8 @@ namespace MyDmsVn.Desktop.Application
                         }
                     },
                     CancellationToken.None).ConfigureAwait(false);
+                return Outcome(saved ? WorkspaceSaveStatus.Saved : WorkspaceSaveStatus.Unknown,
+                    refreshFailed: saved);
             }
         }
 
@@ -550,9 +659,20 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        private Task LoadAsync(CancellationToken cancellationToken) => WithFeedback("load", WorkspaceOperationKind.Query, () => LoadWithFeedbackAsync(cancellationToken));
+        private Task LoadAsync(CancellationToken cancellationToken) =>
+            WithFeedback("load", WorkspaceOperationKind.Query,
+                async () => { await LoadWithFeedbackAsync(cancellationToken).ConfigureAwait(false); });
 
-        private async Task LoadWithFeedbackAsync(CancellationToken cancellationToken)
+        private async Task<bool> RefreshAfterSaveAsync(CancellationToken cancellationToken)
+        {
+            var refreshed = false;
+            await WithFeedback("load", WorkspaceOperationKind.Query,
+                async () => refreshed = await LoadWithFeedbackAsync(cancellationToken)
+                    .ConfigureAwait(false)).ConfigureAwait(false);
+            return refreshed;
+        }
+
+        private async Task<bool> LoadWithFeedbackAsync(CancellationToken cancellationToken)
         {
             CancellationTokenSource loadCancellation;
             long generation;
@@ -560,7 +680,7 @@ namespace MyDmsVn.Desktop.Application
             {
                 if (_disposed)
                 {
-                    return;
+                    return false;
                 }
 
                 _activeLoad?.Cancel();
@@ -579,15 +699,17 @@ namespace MyDmsVn.Desktop.Application
                     loadCancellation.Token).ConfigureAwait(false);
                 if (!IsCurrent(generation))
                 {
-                    return;
+                    return false;
                 }
 
                 await _dispatcher.InvokeAsync(
                     () => ApplyListResponse(response, generation),
                     loadCancellation.Token).ConfigureAwait(false);
+                return response.IsSuccess;
             }
             catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
             {
+                return false;
             }
             catch (Exception exception)
             {
@@ -603,6 +725,7 @@ namespace MyDmsVn.Desktop.Application
                         },
                         CancellationToken.None).ConfigureAwait(false);
                 }
+                return false;
             }
             finally
             {

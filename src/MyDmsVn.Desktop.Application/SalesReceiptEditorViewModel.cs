@@ -26,6 +26,10 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _active;
     private long _operation;
     private long _document;
+    private Guid _editorIdentity = Guid.NewGuid();
+    private long _editRevision;
+    private WorkspaceSaveStatus _lastSaveStatus = WorkspaceSaveStatus.CanceledBeforeMutation;
+    private long _lastSubmittedRevision;
     private bool _disposed;
     private bool _admitting;
     private bool _read;
@@ -71,6 +75,9 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     public int EmployeeId { get => _employeeId; set { if (CanEdit && _employeeId != value) { _employeeId = value; EmployeeDisplayName = null; EmployeeIsActive = true; Dirty(); } } }
     public string? Note { get => _note; set { if (CanEdit && SetProperty(ref _note, value)) Dirty(); } }
     public bool IsDirty { get; private set; }
+    public Guid EditorIdentity => _editorIdentity;
+    public long EditRevision => _editRevision;
+    public bool IsMutationBusy => _busy == 2 || _admitting;
     public bool IsBusy => _busy != 0;
     public bool IsAccessDenied => !_read || _denied || !SessionCurrent;
     public bool RequiresCreateOutcomeReview { get; private set; }
@@ -169,7 +176,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         lock (_sync)
         {
             if (!SessionCurrent || !_read || !_write || _denied || _admitting || _busy == 2 || RequiresCreateOutcomeReview || RequiresPostOutcomeReload) return false;
-            Invalidate(); ++_document; Scrub(); Notify(); return true;
+            Invalidate(); ++_document; _editorIdentity = Guid.NewGuid(); ++_editRevision; Scrub(); Notify(); return true;
         }
     }
     public Task LoadAsync(long id, CancellationToken token = default)
@@ -177,7 +184,8 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         lock (_sync)
         {
             if (!CanRead || _admitting || _busy == 2 || RequiresCreateOutcomeReview || RequiresPostOutcomeReload || id <= 0) return Task.CompletedTask;
-            ++_document; SetValidationIssues(Array.Empty<SalesReceiptValidationIssue>());
+            ++_document; _editorIdentity = Guid.NewGuid(); ++_editRevision;
+            SetValidationIssues(Array.Empty<SalesReceiptValidationIssue>());
             return ReadAsync(id, false, false, token);
         }
     }
@@ -226,6 +234,15 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     }
     public Task SaveAsync(CancellationToken token = default, IWorkspaceFeedbackSink? feedback = null) => CommandAsync(SalesCommandIntent.Save, token, feedback);
     public Task PostAsync(CancellationToken token = default, IWorkspaceFeedbackSink? feedback = null) => CommandAsync(SalesCommandIntent.Post, token, feedback);
+    public async Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token = default, IWorkspaceFeedbackSink? feedback = null)
+    {
+        var identity = EditorIdentity;
+        var revision = EditRevision;
+        _lastSaveStatus = WorkspaceSaveStatus.CanceledBeforeMutation;
+        _lastSubmittedRevision = revision;
+        await CommandAsync(SalesCommandIntent.Save, token, feedback).ConfigureAwait(false);
+        return new WorkspaceSaveOutcome(_lastSaveStatus, identity, _lastSubmittedRevision);
+    }
 
     private async Task CommandAsync(SalesCommandIntent intent, CancellationToken token, IWorkspaceFeedbackSink? feedback)
     {
@@ -233,7 +250,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         long admissionOperation;
         lock (_sync)
         {
-            if (_admitting || !CanCommand(intent)) return;
+            if (_admitting || !CanCommand(intent)) { if (intent == SalesCommandIntent.Save) _lastSaveStatus = WorkspaceSaveStatus.Rejected; return; }
             _admitting = true; document = _document; admissionOperation = _operation;
         }
         Operation? operation = null;
@@ -253,7 +270,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
                     if (intent == SalesCommandIntent.Post && (SaleId <= 0 || IsDirty))
                     { Error = new ApiError(ApiStatusCode.Conflict, "SalesReceipt.SaveRequired", "Save pending changes before posting."); PublishFailure(feedback, Error); Notify(); return; }
                     if (intent == SalesCommandIntent.Save && SaleId > 0 && !IsDirty) return;
-                    if (!ValidDraft()) { Error = new ApiError(ApiStatusCode.BadRequest, "SalesReceipt.InvalidDraft", "Resolve the sales header and line validation errors."); PublishFailure(feedback, Error); Notify(); return; }
+                    if (!ValidDraft()) { if (intent == SalesCommandIntent.Save) _lastSaveStatus = WorkspaceSaveStatus.Rejected; Error = new ApiError(ApiStatusCode.BadRequest, "SalesReceipt.InvalidDraft", "Resolve the sales header and line validation errors."); PublishFailure(feedback, Error); Notify(); return; }
                     operation = Begin(token, 2);
                     work = intent == SalesCommandIntent.Save ? SaveCore(operation, feedback) : PostCore(operation, feedback);
                 }
@@ -290,6 +307,8 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         var create = SaleId == 0;
         // Set before dispatch: canceled/failed/ambiguous Create cannot safely be replayed.
         if (create) RequiresCreateOutcomeReview = true;
+        _lastSubmittedRevision = EditRevision;
+        _lastSaveStatus = WorkspaceSaveStatus.Unknown;
         Notify();
         var result = create
             ? await _api.CreateDraftAsync(new SaveSalesReceiptRequest(SaleDate, CustomerId, WarehouseId, EmployeeId, Note, requestLines), operation.Cancellation.Token).ConfigureAwait(false)
@@ -302,10 +321,12 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
                 if (dto.Status != "Draft" || (!create && dto.SaleId != SaleId) || !Matches(dto, requestLines))
                 { Error = InvalidResponse(); PublishFailure(feedback, Error); return; }
                 Apply(dto, rows); RequiresCreateOutcomeReview = false; Error = null;
+                _lastSaveStatus = WorkspaceSaveStatus.Saved;
                 feedback?.Publish(new DesktopNotification(DesktopNotificationKind.Success, create ? "Sale created." : "Sale saved."));
             }
             else
             {
+                _lastSaveStatus = KnownRejection(result.Error!) ? WorkspaceSaveStatus.Rejected : WorkspaceSaveStatus.Unknown;
                 if (create && KnownRejection(result.Error!)) RequiresCreateOutcomeReview = false;
                 if (!create && result.Error!.Status == ApiStatusCode.Conflict) BeginPostRecovery(SaleId);
                 ErrorResult(result.Error!, rows);
@@ -431,7 +452,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         if (line != null)
             SetValidationIssues(ValidationIssues.Where(issue => !ReferenceEquals(issue.Line, line) ||
                 !string.Equals(issue.Field, field, StringComparison.Ordinal)).ToArray());
-        IsDirty = true; Error = null; Notify();
+        ++_editRevision; IsDirty = true; Error = null; Notify();
     }
     private Operation Begin(CancellationToken token, int busy)
     {
@@ -458,7 +479,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     private void Invalidate() { ++_operation; _active?.Cancel(); _active = null; _busy = 0; }
     private void SessionChanged(object? sender, EventArgs args)
     {
-        lock (_sync) { Invalidate(); ++_document; _denied = true; _postRecovery = null;
+        lock (_sync) { Invalidate(); ++_document; _editorIdentity = Guid.NewGuid(); ++_editRevision; _denied = true; _postRecovery = null;
             SetValidationIssues(Array.Empty<SalesReceiptValidationIssue>()); }
         _ = _ui.InvokeAsync(() => { lock (_sync) { Scrub(); Notify(); } }, CancellationToken.None);
     }
@@ -476,7 +497,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         lock (_sync)
         {
             if (_disposed) return;
-            _disposed = true; Invalidate(); ++_document; _postRecovery = null; _session.SessionChanged -= SessionChanged; Scrub(); Notify();
+            _disposed = true; Invalidate(); ++_document; _editorIdentity = Guid.NewGuid(); ++_editRevision; _postRecovery = null; _session.SessionChanged -= SessionChanged; Scrub(); Notify();
         }
     }
     private static ApiError Unexpected() => new ApiError(ApiStatusCode.InternalServerError, "Desktop.UnexpectedError", "The operation outcome may require review.");

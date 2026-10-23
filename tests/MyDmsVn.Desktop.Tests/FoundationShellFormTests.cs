@@ -8,11 +8,16 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests
 {
     public sealed class FoundationShellFormTests
     {
+        private readonly ITestOutputHelper _output;
+
+        public FoundationShellFormTests(ITestOutputHelper output) => _output = output;
+
         [Fact]
         public void Shell_exposes_navigation_workspace_and_session_status()
         {
@@ -59,6 +64,102 @@ namespace MyDmsVn.Desktop.Tests
                     }
                 },
                 TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Tab_close_request_removes_only_the_originating_page_and_disposes_it_once()
+        {
+            StaTest.Run(_ =>
+            {
+                using var shell = CreateShell();
+                var firstContent = new Panel();
+                var secondContent = new Panel();
+                var first = shell.OpenWorkspace("first", "First", firstContent, shell.WorkspaceSessionVersion)!;
+                var second = shell.OpenWorkspace("second", "Second", secondContent, shell.WorkspaceSessionVersion)!;
+                Assert.True(shell.Workspace.IsTabClosable(first));
+                Assert.True(shell.Workspace.RequestTabClose(first));
+
+                Assert.Single(shell.Workspace.TabPages);
+                Assert.Same(second, shell.Workspace.TabPages[0]);
+                Assert.True(first.IsDisposed);
+                Assert.True(firstContent.IsDisposed);
+                Assert.False(secondContent.IsDisposed);
+                Assert.Same(second, shell.OpenWorkspace("second", "Second", new Panel(), shell.WorkspaceSessionVersion));
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Disposing_shell_twice_after_workspace_cleanup_is_idempotent()
+        {
+            StaTest.Run(_ =>
+            {
+                var shell = CreateShell();
+                var content = new Panel();
+                shell.OpenWorkspace("first", "First", content, shell.WorkspaceSessionVersion);
+                shell.Dispose();
+                shell.Dispose();
+                Assert.True(content.IsDisposed);
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Native_close_request_keeps_other_tab_and_closes_last_tab_in_both_themes(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using var guard = new WinFormsTestGuard();
+                    using var shell = CreateShell();
+                    shell.Show();
+                    _output.WriteLine(UiNextNativeScaleObservation.Observe(shell, token));
+                    var firstContent = new TextBox();
+                    var secondContent = new TextBox();
+                    var first = shell.OpenWorkspace("first", "First", firstContent, shell.WorkspaceSessionVersion)!;
+                    var second = shell.OpenWorkspace("second", "Second", secondContent, shell.WorkspaceSessionVersion)!;
+                    Assert.True(shell.Workspace.RequestTabClose(first));
+                    Assert.Single(shell.Workspace.TabPages);
+                    Assert.Same(second, shell.Workspace.SelectedTab);
+                    Assert.True(firstContent.IsDisposed);
+                    Assert.True(shell.Workspace.RequestTabClose(second));
+                    Assert.Empty(shell.Workspace.TabPages);
+                    Assert.True(secondContent.IsDisposed);
+                    Assert.Empty(guard.Exceptions);
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
+            }, TimeSpan.FromSeconds(20));
+        }
+
+        [Fact]
+        public void Delayed_close_prompt_cannot_remove_reopened_page_after_session_change()
+        {
+            StaTest.Run(_ =>
+            {
+                var session = new TestDesktopSession();
+                session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                var notifications = new DesktopNotificationCenter();
+                using var shell = new FoundationShellForm(new FoundationViewModel(new ReadyApiClient(), notifications), session, notifications);
+                var answer = new TaskCompletionSource<WorkspaceCloseChoice>();
+                shell.ClosePrompt = (_, _) => answer.Task;
+                var oldContent = new DirtyCloseContent();
+                var oldPage = shell.OpenWorkspace("same", "Old", oldContent, shell.WorkspaceSessionVersion)!;
+                Assert.True(shell.Workspace.RequestTabClose(oldPage));
+                session.SignOut();
+                Assert.True(oldPage.IsDisposed);
+                session.SetCurrentUser(new CurrentUserDto(43, "new-operator", "New Operator"));
+                var newContent = new Panel();
+                var newPage = shell.OpenWorkspace("same", "New", newContent, shell.WorkspaceSessionVersion)!;
+                answer.SetResult(WorkspaceCloseChoice.Discard);
+                System.Windows.Forms.Application.DoEvents();
+                Assert.Single(shell.Workspace.TabPages);
+                Assert.Same(newPage, shell.Workspace.TabPages[0]);
+                Assert.False(newContent.IsDisposed);
+                Assert.Equal(1, oldContent.DisposeCount);
+            }, TimeSpan.FromSeconds(10));
         }
 
         [Fact]
@@ -610,6 +711,20 @@ namespace MyDmsVn.Desktop.Tests
         private sealed class EmptyCatalogControlFactory : ICatalogControlFactory
         {
             public Control Create(CatalogKind kind) => new Panel();
+        }
+
+        private sealed class DirtyCloseContent : Panel, IWorkspaceCloseParticipant
+        {
+            private readonly Guid _identity = Guid.NewGuid();
+            public int DisposeCount { get; private set; }
+            public WorkspaceCloseState CaptureCloseState() => new WorkspaceCloseState(_identity, 1, true, false, false, true);
+            public Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token) =>
+                Task.FromResult(new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected, _identity, 1));
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing && !IsDisposed) DisposeCount++;
+                base.Dispose(disposing);
+            }
         }
 
         private sealed class RecordingGoodsReceiptControlFactory : IGoodsReceiptControlFactory

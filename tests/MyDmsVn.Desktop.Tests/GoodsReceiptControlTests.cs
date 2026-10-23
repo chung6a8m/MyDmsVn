@@ -15,6 +15,79 @@ namespace MyDmsVn.Desktop.Tests
     public sealed partial class GoodsReceiptControlTests
     {
         [Fact]
+        public void Close_state_detects_dirty_draft_and_clean_posted_receipt()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();
+                Assert.False(control.CaptureCloseState().IsDirty);
+                fixture.Editor.Note = "unsaved";
+                Assert.True(control.CaptureCloseState().IsDirty);
+                Assert.True(control.CaptureCloseState().CanSave);
+                fixture.Editor.Load(ReceiptApiClient.Receipt(status: "Posted"));
+                Assert.False(control.CaptureCloseState().IsDirty);
+                Assert.False(control.CaptureCloseState().CanSave);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(15));
+        }
+
+        [Fact]
+        public void Save_for_close_returns_goods_write_and_current_revision()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();
+                fixture.Editor.Note = "unsaved";
+                var outcome = control.SaveForCloseAsync(token).GetAwaiter().GetResult();
+                Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+                Assert.Equal(control.CaptureCloseState().Revision, outcome.SubmittedRevision);
+                Assert.False(control.CaptureCloseState().IsDirty);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(15));
+        }
+
+        [Fact]
+        public void Newer_goods_edit_during_close_save_keeps_receipt_dirty_and_revision_mismatched()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.NewButton.PerformClick();
+                fixture.Editor.SetWarehouse(3, "W3 - Main", true);
+                fixture.Editor.SetEmployee(5, "E5 - Operator", true);
+                var line = fixture.Editor.AddLine();
+                line.SetProduct(7, "P7 - Product 7", true);
+                line.Quantity = 1m; line.UnitCost = 2m;
+                fixture.Editor.Note = "submitted";
+                fixture.Api.ControlCreateResponse = true;
+
+                var pending = control.SaveForCloseAsync(token);
+                Assert.Equal(1, fixture.Api.CreateCalls);
+                fixture.Editor.Note = "newer edit";
+                fixture.Api.CompleteCreate();
+                PumpMessagesUntil(() => pending.IsCompleted, TimeSpan.FromSeconds(2));
+                var outcome = pending.GetAwaiter().GetResult();
+
+                Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+                Assert.True(outcome.RefreshFailed);
+                Assert.NotEqual(control.CaptureCloseState().Revision, outcome.SubmittedRevision);
+                Assert.True(control.CaptureCloseState().IsDirty);
+                Assert.Equal("newer edit", fixture.Editor.Note);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(15));
+        }
+
+        [Fact]
         public void Activation_and_selection_render_master_detail_lookups_total_and_read_only_state()
         {
             StaTest.Run(

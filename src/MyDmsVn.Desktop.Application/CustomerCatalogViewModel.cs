@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Messaging;
@@ -16,7 +17,11 @@ namespace MyDmsVn.Desktop.Application
         private string? _taxCode;
 
         public CustomerCatalogViewModel(ICustomerApiClient client, IMessenger messenger, IUiDispatcher dispatcher, IDesktopNotificationService notifications, IAsyncDelay delay, TimeSpan? debounceInterval = null, IDesktopExceptionReporter? exceptionReporter = null)
-            : base(CatalogKind.Customer, messenger, dispatcher, notifications, delay, debounceInterval, exceptionReporter) => _client = client ?? throw new ArgumentNullException(nameof(client));
+            : base(CatalogKind.Customer, messenger, dispatcher, notifications, delay, debounceInterval, exceptionReporter)
+        {
+            _client = client ?? throw new ArgumentNullException(nameof(client));
+            InitializeAcceptedEditor();
+        }
         public string Code { get => _code; set => SetProperty(ref _code, value ?? string.Empty); }
         public string Name { get => _name; set => SetProperty(ref _name, value ?? string.Empty); }
         public string? Address { get => _address; set => SetProperty(ref _address, value); }
@@ -31,5 +36,19 @@ namespace MyDmsVn.Desktop.Application
         protected override CustomerDto WithActiveStatus(CustomerDto item, bool isActive) => new CustomerDto(item.Id, item.Code, item.Name, item.Address, item.Phone, item.TaxCode, isActive);
         protected override void PopulateEditor(CustomerDto item) { Code = item.Code; Name = item.Name; Address = item.Address; Phone = item.Phone; TaxCode = item.TaxCode; }
         protected override void ClearEditor() { Code = string.Empty; Name = string.Empty; Address = null; Phone = null; TaxCode = null; }
+        protected override IReadOnlyDictionary<string, string> CaptureEditorFields() =>
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [nameof(Code)] = Code, [nameof(Name)] = Name, [nameof(Address)] = Address ?? string.Empty,
+                [nameof(Phone)] = Phone ?? string.Empty, [nameof(TaxCode)] = TaxCode ?? string.Empty,
+            };
+        protected override IReadOnlyDictionary<string, string> CaptureAcceptedFields(CustomerDto item) =>
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [nameof(Code)] = item.Code, [nameof(Name)] = item.Name,
+                [nameof(Address)] = item.Address ?? string.Empty,
+                [nameof(Phone)] = item.Phone ?? string.Empty,
+                [nameof(TaxCode)] = item.TaxCode ?? string.Empty,
+            };
     }
 }
