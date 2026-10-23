@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Desktop.Application;
 
 namespace MyDmsVn.Desktop.WinForms
@@ -11,10 +12,13 @@ namespace MyDmsVn.Desktop.WinForms
     public sealed class StockBalanceControl : UserControl
     {
         private readonly StockBalanceViewModel _viewModel;
+        private readonly WorkspaceFeedbackNotificationService? _feedbackNotifications;
 
-        public StockBalanceControl(StockBalanceViewModel viewModel)
+        public StockBalanceControl(StockBalanceViewModel viewModel, WorkspaceFeedbackNotificationService? feedbackNotifications = null)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            _feedbackNotifications = feedbackNotifications;
+            FeedbackScope = feedbackNotifications?.Scope ?? new WorkspaceFeedbackScope();
             Dock = DockStyle.Fill;
 
             SearchTextBox = new TextBox { Width = 180, AccessibleName = "Search stock balances" };
@@ -25,9 +29,9 @@ namespace MyDmsVn.Desktop.WinForms
             RefreshButton = new Button { Text = "Refresh", AutoSize = true };
             PreviousPageButton = new Button { Text = "Previous", AutoSize = true };
             NextPageButton = new Button { Text = "Next", AutoSize = true };
-            PageLabel = new Label { AutoSize = true, Text = "Page 1" };
-            TotalLabel = new Label { AutoSize = true, Text = "0.0000" };
-            OperationStatusLabel = new Label { AutoSize = true, Text = "Ready" };
+            PageLabel = new BootstrapLabel { AutoSize = true, Text = "Page 1", TextRole = BootstrapTextRole.Muted };
+            TotalLabel = new BootstrapLabel { AutoSize = true, Text = "0.0000" };
+            OperationStatusLabel = new BootstrapLabel { AutoSize = true, Text = "Ready", TextRole = BootstrapTextRole.Muted };
             BusyIndicator = new ProgressBar
             {
                 Style = ProgressBarStyle.Marquee,
@@ -71,6 +75,7 @@ namespace MyDmsVn.Desktop.WinForms
         }
 
         public DataGridView BalanceGrid { get; }
+        public WorkspaceFeedbackScope FeedbackScope { get; }
         public TextBox SearchTextBox { get; }
         public NumericUpDown WarehouseFilter { get; }
         public NumericUpDown ProductFilter { get; }
@@ -85,7 +90,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         public Task ActivateAsync(CancellationToken cancellationToken)
         {
-            LastOperation = _viewModel.ActivateAsync(cancellationToken);
+            LastOperation = RunQuery(() => _viewModel.ActivateAsync(cancellationToken));
             return LastOperation;
         }
 
@@ -101,26 +106,27 @@ namespace MyDmsVn.Desktop.WinForms
                 NextPageButton.Click -= OnNextPageClicked;
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
                 _viewModel.Dispose();
+                FeedbackScope.Dispose();
             }
 
             base.Dispose(disposing);
         }
 
         private void OnSearchChanged(object? sender, EventArgs eventArgs) =>
-            LastOperation = _viewModel.SetSearch(SearchTextBox.Text);
+            LastOperation = RunQuery(() => _viewModel.SetSearch(SearchTextBox.Text));
 
         private void OnWarehouseChanged(object? sender, EventArgs eventArgs) =>
-            LastOperation = _viewModel.SetWarehouseFilterAsync(
+            LastOperation = RunQuery(() => _viewModel.SetWarehouseFilterAsync(
                 ToOptionalId(WarehouseFilter.Value),
-                CancellationToken.None);
+                CancellationToken.None));
 
         private void OnProductChanged(object? sender, EventArgs eventArgs) =>
-            LastOperation = _viewModel.SetProductFilterAsync(
+            LastOperation = RunQuery(() => _viewModel.SetProductFilterAsync(
                 ToOptionalId(ProductFilter.Value),
-                CancellationToken.None);
+                CancellationToken.None));
 
         private void OnRefreshClicked(object? sender, EventArgs eventArgs) =>
-            LastOperation = _viewModel.RefreshAsync(CancellationToken.None);
+            LastOperation = RunQuery(() => _viewModel.RefreshAsync(CancellationToken.None));
 
         private void OnPreviousPageClicked(object? sender, EventArgs eventArgs)
         {
@@ -130,7 +136,7 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             _viewModel.PageNumber--;
-            LastOperation = _viewModel.RefreshAsync(CancellationToken.None);
+            LastOperation = RunQuery(() => _viewModel.RefreshAsync(CancellationToken.None));
         }
 
         private void OnNextPageClicked(object? sender, EventArgs eventArgs)
@@ -141,8 +147,12 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             _viewModel.PageNumber++;
-            LastOperation = _viewModel.RefreshAsync(CancellationToken.None);
+            LastOperation = RunQuery(() => _viewModel.RefreshAsync(CancellationToken.None));
         }
+
+        private Task RunQuery(Func<Task> query) => _feedbackNotifications == null
+            ? query()
+            : _feedbackNotifications.RunAsync("stock-balance-query", WorkspaceOperationKind.Query, query);
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs) =>
             Render();
@@ -175,6 +185,10 @@ namespace MyDmsVn.Desktop.WinForms
                 : _viewModel.IsEmpty
                     ? "No stock balances."
                     : "Ready";
+            ((BootstrapLabel)OperationStatusLabel).TextRole = string.IsNullOrWhiteSpace(_viewModel.ErrorMessage)
+                ? BootstrapTextRole.Muted : BootstrapTextRole.Danger;
+            OperationStatusLabel.AccessibleRole = string.IsNullOrWhiteSpace(_viewModel.ErrorMessage)
+                ? AccessibleRole.StaticText : AccessibleRole.Alert;
         }
 
         private static DataGridView CreateGrid()

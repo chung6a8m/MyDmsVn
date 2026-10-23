@@ -25,14 +25,8 @@ namespace MyDmsVn.Desktop.WinForms
     {
         private readonly GoodsReceiptListViewModel _list;
         private readonly GoodsReceiptEditorViewModel _editor;
-        public WorkspaceFeedbackScope FeedbackScope { get; private set; } = new WorkspaceFeedbackScope();
-        internal void AttachFeedback(WorkspaceFeedbackScope scope)
-        {
-            _masterBusyBinder.ReplaceScope(scope);
-            _detailBusyBinder.ReplaceScope(scope);
-            FeedbackScope.Dispose();
-            FeedbackScope = scope;
-        }
+        private readonly WorkspaceFeedbackNotificationService? _feedbackNotifications;
+        public WorkspaceFeedbackScope FeedbackScope { get; }
         private readonly ErrorProvider _errors;
         private readonly Dictionary<string, Control> _errorControls;
         private readonly List<GoodsReceiptLineViewModel> _subscribedLines =
@@ -53,10 +47,13 @@ namespace MyDmsVn.Desktop.WinForms
 
         public GoodsReceiptControl(
             GoodsReceiptListViewModel list,
-            GoodsReceiptEditorViewModel editor)
+            GoodsReceiptEditorViewModel editor,
+            WorkspaceFeedbackNotificationService? feedbackNotifications = null)
         {
             _list = list ?? throw new ArgumentNullException(nameof(list));
             _editor = editor ?? throw new ArgumentNullException(nameof(editor));
+            _feedbackNotifications = feedbackNotifications;
+            FeedbackScope = feedbackNotifications?.Scope ?? new WorkspaceFeedbackScope();
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
             Dock = DockStyle.Fill;
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -71,7 +68,7 @@ namespace MyDmsVn.Desktop.WinForms
             };
             StatusFilter.Items.AddRange(new object[] { "All", "Draft", "Posted" });
             StatusFilter.SelectedIndex = 0;
-            RefreshButton = CreateButton("Refresh", () => SetOperation(RefreshAsync()));
+            RefreshButton = CreateButton("Refresh", () => SetOperation(RunFeedback("goods-refresh", WorkspaceOperationKind.Query, RefreshAsync)));
             NewButton = CreateButton("New", BeginNew);
             PreviousPageButton = CreateButton("Previous", () => MovePage(-1));
             NextPageButton = CreateButton("Next", () => MovePage(1));
@@ -101,10 +98,10 @@ namespace MyDmsVn.Desktop.WinForms
             WarehouseLookup = CreateLookup("Warehouse");
             EmployeeLookup = CreateLookup("Employee");
             NoteEditor = new BootstrapTextBox { Dock = DockStyle.Top, AccessibleName = "Note" };
-            StatusLabel = new Label { AutoSize = true };
-            VersionLabel = new Label { AutoSize = true };
-            TotalLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleRight };
-            OperationStatusLabel = new Label { AutoSize = true, Text = "Ready", AccessibleName = "Goods receipt operation status" };
+            StatusLabel = new BootstrapLabel { AutoSize = true, TextRole = BootstrapTextRole.Muted };
+            VersionLabel = new BootstrapLabel { AutoSize = true, TextRole = BootstrapTextRole.Muted };
+            TotalLabel = new BootstrapLabel { AutoSize = true, TextAlign = ContentAlignment.MiddleRight };
+            OperationStatusLabel = new BootstrapLabel { AutoSize = true, Text = "Ready", TextRole = BootstrapTextRole.Muted, AccessibleName = "Goods receipt operation status" };
             BusyIndicator = new BootstrapProgressBar
             {
                 Width = 100,
@@ -114,8 +111,8 @@ namespace MyDmsVn.Desktop.WinForms
                 ShowText = false,
                 Visible = false,
             };
-            SaveButton = CreateButton("Save", () => SetOperation(SaveAsync()));
-            PostButton = CreateButton("Post", () => SetOperation(PostAsync()));
+            SaveButton = CreateButton("Save", () => SetOperation(RunFeedback("goods-save", WorkspaceOperationKind.Write, SaveAsync)));
+            PostButton = CreateButton("Post", () => SetOperation(RunFeedback("goods-post", WorkspaceOperationKind.Write, PostAsync)));
 
             LineGrid = new GoodsReceiptLinesGrid { Dock = DockStyle.Fill, TabStop = true, CausesValidation = false };
             _inline = new GoodsReceiptLinesGridAdapter((GoodsReceiptLinesGrid)LineGrid, _editor, CanEditLines);
@@ -191,15 +188,18 @@ namespace MyDmsVn.Desktop.WinForms
 
         public Task ActivateAsync(CancellationToken cancellationToken)
         {
-            LastOperation = ActivateCoreAsync(cancellationToken);
+            LastOperation = RunFeedback("goods-activate", WorkspaceOperationKind.Query, () => ActivateCoreAsync(cancellationToken));
             return LastOperation;
         }
 
         public Task SelectReceiptAsync(long id, CancellationToken cancellationToken)
         {
-            LastOperation = SelectReceiptCoreAsync(id, cancellationToken);
+            LastOperation = RunFeedback("goods-select", WorkspaceOperationKind.Query, () => SelectReceiptCoreAsync(id, cancellationToken));
             return LastOperation;
         }
+
+        private Task RunFeedback(string key, WorkspaceOperationKind kind, Func<Task> operation) =>
+            _feedbackNotifications == null ? operation() : _feedbackNotifications.RunAsync(key, kind, operation);
 
         public string GetFieldError(string field)
         {
@@ -362,7 +362,13 @@ namespace MyDmsVn.Desktop.WinForms
         }
         WorkspaceCloseState IWorkspaceCloseParticipant.CaptureCloseState() => CaptureCloseState();
 
-        internal Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token) => SaveCoreAsync(token, true);
+        internal async Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token)
+        {
+            var outcome = default(WorkspaceSaveOutcome);
+            await RunFeedback("goods-close-save", WorkspaceOperationKind.Write,
+                async () => outcome = await SaveCoreAsync(token, true).ConfigureAwait(true)).ConfigureAwait(true);
+            return outcome!;
+        }
 
         private async Task<WorkspaceSaveOutcome> SaveCoreAsync(CancellationToken token, bool forClose)
         {
@@ -545,7 +551,8 @@ namespace MyDmsVn.Desktop.WinForms
             if (target >= 1 && target <= pageCount)
             {
                 _list.PageNumber = target;
-                SetOperation(_list.RefreshAsync(CancellationToken.None));
+                SetOperation(RunFeedback("goods-page", WorkspaceOperationKind.Query,
+                    () => _list.RefreshAsync(CancellationToken.None)));
             }
         }
 
@@ -606,7 +613,7 @@ namespace MyDmsVn.Desktop.WinForms
             var row = ReceiptGrid.Selection.ActivePosition.Row;
             if (row > 0 && row - 1 < _receiptIds.Count)
             {
-                SetOperation(SelectReceiptCoreAsync(_receiptIds[row - 1], CancellationToken.None));
+                SelectReceiptAsync(_receiptIds[row - 1], CancellationToken.None);
             }
         }
 
@@ -624,7 +631,8 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (!_applyingState && !_isApplyingWarehouseFilter)
             {
-                SetOperation(_list.SetSearch(SearchBox.Text));
+                SetOperation(RunFeedback("goods-search", WorkspaceOperationKind.Query,
+                    () => _list.SetSearch(SearchBox.Text)));
             }
         }
 
@@ -635,7 +643,8 @@ namespace MyDmsVn.Desktop.WinForms
             if (!_applyingState && canSearch && lookup.HasPendingText)
             {
                 if (!ReferenceEquals(lookup, WarehouseFilterLookup)) ++_closeBufferRevision;
-                SetOperation(_editor.WarehouseLookup.SetSearch(lookup.Text));
+                SetOperation(RunFeedback("goods-warehouse-lookup", WorkspaceOperationKind.Query,
+                    () => _editor.WarehouseLookup.SetSearch(lookup.Text)));
             }
         }
 
@@ -644,7 +653,8 @@ namespace MyDmsVn.Desktop.WinForms
             if (!_applyingState && CanEditLines() && EmployeeLookup.HasPendingText)
             {
                 ++_closeBufferRevision;
-                SetOperation(_editor.EmployeeLookup.SetSearch(EmployeeLookup.Text));
+                SetOperation(RunFeedback("goods-employee-lookup", WorkspaceOperationKind.Query,
+                    () => _editor.EmployeeLookup.SetSearch(EmployeeLookup.Text)));
             }
         }
 
@@ -656,7 +666,8 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             _warehouseFilterId = WarehouseFilterLookup.SelectedValue as int?;
-            SetOperation(ApplyWarehouseFilterAsync(_warehouseFilterId));
+            SetOperation(RunFeedback("goods-warehouse-filter", WorkspaceOperationKind.Query,
+                () => ApplyWarehouseFilterAsync(_warehouseFilterId)));
         }
 
         private async Task ApplyWarehouseFilterAsync(int? warehouseId)
@@ -685,10 +696,8 @@ namespace MyDmsVn.Desktop.WinForms
             _statusFilter = string.Equals(StatusFilter.SelectedItem as string, "All", StringComparison.Ordinal)
                 ? null
                 : StatusFilter.SelectedItem as string;
-            SetOperation(
-                _list.SetStatusFilterAsync(
-                    _statusFilter,
-                    CancellationToken.None));
+            SetOperation(RunFeedback("goods-status-filter", WorkspaceOperationKind.Query,
+                () => _list.SetStatusFilterAsync(_statusFilter, CancellationToken.None)));
         }
 
         private void OnReceiptDateChanged(object? sender, EventArgs eventArgs)
@@ -863,10 +872,8 @@ namespace MyDmsVn.Desktop.WinForms
                     (busy ? "Loading..." : "Ready");
                 OperationStatusLabel.AccessibleRole = requiresPostReload || _inline.EditError != null || _workflowMessage != null || _editor.ErrorMessage != null || _list.ErrorMessage != null
                     ? AccessibleRole.Alert : AccessibleRole.StaticText;
-                OperationStatusLabel.ForeColor = OperationStatusLabel.AccessibleRole == AccessibleRole.Alert
-                    ? MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Mode == MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark
-                        ? Color.FromArgb(255, 180, 171) : Color.FromArgb(180, 35, 24)
-                    : ForeColor;
+                ((BootstrapLabel)OperationStatusLabel).TextRole = OperationStatusLabel.AccessibleRole == AccessibleRole.Alert
+                    ? BootstrapTextRole.Danger : BootstrapTextRole.Muted;
                 ReceiptGrid.Enabled = !busy && !requiresPostReload;
                 LineGrid.Enabled = !busy && !requiresPostReload;
                 RefreshButton.Enabled = !busy;

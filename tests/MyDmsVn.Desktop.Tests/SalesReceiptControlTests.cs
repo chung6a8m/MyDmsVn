@@ -12,11 +12,65 @@ using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
 using Xunit;
 using Box = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDecimalInput;
+using DateInput = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDateInput;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SalesReceiptControlTests
 {
+    [Fact]
+    public void Nullable_sales_date_filters_commit_clear_and_reject_invalid_range_without_query()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost();
+            var from = Assert.IsType<DateInput>(host.Value<Control>("FromDateEditor"));
+            var to = Assert.IsType<DateInput>(host.Value<Control>("ToDateEditor"));
+            var before = host.Api.Lists.Count;
+
+            from.Text = "23/10/2026"; to.Text = "22/10/2026";
+            host.CallTask("ApplyFiltersAsync");
+            Assert.Equal(before, host.Api.Lists.Count);
+            Assert.Equal("23/10/2026", from.PendingText);
+            Assert.Equal("22/10/2026", to.PendingText);
+            Assert.Equal(BootstrapValidationState.Invalid, from.ValidationState);
+            Assert.Equal(BootstrapValidationState.Invalid, to.ValidationState);
+            Assert.Equal(AccessibleRole.Alert, host.Value<Label>("OperationStatusLabel").AccessibleRole);
+
+            to.Text = "24/10/2026";
+            Assert.Equal(BootstrapValidationState.None, from.ValidationState);
+            Assert.Equal(BootstrapValidationState.None, to.ValidationState);
+            host.CallTask("ApplyFiltersAsync");
+            Assert.Equal(new DateTime(2026, 10, 23), host.Api.Lists.Last().FromDate);
+            Assert.Equal(new DateTime(2026, 10, 24), host.Api.Lists.Last().ToDate);
+
+            from.Text = ""; to.Text = "";
+            host.CallTask("ApplyFiltersAsync");
+            Assert.Null(host.Api.Lists.Last().FromDate);
+            Assert.Null(host.Api.Lists.Last().ToDate);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Pending_sales_date_filter_survives_unrelated_state_projection_and_rejected_apply()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost();
+            var from = Assert.IsType<DateInput>(host.Value<Control>("FromDateEditor"));
+            var before = host.Api.Lists.Count;
+            from.Text = "31/02/2026";
+            host.Value<NumericUpDown>("PageSizeEditor").Value = 26;
+            Assert.Equal("31/02/2026", from.PendingText);
+            host.CallTask("ApplyFiltersAsync");
+            Assert.Equal(before, host.Api.Lists.Count);
+            Assert.Equal("31/02/2026", from.PendingText);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
     [Fact]
     public void Unknown_post_alert_clears_only_after_authoritative_reload()
     {

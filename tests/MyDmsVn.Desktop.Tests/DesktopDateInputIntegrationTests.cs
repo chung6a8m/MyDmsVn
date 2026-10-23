@@ -90,6 +90,60 @@ public sealed class DesktopDateInputIntegrationTests
     [Theory]
     [InlineData("Light")]
     [InlineData("Dark")]
+    public void Sales_nullable_filter_native_characters_keep_query_closed_until_apply(string theme)
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard();
+            var previous = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(theme == "Dark" ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+                using var host = new SalesControlHost();
+                var input = ((SalesReceiptControl)host.Control).FromDateEditor;
+                var before = host.Api.Lists.Count;
+                var driver = new NativeLookupTypingDriver(input);
+                driver.SelectRange(0, driver.Text.Length);
+                var candidate = string.Empty;
+                foreach (var ch in "5/11/2026")
+                {
+                    driver.TypeCharacter(ch); candidate += ch;
+                    Assert.Equal(candidate, input.PendingText);
+                    Assert.Equal(candidate.Length, driver.SelectionStart);
+                    Assert.Equal(0, driver.SelectionLength);
+                    Assert.Equal(before, host.Api.Lists.Count);
+                }
+                host.CallTask("ApplyFiltersAsync");
+                Assert.Equal(new DateTime(2026, 11, 5), host.Api.Lists.Last().FromDate);
+                Assert.Equal("05/11/2026", input.PendingText);
+                Console.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, CancellationToken.None));
+                Console.WriteLine("UIN_T11_SALES_FILTER_NATIVE;theme=" + theme);
+                Assert.Empty(guard.Exceptions);
+            }
+            finally { BootstrapThemeManager.CurrentTheme = previous; }
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Sales_signout_scrubs_pending_nullable_filter_date_text()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard();
+            using var host = new SalesControlHost();
+            var input = ((SalesReceiptControl)host.Control).FromDateEditor;
+            input.Text = "private candidate";
+            host.Session.SignOut();
+            System.Windows.Forms.Application.DoEvents();
+            Assert.Equal(string.Empty, input.PendingText);
+            Assert.Null(input.Value);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Theory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
     public void Sales_required_date_native_characters_keep_model_until_enter(string theme)
     {
         StaTest.Run(_ =>

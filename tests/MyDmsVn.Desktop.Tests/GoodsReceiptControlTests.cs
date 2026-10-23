@@ -17,6 +17,37 @@ namespace MyDmsVn.Desktop.Tests
     public sealed partial class GoodsReceiptControlTests
     {
         [Fact]
+        public void Factory_goods_query_failure_is_visible_in_its_own_workspace()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                var globalNotices = 0;
+                fixture.Notifications.NotificationPublished += (_, __) => globalNotices++;
+                var factory = new GoodsReceiptControlFactory(fixture.Api,
+                    new WarehouseCatalogClient(fixture.WarehouseSource),
+                    new EmployeeCatalogClient(fixture.EmployeeSource),
+                    new ProductCatalogClient(fixture.ProductSource), fixture.Messenger,
+                    new ImmediateUiDispatcher(), fixture.Notifications,
+                    new InventoryControlTests.SilentReporter(), new ImmediateDelay());
+                var control = Assert.IsType<GoodsReceiptControl>(factory.Create());
+                using var host = new WorkspaceFeedbackHost(control, control.FeedbackScope);
+                using var form = new Form { Width = 900, Height = 600 };
+                form.Controls.Add(host); form.Show(); System.Windows.Forms.Application.DoEvents();
+                fixture.Api.ListError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Goods denied.");
+
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                System.Windows.Forms.Application.DoEvents();
+
+                Assert.True(host.Alert.Visible);
+                Assert.Contains("Support ID:", host.Alert.Text);
+                Assert.Equal(BootstrapTextRole.Danger, Assert.IsType<BootstrapLabel>(control.OperationStatusLabel).TextRole);
+                Assert.Equal(0, globalNotices);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(20));
+        }
+
+        [Fact]
         public void Close_state_detects_dirty_draft_and_clean_posted_receipt()
         {
             StaTest.Run(token =>

@@ -50,6 +50,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     private bool _post;
     private bool _read;
     private bool _criteriaDirty;
+    private string? _filterDateError;
     private string? _message;
     private long _boundary;
     private long _closeBufferRevision;
@@ -87,8 +88,11 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         };
         NoteEditor = new BootstrapTextBox { AccessibleName = "Note", Dock = DockStyle.Top };
         SearchBox = new BootstrapTextBox { AccessibleName = "Search sales receipts", Width = 220 };
-        FromDateEditor = new DateTimePicker { AccessibleName = "From date", ShowCheckBox = true, Checked = false, Format = DateTimePickerFormat.Short, Width = 130 };
-        ToDateEditor = new DateTimePicker { AccessibleName = "To date", ShowCheckBox = true, Checked = false, Format = DateTimePickerFormat.Short, Width = 130 };
+        FromDateEditor = new BootstrapDateInput { AccessibleName = "From date", Width = 190,
+            Profile = new DateInputProfile(true, DateTimePicker.MinimumDateTime, DateTimePicker.MaximumDateTime) };
+        ToDateEditor = new BootstrapDateInput { AccessibleName = "To date", Width = 190,
+            Profile = new DateInputProfile(true, DateTimePicker.MinimumDateTime, DateTimePicker.MaximumDateTime) };
+        FromDateEditor.BeginEditSession(null); ToDateEditor.BeginEditSession(null);
         StatusFilter = new ComboBox { AccessibleName = "Filter by status", DropDownStyle = ComboBoxStyle.DropDownList, Width = 105 };
         StatusFilter.Items.AddRange(new object[] { "All", "Draft", "Posted" }); StatusFilter.SelectedIndex = 0;
         PageSizeEditor = new NumericUpDown { AccessibleName = "Page size", Minimum = 1, Maximum = 200, Value = 50, Width = 65 };
@@ -122,7 +126,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         ReviewCreateButton = Button("Review saved sale", () => { if (long.TryParse(OutcomeSaleIdEditor.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0) SetOperation(ReviewCreateAsync(id)); });
         TotalLabel = Summary("Sales total"); CostLabel = Summary("Posted total cost"); ProfitLabel = Summary("Posted gross profit");
         LineCostLabel = Summary("Selected line posted cost"); StockLabel = Summary("Stock availability");
-        OperationStatusLabel = new Label { Name = "CompactSecondary", AutoSize = true, AccessibleName = "Sales operation status" };
+        OperationStatusLabel = new BootstrapLabel { Name = "CompactSecondary", AutoSize = true, TextRole = BootstrapTextRole.Muted, AccessibleName = "Sales operation status" };
         ValidationSummaryButton = Button("Review validation", () => _inline.FocusFirstValidationError());
         ValidationSummaryButton.AccessibleName = "Review sales validation error";
         AppliedCriteriaLabel = new BootstrapLabel { TextRole = BootstrapTextRole.Muted, AutoSize = true, AccessibleName = "Applied sales filters" };
@@ -131,7 +135,8 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         SaleDateEditor.ValueChanged += (_, __) => { if (!_applying && CanEditHeader && SaleDateEditor.Value.HasValue) Editor.SaleDate = SaleDateEditor.Value.Value; };
         SaleDateEditor.PendingTextChanged += (_, __) => { if (!_applying) { ++_closeBufferRevision; ApplyState(); } };
         NoteEditor.TextChanged += (_, __) => { if (!_applying && CanEditHeader) Editor.Note = NoteEditor.Text; };
-        SearchBox.TextChanged += PendingFilterChanged; FromDateEditor.ValueChanged += PendingFilterChanged;
+        SearchBox.TextChanged += PendingFilterChanged; FromDateEditor.PendingTextChanged += PendingFilterChanged;
+        ToDateEditor.PendingTextChanged += PendingFilterChanged; FromDateEditor.ValueChanged += PendingFilterChanged;
         ToDateEditor.ValueChanged += PendingFilterChanged; StatusFilter.SelectedValueChanged += PendingFilterChanged; PageSizeEditor.ValueChanged += PendingFilterChanged;
         Editor.PropertyChanged += StateChanged; _list.PropertyChanged += StateChanged; _session.SessionChanged += SessionChanged;
         ApplyState();
@@ -153,8 +158,8 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     public BootstrapDateInput SaleDateEditor { get; }
     public BootstrapTextBox NoteEditor { get; }
     public BootstrapTextBox SearchBox { get; }
-    public DateTimePicker FromDateEditor { get; }
-    public DateTimePicker ToDateEditor { get; }
+    public BootstrapDateInput FromDateEditor { get; }
+    public BootstrapDateInput ToDateEditor { get; }
     public ComboBox StatusFilter { get; }
     public NumericUpDown PageSizeEditor { get; }
     public BootstrapButton NewButton { get; }
@@ -350,9 +355,29 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     private Task ApplyFiltersAsync()
     {
         if (Busy || !_read || _lookups.Any(binding => binding.Filter && binding.Control.HasPendingText)) return Task.CompletedTask;
+        var from = FromDateEditor.TryParsePending();
+        var to = ToDateEditor.TryParsePending();
+        if (from.State != InputParseState.Valid || to.State != InputParseState.Valid)
+        {
+            FromDateEditor.ValidationState = from.State == InputParseState.Valid ? BootstrapValidationState.None : BootstrapValidationState.Invalid;
+            ToDateEditor.ValidationState = to.State == InputParseState.Valid ? BootstrapValidationState.None : BootstrapValidationState.Invalid;
+            _filterDateError = "Enter valid From and To dates before applying filters.";
+            ApplyState();
+            return Task.CompletedTask;
+        }
+        if (from.Value.HasValue && to.Value.HasValue && from.Value.Value > to.Value.Value)
+        {
+            FromDateEditor.ValidationState = ToDateEditor.ValidationState = BootstrapValidationState.Invalid;
+            _filterDateError = "From date must not be after To date.";
+            ApplyState();
+            return Task.CompletedTask;
+        }
+        FromDateEditor.TryCommitPending(); ToDateEditor.TryCommitPending();
+        FromDateEditor.ValidationState = ToDateEditor.ValidationState = BootstrapValidationState.None;
+        _filterDateError = null;
         _criteriaDirty = false;
-        return _list.SetCriteriaAsync(new SalesReceiptListRequest(FromDateEditor.Checked ? FromDateEditor.Value.Date : (DateTime?)null,
-            ToDateEditor.Checked ? ToDateEditor.Value.Date : (DateTime?)null, Selected(CustomerFilterLookup), Selected(WarehouseFilterLookup), Selected(EmployeeFilterLookup),
+        return _list.SetCriteriaAsync(new SalesReceiptListRequest(FromDateEditor.Value,
+            ToDateEditor.Value, Selected(CustomerFilterLookup), Selected(WarehouseFilterLookup), Selected(EmployeeFilterLookup),
             StatusFilter.SelectedIndex == 0 ? null : (string)StatusFilter.SelectedItem, Selected(ProductFilterLookup), SearchBox.Text, (int)PageSizeEditor.Value), _lifetime.Token);
     }
     private static int? Selected(BootstrapLookupBox lookup) => lookup.SelectedValue is int id && id > 0 ? id : (int?)null;
@@ -437,14 +462,23 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
             StockLabel.Text = "Stock availability is checked at Post.";
             OutcomeSaleIdEditor.Visible = ReviewCreateButton.Visible = Editor.RequiresCreateOutcomeReview;
             ReviewCreateButton.Enabled = _read && !Busy;
-            OperationStatusLabel.Text = _inline.EditError ?? Editor.Error?.Message ?? _list.Error?.Message ?? _message ?? "Ready";
-            OperationStatusLabel.AccessibleRole = _inline.EditError != null || Editor.Error != null || _list.Error != null || _message != null
+            OperationStatusLabel.Text = _inline.EditError ?? _filterDateError ?? Editor.Error?.Message ?? _list.Error?.Message ?? _message ?? "Ready";
+            OperationStatusLabel.AccessibleRole = _inline.EditError != null || _filterDateError != null || Editor.Error != null || _list.Error != null || _message != null
                 ? AccessibleRole.Alert : AccessibleRole.StaticText;
+            ((BootstrapLabel)OperationStatusLabel).TextRole = OperationStatusLabel.AccessibleRole == AccessibleRole.Alert
+                ? BootstrapTextRole.Danger : BootstrapTextRole.Muted;
             var dateError = SaleDateEditor.ValidationState == BootstrapValidationState.Invalid
                 ? "Enter a valid sale date (day/month/year)." : "";
             _errors.SetError(SaleDateEditor, dateError);
             SaleDateEditor.AccessibleDescription = dateError.Length == 0
                 ? "Type day, day/month or day/month/four-digit-year." : dateError;
+            foreach (var filterDate in new[] { FromDateEditor, ToDateEditor })
+            {
+                var filterError = filterDate.ValidationState == BootstrapValidationState.Invalid ? _filterDateError ?? "Enter a valid date." : "";
+                _errors.SetError(filterDate, filterError);
+                filterDate.AccessibleDescription = filterError.Length == 0
+                    ? "Optional date. Clear the text to remove this filter." : filterError;
+            }
             _errors.SetError(LineGrid, _inline.EditError ?? "");
             foreach (var input in new Control[] { ProductLookup, QuantityEditor, UnitPriceEditor }) _errors.SetError(input, "");
             if (_inline.ActiveValidationControl is Control activeInput)
@@ -561,7 +595,19 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
             else { _message = "Product Unit could not be loaded. Save reloads the authoritative Unit snapshot."; ApplyState(); }
         }, CancellationToken.None).ConfigureAwait(false);
     }
-    private void PendingFilterChanged(object? sender, EventArgs args) { if (!_applying && Current && _read && !Busy) { _criteriaDirty = true; ApplyState(); } }
+    private void PendingFilterChanged(object? sender, EventArgs args)
+    {
+        if (_applying || !Current || !_read || Busy) return;
+        if (ReferenceEquals(sender, FromDateEditor) || ReferenceEquals(sender, ToDateEditor))
+        {
+            if (_filterDateError == "From date must not be after To date.")
+                FromDateEditor.ValidationState = ToDateEditor.ValidationState = BootstrapValidationState.None;
+            ((BootstrapDateInput)sender!).ValidationState = BootstrapValidationState.None;
+            _filterDateError = null;
+        }
+        _criteriaDirty = true;
+        ApplyState();
+    }
     private void InlineChanged(object? sender, EventArgs e) { ++_closeBufferRevision; ApplyState(); }
     private void StateChanged(object? sender, PropertyChangedEventArgs e) => Dispatch(() =>
     {
@@ -574,7 +620,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         // Flip admission before notifications to avoid recursive denial propagation.
         _read = _write = _post = false;
         CancelBoundary(); _hasDetail = false;
-        Editor.SetAccess(false, false, false); _list.SetAccess(false); SaleDateEditor.ProjectAcceptedValue(null); ApplyState();
+        Editor.SetAccess(false, false, false); _list.SetAccess(false); SaleDateEditor.ProjectAcceptedValue(null); ClearFilterDates(); ApplyState();
         if (Current)
         {
             FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-access", WorkspaceOperationKind.Write))
@@ -592,7 +638,14 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     {
         FeedbackScope.Invalidate();
         _lifetime.Cancel();
-        Dispatch(() => { CancelBoundary(); _read = _write = _post = false; SaleDateEditor.ProjectAcceptedValue(null); ApplyState(); });
+        Dispatch(() => { CancelBoundary(); _read = _write = _post = false; SaleDateEditor.ProjectAcceptedValue(null); ClearFilterDates(); ApplyState(); });
+    }
+    private void ClearFilterDates()
+    {
+        FromDateEditor.BeginEditSession(null); ToDateEditor.BeginEditSession(null);
+        FromDateEditor.ValidationState = ToDateEditor.ValidationState = BootstrapValidationState.None;
+        _filterDateError = null;
+        _criteriaDirty = false;
     }
     private void SetOperation(Task task) { LastOperation = Task.WhenAll(LastOperation, Observe(task)); }
     private async Task Observe(Task task)
