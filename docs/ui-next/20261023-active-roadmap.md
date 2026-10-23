@@ -1,7 +1,7 @@
 # UI Next — active roadmap for the SME desktop foundation
 
 **Date:** 2026-10-23
-**Status:** SOLE ACTIVE ROADMAP — T00–T03 VERIFIED in bounded task scope; A01–A04 focused evidence VERIFIED for current adopters; T04–T13 NOT STARTED
+**Status:** SOLE ACTIVE ROADMAP — T00–T04 VERIFIED in bounded task scope; A01–A05 focused evidence VERIFIED for current adopters/pure core; T05–T13 NOT STARTED
 **Base:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`
 **Design:** [Design and control policy](20261023-design-and-control-policy.md)
 **Execution:** [Implementation plan](20261023-implementation-plan.md)
@@ -61,7 +61,7 @@ These defaults make implementation reviewable. They are planning decisions under
 
 ## Execution queue
 
-At activation all rows were **NOT STARTED**. [T00 evidence](evidence/20261023-t00-field-errors.md) verifies its bounded application/session contract; [T01 evidence](evidence/20261023-uin-t01-workspace-feedback.md) records workspace feedback; [T02 evidence](evidence/20261023-uin-t02-validation-pilot.md) records Product/Sales presentation. The [current-candidate completion ledger](evidence/20261023-uin-t00-t02-native-completion.md) verifies T00–T02 with Light/Dark native100/native125 and focused Application/Session/GUI tests. [T03 evidence](evidence/20261023-uin-t03-inline-sessions.md) verifies common inline sessions on the current Goods/Sales adapters at native100. Final package/Owner review remains T13, not task-level acceptance here. T04–T13 remain NOT STARTED; T04 is the next ready task. Follow table order by default; independent work may proceed only after its listed dependencies and without conflicting file ownership.
+At activation all rows were **NOT STARTED**. [T00 evidence](evidence/20261023-t00-field-errors.md) verifies its bounded application/session contract; [T01 evidence](evidence/20261023-uin-t01-workspace-feedback.md) records workspace feedback; [T02 evidence](evidence/20261023-uin-t02-validation-pilot.md) records Product/Sales presentation. The [current-candidate completion ledger](evidence/20261023-uin-t00-t02-native-completion.md) verifies T00–T02 with Light/Dark native100/native125 and focused Application/Session/GUI tests. [T03 evidence](evidence/20261023-uin-t03-inline-sessions.md) verifies common inline sessions on the current Goods/Sales adapters at native100. [T04 evidence](evidence/20261023-uin-t04-decimal-core.md) verifies pure decimal parsing/projection and application-policy compatibility. Final package/Owner review remains T13, not task-level acceptance here. T05–T13 remain NOT STARTED; T05 is the next ready task. Follow table order by default; independent work may proceed only after its listed dependencies and without conflicting file ownership.
 
 | Task | Priority / outcome | Repository ownership | Dependencies | Completion evidence |
 |---|---|---|---|---|
