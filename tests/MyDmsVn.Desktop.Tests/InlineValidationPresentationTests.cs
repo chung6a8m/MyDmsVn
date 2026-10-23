@@ -35,7 +35,7 @@ public sealed class InlineValidationPresentationTests
         StaTest.Run(_ =>
         {
             using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
-            host.Begin(3); host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapFormattedTextBox>("QuantityEditor").Text = "1.00001";
+            host.Begin(3); host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDecimalInput>("QuantityEditor").Text = "1.00001";
             host.CallTask("SaveAsync");
             var grid = host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSourceGrid>("LineGrid");
             var help = grid.AccessibilityObject.GetChild(1)!.GetChild(3)!.Help;
@@ -43,7 +43,7 @@ public sealed class InlineValidationPresentationTests
             Assert.Contains("Quantity", help, StringComparison.OrdinalIgnoreCase);
             var summary = host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapButton>("ValidationSummaryButton");
             Assert.True(summary.Visible); Assert.Contains("Line 1 Quantity", summary.Text);
-            var quantity = host.Value<BootstrapFormattedTextBox>("QuantityEditor");
+            var quantity = host.Value<BootstrapDecimalInput>("QuantityEditor");
             var errors = (ErrorProvider)host.Control.GetType().GetField("_errors", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Control)!;
             Assert.Equal(BootstrapValidationState.Invalid, quantity.ValidationState);
             Assert.Contains("Quantity", quantity.AccessibleDescription, StringComparison.OrdinalIgnoreCase);
@@ -63,7 +63,7 @@ public sealed class InlineValidationPresentationTests
         {
             using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
             host.Begin(4);
-            var price = host.Value<BootstrapFormattedTextBox>("UnitPriceEditor");
+            var price = host.Value<BootstrapDecimalInput>("UnitPriceEditor");
             price.Text = "9.25";
             var inline = (SalesReceiptLinesGridAdapter)host.Control.GetType().GetField("_inline", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Control)!;
             var errors = (ErrorProvider)host.Control.GetType().GetField("_errors", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Control)!;
@@ -158,7 +158,7 @@ public sealed class InlineValidationPresentationTests
                 Assert.Contains("Unit price rejected", grid.AccessibilityObject.GetChild(1)!.GetChild(4)!.Help);
                 Assert.NotEqual(((SourceGrid.Cells.Views.Cell)grid[1, 3].View).BackColor,
                     ((SourceGrid.Cells.Views.Cell)grid[1, 4].View).BackColor);
-                Assert.False(host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapFormattedTextBox>("UnitPriceEditor").ContainsFocus);
+                Assert.False(host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDecimalInput>("UnitPriceEditor").ContainsFocus);
                 Assert.True(summary.CanSelect); summary.Select(); summary.Focus();
                 NativeLookupTypingDriver.KeyCharacter(summary, Keys.Enter, '\r');
                 Assert.Equal(4, grid.Selection.ActivePosition.Column);

@@ -131,8 +131,8 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     public BootstrapLookupBox WarehouseLookup { get; }
     public BootstrapLookupBox EmployeeLookup { get; }
     public BootstrapLookupBox ProductLookup => _inline.ProductControl;
-    public BootstrapFormattedTextBox QuantityEditor => _inline.QuantityControl;
-    public BootstrapFormattedTextBox UnitPriceEditor => _inline.PriceControl;
+    public BootstrapDecimalInput QuantityEditor => _inline.QuantityControl;
+    public BootstrapDecimalInput UnitPriceEditor => _inline.PriceControl;
     public BootstrapLookupBox CustomerFilterLookup { get; }
     public BootstrapLookupBox WarehouseFilterLookup { get; }
     public BootstrapLookupBox EmployeeFilterLookup { get; }

@@ -11,7 +11,7 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
 using Xunit;
-using Box = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapFormattedTextBox;
+using Box = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDecimalInput;
 
 namespace MyDmsVn.Desktop.Tests;
 
