@@ -1,13 +1,15 @@
 # Respawn fixture reuse on net48 — implementation plan
 
+> ARCHIVED — 2026-10-23. Snapshot from `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`; historical text below is not an execution queue. See the [archive manifest](../README.md) for final dispositions and the explicit exclusion of unfinished old work.
+
 > **Historical completed plan:** RESP-T00–T05 are complete in their approved scope. Retain the task record and linked evidence; this file is not an active execution queue. Use the [current plan index](README.md) for completed BCF acceptance and current scheduling; completed BCI remains historical evidence. The implementation instructions below describe the accepted historical work.
 
-**Status:** RESP-T00–T05 complete and accepted, 2026-10-18, for the exact uncommitted net48 working-tree candidate recorded in verification. Both unfiltered six-owner passes: 265 passed / 0 failed / 0 skipped per mode; successful cleanup and observed suite wall-time improvement. Default reuse and explicit fresh verified. At the accepted handoff, the next task was L2DB-T00 to bind the eventual commit and preserve this accepted baseline. See [case map](../RESPAWN_CASE_MAP.md) and [verification](../RESPAWN_VERIFICATION.md).
+**Status:** RESP-T00–T05 complete and accepted, 2026-10-18, for the exact uncommitted net48 working-tree candidate recorded in verification. Both unfiltered six-owner passes: 265 passed / 0 failed / 0 skipped per mode; successful cleanup and observed suite wall-time improvement. Default reuse and explicit fresh verified. At the accepted handoff, the next task was L2DB-T00 to bind the eventual commit and preserve this accepted baseline. See [case map](../../../RESPAWN_CASE_MAP.md) and [verification](../../../RESPAWN_VERIFICATION.md).
 **Historical order:** RESP preceded the now-completed [LINQ to DB migration](20261018-001-linq2db-net48-persistence-migration.md). This ordering is retained for evidence provenance, not current scheduling.
 **Goal:** Amortize database creation and migration across eligible SQL tests while proving each test receives the same clean, deterministic starting state as a fresh database.
 **Architecture:** One reusable database belongs to one xUnit v2 collection in one assembly/process/TFM. Small helpers in the existing SQL test projects own allocation, reset, seeding and teardown. Each test owns its application resources; exceptions retain fresh databases.
 **Tech stack:** Active SQL/product/Desktop `net48`; xUnit `2.9.3`; DbUp `7.2.0`; central `Microsoft.Data.SqlClient` `7.0.2`; pinned Respawn `4.0.0`.
-**Spec:** The owner's 2026-10-18 decisions, [TEST_POLICY](../TEST_POLICY.md), [TEST_STRATEGY](../TEST_STRATEGY.md), [ADR 0005](../adr/0005-test-isolation-and-bounded-parallelism.md) and [ADR 0010](../adr/0010-respawn-fixture-reuse-and-test-policy.md).
+**Spec:** The owner's 2026-10-18 decisions, [TEST_POLICY](../../../TEST_POLICY.md), [TEST_STRATEGY](../../../TEST_STRATEGY.md), [ADR 0005](../../../adr/0005-test-isolation-and-bounded-parallelism.md) and [ADR 0010](../../../adr/0010-respawn-fixture-reuse-and-test-policy.md).
 
 ## 1. Current baseline and constraints
 
@@ -160,7 +162,7 @@ Review empty/populated append-only ledger reset, partial reset/seed failure, lea
 | T04 | Changed Inventory/Security profiles and case map | Source-reviewed applicable categories/methods; many Security data cases use `SecurityProvisioning` |
 | T05 | All affected lifecycle tests and reviewed source/case inventory | Complete Foundation, Catalog, Inventory, Security, Migrations and original IntegrationTests in each explicit mode |
 
-Use [tests/README](../../tests/README.md) for SQL configuration and the sequential complete-project loop. Current focused Catalog command:
+Use [tests/README](../../../../tests/README.md) for SQL configuration and the sequential complete-project loop. Current focused Catalog command:
 
 ```powershell
 $project = 'tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj'
@@ -172,7 +174,7 @@ dotnet test $project -c Release -f net48 --no-restore `
 if ($LASTEXITCODE -ne 0) { throw 'Catalog SQL tests failed.' }
 ```
 
-T02 implements the setting for lifecycle adapters. The T05 comparison sets `MYDMSVN_SQL_TEST_FIXTURE_MODE=fresh`, executes the complete six-project loop, then repeats with `reuse` and a separate results directory. Record/restore the caller's prior setting afterward. The setting is supported by all three accepted data collections; T04 changes the default to reuse. The complete T05 comparison is accepted for the exact working-tree candidate in [verification](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
+T02 implements the setting for lifecycle adapters. The T05 comparison sets `MYDMSVN_SQL_TEST_FIXTURE_MODE=fresh`, executes the complete six-project loop, then repeats with `reuse` and a separate results directory. Record/restore the caller's prior setting afterward. The setting is supported by all three accepted data collections; T04 changes the default to reuse. The complete T05 comparison is accepted for the exact working-tree candidate in [verification](../../../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
 
 Use the designated non-production master connection, short unique local result paths and finite reset/SQL bounds. Keep raw connections, SQL identifiers, Theory values and TRX local; publish sanitized revision/mode/scope/count/cleanup observations. Missing Windows/SQL or failed required cleanup is BLOCKED / NOT RUN or FAIL as appropriate. RESP-T00–T05 checkboxes are complete with evidence in verification; no release acceptance follows.
 

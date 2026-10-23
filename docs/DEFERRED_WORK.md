@@ -1,10 +1,12 @@
 # Retired directions and scope boundaries
 
-**Updated:** 2026-10-21 at merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. This page is a non-executable scope record. BCI is implemented/accepted historical work; the owner selected [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) as the then-sole active roadmap. BCF repairs three receipt lookups first, then refines the shared shell, Products content and receipt against all three design references. It is now COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); the Owner has now selected [SAL](plans/20261021-002-direct-sales-and-moving-average-costing.md) as the sole ACTIVE successor, not yet implemented. There are no tasks to execute from this page.
+**Updated:** 2026-10-23 at merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This page is a non-executable scope record. [UI-NEXT](ui-next/20261023-active-roadmap.md) is the sole active roadmap; all implementation tasks are NOT STARTED. There are no tasks to execute from this page.
 
 ## Active scope is recorded elsewhere
 
-[SAL](DIRECT_SALES.md) schedules direct sales, cost/value inventory, LINQ Product filtering and keyset pages. Its migration/bootstrap and scoped package checks are feature acceptance obligations. This page supplies no task queue; the broader operational rollout, support and recovery acceptance below remains unscheduled and cannot be inferred from a feature test.
+UI-NEXT covers workspace feedback, validation, tab close/busy presentation and theme infrastructure under its [design and control policy](ui-next/20261023-design-and-control-policy.md). The [archive boundary](archive/20261023-pre-ui-next/README.md) retires prior queues and excludes their unfinished work, including SAL native125/attended/Owner acceptance and complete integration repeats. Exclusion does not complete or waive those gaps. Current Sales/schema10 and other business contracts remain implemented source behavior.
+
+[SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) retains product/package `f5039cb`, separate GUI test `4697744`, candidate-specific runnable automation PASS and its OPEN acceptance boundary. BCF/BCI/GUI-P5/L2DB/RESP retain their recorded signed scopes and exceptions. The broader operational rollout, support and recovery requirements below remain unscheduled and cannot be inferred from feature tests.
 
 ## Release prerequisites
 
@@ -18,11 +20,11 @@ GUI-P5 is complete only in its signed scope, including the Warehouse 125% Dark D
 
 | Direction | Current boundary |
 |---|---|
-| P7 / HTTP / remote adapter | Not part of SAL; no new API host, remote security boundary or adapter parity claim |
+| P7 / HTTP / remote adapter | Not part of UI-NEXT; no new API host, remote security boundary or adapter parity claim |
 | AppCore / modern runtime | Parked, not shipped; all active product/tests remain net48. The unimplemented reactivation procedure was deleted; no automatic target/lock/package restoration is authorized |
-| Business scope beyond SAL | Orders/POS, payments, debt, returns/reversal, pricing engine, tax/fiscal invoicing, FIFO/periodic/revaluation, transfers, lots/serials, sync and multi-tenancy remain excluded; direct sales and moving-average valuation are approved in SAL |
+| Business expansion beyond implemented contracts | Orders/POS, payments, debt, returns/reversal, pricing engine, tax/fiscal invoicing, FIFO/periodic/revaluation, transfers, lots/serials, sync and multi-tenancy remain excluded; direct sales and moving-average valuation are implemented source contracts with archived incomplete acceptance |
 | Unapproved receipt fields | Supplier/tax/discount/lot and other fields beyond the explicit SAL seven-column/header contract remain excluded; Goods Receipt keeps its business fields |
-| Distribution tooling | No MSI, auto-updater or new migration framework is scheduled by SAL |
+| Distribution tooling | No MSI, auto-updater or new migration framework is scheduled by UI-NEXT |
 
 This table records exclusions, not a backlog or checklist. Any future selection needs a fresh design and evidence boundary.
 
@@ -34,4 +36,4 @@ This historical metadata defect is CLOSED in its narrow scope: the publisher rea
 
 The former `tests/test-gates.v1.json`, SqlTestHarness, standalone SQL runner/runner tests, approval-file flow and related command wrappers remain removed. STAB-T03/T04 manifest-v2/fingerprint work remains cancelled. Respawn ownership stays inside existing SQL test owners; bounded GUI-owned processes do not recreate a global runner or authorize cleanup by database-name prefix.
 
-[History](HISTORY.md#2026-10-20--business-compact-roadmap-reset) preserves immutable links to the retired plans and earlier decisions. Historical commands are not current execution authority. Use [the active index](plans/README.md) and the sole [TEST_POLICY](TEST_POLICY.md).
+[History](HISTORY.md#2026-10-20--business-compact-roadmap-reset) preserves immutable links to the retired plans and earlier decisions. Historical commands are not current execution authority. Use [the UI-NEXT roadmap](ui-next/20261023-active-roadmap.md) and the sole [TEST_POLICY](TEST_POLICY.md).

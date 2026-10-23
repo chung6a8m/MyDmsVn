@@ -2,7 +2,7 @@
 
 **Status: T03 remains OPEN / verification partial.** This follow-up repairs the previously recorded tab caption/band defects and the private vendor lookup accessory paint defect. Required 1680×900 logical captures at native125 still cannot fit the available 1920×1080 monitor; the Owner confirms no higher resolution is available. No waiver, full visual/Owner acceptance or T04 admission is inferred.
 
-[Original T03 checkpoint](20261021-t03-shell-theme.md) · [Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md)
+[Original T03 checkpoint](20261021-t03-shell-theme.md) · [Plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md)
 
 ## Repair and provenance
 

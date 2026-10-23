@@ -1,5 +1,7 @@
 # Business Compact lookup and visual parity implementation plan
 
+> ARCHIVED — 2026-10-23. Snapshot from `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`; historical text below is not an execution queue. See the [archive manifest](../README.md) for final dispositions and the explicit exclusion of unfinished old work.
+
 > **For agentic workers:** Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task by task. Track the checkboxes and preserve the two-phase ordering. Creating this roadmap does not execute its implementation tasks.
 
 **Goal:** Repair manual typing in the three Goods Receipt lookups first, then complete the shell, Products catalog and receipt presentation against the three owner-provided designs.
@@ -8,9 +10,9 @@
 
 **Tech stack:** C#, WinForms, .NET Framework 4.8, Windows x86, Bootstrap5WinFormUI, BootstrapSourceGrid/SourceGrid, CommunityToolkit.Mvvm and the existing xUnit/native GUI test owner.
 
-**Spec:** [BCF design](../BUSINESS_COMPACT_REFINEMENT.md). **Acceptance:** [BCF-A01–A23](../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). **References:** [three original mockups](../design-references/business-compact/README.md).
+**Spec:** [BCF design](../../../BUSINESS_COMPACT_REFINEMENT.md). **Acceptance:** [BCF-A01–A23](../../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). **References:** [three original mockups](../../../design-references/business-compact/README.md).
 
-**Status:** BCF-T00–T06 COMPLETE / OWNER ACCEPTED — 2026-10-21. See the [final frozen candidate and bounded dispositions](../evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). Six strict wide125 rows remain NOT TESTED under explicit Owner exception; T04 Minor is deferred and visual/native100 composite deviations are accepted. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
+**Status:** BCF-T00–T06 COMPLETE / OWNER ACCEPTED — 2026-10-21. See the [final frozen candidate and bounded dispositions](../../../evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21). Six strict wide125 rows remain NOT TESTED under explicit Owner exception; T04 Minor is deferred and visual/native100 composite deviations are accepted. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
 **Planning baseline:** `v1a-pro@6040d7bcfca698fc9daba8268bb94e4454e8eacb`, the merge of [PR #40](https://github.com/chung6a8m/MyDmsVn/pull/40). Its product tree matches reviewed head `5ac2bb592aaa947245ea27f9e53b5bc39aaa8ec1`. BCI is completed history; BCF was the sole selected roadmap and is now complete in its accepted scope.
 
@@ -18,7 +20,7 @@
 
 - Product and all ten active test projects remain `net48`; shipped Desktop/admin packages remain Windows x86. AppCore stays parked.
 - Default vendor pins remain BootstrapSourceGrid `09eab7ad3d6ef0a7fcd27c2b198f7ca573dc4b0f`, Bootstrap5WinFormUI `aba102e33c48937fd92468791c287afda0a59e77` and SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`.
-- T03 narrow exception to the planning defaults above: Bootstrap5WinFormUI `2be9a4d` and integration `2bd7874` are traced candidate pins for the proven accessory paint/palette seam, after independent vendor/adapter RED/GREEN and dual-TFM evidence. See [follow-up provenance](../evidence/bcf/20261021-t03-chrome-followup.md). SourceGrid remains unchanged; this does not accept upstream merges or the new candidate as a package.
+- T03 narrow exception to the planning defaults above: Bootstrap5WinFormUI `2be9a4d` and integration `2bd7874` are traced candidate pins for the proven accessory paint/palette seam, after independent vendor/adapter RED/GREEN and dual-TFM evidence. See [follow-up provenance](../../../evidence/bcf/20261021-t03-chrome-followup.md). SourceGrid remains unchanged; this does not accept upstream merges or the new candidate as a package.
 - Repair exactly `WarehouseFilterLookup`, `WarehouseLookup` and `EmployeeLookup`. Inline Product is a reference and regression target, not a fourth reported broken control.
 - Preserve API/DTO/schema, permissions, explicit UoW, rowversion, Draft/Post, ledger/balance, session and SQL-resource ownership. No new receipt fields or business modules.
 - Preserve strict numeric parsing, culture, full decimal bounds, pending versus committed values, historical lookup labels, row identity, dirty guards and `RequiresPostOutcomeReload`.
@@ -98,7 +100,7 @@ For T00, the intended product assertions must fail and be recorded; a driver/foc
 - [x] Run the typing selector against the unmodified product baseline and retain sanitized expected-failure evidence, including failing assertion and source/test revision. Confirm the filter-clear and header-caret defects independently; the broken string need not always equal `igu`.
 - [x] Commit the test/proof work as a reviewable T00 checkpoint; leave production code unchanged until the failure is explained. Gate status remains OPEN until T01/T02 pass.
 
-T00 checkpoint: test commits `845ca0a` and `dbd0798`; final source selects 15 Theory rows (five per target), all fail the intended product assertions with native ownership, STA mutation, guard and drain checks satisfied. [Sanitized evidence and retained invalid attempts](../evidence/bcf/20261021-t00-native-typing.md) distinguish hosted DPI 96 from OS scaling and leave the full T02 matrix uncredited.
+T00 checkpoint: test commits `845ca0a` and `dbd0798`; final source selects 15 Theory rows (five per target), all fail the intended product assertions with native ownership, STA mutation, guard and drain checks satisfied. [Sanitized evidence and retained invalid attempts](../../../evidence/bcf/20261021-t00-native-typing.md) distinguish hosted DPI 96 from OS scaling and leave the full T02 matrix uncredited.
 
 ### BCF-T01 — minimal binding repair and boundaries
 
@@ -112,7 +114,7 @@ T00 checkpoint: test commits `845ca0a` and `dbd0798`; final source selects 15 Th
 - [x] Add real F4/Up/Down/Enter/Escape/Tab/Shift+Tab cases, paste and popup mouse/outside-click/deactivation cases, non-first result choice, rejected dirty New/select/Refresh, admitted query-only cancellation, Posted/busy/access/recovery locks, disposal/session replacement and inline Product regression cases. Assert model/filter effects as well as rendered input.
 - [x] Run the T00/T01 selectors plus affected `GoodsReceiptControlTests`, `GoodsReceiptInlineEditorTests` and `InventoryAccessibilityAcceptanceTests`. Add focused Session lookup cases if their shared logic changes. Inspect TRX, verify no leaks/late callbacks, then commit the repair.
 
-T01 checkpoint: 172 discovered/executed/passed rows, including 92 binding and the unchanged 15 T00 typing rows. [Evidence](../evidence/bcf/20261021-t01-lookup-binding.md) records exact revisions, failed trials, the independent review/admission repair, native owned-message input limits and scoped verification ruling. This hosted result does not satisfy T02's native100/125 Light/Dark, attended or package obligations.
+T01 checkpoint: 172 discovered/executed/passed rows, including 92 binding and the unchanged 15 T00 typing rows. [Evidence](../../../evidence/bcf/20261021-t01-lookup-binding.md) records exact revisions, failed trials, the independent review/admission repair, native owned-message input limits and scoped verification ruling. This hosted result does not satisfy T02's native100/125 Light/Dark, attended or package obligations.
 
 ### BCF-T02 — close the lookup gate on Windows
 
@@ -125,7 +127,7 @@ T01 checkpoint: 172 discovered/executed/passed rows, including 92 binding and th
 - [x] Reconcile actual selectors/discovery/TRX, product/test hashes, Windows/monitor scaling, results and disposal. Preserve failing baseline and earlier failed attempts. No unrelated full SQL suite is required for application binding; package smoke uses the existing owned fixture when it needs SQL.
 - [x] Mark A01–A13 PASS only with their evidence. Missing Windows, mandatory control/theme/scale, exception-free completion or cleanup leaves T02 BLOCKED/OPEN. Commit the ledger; only then admit T03.
 
-T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, unchanged T01 runtime/vendor trees. Four contexts each discover/execute/pass 172 rows (688 total), with 107 clean independently measured lookup records per context. The human reports all three controls stable in each context; two owned real-package/Login sessions pass, independently assert no receipt/inventory writes, and positively drain/drop all owned resources. [Evidence](../evidence/bcf/20261021-t02-lookup-gate.md) preserves failed preflights, source/test/package distinctions, final snapshot limitations and one deferred Minor observer-budget issue. T03 is eligible, not yet implemented.
+T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, unchanged T01 runtime/vendor trees. Four contexts each discover/execute/pass 172 rows (688 total), with 107 clean independently measured lookup records per context. The human reports all three controls stable in each context; two owned real-package/Login sessions pass, independently assert no receipt/inventory writes, and positively drain/drop all owned resources. [Evidence](../../../evidence/bcf/20261021-t02-lookup-gate.md) preserves failed preflights, source/test/package distinctions, final snapshot limitations and one deferred Minor observer-budget issue. T03 is eligible, not yet implemented.
 
 ### BCF-T03 — shared shell and Light/Graphite visual system
 
@@ -139,7 +141,7 @@ T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, 
 - [x] Verify 224/64 logical navigation widths, keyboard access, accessible names, focus contrast, resize/theme continuity and native editor bounds. Run the focused shell/refinement/layout tests and lookup regression selector.
 - [x] Capture matched Light/Graphite shell evidence at the specified client sizes with actual DPI metadata. Review composition against references, record remaining native limits and commit.
 
-**T03 checkpoint:** Initial source `a8a535c`; follow-up runtime `064760f` / native125 test oracle `dfd29d2` with traced candidate pins (BootstrapSourceGrid `2bd7874`, Bootstrap5WinFormUI `2be9a4d`, SourceGrid unchanged); [partial verification and reviewed captures](../evidence/bcf/20261021-t03-chrome-followup.md). Required native125 at 1680×900 Light/Dark remains OPEN (monitor limitation confirmed by Owner), and native chrome deviations are explicit. Remaining boxes are not full parity acceptance. The Owner subsequently requested T04; its separate checkpoint does not waive these T03 obligations.
+**T03 checkpoint:** Initial source `a8a535c`; follow-up runtime `064760f` / native125 test oracle `dfd29d2` with traced candidate pins (BootstrapSourceGrid `2bd7874`, Bootstrap5WinFormUI `2be9a4d`, SourceGrid unchanged); [partial verification and reviewed captures](../../../evidence/bcf/20261021-t03-chrome-followup.md). Required native125 at 1680×900 Light/Dark remains OPEN (monitor limitation confirmed by Owner), and native chrome deviations are explicit. Remaining boxes are not full parity acceptance. The Owner subsequently requested T04; its separate checkpoint does not waive these T03 obligations.
 
 ### BCF-T04 — Products toolbar, results and inspector
 
@@ -153,7 +155,7 @@ T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, 
 - [x] Verify empty/no-selection/loading/error and active/inactive states with multiple pages and long Unicode names. Run catalog/refinement tests plus focused catalog-change/lookup regressions; ensure changes to shared layout do not remove another catalog's fields/actions.
 - [x] Capture reference 01/03 comparisons with the same synthetic data, selected record, page and viewport. Inspect density, typography, row status/selection and inspector hierarchy; commit the reviewed screen.
 
-**T04 checkpoint:** Source/test `29cd2a1`; [focused Windows evidence, retained RED trials and 14 reviewed captures](../evidence/bcf/20261021-t04-products-inspector.md). Native100 240/240; native125 234+2=236/236 runnable affected rows; extra Dark 122/122 at each scale; Session 43/43. The four strict shell/Products 1680-wide native125 rows remain NOT TESTED; fitted legacy layout passes do not replace them. T03 remains OPEN, one stale-query-error Minor is deferred, and full reference/Owner disposition remains T06. T05 was NOT STARTED at this T04 checkpoint.
+**T04 checkpoint:** Source/test `29cd2a1`; [focused Windows evidence, retained RED trials and 14 reviewed captures](../../../evidence/bcf/20261021-t04-products-inspector.md). Native100 240/240; native125 234+2=236/236 runnable affected rows; extra Dark 122/122 at each scale; Session 43/43. The four strict shell/Products 1680-wide native125 rows remain NOT TESTED; fitted legacy layout passes do not replace them. T03 remains OPEN, one stale-query-error Minor is deferred, and full reference/Owner disposition remains T06. T05 was NOT STARTED at this T04 checkpoint.
 
 ### BCF-T05 — guarded detail-focused receipt presentation
 
@@ -168,7 +170,7 @@ T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, 
 - [x] Ensure Product/Quantity/Unit cost/Total coexist at the reference wide viewport; use full-width detail to recover space, not reduced numeric safety bounds. Constrained/max-value cases may scroll with recorded reachability. Run affected receipt/inline/accessibility/refinement tests and all three lookup regressions after moving their controls.
 - [x] Capture multi-line Light/Graphite receipts, saved/dirty/invalid/Posted/recovery states and list/detail transitions. Recheck row identity through scroll/resize/theme and shell session teardown. Commit the presentation with focused evidence.
 
-**T05 checkpoint:** Source/test `991530f`; [focused Windows evidence and 26 reviewed captures](../evidence/bcf/20261021-t05-receipt-presentation.md). Native100 301/301 and native125 295/295 runnable affected rows PASS;116/116 measured Dark lookup rows at each scale PASS. Native100 supplementary 185/185 includes those 116 Dark lookups plus 69 default-theme guards; no rebuild between contexts. Six strict 1680-wide native125 rows remain unselected/NOT TESTED (shell, Products and receipt in both themes); two fitted legacy layout rows remain runnable and do not replace that evidence. T03 wide125/chrome and T04 Minor remain OPEN; T06 is NOT STARTED.
+**T05 checkpoint:** Source/test `991530f`; [focused Windows evidence and 26 reviewed captures](../../../evidence/bcf/20261021-t05-receipt-presentation.md). Native100 301/301 and native125 295/295 runnable affected rows PASS;116/116 measured Dark lookup rows at each scale PASS. Native100 supplementary 185/185 includes those 116 Dark lookups plus 69 default-theme guards; no rebuild between contexts. Six strict 1680-wide native125 rows remain unselected/NOT TESTED (shell, Products and receipt in both themes); two fitted legacy layout rows remain runnable and do not replace that evidence. T03 wide125/chrome and T04 Minor remain OPEN; T06 is NOT STARTED.
 
 ### BCF-T06 — frozen comparison and integrated acceptance
 
@@ -185,4 +187,4 @@ T02 checkpoint: test/package source `67fff29866024a995da3ff83218bed69033dfcc1`, 
 
 ## Completion boundary
 
-BCF-T00–T06 are COMPLETE / OWNER ACCEPTED on the isolated branch. The [final T06 record](../evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) supersedes historical OPEN checkpoints only for their explicit final disposition; all original failed trials and unexecuted strict wide125 cases remain intact. The T03 capture checkbox closes with the accepted six-wide125 hardware exception, not fabricated captures. The planning baseline and T02 gate retain their original candidate attribution. No new implementation plan, upstream merge or production release acceptance is selected by this closure.
+BCF-T00–T06 are COMPLETE / OWNER ACCEPTED on the isolated branch. The [final T06 record](../../../evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) supersedes historical OPEN checkpoints only for their explicit final disposition; all original failed trials and unexecuted strict wide125 cases remain intact. The T03 capture checkbox closes with the accepted six-wide125 hardware exception, not fabricated captures. The planning baseline and T02 gate retain their original candidate attribution. No new implementation plan, upstream merge or production release acceptance is selected by this closure.

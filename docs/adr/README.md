@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. [Execution roadmap](../plans/README.md) records BCF as COMPLETE / OWNER ACCEPTED in bounded scope, with BCI/RESP/L2DB/GUI-P5 retained as historical baselines; [SAL](../DIRECT_SALES.md) is the sole ACTIVE successor with implementation/evidence NOT RUN; [TEST_POLICY](../TEST_POLICY.md) is the sole test-execution policy.
+Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. [UI-NEXT](../ui-next/20261023-active-roadmap.md) is the sole active queue with all implementation tasks NOT STARTED. The [archive boundary](../archive/20261023-pre-ui-next/README.md) retires prior queues without waiving their unfinished acceptance. [TEST_POLICY](../TEST_POLICY.md) remains the sole test-execution policy.
 
 | ADR | Decision | Current status |
 |---|---|---|
@@ -14,7 +14,7 @@ Current decisions and explicit owner instructions supersede older examples. Impl
 | [0008](0008-temporary-net8-target-pause.md) | Active net48 product with parked modern targets | Implemented and accepted in PR #32 |
 | [0009](0009-linq2db-local-net48-persistence.md) | LINQ to DB with Local v1, net48, DbUp and explicit UoW | Implemented and accepted in L2DB-T00–T07 scope; historical design rationale retained |
 | [0010](0010-respawn-fixture-reuse-and-test-policy.md) | Respawn fixtures and rebuilt test policy | Implemented and accepted in RESP-T00–T05 scope; fixture ownership and replacement policy remain binding |
-| [0011](0011-direct-sales-and-moving-average-costing.md) | Direct sales, moving weighted average, coherent value inventory and LINQ/keyset | Accepted design; SAL ACTIVE, implementation NOT STARTED, acceptance NOT RUN |
+| [0011](0011-direct-sales-and-moving-average-costing.md) | Direct sales, moving weighted average, coherent value inventory and LINQ/keyset | Accepted and source implemented; SAL queue archived, native125/attended/Owner acceptance OPEN |
 
 Historical approvals and measurements are indexed in [History](../HISTORY.md). Do not describe a documentation decision as delivered code, restore an obsolete policy from Git, or reopen a completed plan from its old task ID.
 

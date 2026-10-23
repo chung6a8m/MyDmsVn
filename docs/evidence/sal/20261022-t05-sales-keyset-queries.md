@@ -1,6 +1,6 @@
 # SAL-T05 — reviewed Sales keyset queries
 
-Date: 2026-10-22. Development branch `codex/sal-direct-sales`; planning branch `v1a-pro`. Source/test commit `f9149a6a7ca35d26163fac0745101774246891a7`, parent `0b6c5f961cceed447f3ddf4b5e8a44fb17e2bacc`. Planning baseline stays `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. T05 is COMPLETE in its reviewed query scope. [Execution index](../../plans/README.md) records T06 IN PROGRESS; Local/VM/UI, frozen T08 SQL/UI/package/Login/attended/Owner and operational release acceptance remain open. This development checkpoint is not deployable.
+Date: 2026-10-22. Development branch `codex/sal-direct-sales`; planning branch `v1a-pro`. Source/test commit `f9149a6a7ca35d26163fac0745101774246891a7`, parent `0b6c5f961cceed447f3ddf4b5e8a44fb17e2bacc`. Planning baseline stays `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. T05 is COMPLETE in its reviewed query scope. [Execution index](../../archive/20261023-pre-ui-next/plans/README.md) records T06 IN PROGRESS; Local/VM/UI, frozen T08 SQL/UI/package/Login/attended/Owner and operational release acceptance remain open. This development checkpoint is not deployable.
 
 ## Frozen candidate and review
 

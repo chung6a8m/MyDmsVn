@@ -4,7 +4,7 @@
 
 **Status: IMPLEMENTED / verification partial.** Native125 cannot realize the required 1680×900 logical client on the available 1920×1080 monitor. Windows clamps it to 1540×845; the Owner confirms no larger resolution is available. Both Light/Dark cases remain OPEN. This is not a waiver, full visual parity, T04 admission or BCF/Owner/release acceptance.
 
-[Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Capture index](20261021-t03-shell-captures/README.md) · [Frozen T02 gate](20261021-t02-lookup-gate.md)
+[Plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Capture index](20261021-t03-shell-captures/README.md) · [Frozen T02 gate](20261021-t02-lookup-gate.md)
 
 ## Source and scope
 

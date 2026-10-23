@@ -1,6 +1,6 @@
 # SAL-T04 — reviewed atomic Sales Post checkpoint
 
-Date: 2026-10-22. Development branch `codex/sal-direct-sales`; planning branch `v1a-pro`. Source/test commit `7eeafa4e46f5058a6c95155ad4cff27191315e90`, parent `3ed6c75add18b1766cf47fd3d146f348f58d9418`. Planning baseline remains `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. T04 is COMPLETE in its bounded reviewed scope; [execution index](../../plans/README.md) releases T05 IN PROGRESS. Full [SAL acceptance](../../DIRECT_SALES_ACCEPTANCE.md), Local/UI, frozen T08/package/Owner and operational release acceptance remain open. This development checkpoint is not deployable.
+Date: 2026-10-22. Development branch `codex/sal-direct-sales`; planning branch `v1a-pro`. Source/test commit `7eeafa4e46f5058a6c95155ad4cff27191315e90`, parent `3ed6c75add18b1766cf47fd3d146f348f58d9418`. Planning baseline remains `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. T04 is COMPLETE in its bounded reviewed scope; [execution index](../../archive/20261023-pre-ui-next/plans/README.md) releases T05 IN PROGRESS. Full [SAL acceptance](../../DIRECT_SALES_ACCEPTANCE.md), Local/UI, frozen T08/package/Owner and operational release acceptance remain open. This development checkpoint is not deployable.
 
 ## Candidate and review
 

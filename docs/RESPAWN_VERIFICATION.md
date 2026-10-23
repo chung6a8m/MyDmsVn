@@ -2,7 +2,7 @@
 
 > Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCF lookup and visual refinement; this record does not satisfy its new obligations or schedule retired plans. Completed BCI remains historical evidence for its own accepted scope.
 
-**Date:** 2026-10-18. **Reviewed source revision:** `6383289a2e43e2021abd65048a1e2f3f3838324e` (v1a). **Working branch:** `codex/resp-t00-baseline`. This document and the [case map](RESPAWN_CASE_MAP.md) freeze the source baseline for [RESP-T00](plans/20261018-002-respawn-fixture-reuse.md). This opening inventory describes the T00 audit snapshot. T01 execution evidence below now verifies the pinned reset profile; T02 lifecycle, T03 Catalog adoption and T04 Inventory/Security/default-reuse evidence are appended below. The frozen T04 candidate awaits complete RESP acceptance and speedup comparison (T05).
+**Date:** 2026-10-18. **Reviewed source revision:** `6383289a2e43e2021abd65048a1e2f3f3838324e` (v1a). **Working branch:** `codex/resp-t00-baseline`. This document and the [case map](RESPAWN_CASE_MAP.md) freeze the source baseline for [RESP-T00](archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md). This opening inventory describes the T00 audit snapshot. T01 execution evidence below now verifies the pinned reset profile; T02 lifecycle, T03 Catalog adoption and T04 Inventory/Security/default-reuse evidence are appended below. The frozen T04 candidate awaits complete RESP acceptance and speedup comparison (T05).
 
 ## T00 scope and outcome
 

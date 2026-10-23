@@ -2,7 +2,7 @@
 
 **Status: COMPLETE / lookup gate PASS on the frozen candidate.** All four automated contexts pass (688/688), with independent native100/125 Light/Dark observations for all three controls. The human reports all three stable in all four contexts; both owned attended package sessions pass and clean up. BCF-A01–A13 are reconciled for this input scope. T03 is now eligible to start, but visual implementation, full BCF Owner acceptance and release acceptance are not granted here.
 
-[Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [T01 repair evidence](20261021-t01-lookup-binding.md)
+[Plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [T01 repair evidence](20261021-t01-lookup-binding.md)
 
 ## Candidate and execution boundary
 

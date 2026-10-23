@@ -11,7 +11,7 @@ SQL tests use positively owned disposable databases on the explicitly designated
 
 ## Accepted fixture direction
 
-The owner selected and accepted **Respawn fixture reuse** for eligible tests in the completed [RESP plan](../plans/20261018-002-respawn-fixture-reuse.md). One migrated database belongs to one collection and is reset/seeded before every test. Schema/principal/lifecycle exceptions keep fresh allocations. Existing SQL assembly guards remain; Catalog's shared fixture uses its explicit serialized collection because Catalog has no assembly guard. RESP is not a parallelism rollout.
+The owner selected and accepted **Respawn fixture reuse** for eligible tests in the completed [RESP plan](../archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md). One migrated database belongs to one collection and is reset/seeded before every test. Schema/principal/lifecycle exceptions keep fresh allocations. Existing SQL assembly guards remain; Catalog's shared fixture uses its explicit serialized collection because Catalog has no assembly guard. RESP is not a parallelism rollout.
 
 The old rejection of reusable fixtures was based on the then-current reset evidence. It is superseded by the accepted reuse strategy; its original measurements remain historical facts in [History](../HISTORY.md). No old dual-TFM stress/benchmark requirement is silently reinstated by this ADR. Current verification and failure handling are defined by [TEST_POLICY](../TEST_POLICY.md) and the completed [RESP evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
 

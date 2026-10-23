@@ -2,13 +2,21 @@
 
 **Reset date:** 2026-10-18 · **Branch assessed:** `v1a` · **Baseline:** [c7ad32a4b0040f87417973eabd6c12757c54f7d5](https://github.com/chung6a8m/MyDmsVn/commit/c7ad32a4b0040f87417973eabd6c12757c54f7d5).
 
-This page is historical provenance, not an execution queue or a test policy. [The execution index](plans/README.md) records BCF as COMPLETE / OWNER ACCEPTED in its bounded UI scope; SAL is now the sole ACTIVE successor, with implementation and runtime evidence NOT RUN. Historical activation checkpoints below retain their original status. Runtime behavior is described in the current reference documents and source; test execution follows [TEST_POLICY](TEST_POLICY.md).
+This page is historical provenance, not an execution queue or test policy. [UI Next](ui-next/20261023-active-roadmap.md) is the current queue. Historical activation checkpoints below retain their original dates/statuses; [the archive](archive/20261023-pre-ui-next/README.md) records the latest old-plan dispositions. Runtime behavior follows current source/specifications and execution follows [TEST_POLICY](TEST_POLICY.md).
+
+## 2026-10-23 — UI Next selected; prior plans archived
+
+The Owner moved the UI assessment to `docs/ui-next` on `v1a-pro-ui-next` and requested analysis, an active roadmap, archival of old plans without carrying their unfinished work, and a PR into that branch. The inspected base is `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`, including merged PR #43 and the moved assessment.
+
+The [new roadmap](ui-next/20261023-active-roadmap.md), [design](ui-next/20261023-design-and-control-policy.md), [implementation tasks](ui-next/20261023-implementation-plan.md) and [validation](ui-next/20261023-validation-and-handoff.md) select contextual feedback, field/cell validation, shared edit mechanics, lossless numeric entry, typed dates, close/busy/theme primitives, DGV numeric parity and bounded paste/measurement. Every new implementation task is NOT STARTED; no runtime outcome is supplied by this documentation change.
+
+Six old plans plus their execution index moved to the [archive](archive/20261023-pre-ui-next/README.md). SAL-T07/T08 are archived incomplete: final product/package `f5039cb` and GUI tests `4697744` have bounded runnable automated evidence, while native125, attended and dated Owner acceptance remain OPEN. The archive preserves those results and earlier failures/exceptions. Unfinished old tasks and release prerequisites are excluded from the new queue, not completed or waived. Current business/security/recovery contracts and test-resource safeguards remain in force.
 
 ## 2026-10-21 — Direct Sales roadmap selected
 
 After PR #41 merged at `35ba2e8a3f37fb07095701eb94f4b56f7941c491`, the Owner selected direct sales receipts, manual price, independent repeated Product lines, gifts, cost tracking, Product filtering, LINQ-first queries and keyset pagination. The Owner then chose moving weighted average and requested design/acceptance/plan documents, activation of that roadmap and a PR into `v1a-pro`.
 
-[ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md), [the business design](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [SAL-T00–T08](plans/20261021-002-direct-sales-and-moving-average-costing.md) record this decision. T00 is READY; no product/schema changes or runtime passes are supplied by the documentation PR. Existing schema9 remains the source fact; schema10/bootstrap and receipt/sale/reconciliation changes are planned.
+[ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md), [the business design](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md), [acceptance](DIRECT_SALES_ACCEPTANCE.md) and [SAL-T00–T08](archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md) record this decision. T00 is READY; no product/schema changes or runtime passes are supplied by the documentation PR. Existing schema9 remains the source fact; schema10/bootstrap and receipt/sale/reconciliation changes are planned.
 
 BCF remains COMPLETE / OWNER ACCEPTED in its original bounded scope, preserving exact candidate revisions, failed trials, NOT TESTED exceptions and Owner dispositions. Earlier completed baselines and retired REL/P6/.NET8 directions are not restarted. Payments, debt, returns and broader production release acceptance remain outside SAL.
 
@@ -65,7 +73,7 @@ Business SQL tests and their six module owners remain, alongside Application, Ar
 | Delete unimplemented REL/P6 plan | 0 checked / 32 unchecked task steps at the assessed source; [immutable retired plan](https://github.com/chung6a8m/MyDmsVn/blob/f37038b250821a538b9cdc10a6d6d8b4bc1f386f/docs/plans/20261019-002-local-v1-p6-release-acceptance.md) |
 | Delete deferred .NET 8 reactivation procedure | No implemented runtime reactivation; [immutable retired procedure](https://github.com/chung6a8m/MyDmsVn/blob/f37038b250821a538b9cdc10a6d6d8b4bc1f386f/docs/REACTIVATE_NET8.md) |
 | Remove old P7/net8 executable checklist | Eight unchecked items were future instructions, not completed work; [original scope page](https://github.com/chung6a8m/MyDmsVn/blob/f37038b250821a538b9cdc10a6d6d8b4bc1f386f/docs/DEFERRED_WORK.md) |
-| Activate BCI | [Single implementation plan](plans/20261020-001-business-compact-inline-goods-receipt.md), [design](BUSINESS_COMPACT_UI.md) and [acceptance matrix](BUSINESS_COMPACT_ACCEPTANCE.md); all new implementation/runtime work remains unexecuted |
+| Activate BCI | [Single implementation plan](archive/20261023-pre-ui-next/plans/20261020-001-business-compact-inline-goods-receipt.md), [design](BUSINESS_COMPACT_UI.md) and [acceptance matrix](BUSINESS_COMPACT_ACCEPTANCE.md); all new implementation/runtime work remains unexecuted |
 
 Completed plans stay at their existing paths to preserve evidence backlinks; their original task handoffs are historical. Current context/index/policy references are refreshed so no old queue competes with BCI. The large historical checkpoints formerly duplicated in AI_CONTEXT remain in canonical GUI-P5 ledgers and Git history; the handoff now describes the current state concisely.
 
@@ -75,7 +83,7 @@ No product source, test implementation, schema or vendor pin is changed by this 
 
 The owner merged [PR #40](https://github.com/chung6a8m/MyDmsVn/pull/40) into `v1a-pro` at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`, then requested an active roadmap committed to that branch. BCI remains complete in its [final signed UI scope](BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21); its original evidence, failed trials and limitations are retained.
 
-[BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is the sole new active roadmap. T00–T02 first reproduce and repair manual per-key input in the list warehouse filter and header Warehouse/Employee lookups, including caret/selection, canceled-operation completion and committed-value boundaries. These binding paths predate PR #40. A mandatory native100/125 Light/Dark and attended lookup gate precedes visual implementation.
+[BCF](archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) is the sole new active roadmap. T00–T02 first reproduce and repair manual per-key input in the list warehouse filter and header Warehouse/Employee lookups, including caret/selection, canceled-operation completion and committed-value boundaries. These binding paths predate PR #40. A mandatory native100/125 Light/Dark and attended lookup gate precedes visual implementation.
 
 T03–T06 then complete the shared shell, Products content/inspector, detail-focused receipt presentation and Graphite consistency against [all three original designs](design-references/business-compact/README.md), followed by new frozen integrated evidence and Owner comparison. This deliberately expands BCI's catalog exclusion and always-visible receipt list while preserving the established business/security/runtime boundaries and English UI.
 

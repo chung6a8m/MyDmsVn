@@ -2,7 +2,7 @@
 
 **Executed:** 2026-10-23. **Status:** feasible frozen integration recorded; full SAL/T07/T08 and dated Owner acceptance remain OPEN. This file uses the evidence path reserved by the 2026-10-21 plan; it does not backdate execution or acceptance.
 
-Read with the [acceptance ledger](../../DIRECT_SALES_ACCEPTANCE.md), [active plan](../../plans/20261021-002-direct-sales-and-moving-average-costing.md), [development checkpoint](20261023-t08-packaged-development-checkpoint.md) and [final source fix wave](20261023-t08-final-source-fix-wave.md). Original T00–T07 and BCF/BCI/GUI-P5 evidence remains candidate-specific history. Production release prerequisites remain [UNACCEPTED / UNSCHEDULED](../../DEFERRED_WORK.md#release-prerequisites).
+Read with the [acceptance ledger](../../DIRECT_SALES_ACCEPTANCE.md), [active plan](../../archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md), [development checkpoint](20261023-t08-packaged-development-checkpoint.md) and [final source fix wave](20261023-t08-final-source-fix-wave.md). Original T00–T07 and BCF/BCI/GUI-P5 evidence remains candidate-specific history. Production release prerequisites remain [UNACCEPTED / UNSCHEDULED](../../DEFERRED_WORK.md#release-prerequisites).
 
 ## Frozen identity and execution boundary
 

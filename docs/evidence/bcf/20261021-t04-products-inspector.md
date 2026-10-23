@@ -2,7 +2,7 @@
 
 **Status: T04 IMPLEMENTED / focused Windows verification PASS, within the limits below.** Source/test checkpoint `29cd2a1077c8a385c570f4bd3a51b72a88d38357`, from `d62a487`. The Owner explicitly requested T04 after the T03 partial-verification report. This admits Products work without waiving the two unavailable T03 native125 wide captures or accepting its native chrome limits. T05/T06 are NOT STARTED; full visual/Owner/release acceptance remains ungranted.
 
-[Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [References 01/03](../../design-references/business-compact/README.md)
+[Plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [References 01/03](../../design-references/business-compact/README.md)
 
 ## Changed behavior and boundaries
 

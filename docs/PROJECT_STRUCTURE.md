@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment:** `v1a-pro` at merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`, refreshed 2026-10-21. All ten active net48 test projects and the current LINQ/native sources are represented here. RESP, L2DB, GUI-P5 and BCI are implemented/accepted in their approved scopes. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); no new product host/runtime/API/schema is introduced.
+**Assessment:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (includes merged PR #43 and the migrated assessment), refreshed 2026-10-23. All ten active net48 test projects and current LINQ/native/Sales/schema10 source are represented here. [UI-NEXT](ui-next/20261023-active-roadmap.md) is the sole active queue; proposed UI services/controls remain NOT STARTED. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and excludes old unfinished work.
 
 ## Source projects
 
@@ -18,7 +18,7 @@
 | `MyDmsVn.Desktop.App` | `net48` | Current WinForms host and Local composition root. |
 | `MyDmsVn.Desktop.AppCore` | `net8.0-windows`, parked | Retained source outside active solution/release; not current executable coverage. |
 
-`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. HTTP v2 is [out of scope](DEFERRED_WORK.md#out-of-scope-directions) and needs a separate runtime decision. Do not create these projects as part of SAL.
+`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. HTTP v2 is [out of scope](DEFERRED_WORK.md#out-of-scope-directions) and needs a separate runtime decision. Do not create these projects as part of UI-NEXT.
 
 ## Active test projects
 
@@ -37,22 +37,22 @@
 
 There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual owning project and source case rather than a historical proposed path. These are ten current test projects; no standalone SQL support or runner project remains. Each SQL owner has its own csproj; a shared library or test trait does not by itself prove isolation or parallel safety.
 
-## Approved Sales locations — proposed only
+## Implemented Sales locations
 
-SAL uses the existing projects; it adds no HTTP host, ORM or test project. [The plan](plans/20261021-002-direct-sales-and-moving-average-costing.md) gives exact task-owned paths and proposed tests. [Business](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md) and [query/UI](DIRECT_SALES_QUERY_AND_UI.md) define new `Contracts/SalesContracts.cs`, Domain/Application/Infrastructure `Sales/` folders, inventory valuation math/coordinator, a Local sales adapter and sales ViewModels/WinForms controls.
+Sales uses the existing projects and test owners. Current source includes `Contracts/SalesContracts.cs`, Domain/Application/Infrastructure `Sales/` folders, inventory valuation math/coordinator, `LocalSalesReceiptApiClient.cs`, Sales ViewModels and `SalesReceiptControl.cs` with its app-owned grid/adapter. Schema `010_DirectSalesAndValuation.sql`, preflight/grants and fixture metadata are implemented. The [business](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [archived plan](archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md) retain their source rationale and historical checkpoints.
 
-Implementation also updates existing DI/permission/audit registries, receipt/reconciliation/stock read paths, migration/preflight/grants and Respawn metadata. None of those new files or schema10 objects exists merely because this plan is active. Existing source directories below describe the inspected PR #41 baseline.
+UI-NEXT's [implementation plan](ui-next/20261023-implementation-plan.md) identifies proposed presentation files and affected existing owners. Proposed paths/types do not exist merely because documentation names them; inspect source before choosing test selectors or using an API. The old SAL native125/attended/Owner gaps do not redefine the implemented project graph.
 
 ## Actual feature directories
 
 | Layer | Existing directories and anchors |
 |---|---|
-| Server.Application | `Catalog/`, `Inventory/`, `Identity/`, `Security/`, `Persistence/`; pipeline behaviors and result mapping at project root. |
-| Server.Infrastructure | `Catalog/`, `Inventory/`, `Identity/`, `Security/`, `Operations/`, `Persistence/`; `DependencyInjection.cs`. |
+| Server.Application | `Catalog/`, `Inventory/`, `Sales/`, `Identity/`, `Security/`, `Persistence/`; pipeline behaviors and result mapping at project root. |
+| Server.Infrastructure | `Catalog/`, `Inventory/`, `Sales/`, `Identity/`, `Security/`, `Operations/`, `Persistence/`; `DependencyInjection.cs`. |
 | Application persistence contract | `src/MyDmsVn.Server.Application/Persistence/{IUnitOfWork,IUnitOfWorkFactory,UnitOfWorkState}.cs`. |
 | Infrastructure persistence | `src/MyDmsVn.Server.Infrastructure/Persistence/{SqlUnitOfWorkFactory,ISqlExecutionContext,SqlConnectionFactory,SqlPersistenceBuilder,LinqToDbSessionFactory,LinqToDbMappingSchemaProvider}.cs`. |
-| Schema | `src/MyDmsVn.Server.DbMigrator/Scripts/001_PersistenceFoundation.sql` through `009_Security_Permission_Import.sql`; exact names in [PERSISTENCE](PERSISTENCE.md). |
-| Implemented WinForms BCI seams | `BusinessCompactAppearance.cs`, `BusinessCompactNavigation.cs`, `GoodsReceiptLinesGrid.cs`, `GoodsReceiptLinesGridAdapter.cs`, `ReceiptNumericInput.cs` and `ReceiptNumberEditor.cs` in `src/MyDmsVn.Desktop.WinForms/`; existing `CatalogControl.cs` remains shared by four catalogs. |
+| Schema | `src/MyDmsVn.Server.DbMigrator/Scripts/001_PersistenceFoundation.sql` through `010_DirectSalesAndValuation.sql`; exact names in [PERSISTENCE](PERSISTENCE.md). |
+| Implemented WinForms presentation seams | `BusinessCompactAppearance.cs`, `BusinessCompactNavigation.cs`, `GoodsReceiptLinesGrid.cs`, `GoodsReceiptLinesGridAdapter.cs`, `ReceiptNumericInput.cs` and `ReceiptNumberEditor.cs` in `src/MyDmsVn.Desktop.WinForms/`; `SalesReceiptControl.cs` and its grid/adapter own the Sales workspace; `CatalogControl.cs` remains shared by four catalogs. |
 | UI dependency | `vendor/MyDmsVn.BootstrapSourceGrid/`, pinned as checked in. |
 
 `Application/Features/...`, `Application/Abstractions/Persistence` and Infrastructure `Persistence/Repositories`/`EntityMaps` were earlier blueprint examples. They are not the current file layout; use source-owned paths when changing code.
@@ -64,7 +64,8 @@ Implementation also updates existing DI/permission/audit registries, receipt/rec
 | `MyDmsVn.sln` | Current declared solution graph; parked AppCore is excluded. |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/plans/README.md` | Sole ACTIVE SAL queue; T00 READY, implementation NOT STARTED; completed baselines retained. |
+| `docs/ui-next/20261023-active-roadmap.md` | Sole ACTIVE UI-NEXT queue; every implementation task NOT STARTED. |
+| `docs/archive/20261023-pre-ui-next/README.md` | Archive boundary; previous queues and unfinished work are excluded without acceptance or waiver. |
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
 | `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current roadmap pointer, unscheduled release constraints/out-of-scope directions and historical evidence. |
@@ -72,4 +73,4 @@ Implementation also updates existing DI/permission/audit registries, receipt/rec
 | `deployment/sql/Provision-MyDmsVnPrincipals.sql` | Explicit runtime/maintenance SQL authority separation. |
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
-Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. BCF does not reactivate AppCore or upgrade the framework. Proposed SAL files/interfaces in its plan are not implemented project structure; BCF files are assessed against the merged source and its recorded evidence.
+Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. UI-NEXT does not reactivate AppCore or upgrade the framework. Sales files are implemented source; new UI-NEXT services/controls remain proposals until implemented. Historical evidence remains tied to its exact revision and scope.

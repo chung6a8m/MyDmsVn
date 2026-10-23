@@ -3,7 +3,7 @@
 **Initiative:** BCF — selected on 2026-10-21; COMPLETE in its Owner-accepted scope.
 **Status:** BCF-T00–T06 COMPLETE / OWNER ACCEPTED — 2026-10-21. The [final T06 Owner acceptance](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) records all three reference comparisons, exact source/test/package evidence and explicit visual, hardware, T04 Minor and native100 composite dispositions. Six strict wide125 rows remain NOT TESTED; operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
 **Baseline:** merged PR #40, `v1a-pro` at `6040d7bcfca698fc9daba8268bb94e4454e8eacb`.
-**Plan:** [BCF execution plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md).
+**Plan:** [BCF execution plan](archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md).
 **Acceptance:** [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md).
 
 ## 1. Purpose and authority

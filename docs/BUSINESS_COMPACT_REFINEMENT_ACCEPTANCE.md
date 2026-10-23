@@ -5,7 +5,7 @@
 
 ## 1. Scope, authority and ordering
 
-This ledger verifies the [BCF design](BUSINESS_COMPACT_REFINEMENT.md) and [active plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md).
+This ledger verifies the [BCF design](BUSINESS_COMPACT_REFINEMENT.md) and [active plan](archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md).
 [TEST_POLICY](TEST_POLICY.md) owns execution; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage and [tests/README](../tests/README.md) owns commands.
 BCF first repairs typing in `WarehouseFilterLookup`, `WarehouseLookup` and `EmployeeLookup`, then implements visual parity with the three Owner-provided mockups.
 Inline Product is a regression/reference path; it is not a fourth reported broken control.

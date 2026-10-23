@@ -1,6 +1,6 @@
 # SAL-T07 — bounded native Sales workspace checkpoint
 
-Date: 2026-10-22. Development `codex/sal-direct-sales`; planning `v1a-pro`. Final source/test commit `879ab7bc6046d598fe06be1d95614df2b02a5810`; direct parent/review BASE `1949abab1a0892783e55afc863001cf020a4f06e`, previous product/test `5fbd6f5c3022ccb05c770648e4967747d73602fa`. Planning baseline remains `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. This is a bounded reviewed development checkpoint. **Full T07 remains IN PROGRESS / OPEN** because mandatory native125 evidence is unavailable. [The serial execution index](../../plans/README.md) remains T00 → T08; T08 is NOT STARTED. No Owner order change, full GUI, package, actual Login, attended cost review, Owner acceptance or operational release is established.
+Date: 2026-10-22. Development `codex/sal-direct-sales`; planning `v1a-pro`. Final source/test commit `879ab7bc6046d598fe06be1d95614df2b02a5810`; direct parent/review BASE `1949abab1a0892783e55afc863001cf020a4f06e`, previous product/test `5fbd6f5c3022ccb05c770648e4967747d73602fa`. Planning baseline remains `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. This is a bounded reviewed development checkpoint. **Full T07 remains IN PROGRESS / OPEN** because mandatory native125 evidence is unavailable. [The serial execution index](../../archive/20261023-pre-ui-next/plans/README.md) remains T00 → T08; T08 is NOT STARTED. No Owner order change, full GUI, package, actual Login, attended cost review, Owner acceptance or operational release is established.
 
 ## Source, review and formatting boundary
 

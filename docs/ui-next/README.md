@@ -1,76 +1,45 @@
-# UI Next — SME desktop assessment
+# UI Next — active SME desktop roadmap
 
-**Date:** 2026-10-22 (Asia/Bangkok)  
-**Requested branch:** `v1-ui-next`  
-**Status:** ANALYSIS / PROPOSALS — not an active implementation roadmap
+**Updated:** 2026-10-23
+**Base branch:** `v1a-pro-ui-next` at `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`
+**Status:** ACTIVE ROADMAP; implementation tasks NOT STARTED; runtime evidence NOT RUN
 
-## Purpose
+The Owner selected the UI foundation proposals for an active roadmap and requested a documentation PR into `v1a-pro-ui-next`. The work preserves the current compact visual direction and develops contextual feedback, complete validation, efficient inline entry and reusable workspace controls for the SME application.
 
-This folder preserves the Owner's assessment request and the source-backed findings needed to continue the discussion across sessions. The goal is a compact, keyboard-friendly WinForms UI for an SME application: consistent Light/Dark appearance, contextual operation feedback, visible field/cell validation, efficient document entry, and less repeated application infrastructure.
+## Read for current work
 
-The Owner considers the current visual direction appropriate. This is an assessment of the reusable UI foundation and input behavior, not a request to redesign the application or implement every proposal. The only repository changes in this assessment are these documents.
+Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md) and the sole [TEST_POLICY](../TEST_POLICY.md), then the selected task and its contracts below. There is one execution queue, not one per index.
 
-## Read in this order
-
-| Document | Purpose |
+| Document | Responsibility |
 |---|---|
-| [Source assessment](20261022-ui-foundation-assessment.md) | What exists, why the reported gaps occur, ownership boundaries, and recommended direction |
-| [Input and inline-editing contracts](20261022-input-and-inline-editing-contracts.md) | Proposed numeric/date editing, validation, keyboard, grid, and commit/cancel behavior |
-| [Candidate backlog and validation](20261022-candidate-backlog-and-validation.md) | Priorities, dependencies, focused evidence, and decisions to make before implementation |
+| [Active roadmap](20261023-active-roadmap.md) | Selected scope, refreshed baseline, task order/dependencies, current status and exclusions |
+| [Design and control policy](20261023-design-and-control-policy.md) | Control selection, ownership, numeric/date/editing behavior and workspace lifecycle |
+| [Implementation plan](20261023-implementation-plan.md) | Bounded task steps, exact source/test owners, proposed interfaces and review focus |
+| [Validation and handoff](20261023-validation-and-handoff.md) | New UI Next acceptance cases, focused execution and cross-session evidence protocol |
+| [Pre-UI-Next archive](../archive/20261023-pre-ui-next/README.md) | Old plan inventory, last-known completion/open states and explicit no-carryover decision |
 
-Read the repository [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [active execution index](../plans/README.md), and [TEST_POLICY](../TEST_POLICY.md) first. These assessment documents do not supersede them.
+The [general plan index](../plans/README.md) routes here. Old plans are archived, including the incomplete SAL plan. SAL-T07/T08 open evidence, historical exceptions and operational release prerequisites are **not tasks or prerequisites of this roadmap**. Their status remains recorded; archiving does not complete or waive them. Existing business, security and recovery behavior remains a regression constraint.
+
+## Assessment references
+
+The following retain the 2026-10-22 analysis and source permalinks. Their candidate/authority statements describe that date and are superseded for scheduling by the active roadmap.
+
+| Historical assessment | Use |
+|---|---|
+| [UI foundation assessment](20261022-ui-foundation-assessment.md) | Findings F01–F09 and original source evidence |
+| [Input and inline-editing contracts](20261022-input-and-inline-editing-contracts.md) | Detailed reasoning and existing-versus-proposed distinctions |
+| [Candidate backlog and validation](20261022-candidate-backlog-and-validation.md) | Original UIN-01–UIN-10 candidates and alternatives; selected disposition is in the active roadmap |
 
 ## Exact inspected baseline
 
-| Repository / component | Inspected revision | Relationship |
-|---|---|---|
-| `chung6a8m/MyDmsVn` | `9d8a199a27bc505f58b5997fd611ce249c26c00d` | Head of `v1-ui-next` when assessment started |
-| `chung6a8m/MyDmsVn.BootstrapSourceGrid` | `2bd7874f7e80b22ef181763749c2a2938ab7f16e` | Application's pinned submodule |
-| `chung6a8m/MyDmsVn.Bootstrap5WinFormUI` | `2be9a4d778fda7016207b75470020be6126f2f3f` | Nested UI submodule consumed through BootstrapSourceGrid |
-| `chung6a8m/sourcegrid` | `f4e457b43582bf01892f50bdc74aa480531e5944` | Nested SourceGrid pin |
-| UI upstream `main` | `33f1476d87f3c0bfd11f5cf4c6688e7edc9423b0` | One commit ahead, with no changed files compared with the consumed UI revision |
+The original app baseline was `9d8a199a27bc505f58b5997fd611ce249c26c00d`. The new base includes later SAL source/evidence changes and the migrated assessment. The three consumed UI pins are unchanged; the [refresh table](20261023-active-roadmap.md#refreshed-source-baseline) records what was rechecked. The [original baseline table](https://github.com/chung6a8m/MyDmsVn/blob/7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639/docs/ui-next/README.md#exact-inspected-baseline) remains available at its frozen commit. Do not copy the old assessment's T08 NOT STARTED or R4 deferred status into current handoffs.
 
-The [UI comparison](https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI/compare/2be9a4d778fda7016207b75470020be6126f2f3f...33f1476d87f3c0bfd11f5cf4c6688e7edc9423b0) prevents attributing these gaps to an unconsumed newer UI implementation. Findings are source analysis, not newly executed Windows interaction evidence.
+## Resume without re-planning
 
-The active product target remains `net48`, Windows x86. SAL-T07 source exists at `879ab7b`, but the current execution index still records T07 IN PROGRESS / OPEN, native125 RESOURCE BLOCKED, R4 deferred Minor, and T08 NOT STARTED. Do not turn the phrase "almost finished" or this assessment into acceptance. SAL remains the sole ACTIVE roadmap.
+1. Resolve the current app head and three nested pins; inspect relevant changes since the recorded baseline.
+2. Select the first ready task in the active queue, with its design and acceptance IDs. Update only its state as work actually advances.
+3. Keep new public API names marked proposed until their upstream commit is available. Land narrowly scoped upstream changes before explicitly consuming pins.
+4. Record actual source/test/package revisions, selected tests, outcomes and limitations in this folder's evidence ledger. Planning is not runtime proof.
+5. Do not resume an archived task from a stale link or treat a missing old acceptance result as a new UI Next task.
 
-## Findings to retain across sessions
-
-| ID | Finding |
-|---|---|
-| F01 | Sales uses `BootstrapDatePicker` for its document date and plain `DateTimePicker` for optional From/To filters. The former itself wraps the native picker. |
-| F02 | `BootstrapCalendarPicker` already supplies a themed, nullable, date-only selection surface. It does not supply free-text date entry or partial-date completion. |
-| F03 | `BootstrapToastContainer`, `BootstrapAlert`, and `ValidationState` already exist. The main gaps are adoption, scope/routing, and field/cell presentation. |
-| F04 | Shared notifications contain only Kind/Message; Shell displays the latest message. Catalog and receipt screens also have local labels, so not every message is Shell-only. |
-| F05 | Catalog duplicate-code conflicts omit field metadata. The mapper therefore supplies no field path and `DesktopViewModelBase` cannot attach that conflict to the Code editor. |
-| F06 | Receipt numeric editing deliberately uses `FormatMode.None`. Stock Numeral formatting can remove meaningful input; simply enabling it would violate current precision and rejection rules. |
-| F07 | BootstrapSourceGrid already has text/formatted/lookup editor adapters; BootstrapDataGridView already has `BootstrapLookupColumn`. A new universal grid is not required. |
-| F08 | Receipt adapters duplicate generic editing mechanisms. Business-specific save/post/security/identity policies still belong to the application. |
-| F09 | Closable-tab infrastructure, generic themed surfaces/text, and a reusable tab busy overlay are useful missing seams; some constituent primitives already exist. |
-
-## Scope and decision status
-
-The Owner explicitly requested stronger inline editing, tab-scoped feedback, invalid states, faster numeric/date entry, and an SME-oriented evaluation. The following are recommendations awaiting selection, not previously approved APIs:
-
-- Evolve the current libraries plus a thin application workspace layer.
-- Prioritize contextual feedback and complete validation before broad cosmetic replacement.
-- Preserve the current strict numeric behavior until an information-preserving formatter/parser path is proven.
-- Add a typed date-entry composition that reuses the custom calendar; retain native date-time behavior for explicit exceptions.
-- Extract shared edit mechanisms from receipt and sales incrementally; retain both grid implementations with a common behavioral contract.
-- Add generic close-request, busy-overlay, and theme primitives; keep dirty-document and transaction-outcome decisions in MyDmsVn.
-
-Suggested names such as `WorkspaceFeedbackHost`, `FieldValidationBinder`, `BootstrapDateInput`, `BootstrapDecimalInput`, and `BootstrapBusyOverlay` are illustrative. None is asserted to exist in the inspected source.
-
-Preserve the seven sales columns, independent duplicate-Product rows, manually entered prices, gift quantity/cost behavior, strict decimal precision, and authoritative uncertain-Post recovery. Payments, receivables, returns, new pricing/tax workflows, grid replacement, and runtime migration are outside this assessment's implementation authority.
-
-## How to resume
-
-1. Resolve the current branch head and nested submodule pins again. Compare only the code relevant to findings F01–F09; do not silently carry these findings forward if the source changed.
-2. Read these documents and the current active roadmap. Keep analysis proposals separate from approved work and from historical acceptance.
-3. Record the Owner's next choices in this folder with date, selected behavior, affected repository, and remaining alternatives.
-4. Once a bounded work package is selected, create its concrete design/implementation/evidence requirements under the repository's then-current process. Do not activate this entire candidate backlog automatically.
-5. Keep upstream changes traceable and explicitly pinned. Record exact source/test/package revisions for subsequent native Windows evidence.
-
-## Verification boundary for this assessment
-
-Inspected source, existing tests, documentation, Git trees, and upstream comparison. No application code, submodule pin, test policy, or active-roadmap state is changed. No Windows GUI, SQL integration, or package acceptance run is claimed. Documentation validation covers changed paths, links, encoding, source references, and proposal-versus-existing API distinctions.
+This activation changes documentation only. It does not implement proposed controls, change submodule pins, execute Windows/SQL verification or establish product/release acceptance.
