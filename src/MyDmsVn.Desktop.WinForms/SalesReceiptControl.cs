@@ -37,6 +37,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     private readonly Label _state = new Label { Name = "CompactSecondary", AutoSize = true };
     private readonly ErrorProvider _errors;
     private readonly int _uiThread;
+    public WorkspaceFeedbackScope FeedbackScope { get; }
     private bool _applying;
     private bool _disposed;
     private bool _hasDetail;
@@ -54,6 +55,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         ISalesReceiptPreviewCalculator calculator, Func<CatalogKind, CatalogLookupViewModel> lookupFactory, IPermissionApiClient permissions, IProductApiClient productApi)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session)); _sessionVersion = session.Version;
+        FeedbackScope = new WorkspaceFeedbackScope(_sessionVersion);
         _ui = ui ?? throw new ArgumentNullException(nameof(ui)); _permissions = permissions ?? throw new ArgumentNullException(nameof(permissions));
         _productApi = productApi ?? throw new ArgumentNullException(nameof(productApi));
         if (lookupFactory == null) throw new ArgumentNullException(nameof(lookupFactory));
@@ -105,7 +107,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         NextPageButton = Button("Next", () => SetOperation(_list.NextAsync(_lifetime.Token)));
         ApplyFiltersButton = Button("Apply filters", () => SetOperation(ApplyFiltersAsync()));
         OutcomeSaleIdEditor = new TextBox { AccessibleName = "Reviewed saved sale ID", Width = 120 };
-        ReviewCreateButton = Button("Review saved sale", () => { if (long.TryParse(OutcomeSaleIdEditor.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0) SetOperation(Editor.ResolveCreateOutcomeAsync(id, _lifetime.Token)); });
+        ReviewCreateButton = Button("Review saved sale", () => { if (long.TryParse(OutcomeSaleIdEditor.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0) SetOperation(ReviewCreateAsync(id)); });
         TotalLabel = Summary("Sales total"); CostLabel = Summary("Posted total cost"); ProfitLabel = Summary("Posted gross profit");
         LineCostLabel = Summary("Selected line posted cost"); StockLabel = Summary("Stock availability");
         OperationStatusLabel = new Label { Name = "CompactSecondary", AutoSize = true, AccessibleName = "Sales operation status" };
@@ -191,13 +193,44 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         if (!Current || Editor.SaleId != id || Editor.IsAccessDenied) return;
         _hasDetail = true; WorkspaceMode = ReceiptWorkspaceMode.Detail; ApplyState();
     }
-    public Task SaveAsync() => Current && !Busy && _read && !Editor.IsAccessDenied ? Editor.SaveAsync(_lifetime.Token) : Task.CompletedTask;
-    public Task PostAsync() => Current && !Busy && _read && !Editor.IsAccessDenied ? Editor.PostAsync(_lifetime.Token) : Task.CompletedTask;
-    private Task ReloadAsync()
+    public Task SaveAsync()
     {
-        if (Busy || Editor.RequiresCreateOutcomeReview) return Task.CompletedTask;
-        if (!Editor.RequiresPostOutcomeReload && !CanLeaveDetail()) return Task.CompletedTask;
-        CancelBoundary(); return Editor.ReloadOutcomeAsync(_lifetime.Token);
+        if (!Current || Busy) return Task.CompletedTask;
+        var sink = FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-save", WorkspaceOperationKind.Write));
+        if (!_read || !_write || Editor.IsAccessDenied)
+        {
+            sink.Publish(new DesktopNotification(DesktopNotificationKind.Error, "Saving this sale is not permitted."));
+            return Task.CompletedTask;
+        }
+        return Editor.SaveAsync(_lifetime.Token, sink);
+    }
+    public Task PostAsync()
+    {
+        if (!Current || Busy) return Task.CompletedTask;
+        var sink = FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-post", WorkspaceOperationKind.Write));
+        if (!_read || !_post || Editor.IsAccessDenied)
+        {
+            sink.Publish(new DesktopNotification(DesktopNotificationKind.Error, "Posting this sale is not permitted."));
+            return Task.CompletedTask;
+        }
+        return Editor.PostAsync(_lifetime.Token, sink);
+    }
+    private async Task ReloadAsync()
+    {
+        if (Busy || Editor.RequiresCreateOutcomeReview) return;
+        if (!Editor.RequiresPostOutcomeReload && !CanLeaveDetail()) return;
+        var resolving = Editor.RequiresPostOutcomeReload;
+        CancelBoundary(advanceDocument: false);
+        var sink = FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-reload", WorkspaceOperationKind.Query));
+        await Editor.ReloadOutcomeAsync(_lifetime.Token);
+        if (resolving && Current && !Editor.RequiresPostOutcomeReload && Editor.Error == null) sink.ClearActionable();
+    }
+    private async Task ReviewCreateAsync(long id)
+    {
+        if (!Current || Busy || !Editor.RequiresCreateOutcomeReview) return;
+        var sink = FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-create-review", WorkspaceOperationKind.Query));
+        await Editor.ResolveCreateOutcomeAsync(id, _lifetime.Token);
+        if (Current && !Editor.RequiresCreateOutcomeReview && Editor.Error == null) sink.ClearActionable();
     }
     private Task RefreshAsync() => WorkspaceMode == ReceiptWorkspaceMode.Detail ? ReloadAsync() : _list.RefreshAsync(_lifetime.Token);
     public Task<bool> TryCommitPendingEditsAsync(SalesCommandIntent intent, CancellationToken token)
@@ -245,8 +278,9 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         CancelBoundary(); if (!Editor.NewDraft()) return;
         _hasDetail = true; WorkspaceMode = ReceiptWorkspaceMode.Detail; ApplyState();
     }
-    private void CancelBoundary()
+    private void CancelBoundary(bool advanceDocument = true)
     {
+        if (advanceDocument) FeedbackScope.AdvanceDocument();
         ++_boundary; InvalidateProductRequests();
         _inline.CancelActiveEdit(); _products.Cancel();
         foreach (var binding in _lookups) { binding.ViewModel.Cancel(); binding.Control.CancelPendingEdit(); }
@@ -437,7 +471,8 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     private void InlineChanged(object? sender, EventArgs e) => ApplyState();
     private void StateChanged(object? sender, PropertyChangedEventArgs e) => Dispatch(() =>
     {
-        if (ReferenceEquals(sender, _list) && _list.IsAccessDenied && _read) DenyProtectedState();
+        if (_read && ((ReferenceEquals(sender, _list) && _list.IsAccessDenied) ||
+            (ReferenceEquals(sender, Editor) && Editor.IsAccessDenied))) DenyProtectedState();
         else ApplyState();
     });
     private void DenyProtectedState()
@@ -446,6 +481,11 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         _read = _write = _post = false;
         CancelBoundary(); _hasDetail = false;
         Editor.SetAccess(false, false, false); _list.SetAccess(false); ApplyState();
+        if (Current)
+        {
+            FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-access", WorkspaceOperationKind.Write))
+                .Publish(new DesktopNotification(DesktopNotificationKind.Error, "Access to sales receipts is no longer available."));
+        }
     }
     private void Dispatch(Action action)
     {
@@ -456,6 +496,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     }
     private void SessionChanged(object? sender, EventArgs e)
     {
+        FeedbackScope.Invalidate();
         _lifetime.Cancel();
         Dispatch(() => { CancelBoundary(); _read = _write = _post = false; ApplyState(); });
     }
@@ -477,6 +518,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         if (disposing && !_disposed)
         {
             _disposed = true; _lifetime.Cancel(); _documentCancellation.Cancel(); ++_boundary;
+            FeedbackScope.Dispose();
             _session.SessionChanged -= SessionChanged; Editor.PropertyChanged -= StateChanged; _list.PropertyChanged -= StateChanged;
             _inline.EditStateChanged -= InlineChanged; _inline.LookupOperationStarted -= SetOperation; _inline.ProductCommitted -= ProductCommitted; _inline.Dispose(); _products.Dispose();
             foreach (var binding in _lookups) { binding.ViewModel.PropertyChanged -= StateChanged; binding.ViewModel.Dispose(); }

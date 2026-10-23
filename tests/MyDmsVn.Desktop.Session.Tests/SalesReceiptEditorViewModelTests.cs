@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
@@ -10,6 +11,42 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SalesReceiptEditorViewModelTests
 {
+    [Fact]
+    public async Task Confirmed_post_publishes_success_before_failed_detail_refresh_and_keeps_recovery()
+    {
+        var api = new SalesApi();
+        var feedback = new RecordedFeedback();
+        using var vm = Editor(api);
+        await vm.LoadAsync(41);
+        api.Get = _ => Task.FromResult(SalesApi.Error<SalesReceiptDto>());
+
+        await vm.PostAsync(feedback: feedback);
+
+        Assert.Equal(new[] { DesktopNotificationKind.Success, DesktopNotificationKind.Error },
+            feedback.Notices.Select(notice => notice.Kind));
+        Assert.Equal("Posted", vm.Status);
+        Assert.True(vm.RequiresPostOutcomeReload);
+        Assert.Single(api.Posts);
+    }
+
+    [Fact]
+    public async Task Ambiguous_create_publishes_no_success_and_keeps_review_lock()
+    {
+        var api = new SalesApi { Create = _ => throw new InvalidOperationException("ambiguous") };
+        var feedback = new RecordedFeedback();
+        using var vm = Editor(api);
+        Valid(vm);
+        var row = vm.AddLine()!;
+        row.ProductId = 7;
+
+        await vm.SaveAsync(feedback: feedback);
+
+        Assert.DoesNotContain(feedback.Notices, notice => notice.Kind == DesktopNotificationKind.Success);
+        Assert.Contains(feedback.Notices, notice => notice.Kind == DesktopNotificationKind.Error);
+        Assert.True(vm.RequiresCreateOutcomeReview);
+        Assert.Single(api.Creates);
+    }
+
     [Fact]
     public async Task Changing_product_identity_clears_old_unit_and_keeps_manual_price()
     {
@@ -230,4 +267,12 @@ public sealed class SalesReceiptEditorViewModelTests
         vm.SetAccess(true, true, true); return vm;
     }
     private static void Valid(SalesReceiptEditorViewModel vm) { vm.CustomerId = 1; vm.WarehouseId = 2; vm.EmployeeId = 3; }
+
+    private sealed class RecordedFeedback : IWorkspaceFeedbackSink
+    {
+        public List<DesktopNotification> Notices { get; } = new List<DesktopNotification>();
+
+        public void Publish(DesktopNotification notice) => Notices.Add(notice);
+        public void ClearActionable() { }
+    }
 }

@@ -18,6 +18,74 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class SalesReceiptControlTests
 {
     [Fact]
+    public void Unknown_post_alert_clears_only_after_authoritative_reload()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var cleared = 0;
+            host.Value<WorkspaceFeedbackScope>("FeedbackScope").ActionableCleared += (_, __) => cleared++;
+            host.CallTask("PostAsync");
+            Assert.True(host.Editor.RequiresPostOutcomeReload);
+            host.Api.GetHandler = _ => Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+                new ApiError(ApiStatusCode.InternalServerError, "Test.RefreshFailed", "Refresh failed.")));
+
+            host.CallTask("ReloadAsync");
+            Assert.Equal(0, cleared);
+            Assert.True(host.Editor.RequiresPostOutcomeReload);
+            host.Api.GetHandler = id => Task.FromResult(ApiResponse<SalesReceiptDto>.Success(SalesGuiApi.Receipt(id)));
+            host.CallTask("ReloadAsync");
+
+            Assert.Equal(1, cleared);
+            Assert.False(host.Editor.RequiresPostOutcomeReload);
+            Assert.Single(host.Api.Posts);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Editor_read_denial_invalidates_previous_sales_feedback()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var scope = host.Value<WorkspaceFeedbackScope>("FeedbackScope");
+            var old = scope.BeginOperation("old", WorkspaceOperationKind.Write);
+            scope.Capture(old).Publish(new DesktopNotification(DesktopNotificationKind.Success, "Old sale"));
+            host.Api.GetHandler = _ => Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+                new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "The operation is not permitted.")));
+
+            host.CallTask("ReloadAsync");
+
+            Assert.True(host.Editor.IsAccessDenied);
+            Assert.False(scope.IsCurrent(old));
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Confirmed_post_reports_to_its_sales_scope_before_detail_refresh_failure()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var notices = new System.Collections.Generic.List<DesktopNotification>();
+            host.Value<WorkspaceFeedbackScope>("FeedbackScope").Published += (_, eventArgs) => notices.Add(eventArgs.Notification);
+            host.Api.PostHandler = () => Task.FromResult(ApiResponse<PostSalesReceiptResponse>.Success(
+                new PostSalesReceiptResponse(41, "Posted", DateTime.UtcNow, "known-post-version")));
+            host.Api.GetHandler = _ => Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+                new ApiError(ApiStatusCode.InternalServerError, "Test.RefreshFailed", "Refresh failed.")));
+
+            host.CallTask("PostAsync");
+
+            Assert.Equal(new[] { DesktopNotificationKind.Success, DesktopNotificationKind.Error }, notices.Select(notice => notice.Kind));
+            Assert.True(host.Editor.RequiresPostOutcomeReload);
+            Assert.Single(host.Api.Posts);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
     public void Saved_read_and_post_only_draft_posts_through_real_buffer_admission_without_write()
     {
         StaTest.Run(_ =>

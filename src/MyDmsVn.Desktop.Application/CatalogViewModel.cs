@@ -12,6 +12,13 @@ namespace MyDmsVn.Desktop.Application
     {
         public static readonly TimeSpan DefaultDebounceInterval = TimeSpan.FromMilliseconds(300);
 
+        private readonly WorkspaceFeedbackNotificationService? _feedback;
+        private Task WithFeedback(string key, WorkspaceOperationKind kind, Func<Task> action)
+        {
+            if (kind == WorkspaceOperationKind.Write && IsBusy)
+                return Task.FromException(new InvalidOperationException("Another operation is already running."));
+            return _feedback == null ? action() : _feedback.RunAsync(key, kind, action);
+        }
         private readonly object _sync = new object();
         private readonly IUiDispatcher _dispatcher;
         private readonly DebouncedAsyncAction _searchReload;
@@ -45,6 +52,7 @@ namespace MyDmsVn.Desktop.Application
             IDesktopExceptionReporter? exceptionReporter = null)
             : base(notifications, exceptionReporter)
         {
+            _feedback = notifications as WorkspaceFeedbackNotificationService;
             Kind = kind;
             Messenger = messenger ?? throw new ArgumentNullException(nameof(messenger));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
@@ -173,6 +181,7 @@ namespace MyDmsVn.Desktop.Application
         public void BeginCreate()
         {
             ThrowIfDisposed();
+            _feedback?.Scope.AdvanceDocument();
             CancelEditorLoad();
             SelectedId = null;
             SelectedItem = default;
@@ -180,7 +189,9 @@ namespace MyDmsVn.Desktop.Application
             ClearEditor();
         }
 
-        public async Task SaveAsync(CancellationToken cancellationToken)
+        public Task SaveAsync(CancellationToken cancellationToken) => WithFeedback("save", WorkspaceOperationKind.Write, () => SaveWithFeedbackAsync(cancellationToken));
+
+        private async Task SaveWithFeedbackAsync(CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
             using (var linked = CancellationTokenSource.CreateLinkedTokenSource(
@@ -194,7 +205,10 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        public async Task SetActiveAsync(
+        public Task SetActiveAsync(int id, bool isActive, CancellationToken cancellationToken) =>
+            WithFeedback("active", WorkspaceOperationKind.Write, () => SetActiveWithFeedbackAsync(id, isActive, cancellationToken));
+
+        private async Task SetActiveWithFeedbackAsync(
             int id,
             bool isActive,
             CancellationToken cancellationToken)
@@ -211,7 +225,13 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        public async Task SelectAsync(int id, CancellationToken cancellationToken)
+        public Task SelectAsync(int id, CancellationToken cancellationToken)
+        {
+            _feedback?.Scope.AdvanceDocument();
+            return WithFeedback("select", WorkspaceOperationKind.Query, () => SelectWithFeedbackAsync(id, cancellationToken));
+        }
+
+        private async Task SelectWithFeedbackAsync(int id, CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
             CancellationTokenSource editorCancellation;
@@ -346,6 +366,7 @@ namespace MyDmsVn.Desktop.Application
             _messageReload.Dispose();
             Messenger.UnregisterAll(this);
             _lifetimeCancellation.Dispose();
+            _feedback?.Scope.Dispose();
         }
 
         protected abstract Task<ApiResponse<PagedResult<TDto>>> ListAsync(
@@ -430,11 +451,13 @@ namespace MyDmsVn.Desktop.Application
                                 SelectedId = entityId;
                                 SelectedItem = response.Data;
                                 PopulateEditor(response.Data!);
+                                PublishNotification(DesktopNotificationKind.Success, "Saved successfully.");
                             }
                         },
                         cancellationToken).ConfigureAwait(false);
                 }
                 cancellationToken.ThrowIfCancellationRequested();
+                if (!IsEditorCurrent(editorGeneration)) return;
                 _ignoreNextRelevantMessage = true;
                 Messenger.Send(new CatalogChangedMessage(Kind, entityId, operation));
                 await LoadAsync(cancellationToken).ConfigureAwait(false);
@@ -481,6 +504,16 @@ namespace MyDmsVn.Desktop.Application
                     return;
                 }
 
+                await _dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        if (!IsDisposed())
+                        {
+                            PublishNotification(DesktopNotificationKind.Success,
+                                isActive ? "Activated successfully." : "Deactivated successfully.");
+                        }
+                    },
+                    cancellationToken).ConfigureAwait(false);
                 _ignoreNextRelevantMessage = true;
                 Messenger.Send(
                     new CatalogChangedMessage(
@@ -517,7 +550,9 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        private async Task LoadAsync(CancellationToken cancellationToken)
+        private Task LoadAsync(CancellationToken cancellationToken) => WithFeedback("load", WorkspaceOperationKind.Query, () => LoadWithFeedbackAsync(cancellationToken));
+
+        private async Task LoadWithFeedbackAsync(CancellationToken cancellationToken)
         {
             CancellationTokenSource loadCancellation;
             long generation;

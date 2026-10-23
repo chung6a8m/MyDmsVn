@@ -1,23 +1,23 @@
 # UI Next — validation and cross-session handoff
 
 **Date:** 2026-10-23
-**Status:** PLANNED EVIDENCE — all UI Next runtime acceptance NOT RUN
+**Status:** T00 bounded contract and T01 focused hosted evidence recorded; A01/A02 partial, final acceptance open
 **Authority:** [TEST_POLICY](../TEST_POLICY.md) remains the sole execution policy. This document selects behavior for the [new active roadmap](20261023-active-roadmap.md), not an additional test framework.
 
 ## Evidence boundary
 
-The documentation activation verifies source references, plan/archive status, links, encoding and a docs-only diff. It does not execute product, GUI, SQL, package or upstream compatibility tests. Source test existence is not a new PASS.
+The original documentation activation verified source references, plan/archive status, links, encoding and a docs-only diff. Subsequent [T00](evidence/20261023-t00-field-errors.md) and [T01](evidence/20261023-uin-t01-workspace-feedback.md) implementation evidence records focused product/session/host tests. Source test existence alone is not a PASS.
 
 The old SAL-T07/T08 open native125, attended and Owner obligations remain in the [archive](../archive/20261023-pre-ui-next/README.md). They are neither prerequisites nor acceptance rows here. New UI Next checks use UIN-A identifiers and exact current candidates; they cannot change historical SAL/BCF results. Production prerequisites remain unaccepted and unscheduled.
 
 ## Acceptance matrix
 
-All rows begin **NOT RUN**. Update each only with an evidence path and exact candidate, separating partial coverage from full row closure.
+All rows began **NOT RUN** at activation. Current states below separate focused evidence from full row closure.
 
-| ID / task owner | Required observable behavior | Minimum meaningful evidence | Initial state |
+| ID / task owner | Required observable behavior | Minimum meaningful evidence | Current evidence state |
 |---|---|---|---|
-| UIN-A01 / T00,T02 | Duplicate Code create/update retains attempted text, Conflict and `code` target; correct editor shows invalid/readable state; unrelated fields stay intact; general/authorization errors remain safe and visible | AT mapper/catalog + ST VM + focused Product native UI; delayed old response and relevant-field clearing | NOT RUN |
-| UIN-A02 / T01 | Concurrent A/B outcomes remain in originating workspace; switch/close/reopen/document/session changes reject stale results; hidden success retention is bounded; persistent recovery survives status/Toast changes | Deterministic captured-scope tests and real host lifecycle tests including pre-handle publication/UI dispatch | NOT RUN |
+| UIN-A01 / T00,T02 | Duplicate Code create/update retains attempted text, Conflict and `code` target; correct editor shows invalid/readable state; unrelated fields stay intact; general/authorization errors remain safe and visible | AT mapper/catalog + ST VM + focused Product native UI; delayed old response and relevant-field clearing | PARTIAL: [T00 AT/ST PASS](evidence/20261023-t00-field-errors.md); T02 native invalid presentation NOT RUN |
+| UIN-A02 / T01 | Concurrent A/B outcomes remain in originating workspace; switch/close/reopen/document/session changes reject stale results; hidden success retention is bounded; persistent recovery survives status/Toast changes | Deterministic captured-scope tests and real host lifecycle tests including pre-handle publication/UI dispatch | PARTIAL: [T01 focused ST/host GUI PASS](evidence/20261023-uin-t01-workspace-feedback.md); required Light/Dark native100/native125 composition NOT RUN |
 | UIN-A03 / T02 | Same current errors drive editor border, readable message, ErrorProvider, inactive cell/row and accessible summary; duplicate/zero-ID/reordered/removed rows cannot steal another line's error | Native Sales pilot + accessible keyboard navigation; submitted-index-to-stable-line mapping; R4 clearing regressions | NOT RUN |
 | UIN-A04 / T03,T05 | Commit applies once after host acceptance; stale validation proof or a different native accepted value cannot apply; invalid buffer is retained; cancel projects current model; Save/Post/navigation resolve all pending buffers; locked routes cannot mutate | Both receipt adapter session tests, controlled late callbacks, native Enter/Escape/Tab/Back and existing admission tests | NOT RUN |
 | UIN-A05 / T04 | Decimal candidate is lossless; exact maxima/scale/sign/culture/null grammar match current app policy; meaningful far-tail digits reject before decimal rounding; generated grouping is distinguishable from pasted input | Pure parser/display vectors with fixed expected values, app-profile differential characterization and legacy formatter compatibility | NOT RUN |
@@ -110,6 +110,6 @@ Keep implementation state (NOT STARTED / IN PROGRESS / VERIFIED), evidence state
 
 ## Activation handoff
 
-At this planning boundary all T00–T13 implementation states are NOT STARTED and all A01–A14 runtime states are NOT RUN. The next ready task is T00. The PR contains the source refresh, selected contracts, bounded implementation plan, archive and authority/link updates only.
+At the original planning boundary all T00–T13 implementation states were NOT STARTED and all A01–A14 runtime states were NOT RUN. T00 now has bounded implementation evidence; T01 source is implemented and its focused hosted boundary is verified, while A01/A02 remain partial as shown above. T02 is the next ready task. The original activation PR contained the source refresh, selected contracts, bounded implementation plan, archive and authority/link updates only.
 
 Before publishing the docs PR, verify exact base/target branch, documentation-only changed paths, six archived plans plus frozen old index, preservation of historical bodies/results except archive notices/link relocation, local links/anchors, proposed API labels, UTF-8 without BOM/CRLF working tree and normalized LF Git blobs. Record actual publication/verification outcomes in the PR; never claim a push or PR before its remote result is confirmed.

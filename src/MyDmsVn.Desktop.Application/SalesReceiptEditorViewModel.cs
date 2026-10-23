@@ -215,10 +215,10 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         catch (Exception) { await Publish(operation, () => { Error = Unexpected(); Notify(); }).ConfigureAwait(false); }
         finally { await End(operation).ConfigureAwait(false); }
     }
-    public Task SaveAsync(CancellationToken token = default) => CommandAsync(SalesCommandIntent.Save, token);
-    public Task PostAsync(CancellationToken token = default) => CommandAsync(SalesCommandIntent.Post, token);
+    public Task SaveAsync(CancellationToken token = default, IWorkspaceFeedbackSink? feedback = null) => CommandAsync(SalesCommandIntent.Save, token, feedback);
+    public Task PostAsync(CancellationToken token = default, IWorkspaceFeedbackSink? feedback = null) => CommandAsync(SalesCommandIntent.Post, token, feedback);
 
-    private async Task CommandAsync(SalesCommandIntent intent, CancellationToken token)
+    private async Task CommandAsync(SalesCommandIntent intent, CancellationToken token, IWorkspaceFeedbackSink? feedback)
     {
         long document;
         long admissionOperation;
@@ -242,26 +242,26 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
                     token.ThrowIfCancellationRequested();
                     if (!CanCommand(intent) || _document != document || _operation != admissionOperation) return;
                     if (intent == SalesCommandIntent.Post && (SaleId <= 0 || IsDirty))
-                    { Error = new ApiError(ApiStatusCode.Conflict, "SalesReceipt.SaveRequired", "Save pending changes before posting."); Notify(); return; }
+                    { Error = new ApiError(ApiStatusCode.Conflict, "SalesReceipt.SaveRequired", "Save pending changes before posting."); PublishFailure(feedback, Error); Notify(); return; }
                     if (intent == SalesCommandIntent.Save && SaleId > 0 && !IsDirty) return;
-                    if (!ValidDraft()) { Error = new ApiError(ApiStatusCode.BadRequest, "SalesReceipt.InvalidDraft", "Resolve the sales header and line validation errors."); Notify(); return; }
+                    if (!ValidDraft()) { Error = new ApiError(ApiStatusCode.BadRequest, "SalesReceipt.InvalidDraft", "Resolve the sales header and line validation errors."); PublishFailure(feedback, Error); Notify(); return; }
                     operation = Begin(token, 2);
-                    work = intent == SalesCommandIntent.Save ? SaveCore(operation) : PostCore(operation);
+                    work = intent == SalesCommandIntent.Save ? SaveCore(operation, feedback) : PostCore(operation, feedback);
                 }
             }, CancellationToken.None).ConfigureAwait(false);
             if (work != null) await work.ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
-            if (operation != null) await Publish(operation, () => { Error = Unexpected(); Notify(); }).ConfigureAwait(false);
+            if (operation != null) await Publish(operation, () => { Error = Unexpected(); PublishFailure(feedback, Error); Notify(); }).ConfigureAwait(false);
         }
         catch (Exception)
         {
-            if (operation != null) await Publish(operation, () => { Error = Unexpected(); Notify(); }).ConfigureAwait(false);
+            if (operation != null) await Publish(operation, () => { Error = Unexpected(); PublishFailure(feedback, Error); Notify(); }).ConfigureAwait(false);
             else await _ui.InvokeAsync(() =>
             {
                 lock (_sync)
-                    if (SessionCurrent && _document == document && _operation == admissionOperation) { Error = Unexpected(); Notify(); }
+                    if (SessionCurrent && _document == document && _operation == admissionOperation) { Error = Unexpected(); PublishFailure(feedback, Error); Notify(); }
             }, CancellationToken.None).ConfigureAwait(false);
         }
         finally
@@ -274,7 +274,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         (Note?.Length ?? 0) <= SalesContractLimits.MaximumNoteLength && _lines.Count >= 1 && _lines.Count <= SalesContractLimits.MaximumLines &&
         _lines.All(row => row.ProductId > 0 && row.ProductIsActive && row.LineAmount.HasValue) && TotalAmount.HasValue;
 
-    private async Task SaveCore(Operation operation)
+    private async Task SaveCore(Operation operation, IWorkspaceFeedbackSink? feedback)
     {
         var rows = _lines.ToArray();
         var requestLines = rows.Select(row => new SaveSalesReceiptLineRequest(row.SaleLineId, row.ProductId, row.Quantity, row.UnitPrice, row.IsGift)).ToArray();
@@ -291,14 +291,16 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
             {
                 var dto = result.Data!;
                 if (dto.Status != "Draft" || (!create && dto.SaleId != SaleId) || !Matches(dto, requestLines))
-                { Error = InvalidResponse(); return; }
+                { Error = InvalidResponse(); PublishFailure(feedback, Error); return; }
                 Apply(dto, rows); RequiresCreateOutcomeReview = false; Error = null;
+                feedback?.Publish(new DesktopNotification(DesktopNotificationKind.Success, create ? "Sale created." : "Sale saved."));
             }
             else
             {
                 if (create && KnownRejection(result.Error!)) RequiresCreateOutcomeReview = false;
                 if (!create && result.Error!.Status == ApiStatusCode.Conflict) BeginPostRecovery(SaleId);
                 ErrorResult(result.Error!);
+                PublishFailure(feedback, Error);
             }
             Notify();
         }).ConfigureAwait(false);
@@ -311,7 +313,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         return returned.Select((row, i) => row.LineNo == i + 1 && (submitted[i].SaleLineId == 0 || submitted[i].SaleLineId == row.SaleLineId) &&
             row.ProductId == submitted[i].ProductId && row.Qty == submitted[i].Qty && row.UnitPrice == submitted[i].UnitPrice && row.IsGift == submitted[i].IsGift).All(valid => valid);
     }
-    private async Task PostCore(Operation operation)
+    private async Task PostCore(Operation operation, IWorkspaceFeedbackSink? feedback)
     {
         var id = SaleId;
         var version = Version;
@@ -323,17 +325,19 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
             if (result.IsSuccess)
             {
                 var dto = result.Data!;
-                if (dto.SaleId != id || dto.Status != "Posted" || string.IsNullOrWhiteSpace(dto.Version)) { Error = InvalidResponse(); return; }
+                if (dto.SaleId != id || dto.Status != "Posted" || string.IsNullOrWhiteSpace(dto.Version)) { Error = InvalidResponse(); PublishFailure(feedback, Error); return; }
                 Status = dto.Status; Version = dto.Version; PostedAtUtc = dto.PostedAtUtc;
                 _postRecovery!.KnownPosted = dto;
                 IsDirty = false; TotalCost = null; GrossProfit = null; _postedAmount = _calculator.SumAmounts(_lines.Select(row => row.LineAmount!.Value));
                 knownPosted = true; Error = null;
+                feedback?.Publish(new DesktopNotification(DesktopNotificationKind.Success, "Sale posted."));
             }
             else
             {
                 if (KnownRejection(result.Error!) && result.Error!.Status != ApiStatusCode.Conflict)
                 { RequiresPostOutcomeReload = false; _postRecovery = null; }
                 ErrorResult(result.Error!);
+                PublishFailure(feedback, Error);
             }
             Notify();
         }).ConfigureAwait(false);
@@ -344,13 +348,17 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         {
             if (detail.IsSuccess && detail.Data!.SaleId == id && detail.Data.Status == "Posted")
             { Apply(detail.Data, null); RequiresPostOutcomeReload = false; _postRecovery = null; Error = null; }
-            else ErrorResult(detail.Error ?? InvalidResponse());
+            else { ErrorResult(detail.Error ?? InvalidResponse()); PublishFailure(feedback, Error); }
             Notify();
         }).ConfigureAwait(false);
     }
     private static bool KnownRejection(ApiError error) => error.Status == ApiStatusCode.BadRequest || error.Status == ApiStatusCode.Forbidden ||
         error.Status == ApiStatusCode.NotFound || error.Status == ApiStatusCode.Conflict ||
         (error.Status == ApiStatusCode.Unauthorized && error.Code != "Auth.SessionChanged");
+    private static void PublishFailure(IWorkspaceFeedbackSink? feedback, ApiError? error)
+    {
+        if (error != null) feedback?.Publish(new DesktopNotification(DesktopNotificationKind.Error, error.Message));
+    }
     private void ErrorResult(ApiError error)
     {
         if (SalesReceiptListViewModel.IsAuthorization(error)) { _denied = true; Scrub(); }

@@ -13,6 +13,95 @@ namespace MyDmsVn.Desktop.Tests
     public sealed class CatalogViewModelTests
     {
         [Fact]
+        public async Task Busy_rejected_save_does_not_supersede_admitted_write_feedback()
+        {
+            using var scope = new WorkspaceFeedbackScope();
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var notices = new List<DesktopNotification>();
+            scope.Published += (_, e) => notices.Add(e.Notification);
+            using var vm = new ProductCatalogViewModel(client, new WeakReferenceMessenger(), new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "P1";
+            var admitted = vm.SaveAsync(CancellationToken.None);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => vm.SaveAsync(CancellationToken.None));
+            client.CompleteCreate(Product(1, "P1")); await admitted;
+            Assert.Equal(DesktopNotificationKind.Success, Assert.Single(notices).Kind);
+        }
+        [Fact]
+        public async Task Old_document_success_does_not_emit_feedback_or_reload_new_document()
+        {
+            using var scope = new WorkspaceFeedbackScope(4);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var messenger = new WeakReferenceMessenger();
+            var messages = new List<CatalogChangedMessage>();
+            messenger.Register<CatalogChangedMessage>(messages, (_, message) => messages.Add(message));
+            int notices = 0; scope.Published += (_, __) => notices++;
+            using var vm = new ProductCatalogViewModel(client, messenger, new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "OLD";
+            var save = vm.SaveAsync(CancellationToken.None);
+            vm.BeginCreate(); vm.Code = "NEW";
+            client.CompleteCreate(Product(1, "OLD")); await save;
+            Assert.Empty(messages); Assert.Empty(client.ListRequests); Assert.Equal(0, notices);
+            Assert.Equal("NEW", vm.Code); Assert.Null(vm.SelectedId);
+        }
+        [Fact]
+        public async Task Workspace_feedback_reports_authoritative_save_before_refresh_failure()
+        {
+            using var scope = new WorkspaceFeedbackScope(4);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient
+            {
+                ListResponse = ApiResponse<PagedResult<ProductDto>>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Refresh failed.")),
+            };
+            var notices = new List<DesktopNotification>();
+            scope.Published += (_, e) => notices.Add(e.Notification);
+            using var vm = new ProductCatalogViewModel(client, new WeakReferenceMessenger(), new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "P1"; vm.Name = "Product"; vm.Unit = "pcs";
+            await vm.SaveAsync(CancellationToken.None);
+            Assert.Equal(new[] { DesktopNotificationKind.Success, DesktopNotificationKind.Error }, notices.Select(n => n.Kind));
+            Assert.Equal(1, vm.SelectedId);
+            Assert.Equal("Refresh failed.", notices[1].Message);
+        }
+
+        [Fact]
+        public async Task Workspace_feedback_reports_authoritative_active_change_before_refresh_failure()
+        {
+            using var scope = new WorkspaceFeedbackScope(4);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient
+            {
+                ListResponse = ApiResponse<PagedResult<ProductDto>>.Failure(
+                    new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Refresh failed.")),
+            };
+            var notices = new List<DesktopNotification>();
+            scope.Published += (_, e) => notices.Add(e.Notification);
+            using var vm = new ProductCatalogViewModel(client, new WeakReferenceMessenger(),
+                new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            await vm.SetActiveAsync(1, false, CancellationToken.None);
+            Assert.Equal(new[] { DesktopNotificationKind.Success, DesktopNotificationKind.Error },
+                notices.Select(n => n.Kind));
+            Assert.Equal("Deactivated successfully.", notices[0].Message);
+            Assert.Equal("Refresh failed.", notices[1].Message);
+        }
+
+        [Fact]
+        public async Task Workspace_feedback_captures_query_without_control_or_selected_tab()
+        {
+            using var scope = new WorkspaceFeedbackScope(4);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient
+            {
+                ListResponse = ApiResponse<PagedResult<ProductDto>>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Refresh failed.")),
+            };
+            var notices = new List<WorkspaceFeedbackEventArgs>();
+            scope.Published += (_, e) => notices.Add(e);
+            using var vm = new ProductCatalogViewModel(client, new WeakReferenceMessenger(), new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            await vm.RefreshAsync(CancellationToken.None);
+            Assert.Equal(scope.WorkspaceId, Assert.Single(notices).Context.WorkspaceId);
+            Assert.Equal(WorkspaceOperationKind.Query, notices[0].Context.Kind);
+        }
+        [Fact]
         public async Task Product_create_update_and_set_active_publish_one_typed_message_after_each_success()
         {
             var client = new FakeProductClient

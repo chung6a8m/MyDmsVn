@@ -1,6 +1,6 @@
 # Test projects and commands — v1a-pro-ui-next
 
-**Updated:** 2026-10-23. [TEST_POLICY](../docs/TEST_POLICY.md) alone owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. The [UI-NEXT roadmap](../docs/ui-next/20261023-active-roadmap.md) is the sole active queue from merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. All implementation tasks are NOT STARTED and new runtime validation is NOT RUN. No external SQL test framework is restored.
+**Updated:** 2026-10-23. [TEST_POLICY](../docs/TEST_POLICY.md) alone owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. The [UI-NEXT roadmap](../docs/ui-next/20261023-active-roadmap.md) is the sole active queue from merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. UIN-T00/T01 have focused application/session/host evidence; later tasks and final package/Owner acceptance remain open. No external SQL test framework is restored.
 
 ## Active UI-NEXT commands and evidence
 

@@ -1,7 +1,7 @@
 # UI Next — active roadmap for the SME desktop foundation
 
 **Date:** 2026-10-23
-**Status:** SOLE ACTIVE ROADMAP — documentation activation; all implementation tasks NOT STARTED
+**Status:** SOLE ACTIVE ROADMAP — T00 bounded implementation VERIFIED; T01 implemented with focused host evidence, acceptance partial; T02–T13 NOT STARTED
 **Base:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`
 **Design:** [Design and control policy](20261023-design-and-control-policy.md)
 **Execution:** [Implementation plan](20261023-implementation-plan.md)
@@ -9,7 +9,7 @@
 
 ## Selection and scheduling boundary
 
-The Owner requested analysis and an active roadmap for the earlier UI proposals, archiving old plans and explicitly excluding their unfinished work. This document makes that selection concrete. It is the execution queue for future implementation; this PR delivers the plan and archive only.
+The Owner requested analysis and an active roadmap for the earlier UI proposals, archiving old plans and explicitly excluding their unfinished work. This document makes that selection concrete. The original activation contained documentation only; subsequent T00/T01 implementation is recorded in the evidence linked below.
 
 The selected direction is incremental shared UI infrastructure with thin application adapters. It keeps the existing compact visual composition, SourceGrid document editors, business behavior and active `net48` application. The main SME benefit is faster, predictable keyboard entry with visible, local outcomes; reducing repeated code supports that behavior. A new general-purpose ERP grid or application framework is unnecessary for this scope.
 
@@ -61,7 +61,7 @@ These defaults make implementation reviewable. They are planning decisions under
 
 ## Execution queue
 
-All rows below are **NOT STARTED**. No row is complete because this plan exists. The first ready task is **UIN-T00**. Follow table order by default; independent work may proceed only after its listed dependencies and without conflicting file ownership.
+At activation all rows were **NOT STARTED**. [T00 evidence](evidence/20261023-t00-field-errors.md) verifies its bounded application/session contract; [T01 evidence](evidence/20261023-uin-t01-workspace-feedback.md) records implemented source and focused hosted checks, with remaining native theme/DPI and later package/Owner gates. T02–T13 remain NOT STARTED; T02 is the next ready task. Follow table order by default; independent work may proceed only after its listed dependencies and without conflicting file ownership.
 
 | Task | Priority / outcome | Repository ownership | Dependencies | Completion evidence |
 |---|---|---|---|---|

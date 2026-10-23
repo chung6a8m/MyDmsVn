@@ -389,7 +389,16 @@ namespace MyDmsVn.Desktop.WinForms
                 Name = key,
             };
             content.Dock = DockStyle.Fill;
-            page.Controls.Add(content);
+            var scope = content is CatalogControl catalogContent ? catalogContent.FeedbackScope :
+                content is SalesReceiptControl salesContent ? salesContent.FeedbackScope : new WorkspaceFeedbackScope(sessionVersion);
+            var feedbackHost = new WorkspaceFeedbackHost(content, scope) { Dock = DockStyle.Fill };
+            feedbackHost.AttentionChanged += (_, __) =>
+            {
+                if (page.IsDisposed) return;
+                page.Text = title + (feedbackHost.HasAttention ? " !" : string.Empty);
+                page.AccessibleDescription = feedbackHost.HasAttention ? "Unread workspace error" : string.Empty;
+            };
+            page.Controls.Add(feedbackHost);
             _documents.Add(key, page);
             Workspace.TabPages.Add(page);
             Workspace.SelectedTab = page;
@@ -550,25 +559,28 @@ namespace MyDmsVn.Desktop.WinForms
             }
         }
 
+        private static Control? WorkspaceContent(TabPage? page) => page?.Controls.Count > 0 ?
+            (page.Controls[0] is WorkspaceFeedbackHost host ? host.Content : page.Controls[0]) : null;
+
         private static void ActivateWorkspace(TabPage? page)
         {
             ActivateCatalog(page);
-            if (page?.Controls.Count > 0 && page.Controls[0] is GoodsReceiptControl goodsReceipts)
+            if (WorkspaceContent(page) is GoodsReceiptControl goodsReceipts)
             {
                 _ = goodsReceipts.ActivateAsync(CancellationToken.None);
             }
 
-            if (page?.Controls.Count > 0 && page.Controls[0] is StockBalanceControl balances)
+            if (WorkspaceContent(page) is StockBalanceControl balances)
             {
                 _ = balances.ActivateAsync(CancellationToken.None);
             }
 
-            if (page?.Controls.Count > 0 && page.Controls[0] is StockCardControl card)
+            if (WorkspaceContent(page) is StockCardControl card)
             {
                 _ = card.ActivateAsync(CancellationToken.None);
             }
 
-            if (page?.Controls.Count > 0 && page.Controls[0] is IActivatableDesktopControl activatable)
+            if (WorkspaceContent(page) is IActivatableDesktopControl activatable)
             {
                 _ = activatable.ActivateAsync(CancellationToken.None);
             }
@@ -576,7 +588,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private static void ActivateCatalog(TabPage? page)
         {
-            if (page?.Controls.Count > 0 && page.Controls[0] is CatalogControl catalog)
+            if (WorkspaceContent(page) is CatalogControl catalog)
             {
                 _ = catalog.ActivateAsync(CancellationToken.None);
             }

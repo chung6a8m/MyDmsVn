@@ -54,7 +54,7 @@ namespace MyDmsVn.Desktop.Tests
 
                         Assert.Same(firstPage, secondPage);
                         Assert.Single(shell.Workspace.TabPages);
-                        Assert.Same(first, firstPage!.Controls[0]);
+                        Assert.Same(first, Assert.IsType<WorkspaceFeedbackHost>(firstPage!.Controls[0]).Content);
                         Assert.True(duplicate.IsDisposed);
                     }
                 },

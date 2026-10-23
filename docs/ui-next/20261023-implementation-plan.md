@@ -1,6 +1,6 @@
 # UI Next — Implementation Plan
 
-> For agentic workers: use `superpowers:subagent-driven-development` or `superpowers:executing-plans` for an authorized implementation session. This document plans future implementation; the current PR is documentation only.
+> For agentic workers: use `superpowers:subagent-driven-development` or `superpowers:executing-plans` for an authorized implementation session. The original activation was documentation only; see the T00/T01 evidence for later implementation.
 
 **Goal:** Deliver consistent tab feedback, complete validation, lossless fast input and reusable workspace/grid mechanisms for the existing SME desktop app.
 
@@ -12,7 +12,7 @@
 
 ## Global constraints
 
-- All tasks are NOT STARTED. Proposed filenames/types below are NEW until implemented; existing file paths are baseline anchors, not proof of passing tests.
+- T00 has bounded implementation evidence and T01 has implemented source with focused hosted evidence; T02–T13 remain NOT STARTED. Proposed filenames/types for later tasks are NEW until implemented; existing file paths are baseline anchors, not proof of passing tests.
 - Preserve the current business/runtime/security/decimal/recovery invariants in AGENTS. No schema, business feature, new permission or runtime migration is needed.
 - Archived unfinished SAL/BCF/release work is excluded. Do not make old T07/T08 closure, old full-SQL acceptance or old visual exceptions a prerequisite.
 - Work in small coherent slices; use existing passing characterization for a pure refactor and meaningful failing behavior tests for a demonstrated gap. Do not fabricate RED or broaden runs without a concrete risk.
@@ -57,12 +57,12 @@ The app consumes BSG at `vendor/MyDmsVn.BootstrapSourceGrid`; its UI source is `
 
 **Interfaces:** consume existing `Error.Conflict`, `ApiError.Details`, `ApiErrorDetail.Field`, `INotifyDataErrorInfo.GetErrors/ErrorsChanged`. Produce explicit metadata `Field = "Code"` on the intended DuplicateCode errors, mapped to JSON `code`. If repeated construction warrants a helper, NEW `SA/Catalog/CatalogErrors.cs` exposes `DuplicateCode(string code, string message): Error`; it is internal and does not rewrite unrelated conflicts.
 
-- [ ] Add/extend create/update duplicate-code tests across the four catalogs. Require Conflict + field `code`, retained attempted data and no committed mutation; first demonstrate missing metadata, not a build/discovery failure.
-- [ ] Add mapper cases for field casing, unknown/unbound errors and authorization privacy; verify generic/permission conflicts are not attached to Code.
-- [ ] Add metadata at the error source and preserve existing codes/status/messages. Fix mapper/VM clearing only if the tests expose a missing contract; do not introduce a transport schema redesign.
-- [ ] Exercise delayed response after record/document/session replacement and relevant-field error clearing through the existing VM admission path; retain current errors in unrelated fields.
-- [ ] Run focused AT/ST cases, inspect nonempty discovery and actual outcomes. Metadata-only changes do not require a full SQL suite; database behavior changes are outside this task.
-- [ ] Record the error contract/sample and evidence, review compatibility, and commit the bounded change. T02 provides the visual completion.
+- [x] Add/extend create/update duplicate-code tests across the four catalogs. Require Conflict + field `code`, retained attempted data and no committed mutation; first demonstrate missing metadata, not a build/discovery failure.
+- [x] Add mapper cases for field casing, unknown/unbound errors and authorization privacy; verify generic/permission conflicts are not attached to Code.
+- [x] Add metadata at the error source and preserve existing codes/status/messages. Fix mapper/VM clearing only if the tests expose a missing contract; do not introduce a transport schema redesign.
+- [x] Exercise delayed response after record/document/session replacement and relevant-field error clearing through the existing VM admission path; retain current errors in unrelated fields.
+- [x] Run focused AT/ST cases, inspect nonempty discovery and actual outcomes. Metadata-only changes do not require a full SQL suite; database behavior changes are outside this task.
+- [x] Record the error contract/sample and [evidence](evidence/20261023-t00-field-errors.md), review compatibility, and commit the bounded change. T02 provides the visual completion.
 
 ## UIN-T01 — originating-workspace feedback scope and host
 
@@ -72,12 +72,12 @@ The app consumes BSG at `vendor/MyDmsVn.BootstrapSourceGrid`; its UI source is `
 
 **Interfaces:** retain `IDesktopNotificationService` for global/backward-compatible callers. Proposed NEW `IWorkspaceFeedbackScope.Capture(WorkspaceOperationContext context): IWorkspaceFeedbackSink`; `IWorkspaceFeedbackSink.Publish(DesktopNotification notice): void`. Context holds immutable workspace instance, authenticated-session/document generations, operation key/generation. Scope owns invalidation/disposal and an origin-bearing published event; host never chooses scope from SelectedTab. A thin legacy-service adapter may implement the existing notification interface without WinForms references. Uncertain outcome remains VM state, not only an event.
 
-- [ ] Build deterministic routing tests: A/B completion in either order, switch while pending, close/reopen same module, document switch, logout and pre-handle publication. Separate query and write freshness; require stale UI-dispatch rejection.
-- [ ] Implement the pure captured scope and disposal fence, then connect one scope to each actual shell workspace. Preserve global session/application notifications.
-- [ ] Compose existing `BootstrapAlert` and `BootstrapToastContainer` in a small local host. Implement the design's bounded success retention and persistent-error policy; do not use monitor-scoped ToastService as tab routing.
-- [ ] Pilot Product and Sales outcomes, including denied command and unknown Post/Create recovery. Emit success only from an authoritative mutation response, separately from later refresh failure; never infer it from Task completion or cleared errors. T07 exposes this same outcome to close admission. Remove duplicate display of the same actionable error only after the new local presentation owns it; ordinary Shell Ready refresh must not erase it.
-- [ ] Run focused ST/GT cases for hidden/disposed controls, UI dispatch, focus and queued-toast disposal. Retain existing login/session scrubbing and no protected-data leakage.
-- [ ] Record ownership/lifetime samples and evidence, commit app-only changes with current UI pin unchanged. No new global notification centre is needed.
+- [x] Build deterministic routing tests: A/B completion in either order, switch while pending, close/reopen same module, document switch, logout and pre-handle publication. Separate query and write freshness; require stale UI-dispatch rejection.
+- [x] Implement the pure captured scope and disposal fence, then connect one scope to each actual shell workspace. Preserve global session/application notifications.
+- [x] Compose existing `BootstrapAlert` and `BootstrapToastContainer` in a small local host. Implement the design's bounded success retention and persistent-error policy; do not use monitor-scoped ToastService as tab routing.
+- [x] Pilot Product and Sales outcomes, including denied command and unknown Post/Create recovery. Emit success only from an authoritative mutation response, separately from later refresh failure; never infer it from Task completion or cleared errors. T07 exposes this same outcome to close admission. Remove duplicate display of the same actionable error only after the new local presentation owns it; ordinary Shell Ready refresh must not erase it.
+- [x] Run focused ST/GT cases for hidden/disposed controls, UI dispatch, focus and queued-toast disposal. Retain existing login/session scrubbing and no protected-data leakage.
+- [x] Record ownership/lifetime samples and [evidence](evidence/20261023-uin-t01-workspace-feedback.md), commit app-only changes with current UI pin unchanged. No new global notification centre is needed. Native theme/DPI and later package/Owner acceptance remain separate validation work.
 
 ## UIN-T02 — shared field/cell presentation and first user-visible pilot
 

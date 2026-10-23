@@ -23,6 +23,14 @@ namespace MyDmsVn.Desktop.WinForms
     public sealed class CatalogControl : UserControl
     {
         private readonly CatalogBinding _binding;
+        private WorkspaceFeedbackNotificationService? _feedbackNotifications;
+        public WorkspaceFeedbackScope FeedbackScope { get; private set; } = new WorkspaceFeedbackScope();
+        internal void AttachFeedback(WorkspaceFeedbackScope scope, WorkspaceFeedbackNotificationService notifications)
+        {
+            FeedbackScope.Dispose();
+            FeedbackScope = scope;
+            _feedbackNotifications = notifications;
+        }
         private readonly ErrorProvider _errors;
         private readonly Dictionary<string, BootstrapTextBox> _editorControls =
             new Dictionary<string, BootstrapTextBox>(StringComparer.Ordinal);
@@ -242,6 +250,7 @@ namespace MyDmsVn.Desktop.WinForms
                 _binding.PropertyChanged -= OnViewModelPropertyChanged;
                 _binding.ErrorsChanged -= OnErrorsChanged;
                 BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+                FeedbackScope.Dispose();
                 _binding.Dispose();
                 _errors.Dispose();
             }
@@ -354,7 +363,7 @@ namespace MyDmsVn.Desktop.WinForms
                 _resultsState.Text = _binding.IsLoading ? "Loading results…" : _rows.Count == 0 ? "No results" : string.Empty;
                 _resultsState.Visible = _resultsState.Text.Length != 0;
                 _error.Text = _binding.ErrorMessage ?? string.Empty;
-                _error.Visible = _error.Text.Length != 0;
+                _error.Visible = _feedbackNotifications == null && _error.Text.Length != 0;
                 SaveButton.Enabled = !busy;
                 RefreshButton.Enabled = !busy;
                 NewButton.Enabled = !busy;
