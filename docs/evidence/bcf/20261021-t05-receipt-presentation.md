@@ -1,6 +1,6 @@
 # BCF-T05 — guarded receipt List/Detail presentation
 
-**Date:** 2026-10-21. **Status:** IMPLEMENTED / focused verification PASS for all runnable cases; six strict wide native125 capture rows remain NOT TESTED. Full BCF/Owner acceptance remains OPEN. **Baseline:** `1ec4703944f15cd01554c821903468ea5b9800ab`, isolated branch `codex/bcf-t00-native-lookup-proof`. [Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md), [design](../../BUSINESS_COMPACT_REFINEMENT.md), [acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md).
+**Date:** 2026-10-21. **Status:** IMPLEMENTED / focused verification PASS for all runnable cases; six strict wide native125 capture rows remain NOT TESTED. Full BCF/Owner acceptance remains OPEN. **Baseline:** `1ec4703944f15cd01554c821903468ea5b9800ab`, isolated branch `codex/bcf-t00-native-lookup-proof`. [Plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md), [design](../../BUSINESS_COMPACT_REFINEMENT.md), [acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md).
 
 ## Implemented boundary
 

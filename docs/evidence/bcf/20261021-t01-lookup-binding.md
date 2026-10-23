@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-21 (Asia/Bangkok). **Outcome:** T01 COMPLETE / hosted Windows GREEN. Final affected selection: **172 discovered, 172 executed, 172 passed**, no skipped, failed, aborted or timed-out rows. T02 remains OPEN; native100/125 Light/Dark, attended observations, package and visual acceptance are not granted by this checkpoint.
 
-[Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Immutable T00 RED proof](20261021-t00-native-typing.md)
+[Plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Immutable T00 RED proof](20261021-t00-native-typing.md)
 
 ## Source, environment and scope
 

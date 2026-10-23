@@ -1,6 +1,6 @@
 # SAL-T06 — reviewed Local/session/ViewModels checkpoint
 
-Date: 2026-10-22. Development `codex/sal-direct-sales`; planning `v1a-pro`. Source/test commit `5fbd6f5c3022ccb05c770648e4967747d73602fa`, direct parent/review BASE `b1683af8deb1dc61ea720a45f73bf7a3f562a2ad`, product predecessor `f9149a6a7ca35d26163fac0745101774246891a7`. Planning baseline remains `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. T06 is COMPLETE in its bounded Local/API/VM scope; [execution index](../../plans/README.md) records T07 IN PROGRESS, T08 NOT STARTED. Native UI/frozen package/Login/attended/Owner and operational release acceptance remain open. This development checkpoint is not deployable.
+Date: 2026-10-22. Development `codex/sal-direct-sales`; planning `v1a-pro`. Source/test commit `5fbd6f5c3022ccb05c770648e4967747d73602fa`, direct parent/review BASE `b1683af8deb1dc61ea720a45f73bf7a3f562a2ad`, product predecessor `f9149a6a7ca35d26163fac0745101774246891a7`. Planning baseline remains `35ba2e8a3f37fb07095701eb94f4b56f7941c491`. T06 is COMPLETE in its bounded Local/API/VM scope; [execution index](../../archive/20261023-pre-ui-next/plans/README.md) records T07 IN PROGRESS, T08 NOT STARTED. Native UI/frozen package/Login/attended/Owner and operational release acceptance remain open. This development checkpoint is not deployable.
 
 ## Approved candidate and source boundary
 

@@ -2,7 +2,7 @@
 
 **Registered:** 2026-10-21. These are the three original design images supplied by the owner during PR #40 review and selected for the BCF follow-up. Files are copied byte-for-byte; the repository names are stable and Markdown-safe.
 
-[Active plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md)
+[Active plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md)
 
 ## Reference register
 

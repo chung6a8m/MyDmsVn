@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-21 (Asia/Bangkok). **Outcome:** T00 COMPLETE as a test-only RED checkpoint. Product repair T01 is NOT STARTED; T02 remains OPEN. A01–A03 are failing baseline obligations, not acceptance PASS. No visual or production release acceptance is implied.
 
-[Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md)
+[Plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md)
 
 ## Scope and immutable baseline
 

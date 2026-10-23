@@ -1,5 +1,7 @@
 # Proposed input and inline-editing contracts
 
+> Historical assessment — 2026-10-22. Scheduling/proposal status below is preserved for that date. The [2026-10-23 active roadmap](20261023-active-roadmap.md) now selects the bounded work, and its refreshed baseline supersedes old T08/R4 status summaries. These source findings do not imply new runtime verification.
+
 **Date:** 2026-10-22  
 **Status:** Design recommendations; no API or implementation commitment  
 **Context:** [Assessment](20261022-ui-foundation-assessment.md) · [Baseline](README.md)

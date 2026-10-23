@@ -2,7 +2,7 @@
 
 > Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCF only; BCI is completed history, and this record does not certify the new lookup/visual obligations or schedule retired plans.
 
-**Source baseline:** `6383289a2e43e2021abd65048a1e2f3f3838324e`, reviewed 2026-10-18. All six owners target `net48`. This is a source inventory, not executed discovery or SQL acceptance. [Verification and comparison protocol](RESPAWN_VERIFICATION.md); [active plan](plans/20261018-002-respawn-fixture-reuse.md).
+**Source baseline:** `6383289a2e43e2021abd65048a1e2f3f3838324e`, reviewed 2026-10-18. All six owners target `net48`. This is a source inventory, not executed discovery or SQL acceptance. [Verification and comparison protocol](RESPAWN_VERIFICATION.md); [active plan](archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md).
 
 ## Reading the map
 

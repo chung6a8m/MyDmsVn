@@ -1,9 +1,9 @@
 # Business Compact UI and inline Goods Receipt design
 
-> **Completed historical baseline — 2026-10-21:** BCI was accepted in its recorded UI scope and merged through PR #40 (`6040d7b`). Current work is [BCF — lookup correctness and visual parity](plans/20261021-001-business-compact-lookup-and-visual-parity.md). Original planning/source references, outcomes and exceptions below remain historical; they do not establish a new BCF PASS.
+> **Completed historical baseline — 2026-10-21:** BCI was accepted in its recorded UI scope and merged through PR #40 (`6040d7b`). Current work is [BCF — lookup correctness and visual parity](archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md). Original planning/source references, outcomes and exceptions below remain historical; they do not establish a new BCF PASS.
 
 **Direction:** approved; frozen Business Compact UI acceptance is COMPLETE / OWNER ACCEPTED on 2026-10-21. The acceptance ledger records the completed T00 proof, T01 scalar parser, T02 projection/session foundation, T03 control-integration and T04 editable native-accessibility scopes. T04 includes a focused clean-package probe; T05 compact layout has hosted native 100%/125% evidence ([record](BUSINESS_COMPACT_ACCEPTANCE.md#86-bci-t05-business-compact-layout--2026-10-20)). T06 completes frozen UI/package acceptance; [final signed scope](BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21) records the accepted candidate and limitations. Operational release prerequisites remain unaccepted/unscheduled.
-**Plan:** [BCI execution plan](plans/20261020-001-business-compact-inline-goods-receipt.md).
+**Plan:** [BCI execution plan](archive/20261023-pre-ui-next/plans/20261020-001-business-compact-inline-goods-receipt.md).
 **Acceptance:** [Business Compact acceptance](BUSINESS_COMPACT_ACCEPTANCE.md).
 **Planning source baseline:** `v1a-pro` at `f37038b250821a538b9cdc10a6d6d8b4bc1f386f` (2026-10-20).
 This specification introduces no runtime PASS, completed implementation task, or production-release approval.

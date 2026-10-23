@@ -47,4 +47,4 @@ dotnet test tests/MyDmsVn.Architecture.Tests -c Release -f net48 --no-restore --
 - Final Architecture TRX SHA-256: `db886550bf66df44a9dcb4f18be583c1419ae8ccd54a3ab7133e2b32cacfd703`.
 - Original failures/discovery/command log remain local; no raw TRX, connections or SQL identifiers are committed. Diff/encoding checks passed. No SQL/GUI resources were allocated in T00.
 
-T01 is next in the [serial plan](../../plans/20261021-002-direct-sales-and-moving-average-costing.md). [SAL acceptance](../../DIRECT_SALES_ACCEPTANCE.md) remains open for all required multi-task portions and frozen T08/Owner disposition. This development checkpoint is not deployable; operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
+T01 is next in the [serial plan](../../archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md). [SAL acceptance](../../DIRECT_SALES_ACCEPTANCE.md) remains open for all required multi-task portions and frozen T08/Owner disposition. This development checkpoint is not deployable; operational release prerequisites remain UNACCEPTED / UNSCHEDULED.

@@ -1,6 +1,6 @@
 # Diagnostics, security audit và troubleshooting cho Local Mode v1
 
-**Hiện trạng:** `v1a-pro`, cập nhật 2026-10-21. Host active `MyDmsVn.Desktop.App` (`net48`/x86), AppCore (`net8.0-windows`) parked. SEC-REBUILD/RESP/L2DB và [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) đã hoàn thành trong phạm vi được nghiệm thu. BCI đã triển khai/nghiệm thu trong phạm vi UI lịch sử. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) đã COMPLETE / OWNER ACCEPTED trong [phạm vi và ngoại lệ cuối](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); [điều kiện diagnostics/recovery/release](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**. [HISTORY](HISTORY.md) giữ nguồn lịch sử.
+**Hiện trạng:** `v1a-pro`, cập nhật 2026-10-21. Host active `MyDmsVn.Desktop.App` (`net48`/x86), AppCore (`net8.0-windows`) parked. SEC-REBUILD/RESP/L2DB và [GUI-P5](archive/20261023-pre-ui-next/plans/20261019-001-full-winforms-gui-p5-acceptance.md) đã hoàn thành trong phạm vi được nghiệm thu. BCI đã triển khai/nghiệm thu trong phạm vi UI lịch sử. [BCF](archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) đã COMPLETE / OWNER ACCEPTED trong [phạm vi và ngoại lệ cuối](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); [điều kiện diagnostics/recovery/release](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**. [HISTORY](HISTORY.md) giữ nguồn lịch sử.
 
 ## Log và retention
 

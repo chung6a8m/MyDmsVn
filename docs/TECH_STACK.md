@@ -1,8 +1,8 @@
 # Technical stack and compatibility baseline
 
-**Current cutover:** L2DB-T00–T07 on net48 accepted in plan scope on 2026-10-19 ([T07 evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); RESP, GUI-P5 and BCI are also implemented/accepted in their approved scopes. As of 2026-10-21, merged PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`, [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED and merged through PR #41 in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); runtime/API/schema remain unchanged. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. Historical evidence retains its original provider/revision.
+**Current baseline:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (includes merged PR #43 and the migrated assessment), refreshed 2026-10-23. [UI-NEXT](ui-next/20261023-active-roadmap.md) is the sole active roadmap with all implementation tasks NOT STARTED. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves prior evidence and excludes unfinished work without waiving it. Production release prerequisites remain [UNACCEPTED / UNSCHEDULED](DEFERRED_WORK.md#release-prerequisites).
 
-[SAL](DIRECT_SALES.md) is the sole ACTIVE successor, NOT IMPLEMENTED. It retains these runtime/provider/vendor pins and uses existing LINQ to DB 6.3.0. The planned fixed-point valuation arithmetic uses net48 `System.Numerics.BigInteger` with an explicit assembly reference, not a framework upgrade. Schema10 and new Sales contracts are approved work under [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md); no dependency upgrade is required by this documentation PR.
+Sales, schema10 and fixed-point valuation are implemented using the existing net48/provider graph; valuation uses `System.Numerics.BigInteger`, not a framework upgrade. [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) remains the architecture decision. [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`, with candidate-specific runnable automation PASS and native125/attended/Owner acceptance OPEN. UI-NEXT proposes narrow UI infrastructure changes; it does not upgrade the runtime, SQL provider or dependencies by documentation alone.
 
 ## Runtime matrix
 
@@ -15,7 +15,7 @@
 | Historical modern product/SQL/GUI cases | `PARKED / NOT RUN`; no current modern product coverage is claimed. |
 | HTTP v2 and modern product runtime | Out of scope; requires a separate runtime decision and new approved plan before implementation. |
 
-The user retains the repository's current net48 profile. Neither [RESP](plans/20261018-002-respawn-fixture-reuse.md) nor [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) restores net8 product targets or upgrades to .NET 10. Windows verification requires the .NET Framework 4.8 developer targeting pack, the existing .NET 8 SDK for tooling and the repository's pinned source dependencies. [ADR 0008](adr/0008-temporary-net8-target-pause.md) records the runtime pause; [HISTORY](HISTORY.md) retains historical acceptance and the unmeasured duration comparison. No speedup is inferred from that waiver.
+The user retains the repository's current net48 profile. Neither [RESP](archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md) nor [L2DB](archive/20261023-pre-ui-next/plans/20261018-001-linq2db-net48-persistence-migration.md) restores net8 product targets or upgrades to .NET 10. Windows verification requires the .NET Framework 4.8 developer targeting pack, the existing .NET 8 SDK for tooling and the repository's pinned source dependencies. [ADR 0008](adr/0008-temporary-net8-target-pause.md) records the runtime pause; [HISTORY](HISTORY.md) retains historical acceptance and the unmeasured duration comparison. No speedup is inferred from that waiver.
 
 ## Current packages and application architecture
 
@@ -55,7 +55,7 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 
 ## Test configuration and verification
 
-[Test policy](TEST_POLICY.md) defines focused task scope and broader SQL/final milestones. Run test projects directly and preserve the local allocation/cleanup guards. Mandatory SQL acceptance with missing configuration, Windows or targeting resources is `BLOCKED / NOT RUN`, not PASS; a skipped optional/local diagnostic is not mandatory coverage.
+[Test policy](TEST_POLICY.md) and [UI-NEXT validation](ui-next/20261023-validation-and-handoff.md) define focused task scope and dependency-based broadening; archived integration gates are not inherited. Run test projects directly and preserve the local allocation/cleanup guards. Mandatory SQL acceptance with missing configuration, Windows or targeting resources is `BLOCKED / NOT RUN`, not PASS; a skipped optional/local diagnostic is not mandatory coverage.
 
 `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` explicitly identifies the designated non-production SQL instance and `master` catalog. The local IntegrationTests helper validates the live allocation before drop. There is no approval-file or external runner requirement. The product migrator instead requires an explicit application database and rejects system databases. Never confuse these configurations, print credentials or silently fall back to a developer/production database.
 
@@ -63,4 +63,4 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 
 Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; RESP and L2DB-T00–T07 have scoped evidence; broader release acceptance remains deferred.
 
-Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or pins within RESP/L2DB/BCF.
+Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or unrelated pins within UI-NEXT.

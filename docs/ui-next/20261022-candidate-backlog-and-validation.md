@@ -1,9 +1,11 @@
 # Candidate backlog and validation for the SME UI foundation
 
+> Historical assessment — 2026-10-22. Scheduling/proposal status below is preserved for that date. The [2026-10-23 active roadmap](20261023-active-roadmap.md) now selects the bounded work, and its refreshed baseline supersedes old T08/R4 status summaries. These source findings do not imply new runtime verification.
+
 **Date:** 2026-10-22  
 **Status:** PROPOSED CANDIDATES — not scheduled, not active, not implemented by this assessment
 
-Read the [baseline/index](README.md), [source assessment](20261022-ui-foundation-assessment.md), and [input contracts](20261022-input-and-inline-editing-contracts.md). The current [SAL execution index](../plans/README.md) remains authoritative. Priority below expresses relative value once a work package is selected; it does not authorize interrupting the current SAL queue.
+Read the [baseline/index](README.md), [source assessment](20261022-ui-foundation-assessment.md), and [input contracts](20261022-input-and-inline-editing-contracts.md). The current [SAL execution index](../archive/20261023-pre-ui-next/plans/README.md) remains authoritative. Priority below expresses relative value once a work package is selected; it does not authorize interrupting the current SAL queue.
 
 ## 1. Recommended order
 

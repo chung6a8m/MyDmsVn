@@ -4,7 +4,7 @@
 
 **Status: COMPLETE / OWNER ACCEPTED — baseline49/49 and supplemental24/24 observations PASS; REMAIN-P5-GUI-01 PASS. Owner signature recorded2026-10-19. T05/T06/overallP5/P6 remain OPEN.**
 
-**Plan:** [GUI-P5-T04](plans/20261019-001-full-winforms-gui-p5-acceptance.md#gui-p5-t04--remain-p5-gui-01-attended-cataloglookup-sign-off). **Prepared:** 2026-10-19 (Asia/Bangkok), Codex; documentation base `f33a959`. This is an operator worksheet for actual installed Login-first use. [T03 automated results](GUI_P5_VERIFICATION.md#final-frozen-candidate--gui-p5-t03) remain separate and are not counted as attended passes.
+**Plan:** [GUI-P5-T04](archive/20261023-pre-ui-next/plans/20261019-001-full-winforms-gui-p5-acceptance.md#gui-p5-t04--remain-p5-gui-01-attended-cataloglookup-sign-off). **Prepared:** 2026-10-19 (Asia/Bangkok), Codex; documentation base `f33a959`. This is an operator worksheet for actual installed Login-first use. [T03 automated results](GUI_P5_VERIFICATION.md#final-frozen-candidate--gui-p5-t03) remain separate and are not counted as attended passes.
 
 ## Original candidate and preparation evidence (historical02eff22)
 

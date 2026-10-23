@@ -2,7 +2,7 @@
 
 **Status: COMPLETE / OWNER ACCEPTED — 2026-10-21, within the final bounded scope below.** Automated matrices, failed trials, attended observations and explicit exceptions remain separately attributed. Historical T02 attended reports remain candidate-specific. Operational release prerequisites remain UNACCEPTED / UNSCHEDULED.
 
-[Plan](../../plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Original reference register](../../design-references/business-compact/README.md)
+[Plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Acceptance ledger](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [Original reference register](../../design-references/business-compact/README.md)
 
 ## Candidate and execution boundary
 

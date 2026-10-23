@@ -1,17 +1,17 @@
 # ADR 0011 — Direct sales and moving weighted average costing
 
 - **Date:** 2026-10-21
-- **Status:** Accepted design decision; bounded implementation checkpoints recorded (2026-10-22)
-- **Target/source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491` (PR #41)
-- **Scope:** Local net48 sales, inventory value and the SAL roadmap; not production release acceptance
+- **Status:** Accepted design decision; source implemented, execution queue archived (2026-10-23)
+- **Original decision baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491` (PR #41)
+- **Scope:** Local net48 sales and inventory value; source rules remain binding, with no production release acceptance
 
-Implementation note (2026-10-22): T00 foundations and [T01 schema/bootstrap checkpoint](../evidence/sal/20261022-t01-schema-bootstrap.md) are complete at `b5a2f3f` / `81e8aab`. The [T02 receipt/reconciliation/read checkpoint](../evidence/sal/20261022-t02-valued-inventory.md) is complete at `47165ded`; The [T03 Draft/detail checkpoint](../evidence/sal/20261022-t03-sales-draft.md) is complete at `1164199`; [T04 atomic Sales Post](../evidence/sal/20261022-t04-atomic-sales-post.md) is complete at `7eeafa4`; [T05 keyset queries](../evidence/sal/20261022-t05-sales-keyset-queries.md) are complete at `f9149a6`; [T06 Local/session/ViewModels](../evidence/sal/20261022-t06-local-session-viewmodels.md) is complete at `5fbd6f5`; T07 source is implemented at `879ab7b` ([bounded native100 evidence](../evidence/sal/20261022-t07-native-sales-workspace.md)); full T07 remains IN PROGRESS / OPEN with native125 RESOURCE BLOCKED and R4 deferred Minor; T08 is NOT STARTED in the unchanged serial queue. T04 completes the receipt/sale/reconciliation source protocol; coherent deployment, later workflows and SAL-T08/Owner acceptance remain incomplete. T01 is not deployable. The decision and baseline context below remain historical.
+Archive note (2026-10-23): Sales/schema10, shared receipt/sale/reconciliation valuation, keyset queries and Local/WinForms source are merged at `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (PR #43). R3/R4 source fixes were reviewed/approved at `f5039cb`. [T08 integration evidence](../evidence/sal/20261021-t08-integrated-acceptance.md) records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific core/SQL/package/native100 runnable automation PASS. Native125, attended observations and dated Owner acceptance remain OPEN.
 
-T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](../evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. Native UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
+The [archive boundary](../archive/20261023-pre-ui-next/README.md) retires the SAL queue and excludes its unfinished work from the new [UI-NEXT roadmap](../ui-next/20261023-active-roadmap.md), without completing or waiving it. This ADR's accepted business/transaction rules remain binding. The original decision context below describes the pre-SAL schema9 baseline, not current source.
 
 ## Context
 
-The current application records Goods Receipts, positive quantity movements and quantity balances under schema9. Customers are a catalog without a sales workflow. The Owner selected direct sales receipts, manually entered prices, duplicate Product lines, gift lines and cost tracking. Payments, debt and returns are excluded. The list must add Product filtering, prefer LINQ over SQL strings and use keyset pagination.
+At the decision baseline, the application recorded Goods Receipts, positive quantity movements and quantity balances under schema9. Customers were a catalog without a sales workflow. The Owner selected direct sales receipts, manually entered prices, duplicate Product lines, gift lines and cost tracking. Payments, debt and returns are excluded. The list must add Product filtering, prefer LINQ over SQL strings and use keyset pagination.
 
 The Owner selected moving weighted average from the costing options. This requires a persisted value pool and changes to receipt posting and reconciliation; adding only a negative quantity writer would not establish reliable cost. Existing append-only ledger, explicit UoW, rowversion, authorization and desktop session boundaries remain applicable.
 
@@ -50,6 +50,6 @@ There is no payment, receivable, return, tax, print, multi-unit, multi-currency,
 
 ## Implementation and validation
 
-The normative [business design](../DIRECT_SALES.md), [costing specification](../DIRECT_SALES_COSTING.md) and [query/UI specification](../DIRECT_SALES_QUERY_AND_UI.md) supply the details. [SAL-T00–T08](../plans/20261021-002-direct-sales-and-moving-average-costing.md) is the sole active roadmap; [SAL acceptance](../DIRECT_SALES_ACCEPTANCE.md) retains the initial NOT RUN baseline and now records the bounded T00/T01 evidence; full feature acceptance remains open.
+The normative [business design](../DIRECT_SALES.md), [costing specification](../DIRECT_SALES_COSTING.md) and [query/UI specification](../DIRECT_SALES_QUERY_AND_UI.md) retain the implemented rules. The [archived SAL plan](../archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md), [acceptance ledger](../DIRECT_SALES_ACCEPTANCE.md) and T08 evidence retain candidate-specific implementation/verification history and unresolved acceptance. They supply no active tasks. UI-NEXT uses its own [scoped validation and handoff](../ui-next/20261023-validation-and-handoff.md); it does not inherit the full SAL integration round or production release work.
 
 This ADR extends the inventory decision in [ADR 0004](0004-p5-ledger-and-posting.md) and preserves the current framework/provider decisions in [ADR 0009](0009-linq2db-local-net48-persistence.md). Check the ADR index for historical statuses. No product code or schema is implemented by accepting this document.

@@ -1,16 +1,10 @@
 # Application / Desktop API contracts
 
-**Status:** Current Local v1 contracts on active net48, refreshed 2026-10-18. RESP changes test lifecycle and L2DB changes persistence adapters; both preserve these observable behaviors. HTTP v2 remains deferred and will need a separately approved implementation/runtime plan.
+**Status:** Current Local v1 contracts on active net48, refreshed 2026-10-23 against merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. [UI-NEXT](ui-next/20261023-active-roadmap.md) is the sole active queue with all implementation tasks NOT STARTED. It preserves public business/transport shapes; proposed workspace/presenter services belong to desktop presentation layers. No WinForms control, vendor type or raw diagnostic is added to a DTO.
 
-T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. Native UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
+The [archive boundary](archive/20261023-pre-ui-next/README.md) retires old queues while retaining source contracts. [SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific runnable automation PASS; native125, attended observations and dated Owner acceptance remain OPEN. R3/R4 source fixes are reviewed/approved. That historical acceptance boundary is not inherited by UI-NEXT.
 
-Post accepts only SaleId and opaque expectedVersion. It returns authoritative status/time/newVersion before commit; a separately authorized Get loads full detail. AlreadyPosted precedes stale-Draft conflict after request-format validation. No postcommit detail fetch or implicit retry is introduced.
-
-T05 query checkpoint (2026-10-22, `f9149a6`): [reviewed evidence](evidence/sal/20261022-t05-sales-keyset-queries.md) records independently Read-authorized List, strict normalized-filter-bound cursors, typed LINQ Product membership and all-line slim totals, retained-endpoint two-way keyset paging, and page/aggregate/probe on one short owned SERIALIZABLE transaction. Navigation is live across requests; the cursor grants no authority. Native UI and frozen T08/package/Owner acceptance remain open.
-
-T06 Local/VM checkpoint (2026-10-22, `5fbd6f5`): [reviewed evidence](evidence/sal/20261022-t06-local-session-viewmodels.md) records all five session-bound Sales API operations, atomic list snapshots and bounded recovery, guarded stable line/editor models, independent Post permission and shared exact preview. Original-owner binding rejects replacement-user service admission; it does not promise zero API method attempts or UI-thread serialization. Denied Post reload hides protected presentation while retaining private same-owner recovery identity. Native control/raw-buffer/UI, frozen T08/package/Owner and release acceptance remain open.
-
-T07 source (`879ab7b`) wires native buffers to the T06 contracts without changing a public transport contract. The Sales List SetAccess(bool) seam controls UI admission only: no restored DTOs, automatic query or actor rebinding. [Bounded native100 evidence](evidence/sal/20261022-t07-native-sales-workspace.md) separates tested candidate3 from final candidate4's one EOF CRLF removal. Full T07 stays IN PROGRESS / OPEN with native125 RESOURCE BLOCKED and R4 deferred Minor; T08 is NOT STARTED.
+Post accepts only SaleId and opaque expectedVersion. It materializes authoritative status/time/newVersion before commit; a separately authorized Get loads full detail. AlreadyPosted precedes stale-Draft conflict after request-format validation. No postcommit detail fetch or implicit retry is introduced. Sales List uses independently Read-authorized filter-bound keyset cursors and a short owned transaction; a cursor grants no authority. Session-bound Local admission, guarded raw buffers and recovery state retain their existing actor/document lifetime semantics.
 
 ## Purpose
 
@@ -24,7 +18,7 @@ Save carries ordered independent lines with SaleLineId (0 for new), ProductId, Q
 
 `SalesReceiptListRequest`/`SalesReceiptListPage` form a separate cursor contract: optional date/customer/warehouse/employee/status/Product/search, bounded PageSize and validated Cursor; slim Items plus nullable NextCursor/PreviousCursor. Use unique SaleId DESC and Product Any; totals cover all receipt lines. No PageNumber, required TotalCount or reuse of the existing PagedResult offset contract. Cursor encoding is not authorization. Existing catalog/receipt/stock paging remains unchanged unless explicitly extended by SAL.
 
-T02 implements the inventory read extension under existing Inventory read keys ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). `StockBalanceRow` constructors require `InventoryValue` and nullable `AverageUnitCost` (null at Q0, checked round8(V/Q) otherwise); `StockCardRow` requires `ValueChange` and resolves SalesReceipt `SaleNo`. Queries reject invalid Q/V/average or a missing valuation companion. Existing COUNT/OFFSET paging is preserved. Reconciliation retains key-presence fields and adds ledger/balance values and Issues; T04 now implements Sales Post through the same transaction-owned coordinator. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) supplies new compatibility obligations.
+T02 implements the inventory read extension under existing Inventory read keys ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). `StockBalanceRow` constructors require `InventoryValue` and nullable `AverageUnitCost` (null at Q0, checked round8(V/Q) otherwise); `StockCardRow` requires `ValueChange` and resolves SalesReceipt `SaleNo`. Queries reject invalid Q/V/average or a missing valuation companion. Existing COUNT/OFFSET paging is preserved. Reconciliation retains key-presence fields and adds ledger/balance values and Issues; T04 now implements Sales Post through the same transaction-owned coordinator. [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) retains the historical compatibility evidence and unresolved acceptance boundary.
 
 ## Implemented result envelope
 
@@ -63,18 +57,21 @@ Validation detail example: `{ "code": "Validation.Required", "message": "Quantit
 
 For multiple failures, choose a deterministic aggregate code/status policy (all validation => ValidationError; mixed types => mapped dominant safe status) and retain details. Never select a status only from arbitrary enumeration order.
 
+UI-NEXT proposes filling safe existing field metadata for catalog code conflicts and mapping fields/cells consistently in the desktop; it does not change the envelope shape. At this baseline, code conflicts can still lack field metadata. A fieldless safe error must remain visible instead of disappearing from a field-only presenter. Session/authorization details and unexpected exceptions retain the current redaction policy.
+
 ## Desktop client APIs
 
 Current interfaces include:
 
 - `IProductApiClient`, `IWarehouseApiClient`, `IEmployeeApiClient`, `ICustomerApiClient`.
 - `IGoodsReceiptApiClient`: `CreateDraftAsync`, `UpdateDraftAsync`, `PostAsync`, `GetAsync`, `ListAsync`.
+- `ISalesReceiptApiClient`: session-bound CreateDraft, UpdateDraft, Post, Get and List operations; cursor paging remains separate from existing offset contracts.
 - `IInventoryApiClient`: `GetStockBalancesAsync`, `GetStockCardAsync`.
 - `IIdentityApiClient`: `LoginAsync` / `GetCurrentUserAsync` for authenticated identity and the existing desktop session boundary.
 - `IPermissionApiClient` and `IPermissionCatalogApiClient`: current permission decisions and the code-defined catalog.
 - `ISecurityAdministrationApiClient`: user/role lists, authorized mutation and permission-import preview/apply; protected-account maintenance is outside the client API.
 
-Each call is async and accepts `CancellationToken`. Commands have DTO request and typed response; queries return paginated DTOs with total count and deterministic sort where appropriate.
+Each call is async and accepts `CancellationToken`. Commands have DTO request and typed response; queries return their source-defined paging DTOs. Existing offset lists retain total counts; Sales uses its separate cursor-page contract without a mandatory count.
 
 The current catalog clients expose Create, Update, SetActive, List, Get and Lookup operations. List queries accept `CatalogListRequest`, sort by Code then stable ID, and return total-count paging. Lookup queries accept `CatalogLookupRequest`, return the shared `CatalogLookupDto`, and include active rows only; Get/List may still return inactive rows when requested so historical selections can be displayed. List and Lookup search text is optional, limited to 256 characters and must not contain the NUL character; catalog Code and Name values (plus Product Unit) also reject NUL on Create and Update. Invalid input returns a validation response before database access. An Update response is loaded through the command repository inside the same transaction as the write and is materialized before commit, so it preserves the persisted `IsActive` value without a fallible post-commit read. Catalog adapters remove the internal MediatR `Request` wrapper segment when mapping validation details, so fields remain relative to the public DTO (`search`, `code`, and so on). Local adapters dispatch the matching Application request and map its typed result into `ApiResponse<T>` without exposing Domain entities, persistence-provider objects or SQL exceptions.
 
@@ -108,4 +105,4 @@ Preserve or extend source-owned golden JSON and behavior fixtures for:
 - decimal quantities and UTC timestamps,
 - current catalog, receipt, inventory and security/import DTOs.
 
-The completed RESP/L2DB/GUI-P5/BCI/BCF plans retain candidate-specific Local behavior evidence; the retired REL plan is not active. SAL must add and verify its new Local contracts without treating those historical results as current acceptance. A future approved HTTP adapter must run the same behavior/response assertions against Local and HTTP. A contract breaking change requires versioning or an ADR. [TEST_POLICY](TEST_POLICY.md) selects execution scope; this coverage reference does not require a full suite after every change.
+The completed RESP/L2DB/GUI-P5/BCI/BCF plans retain candidate-specific Local behavior evidence; the retired REL plan is not active. UI-NEXT must preserve the implemented Local contracts and verify affected metadata/presentation boundaries without treating historical results as current acceptance. A future approved HTTP adapter must run the same behavior/response assertions against Local and HTTP. A contract breaking change requires versioning or an ADR. [TEST_POLICY](TEST_POLICY.md) selects execution scope; this coverage reference does not require a full suite after every change.
