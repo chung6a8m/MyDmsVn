@@ -79,7 +79,7 @@ public sealed class SalesReceiptControlAdmissionTests
                 Assert.False(control.SaleDateEditor.Enabled); Assert.False(control.NoteEditor.Enabled); Assert.False(control.SearchBox.Enabled);
                 Assert.False(control.FromDateEditor.Enabled); Assert.False(control.ToDateEditor.Enabled); Assert.False(control.StatusFilter.Enabled); Assert.False(control.PageSizeEditor.Enabled);
                 foreach (var lookup in new[] { control.CustomerLookup, control.WarehouseLookup, control.EmployeeLookup }) { lookup.Text = "blocked query"; lookup.SelectValue(8); }
-                control.SaleDateEditor.Value = date.AddDays(1); control.NoteEditor.Text = "blocked note";
+                control.SaleDateEditor.ProjectAcceptedValue(date.AddDays(1)); control.NoteEditor.Text = "blocked note";
                 host.CallTask("SaveAsync"); host.CallTask("PostAsync");
                 Assert.Equal(1, host.Editor.CustomerId); Assert.Equal(2, host.Editor.WarehouseId); Assert.Equal(3, host.Editor.EmployeeId); Assert.Equal(date, host.Editor.SaleDate); Assert.Equal(note, host.Editor.Note);
                 Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);

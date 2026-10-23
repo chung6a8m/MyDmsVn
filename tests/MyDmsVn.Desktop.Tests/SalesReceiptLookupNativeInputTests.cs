@@ -151,7 +151,7 @@ public sealed class SalesReceiptLookupNativeInputTests
                     var lookup = (BootstrapLookupBox)typeof(SalesReceiptControl).GetProperty(name)!.GetValue(control)!;
                     Assert.False(lookup.Enabled); lookup.Text = "blocked"; lookup.AccessibilityObject.Value = "blocked accessibility"; lookup.SelectValue(8);
                 }
-                Assert.False(control.SaleDateEditor.Enabled); Assert.False(control.NoteEditor.Enabled); control.SaleDateEditor.Value = date.AddDays(1); control.NoteEditor.Text = "blocked"; control.NoteEditor.AccessibilityObject.Value = "blocked accessibility";
+                Assert.False(control.SaleDateEditor.Enabled); Assert.False(control.NoteEditor.Enabled); control.SaleDateEditor.ProjectAcceptedValue(date.AddDays(1)); control.NoteEditor.Text = "blocked"; control.NoteEditor.AccessibilityObject.Value = "blocked accessibility";
                 var gift = control.LineGrid.AccessibilityObject.GetChild(1)!.GetChild(5)!; Assert.Throws<InvalidOperationException>(() => gift.Value = "true");
                 host.Wait(control.SaveAsync()); host.Wait(control.PostAsync()); host.Pump();
                 Assert.Equal(counts, names.Select(host.Calls).ToArray()); Assert.Equal(1, control.Editor.CustomerId); Assert.Equal(2, control.Editor.WarehouseId); Assert.Equal(3, control.Editor.EmployeeId); Assert.Equal(date, control.Editor.SaleDate); Assert.Equal(note, control.Editor.Note); Assert.False(control.Editor.Lines.Single().IsGift);

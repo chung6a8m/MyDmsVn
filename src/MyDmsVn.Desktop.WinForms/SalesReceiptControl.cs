@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms.Features.Security;
@@ -72,7 +73,11 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         WarehouseFilterLookup = BindLookup("Filter by warehouse", lookupFactory(CatalogKind.Warehouse), true, null);
         EmployeeFilterLookup = BindLookup("Filter by employee", lookupFactory(CatalogKind.Employee), true, null);
         ProductFilterLookup = BindLookup("Filter by product", lookupFactory(CatalogKind.Product), true, null);
-        SaleDateEditor = new BootstrapDatePicker { AccessibleName = "Sale date", Dock = DockStyle.Top };
+        SaleDateEditor = new BootstrapDateInput
+        {
+            AccessibleName = "Sale date", Dock = DockStyle.Top,
+            Profile = new DateInputProfile(false, DateTimePicker.MinimumDateTime, DateTimePicker.MaximumDateTime)
+        };
         NoteEditor = new BootstrapTextBox { AccessibleName = "Note", Dock = DockStyle.Top };
         SearchBox = new BootstrapTextBox { AccessibleName = "Search sales receipts", Width = 220 };
         FromDateEditor = new DateTimePicker { AccessibleName = "From date", ShowCheckBox = true, Checked = false, Format = DateTimePickerFormat.Short, Width = 130 };
@@ -116,7 +121,8 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         AppliedCriteriaLabel = new Label { AutoSize = true, AccessibleName = "Applied sales filters" };
         _errors = new ErrorProvider { ContainerControl = this, BlinkStyle = ErrorBlinkStyle.NeverBlink };
         CreateLayout(); BusinessCompactAppearance.Apply(this);
-        SaleDateEditor.ValueChanged += (_, __) => { if (!_applying && CanEditHeader) Editor.SaleDate = SaleDateEditor.Value; };
+        SaleDateEditor.ValueChanged += (_, __) => { if (!_applying && CanEditHeader && SaleDateEditor.Value.HasValue) Editor.SaleDate = SaleDateEditor.Value.Value; };
+        SaleDateEditor.PendingTextChanged += (_, __) => { if (!_applying) ApplyState(); };
         NoteEditor.TextChanged += (_, __) => { if (!_applying && CanEditHeader) Editor.Note = NoteEditor.Text; };
         SearchBox.TextChanged += PendingFilterChanged; FromDateEditor.ValueChanged += PendingFilterChanged;
         ToDateEditor.ValueChanged += PendingFilterChanged; StatusFilter.SelectedValueChanged += PendingFilterChanged; PageSizeEditor.ValueChanged += PendingFilterChanged;
@@ -137,7 +143,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     public BootstrapLookupBox WarehouseFilterLookup { get; }
     public BootstrapLookupBox EmployeeFilterLookup { get; }
     public BootstrapLookupBox ProductFilterLookup { get; }
-    public BootstrapDatePicker SaleDateEditor { get; }
+    public BootstrapDateInput SaleDateEditor { get; }
     public BootstrapTextBox NoteEditor { get; }
     public BootstrapTextBox SearchBox { get; }
     public DateTimePicker FromDateEditor { get; }
@@ -194,6 +200,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         if (!_read || Busy || !CanLeaveDetail()) return;
         CancelBoundary(); _list.Select(id); await Editor.LoadAsync(id, token);
         if (!Current || Editor.SaleId != id || Editor.IsAccessDenied) return;
+        BeginSaleDateSession();
         _hasDetail = true; WorkspaceMode = ReceiptWorkspaceMode.Detail; ApplyState();
     }
     public Task SaveAsync()
@@ -226,6 +233,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         CancelBoundary(advanceDocument: false);
         var sink = FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-reload", WorkspaceOperationKind.Query));
         await Editor.ReloadOutcomeAsync(_lifetime.Token);
+        if (Current && !Editor.RequiresPostOutcomeReload && !Editor.IsAccessDenied && Editor.Error == null) BeginSaleDateSession();
         if (resolving && Current && !Editor.RequiresPostOutcomeReload && Editor.Error == null) sink.ClearActionable();
     }
     private async Task ReviewCreateAsync(long id)
@@ -233,6 +241,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         if (!Current || Busy || !Editor.RequiresCreateOutcomeReview) return;
         var sink = FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-create-review", WorkspaceOperationKind.Query));
         await Editor.ResolveCreateOutcomeAsync(id, _lifetime.Token);
+        if (Current && !Editor.RequiresCreateOutcomeReview && !Editor.IsAccessDenied && Editor.Error == null) BeginSaleDateSession();
         if (Current && !Editor.RequiresCreateOutcomeReview && Editor.Error == null) sink.ClearActionable();
     }
     private Task RefreshAsync() => WorkspaceMode == ReceiptWorkspaceMode.Detail ? ReloadAsync() : _list.RefreshAsync(_lifetime.Token);
@@ -247,6 +256,14 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
                 if (!Current || Busy || !_read || Editor.IsAccessDenied || WorkspaceMode != ReceiptWorkspaceMode.Detail || token.IsCancellationRequested) return;
                 var pending = _lookups.FirstOrDefault(binding => !binding.Filter && binding.Control.HasPendingText);
                 if (pending != null) { _message = "Choose a current header lookup result or cancel the pending query."; pending.Control.Focus(); ApplyState(); return; }
+                if (SaleDateEditor.HasPendingEdit && !SaleDateEditor.TryCommitPending())
+                {
+                    _message = "Enter a valid sale date (day/month/year).";
+                    SaleDateEditor.ValidationState = BootstrapValidationState.Invalid;
+                    ApplyState(); SaleDateEditor.Focus(); return;
+                }
+                SaleDateEditor.ValidationState = BootstrapValidationState.None;
+                if (_message == "Enter a valid sale date (day/month/year).") _message = null;
                 result = _inline.TryFinishEdit(intent == SalesCommandIntent.Save ? ReceiptEditIntent.Save : ReceiptEditIntent.Post);
                 // The adapter owns inline validation and clears it on cancel/commit.
                 // Do not overwrite independent operation feedback with a second error copy.
@@ -261,8 +278,8 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     {
         if (Busy || Editor.RequiresPostOutcomeReload || Editor.RequiresCreateOutcomeReview) return false;
         if (WorkspaceMode == ReceiptWorkspaceMode.List) return true;
-        if (Editor.IsDirty || _inline.HasPendingDataEdit)
-        { _message = "Save or cancel changes before leaving the sale."; ApplyState(); return false; }
+        if (Editor.IsDirty || _inline.HasPendingDataEdit || SaleDateEditor.HasPendingEdit)
+        { _message = "Save or cancel changes before leaving the sale."; ApplyState(); if (SaleDateEditor.HasPendingEdit) SaleDateEditor.Focus(); return false; }
         return _inline.TryFinishEdit(ReceiptEditIntent.ReturnToList);
     }
     internal bool TryShowReceiptList()
@@ -279,6 +296,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     {
         if (!_write || !CanLeaveDetail()) return;
         CancelBoundary(); if (!Editor.NewDraft()) return;
+        BeginSaleDateSession();
         _hasDetail = true; WorkspaceMode = ReceiptWorkspaceMode.Detail; ApplyState();
     }
     private void CancelBoundary(bool advanceDocument = true)
@@ -288,6 +306,11 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         _inline.CancelActiveEdit(); _products.Cancel();
         foreach (var binding in _lookups) { binding.ViewModel.Cancel(); binding.Control.CancelPendingEdit(); }
         _message = null;
+    }
+    private void BeginSaleDateSession()
+    {
+        SaleDateEditor.BeginEditSession(Editor.SaleDate);
+        SaleDateEditor.ValidationState = BootstrapValidationState.None;
     }
     private Task ApplyFiltersAsync()
     {
@@ -340,7 +363,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
             var detail = WorkspaceMode == ReceiptWorkspaceMode.Detail;
             _master.Visible = !detail; _detail.Visible = detail; _state.Visible = detail;
             _title.Text = detail ? (Editor.SaleId > 0 ? Editor.SaleNumber : "New sale") : "Sales receipts";
-            _state.Text = Editor.RequiresPostOutcomeReload ? "Reload required" : Editor.RequiresCreateOutcomeReview ? "Review Create outcome" : Busy ? "Working…" : Editor.IsDirty || _inline.HasPendingDataEdit ? "Unsaved changes" : Editor.SaleId > 0 ? "Saved · " + Editor.Status : "Not saved";
+            _state.Text = Editor.RequiresPostOutcomeReload ? "Reload required" : Editor.RequiresCreateOutcomeReview ? "Review Create outcome" : Busy ? "Working…" : Editor.IsDirty || _inline.HasPendingDataEdit || SaleDateEditor.HasPendingEdit ? "Unsaved changes" : Editor.SaleId > 0 ? "Saved · " + Editor.Status : "Not saved";
             BackToReceiptsButton.Visible = detail; OpenCurrentReceiptButton.Visible = !detail && _hasDetail;
             SaveButton.Visible = PostButton.Visible = ReloadButton.Visible = detail;
             SaveButton.Enabled = Editor.CanEdit && !Busy; PostButton.Enabled = _post && _read && !Editor.IsAccessDenied && !Busy && Editor.Status == "Draft" && !Editor.RequiresPostOutcomeReload && !Editor.RequiresCreateOutcomeReview;
@@ -353,7 +376,16 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
             SearchBox.Enabled = FromDateEditor.Enabled = ToDateEditor.Enabled = StatusFilter.Enabled = PageSizeEditor.Enabled = _read && !Busy;
             OutcomeSaleIdEditor.Enabled = _read && !Busy;
             OpenCurrentReceiptButton.Enabled = _read && !Busy && _hasDetail && !Editor.IsAccessDenied;
-            SaleDateEditor.Value = Editor.SaleDate; NoteEditor.Text = Editor.Note ?? "";
+            if (!_read || !Current)
+            {
+                if (SaleDateEditor.Value.HasValue || SaleDateEditor.HasPendingEdit) SaleDateEditor.ProjectAcceptedValue(null);
+            }
+            else if (SaleDateEditor.Value != Editor.SaleDate)
+            {
+                SaleDateEditor.ProjectAcceptedValue(Editor.SaleDate);
+                SaleDateEditor.ValidationState = BootstrapValidationState.None;
+            }
+            NoteEditor.Text = Editor.Note ?? "";
             SynchronizeLookup(CustomerLookup, Editor.CustomerId, Editor.CustomerDisplayName, Editor.CustomerIsActive);
             SynchronizeLookup(WarehouseLookup, Editor.WarehouseId, Editor.WarehouseDisplayName, Editor.WarehouseIsActive);
             SynchronizeLookup(EmployeeLookup, Editor.EmployeeId, Editor.EmployeeDisplayName, Editor.EmployeeIsActive);
@@ -492,7 +524,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         // Flip admission before notifications to avoid recursive denial propagation.
         _read = _write = _post = false;
         CancelBoundary(); _hasDetail = false;
-        Editor.SetAccess(false, false, false); _list.SetAccess(false); ApplyState();
+        Editor.SetAccess(false, false, false); _list.SetAccess(false); SaleDateEditor.ProjectAcceptedValue(null); ApplyState();
         if (Current)
         {
             FeedbackScope.Capture(FeedbackScope.BeginOperation("sale-access", WorkspaceOperationKind.Write))
@@ -510,7 +542,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     {
         FeedbackScope.Invalidate();
         _lifetime.Cancel();
-        Dispatch(() => { CancelBoundary(); _read = _write = _post = false; ApplyState(); });
+        Dispatch(() => { CancelBoundary(); _read = _write = _post = false; SaleDateEditor.ProjectAcceptedValue(null); ApplyState(); });
     }
     private void SetOperation(Task task) { LastOperation = Task.WhenAll(LastOperation, Observe(task)); }
     private async Task Observe(Task task)
