@@ -18,7 +18,7 @@ using Xunit;
 namespace MyDmsVn.Desktop.Tests;
 
 // Infrastructure for the existing GUI owner, never a SQL runner or product service.
-internal sealed class GuiSqlEnvironment : IDisposable
+internal sealed partial class GuiSqlEnvironment : IDisposable
 {
     private readonly SqlTestDatabase _database;
     private readonly string _administration;
@@ -30,6 +30,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
     private string _runtime = "";
     private string _migration = "";
     private string _oracle = "";
+    private int _expectedSchema = 10;
     private readonly string _resourceFile;
     public string OwnerPassword { get; } = Guid.NewGuid().ToString("N") + "aA9!";
     public const string OwnerUsername = "gui.p5.owner";
@@ -140,13 +141,13 @@ internal sealed class GuiSqlEnvironment : IDisposable
             "AND rp.PermissionKey=N'Catalog.Products.Write' AND up.Granted=0;"));
         Assert.Equal(1, await ScalarAsync<int>(_oracle,
             "SELECT COUNT(*) FROM dbo.Users WHERE NormalizedUsername=N'GUI.P5.DISABLED' AND IsActive=0;"));
-        foreach (var table in new[] { "Products", "GoodsReceipts", "GoodsReceiptLines", "StockLedger", "StockBalances" })
+        foreach (var table in new[] { "Products", "GoodsReceipts", "GoodsReceiptLines", "SalesReceipts", "SalesReceiptLines", "StockLedger", "StockValuationEntries", "StockBalances" })
             Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo." + table + ";"));
     }
 
     public async Task AssertNoInventoryAsync()
     {
-        foreach (var table in new[] { "GoodsReceipts", "GoodsReceiptLines", "StockLedger", "StockBalances" })
+        foreach (var table in new[] { "GoodsReceipts", "GoodsReceiptLines", "SalesReceipts", "SalesReceiptLines", "StockLedger", "StockValuationEntries", "StockBalances" })
             Assert.Equal(0, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo." + table + ";"));
     }
 
@@ -231,7 +232,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
 
     // Keep admission before the async state machine's SQL dependency/configuration work.
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private static async Task<GuiSqlEnvironment> CreateCoreAsync(string package)
+    private static async Task<GuiSqlEnvironment> CreateCoreAsync(string package, string? schema9Package = null)
     {
         var configured = Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable);
         if (string.IsNullOrWhiteSpace(configured)) throw new InvalidOperationException("BLOCKED: designated non-production master connection is missing.");
@@ -247,7 +248,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
             Directory.CreateDirectory(Path.GetDirectoryName(fixture._resourceFile)!);
             await fixture.CaptureAllocationAsync();
             fixture.Record("Allocated");
-            await fixture.ProvisionAsync(package, repository);
+            await fixture.ProvisionAsync(package, repository, schema9Package);
             return fixture;
         }
         catch (Exception initial)
@@ -259,7 +260,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
         }
     }
 
-    private async Task ProvisionAsync(string package, string repository)
+    private async Task ProvisionAsync(string package, string repository, string? schema9Package = null)
     {
         var migration = await CreateLoginAsync("migration");
         var runtime = await CreateLoginAsync("runtime");
@@ -271,7 +272,8 @@ internal sealed class GuiSqlEnvironment : IDisposable
         _runtime = Connection(runtime);
         _oracle = Connection(oracle);
 
-        var migrator = Path.Combine(package, "admin-migrator-net48-win-x86", "MyDmsVn.Server.DbMigrator.exe");
+        _expectedSchema = schema9Package == null ? 10 : 9;
+        var migrator = Path.Combine(schema9Package ?? package, "admin-migrator-net48-win-x86", "MyDmsVn.Server.DbMigrator.exe");
         var start = new ProcessStartInfo(migrator) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(migrator)! };
         PackagedGuiAcceptanceTests.ClearSqlEnvironment(start);
         start.EnvironmentVariables["MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING"] = _migration;
@@ -280,12 +282,15 @@ internal sealed class GuiSqlEnvironment : IDisposable
 
         var grants = File.ReadAllText(Path.Combine(repository, "deployment", "sql", "Provision-MyDmsVnPrincipals.sql"))
             .Replace("$(RuntimeUser)", runtime.Name).Replace("$(MigrationUser)", migration.Name);
+        if (_expectedSchema == 9)
+            grants = string.Join(Environment.NewLine, grants.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(line => !line.Contains("::dbo.SalesReceipt") && !line.Contains("::dbo.StockValuationEntries")));
         await ExecuteAsync(_database.ConnectionString, grants);
         await ExecuteAsync(_database.ConnectionString, "GRANT SELECT ON SCHEMA::dbo TO [" + oracle.Name + "];");
 
         // Invoke the shipped administrative bootstrap engine, with an in-memory secret.
         // Desktop still authenticates normally against the resulting protected binding.
-        var assembly = Assembly.LoadFrom(migrator);
+        var assembly = Assembly.LoadFrom(Path.Combine(package, "admin-migrator-net48-win-x86", "MyDmsVn.Server.DbMigrator.exe"));
         var type = assembly.GetType("MyDmsVn.Server.DbMigrator.SecurityProvisioning.SuperuserBootstrapEngine", true)!;
         var engine = Activator.CreateInstance(type, new BcryptPasswordHasher(10))!;
         await (Task<int>)type.GetMethod("BootstrapAsync")!.Invoke(engine,
@@ -341,7 +346,7 @@ internal sealed class GuiSqlEnvironment : IDisposable
             "SELECT COUNT(*) FROM sys.objects o INNER JOIN sys.schemas s ON o.schema_id=s.schema_id " +
             "WHERE o.is_ms_shipped=0 AND HAS_PERMS_BY_NAME(QUOTENAME(s.name)+N'.'+QUOTENAME(o.name),N'OBJECT',N'EXECUTE')=1 " +
             "AND NOT(s.name=N'dbo' AND o.name IN(N'ApplySecurityAdministration',N'ReadSecurityPermissionImportTarget',N'ApplySecurityPermissionImport'));"));
-        Assert.Equal(9, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
+        Assert.Equal(_expectedSchema, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
         Assert.Equal(1, await ScalarAsync<int>(_oracle, "SELECT COUNT(*) FROM dbo.SystemSecuritySettings WHERE BoundNormalizedUsername=N'GUI.P5.OWNER';"));
         Assert.Equal(0, await ScalarAsync<int>(_oracle,
             "SELECT HAS_PERMS_BY_NAME(N'dbo.Products',N'OBJECT',N'INSERT')+HAS_PERMS_BY_NAME(N'dbo.Products',N'OBJECT',N'UPDATE')+HAS_PERMS_BY_NAME(DB_NAME(),N'DATABASE',N'ALTER');"));
@@ -393,6 +398,10 @@ internal sealed class GuiSqlEnvironment : IDisposable
             "AND s.DocumentId=r.ReceiptId AND s.ProductId=l.ProductId AND s.WarehouseId=r.WarehouseId " +
             "AND s.QuantityChange=3.125 AND s.PostedByUserId=r.PostedByUserId;"));
         Assert.Equal(3.125m, await ScalarAsync<decimal>(_oracle, "SELECT SUM(Quantity) FROM dbo.StockBalances;"));
+        Assert.Equal(12.5m, await ScalarAsync<decimal>(_oracle, "SELECT SUM(InventoryValue) FROM dbo.StockBalances;"));
+        Assert.Equal(1, await ScalarAsync<int>(_oracle,
+            "SELECT COUNT(*) FROM dbo.StockValuationEntries v JOIN dbo.StockLedger l ON l.LedgerId=v.LedgerId " +
+            "WHERE l.DocumentType='GoodsReceipt' AND l.QuantityChange=3.125 AND v.ValueChange=12.5;"));
         Assert.Equal(0, await ScalarAsync<int>(_oracle,
             "SELECT COUNT(*) FROM (SELECT WarehouseId,ProductId,SUM(QuantityChange) Quantity FROM dbo.StockLedger " +
             "GROUP BY WarehouseId,ProductId) l FULL JOIN dbo.StockBalances b " +

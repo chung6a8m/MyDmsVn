@@ -12,6 +12,7 @@ internal static class GuiPackageProbe
     private static string _stage = "startup";
     private static string _detail = "none";
     private static string _theme = "Light";
+    private static int _salesRow = 1;
     private static Process _application;
     private static IntPtr MainWindow;
     private static readonly Stopwatch TraceClock = Stopwatch.StartNew();
@@ -33,7 +34,12 @@ internal static class GuiPackageProbe
     [DllImport("user32.dll")] private static extern int GetAwarenessFromDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr key, IntPtr data);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr window);
+    private delegate bool EnumerateWindow(IntPtr window, IntPtr state);
+    [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr window, EnumerateWindow callback, IntPtr state);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, System.Text.StringBuilder name, int length);
     [DllImport("user32.dll", EntryPoint = "SendMessageW")] private static extern IntPtr SendMessageSelection(IntPtr window, uint message, out int start, out int end);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, UIntPtr length, System.Text.StringBuilder text, uint flags, uint timeout, out UIntPtr result);
     [DllImport("oleacc.dll")] private static extern int AccessibleObjectFromWindow(IntPtr window, uint objectId, ref Guid interfaceId, [MarshalAs(UnmanagedType.Interface)] out Accessibility.IAccessible accessible);
 
     private static string NativeDescription(AutomationElement element)
@@ -77,7 +83,17 @@ internal static class GuiPackageProbe
                 return 0;
             }
             StartApplication(args[0]);
-            if (args[1] == "startup-unavailable")
+            if (args[1].StartsWith("startup-schema-", StringComparison.Ordinal))
+            {
+                var expected = args[1].Substring("startup-schema-".Length);
+                var window = Window("MyDmsVn");
+                Find(window, expected, ControlType.Text, true);
+                Invoke(Find(window, "OK", ControlType.Button, false));
+                if (!_application.WaitForExit(5000) || _application.ExitCode != 2)
+                    throw new InvalidOperationException("Schema-refused application did not exit safely.");
+                Console.WriteLine("PACKAGED_SCHEMA_REFUSED=" + expected + ":PASS");
+            }
+            else if (args[1] == "startup-unavailable")
             {
                 _stage = "owned-startup-dialog";
                 var window = Window("MyDmsVn");
@@ -165,6 +181,13 @@ internal static class GuiPackageProbe
                 CloseApplication(shell);
                 Console.WriteLine("SERVER_DIRECT_DENY=PASS");
             }
+            else if (args[1].StartsWith("sales-", StringComparison.Ordinal))
+            {
+                var shell = Login("gui.sal.writer", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), "SAL Writer");
+                Console.WriteLine("SALES_ACTUAL_LOGIN=PASS");
+                Sales(shell, args[0], args[1]);
+                CloseApplication(shell);
+            }
             else if (args[1] == "inventory-deny")
             {
                 var shell = Login("gui.bci.receipt.writer", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), "BCI Receipt Writer");
@@ -231,6 +254,14 @@ internal static class GuiPackageProbe
         {
             // Never print credential-bearing exceptions, element values or connection strings.
             Console.Error.WriteLine("GUI_PROBE_FAILED=" + _stage + ":" + error.GetType().Name + ":" + _detail);
+            // Method metadata only: never exception messages, arguments, values or SQL identities.
+            var frames = new StackTrace(error, false).GetFrames();
+            if (frames != null)
+                for (var index = 0; index < frames.Length && index < 4; index++)
+                {
+                    var method = frames[index].GetMethod();
+                    Console.Error.WriteLine("GUI_PROBE_FAILURE_SITE=" + method.DeclaringType.FullName + "." + method.Name);
+                }
             return 1;
         }
         finally
@@ -361,6 +392,306 @@ internal static class GuiPackageProbe
         Console.WriteLine("THEME_STATE_PROVIDER=MSAA.Description");
         Console.WriteLine("APPLICATION_THEME=" + _theme);
         return shell;
+    }
+
+    private static void Sales(AutomationElement shell, string executable, string scenario)
+    {
+        _stage = scenario;
+        Invoke(Find(shell, "Sales Receipts", ControlType.Button, false));
+        var page = Find(shell, "Sales Receipts", ControlType.TabItem, false);
+        if (scenario == "sales-list-input")
+        {
+            SetSalesPageSize(page, 1);
+            Invoke(Find(page, "Apply filters", ControlType.Button, false));
+            Console.WriteLine("SALES_NATIVE_PAGE_SIZE=PASS");
+            return;
+        }
+        if (scenario == "sales-inspect")
+        {
+            SetInput(page, "Search sales receipts", "SAL golden", false);
+            Invoke(Find(page, "Apply filters", ControlType.Button, false));
+            Invoke(SalesOpenAction(page));
+            AssertSalesPosted(page);
+            Console.WriteLine("SALES_LATER_RECEIPT_COST_IMMUTABLE=PASS");
+            return;
+        }
+        CreateSalesGolden(page);
+        var action = SalesOpenAction(page).Current.Name;
+        Invoke(Find(page, "New", ControlType.Button, false));
+        Invoke(Find(page, "Back to sales", ControlType.Button, false));
+        Invoke(Find(page, "Refresh", ControlType.Button, false));
+        Invoke(Find(page, action, ControlType.Button, false));
+        Wait(delegate { return InputValue(page, "Note") == "SAL golden"; }, "Saved Sales draft did not reload.");
+        _salesRow = 1;
+        AssertSalesCell(page, "Quantity", 3m);
+        AssertSalesCell(page, "Unit price", 25m);
+        _salesRow = 2;
+        AssertSalesCell(page, "Quantity", 2m);
+        AssertSalesCell(page, "Unit price", 40m);
+        AssertSalesCell(page, "Line amount", 0m);
+        SalesSummary(page, "Posted total cost", "Posted cost: Not posted");
+        Console.WriteLine("SALES_DUPLICATE_GIFT_RELOAD=PASS");
+        if (scenario == "sales-stale" || scenario == "sales-stale-post")
+        {
+            SalesStale(page, executable, action, scenario == "sales-stale-post");
+            return;
+        }
+        if (scenario.StartsWith("sales-deny-", StringComparison.Ordinal)) { SalesDeny(page, scenario.Substring("sales-deny-".Length)); return; }
+        if (scenario == "sales-fault") SalesUncertainPost(page);
+        else
+        {
+            Invoke(Find(page, "Post", ControlType.Button, false));
+            AssertSalesPosted(page);
+        }
+        Console.WriteLine("SALES_POSTED_IMMUTABLE=PASS");
+        if (scenario == "sales-audit") SalesKeyset(page);
+    }
+
+    private static void CreateSalesGolden(AutomationElement page)
+    {
+        Invoke(Find(page, "New", ControlType.Button, false));
+        SetLookup(page, "Customer", "SAL-C - Sales Customer");
+        SetLookup(page, "Warehouse", "SAL-W - Sales Warehouse");
+        SetLookup(page, "Employee", "SAL-E - Sales Employee");
+        SetInput(page, "Note", "SAL golden", false);
+        AddSalesLine(page, 1, 3m, 25m);
+        AddSalesLine(page, 2, 2m, 40m);
+        var gift = InlineCell(page, "Gift");
+        ((ValuePattern)gift.GetCurrentPattern(ValuePattern.Pattern)).SetValue("true");
+        AssertSalesCell(page, "Unit price", 40m);
+        AssertSalesCell(page, "Line amount", 0m);
+        ((ValuePattern)gift.GetCurrentPattern(ValuePattern.Pattern)).SetValue("false");
+        AssertSalesCell(page, "Line amount", 80m);
+        ((ValuePattern)gift.GetCurrentPattern(ValuePattern.Pattern)).SetValue("true");
+        InputEditor(page, "Note").SetFocus();
+        SalesSummary(page, "Posted total cost", "Posted cost: Not posted");
+        Invoke(Find(page, "Save", ControlType.Button, false));
+        _stage = "sales-save";
+        try { Find(page, "Saved · Draft", ControlType.Text, false); }
+        catch { Console.WriteLine("SALES_SAVE_STATUS=" + SalesLabelText(page, "Sales operation status")); Dump(page); throw; }
+        Invoke(Find(page, "Back to sales", ControlType.Button, false));
+        Invoke(Find(page, "Refresh", ControlType.Button, false));
+    }
+
+    private static void AddSalesLine(AutomationElement page, int row, decimal quantity, decimal price)
+    {
+        var previousStage = _stage;
+        _stage = "sales-line-" + row + "-add";
+        Invoke(Find(page, "Add line", ControlType.Button, false));
+        _salesRow = row;
+        _stage = "sales-line-" + row + "-product";
+        SetLookup(page, "Product", "SAL-P - Sales Product");
+        _stage = "sales-line-" + row + "-quantity";
+        SetInput(page, "Quantity", quantity.ToString("F4"), false);
+        _stage = "sales-line-" + row + "-price";
+        SetInput(page, "Unit price", price.ToString("F4"), false);
+        _stage = "sales-line-" + row + "-commit";
+        InputEditor(page, "Note").SetFocus();
+        _stage = previousStage;
+    }
+
+    private static void AssertSalesCell(AutomationElement page, string field, decimal expected)
+    {
+        Wait(delegate
+        {
+            var value = (ValuePattern)InlineCell(page, field).GetCurrentPattern(ValuePattern.Pattern);
+            decimal actual;
+            return decimal.TryParse(value.Current.Value, System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.CurrentCulture, out actual) && actual == expected;
+        }, "Sales cell value differs: " + field);
+    }
+
+    private static AutomationElement SalesOpenAction(AutomationElement page)
+    {
+        var table = Find(page, "Sales receipt results", ControlType.Table, false);
+        AutomationElement result = null;
+        Wait(delegate
+        {
+            result = null;
+            var count = 0;
+            foreach (AutomationElement item in table.FindAll(TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button)))
+                if (item.Current.Name.StartsWith("Open ", StringComparison.Ordinal))
+                {
+                    result = item; count++;
+                }
+            return result != null && count == 1;
+        }, "Sales result row absent.");
+        return result;
+    }
+
+    private static void AssertSalesPosted(AutomationElement page)
+    {
+        Find(page, "Saved · Posted", ControlType.Text, false);
+        SalesSummary(page, "Posted total cost", "Posted cost: " + 75m.ToString("N4"));
+        SalesSummary(page, "Posted gross profit", "Gross profit: " + 0m.ToString("N4"));
+        foreach (var name in new[] { "Save", "Post", "Add line", "Remove line" })
+            if (Find(page, name, ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Posted Sales mutation enabled.");
+        _salesRow = 2;
+        var gift = (ValuePattern)InlineCell(page, "Gift").GetCurrentPattern(ValuePattern.Pattern);
+        if (!gift.Current.IsReadOnly) throw new InvalidOperationException("Posted gift still editable.");
+        AssertSalesCell(page, "Unit price", 40m);
+    }
+
+    private static void SalesKeyset(AutomationElement page)
+    {
+        Invoke(Find(page, "Back to sales", ControlType.Button, false));
+        var golden = SalesOpenAction(page).Current.Name;
+        for (var index = 0; index < 2; index++)
+        {
+            Invoke(Find(page, "New", ControlType.Button, false));
+            SetLookup(page, "Customer", "SAL-C - Sales Customer");
+            SetLookup(page, "Warehouse", "SAL-W - Sales Warehouse");
+            SetLookup(page, "Employee", "SAL-E - Sales Employee");
+            SetInput(page, "Note", "SAL list " + index, false);
+            AddSalesLine(page, 1, 1m, index + 1);
+            Invoke(Find(page, "Save", ControlType.Button, false));
+            Find(page, "Saved · Draft", ControlType.Text, false);
+            Invoke(Find(page, "Back to sales", ControlType.Button, false));
+        }
+        SetSalesPageSize(page, 1);
+        SetLookup(page, "Filter by product", "SAL-P - Sales Product");
+        Invoke(Find(page, "Apply filters", ControlType.Button, false));
+        var first = SalesOpenAction(page).Current.Name;
+        Invoke(Find(page, "Next", ControlType.Button, false));
+        Wait(delegate { return SalesOpenAction(page).Current.Name != first; }, "Next Sales cursor repeated first row.");
+        var second = SalesOpenAction(page).Current.Name;
+        Invoke(Find(page, "Next", ControlType.Button, false));
+        Wait(delegate { return SalesOpenAction(page).Current.Name == golden; }, "Duplicate Product membership repeated/skipped Sales header.");
+        ReadOnlyValue(Find(page, "Sales receipt results", ControlType.Table, false), 75m.ToString("N4"));
+        if (Find(page, "Next", ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Last Sales page allows Next.");
+        Invoke(Find(page, "Previous", ControlType.Button, false));
+        Wait(delegate { return SalesOpenAction(page).Current.Name == second; }, "Previous Sales cursor differs.");
+        Invoke(Find(page, "First", ControlType.Button, false));
+        Wait(delegate { return SalesOpenAction(page).Current.Name == first; }, "First Sales cursor did not reset.");
+        if (Find(page, "Previous", ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("First Sales page allows Previous.");
+        Console.WriteLine("SALES_KEYSET_PRODUCT_TOTALS=PASS");
+    }
+
+    // Fixed semantic accessible names identify the labels. Read their actual native
+    // HWND text with a finite send, rather than assuming the name equals rendered text.
+    private static string SalesLabelText(AutomationElement page, string name)
+    {
+        var label = Find(page, name, ControlType.Text, false);
+        var handle = new IntPtr(label.Current.NativeWindowHandle);
+        uint process; GetWindowThreadProcessId(handle, out process);
+        if (handle == IntPtr.Zero || process != _application.Id) throw new InvalidOperationException("Sales label HWND is not owned.");
+        var text = new System.Text.StringBuilder(2048); UIntPtr count;
+        if (SendMessageTimeout(handle, 0x000D, new UIntPtr(2048), text, 2, 2000, out count) == IntPtr.Zero)
+            throw new TimeoutException("Owned Sales label text unavailable.");
+        return text.ToString();
+    }
+    private static void SalesSummary(AutomationElement page, string name, string expected)
+    {
+        Wait(delegate { return SalesLabelText(page, name) == expected; }, "Sales summary differs: " + name);
+        Console.WriteLine("SALES_SUMMARY=" + name + ":" + expected);
+    }
+    private static void SetSalesPageSize(AutomationElement page, int size)
+    {
+        // net48 NumericUpDown exposes only its two arrow buttons in this UIA tree.
+        // Its named caption identifies one owned field, whose unique native EDIT is
+        // the actual keyboard input. Never select an unrelated unnamed page EDIT.
+        var caption = Find(page, "Page size", ControlType.Text, false);
+        var field = GetParent(new IntPtr(caption.Current.NativeWindowHandle));
+        uint process; GetWindowThreadProcessId(field, out process);
+        if (field == IntPtr.Zero || process != _application.Id) throw new InvalidOperationException("Page size field is not owned.");
+        var edits = new System.Collections.Generic.List<IntPtr>();
+        EnumChildWindows(field, delegate(IntPtr window, IntPtr ignored)
+        {
+            var name = new System.Text.StringBuilder(256); GetClassName(window, name, name.Capacity);
+            if (name.ToString().StartsWith("WindowsForms10.EDIT.", StringComparison.OrdinalIgnoreCase)) edits.Add(window);
+            return true;
+        }, IntPtr.Zero);
+        if (edits.Count != 1) throw new InvalidOperationException("Owned Page size field must have exactly one native EDIT.");
+        GetWindowThreadProcessId(edits[0], out process);
+        if (process != _application.Id) throw new InvalidOperationException("Page size editor is not owned.");
+        var editor = AutomationElement.FromHandle(edits[0]);
+        FocusOwnedEditor(editor, "Page size");
+        var value = (ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern);
+        value.SetValue(size.ToString(System.Globalization.CultureInfo.CurrentCulture));
+        InputEditor(page, "Search sales receipts").SetFocus(); // Admit NumericUpDown's normal validation.
+        Wait(delegate { return value.Current.Value == size.ToString(); }, "Sales page size text did not commit.");
+        Console.WriteLine("SALES_PAGE_SIZE_NATIVE_OWNERSHIP=PASS");
+    }
+    private static void SalesDeny(AutomationElement page, string permission)
+    {
+        Signal("sales-deny-ready"); AwaitSignal("sales-allow-denied-operation");
+        if (permission == "Write") SetInput(page, "Note", "SAL denied input", false);
+        Invoke(Find(page, permission == "Read" ? "Reload" : permission == "Write" ? "Save" : "Post", ControlType.Button, false));
+        Wait(delegate { return SalesLabelText(page, "Sales operation status").Contains("not permitted"); }, "Sales direct Deny was not reported.");
+        if (InputValue(page, "Note").Length != 0 || InputEditor(page, "Note").Current.IsEnabled)
+            throw new InvalidOperationException("Denied Sales protected header was retained/editable.");
+        if (LineGrid(page).FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.CheckBox)).Count != 0)
+            throw new InvalidOperationException("Denied Sales protected line rows remain exposed.");
+        foreach (var name in new[] { "Save", "Post", "Add line", "Remove line" })
+            if (Find(page, name, ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Denied Sales mutation enabled.");
+        Console.WriteLine("SALES_" + permission.ToUpperInvariant() + "_DENIED_PROTECTED_STATE_CLEARED=PASS");
+        Signal("sales-denied"); AwaitSignal("sales-denial-checked");
+    }
+    private static void SalesStale(AutomationElement page, string executable, string action, bool post)
+    {
+        var firstClient = _application;
+        var firstWindow = MainWindow;
+        StartApplication(executable);
+        var otherClient = _application;
+        var otherShell = Login("gui.sal.writer", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_ACTOR_PASSWORD"), "SAL Writer");
+        Invoke(Find(otherShell, "Sales Receipts", ControlType.Button, false));
+        var otherPage = Find(otherShell, "Sales Receipts", ControlType.TabItem, false);
+        _stage = "sales-stale-second-open";
+        Invoke(Find(otherPage, action, ControlType.Button, false));
+        // Match the existing receipt probe: Open loads asynchronously; List has no Note editor.
+        var note = Find(otherPage, "Note", ControlType.Edit, false);
+        if (note.Current.ProcessId != otherClient.Id) throw new InvalidOperationException("Second Sales editor is not owned.");
+        Console.WriteLine("SALES_STALE_SECOND_NOTE_PRESENT=PASS;ENABLED=" + note.Current.IsEnabled);
+        Wait(delegate { return InputValue(otherPage, "Note") == "SAL golden"; }, "Second actual client did not reload Sales Draft.");
+        _stage = post ? "sales-stale-post" : "sales-stale-save";
+        if (post)
+        {
+            Invoke(Find(otherPage, "Post", ControlType.Button, false));
+            AssertSalesPosted(otherPage);
+        }
+        else
+        {
+            SetInput(otherPage, "Note", "SAL winner", false);
+            Find(otherPage, "Unsaved changes", ControlType.Text, false);
+            Invoke(Find(otherPage, "Save", ControlType.Button, false));
+            Find(otherPage, "Saved · Draft", ControlType.Text, false);
+        }
+        Signal("sales-stale-winner-ready"); AwaitSignal("sales-allow-loser");
+        _application = firstClient; MainWindow = firstWindow;
+        if (!post) SetInput(page, "Note", "SAL losing raw input", false);
+        Invoke(Find(page, post ? "Post" : "Save", ControlType.Button, false));
+        Wait(delegate { return SalesLabelText(page, "Sales operation status").Contains(post ? "already posted" : "changed by another operation"); }, "Sales conflict not reported.");
+        if (!post && InputValue(page, "Note") != "SAL losing raw input") throw new InvalidOperationException("Stale Sales input was lost.");
+        if (post)
+        {
+            if (Find(page, "Post", ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Conflict permits automatic Post retry.");
+            Invoke(Find(page, "Reload", ControlType.Button, false));
+            AssertSalesPosted(page);
+        }
+        Signal("sales-stale-conflict-ready"); AwaitSignal("sales-stale-checked");
+        _application = otherClient; CloseApplication(otherShell); otherClient.Dispose();
+        _application = firstClient; MainWindow = firstWindow;
+        Console.WriteLine(post ? "SALES_STALE_POST_ONE_EFFECT=PASS" : "SALES_STALE_SAVE_INPUT_RETAINED=PASS");
+    }
+
+    private static void SalesUncertainPost(AutomationElement page)
+    {
+        Signal("sales-post-ready"); AwaitSignal("sales-allow-post");
+        Invoke(Find(page, "Post", ControlType.Button, false));
+        Wait(delegate { return !Find(page, "Post", ControlType.Button, false).Current.IsEnabled; }, "Sales Post did not begin.");
+        Wait(delegate { return Find(page, "Reload", ControlType.Button, false).Current.IsEnabled; }, "Sales timeout did not finish.", 55);
+        foreach (var name in new[] { "New", "Save", "Post", "Add line", "Remove line" })
+            if (Find(page, name, ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Uncertain Sales Post permits mutation.");
+        if (InputEditor(page, "Note").Current.IsEnabled) throw new InvalidOperationException("Uncertain Sales header editable.");
+        Signal("sales-uncertain"); AwaitSignal("sales-allow-reload");
+        Invoke(Find(page, "Reload", ControlType.Button, false));
+        Wait(delegate { return Find(page, "Post", ControlType.Button, false).Current.IsEnabled; }, "Explicit Sales reload did not recover Draft.");
+        Find(page, "Saved · Draft", ControlType.Text, false);
+        Signal("sales-reloaded"); AwaitSignal("sales-allow-retry");
+        Invoke(Find(page, "Post", ControlType.Button, false)); // One explicit checked retry only.
+        AssertSalesPosted(page);
+        Console.WriteLine("SALES_UNCERTAIN_RELOAD_EXPLICIT_RETRY=PASS");
     }
 
     private static void Receipt(AutomationElement shell, string executable, string scenario)
@@ -978,11 +1309,12 @@ internal static class GuiPackageProbe
     }
 
 
-    private static bool IsLineField(string name) { return name == "Product" || name == "Quantity" || name == "Unit cost"; }
+    private static bool IsLineField(string name) { return name == "Product" || name == "Quantity" || name == "Unit cost" || name == "Unit price"; }
     private static AutomationElement LineGrid(AutomationElement root)
     {
         return root.FindFirst(TreeScope.Descendants, new AndCondition(
-            new PropertyCondition(AutomationElement.NameProperty, "Goods receipt lines"),
+            new OrCondition(new PropertyCondition(AutomationElement.NameProperty, "Goods receipt lines"),
+                new PropertyCondition(AutomationElement.NameProperty, "Sales receipt lines")),
             new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Table)));
     }
     private static AutomationElement InlineCell(AutomationElement root, string field)
@@ -994,6 +1326,7 @@ internal static class GuiPackageProbe
         {
             var name = candidate.Current.Name;
             if (!name.StartsWith(field + " row ", StringComparison.Ordinal) || name.EndsWith(" editor", StringComparison.Ordinal)) continue;
+            if (grid.Current.Name == "Sales receipt lines" && name != field + " row " + _salesRow) continue;
             if (selected != null) throw new InvalidOperationException("Ambiguous receipt line field: " + field);
             selected = candidate;
         }
