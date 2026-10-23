@@ -181,12 +181,12 @@ App removes the superseded `src/MyDmsVn.Desktop.WinForms/ReceiptNumberEditor.cs`
 
 **Interfaces:** proposed `BootstrapBusyHost.Begin(BusyPresentation presentation): IDisposable` acquires a UI-thread-owned presentation token for a target Control. `BusyPresentation` contains message and optional cancel-request callback; disposal releases only its token. App binder projects existing operation/admission state and scope identity, without moving async commands into the control.
 
-- [ ] Test overlapping operations, out-of-order completion, <150 ms completion, hidden/disposed targets, canceled delayed show and a completion after scope replacement.
-- [ ] Compose the existing spinner/shared scheduler with a native-safe opaque/inset backdrop and message. Avoid component-local animation timers and retain permitted Cancel/recovery access.
-- [ ] Implement idempotent token disposal and state precedence, respecting caller-owned Enabled/focus. Cancellation requests only app-declared cancellable work and never represents rollback.
-- [ ] Integrate Product/Sales/Goods busy state; check keyboard, accessibility, checkbox and command routes still enforce guards before/under the overlay. Keep lookups local where whole-tab blocking is unnecessary.
-- [ ] Run focused native/DPI/theme/lifetime tests and app admission regressions; confirm no orphan scheduling, cross-tab focus restoration or stale unlock.
-- [ ] Document target ownership and samples, verify dual-target compatibility, record explicit pin/adoption evidence and commit.
+- [x] Test overlapping operations, out-of-order completion, <150 ms completion, hidden/disposed targets, canceled delayed show and a completion after scope replacement.
+- [x] Compose the existing spinner/shared scheduler with a native-safe opaque/inset backdrop and message. Avoid component-local animation timers and retain permitted Cancel/recovery access.
+- [x] Implement idempotent token disposal and state precedence, respecting caller-owned Enabled/focus. Cancellation requests only app-declared cancellable work and never represents rollback.
+- [x] Integrate Product/Sales/Goods busy state; check keyboard, accessibility, checkbox and command routes still enforce guards before/under the overlay. Keep lookups local where whole-tab blocking is unnecessary.
+- [x] Run focused native/DPI/theme/lifetime tests and app admission regressions; confirm no orphan scheduling, cross-tab focus restoration or stale unlock.
+- [x] Document target ownership and samples, verify dual-target compatibility, record explicit pin/adoption evidence and commit.
 
 ## UIN-T09 — semantic Panel/Label and theme ownership
 
