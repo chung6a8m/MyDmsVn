@@ -151,6 +151,36 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Empty(response.Error.Details);
         }
 
+        [Theory]
+        [InlineData("Code", "code")]
+        [InlineData("Request.Code", "code")]
+        [InlineData("code", "code")]
+        [InlineData("UnknownField", "unknownField")]
+        [InlineData(null, null)]
+        public void Conflict_field_is_explicit_and_follows_json_policy(string? field, string? expected)
+        {
+            var metadata = new Dictionary<string, object>();
+            if (field != null) metadata["Field"] = field;
+            var response = ApiResponseMapper.Map<string>(
+                Error.Conflict("Catalog.Conflict", "Conflict.", metadata), "Request");
+            Assert.Equal(ApiStatusCode.Conflict, response.Error!.Status);
+            Assert.Equal(expected, Assert.Single(response.Error.Details).Field);
+        }
+
+        [Fact]
+        public void Authorization_dominates_explicit_duplicate_code_metadata_without_leaking_fields()
+        {
+            var response = ApiResponseMapper.Map(ErrorOrFactory.From<string>(new List<Error>
+            {
+                Error.Conflict("Product.DuplicateCode", "Duplicate.",
+                    new Dictionary<string, object> { ["Field"] = "Code" }),
+                Error.Forbidden("Private.Permission", "Private detail."),
+            }));
+            Assert.Equal(ApiStatusCode.Forbidden, response.Error!.Status);
+            Assert.Empty(response.Error.Details);
+            Assert.Equal("The operation is not permitted.", response.Error.Message);
+        }
+
         private static void AssertSafeInternalError(ApiResponse<string> response)
         {
             Assert.Equal(ApiStatusCode.InternalServerError, response.Error!.Status);

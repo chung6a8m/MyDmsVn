@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Messaging;
@@ -374,16 +375,27 @@ namespace MyDmsVn.Desktop.Application
 
         protected abstract void ClearEditor();
 
+        protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(e.PropertyName))
+            {
+                ClearFieldError(ApiJson.ResolvePropertyName(e.PropertyName!));
+            }
+
+            base.OnPropertyChanged(e);
+        }
+
         private async Task SaveCoreAsync(CancellationToken cancellationToken)
         {
+            long editorGeneration;
+            lock (_sync)
+            {
+                editorGeneration = _editorGeneration;
+            }
+
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                long editorGeneration;
-                lock (_sync)
-                {
-                    editorGeneration = _editorGeneration;
-                }
 
                 var selectedId = SelectedId;
                 var operation = selectedId.HasValue
@@ -396,7 +408,13 @@ namespace MyDmsVn.Desktop.Application
                 if (!response.IsSuccess)
                 {
                     await _dispatcher.InvokeAsync(
-                        () => ApplyApiError(response.Error!),
+                        () =>
+                        {
+                            if (IsEditorCurrent(editorGeneration))
+                            {
+                                ApplyApiError(response.Error!);
+                            }
+                        },
                         cancellationToken).ConfigureAwait(false);
                     return;
                 }
@@ -427,7 +445,7 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (Exception exception)
             {
-                if (cancellationToken.IsCancellationRequested || IsDisposed())
+                if (cancellationToken.IsCancellationRequested || !IsEditorCurrent(editorGeneration))
                 {
                     return;
                 }
@@ -435,7 +453,7 @@ namespace MyDmsVn.Desktop.Application
                 await _dispatcher.InvokeAsync(
                     () =>
                     {
-                        if (!IsDisposed())
+                        if (IsEditorCurrent(editorGeneration))
                         {
                             ApplyUnexpectedError(exception);
                         }

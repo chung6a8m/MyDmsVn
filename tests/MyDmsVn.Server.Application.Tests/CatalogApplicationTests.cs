@@ -73,6 +73,63 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.False(unitOfWork.Committed);
         }
 
+        [Theory]
+        [InlineData("Product", false)]
+        [InlineData("Product", true)]
+        [InlineData("Warehouse", false)]
+        [InlineData("Warehouse", true)]
+        [InlineData("Employee", false)]
+        [InlineData("Employee", true)]
+        [InlineData("Customer", false)]
+        [InlineData("Customer", true)]
+        public async Task Duplicate_code_create_and_update_target_code_without_committing(string catalog, bool update)
+        {
+            var repository = new FakeCatalogWriteRepository
+            {
+                InsertFailure = new CatalogWriteConflictException(CatalogWriteConflict.DuplicateCode),
+            };
+            var uow = new FakeUnitOfWork(repository);
+            using var provider = CreateProvider(uow);
+            var sender = provider.GetRequiredService<MediatR.ISender>();
+            ErrorOr.Error error;
+            switch (catalog)
+            {
+                case "Product":
+                    var product = new SaveProductRequest("DUP", "Attempted name", "Unit");
+                    error = (update ? await sender.Send(new UpdateProductCommand(1, product)) : await sender.Send(new CreateProductCommand(product))).FirstError;
+                    Assert.Equal("DUP", product.Code);
+                    Assert.Equal("Attempted name", product.Name);
+                    break;
+                case "Warehouse":
+                    var warehouse = new SaveWarehouseRequest("DUP", "Attempted name", "Address");
+                    error = (update ? await sender.Send(new UpdateWarehouseCommand(1, warehouse)) : await sender.Send(new CreateWarehouseCommand(warehouse))).FirstError;
+                    Assert.Equal("DUP", warehouse.Code);
+                    Assert.Equal("Address", warehouse.Address);
+                    break;
+                case "Employee":
+                    var employee = new SaveEmployeeRequest("DUP", "Attempted name", "Phone", null);
+                    error = (update ? await sender.Send(new UpdateEmployeeCommand(1, employee)) : await sender.Send(new CreateEmployeeCommand(employee))).FirstError;
+                    Assert.Equal("DUP", employee.Code);
+                    Assert.Equal("Phone", employee.Phone);
+                    break;
+                default:
+                    var customer = new SaveCustomerRequest("DUP", "Attempted name", "Address", "Phone", "Tax");
+                    error = (update ? await sender.Send(new UpdateCustomerCommand(1, customer)) : await sender.Send(new CreateCustomerCommand(customer))).FirstError;
+                    Assert.Equal("DUP", customer.Code);
+                    Assert.Equal("Tax", customer.TaxCode);
+                    break;
+            }
+            Assert.Equal(ErrorOr.ErrorType.Conflict, error.Type);
+            Assert.Equal(catalog + ".DuplicateCode", error.Code);
+            Assert.False(uow.Committed);
+            Assert.NotNull(error.Metadata);
+            Assert.Equal("Code", error.Metadata!["Field"]);
+            var response = ApiResponseMapper.Map<string>(error);
+            Assert.Equal(ApiStatusCode.Conflict, response.Error!.Status);
+            Assert.Equal("code", Assert.Single(response.Error.Details).Field);
+            Assert.Equal(error.Description, response.Error.Message);
+        }
+
         [Fact]
         public async Task Product_list_query_preserves_deterministic_page_from_query_service()
         {
@@ -328,6 +385,7 @@ namespace MyDmsVn.Server.Application.Tests
 
             Assert.True(result.IsError);
             Assert.Equal("Employee.UserAlreadyLinked", result.FirstError.Code);
+            Assert.Null(Assert.Single(ApiResponseMapper.Map(result).Error!.Details).Field);
         }
 
         [Fact]
@@ -364,6 +422,10 @@ namespace MyDmsVn.Server.Application.Tests
             services.AddSingleton<IPermissionStore>(new AllowPermissionStore());
             services.AddSingleton<IUtcClock>(new FixedUtcClock());
             services.AddSingleton(productQueryService ?? new FakeProductQueryService());
+            var queries = new RejectingCatalogQueryServices();
+            services.AddSingleton<IWarehouseQueryService>(queries);
+            services.AddSingleton<IEmployeeQueryService>(queries);
+            services.AddSingleton<ICustomerQueryService>(queries);
 
             services.AddServerApplication();
             return services.BuildServiceProvider();
@@ -508,6 +570,7 @@ namespace MyDmsVn.Server.Application.Tests
             public Task<Product?> UpdateProductAsync(Product product, CancellationToken cancellationToken)
             {
                 UpdatedProduct = product;
+                if (InsertFailure != null) throw InsertFailure;
                 return Task.FromResult(ProductUpdateFound ? product : null);
             }
 
@@ -523,12 +586,18 @@ namespace MyDmsVn.Server.Application.Tests
                 return Task.FromResult(ProductActiveFound);
             }
 
-            public Task<Warehouse?> UpdateWarehouseAsync(Warehouse entity, CancellationToken token) => Task.FromResult<Warehouse?>(entity);
+            public Task<Warehouse?> UpdateWarehouseAsync(Warehouse entity, CancellationToken token) => UpdateOrThrow(entity);
             public Task<bool> SetWarehouseActiveAsync(int id, bool active, DateTime at, int? by, CancellationToken token) => Task.FromResult(true);
-            public Task<Employee?> UpdateEmployeeAsync(Employee entity, CancellationToken token) => Task.FromResult<Employee?>(entity);
+            public Task<Employee?> UpdateEmployeeAsync(Employee entity, CancellationToken token) => UpdateOrThrow(entity);
             public Task<bool> SetEmployeeActiveAsync(int id, bool active, DateTime at, int? by, CancellationToken token) => Task.FromResult(true);
-            public Task<Customer?> UpdateCustomerAsync(Customer entity, CancellationToken token) => Task.FromResult<Customer?>(entity);
+            public Task<Customer?> UpdateCustomerAsync(Customer entity, CancellationToken token) => UpdateOrThrow(entity);
             public Task<bool> SetCustomerActiveAsync(int id, bool active, DateTime at, int? by, CancellationToken token) => Task.FromResult(true);
+
+            private Task<T?> UpdateOrThrow<T>(T entity) where T : class
+            {
+                if (InsertFailure != null) throw InsertFailure;
+                return Task.FromResult<T?>(entity);
+            }
 
             private Task<int> InsertOrThrow(object entity, int id)
             {

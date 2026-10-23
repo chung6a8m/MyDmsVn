@@ -540,6 +540,92 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public async Task Delayed_save_error_cannot_restore_validation_after_editor_replacement(bool select, bool unexpected)
+        {
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var notifications = new DesktopNotificationCenter();
+            using (var viewModel = new ProductCatalogViewModel(client, new WeakReferenceMessenger(),
+                new ImmediateUiDispatcher(), notifications, new ControllableDelay()))
+            {
+                viewModel.Code = "DUP";
+                var saving = viewModel.SaveAsync(CancellationToken.None);
+                if (select) await viewModel.SelectAsync(2, CancellationToken.None);
+                else viewModel.BeginCreate();
+                if (unexpected) client.FailCreate(new InvalidOperationException("old save failed"));
+                else client.CompleteCreateError(DuplicateCodeError());
+                await saving;
+                Assert.False(viewModel.HasErrors);
+                Assert.Null(viewModel.ErrorMessage);
+                Assert.Null(notifications.LastNotification);
+                Assert.Equal(select ? "P1" : string.Empty, viewModel.Code);
+            }
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public async Task Queued_save_error_is_rechecked_at_dispatch_after_new_document_or_disposal(bool unexpected, bool dispose)
+        {
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var dispatcher = new SwitchableUiDispatcher { Defer = true };
+            var notifications = new DesktopNotificationCenter();
+            using (var viewModel = new ProductCatalogViewModel(client, new WeakReferenceMessenger(),
+                dispatcher, notifications, new ControllableDelay()))
+            {
+                var saving = viewModel.SaveAsync(CancellationToken.None);
+                if (unexpected) client.FailCreate(new InvalidOperationException("old failure"));
+                else client.CompleteCreateError(DuplicateCodeError());
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+                if (dispose) viewModel.Dispose();
+                else viewModel.BeginCreate();
+                dispatcher.RunNext();
+                await saving;
+                Assert.False(viewModel.HasErrors);
+                Assert.Null(viewModel.ErrorMessage);
+                Assert.Null(notifications.LastNotification);
+            }
+        }
+
+        [Fact]
+        public async Task Editing_code_clears_only_its_error_and_retains_attempted_fields_and_summary()
+        {
+            var error = new ApiError(ApiStatusCode.Conflict, "Product.DuplicateCode", "Correct fields.",
+                new[] { new ApiErrorDetail("Product.DuplicateCode", "Duplicate code.", "code"),
+                    new ApiErrorDetail("Validation.Required", "Name error.", "name") });
+            var client = new FakeProductClient { CreateResponse = ApiResponse<ProductDto>.Failure(error) };
+            using (var viewModel = CreateProduct(client, new ControllableDelay()))
+            {
+                viewModel.Code = "DUP";
+                viewModel.Name = "Attempted name";
+                viewModel.Unit = "Box";
+                await viewModel.SaveAsync(CancellationToken.None);
+                Assert.Equal("DUP", viewModel.Code);
+                Assert.Equal("Attempted name", viewModel.Name);
+                Assert.Equal("Box", viewModel.Unit);
+                var changed = new List<string?>();
+                viewModel.ErrorsChanged += (_, args) => changed.Add(args.PropertyName);
+                viewModel.Code = "DUP";
+                Assert.Single(viewModel.GetErrors("code"));
+                viewModel.Code = "NEW";
+                Assert.Empty(viewModel.GetErrors("code"));
+                Assert.Single(viewModel.GetErrors("name"));
+                Assert.True(viewModel.HasErrors);
+                Assert.Equal("Correct fields.", viewModel.ErrorMessage);
+                Assert.Equal(new[] { "code" }, changed);
+            }
+        }
+
+        private static ApiError DuplicateCodeError() => new ApiError(ApiStatusCode.Conflict,
+            "Product.DuplicateCode", "Duplicate code.",
+            new[] { new ApiErrorDetail("Product.DuplicateCode", "Duplicate code.", "code") });
+
         [Fact]
         public async Task Begin_create_clears_validation_from_the_previous_editor_context()
         {
@@ -933,6 +1019,8 @@ namespace MyDmsVn.Desktop.Tests
                     : CreateException == null
                     ? Task.FromResult(CreateResponse)
                     : Task.FromException<ApiResponse<ProductDto>>(CreateException);
+            public void CompleteCreateError(ApiError error) =>
+                _controlledCreate!.TrySetResult(ApiResponse<ProductDto>.Failure(error));
             public void CompleteCreate(ProductDto item) =>
                 _controlledCreate!.TrySetResult(ApiResponse<ProductDto>.Success(item));
             public void FailCreate(Exception exception) =>

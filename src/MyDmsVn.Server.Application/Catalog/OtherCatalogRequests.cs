@@ -129,7 +129,7 @@ internal sealed class CreateWarehouseCommandHandler
         }
         catch (CatalogWriteConflictException)
         {
-            return Error.Conflict("Warehouse.DuplicateCode", "A warehouse with this code already exists.");
+            return CatalogErrors.DuplicateCode("Warehouse.DuplicateCode", "A warehouse with this code already exists.");
         }
 
         return new WarehouseDto(entity.Id, entity.Code, entity.Name, entity.Address, entity.IsActive);
@@ -165,7 +165,7 @@ internal sealed class CreateCustomerCommandHandler
         }
         catch (CatalogWriteConflictException)
         {
-            return Error.Conflict("Customer.DuplicateCode", "A customer with this code already exists.");
+            return CatalogErrors.DuplicateCode("Customer.DuplicateCode", "A customer with this code already exists.");
         }
 
         return new CustomerDto(
@@ -231,7 +231,7 @@ internal sealed class CreateEmployeeCommandHandler
                     Error.Conflict("Employee.UserAlreadyLinked", "This user is already linked to an employee."),
                 CatalogWriteConflict.EmployeeUserNotFound =>
                     Error.Conflict("Employee.UserNotFound", "The selected user does not exist."),
-                _ => Error.Conflict("Employee.DuplicateCode", "An employee with this code already exists."),
+                _ => CatalogErrors.DuplicateCode("Employee.DuplicateCode", "An employee with this code already exists."),
             };
         }
 
