@@ -43,6 +43,9 @@ namespace MyDmsVn.Desktop.Tests
                         control.CreateControl();
                         control.PerformLayout();
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        Assert.Equal(BootstrapSurfaceRole.Surface,
+                            Assert.IsType<BootstrapPanel>(Assert.Single(control.Controls.Find("CatalogInspector", true))).SurfaceRole);
+                        Assert.Equal(BootstrapTextRole.Muted, Assert.IsType<BootstrapLabel>(control.PageLabel).TextRole);
 
                         Assert.Equal(3, control.Grid.RowsCount);
                         Assert.Equal("Active", control.Grid[1, 3].Value);

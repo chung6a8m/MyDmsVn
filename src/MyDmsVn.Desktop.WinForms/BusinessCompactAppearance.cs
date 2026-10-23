@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Desktop.WinForms;
@@ -18,6 +19,7 @@ internal sealed class BusinessCompactAppearance : IDisposable
     private readonly Font _secondary = new Font("Segoe UI", 9f);
     private readonly Font _brand = new Font("Segoe UI", 15f, FontStyle.Bold);
     private readonly Font _strong = new Font("Segoe UI", 10f, FontStyle.Bold);
+    private readonly HashSet<Control> _attached = new HashSet<Control>();
     private bool _disposed;
     private BusinessCompactAppearance(Control root)
     {
@@ -60,15 +62,24 @@ internal sealed class BusinessCompactAppearance : IDisposable
     }
     private void Attach(Control control)
     {
-        if (VendorOwnsChildren(control) && !(control is TabControl)) return;
+        if (VendorOwnsChildren(control) && !(control is TabControl) && !(control is BootstrapPanel) && !(control is BootstrapBusyHost)) return;
+        if (!_attached.Add(control)) return;
         control.ControlAdded += OnControlAdded;
         foreach (var child in OwnedChildren(control)) Attach(child);
     }
-    // TabPages are application content, unlike a composite's private EDIT/accessory children.
+    // TabPages, a semantic panel's Controls and a busy host's Content are public app content.
+    // Other vendor composite children belong to the component and must remain untouched.
     private static IEnumerable<Control> OwnedChildren(Control control) => control is TabControl tabs
         ? tabs.TabPages.Cast<Control>()
+        : control is BootstrapBusyHost busy ? new[] { busy.Content }
+        : control is BootstrapPanel panel ? panel.Controls.Cast<Control>()
         : VendorOwnsChildren(control) ? Enumerable.Empty<Control>() : control.Controls.Cast<Control>();
-    private void OnControlAdded(object? sender, ControlEventArgs e) { Attach(e.Control); Style(e.Control); }
+    private void OnControlAdded(object? sender, ControlEventArgs e)
+    {
+        if (_disposed) return;
+        if (sender is BootstrapBusyHost busy && !ReferenceEquals(e.Control, busy.Content)) return;
+        Attach(e.Control); Style(e.Control);
+    }
     private void OnTheme(object? sender, BootstrapThemeChangedEventArgs e)
     {
         if (_root.IsDisposed) return;
@@ -81,13 +92,23 @@ internal sealed class BusinessCompactAppearance : IDisposable
         var dark = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Dark;
         var colors = BootstrapThemeManager.CurrentTheme.Colors;
         var typography = control.Tag as string ?? control.Name;
-        control.Font = typography == "CompactHeading" ? _heading : control.Name == "CompactBrand" ? _brand : control.Name == "CompactUser" ? _strong : typography == "CompactSecondary" || typography == "CompactSection" ? _secondary : _body;
-        if (control is Panel || control is TabPage || control is Form || control is UserControl || control is Label)
+        var semantic = control is BootstrapPanel || control is BootstrapLabel;
+        if (!semantic)
+            control.Font = typography == "CompactHeading" ? _heading : control.Name == "CompactBrand" ? _brand : control.Name == "CompactUser" ? _strong : typography == "CompactSecondary" || typography == "CompactSection" ? _secondary : _body;
+        if (!semantic && (control is Panel || control is TabPage || control is Form || control is UserControl || control is Label))
         {
             control.BackColor = colors.Body;
             control.ForeColor = colors.Text;
             for (var parent = control; parent != null && !(parent is CatalogControl); parent = parent.Parent)
+            {
                 if (parent.Name == "CatalogInspector" || parent.Name == "CatalogResultsSurface") { control.BackColor = colors.Surface; break; }
+                if (parent is BootstrapPanel surface)
+                {
+                    control.BackColor = surface.SurfaceRole == BootstrapSurfaceRole.Surface ? colors.Surface :
+                        surface.SurfaceRole == BootstrapSurfaceRole.Alternate ? colors.SurfaceSecondary : colors.Body;
+                    break;
+                }
+            }
         }
         if (control is TabControl) { control.BackColor = colors.Surface; control.ForeColor = colors.Text; }
         if (control is TextBox || control is ComboBox || control is DateTimePicker)
@@ -124,6 +145,8 @@ internal sealed class BusinessCompactAppearance : IDisposable
         _disposed = true;
         BootstrapThemeManager.ThemeChanged -= OnTheme;
         _root.Disposed -= OnDisposed;
+        foreach (var control in _attached) control.ControlAdded -= OnControlAdded;
+        _attached.Clear();
         Owners.Remove(_root);
         _body.Dispose(); _heading.Dispose(); _secondary.Dispose(); _brand.Dispose(); _strong.Dispose();
     }

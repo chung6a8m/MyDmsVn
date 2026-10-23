@@ -22,6 +22,9 @@ public sealed class SalesReceiptControlAdmissionTests
         {
             using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
             var control = (SalesReceiptControl)host.Control;
+            Assert.Equal(BootstrapSurfaceRole.Surface,
+                Assert.IsType<BootstrapPanel>(Assert.Single(control.Controls.Find("SalesDetailSurface", true))).SurfaceRole);
+            Assert.Equal(BootstrapTextRole.Muted, Assert.IsType<BootstrapLabel>(control.AppliedCriteriaLabel).TextRole);
             Assert.False(control.CaptureCloseState().IsDirty);
             host.Editor.Note = "unsaved";
             var dirty = control.CaptureCloseState();

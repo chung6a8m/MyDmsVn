@@ -33,7 +33,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     private readonly List<LookupBinding> _lookups = new List<LookupBinding>();
     private readonly CatalogLookupViewModel _products;
     private readonly Panel _master = new Panel { Dock = DockStyle.Fill };
-    private readonly Panel _detail = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+    private readonly BootstrapPanel _detail = new BootstrapPanel { Name = "SalesDetailSurface", SurfaceRole = BootstrapSurfaceRole.Surface, Dock = DockStyle.Fill, AutoScroll = true };
     private BootstrapBusyHost _masterBusyHost = null!;
     private BootstrapBusyHost _detailBusyHost = null!;
     private WorkspaceBusyBinder _masterBusyBinder = null!;
@@ -125,7 +125,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         OperationStatusLabel = new Label { Name = "CompactSecondary", AutoSize = true, AccessibleName = "Sales operation status" };
         ValidationSummaryButton = Button("Review validation", () => _inline.FocusFirstValidationError());
         ValidationSummaryButton.AccessibleName = "Review sales validation error";
-        AppliedCriteriaLabel = new Label { AutoSize = true, AccessibleName = "Applied sales filters" };
+        AppliedCriteriaLabel = new BootstrapLabel { TextRole = BootstrapTextRole.Muted, AutoSize = true, AccessibleName = "Applied sales filters" };
         _errors = new ErrorProvider { ContainerControl = this, BlinkStyle = ErrorBlinkStyle.NeverBlink };
         CreateLayout(); BusinessCompactAppearance.Apply(this);
         SaleDateEditor.ValueChanged += (_, __) => { if (!_applying && CanEditHeader && SaleDateEditor.Value.HasValue) Editor.SaleDate = SaleDateEditor.Value.Value; };

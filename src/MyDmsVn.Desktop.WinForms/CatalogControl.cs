@@ -136,7 +136,7 @@ namespace MyDmsVn.Desktop.WinForms
             RefreshButton = CreateButton("Refresh", 20, () => SetOperation(_binding.RefreshAsync(CancellationToken.None)));
             PreviousPageButton = CreateButton("Previous", 18, () => MovePage(-1));
             NextPageButton = CreateButton("Next", 19, () => MovePage(1));
-            PageLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
+            PageLabel = new BootstrapLabel { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter, TextRole = BootstrapTextRole.Muted };
             NewButton = CreateButton(binding.Kind == CatalogKind.Product ? "Add product" : "New", 21, BeginCreate);
             SaveButton = CreateButton("Save", 22, () => SetOperation(_binding.SaveAsync(CancellationToken.None)));
             ActivateButton = CreateButton("Activate", 23, () => SetActive(true));
@@ -386,7 +386,7 @@ namespace MyDmsVn.Desktop.WinForms
             foreach (Control child in panel.Controls) panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             // A dedicated scroll owner measures the complete preferred content height.
             // A scrolling fill TableLayoutPanel can under-report the final nested command row.
-            var scroll = new Panel { Name = "CatalogInspector", Dock = DockStyle.Fill, AutoScroll = true };
+            var scroll = new BootstrapPanel { Name = "CatalogInspector", SurfaceRole = BootstrapSurfaceRole.Surface, Dock = DockStyle.Fill, AutoScroll = true };
             scroll.Controls.Add(panel);
             return scroll;
         }

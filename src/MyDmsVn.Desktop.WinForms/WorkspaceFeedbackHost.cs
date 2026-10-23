@@ -52,9 +52,11 @@ namespace MyDmsVn.Desktop.WinForms
             _utcNow = utcNow ?? throw new ArgumentNullException(nameof(utcNow));
             Dock = DockStyle.Fill;
             Content.Dock = DockStyle.Fill;
+            var surface = new BootstrapPanel { Name = "WorkspaceFeedbackSurface", Dock = DockStyle.Fill, SurfaceRole = BootstrapSurfaceRole.Body };
+            surface.Controls.Add(Content);
             Alert = new BootstrapAlert { Dock = DockStyle.Top, Height = 64, Visible = false, Dismissible = false, Variant = BootstrapVariant.Danger };
             ToastContainer = new BootstrapToastContainer { MaximumVisibleToasts = 3, Size = new Size(340, 240), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-            Controls.Add(Content);
+            Controls.Add(surface);
             Controls.Add(Alert);
             Controls.Add(ToastContainer);
             ToastContainer.BringToFront();

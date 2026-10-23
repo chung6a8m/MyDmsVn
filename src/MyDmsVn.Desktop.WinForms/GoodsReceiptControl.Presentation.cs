@@ -111,7 +111,7 @@ public sealed partial class GoodsReceiptControl
         paging.Controls.AddRange(new Control[] { PreviousPageButton, PageLabel, NextPageButton });
         master.Controls.Add(ReceiptGrid); master.Controls.Add(paging); master.Controls.Add(masterBar);
 
-        var detail = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        var detail = new BootstrapPanel { Name = "GoodsDetailSurface", SurfaceRole = BootstrapSurfaceRole.Surface, Dock = DockStyle.Fill, AutoScroll = true };
         var content = new Panel { Dock = DockStyle.Fill };
         var metadata = new TableLayoutPanel { Name = "ReceiptMetadata", Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3 };
         var fields = new[] { CompactField("Receipt date", ReceiptDateEditor, 0), CompactField("Warehouse", WarehouseLookup, 1), CompactField("Employee", EmployeeLookup, 2), CompactField("Note", NoteEditor, 3) };

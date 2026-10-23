@@ -75,7 +75,7 @@ namespace MyDmsVn.Desktop.WinForms
             NewButton = CreateButton("New", BeginNew);
             PreviousPageButton = CreateButton("Previous", () => MovePage(-1));
             NextPageButton = CreateButton("Next", () => MovePage(1));
-            PageLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
+            PageLabel = new BootstrapLabel { TextRole = BootstrapTextRole.Muted, AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
             ReceiptGrid = new ReceiptResultsGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt results", CausesValidation = false };
             ((AccessibleActionGrid)ReceiptGrid).ConfigureRowActions(
                 row => row > 0 && row <= _receiptIds.Count ? (object)_receiptIds[row - 1] : null,

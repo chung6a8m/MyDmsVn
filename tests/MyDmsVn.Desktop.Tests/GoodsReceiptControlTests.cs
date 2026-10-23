@@ -23,6 +23,9 @@ namespace MyDmsVn.Desktop.Tests
             {
                 using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
                 using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                Assert.Equal(BootstrapSurfaceRole.Surface,
+                    Assert.IsType<BootstrapPanel>(Assert.Single(control.Controls.Find("GoodsDetailSurface", true))).SurfaceRole);
+                Assert.Equal(BootstrapTextRole.Muted, Assert.IsType<BootstrapLabel>(control.PageLabel).TextRole);
                 fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
                 control.ActivateAsync(token).GetAwaiter().GetResult();
                 control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();

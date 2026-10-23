@@ -38,6 +38,9 @@ namespace MyDmsVn.Desktop.Tests
                     using (var hostA = new WorkspaceFeedbackHost(new TextBox(), scopeA))
                     using (var hostB = new WorkspaceFeedbackHost(new TextBox(), scopeB))
                     {
+                        var surfaceA = Assert.IsType<BootstrapPanel>(Assert.Single(hostA.Controls.Find("WorkspaceFeedbackSurface", true)));
+                        Assert.Same(surfaceA, hostA.Content.Parent);
+                        Assert.Equal(BootstrapSurfaceRole.Body, surfaceA.SurfaceRole);
                         var pageA = new TabPage("A");
                         var pageB = new TabPage("B");
                         pageA.Controls.Add(hostA);
