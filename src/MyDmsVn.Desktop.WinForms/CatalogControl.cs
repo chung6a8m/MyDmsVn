@@ -32,8 +32,12 @@ namespace MyDmsVn.Desktop.WinForms
             _feedbackNotifications = notifications;
         }
         private readonly ErrorProvider _errors;
+        private readonly FieldValidationBinder _validationBinder;
+        private readonly List<IDisposable> _validationBindings = new List<IDisposable>();
         private readonly Dictionary<string, BootstrapTextBox> _editorControls =
             new Dictionary<string, BootstrapTextBox>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Label> _fieldHelp =
+            new Dictionary<string, Label>(StringComparer.Ordinal);
         private IReadOnlyList<int> _rowIds = Array.Empty<int>();
         private readonly SplitContainer _split;
         private readonly int _uiThreadId;
@@ -51,6 +55,8 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly Label _resultRange;
         private readonly Label _resultsState;
         private readonly Label _error;
+        private readonly Label _validationSummary;
+        private readonly BootstrapButton _firstErrorButton;
 
         public CatalogControl(ProductCatalogViewModel viewModel)
             : this(CreateBinding(viewModel))
@@ -129,7 +135,27 @@ namespace MyDmsVn.Desktop.WinForms
             _error.AccessibleRole = AccessibleRole.Alert;
             _error.Dock = DockStyle.Bottom;
             _error.Padding = new Padding(8);
+            _validationSummary = TextLabel("CatalogValidationSummary", string.Empty);
+            _validationSummary.AccessibleRole = AccessibleRole.Alert;
+            _validationSummary.AutoSize = true;
+            _firstErrorButton = new BootstrapButton { Name = "CatalogValidationNavigation", Text = "Go to first error", AccessibleName = "Go to first validation error", AutoSize = true, Outline = true };
+            _firstErrorButton.Click += (_, __) => FocusFirstValidationError();
             var editor = CreateEditorPanel();
+            _validationBinder = new FieldValidationBinder(_binding.ErrorSource, DispatchToUi);
+            foreach (var field in _binding.Fields)
+            {
+                var key = field.Key;
+                var control = _editorControls[key];
+                _validationBindings.Add(_validationBinder.Bind(key, control,
+                    state => control.ValidationState = state,
+                    message =>
+                    {
+                        _fieldHelp[key].Text = message;
+                        if (IsHandleCreated) _fieldHelp[key].Visible = message.Length != 0;
+                        _errors.SetError(control, message);
+                    }));
+            }
+            _validationBinder.Changed += OnValidationChanged;
             _split = new SplitContainer
             {
                 Dock = DockStyle.Fill,
@@ -187,7 +213,6 @@ namespace MyDmsVn.Desktop.WinForms
             Controls.Add(_toolbar);
             SearchBox.TextChanged += OnSearchTextChanged;
             _binding.PropertyChanged += OnViewModelPropertyChanged;
-            _binding.ErrorsChanged += OnErrorsChanged;
             BootstrapThemeManager.ThemeChanged += OnThemeChanged;
             BusinessCompactAppearance.Apply(this);
             SizeChanged += (_, __) => UpdateEditorPanelWidth();
@@ -231,9 +256,21 @@ namespace MyDmsVn.Desktop.WinForms
 
         public string GetFieldError(string field)
         {
+            // A control used before handle creation cannot BeginInvoke an async error event.
+            // The first UI-thread read projects the authoritative source; HandleCreated does likewise.
+            if (Thread.CurrentThread.ManagedThreadId == _uiThreadId) _validationBinder.Refresh();
             return _editorControls.TryGetValue(field, out var control)
                 ? _errors.GetError(control)
                 : string.Empty;
+        }
+
+        public string ValidationSummaryText => _validationSummary.Text;
+
+        public void FocusFirstValidationError()
+        {
+            var target = _validationBinder.Entries.FirstOrDefault(entry => entry.FocusTarget != null)?.FocusTarget;
+            if (target != null && target.CanFocus) target.Focus();
+            else if (_firstErrorButton.CanFocus) _firstErrorButton.Focus();
         }
 
         protected override void OnHandleCreated(EventArgs eventArgs)
@@ -248,7 +285,9 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 SearchBox.TextChanged -= OnSearchTextChanged;
                 _binding.PropertyChanged -= OnViewModelPropertyChanged;
-                _binding.ErrorsChanged -= OnErrorsChanged;
+                _validationBinder.Changed -= OnValidationChanged;
+                foreach (var binding in _validationBindings) binding.Dispose();
+                _validationBinder.Dispose();
                 BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
                 FeedbackScope.Dispose();
                 _binding.Dispose();
@@ -273,6 +312,8 @@ namespace MyDmsVn.Desktop.WinForms
             panel.Controls.Add(_heading);
             panel.Controls.Add(_selectedCode);
             panel.Controls.Add(_status);
+            panel.Controls.Add(_validationSummary);
+            panel.Controls.Add(_firstErrorButton);
             panel.Controls.Add(TextLabel("CatalogBasicInformation", "BASIC INFORMATION", "CompactSection"));
             var tabIndex = 2;
             foreach (var field in _binding.Fields)
@@ -294,6 +335,12 @@ namespace MyDmsVn.Desktop.WinForms
                 _editorControls.Add(field.Key, editor);
                 panel.Controls.Add(new Label { Text = field.Label, AutoSize = true });
                 panel.Controls.Add(editor);
+                var help = TextLabel("CatalogFieldHelp_" + field.Key, string.Empty);
+                help.AccessibleName = field.Label + " validation message";
+                help.Visible = false;
+                help.AutoSize = true;
+                _fieldHelp.Add(field.Key, help);
+                panel.Controls.Add(help);
             }
 
             var commands = new FlowLayoutPanel
@@ -375,7 +422,7 @@ namespace MyDmsVn.Desktop.WinForms
                 PageLabel.Text = $"Page {_binding.PageNumber} of {pageCount}";
                 PreviousPageButton.Enabled = !busy && _binding.PageNumber > 1;
                 NextPageButton.Enabled = !busy && _binding.PageNumber < pageCount;
-                ApplyErrors();
+                _validationBinder.Refresh();
             }
             finally
             {
@@ -500,17 +547,14 @@ namespace MyDmsVn.Desktop.WinForms
             DispatchToUi(ApplyState);
         }
 
-        private void OnErrorsChanged(object? sender, DataErrorsChangedEventArgs eventArgs)
+        private void OnValidationChanged(object? sender, EventArgs eventArgs)
         {
-            DispatchToUi(ApplyErrors);
-        }
-
-        private void ApplyErrors()
-        {
-            foreach (var field in _editorControls)
+            _validationSummary.Text = string.Join(Environment.NewLine,
+                _validationBinder.Entries.Select(entry => entry.FieldKey + ": " + entry.Message));
+            if (IsHandleCreated)
             {
-                var messages = _binding.GetErrors(field.Key).Cast<string>();
-                _errors.SetError(field.Value, string.Join(Environment.NewLine, messages));
+                _validationSummary.Visible = _validationSummary.Text.Length != 0;
+                _firstErrorButton.Visible = _validationBinder.Entries.Count != 0;
             }
         }
 
@@ -721,7 +765,7 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             private INotifyPropertyChanged PropertySource { get; }
-            private INotifyDataErrorInfo ErrorSource { get; }
+            public INotifyDataErrorInfo ErrorSource { get; }
             public Func<IReadOnlyList<CatalogDisplayRow>> Rows { get; }
             public IReadOnlyList<CatalogField> Fields { get; }
             public CatalogKind Kind { get; }

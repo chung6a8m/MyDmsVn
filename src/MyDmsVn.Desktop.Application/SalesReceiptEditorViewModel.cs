@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -17,6 +20,8 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     private readonly ISalesReceiptPreviewCalculator _calculator;
     private readonly ISalesCommandBufferAdmission _buffers;
     private readonly ObservableCollection<SalesReceiptLineViewModel> _lines = new ObservableCollection<SalesReceiptLineViewModel>();
+    private static readonly Regex LineFieldPattern = new Regex(@"^(?:request\.)?lines\[([0-9]+)\](?:\.(productId|qty|unitPrice|saleLineId))?$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private readonly long _sessionVersion;
     private CancellationTokenSource? _active;
     private long _operation;
@@ -88,6 +93,8 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     public decimal? TotalCost { get; private set; }
     public decimal? GrossProfit { get; private set; }
     public ApiError? Error { get; private set; }
+    public System.Collections.Generic.IReadOnlyList<SalesReceiptValidationIssue> ValidationIssues { get; private set; } =
+        Array.Empty<SalesReceiptValidationIssue>();
     private bool SessionCurrent => !_disposed && _session.IsAuthenticated && _session.Version == _sessionVersion;
     private bool CanRead => SessionCurrent && _read && !_denied;
 
@@ -131,7 +138,8 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     private SalesReceiptLineViewModel CreateRow()
     {
         SalesReceiptLineViewModel? row = null;
-        row = new SalesReceiptLineViewModel(() => CanEdit && _lines.Contains(row!), Dirty, _calculator);
+        row = new SalesReceiptLineViewModel(() => CanEdit && _lines.Contains(row!),
+            field => Dirty(row, field), _calculator);
         return row;
     }
     public bool RemoveLine(SalesReceiptLineViewModel line)
@@ -139,6 +147,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         lock (_sync)
         {
             if (!CanEdit || !_lines.Remove(line)) return false;
+            SetValidationIssues(ValidationIssues.Where(issue => !ReferenceEquals(issue.Line, line)).ToArray());
             if (ReferenceEquals(SelectedLine, line)) SelectedLine = null;
             Dirty(); return true;
         }
@@ -168,7 +177,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         lock (_sync)
         {
             if (!CanRead || _admitting || _busy == 2 || RequiresCreateOutcomeReview || RequiresPostOutcomeReload || id <= 0) return Task.CompletedTask;
-            ++_document;
+            ++_document; SetValidationIssues(Array.Empty<SalesReceiptValidationIssue>());
             return ReadAsync(id, false, false, token);
         }
     }
@@ -299,7 +308,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
             {
                 if (create && KnownRejection(result.Error!)) RequiresCreateOutcomeReview = false;
                 if (!create && result.Error!.Status == ApiStatusCode.Conflict) BeginPostRecovery(SaleId);
-                ErrorResult(result.Error!);
+                ErrorResult(result.Error!, rows);
                 PublishFailure(feedback, Error);
             }
             Notify();
@@ -317,6 +326,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     {
         var id = SaleId;
         var version = Version;
+        var rows = _lines.ToArray();
         BeginPostRecovery(id); Notify();
         var result = await _api.PostAsync(new PostSalesReceiptRequest(id, version), operation.Cancellation.Token).ConfigureAwait(false);
         var knownPosted = false;
@@ -336,7 +346,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
             {
                 if (KnownRejection(result.Error!) && result.Error!.Status != ApiStatusCode.Conflict)
                 { RequiresPostOutcomeReload = false; _postRecovery = null; }
-                ErrorResult(result.Error!);
+                ErrorResult(result.Error!, rows);
                 PublishFailure(feedback, Error);
             }
             Notify();
@@ -359,10 +369,37 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     {
         if (error != null) feedback?.Publish(new DesktopNotification(DesktopNotificationKind.Error, error.Message));
     }
-    private void ErrorResult(ApiError error)
+    private void ErrorResult(ApiError error, SalesReceiptLineViewModel[]? submitted = null)
     {
         if (SalesReceiptListViewModel.IsAuthorization(error)) { _denied = true; Scrub(); }
+        else SetValidationIssues(ProjectValidationIssues(error, submitted));
         Error = error;
+    }
+    private static IReadOnlyList<SalesReceiptValidationIssue> ProjectValidationIssues(
+        ApiError error, SalesReceiptLineViewModel[]? submitted)
+    {
+        return error.Details.Select(detail =>
+        {
+            var field = detail.Field ?? string.Empty;
+            var match = LineFieldPattern.Match(field);
+            if (submitted != null && match.Success &&
+                int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var index) &&
+                index < submitted.Length)
+            {
+                var member = match.Groups[2].Value;
+                var canonical = member.Equals("qty", StringComparison.OrdinalIgnoreCase) ? "qty" :
+                    member.Equals("unitPrice", StringComparison.OrdinalIgnoreCase) ? "unitPrice" :
+                    member.Equals("productId", StringComparison.OrdinalIgnoreCase) ? "productId" : "line";
+                return new SalesReceiptValidationIssue(submitted[index], canonical, detail.Code, detail.Message, "server");
+            }
+            return new SalesReceiptValidationIssue(null, field, detail.Code, detail.Message, "server");
+        }).ToArray();
+    }
+    private void SetValidationIssues(IReadOnlyList<SalesReceiptValidationIssue> issues)
+    {
+        if (ValidationIssues.SequenceEqual(issues)) return;
+        ValidationIssues = issues;
+        OnPropertyChanged(nameof(ValidationIssues));
     }
     private void BeginPostRecovery(long id)
     {
@@ -383,12 +420,19 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         CustomerIsActive = dto.CustomerIsActive; WarehouseIsActive = dto.WarehouseIsActive; EmployeeIsActive = dto.EmployeeIsActive;
         TotalCost = dto.TotalCost; GrossProfit = dto.GrossProfit; _postedAmount = dto.Status == "Posted" ? dto.TotalAmount : null;
         IsDirty = false;
+        SetValidationIssues(Array.Empty<SalesReceiptValidationIssue>());
         if (!_lines.SequenceEqual(rows)) { _lines.Clear(); foreach (var row in rows) _lines.Add(row); }
         SelectedLine = rows.FirstOrDefault(row => row.ClientKey == selectedKey);
         foreach (var row in rows) row.Notify();
         Notify();
     }
-    private void Dirty() { IsDirty = true; Error = null; Notify(); }
+    private void Dirty(SalesReceiptLineViewModel? line = null, string? field = null)
+    {
+        if (line != null)
+            SetValidationIssues(ValidationIssues.Where(issue => !ReferenceEquals(issue.Line, line) ||
+                !string.Equals(issue.Field, field, StringComparison.Ordinal)).ToArray());
+        IsDirty = true; Error = null; Notify();
+    }
     private Operation Begin(CancellationToken token, int busy)
     {
         _active?.Cancel();
@@ -414,7 +458,8 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     private void Invalidate() { ++_operation; _active?.Cancel(); _active = null; _busy = 0; }
     private void SessionChanged(object? sender, EventArgs args)
     {
-        lock (_sync) { Invalidate(); ++_document; _denied = true; _postRecovery = null; }
+        lock (_sync) { Invalidate(); ++_document; _denied = true; _postRecovery = null;
+            SetValidationIssues(Array.Empty<SalesReceiptValidationIssue>()); }
         _ = _ui.InvokeAsync(() => { lock (_sync) { Scrub(); Notify(); } }, CancellationToken.None);
     }
     private void Scrub()
@@ -424,6 +469,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         CustomerDisplayName = WarehouseDisplayName = EmployeeDisplayName = null;
         CustomerIsActive = WarehouseIsActive = EmployeeIsActive = true;
         TotalCost = GrossProfit = _postedAmount = null; IsDirty = false; Error = null;
+        SetValidationIssues(Array.Empty<SalesReceiptValidationIssue>());
     }
     public void Dispose()
     {
@@ -437,7 +483,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     private static ApiError InvalidResponse() => new ApiError(ApiStatusCode.InternalServerError, "SalesReceipt.InvalidResponse", "Reload the authoritative sale before continuing.");
     private void Notify()
     {
-        foreach (var name in new[] { nameof(SaleId), nameof(SaleNumber), nameof(Version), nameof(Status), nameof(PostedAtUtc), nameof(SaleDate), nameof(CustomerId), nameof(WarehouseId), nameof(EmployeeId), nameof(Note), nameof(IsDirty), nameof(IsBusy), nameof(IsAccessDenied), nameof(RequiresCreateOutcomeReview), nameof(RequiresPostOutcomeReload), nameof(CanEdit), nameof(TotalAmount), nameof(TotalCost), nameof(GrossProfit), nameof(Error), nameof(SelectedLine) })
+        foreach (var name in new[] { nameof(SaleId), nameof(SaleNumber), nameof(Version), nameof(Status), nameof(PostedAtUtc), nameof(SaleDate), nameof(CustomerId), nameof(WarehouseId), nameof(EmployeeId), nameof(Note), nameof(IsDirty), nameof(IsBusy), nameof(IsAccessDenied), nameof(RequiresCreateOutcomeReview), nameof(RequiresPostOutcomeReload), nameof(CanEdit), nameof(TotalAmount), nameof(TotalCost), nameof(GrossProfit), nameof(Error), nameof(SelectedLine), nameof(ValidationIssues) })
             OnPropertyChanged(name);
         foreach (var name in new[] { nameof(CustomerDisplayName), nameof(WarehouseDisplayName), nameof(EmployeeDisplayName), nameof(CustomerIsActive), nameof(WarehouseIsActive), nameof(EmployeeIsActive) })
             OnPropertyChanged(name);

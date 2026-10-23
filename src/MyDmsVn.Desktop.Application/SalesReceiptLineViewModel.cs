@@ -7,13 +7,13 @@ namespace MyDmsVn.Desktop.Application;
 public sealed class SalesReceiptLineViewModel : ObservableObject
 {
     private readonly Func<bool> _canEdit;
-    private readonly Action _changed;
+    private readonly Action<string> _changed;
     private readonly ISalesReceiptPreviewCalculator _calculator;
     private int _productId;
     private decimal _quantity = 1m;
     private decimal _unitPrice;
     private bool _isGift;
-    internal SalesReceiptLineViewModel(Func<bool> canEdit, Action changed, ISalesReceiptPreviewCalculator calculator)
+    internal SalesReceiptLineViewModel(Func<bool> canEdit, Action<string> changed, ISalesReceiptPreviewCalculator calculator)
     { _canEdit = canEdit; _changed = changed; _calculator = calculator; }
     public Guid ClientKey { get; } = Guid.NewGuid();
     public long SaleLineId { get; private set; }
@@ -24,19 +24,20 @@ public sealed class SalesReceiptLineViewModel : ObservableObject
         {
             if (!_canEdit() || _productId == value) return;
             _productId = value; Unit = ""; ProductDisplayName = null; ProductIsActive = true;
-            Notify(); _changed();
+            Notify(); _changed("productId");
         }
     }
     public bool SetProduct(int productId, string? displayName, bool isActive, string unit)
     {
         if (!_canEdit()) return false;
         if (_productId == productId && ProductDisplayName == displayName && ProductIsActive == isActive && Unit == (unit ?? "")) return true;
+        var identityChanged = _productId != productId;
         _productId = productId; ProductDisplayName = displayName; ProductIsActive = isActive; Unit = unit ?? "";
-        Notify(); _changed(); return true;
+        Notify(); _changed(identityChanged ? "productId" : ""); return true;
     }
-    public decimal Quantity { get => _quantity; set { if (_canEdit() && SetProperty(ref _quantity, value)) Changed(); } }
-    public decimal UnitPrice { get => _unitPrice; set { if (_canEdit() && SetProperty(ref _unitPrice, value)) Changed(); } }
-    public bool IsGift { get => _isGift; set { if (_canEdit() && SetProperty(ref _isGift, value)) Changed(); } }
+    public decimal Quantity { get => _quantity; set { if (_canEdit() && SetProperty(ref _quantity, value)) Changed("qty"); } }
+    public decimal UnitPrice { get => _unitPrice; set { if (_canEdit() && SetProperty(ref _unitPrice, value)) Changed("unitPrice"); } }
+    public bool IsGift { get => _isGift; set { if (_canEdit() && SetProperty(ref _isGift, value)) Changed("isGift"); } }
     public string Unit { get; private set; } = "";
     public string? ProductDisplayName { get; private set; }
     public bool ProductIsActive { get; private set; } = true;
@@ -53,7 +54,7 @@ public sealed class SalesReceiptLineViewModel : ObservableObject
         }
     }
     private decimal _storedAmount;
-    private void Changed() { OnPropertyChanged(nameof(LineAmount)); _changed(); }
+    private void Changed(string field) { OnPropertyChanged(nameof(LineAmount)); _changed(field); }
     internal void Apply(SalesReceiptLineDto line)
     {
         SaleLineId = line.SaleLineId; _productId = line.ProductId; _quantity = line.Qty;

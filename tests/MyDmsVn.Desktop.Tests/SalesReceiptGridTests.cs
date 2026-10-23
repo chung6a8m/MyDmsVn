@@ -38,7 +38,7 @@ public sealed class SalesReceiptGridTests
             using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
             Assert.Equal(new[] { "STT", "Product", "Unit", "Quantity", "Unit price", "Gift", "Line amount" },
                 Enumerable.Range(0, host.Grid.ColumnsCount).Select(c => host.Grid[0, c].DisplayText));
-            foreach (var c in new[] { 0, 2, 6 }) Assert.Null(host.Grid[1, c].Editor);
+            foreach (var c in new[] { 0, 2, 6 }) Assert.True(host.Grid[1, c].Editor == null, $"Read-only column {c} has editor {host.Grid[1, c].Editor?.GetType().Name}.");
             Assert.Null(host.Editor.TotalCost); Assert.Null(host.Editor.GrossProfit);
         }, TimeSpan.FromSeconds(15));
     }
@@ -141,6 +141,7 @@ internal sealed class SalesGuiApi : ISalesReceiptApiClient
     internal bool UnknownCreate;
     internal readonly List<SalesReceiptListRequest> Lists = new List<SalesReceiptListRequest>();
     internal SalesReceiptDto? NextUpdate;
+    internal ApiError? UpdateError;
     internal SalesReceiptDto? Current = null;
     internal TaskCompletionSource<ApiResponse<SalesReceiptDto>>? SaveBarrier;
     public readonly List<SaveSalesReceiptRequest> Creates = new List<SaveSalesReceiptRequest>();
@@ -153,7 +154,7 @@ internal sealed class SalesGuiApi : ISalesReceiptApiClient
     public Task<ApiResponse<SalesReceiptListPage>> ListAsync(SalesReceiptListRequest r, CancellationToken t) { Lists.Add(r); if (ListHandler != null) return ListHandler(t); return Task.FromResult(ApiResponse<SalesReceiptListPage>.Success(new SalesReceiptListPage(new[] { new SalesReceiptListRow(41, "SA0000000041", new DateTime(2026, 10, 22), 1, "C1 - Customer", 2, "W2 - Warehouse", 3, "E3 - Employee", "Draft", Current?.Lines.Count ?? 1, Current?.TotalAmount ?? 4m) }, "next", null))); }
     public Task<ApiResponse<SalesReceiptDto>> GetAsync(long id, CancellationToken t) { Gets.Add(id); if (GetHandler != null) return GetHandler(id); return Task.FromResult(ApiResponse<SalesReceiptDto>.Success(Current ?? Receipt(id, Posted))); }
     public Task<ApiResponse<SalesReceiptDto>> CreateDraftAsync(SaveSalesReceiptRequest r, CancellationToken t) { Creates.Add(r); if (UnknownCreate) return Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Test.UnknownCreate", "Review outcome"))); return Task.FromResult(ApiResponse<SalesReceiptDto>.Success(Receipt(41))); }
-    public Task<ApiResponse<SalesReceiptDto>> UpdateDraftAsync(UpdateSalesReceiptDraftRequest r, CancellationToken t) { Updates.Add(r); if (SaveBarrier != null) return SaveBarrier.Task; return Task.FromResult(ApiResponse<SalesReceiptDto>.Success(NextUpdate ?? Receipt(r.SaleId))); }
+    public Task<ApiResponse<SalesReceiptDto>> UpdateDraftAsync(UpdateSalesReceiptDraftRequest r, CancellationToken t) { Updates.Add(r); if (SaveBarrier != null) return SaveBarrier.Task; if (UpdateError != null) return Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(UpdateError)); return Task.FromResult(ApiResponse<SalesReceiptDto>.Success(NextUpdate ?? Receipt(r.SaleId))); }
     public Task<ApiResponse<PostSalesReceiptResponse>> PostAsync(PostSalesReceiptRequest r, CancellationToken t) { Posts.Add(r); if (PostHandler != null) return PostHandler(); return Task.FromResult(ApiResponse<PostSalesReceiptResponse>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Test.Unknown", "Unknown outcome"))); }
     public static SalesReceiptDto Receipt(long id, bool posted = false, bool active = true) => new SalesReceiptDto(id, "SA0000000041", new DateTime(2026, 10, 22), 1, 2, 3, posted ? "Posted" : "Draft", "note", posted ? new DateTime(2026, 10, 22, 0, 0, 0, DateTimeKind.Utc) : (DateTime?)null, "AQIDBAUGBwg=",
         new[] { new SalesReceiptLineDto(91, 1, 7, "box", 1m, 4m, false, 4m, posted ? 2m : (decimal?)null, posted ? 2m : (decimal?)null, "P7 - Product", active) }, 4m, posted ? 2m : (decimal?)null, posted ? 2m : (decimal?)null, "C1 - Customer", active, "W2 - Warehouse", active, "E3 - Employee", active);

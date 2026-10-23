@@ -1,7 +1,7 @@
 # UI Next — active roadmap for the SME desktop foundation
 
 **Date:** 2026-10-23
-**Status:** SOLE ACTIVE ROADMAP — T00 bounded implementation VERIFIED; T01 implemented with focused host evidence, acceptance partial; T02–T13 NOT STARTED
+**Status:** SOLE ACTIVE ROADMAP — T00–T02 implemented with bounded focused evidence; A01–A03 partial; T03–T13 NOT STARTED
 **Base:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`
 **Design:** [Design and control policy](20261023-design-and-control-policy.md)
 **Execution:** [Implementation plan](20261023-implementation-plan.md)
@@ -61,7 +61,7 @@ These defaults make implementation reviewable. They are planning decisions under
 
 ## Execution queue
 
-At activation all rows were **NOT STARTED**. [T00 evidence](evidence/20261023-t00-field-errors.md) verifies its bounded application/session contract; [T01 evidence](evidence/20261023-uin-t01-workspace-feedback.md) records implemented source and focused hosted checks, with remaining native theme/DPI and later package/Owner gates. T02–T13 remain NOT STARTED; T02 is the next ready task. Follow table order by default; independent work may proceed only after its listed dependencies and without conflicting file ownership.
+At activation all rows were **NOT STARTED**. [T00 evidence](evidence/20261023-t00-field-errors.md) verifies its bounded application/session contract; [T01 evidence](evidence/20261023-uin-t01-workspace-feedback.md) records implemented source and focused hosted checks; [T02 evidence](evidence/20261023-uin-t02-validation-pilot.md) records Product/Sales presentation and hosted native100 checks. Native125, package and Owner gates remain open. T03–T13 remain NOT STARTED; T03 is the next ready task. Follow table order by default; independent work may proceed only after its listed dependencies and without conflicting file ownership.
 
 | Task | Priority / outcome | Repository ownership | Dependencies | Completion evidence |
 |---|---|---|---|---|

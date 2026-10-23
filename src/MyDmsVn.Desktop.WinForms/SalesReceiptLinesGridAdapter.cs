@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using MyDmsVn.Bootstrap5WinFormUI.Formatting;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.BootstrapSourceGrid.Editors;
 using MyDmsVn.Desktop.Application;
 using SourceGrid;
@@ -26,6 +27,10 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
     private readonly ReceiptNumberEditor _price;
     private readonly List<SalesReceiptLineViewModel> _lines = new List<SalesReceiptLineViewModel>();
     private readonly List<(Cell Cell, LineController Controller)> _controllers = new List<(Cell, LineController)>();
+    private readonly InlineValidationStore _validation = new InlineValidationStore();
+    private readonly List<ValidationIssue> _unboundValidation = new List<ValidationIssue>();
+    private IReadOnlyList<SalesReceiptValidationIssue>? _serverIssues;
+    private long _validationDocument = 1;
     private CultureInfo _culture = CultureInfo.ReadOnly((CultureInfo)CultureInfo.CurrentCulture.Clone());
     private Session? _session;
     private long _generation;
@@ -122,11 +127,11 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         var row = AccessibleRow(generation, line);
         if (row <= 0) return "This receipt line is no longer available.";
 
-        var server = _editor.Error?.Message ?? "";
+        var issues = _validation.Get(ValidationAddress(line, column));
         var active = _session != null && ReferenceEquals(_session.Line, line) && _session.Column == column;
         var state = column == 1 ? $"Committed key: {line.ProductId}; Selected: {ProductCaption(line.ProductId)}" : "Committed value: " + AccessibleValue(generation, line, column);
         if (active && column == 1 && _product.BootstrapControl.HasPendingText) state = "Pending selection: " + _product.Control.Text + "; " + state;
-        return state + (active && EditError != null ? "; " + EditError : "") + (server.Length > 0 ? "; " + server : "");
+        return state + (issues.Count > 0 ? "; Validation error: " + string.Join("; ", issues.Select(issue => issue.Message)) : "");
     }
     internal void BeginAccessibleEdit(long generation, SalesReceiptLineViewModel line, int column)
     {
@@ -169,6 +174,99 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         if (_grid.Selection.Focus(position, true)) new CellContext(_grid, position).StartEdit();
     }
     internal void FocusActiveEdit() { if (_session != null && !_session.Input.Control.ContainsFocus) _session.Input.Control.Focus(); }
+    internal System.Windows.Forms.Control? ActiveValidationControl => _session != null && _session.Input.IsEditing ? _session.Input.Control : null;
+    internal string ActiveValidationMessage => _session == null ? "" :
+        string.Join("; ", _validation.Get(ValidationAddress(_session.Line, _session.Column)).Select(issue => issue.Message));
+    internal string? ValidationSummaryText
+    {
+        get
+        {
+            var targeted = _validation.Entries.SelectMany(entry =>
+            {
+                var row = _lines.FindIndex(line => ReferenceEquals(line, entry.Key.LineIdentity));
+                var column = ColumnForField(entry.Key.Field);
+                return entry.Key.DocumentGeneration == _validationDocument && row >= 0 && column >= 0
+                    ? entry.Value.Select(issue => (Row: row + 1, Column: column, Issue: issue))
+                    : Enumerable.Empty<(int Row, int Column, ValidationIssue Issue)>();
+            }).OrderBy(item => item.Row).ThenBy(item => item.Column)
+                .Select(item => $"Line {item.Row}{(item.Column == 0 ? "" : " " + ColumnName(item.Column))}: {item.Issue.Message}");
+            var messages = targeted.Concat(_unboundValidation.Select(issue => issue.Message)).ToArray();
+            return messages.Length == 0 ? null : string.Join(" | ", messages);
+        }
+    }
+    internal bool FocusFirstValidationError()
+    {
+        var target = FirstValidationTarget();
+        if (target == null || !Editable) return false;
+        FocusCell(target.Value.Line, target.Value.Column == 0 ? 1 : target.Value.Column);
+        FocusActiveEdit();
+        return _session != null && ReferenceEquals(_session.Line, target.Value.Line) &&
+            _session.Column == (target.Value.Column == 0 ? 1 : target.Value.Column);
+    }
+    internal void ResetValidationDocument()
+    {
+        ++_validationDocument;
+        _serverIssues = null;
+        _validation.ClearAll(); _unboundValidation.Clear();
+        RefreshValidationAppearance();
+    }
+    internal void SetServerIssues(IReadOnlyList<SalesReceiptValidationIssue> issues)
+    {
+        if (ReferenceEquals(_serverIssues, issues)) return;
+        _serverIssues = issues;
+        _validation.ClearSource("server"); _unboundValidation.Clear();
+        foreach (var issue in issues)
+        {
+            var mapped = new ValidationIssue(issue.Code, issue.Message, issue.Source);
+            var column = ColumnForField(issue.Field);
+            if (issue.Line == null || column < 0 || !_editor.Lines.Any(line => ReferenceEquals(line, issue.Line)))
+            { _unboundValidation.Add(new ValidationIssue(issue.Code, issue.Field + ": " + issue.Message, issue.Source)); continue; }
+            var address = ValidationAddress(issue.Line, column);
+            var prior = _validation.Get(address).Where(existing => existing.Source == "server");
+            _validation.SetSource(address, "server", prior.Concat(new[] { mapped }).ToArray());
+        }
+        RefreshValidationAppearance();
+        EditStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+    private (SalesReceiptLineViewModel Line, int Row, int Column, ValidationIssue Issue)? FirstValidationTarget()
+    {
+        var target = _validation.Entries.Select(entry =>
+        {
+            var row = _lines.FindIndex(line => ReferenceEquals(line, entry.Key.LineIdentity));
+            return (Generation: entry.Key.DocumentGeneration, Row: row, Column: ColumnForField(entry.Key.Field), Issues: entry.Value);
+        }).Where(item => item.Generation == _validationDocument && item.Row >= 0 && item.Column >= 0 && item.Issues.Count > 0)
+            .OrderBy(item => item.Row).ThenBy(item => item.Column).FirstOrDefault();
+        return target.Issues == null ? null : (_lines[target.Row], target.Row + 1, target.Column, target.Issues[0]);
+    }
+    private InlineValidationAddress ValidationAddress(SalesReceiptLineViewModel line, int column) =>
+        new InlineValidationAddress(_validationDocument, line, FieldForColumn(column));
+    private static string FieldForColumn(int column) => column == 0 ? "line" : column == 1 ? "productId" : column == 3 ? "qty" : column == 4 ? "unitPrice" : "unknown";
+    private static int ColumnForField(string field) => string.Equals(field, "line", StringComparison.OrdinalIgnoreCase) ? 0 :
+        string.Equals(field, "productId", StringComparison.OrdinalIgnoreCase) ? 1 :
+        string.Equals(field, "qty", StringComparison.OrdinalIgnoreCase) ? 3 : string.Equals(field, "unitPrice", StringComparison.OrdinalIgnoreCase) ? 4 : -1;
+    internal string AccessibleRowValidation(long generation, SalesReceiptLineViewModel line) =>
+        AccessibleRow(generation, line) <= 0 ? "" : string.Join("; ", _validation.Get(ValidationAddress(line, 0)).Select(issue => issue.Message));
+    private static string ColumnName(int column) => column == 1 ? "Product" : column == 3 ? "Quantity" : "Unit price";
+    private void RefreshValidationAppearance()
+    {
+        if (_disposed || _grid.IsDisposed) return;
+        RefreshAppearance();
+        RefreshActiveValidation();
+        _grid.Invalidate();
+    }
+    private void RefreshActiveValidation()
+    {
+        if (_session == null) return;
+        if (_session.Input.Control is BootstrapTextBox input)
+            input.ValidationState = ActiveValidationMessage.Length == 0 ? BootstrapValidationState.None : BootstrapValidationState.Invalid;
+        _session.Input.Control.AccessibleDescription = AccessibleHelp(_generation, _session.Line, _session.Column);
+    }
+    private static void ClearActiveValidation(Session? session)
+    {
+        if (session == null) return;
+        if (session.Input.Control is BootstrapTextBox input) input.ValidationState = BootstrapValidationState.None;
+        session.Input.Control.AccessibleDescription = "";
+    }
     private string? _editError;
     internal event EventHandler? EditStateChanged;
     internal event Action<Task>? LookupOperationStarted;
@@ -182,6 +280,10 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         {
             if (_editError == value) return;
             _editError = value;
+            if (_session != null)
+                _validation.SetSource(ValidationAddress(_session.Line, _session.Column), "local",
+                    value == null ? Array.Empty<ValidationIssue>() : new[] { new ValidationIssue("Desktop.InvalidCell", value, "local") });
+            RefreshValidationAppearance();
             EditStateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -215,6 +317,8 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
     {
         var session = _session;
         _session = null; // Invalidate callbacks before native cancellation/focus events.
+        ClearActiveValidation(session);
+        if (session != null) _validation.SetSource(ValidationAddress(session.Line, session.Column), "local", Array.Empty<ValidationIssue>());
         if (session != null && !_grid.IsDisposed && session.Input.IsEditing)
             session.Input.EditCellContext.EndEdit(true);
         EditError = null;
@@ -228,6 +332,7 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
 
     internal void ResetDocument(IReadOnlyList<SalesReceiptLineViewModel> lines)
     {
+        ResetValidationDocument();
         Rebuild(lines, true);
         // Explicit document reset is the final mapping boundary after the VM's incremental
         // Clear/Add load notifications. A missing persisted target now settles on the fallback.
@@ -329,6 +434,7 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
             " row " + context.Position.Row + " editor";
         input.Control.AccessibleDescription = AccessibleHelp(_generation, controller.Line, controller.Column);
         EditError = null;
+        RefreshActiveValidation();
     }
 
     private void ConvertCandidate(object? sender, DevAge.ComponentModel.ConvertingObjectEventArgs e)
@@ -400,6 +506,8 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         if (_session != null && controller.Generation == _session.Generation && ReferenceEquals(context.Cell, _session.Context.Cell))
         {
             var wasProduct = _session.Column == 1;
+            _validation.SetSource(ValidationAddress(_session.Line, _session.Column), "local", Array.Empty<ValidationIssue>());
+            ClearActiveValidation(_session);
             _session = null;
             EditError = null;
             if (wasProduct && !_disposed) SearchProducts(null);
@@ -514,6 +622,14 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
                     else _grid[row, column].View = view;
                 }
             }
+            for (var row = 1; row < _grid.RowsCount; row++)
+                foreach (var column in new[] { 0, 1, 3, 4 })
+                    if (_validation.Get(ValidationAddress(_lines[row - 1], column)).Count > 0)
+                    {
+                        var view = (SourceGrid.Cells.Views.Cell)_grid[row, column].View;
+                        view.BackColor = dark ? System.Drawing.Color.FromArgb(85, 38, 45) : System.Drawing.Color.FromArgb(255, 231, 232);
+                        view.ForeColor = dark ? System.Drawing.Color.FromArgb(255, 237, 237) : System.Drawing.Color.FromArgb(135, 21, 31);
+                    }
             _grid.ArrangeLinkedControls();
         }
         finally { _sizing = false; }
@@ -547,6 +663,9 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
     private void OnOptionsChanged(object? sender, PropertyChangedEventArgs e) => Dispatch(() => { BindProductOptions(); RefreshProjection(); });
     private void OnLinesChanged(object? sender, NotifyCollectionChangedEventArgs e) => Dispatch(() =>
     {
+        foreach (var entry in _validation.Entries)
+            if (entry.Key.DocumentGeneration == _validationDocument && !_editor.Lines.Any(line => ReferenceEquals(line, entry.Key.LineIdentity)))
+                _validation.Clear(entry.Key);
         if (_session != null && _editor.Lines.IndexOf(_session.Line) == _session.Context.Position.Row - 1)
         {
             _structurePending = true;

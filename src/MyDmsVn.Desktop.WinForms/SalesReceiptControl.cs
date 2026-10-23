@@ -111,6 +111,8 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         TotalLabel = Summary("Sales total"); CostLabel = Summary("Posted total cost"); ProfitLabel = Summary("Posted gross profit");
         LineCostLabel = Summary("Selected line posted cost"); StockLabel = Summary("Stock availability");
         OperationStatusLabel = new Label { Name = "CompactSecondary", AutoSize = true, AccessibleName = "Sales operation status" };
+        ValidationSummaryButton = Button("Review validation", () => _inline.FocusFirstValidationError());
+        ValidationSummaryButton.AccessibleName = "Review sales validation error";
         AppliedCriteriaLabel = new Label { AutoSize = true, AccessibleName = "Applied sales filters" };
         _errors = new ErrorProvider { ContainerControl = this, BlinkStyle = ErrorBlinkStyle.NeverBlink };
         CreateLayout(); BusinessCompactAppearance.Apply(this);
@@ -163,6 +165,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     public Label LineCostLabel { get; }
     public Label StockLabel { get; }
     public Label OperationStatusLabel { get; }
+    public BootstrapButton ValidationSummaryButton { get; }
     public Label AppliedCriteriaLabel { get; }
     public Task LastOperation { get; private set; } = Task.CompletedTask;
     internal ReceiptWorkspaceMode WorkspaceMode { get; private set; } = ReceiptWorkspaceMode.List;
@@ -280,7 +283,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     }
     private void CancelBoundary(bool advanceDocument = true)
     {
-        if (advanceDocument) FeedbackScope.AdvanceDocument();
+        if (advanceDocument) { FeedbackScope.AdvanceDocument(); _inline.ResetValidationDocument(); }
         ++_boundary; InvalidateProductRequests();
         _inline.CancelActiveEdit(); _products.Cancel();
         foreach (var binding in _lookups) { binding.ViewModel.Cancel(); binding.Control.CancelPendingEdit(); }
@@ -356,6 +359,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
             SynchronizeLookup(EmployeeLookup, Editor.EmployeeId, Editor.EmployeeDisplayName, Editor.EmployeeIsActive);
             foreach (var binding in _lookups.Where(item => item.Filter)) { binding.Control.Enabled = _read && !Busy; binding.Control.DataSource = binding.ViewModel.Items.Where(item => item.IsAvailableForNewSelection).ToArray(); }
             _inline.RefreshEditability();
+            _inline.SetServerIssues(Editor.ValidationIssues);
             TotalLabel.Text = "Total: " + (Editor.TotalAmount.HasValue ? Money(Editor.TotalAmount) : "Invalid amount"); CostLabel.Text = "Posted cost: " + Money(Editor.TotalCost); ProfitLabel.Text = "Gross profit: " + Money(Editor.GrossProfit);
             var selected = _inline.SelectedLine;
             LineCostLabel.Text = "Selected line cost: " + Money(selected?.CostAmount) + " · Unit cost: " + (selected?.PostedUnitCost?.ToString("0.########") ?? "Not posted");
@@ -364,6 +368,14 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
             ReviewCreateButton.Enabled = _read && !Busy;
             OperationStatusLabel.Text = _inline.EditError ?? Editor.Error?.Message ?? _list.Error?.Message ?? _message ?? "Ready";
             _errors.SetError(LineGrid, _inline.EditError ?? "");
+            foreach (var input in new Control[] { ProductLookup, QuantityEditor, UnitPriceEditor }) _errors.SetError(input, "");
+            if (_inline.ActiveValidationControl is Control activeInput)
+                _errors.SetError(activeInput, _inline.ActiveValidationMessage);
+            var validation = _inline.ValidationSummaryText;
+            ValidationSummaryButton.Visible = detail && validation != null;
+            ValidationSummaryButton.Enabled = detail && Current && !Busy && validation != null;
+            ValidationSummaryButton.Text = validation ?? "Review validation";
+            ValidationSummaryButton.AccessibleDescription = validation ?? "";
             AppliedCriteriaLabel.Text = _list.AppliedCriteria == null ? "No applied results" : !_criteriaDirty && ReferenceEquals(_list.AppliedCriteria, _list.PendingCriteria) ? "Applied filters · " + _list.Items.Count + " sales" : "Pending criteria · previous results retained";
             FirstPageButton.Enabled = _read && !Busy; PreviousPageButton.Enabled = !_criteriaDirty && _list.CanPrevious && !Busy; NextPageButton.Enabled = !_criteriaDirty && _list.CanNext && !Busy;
             ApplyFiltersButton.Enabled = _read && !Busy;
@@ -422,7 +434,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
         var lineCommands = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true }; lineCommands.Controls.AddRange(new Control[] { AddLineButton, RemoveLineButton });
         var summary = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true }; summary.Controls.AddRange(new Control[] { TotalLabel, CostLabel, ProfitLabel, LineCostLabel, StockLabel });
         _detail.Controls.Add(LineGrid); _detail.Controls.Add(lineCommands); _detail.Controls.Add(metadata); _detail.Controls.Add(summary);
-        var status = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true }; status.Controls.Add(OperationStatusLabel);
+        var status = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true }; status.Controls.Add(OperationStatusLabel); status.Controls.Add(ValidationSummaryButton);
         Controls.Add(_master); Controls.Add(_detail); Controls.Add(commands); Controls.Add(status);
     }
     private static Control Field(string label, Control editor)

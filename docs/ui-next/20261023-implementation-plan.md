@@ -12,7 +12,7 @@
 
 ## Global constraints
 
-- T00 has bounded implementation evidence and T01 has implemented source with focused hosted evidence; T02–T13 remain NOT STARTED. Proposed filenames/types for later tasks are NEW until implemented; existing file paths are baseline anchors, not proof of passing tests.
+- T00–T02 have bounded implementation evidence; T03–T13 remain NOT STARTED. Proposed filenames/types for later tasks are NEW until implemented; existing file paths are baseline anchors, not proof of passing tests.
 - Preserve the current business/runtime/security/decimal/recovery invariants in AGENTS. No schema, business feature, new permission or runtime migration is needed.
 - Archived unfinished SAL/BCF/release work is excluded. Do not make old T07/T08 closure, old full-SQL acceptance or old visual exceptions a prerequisite.
 - Work in small coherent slices; use existing passing characterization for a pure refactor and meaningful failing behavior tests for a demonstrated gap. Do not fabricate RED or broaden runs without a concrete risk.
@@ -87,12 +87,12 @@ The app consumes BSG at `vendor/MyDmsVn.BootstrapSourceGrid`; its UI source is `
 
 **Interfaces:** binder consumes existing `INotifyDataErrorInfo` and `BootstrapValidationState`. Proposed `FieldValidationBinder.Bind(string fieldKey, Control focusTarget, Action<BootstrapValidationState> setState, Action<string> setMessage): IDisposable`, with error source injected at construction. Proposed internal `InlineValidationAddress(long documentGeneration, object lineIdentity, string field)` uses reference identity for the line; `InlineValidationStore.Set(address, IReadOnlyList<ValidationIssue>)`, `Get(address)` and `Clear(address)` project the same state. `ValidationIssue` contains Code/Message/Source, no control or SQL object. T03 reuses this identity; no second competing row-key model.
 
-- [ ] Demonstrate the visual gaps with duplicate Code and invalid inline quantity/price: target state/message plus accessible summary must identify the correct editor/cell without losing raw input.
-- [ ] Implement binder subscriptions/disposal and one shared error source; use `ValidationState.Invalid`, readable field help and supplemental ErrorProvider. Unknown fields remain visible at workspace level.
-- [ ] Add stable cell/row indicators for inactive editors and summary navigation. Map indexed server errors using the submitted-row snapshot; test duplicate zero-ID lines, remove/reorder and document/session replacement.
-- [ ] Preserve current R4 tests: corrected/canceled inline validation clears its own footer/provider without clearing independent operation feedback. Clear only obsolete relevant errors; do not declare server uniqueness valid on local typing.
-- [ ] Run focused Product/Sales native and accessibility cases in Light/Dark; test keyboard-only access and no passive focus theft. Keep library control defaults unchanged.
-- [ ] Record the Product/Sales pilot evidence and binding example, then commit. Full catalog/Goods/inventory adoption is T11.
+- [x] Demonstrate the visual gaps with duplicate Code and invalid inline quantity/price: target state/message plus accessible summary must identify the correct editor/cell without losing raw input.
+- [x] Implement binder subscriptions/disposal and one shared error source; use `ValidationState.Invalid`, readable field help and supplemental ErrorProvider. Unknown fields remain visible at workspace level.
+- [x] Add stable cell/row indicators for inactive editors and summary navigation. Map indexed server errors using the submitted-row snapshot; test duplicate zero-ID lines, remove/reorder and document/session replacement.
+- [x] Preserve current R4 tests: corrected/canceled inline validation clears its own footer/provider without clearing independent operation feedback. Clear only obsolete relevant errors; do not declare server uniqueness valid on local typing.
+- [x] Run focused Product/Sales native and accessibility cases in Light/Dark at measured native100; test keyboard-only access and no passive focus theft. Keep library control defaults unchanged. Native125 remains a validation gap.
+- [x] Record the Product/Sales pilot [evidence](evidence/20261023-uin-t02-validation-pilot.md) and binding example, then commit. Full catalog/Goods/inventory adoption is T11.
 
 ## UIN-T03 — App-local common inline edit sessions
 
