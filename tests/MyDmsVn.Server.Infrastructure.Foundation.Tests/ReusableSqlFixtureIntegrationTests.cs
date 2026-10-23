@@ -18,10 +18,11 @@ public sealed class ReusableSqlFixtureIntegrationTests
         "Users", "Roles", "UserRoles", "RolePermissions", "UserPermissions",
         "SystemSecuritySettings", "Products", "Warehouses", "Employees", "Customers",
         "GoodsReceipts", "GoodsReceiptLines", "StockLedger", "StockBalances", "SecurityAuditEvents",
+        "SalesReceipts", "SalesReceiptLines", "StockValuationEntries",
     };
 
     private const string SeedSql = @"
-DECLARE @u int, @r int, @w int, @p int, @e int, @g bigint, @l bigint;
+DECLARE @u int, @r int, @w int, @p int, @e int, @g bigint, @l bigint, @c int, @s bigint;
 INSERT dbo.Users (Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm)
 VALUES (N'probe',N'PROBE',N'Probe',N'Local',N'hash',N'',N'BCrypt');
 SET @u=SCOPE_IDENTITY();
@@ -33,16 +34,60 @@ INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) VA
 INSERT dbo.Warehouses(Code,Name) VALUES(N'W',N'Warehouse'); SET @w=SCOPE_IDENTITY();
 INSERT dbo.Products(Code,Name,Unit) VALUES(N'P',N'Product',N'EA'); SET @p=SCOPE_IDENTITY();
 INSERT dbo.Employees(Code,Name,UserId) VALUES(N'E',N'Employee',@u); SET @e=SCOPE_IDENTITY();
-INSERT dbo.Customers(Code,Name) VALUES(N'C',N'Customer');
+INSERT dbo.Customers(Code,Name) VALUES(N'C',N'Customer'); SET @c=SCOPE_IDENTITY();
 INSERT dbo.GoodsReceipts(ReceiptNo,ReceiptDate,WarehouseId,EmployeeId,CreatedByUserId)
 VALUES(N'probe-receipt','20261018',@w,@e,@u); SET @g=SCOPE_IDENTITY();
 INSERT dbo.GoodsReceiptLines(ReceiptId,[LineNo],ProductId,Quantity,UnitCost,CreatedByUserId)
 VALUES(@g,1,@p,2,3,@u); SET @l=SCOPE_IDENTITY();
 INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId)
 VALUES(@w,@p,'GoodsReceipt',@g,@l,2,SYSUTCDATETIME(),@u);
-INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity) VALUES(@w,@p,2);
+INSERT dbo.StockValuationEntries(LedgerId,ValueChange) VALUES(SCOPE_IDENTITY(),6);
+INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@w,@p,2,6);
+INSERT dbo.SalesReceipts(SaleNo,SaleDate,WarehouseId,EmployeeId,CustomerId,CreatedByUserId)
+VALUES(N'probe-sale','20261018',@w,@e,@c,@u); SET @s=SCOPE_IDENTITY();
+INSERT dbo.SalesReceiptLines(SaleId,[LineNo],ProductId,Qty,Unit,IsGift,UnitPrice,LineAmount,CreatedByUserId)
+VALUES(@s,1,@p,1,N'EA',0,5,5,@u);
 INSERT dbo.SecurityAuditEvents(ActorUserId,TargetType,TargetId,Operation,CorrelationId)
 VALUES(@u,N'User',@u,N'Probe',NEWID());";
+
+    [SqlServerFact]
+    public async Task Fresh_and_reuse_have_equivalent_sales_and_value_contamination_boundaries()
+    {
+        foreach (var mode in new[] { SqlFixtureRunMode.Fresh, SqlFixtureRunMode.Reuse })
+        {
+            var fixture = ReusableSqlFixture.CreateApplication(mode);
+            try
+            {
+                for (var iteration = 0; iteration < 2; iteration++)
+                {
+                    var scope = await fixture.BeginTestAsync("SalesValueContamination", async (owned, _) =>
+                    {
+                        using var connection = new SqlConnection(owned.ConnectionString);
+                        foreach (var table in MutableTables)
+                        {
+                            Assert.Equal(0L, await connection.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.[" + table + "];"));
+                        }
+                        await AssertTriggerAsync(connection);
+                        Assert.Equal(1L, await connection.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.SalesReceiptNumberSequence;"));
+                        await connection.ExecuteAsync(SeedSql);
+                    });
+                    try
+                    {
+                        using var connection = new SqlConnection(scope.ConnectionString);
+                        foreach (var table in MutableTables)
+                        {
+                            Assert.Equal(1L, await connection.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.[" + table + "];"));
+                        }
+                        Assert.Equal(0, await connection.QuerySingleAsync<int>(@"
+SELECT COUNT(*) FROM dbo.StockValuationEntries v LEFT JOIN dbo.StockLedger l ON l.LedgerId=v.LedgerId WHERE l.LedgerId IS NULL;"));
+                    }
+                    finally { await scope.DisposeAsync(); }
+                }
+                Assert.False(fixture.IsPoisoned);
+            }
+            finally { await fixture.DisposeAsync(); }
+        }
+    }
 
     [SqlServerFact]
     public Task Empty_ledger_reset_restores_append_only_trigger() => WithDatabaseAsync(async database =>
@@ -95,10 +140,12 @@ SELECT CONVERT(decimal(38,0), i.last_value) FROM sys.identity_columns i
 JOIN sys.tables t ON t.object_id=i.object_id
 WHERE t.is_ms_shipped=0 AND SCHEMA_NAME(t.schema_id)=N'dbo' AND t.name<>N'SchemaVersions'
 ORDER BY i.object_id;")).ToArray();
-            Assert.Equal(13, identityValues.Length);
+            Assert.Equal(15, identityValues.Length);
             Assert.All(identityValues, value => Assert.Equal(1m, value));
             Assert.Equal(1L, await connection.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.GoodsReceiptNumberSequence;"));
             Assert.Equal(2L, await connection.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.GoodsReceiptNumberSequence;"));
+            Assert.Equal(1L, await connection.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.SalesReceiptNumberSequence;"));
+            Assert.Equal(2L, await connection.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.SalesReceiptNumberSequence;"));
         }
     });
 
@@ -162,6 +209,8 @@ ORDER BY i.object_id;")).ToArray();
             "CREATE USER reset_probe WITHOUT LOGIN;",
             "ALTER TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger INSTEAD OF UPDATE,DELETE AS RETURN;",
             "DISABLE TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger;",
+            "ALTER TRIGGER dbo.TR_StockValuationEntries_AppendOnly ON dbo.StockValuationEntries INSTEAD OF UPDATE,DELETE AS RETURN;",
+            "DISABLE TRIGGER dbo.TR_StockValuationEntries_AppendOnly ON dbo.StockValuationEntries;",
         })
         {
             await WithDatabaseAsync(async database =>
@@ -223,7 +272,7 @@ ORDER BY i.object_id;")).ToArray();
         {
             if (fail)
             {
-                using var command = new SqlCommand("DROP TRIGGER dbo.TR_StockLedger_AppendOnly; THROW 51099, 'Expected reset fault.', 1;", connection);
+                using var command = new SqlCommand("IF EXISTS(SELECT 1 FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_StockValuationEntries_AppendOnly') AND is_disabled=1) BEGIN DROP TRIGGER dbo.TR_StockLedger_AppendOnly; THROW 51099, 'Expected reset fault.', 1; END;", connection);
                 await command.ExecuteNonQueryAsync(token);
             }
         });
@@ -232,7 +281,63 @@ ORDER BY i.object_id;")).ToArray();
         Assert.Equal(2, error.InnerExceptions.Count);
         Assert.Contains(error.InnerExceptions, e => e is SqlException sql && sql.Number == 51099);
         Assert.True(profile.IsPoisoned);
+        // A damaged ledger trigger must not prevent restoration of its independent companion.
+        using var observer = new SqlConnection(database.ConnectionString);
+        await AssertValuationTriggerAsync(observer);
         await Assert.ThrowsAsync<InvalidOperationException>(() => profile.ResetAsync());
+    });
+
+    [SqlServerFact]
+    public async Task Cancellation_between_each_trigger_disable_restores_both_protections()
+    {
+        foreach (var cancelAfter in new[] { 1, 2 })
+        {
+            await WithDatabaseAsync(async database =>
+            {
+                var observe = false;
+                var disabled = 0;
+                using var cancellation = new CancellationTokenSource();
+                var profile = await RespawnResetProfile.CreateAsync(database, afterTriggerDisabled: (_, token) =>
+                {
+                    if (observe && ++disabled == cancelAfter)
+                    {
+                        cancellation.Cancel();
+                        token.ThrowIfCancellationRequested();
+                    }
+                    return Task.CompletedTask;
+                });
+                observe = true;
+                await Assert.ThrowsAnyAsync<Exception>(() => profile.ResetAsync(cancellation.Token));
+                Assert.Equal(cancelAfter, disabled);
+                Assert.True(profile.IsPoisoned);
+                using var observer = new SqlConnection(database.ConnectionString);
+                await AssertTriggerAsync(observer);
+                await Assert.ThrowsAsync<InvalidOperationException>(() => profile.VerifyAsync());
+            });
+        }
+    }
+
+    [SqlServerFact]
+    public Task Companion_restoration_failure_does_not_leave_ledger_disabled() => WithDatabaseAsync(async database =>
+    {
+        var fail = false;
+        var profile = await RespawnResetProfile.CreateAsync(database, afterTriggerDisabled: async (connection, token) =>
+        {
+            if (fail)
+            {
+                using var command = new SqlCommand("IF EXISTS(SELECT 1 FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_StockValuationEntries_AppendOnly') AND is_disabled=1) BEGIN DROP TRIGGER dbo.TR_StockValuationEntries_AppendOnly; THROW 51099, 'Expected reset fault.', 1; END;", connection);
+                await command.ExecuteNonQueryAsync(token);
+            }
+        });
+        fail = true;
+        var error = await Assert.ThrowsAsync<AggregateException>(() => profile.ResetAsync());
+        Assert.Contains(error.InnerExceptions, e => e is SqlException sql && sql.Number == 51099);
+        using var observer = new SqlConnection(database.ConnectionString);
+        Assert.Equal(0, await observer.QuerySingleAsync<int>(
+            "SELECT is_disabled FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_StockLedger_AppendOnly');"));
+        var denied = await Assert.ThrowsAsync<SqlException>(() => observer.ExecuteAsync("DELETE dbo.StockLedger;"));
+        Assert.Equal(51000, denied.Number);
+        Assert.True(profile.IsPoisoned);
     });
 
     [SqlServerFact]
@@ -320,6 +425,7 @@ SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id=@resetSession;", new 
 
     private static async Task AssertTriggerAsync(SqlConnection connection)
     {
+        await AssertValuationTriggerAsync(connection);
         Assert.Equal(1, await connection.QuerySingleAsync<int>(@"
 SELECT COUNT(*) FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_StockLedger_AppendOnly')
 AND parent_id=OBJECT_ID(N'dbo.StockLedger') AND is_disabled=0 AND is_instead_of_trigger=1;"));
@@ -327,6 +433,18 @@ AND parent_id=OBJECT_ID(N'dbo.StockLedger') AND is_disabled=0 AND is_instead_of_
         Assert.Contains("THROW 51000", definition, StringComparison.Ordinal);
         var error = await Assert.ThrowsAsync<SqlException>(() => connection.ExecuteAsync("DELETE dbo.StockLedger;"));
         Assert.Equal(51000, error.Number);
+    }
+
+    private static async Task AssertValuationTriggerAsync(SqlConnection connection)
+    {
+        Assert.Equal(1, await connection.QuerySingleAsync<int>(@"
+SELECT COUNT(*) FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_StockValuationEntries_AppendOnly')
+AND parent_id=OBJECT_ID(N'dbo.StockValuationEntries') AND is_disabled=0 AND is_instead_of_trigger=1;"));
+        foreach (var sql in new[] { "DELETE dbo.StockValuationEntries;", "UPDATE dbo.StockValuationEntries SET ValueChange=ValueChange;" })
+        {
+            var error = await Assert.ThrowsAsync<SqlException>(() => connection.ExecuteAsync(sql));
+            Assert.Equal(51000, error.Number);
+        }
     }
 
     private static async Task WithDatabaseAsync(Func<SqlTestDatabase, Task> scenario)

@@ -434,6 +434,7 @@ internal sealed class PostGoodsReceiptCommandHandler
             .ConfigureAwait(false);
         unitOfWork.BeginTransaction();
         var repository = unitOfWork.Repository<IGoodsReceiptWriteRepository>();
+        await repository.AcquirePostingGateAsync(cancellationToken).ConfigureAwait(false);
         var header = await repository
             .LockHeaderAsync(command.Request.ReceiptId, cancellationToken)
             .ConfigureAwait(false);
@@ -462,6 +463,26 @@ internal sealed class PostGoodsReceiptCommandHandler
             return ErrorOrFactory.From<PostGoodsReceiptResponse>(validationErrors);
         }
 
+        var balances = await repository.LockValuationBalancesAsync(header.WarehouseId,
+            snapshot.Lines.Select(line => line.ProductId).ToArray(), cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var values = snapshot.Lines.ToDictionary(line => line.Id,
+                line => InventoryValuationMath.CalculateReceiptValue(line.Quantity, line.UnitCost));
+            InventoryValuationMath.SumAmounts(values.Values);
+            foreach (var group in snapshot.Lines.GroupBy(line => line.ProductId))
+            {
+                var balance = balances[group.Key];
+                var quantity = InventoryValuationMath.SumQuantities(group.Select(line => line.Quantity).Prepend(balance.Quantity));
+                var value = InventoryValuationMath.SumAmounts(group.Select(line => values[line.Id]).Prepend(balance.InventoryValue));
+                _ = new StockValuationState(quantity, value);
+            }
+        }
+        catch (Exception error) when (error is OverflowException || error is ArgumentException)
+        {
+            return Error.Validation("GoodsReceipt.ValuationOutOfRange", "Receipt value or resulting stock exceeds the supported range.");
+        }
+
         var postedAtUtc = _clock.UtcNow;
         var marked = await repository.TryMarkPostedAsync(
             header.Id,
@@ -474,21 +495,8 @@ internal sealed class PostGoodsReceiptCommandHandler
             return ConcurrencyConflict();
         }
 
-        await repository.AppendStockLedgerAsync(
-            header.Id,
-            header.WarehouseId,
-            snapshot.Lines,
-            postedAtUtc,
-            command.AuthorizedUserId,
-            cancellationToken).ConfigureAwait(false);
-        var deltas = snapshot.Lines
-            .GroupBy(line => line.ProductId)
-            .OrderBy(group => group.Key)
-            .ToDictionary(group => group.Key, group => group.Sum(line => line.Quantity));
-        await repository.ApplyStockBalanceDeltasAsync(
-            header.WarehouseId,
-            deltas,
-            cancellationToken).ConfigureAwait(false);
+        await repository.ApplyPostedInventoryAsync(header, snapshot.Lines, postedAtUtc,
+            command.AuthorizedUserId, cancellationToken).ConfigureAwait(false);
 
         unitOfWork.Commit();
         await _auditWriter.WriteAsync(

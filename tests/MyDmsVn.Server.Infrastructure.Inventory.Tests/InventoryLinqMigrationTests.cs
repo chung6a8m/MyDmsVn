@@ -27,6 +27,7 @@ public sealed class InventoryLinqMigrationTests
             using var provider = services.BuildServiceProvider();
             Assert.Contains(provider.GetServices<ILinqToDbMapping>(), m => m.GetType().Name == "InventoryLinqToDbMapping");
             using var uow = provider.GetRequiredService<IUnitOfWorkFactory>().Create(); uow.BeginTransaction();
+            await uow.Repository<IGoodsReceiptWriteRepository>().AcquirePostingGateAsync(CancellationToken.None);
             var ctx = (ISqlExecutionContext)uow; var sql = (SqlConnection)ctx.Connection; var tx = (SqlTransaction)ctx.Transaction!;
             var actor = await NativeSql.Scalar<int>(sql, tx, "INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'map',N'MAP',N'Map',N'Local',N'hash',N'',N'BCrypt')");
             var warehouse = await NativeSql.Scalar<int>(sql, tx, "INSERT dbo.Warehouses(Code,Name) OUTPUT INSERTED.WarehouseId VALUES(N'W',N'Kho')");
@@ -55,7 +56,10 @@ public sealed class InventoryLinqMigrationTests
             Assert.Equal(stamp, changed.UpdatedAtUtc); Assert.Equal(actor, changed.UpdatedByUserId); Assert.False(changed.Version.SequenceEqual(saved.Version));
             Assert.False(await r.TryMarkPostedAsync(changed.Id, saved.Version, stamp, actor, CancellationToken.None));
             Assert.True(await r.TryMarkPostedAsync(changed.Id, changed.Version, stamp, actor, CancellationToken.None));
-            await r.AppendStockLedgerAsync(changed.Id, warehouse, new[] { line }, stamp, actor, CancellationToken.None);
+            // Maximal inputs above test mapping, not eligibility of their overflowing product.
+            line.UnitCost = 0;
+            await r.LockValuationBalancesAsync(warehouse, new[] { product }, CancellationToken.None);
+            await r.ApplyPostedInventoryAsync(changed, new[] { line }, stamp, actor, CancellationToken.None);
             var entry = await db.GetTable<StockLedgerEntry>().SingleAsync();
             Assert.Equal(line.Id, entry.DocumentLineId); Assert.Equal(line.Quantity, entry.QuantityChange); Assert.Equal(stamp, entry.PostedAtUtc); Assert.Equal(actor, entry.PostedByUserId);
             Assert.Equal(stamp, await NativeSql.Scalar<DateTime>(sql, tx, "SELECT PostedAtUtc FROM dbo.StockLedger"));
@@ -81,17 +85,18 @@ public sealed class InventoryLinqMigrationTests
             var warehouse = await NativeSql.Scalar<int>(oracle, null, "INSERT dbo.Warehouses(Code,Name,IsActive) OUTPUT INSERTED.WarehouseId VALUES(N'W',N'Kho %_ Việt',0)");
             var product = await NativeSql.Scalar<int>(oracle, null, "INSERT dbo.Products(Code,Name,Unit,IsActive) OUTPUT INSERTED.ProductId VALUES(N'P',N'Hàng',N'cái',0)");
             var stamp = new DateTime(2026, 10, 18, 1, 2, 3, DateTimeKind.Utc).AddTicks(1234567);
-            await NativeSql.Execute(oracle, null, "INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity) VALUES(@w,@p,-.0001)", NativeSql.P("@w", SqlDbType.Int, warehouse), NativeSql.P("@p", SqlDbType.Int, product));
+            await NativeSql.Execute(oracle, null, "INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@w,@p,.0001,0)", NativeSql.P("@w", SqlDbType.Int, warehouse), NativeSql.P("@p", SqlDbType.Int, product));
             var ids = new long[2];
             for (var index = 0; index < 2; index++)
                 ids[index] = await NativeSql.Scalar<long>(oracle, null,
                     "INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId) OUTPUT INSERTED.LedgerId VALUES(@w,@p,@type,@doc,@line,@q,@stamp,@actor)",
                     NativeSql.P("@w", SqlDbType.Int, warehouse), NativeSql.P("@p", SqlDbType.Int, product), NativeSql.P("@type", SqlDbType.VarChar, index == 0 ? "Adjustment" : "GoodsReceipt"),
                     NativeSql.P("@doc", SqlDbType.BigInt, 900L + index), NativeSql.P("@line", SqlDbType.BigInt, index + 1L), NativeSql.P("@q", SqlDbType.Decimal, index == 0 ? -.0001m : .0001m), NativeSql.P("@stamp", SqlDbType.DateTime2, stamp), NativeSql.P("@actor", SqlDbType.Int, actor));
+            await NativeSql.Execute(oracle, null, "INSERT dbo.StockValuationEntries(LedgerId,ValueChange) SELECT LedgerId,0 FROM dbo.StockLedger");
             var services = new ServiceCollection(); services.AddSqlPersistence(database.ConnectionString); using var provider = services.BuildServiceProvider();
             var query = provider.GetRequiredService<IInventoryQueryService>();
             var balance = await query.GetStockBalancesAsync(new StockBalanceQuery(warehouse, product, "  %_  ", 1, 10), CancellationToken.None);
-            var row = Assert.Single(balance.Items); Assert.Equal(1, balance.TotalCount); Assert.Equal(-.0001m, row.Quantity);
+            var row = Assert.Single(balance.Items); Assert.Equal(1, balance.TotalCount); Assert.Equal(.0001m, row.Quantity);
             Assert.Equal("Kho %_ Việt", row.WarehouseName); Assert.Equal("Hàng", row.ProductName); Assert.False(row.WarehouseIsActive); Assert.False(row.ProductIsActive);
             Assert.Empty((await query.GetStockBalancesAsync(new StockBalanceQuery(null, null, "%missing_", 1, 10), CancellationToken.None)).Items);
             for (var page = 1; page <= 2; page++)

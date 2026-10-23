@@ -1,10 +1,12 @@
 # Direct Sales — moving weighted average costing
 
-**Status:** APPROVED DESIGN / NOT IMPLEMENTED / NOT RUNTIME VERIFIED. **Updated:** 2026-10-21.
+**Status:** APPROVED DESIGN / BOUNDED CHECKPOINTS VERIFIED / SOURCE WRITER PROTOCOL IMPLEMENTED / FULL WORKFLOW ACCEPTANCE INCOMPLETE. **Updated:** 2026-10-22.
 **Source baseline:** `v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.
 The Owner selected moving weighted average per `(WarehouseId, ProductId)`, using actual serialized Post order.
-All schema additions, algorithms, interfaces and behavior below are proposals for the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md).
+T00 implements exact math and T01 implements schema/bootstrap/admission/mappings/grants/reset ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). T02 implements valued receipt posting, the shared coordinator, Exclusive reconciliation and stock projections ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). T03 uses T00 revenue math for [reviewed Draft Save/detail](evidence/sal/20261022-t03-sales-draft.md), preserves independent line IDs/current Unit and keeps Draft costs/profit null with no stock movement. T04 Sales Post is implemented; later workflows remain under implementation in the [SAL roadmap](plans/20261021-002-direct-sales-and-moving-average-costing.md); the checkpoint is not deployable.
 [Direct Sales](DIRECT_SALES.md) owns document scope; [query/UI design](DIRECT_SALES_QUERY_AND_UI.md) owns presentation; [acceptance](DIRECT_SALES_ACCEPTANCE.md) owns required evidence.
+
+T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. Native UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 remains deferred Minor.
 
 ## 1. Existing implementation and change boundary
 
@@ -155,7 +157,7 @@ These are design examples, not executed test results.
 
 ## 6. One transaction and one locking protocol
 
-The proposal extends the existing explicit UoW. All participating repositories borrow its current connection/transaction; they never open a hidden connection.
+T02 receipt/reconciliation extends the existing explicit UoW; T04 Sales Post adopts the same coordinator. All participating repositories borrow its current connection/transaction; they never open a hidden connection.
 LINQ to DB owns mapped reads, writes and guarded balance updates wherever the pinned provider can express the required operation safely. Application locks use typed native SqlClient on that same transaction; a key-range/locking escape requires recorded evidence that the required semantics cannot be safely expressed through the pinned LINQ provider.
 Bind precision/scale explicitly, materialize/dispose readers before the next command, and never run parallel commands on a UoW connection.
 
@@ -166,7 +168,7 @@ Every Goods Receipt/Sales Post takes `Shared` immediately after transaction begi
 Reconciliation and authorized inventory maintenance take `Exclusive` immediately after transaction begin and before any table/document lock.
 Acquire once, retain until commit/rollback, and never promote an already-held Shared lock to Exclusive during Post.
 The identical database, principal and resource name are essential: they define the lock's identity.
-Use an explicit finite lock timeout, cancellation and a bounded command timeout; initial proposal is 15 seconds for the application lock and 30 seconds per SQL command.
+Use an explicit finite lock timeout, cancellation and a bounded command timeout; T02 uses 15 seconds for the application lock and 30 seconds per SQL command.
 Accept only nonnegative `sp_getapplock` return codes. Timeout, cancellation, deadlock or call failure terminates/rolls back the owned transaction; no continuation without the barrier.
 Do not assume an application-lock deadlock result automatically rolled the transaction back.
 Verify this path with the actual restricted runtime identity; no `db_owner` grant or alternate connection is permitted as a workaround.
@@ -177,6 +179,8 @@ The Exclusive lock waits for admitted writers to finish and blocks new ones befo
 This prevents the old cycle where a writer held a balance key waiting for ledger access while reconciliation held ledger access waiting for balances.
 Changing only Sales, only Goods Receipt, or only reconciliation would leave an unsafe mixed protocol; deploy all consumers together.
 
+T02 uses typed LINQ UPDLOCK/HOLDLOCK/composite-PK point reads and missing-key range protection; no native balance-lock escape was required. Its provider-free StockValuationState validates Q/V, exact nullable average and signed aggregates use checked coefficient arithmetic. Reconciliation takes Exclusive before ledger/valuation/balance/source reads, indexes receipt/sale lines once and cooperatively checks cancellation through materialized analysis and completion. The final-reader cancellation proof uses existing test tracing, without a production hook. Sales source fixtures verify reconciliation diagnostics, not a completed sale writer.
+
 ### 6.2 Required Post sequence
 
 1. Authorize the current actor; start UoW transaction; acquire the Shared barrier.
@@ -185,7 +189,7 @@ Changing only Sales, only Goods Receipt, or only reconciliation would leave an u
 4. Acquire **all** distinct `(WarehouseId, ProductId)` balance locks in ascending tuple order before writing any ledger row. Use sequential point reads, not an assumption that an `ORDER BY` determines physical lock acquisition.
 5. Point-read balances through their unique composite PK using `UPDLOCK, HOLDLOCK`; retain an absent-key range lock as well. Verify the actual SQL/index path and missing-row concurrency behavior. Never treat an unlocked missing row as zero.
 6. Validate quantities, grouped availability, current value invariants and all numeric bounds; compute every new balance and sale cost allocation. Failure in any key aborts the whole document.
-7. Apply the conditional Draft/expected-version transition and cost snapshots; append per-line quantity/value pairs. Capture each inserted ledger identity and use that exact identity for its companion; the existing Task-only receipt ledger API needs an explicit coordinated extension. Apply sorted quantity **and value** deltas together, checking affected-row counts; insert a missing receipt balance only under its held key-range protection.
+7. Apply the conditional Draft/expected-version transition and cost snapshots; append per-line quantity/value pairs. Capture each inserted ledger identity and use that exact identity for its companion; T02 replaces the quantity-only receipt APIs with gate/balance admission and `ApplyPostedInventoryAsync`; its coordinator captures ledger identity and immediately inserts the companion. Apply sorted quantity **and value** deltas together, checking affected-row counts; insert a missing receipt balance only under its held key-range protection.
 8. Commit once. Dispose/rollback on precommit failure. Return persisted snapshots; later security-audit reporting follows the existing committed-operation semantics and never causes a second Post.
 
 The logical guarded update is `Quantity = Quantity + quantityDelta, InventoryValue = InventoryValue + valueDelta` on the already locked row.
@@ -204,7 +208,7 @@ Persisted companions and line costs preserve the result; no later query reruns m
 
 Propose one new DbUp script, **`010_DirectSalesAndValuation.sql`**, with schema-10 runtime support.
 It contains the sales schema, companion table, balance value column, backfill and final constraints/indexes required for a usable state.
-Scripts 001–009 remain immutable. The [current runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) describes schema 9 until implementation changes it.
+Scripts 001–009 remain immutable. The [current runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) describes complete schema10 and narrow exact9 maintenance admission. Baseline schema9 facts above remain historical.
 
 ### 7.1 Admission and deployment prerequisites
 

@@ -170,9 +170,10 @@ public sealed class InventoryQueryIntegrationTests
             "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) VALUES " +
             "(@warehouseId, @productId, 'GoodsReceipt', @firstReceiptId, @firstLineId, 5.0000, @firstPosted, @userId), " +
             "(@warehouseId, @productId, 'GoodsReceipt', @secondReceiptId, @secondLineId, 7.5000, @secondPosted, @userId); " +
-            "INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity) VALUES " +
-            "(@warehouseId, @productId, 12.5000), " +
-            "(@otherWarehouseId, @otherProductId, 3.0000); " +
+            "INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity, InventoryValue) VALUES " +
+            "(@warehouseId, @productId, 12.5000, 12.5000), " +
+            "(@otherWarehouseId, @otherProductId, 3.0000, 0.0000); " +
+            "INSERT dbo.StockValuationEntries(LedgerId,ValueChange) SELECT LedgerId,QuantityChange FROM dbo.StockLedger; " +
             "UPDATE dbo.Warehouses SET IsActive = 0 WHERE WarehouseId = @warehouseId; " +
             "UPDATE dbo.Products SET IsActive = 0 WHERE ProductId = @productId;",
             new
@@ -246,7 +247,8 @@ public sealed class InventoryQueryIntegrationTests
             "INSERT dbo.StockLedger " +
             "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) VALUES " +
             "(@warehouseId, @productId, 'Boundary', 1, 9001, 1.0000, @lastTickOfSecond, @userId), " +
-            "(@warehouseId, @productId, 'Boundary', 2, 9002, 2.0000, @nextSecond, @userId);",
+            "(@warehouseId, @productId, 'Boundary', 2, 9002, 2.0000, @nextSecond, @userId); " +
+            "INSERT dbo.StockValuationEntries(LedgerId,ValueChange) SELECT LedgerId,QuantityChange FROM dbo.StockLedger WHERE DocumentType='Boundary';",
             parameters);
     }
 

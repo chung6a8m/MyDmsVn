@@ -34,6 +34,7 @@ namespace MyDmsVn.Desktop.WinForms
             services.AddTransient<LoginForm>();
             services.AddTransient<ICatalogControlFactory, CatalogControlFactory>();
             services.AddTransient<IGoodsReceiptControlFactory, GoodsReceiptControlFactory>();
+            services.AddTransient<ISalesReceiptControlFactory, SalesReceiptControlFactory>();
             services.AddTransient<IInventoryControlFactory, InventoryControlFactory>();
             services.AddTransient<ISecurityAdministrationControlFactory, SecurityAdministrationControlFactory>();
             services.AddTransient<FoundationShellForm>();

@@ -58,9 +58,22 @@ public sealed class DatabaseMigrationRunner
         switch (compatibility.Status)
         {
             case SchemaCompatibilityStatus.Empty:
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "EXEC sys.sp_set_session_context @key=N'MyDmsVn.FreshInstall', @value=1, @read_only=1;";
+                    command.ExecuteNonQuery();
+                }
+                return;
             case SchemaCompatibilityStatus.Compatible:
                 return;
             case SchemaCompatibilityStatus.TooOld:
+                var source9 = SqlSchemaCompatibilityChecker.CheckExactSchema9Async(connection,
+                    System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+                if (source9.IsCompatible)
+                {
+                    Schema9MaintenanceValidator.Validate(connection);
+                    return;
+                }
                 throw new DatabaseMigrationPreflightException(
                     "Migration.UnsupportedExistingDatabase",
                     "Cơ sở dữ liệu hiện có không được hỗ trợ sau khi thay security baseline. Hãy reset rõ ràng một database disposable trước khi cài đặt mới.");

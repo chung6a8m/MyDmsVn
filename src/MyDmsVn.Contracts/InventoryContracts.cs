@@ -273,7 +273,9 @@ namespace MyDmsVn.Contracts
             string productCode,
             string productName,
             bool productIsActive,
-            decimal quantity)
+            decimal quantity,
+            decimal inventoryValue,
+            decimal? averageUnitCost)
         {
             WarehouseId = warehouseId;
             WarehouseCode = warehouseCode;
@@ -284,6 +286,8 @@ namespace MyDmsVn.Contracts
             ProductName = productName;
             ProductIsActive = productIsActive;
             Quantity = quantity;
+            InventoryValue = inventoryValue;
+            AverageUnitCost = averageUnitCost;
         }
 
         public int WarehouseId { get; }
@@ -295,6 +299,8 @@ namespace MyDmsVn.Contracts
         public string ProductName { get; }
         public bool ProductIsActive { get; }
         public decimal Quantity { get; }
+        public decimal InventoryValue { get; }
+        public decimal? AverageUnitCost { get; }
     }
 
     public sealed class StockCardQuery
@@ -333,7 +339,8 @@ namespace MyDmsVn.Contracts
             string documentType,
             long documentId,
             string documentNumber,
-            decimal quantityChange)
+            decimal quantityChange,
+            decimal valueChange)
         {
             LedgerId = ledgerId;
             WarehouseId = warehouseId;
@@ -349,6 +356,7 @@ namespace MyDmsVn.Contracts
             DocumentId = documentId;
             DocumentNumber = documentNumber;
             QuantityChange = quantityChange;
+            ValueChange = valueChange;
         }
 
         public long LedgerId { get; }
@@ -365,5 +373,6 @@ namespace MyDmsVn.Contracts
         public long DocumentId { get; }
         public string DocumentNumber { get; }
         public decimal QuantityChange { get; }
+        public decimal ValueChange { get; }
     }
 }

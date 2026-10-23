@@ -1,6 +1,6 @@
 # Schema compatibility và migration runbook
 
-**Hiện trạng:** `v1a-pro`, cập nhật 2026-10-21. SEC-REBUILD/RESP/L2DB và GUI-P5 đã hoàn thành theo phạm vi được nghiệm thu; runtime yêu cầu chính xác scripts 001–009. Desktop và DbMigrator phát hành đều `net48`/x86, AppCore parked. DbMigrator là gói admin riêng; desktop không tự chạy DbUp hoặc security bootstrap. BCI đã triển khai/nghiệm thu trong phạm vi UI lịch sử. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) đã COMPLETE / OWNER ACCEPTED trong [phạm vi và ngoại lệ cuối](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) và không thay schema. Các [điều kiện schema-compatibility, recovery và phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**.
+**Hiện trạng:** SAL-T01 development checkpoint, cập nhật 2026-10-22. Runtime candidate yêu cầu exact schema10; checkpoint này chưa thể triển khai độc lập vì receipt/sale/reconciliation cutover và SAL-T08 package/Owner evidence chưa hoàn tất. SEC-REBUILD/RESP/L2DB và GUI-P5 đã hoàn thành theo phạm vi được nghiệm thu; Baseline lịch sử trước SAL yêu cầu scripts001–009. Desktop và DbMigrator phát hành đều `net48`/x86, AppCore parked. DbMigrator là gói admin riêng; desktop không tự chạy DbUp hoặc security bootstrap. BCI đã triển khai/nghiệm thu trong phạm vi UI lịch sử. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) đã COMPLETE / OWNER ACCEPTED trong [phạm vi và ngoại lệ cuối](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) và không thay schema. Các [điều kiện schema-compatibility, recovery và phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**.
 
 ## 1. Runtime schema contract hiện tại
 
@@ -15,12 +15,13 @@
 7. `007_Inventory_Stock.sql`
 8. `008_Security_Administration.sql`
 9. `009_Security_Permission_Import.sql`
+10. `010_DirectSalesAndValuation.sql`
 
-Journal giữ nguyên `dbo.SchemaVersions`. Script đã phát hành là immutable; không sửa nội dung, đổi tên, xóa hoặc thêm entry thủ công để hợp thức hóa một schema khác. [SqlSchemaCompatibilityChecker](../src/MyDmsVn.Server.Infrastructure/Operations/SqlSchemaCompatibilityChecker.cs) kiểm tra history cùng các artifact/invariant được khai báo: tables/functions/sequence, CHECK/PK/unique index/FK, enabled/trusted state và trigger append-only. Baseline hiện tại còn gồm `SystemSecuritySettings`, `SecurityAuditEvents`, `ApplySecurityAdministration`, `ReadSecurityPermissionImportTarget` và `ApplySecurityPermissionImport`. Chỉ thấy entry `009` không chứng minh các artifact đều đúng.
+Journal giữ nguyên `dbo.SchemaVersions`. Script đã phát hành là immutable; không sửa nội dung, đổi tên, xóa hoặc thêm entry thủ công để hợp thức hóa một schema khác. [SqlSchemaCompatibilityChecker](../src/MyDmsVn.Server.Infrastructure/Operations/SqlSchemaCompatibilityChecker.cs) kiểm tra history cùng các artifact/invariant được khai báo: tables/functions/sequence, CHECK/PK/unique index/FK, enabled/trusted state và trigger append-only. Baseline hiện tại còn gồm `SystemSecuritySettings`, `SecurityAuditEvents`, `ApplySecurityAdministration`, `ReadSecurityPermissionImportTarget` và `ApplySecurityPermissionImport`. Chỉ thấy entry `009`/`010` không chứng minh các artifact đều đúng. Runtime10 giữ các invariant baseline9 và kiểm tra toàn bộ definition inventory10 (columns/defaults/checks/keys/indexes/FKs/modules/triggers/sequences); dữ liệu, current identity/sequence values và grants không được trộn vào definition fingerprint. Grants được kiểm tra riêng.
 
 Sequence cấp số phiếu phải giữ đúng `bigint`, start/increment/min bằng 1, max bằng 9999999999 và `NO CYCLE`; preflight không so `current_value`, `last_used_value`, cache hoặc exhaustion state vì chúng thay đổi hợp lệ khi vận hành. Preflight kiểm kê user-defined schema-scoped object cấp cao nhất, DML trigger trên mọi schema, synonym, database-scoped DDL trigger và user-defined type trong `sys.types`; allowlist khớp schema, tên, object type và parent của trigger. Baseline chưa có managed user-defined type, nên alias/table type ngoài allowlist làm database bị coi là unmanaged. Object ngoài contract hoặc trùng tên nhưng sai type không được coi là database empty. Constraint/index con được kiểm tra bằng các invariant riêng.
 
-Các prefix hợp lệ nhưng chưa đủ, từ `001` đến tối đa `008`, là `Schema.TooOld` và bị desktop chặn. **Migrator hiện tại cũng từ chối TooOld** bằng `Migration.UnsupportedExistingDatabase`; nó không cung cấp auto-upgrade cho dữ liệu của baseline permission cũ hoặc tự hoàn tất một prefix đã commit dở. [DatabaseMigrationRunner](../src/MyDmsVn.Server.DbMigrator/DatabaseMigrationRunner.cs) chỉ nhận `Empty` hoặc `Compatible` trước khi chạy DbUp. Không có prior production baseline/mixed-client upgrade path đã được chấp nhận trong tài liệu hiện tại.
+Các prefix hợp lệ nhưng chưa đủ, từ `001` đến tối đa `008`, là `Schema.TooOld` và bị desktop chặn. **Migrator tiếp tục từ chối prefixes001–008** bằng `Migration.UnsupportedExistingDatabase`; nó không tự hoàn tất một prefix đã commit dở. [DatabaseMigrationRunner](../src/MyDmsVn.Server.DbMigrator/DatabaseMigrationRunner.cs) nhận Empty, exact10 no-op, hoặc đường exact9 riêng với frozen source manifest/artifact validation và maintenance admission dưới đây. New runtime từ chối exact9; old schema9 policy từ chối10. Không có prior production baseline/mixed-client upgrade path đã được chấp nhận trong tài liệu hiện tại.
 
 [Publish script](../deployment/release/Publish-LocalRelease.ps1) hiện lấy schemaSupport và requiredScripts từ runtime policy trong DLL admin của package, qua helper x86. RELEASE-MANIFEST-01 đã đóng riêng phần metadata với package commit sạch `d8013030`: schema9 và danh sách001–009 ([evidence](L2DB_VERIFICATION.md#clean-commit-package-reconciliation--release-manifest-01-closed)). Package cũ ghi schema8 là artifact lịch sử; không downgrade schema hoặc thay journal theo metadata cũ. Metadata đúng chưa chứng minh startup hay release acceptance.
 
@@ -31,9 +32,10 @@ Host active `MyDmsVn.Desktop.App.exe` chạy `DesktopDatabaseStartupCoordinator`
 | Trạng thái | Mã | Desktop | Hành động operator |
 |---|---|---|---|
 | Không history/artifact nghiệp vụ, database empty | `Schema.Empty` | Chặn | DBA tạo/chọn đúng application database empty, rồi chạy clean install bằng migrator |
-| Prefix hợp lệ 001–008 nhưng chưa đủ 009 | `Schema.TooOld` | Chặn | Giữ state; migrator hiện tại trả `Migration.UnsupportedExistingDatabase`. Chọn recovery/forward-fix được review, hoặc tạo lại target disposable đã xác minh; không auto-upgrade |
-| Đúng manifest 001–009 và đủ artifact, bao gồm `SystemSecuritySettings` và security administration/import procedures | `Schema.Compatible` | Cho phép preflight tiếp | Kiểm tra superuser binding/configuration kế tiếp |
-| Đủ prefix 001–009 và journal có thêm script sau đó | `Schema.TooNew` | Chặn | Dùng client/schema contract tương thích đã được duyệt; không downgrade schema |
+| Prefix hợp lệ 001–008 | `Schema.TooOld` | Chặn | Giữ state; migrator hiện tại trả `Migration.UnsupportedExistingDatabase`. Chọn recovery/forward-fix được review, hoặc tạo lại target disposable đã xác minh; không auto-upgrade |
+| Exact9 đã validate đầy đủ | `Schema.TooOld` | Chặn | Chỉ separate admin migrator có thể admission theo mục3.1; không mở old writers trên10 |
+| Đúng manifest001–010 và đầy đủ artifact, gồm Sales/valuation và value balance | `Schema.Compatible` | Cho phép preflight tiếp | Kiểm tra superuser binding/configuration kế tiếp |
+| Đủ prefix001–010 và journal có thêm script sau đó | `Schema.TooNew` | Chặn | Dùng client/schema contract tương thích đã được duyệt; không downgrade schema |
 | Sai/thừa/thiếu giữa chuỗi hoặc artifact ngoài allowlist | `Schema.UnknownHistory` | Chặn | Dừng rollout, điều tra provenance; không sửa journal thủ công |
 | Journal và managed artifact không khớp, hoặc có managed artifact nhưng không journal | `Schema.PartialMigration` | Chặn | Migrator từ chối `Migration.PartialSchema`; giữ client đóng và chọn forward-fix hoặc restore đã kiểm chứng |
 
@@ -48,11 +50,23 @@ Trước migration, operator phải ghi nhận:
 3. migration principal riêng có quyền cần thiết, runtime principal không có DDL;
 4. dung lượng data/log/tempdb đủ và không có lỗi storage;
 5. `dbo.SchemaVersions` và manifest hiện tại;
-6. backup/recovery point đã được tạo và restore-test vào database riêng theo yêu cầu P6 recovery còn mở;
+6. backup/recovery point đã được tạo và restore-test vào database riêng theo release prerequisites còn mở;
 7. client đã dừng/drain, không còn transaction Post đang chạy;
 8. target release/commit/artifact hash đã duyệt.
 
 Chỉ sau đó đặt một maintenance owner và chạy migrator với [migration configuration](CONFIGURATION_AND_SQL_SECURITY.md). Migrator không tạo/drop database và từ chối system database. Nó xác nhận principal có `CONTROL` trên đúng application database trước khi lấy lock hoặc gọi DbUp; runtime principal bị từ chối bằng `Migration.InsufficientPrivileges`, kể cả khi migration sẽ là no-op. `DatabaseMigrationRunner` lấy SQL application lock exclusive `MyDmsVn.SchemaMigration`, chạy preflight và DbUp transaction-per-script trên cùng một SQL session. Mất session đồng thời giải phóng lock và dừng/rollback script đang chạy, tránh một DbUp session mồ côi tiếp tục sau khi lock biến mất. Lần gọi cạnh tranh nhận `Migration.AlreadyRunning`; không retry mù hoặc chạy migrator thứ hai.
+
+## 3.1 Exact9 maintenance admission — narrow supported identity model
+
+Đường upgrade chỉ nhận database ONLINE/read-write/noncontained đã ở `RESTRICTED_USER`. Operator phải đóng/drain clients và thiết lập mode trước; migrator không ALTER mode, KILL, rotate/disable credentials hoặc tự mở lại MULTI_USER. Giữ restriction qua cả thành công lẫn lỗi010 cho đến khi matching receipt/sale/reconciliation runtime, grants và package đã được kiểm chứng và operator chủ động cho mở lại. Một Session applock không đủ chặn old binaries.
+
+`Schema9MaintenanceValidator` đọc trên chính nonpooled session sở hữu migration lock, ngay trước handoff cho DbUp. Admin phải có CONTROL database cùng VIEW SERVER STATE, VIEW ANY DEFINITION và (SQL Server2022+) VIEW SERVER PERFORMANCE STATE; thiếu visibility không được hiểu là zero writers. Guard từ chối session/request khác tại target, user transactions hoặc locks tại target kể cả session đang ở master, và tất cả original-login sessions của mapped SQL writers trên instance. Own implicit observation transaction và system-only transactions không bị nhầm là application writers. Script010 kiểm tra restriction lần nữa và lấy transaction-held exclusive table locks trên historical source/ledger/balances trước data proof.
+
+**Ruling:** admission chỉ hỗ trợ identifiable SQL-login database users; từ chối Windows/group/external/contained/application-role/certificate/key users, guest CONNECT, TRUSTWORTHY hoặc cross-database ownership chaining, unresolved login mappings và mapped elevated writers. Migration identity riêng hiện tại và privileged administrators là trusted maintenance boundary. Đây là cố ý thu hẹp đường exact9 upgrade, không phải bằng chứng universal identity closure cho mọi Windows/group/alternate credential path. Nếu deployment nằm ngoài model này, dừng và thiết kế admission có evidence riêng; không dùng boolean attestation hay bỏ guard để vượt qua. Trusted admin có thể thay mode/permissions hoặc can thiệp database; guard không tuyên bố chống lại admin đó.
+
+Trong transaction010, bootstrap chứng minh ledger↔Posted receipt line và ledger keys↔balance keys theo cả hai chiều; từ chối unsupported movements/audit/quantity/cardinality/cost/overflow, kể cả extra zero balance. Mỗi source line được round4 riêng rồi sum rộng; không gán missing values bằng zero và không rewrite ledger/audit/document tokens. DDL/backfill/checks và010 journal share transaction-per-script. Lỗi010 rollback về intact validated9 và giữ restriction; điều này không biến failure sau prefix001–008 của fresh install thành auto-retry path.
+
+SAL-T01 evidence chỉ là checkpoint schema/bootstrap/grants/reset. Actual packaged upgrade, matched runtime startup, frozen integration và Owner disposition vẫn thuộc SAL-T08; operational release prerequisites vẫn unaccepted/unscheduled.
 
 ## 4. Thực thi
 
@@ -77,7 +91,7 @@ Sau lỗi:
 4. Đánh giá forward-fix đã review nếu có thể bảo toàn dữ liệu; thay đổi đó phải cung cấp một đường chuyển schema được hỗ trợ. Current migrator không tự nâng prefix 001–008, nên “chạy lại executable” không phải forward-fix.
 5. Chỉ restore khi owner chấp nhận recovery point/RPO và backup đã restore-test vào database riêng. Restore có thể mất write sau recovery point.
 6. Không viết lại `SchemaVersions` thủ công như cách sửa thông thường.
-7. Sau recovery, xác nhận target thuộc trạng thái được công cụ đã duyệt hỗ trợ. Với current baseline hoàn chỉnh, chạy migrator một owner để xác nhận no-op, rồi desktop preflight và reconciliation/smoke trước khi mở lại truy cập. Với target empty/disposable được xác nhận rõ, clean install phải hoàn tất đủ 001–009 rồi no-op lần hai.
+7. Sau recovery, xác nhận target thuộc trạng thái được công cụ đã duyệt hỗ trợ. Với current baseline hoàn chỉnh, chạy migrator một owner để xác nhận no-op, rồi desktop preflight và reconciliation/smoke trước khi mở lại truy cập. Với target empty/disposable được xác nhận rõ, clean install phải hoàn tất đủ001–010 rồi no-op lần hai.
 
 ## 6. Rollout order
 
@@ -88,18 +102,18 @@ Fresh install hoặc một đường triển khai đã được review dùng sto
 3. Chạy công cụ migration/forward-fix được duyệt cho đúng trạng thái target, bằng admin package và maintenance principal.
 4. Xác nhận journal/artifact và migrator no-op.
 5. Với fresh install có user store trống, cấu hình `Security__SuperuserUsername` và chạy `security bootstrap-superuser` theo [security administration runbook](SECURITY_ADMINISTRATION_RUNBOOK.md). Không chạy bootstrap trên database đã có user.
-6. Triển khai host phù hợp manifest 001–009 và cùng cấu hình superuser đã được review.
+6. Chỉ triển khai host phù hợp target manifest đã được review/nghiệm thu và cấu hình superuser tương ứng. SAL-T01 checkpoint chưa thỏa bước triển khai này.
 7. Chạy schema preflight, xác nhận binding/configuration, functional smoke và reconciliation.
 8. Mở lại truy cập.
 
 Không chạy client cũ sau khi schema vượt contract của nó; không chạy client mới khi DB còn prefix cũ/partial. Downgrade client không đồng nghĩa downgrade database. Ghi revision/package/SQL version, preflight, exit code, journal/artifact và recovery outcome theo [TEST_POLICY](TEST_POLICY.md); các bài diễn tập recovery và owner release sign-off vẫn là [điều kiện chưa nghiệm thu, chưa xếp lịch](DEFERRED_WORK.md#release-prerequisites).
 
-## SAL schema10 — đường chuyển đã duyệt thiết kế, chưa triển khai
+## SAL schema10 — source checkpoint và evidence boundary
 
-[SAL](DIRECT_SALES.md), [đặc tả giá vốn](DIRECT_SALES_COSTING.md) và [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) đề xuất script `010_DirectSalesAndValuation.sql`. Source hiện tại vẫn chỉ hỗ trợ schema9/001–009 như các mục trên; PR tài liệu không sửa migrator, preflight hoặc journal.
+[SAL](DIRECT_SALES.md), [đặc tả giá vốn](DIRECT_SALES_COSTING.md) và [ADR0011](adr/0011-direct-sales-and-moving-average-costing.md) kiểm soát đường chuyển. SAL-T01 source candidate thêm010, exact9 maintenance admission, runtime exact10 preflight, mappings, grants và reset metadata. Các gói/acceptance schema9 lịch sử ở trên giữ đúng revision gốc; không được diễn giải chúng thành package evidence10.
 
-Khi triển khai T01, migrator phải phân biệt exact schema9 đã kiểm chứng đầy đủ artifact/journal với các trạng thái TooOld khác; chỉ bổ sung đường nâng9→10, không mở chung prefix001–008. Dừng và drain mọi client cũ, khóa khả năng ghi/kết nối lại trong thời gian nâng, dùng maintenance principal và backup/recovery đã xác minh. Client schema9 đang mở không tự trở nên an toàn nhờ preflight mới.
+Script010 kiểm chứng hai chiều Posted Goods Receipt ↔ StockLedger ↔ balance keys và quantity/audit; round từng source line rồi sum rộng; tạo valuation companions và InventoryValue mà không sửa ledger lịch sử hay tự bù0 cho nguồn thiếu/sai. Transaction-per-script gắn DDL/backfill/final constraints với010 journal. Fresh-install failure trước010 có thể để lại prefix đã commit, vẫn cần recovery; không suy atomicity cho toàn001–010.
 
-Trong một transaction của script010, kiểm chứng hai chiều Posted Goods Receipt ↔ StockLedger và quantity balance, tính từng giá trị nguồn bằng quy tắc đã chốt, tạo đầy đủ valuation companions, nạp InventoryValue và bật constraint/index/trigger cuối cùng. Toàn bộ script010 cùng journal phải commit hoặc rollback; không dùng giá vốn0 cho nguồn thiếu/sai, không sửa ledger lịch sử. Thất bại ở script trước010 khi clean install có thể để lại prefix đã commit; vẫn áp dụng chính sách từ chối/recovery có kiểm chứng, không coi cả001–010 là một transaction.
+[Ruling maintenance](#31-exact9-maintenance-admission--narrow-supported-identity-model) cố ý thu hẹp exact9 upgrade vào model đã kiểm chứng. Giữ mọi old clients/writers đóng và restriction cho đến khi receipt Post, sale Post và reconciliation cùng dùng giao thức khóa/value mới và matching runtime/grants/package đã được kiểm tra. Checkpoint T01 không độc lập deploy được.
 
-Nghiệm thu SAL yêu cầu clean install001–010, exact9 upgrade bảo toàn dữ liệu, no-op10, từ chối nguồn/schema sai, fault injection xác nhận rollback010/journal, old-client từ chối10 và new-client từ chối9, quyền runtime và reset profile đúng. Receipt Post, sale Post và reconciliation phải cùng dùng giao thức khóa/value mới trước khi phát hành candidate. Các phép kiểm thử feature này không thay thế [nghiệm thu vận hành/phát hành](DEFERRED_WORK.md#release-prerequisites); mọi evidence SAL hiện NOT RUN.
+[T00 focused foundation evidence](evidence/sal/20261022-t00-foundation.md) đã có; [acceptance ledger](DIRECT_SALES_ACCEPTANCE.md) phân biệt task checkpoint với SAL-T08 frozen SQL/UI/package evidence và Owner disposition còn thiếu. Các kiểm thử feature không thay thế [nghiệm thu vận hành/phát hành](DEFERRED_WORK.md#release-prerequisites), vẫn UNACCEPTED / UNSCHEDULED.

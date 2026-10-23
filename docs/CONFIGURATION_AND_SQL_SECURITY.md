@@ -1,6 +1,6 @@
 # Cấu hình và quyền SQL cho Local Mode v1
 
-**Trạng thái:** Hiện trạng `v1a-pro`, cập nhật 2026-10-20. Desktop.App và DbMigrator là `net48`/x86; AppCore `net8.0-windows` parked. Đây là thiết kế quyền/configuration, chưa phải bằng chứng production clean install, credential rotation hay least-privilege acceptance. Các [điều kiện phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**.
+**Trạng thái:** Hiện trạng `v1a-pro`, cập nhật 2026-10-22. Desktop.App và DbMigrator là `net48`/x86; AppCore `net8.0-windows` parked. Đây là thiết kế quyền/configuration, chưa phải bằng chứng production clean install, credential rotation hay least-privilege acceptance. Các [điều kiện phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**.
 
 [RESP](plans/20261018-002-respawn-fixture-reuse.md) và [L2DB](plans/20261018-001-linq2db-net48-persistence-migration.md) đều đã hoàn thành plan-specific acceptance. Catalog/Inventory hiện dùng LINQ/native; Identity/Security/operations dùng typed native SqlClient ([T05](L2DB_VERIFICATION.md#l2db-t05--identity-security-and-operations-conversion)), test-only oracles cũng đã chuyển sang native tại T06. T07 correctness/package và limited authenticated Local smoke đã hoàn tất ([evidence](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke)); [GUI-P5](plans/20261019-001-full-winforms-gui-p5-acceptance.md) đã được nghiệm thu theo phạm vi và ngoại lệ đã ghi. BCI đã triển khai/nghiệm thu trong phạm vi UI lịch sử. [BCF](plans/20261021-001-business-compact-lookup-and-visual-parity.md) đã COMPLETE / OWNER ACCEPTED trong [phạm vi và ngoại lệ cuối](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) và không thay runtime/API/schema. SQL/VM/recovery release checks chưa được nghiệm thu; thay UI hoặc DAL không cho phép thêm quyền, rò maintenance credential, sửa schema/binding hay thử trên production.
 
@@ -17,7 +17,7 @@ Hai database user phải khác nhau. Runtime không được là `sa`, thành vi
 
 Nguồn provisioning thực tế là [deployment/sql/Provision-MyDmsVnPrincipals.sql](../deployment/sql/Provision-MyDmsVnPrincipals.sql). Script yêu cầu application database và hai database user đã tồn tại, từ chối system database/cùng identity, kiểm tra quyền runtime hiện có, rồi thiết lập `MyDmsVnRuntimeRole` và `MyDmsVnMigrationRole`. Nó không tạo login, database hoặc business schema; các object của supported schema và `dbo.SchemaVersions` phải sẵn sàng trước khi áp dụng các GRANT.
 
-DBA tạo login/database user riêng, cấp maintenance principal quyền `CONTROL` trong đúng application database để chạy migrator, rồi triển khai supported schema bằng identity này. Chỉ sau khi đủ schema/journal 001–009 mới áp dụng script bên dưới để thiết lập managed roles và runtime object grants. Script này không phải bước tạo quyền ban đầu cho một migrator chưa thể kết nối/triển khai schema:
+DBA tạo login/database user riêng, cấp maintenance principal quyền `CONTROL` trong đúng application database để chạy migrator, rồi triển khai supported schema bằng identity này. Với development source T01, chỉ sau khi đủ schema/journal001–010 mới áp dụng script bên dưới; baseline/package lịch sử001–009 giữ nguyên phạm vi bằng chứng. T01 chưa deployable khi writer cutover chưa hoàn tất. Sau bước migration phù hợp mới áp dụng script để thiết lập managed roles và runtime object grants. Script này không phải bước tạo quyền ban đầu cho một migrator chưa thể kết nối/triển khai schema:
 
 ```powershell
 sqlcmd -S '<server>' -d '<application-database>' -E `
@@ -40,6 +40,10 @@ Không đưa password vào lệnh. Với SQL Authentication, DBA tạo/đổi pa
 | `GoodsReceipts` | Có | Có | Có | Không |
 | `GoodsReceiptLines` | Có | Có | Có | Có |
 | `GoodsReceiptNumberSequence` | — | — | Có, để dùng `NEXT VALUE FOR` | — |
+| `SalesReceipts` | Có | Có | Có | Không |
+| `SalesReceiptLines` | Có | Có | Có | Có |
+| `SalesReceiptNumberSequence` | — | — | Có, để dùng `NEXT VALUE FOR` | — |
+| `StockValuationEntries` | Có | Có | Không | Không |
 | `StockLedger` | Có | Có | Không | Không |
 | `StockBalances` | Có | Có | Có | Không |
 | `SchemaVersions` | Có | DENY | DENY | DENY |
@@ -137,9 +141,9 @@ HTTP v2/P7 và modern product runtime là các [hướng ngoài phạm vi](DEFER
 
 ## SAL schema10 — quyền dự kiến, chưa được cấp
 
-[SAL](DIRECT_SALES.md) đề xuất thêm bảng/sequence và valuation; ma trận schema9 ở trên vẫn mô tả source hiện tại. T01 phải sửa provisioning và validator đồng bộ, chỉ sau khi có schema10 hợp lệ. Không cấp quyền toàn schema hoặc db_owner để bỏ qua lỗi.
+[SAL-T01](evidence/sal/20261022-t01-schema-bootstrap.md) đã đồng bộ schema10/provisioning/startup validator và có14 ca restricted-principal PASS trên disposable SQL. Ma trận trên mô tả development source `81e8aab`, không phải nghiệm thu production hoặc chứng minh Sales endpoints. Exact9 upgrade chỉ hỗ trợ SQL-login identity inventory theo [migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md), với RESTRICTED_USER có trước, DMV visibility/drain và trusted maintenance/admin boundary; không tự KILL, đổi mode hoặc credential. Chính sách ưu tiên Windows Authentication ở trên không tự tạo một upgrade path Windows/group được chứng minh. Không cấp quyền toàn schema hoặc db_owner để bỏ qua lỗi.
 
-| Object dự kiến trong dbo | Quyền runtime cần kiểm chứng |
+| Object schema10 trong dbo (T01) | Quyền runtime đã kiểm chứng trong phạm vi SQL |
 |---|---|
 | SalesReceipts | SELECT, INSERT, UPDATE; không DELETE |
 | SalesReceiptLines | SELECT, INSERT, UPDATE, DELETE cho lifecycle Draft do Application kiểm soát |
@@ -149,4 +153,4 @@ HTTP v2/P7 và modern product runtime là các [hướng ngoài phạm vi](DEFER
 
 Giao thức valuation dùng `sys.sp_getapplock` trên cùng runtime connection/transaction, resource `MyDmsVn.InventoryValuation.v1`, principal `public`: Shared cho writer và Exclusive cho reconciliation. Kiểm chứng quyền gọi thực tế bằng principal hạn chế; đây là system procedure, không thêm blanket EXECUTE vào allowlist ba business security procedures. Runtime không được nâng schema hay bootstrap giá trị tồn. Các quyền code Sales.Receipts.Read/Write/Post không tự tạo SQL grant hoặc role assignment.
 
-Kiểm chứng object inventory/VIEW DEFINITION, quyền dữ liệu/sequence, từ chối sửa ledger/value history và tách admin/runtime trên candidate SAL. Giữ nguyên giới hạn trust của Local direct SQL và giới hạn kiểm tra EXECUTE hiện tại đã nêu; tài liệu không tuyên bố đã sửa hay nghiệm thu chúng. Evidence hiện NOT RUN.
+Kiểm chứng object inventory/VIEW DEFINITION, quyền dữ liệu/sequence, từ chối sửa ledger/value history và tách admin/runtime trên candidate SAL. Giữ nguyên giới hạn trust của Local direct SQL và giới hạn kiểm tra EXECUTE hiện tại đã nêu; tài liệu không tuyên bố đã sửa hay nghiệm thu chúng. T01 có bằng chứng grants/validator/append-only trên principal hạn chế; [T02](evidence/sal/20261022-t02-valued-inventory.md) đã kiểm chứng receipt/coordinator application-lock và quantity/value bằng runtime principal hạn chế trên cùng connection/transaction. Không thêm grant hoặc thay allowlist. Sales Post/T04, endpoint và frozen T08 vẫn còn mở.

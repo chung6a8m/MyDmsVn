@@ -39,7 +39,7 @@ public sealed class BcfAttendedLookupFactAttribute : FactAttribute
     }
 }
 
-public sealed class PackagedGuiAcceptanceTests
+public sealed partial class PackagedGuiAcceptanceTests
 {
     private readonly ITestOutputHelper _output;
     public PackagedGuiAcceptanceTests(ITestOutputHelper output)
@@ -473,11 +473,22 @@ public sealed class PackagedGuiAcceptanceTests
     internal static string ValidatedPackage()
     {
         var root = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_PACKAGE")!);
+        return ValidatePackageDirectory(root, 10);
+    }
+
+    internal static string ValidatePackageDirectory(string root, int schema)
+    {
+        Assert.Contains(schema, new[] { 9, 10 });
+        root = Path.GetFullPath(root);
         var manifest = JObject.Parse(File.ReadAllText(Path.Combine(root, "release-manifest.json")));
         Assert.Equal(JTokenType.Boolean, manifest["sourceTreeDirty"]!.Type);
         Assert.False(manifest.Value<bool>("sourceTreeDirty"));
         Assert.Matches("^[a-fA-F0-9]{40}$", manifest.Value<string>("sourceCommit")!);
-        Assert.Equal(9, manifest["schemaSupport"]!.Value<int>("maximum"));
+        Assert.Equal(schema, manifest["schemaSupport"]!.Value<int>("minimum"));
+        Assert.Equal(schema, manifest["schemaSupport"]!.Value<int>("maximum"));
+        Assert.Equal(schema == 10 ? MyDmsVn.Server.Infrastructure.Operations.SchemaCompatibilityPolicy.CurrentScripts :
+            MyDmsVn.Server.Infrastructure.Operations.SchemaCompatibilityPolicy.Schema9Scripts,
+            manifest["schemaSupport"]!["requiredScripts"]!.Values<string>());
         Assert.Equal(2, manifest["packages"]!.Count());
         foreach (var package in manifest["packages"]!)
         {
@@ -495,10 +506,47 @@ public sealed class PackagedGuiAcceptanceTests
                 Assert.Equal(file.Value<string>("sha256"), BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", ""));
             }
         }
-        var desktop = Assembly.ReflectionOnlyLoadFrom(Path.Combine(root, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe"));
-        desktop.ManifestModule.GetPEKind(out var pe, out var machine);
-        Assert.Equal(ImageFileMachine.I386, machine);
-        Assert.True((pe & PortableExecutableKinds.Required32Bit) != 0);
+        // Inspect the actual bytes without loading same-identity historical/current
+        // assemblies into one AppDomain (even ReflectionOnlyLoad unifies identity).
+        AssertX86ManagedExecutable(Path.Combine(root, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe"));
+        AssertX86ManagedExecutable(Path.Combine(root, "admin-migrator-net48-win-x86", "MyDmsVn.Server.DbMigrator.exe"));
         return root;
+    }
+
+    private static void AssertX86ManagedExecutable(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var reader = new BinaryReader(stream);
+        Assert.Equal((ushort)0x5a4d, reader.ReadUInt16()); // DOS MZ
+        stream.Position = 0x3c;
+        var pe = reader.ReadInt32();
+        Assert.InRange(pe, 0x40, checked((int)stream.Length - 256));
+        stream.Position = pe;
+        Assert.Equal(0x00004550u, reader.ReadUInt32()); // PE signature
+        Assert.Equal((ushort)0x14c, reader.ReadUInt16()); // IMAGE_FILE_MACHINE_I386
+        var sections = reader.ReadUInt16();
+        stream.Position = pe + 20;
+        var optionalSize = reader.ReadUInt16();
+        var optional = pe + 24;
+        stream.Position = optional;
+        Assert.Equal((ushort)0x10b, reader.ReadUInt16()); // PE32
+        Assert.True(optionalSize >= 224);
+        stream.Position = optional + 208; // PE32 data directory14: CLR header RVA/size
+        var clrRva = reader.ReadUInt32();
+        Assert.True(reader.ReadUInt32() >= 72);
+        long clrOffset = -1;
+        for (var index = 0; index < sections; index++)
+        {
+            stream.Position = optional + optionalSize + index * 40 + 8;
+            var virtualSize = reader.ReadUInt32();
+            var address = reader.ReadUInt32();
+            var rawSize = reader.ReadUInt32();
+            var rawPointer = reader.ReadUInt32();
+            if (clrRva >= address && (ulong)clrRva - address < Math.Max(virtualSize, rawSize))
+            { clrOffset = rawPointer + (long)clrRva - address; break; }
+        }
+        Assert.InRange(clrOffset, 0, stream.Length - 72);
+        stream.Position = clrOffset + 16;
+        Assert.True((reader.ReadUInt32() & 0x2) != 0, "Managed executable must require32bit.");
     }
 }

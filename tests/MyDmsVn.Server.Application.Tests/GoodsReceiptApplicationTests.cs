@@ -508,7 +508,7 @@ public sealed class GoodsReceiptApplicationTests
         Assert.False(result.IsError);
         Assert.True(unitOfWork.Committed);
         Assert.Equal(
-            new[] { "header", "snapshot", "mark", "ledger", "balance" },
+            new[] { "gate", "header", "snapshot", "lock-balances", "mark", "ledger", "balance" },
             repository.Operations);
         Assert.Equal(42, repository.PostedByUserId);
         Assert.Equal(new DateTime(2026, 10, 10, 1, 2, 3, DateTimeKind.Utc), repository.PostedAtUtc);
@@ -565,7 +565,7 @@ public sealed class GoodsReceiptApplicationTests
 
         Assert.True(result.IsError);
         Assert.Equal(expectedError, result.FirstError.Code);
-        Assert.Equal(new[] { "header" }, repository.Operations);
+        Assert.Equal(new[] { "gate", "header" }, repository.Operations);
         Assert.False(unitOfWork.Committed);
     }
 
@@ -597,7 +597,7 @@ public sealed class GoodsReceiptApplicationTests
         Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.WarehouseInactive");
         Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.EmployeeInactive");
         Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.ProductInactive");
-        Assert.Equal(new[] { "header", "snapshot" }, repository.Operations);
+        Assert.Equal(new[] { "gate", "header", "snapshot" }, repository.Operations);
         Assert.False(unitOfWork.Committed);
     }
 
@@ -626,7 +626,7 @@ public sealed class GoodsReceiptApplicationTests
         Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.InvalidQuantity");
         Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.InvalidUnitCost");
         Assert.Contains(result.Errors, error => error.Code == "GoodsReceipt.DuplicateProduct");
-        Assert.Equal(new[] { "header", "snapshot" }, repository.Operations);
+        Assert.Equal(new[] { "gate", "header", "snapshot" }, repository.Operations);
     }
 
     [Fact]
@@ -643,7 +643,7 @@ public sealed class GoodsReceiptApplicationTests
 
         Assert.True(result.IsError);
         Assert.Equal("GoodsReceipt.ConcurrencyConflict", result.FirstError.Code);
-        Assert.Equal(new[] { "header", "snapshot", "mark" }, repository.Operations);
+        Assert.Equal(new[] { "gate", "header", "snapshot", "lock-balances", "mark" }, repository.Operations);
         Assert.False(unitOfWork.Committed);
     }
 
@@ -986,25 +986,26 @@ public sealed class GoodsReceiptApplicationTests
             return Task.FromResult(TryMarkPosted);
         }
 
-        public Task AppendStockLedgerAsync(
-            long receiptId,
-            int warehouseId,
-            IReadOnlyList<GoodsReceiptLine> lines,
-            DateTime postedAtUtc,
-            int postedByUserId,
-            CancellationToken cancellationToken)
+        public Task AcquirePostingGateAsync(CancellationToken cancellationToken)
         {
-            Operations.Add("ledger");
+            Operations.Add("gate");
             return Task.CompletedTask;
         }
 
-        public Task ApplyStockBalanceDeltasAsync(
-            int warehouseId,
-            IReadOnlyDictionary<int, decimal> deltasByProductId,
-            CancellationToken cancellationToken)
+        public Task<IReadOnlyDictionary<int, StockValuationState>> LockValuationBalancesAsync(
+            int warehouseId, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
         {
+            Operations.Add("lock-balances");
+            return Task.FromResult<IReadOnlyDictionary<int, StockValuationState>>(
+                productIds.Distinct().ToDictionary(id => id, id => new StockValuationState(0, 0)));
+        }
+
+        public Task ApplyPostedInventoryAsync(GoodsReceipt header, IReadOnlyList<GoodsReceiptLine> lines,
+            DateTime postedAtUtc, int postedByUserId, CancellationToken cancellationToken)
+        {
+            Operations.Add("ledger");
             Operations.Add("balance");
-            LastBalanceDeltas = deltasByProductId;
+            LastBalanceDeltas = lines.GroupBy(line => line.ProductId).ToDictionary(group => group.Key, group => group.Sum(line => line.Quantity));
             return Task.CompletedTask;
         }
 

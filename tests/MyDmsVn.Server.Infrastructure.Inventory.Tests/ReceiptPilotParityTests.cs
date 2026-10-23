@@ -35,7 +35,7 @@ public sealed class ReceiptPilotParityTests(ITestOutputHelper output)
                 var p2 = await NativeSql.Scalar<int>(oracle, null, "INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'P2',N'Two',N'EA')");
                 var services = new ServiceCollection(); services.AddSqlPersistence(database.ConnectionString); using var provider = services.BuildServiceProvider();
                 using var uow = provider.GetRequiredService<IUnitOfWorkFactory>().Create(); uow.BeginTransaction(); var ctx = (ISqlExecutionContext)uow;
-                var production = uow.Repository<IGoodsReceiptWriteRepository>(); var sessions = provider.GetRequiredService<ILinqToDbSessionFactory>();
+                var production = uow.Repository<IGoodsReceiptWriteRepository>(); await production.AcquirePostingGateAsync(CancellationToken.None); var sessions = provider.GetRequiredService<ILinqToDbSessionFactory>();
                 var lines = new[] { new GoodsReceiptLine { LineNumber = 1, ProductId = p1, Quantity = 1.2500m, UnitCost = 19.9901m, CreatedByUserId = actor }, new GoodsReceiptLine { LineNumber = 2, ProductId = p2, Quantity = 2.5000m, UnitCost = 29.9902m, CreatedByUserId = actor } };
                 var header = new GoodsReceipt { ReceiptDate = new DateTime(2026, 10, 18), WarehouseId = warehouse, EmployeeId = employee, CreatedByUserId = actor, CreatedAtUtc = new DateTime(2000, 1, 1), Version = new byte[] { 9 } };
                 var conn = (SqlConnection)ctx.Connection; conn.StatisticsEnabled = true; conn.ResetStatistics();
@@ -50,12 +50,12 @@ public sealed class ReceiptPilotParityTests(ITestOutputHelper output)
                     Assert.Equal(await NativeSql.Scalar<int>(conn, tx, "SELECT CONVERT(int,@@SPID)"), await LinqToDB.Data.DataContextExtensions.ExecuteAsync<int>(borrowed, "SELECT CONVERT(int,@@SPID)", CancellationToken.None));
                 var locked = await production.LockHeaderAsync(saved.Id, CancellationToken.None); Assert.NotNull(locked);
                 var snapshot = await production.LockPostSnapshotAsync(locked!, CancellationToken.None); Assert.Equal(2, snapshot.Lines.Count);
+                await production.LockValuationBalancesAsync(warehouse, lines.Select(l => l.ProductId).ToArray(), CancellationToken.None);
                 Assert.True(await production.TryMarkPostedAsync(saved.Id, saved.Version, new DateTime(2026, 10, 18), actor, CancellationToken.None));
                 foreach (var line in lines)
                 {
                     conn.ResetStatistics();
-                    await production.AppendStockLedgerAsync(saved.Id, warehouse, new[] { line }, new DateTime(2026, 10, 18), actor, CancellationToken.None);
-                    await production.ApplyStockBalanceDeltasAsync(warehouse, new Dictionary<int, decimal> { { line.ProductId, line.Quantity } }, CancellationToken.None);
+                    await production.ApplyPostedInventoryAsync(saved, new[] { line }, new DateTime(2026, 10, 18), actor, CancellationToken.None);
                     output.WriteLine("Receipt ledger/balance provider=" + "production" + " observed server roundtrips=" + conn.RetrieveStatistics()["ServerRoundtrips"]);
                     if (fail)
                     {

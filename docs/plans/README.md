@@ -1,6 +1,6 @@
 # Execution roadmap — v1a-pro
 
-**Updated:** 2026-10-21. This index is the sole execution queue. After PR #41, the Owner selected SAL as the sole active implementation roadmap. Completed plans remain evidence; retired directions remain unscheduled.
+**Updated:** 2026-10-23. This index is the sole execution queue. After PR #41, the Owner selected SAL as the sole active implementation roadmap. Completed plans remain evidence; retired directions remain unscheduled.
 
 ## Current roadmap — SAL / ACTIVE
 
@@ -10,17 +10,19 @@ Read [SAL design](../DIRECT_SALES.md), [costing](../DIRECT_SALES_COSTING.md), [q
 
 | Task | Outcome | Current state |
 |---|---|---|
-| SAL-T00 | Exact arithmetic, domain/contracts and permission definitions | READY — not started |
-| SAL-T01 | Atomic schema10, verified schema9 bootstrap/admission and reset profiles | NOT STARTED — after T00 |
-| SAL-T02 | Valued receipt posting, shared lock protocol, reconciliation and stock reads | NOT STARTED — after T01 |
-| SAL-T03 | Authorized sales Draft lifecycle and version/line identity | NOT STARTED — after T02 |
-| SAL-T04 | Atomic sale Post, cost allocation and stock concurrency | NOT STARTED — after T03 |
-| SAL-T05 | LINQ filtering and keyset list | NOT STARTED — after T04 |
-| SAL-T06 | Local API, ViewModels and session/recovery integration | NOT STARTED — after T05 |
-| SAL-T07 | Compact seven-column UI, native input and accessibility | NOT STARTED — after T06 |
-| SAL-T08 | Frozen integrated SQL/UI/package evidence and Owner disposition | NOT STARTED — after T07 |
+| SAL-T00 | Exact arithmetic, domain/contracts and permission definitions | COMPLETE — [focused evidence](../evidence/sal/20261022-t00-foundation.md) |
+| SAL-T01 | Atomic schema10, verified schema9 bootstrap/admission and reset profiles | COMPLETE — [bounded evidence](../evidence/sal/20261022-t01-schema-bootstrap.md) |
+| SAL-T02 | Valued receipt posting, shared lock protocol, reconciliation and stock reads | COMPLETE — [bounded evidence](../evidence/sal/20261022-t02-valued-inventory.md) |
+| SAL-T03 | Authorized sales Draft lifecycle and version/line identity | COMPLETE — [bounded evidence](../evidence/sal/20261022-t03-sales-draft.md) |
+| SAL-T04 | Atomic sale Post, cost allocation and stock concurrency | COMPLETE — [bounded evidence](../evidence/sal/20261022-t04-atomic-sales-post.md) |
+| SAL-T05 | LINQ filtering and keyset list | COMPLETE — `f9149a6`, [bounded evidence](../evidence/sal/20261022-t05-sales-keyset-queries.md) |
+| SAL-T06 | Local API, ViewModels and session/recovery integration | COMPLETE — `5fbd6f5`, [bounded evidence](../evidence/sal/20261022-t06-local-session-viewmodels.md) |
+| SAL-T07 | Compact seven-column UI, native input and accessibility | IN PROGRESS / OPEN — source `879ab7b`, [bounded native100 evidence](../evidence/sal/20261022-t07-native-sales-workspace.md); native125 RESOURCE BLOCKED; R4 source fix approved `f5039cb` |
+| SAL-T08 | Frozen integrated SQL/UI/package evidence and Owner disposition | IN PROGRESS — [frozen automated evidence](../evidence/sal/20261021-t08-integrated-acceptance.md) product/package `f5039cb`, GUI tests `4697744`; core/SQL/package/native100 runnable PASS; native125/full T07, attended and final Owner acceptance OPEN |
 
-All acceptance rows are NOT RUN. The serial order above is the execution queue; the plan records technical dependencies. No task checkpoint is deployable until receipt/sale/reconciliation writers and schema/runtime/reset guards are coherent. Product source still supports schema9; schema10 is approved future work. Payments, debt, returns, HTTP and framework reactivation are excluded. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
+T00-owned pure, T01-owned schema/bootstrap and T02-owned receipt/reconciliation/stock-read and T03-owned Draft/detail and T04-owned atomic Post/protocol portions have focused evidence; T05 List/cursor/ownership has reviewed complete affected-project evidence. Exact bounded row dispositions are recorded in the [acceptance ledger](../DIRECT_SALES_ACCEPTANCE.md); multi-task rows remain open. The original serial order records technical dependencies; the bounded continuation decision below now permits feasible T08 work. No task checkpoint is deployable until receipt/sale/reconciliation writers and schema/runtime/reset guards are coherent. The historical baseline supports schema9; development source at `81e8aab` requires schema10, with receipt/reconciliation implemented at `47165ded` and Sales Post at `7eeafa4`. Coherent source protocol does not establish end-to-end runtime/package/Owner acceptance. Payments, debt, returns, HTTP and framework reactivation are excluded. Release prerequisites remain UNACCEPTED / UNSCHEDULED.
+
+On 2026-10-23 the Owner replied “Tiếp tục” after the explicit choice between feasible T08 continuation and waiting for native125. The execution controller interprets that reply as authorization to proceed with feasible T08 implementation, SQL, package and native100 work while full T07/native125, attended observations and final dated Owner acceptance remain OPEN. This changes the earlier serial execution order only; it waives no evidence or feature/release acceptance requirement.
 
 ## Completed baselines — retain, do not restart
 

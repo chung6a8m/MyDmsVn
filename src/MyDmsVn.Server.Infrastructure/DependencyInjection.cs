@@ -7,11 +7,13 @@ using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Application.Persistence;
+using MyDmsVn.Server.Application.Sales;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.Infrastructure.Catalog;
 using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
+using MyDmsVn.Server.Infrastructure.Sales;
 using MyDmsVn.Server.Infrastructure.Security;
 
 namespace MyDmsVn.Server.Infrastructure
@@ -50,6 +52,7 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddScoped<IEmployeeQueryService, SqlEmployeeQueryService>();
             services.TryAddScoped<ICustomerQueryService, SqlCustomerQueryService>();
             services.TryAddScoped<IGoodsReceiptQueryService, SqlGoodsReceiptQueryService>();
+            services.TryAddScoped<ISalesReceiptQueryService, SqlSalesReceiptQueryService>();
             services.TryAddScoped<IInventoryQueryService, SqlInventoryQueryService>();
             services.TryAddScoped<IStockReconciliationQueryService, SqlStockReconciliationQueryService>();
             services.TryAddEnumerable(
@@ -78,6 +81,7 @@ namespace MyDmsVn.Server.Infrastructure
             return new SqlPersistenceBuilder(services)
                 .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>()
                 .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>()
+                .AddRepository<ISalesReceiptWriteRepository, SqlSalesReceiptWriteRepository>()
                 .AddRepository<ISecurityAdministrationRepository, SqlSecurityAdministrationRepository>()
                 .AddRepository<IPermissionAssignmentImportRepository, SqlSecurityAdministrationRepository>();
         }

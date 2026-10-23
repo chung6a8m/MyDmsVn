@@ -106,6 +106,22 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
             string? requestFieldRoot,
             Func<ApiResponse<T>, string, ApiResponse<T>>? transformResponse,
             CancellationToken cancellationToken)
+            => await SendCoreAsync(request, requestFieldRoot, transformResponse, false, null, cancellationToken).ConfigureAwait(false);
+
+        public Task<ApiResponse<T>> SendForCurrentSessionAsync<T>(
+            ApplicationRequest<T> request,
+            string? requestFieldRoot,
+            CancellationToken cancellationToken,
+            long? expectedSessionVersion = null) =>
+            SendCoreAsync(request, requestFieldRoot, null, true, expectedSessionVersion, cancellationToken);
+
+        private async Task<ApiResponse<T>> SendCoreAsync<T>(
+            ApplicationRequest<T> request,
+            string? requestFieldRoot,
+            Func<ApiResponse<T>, string, ApiResponse<T>>? transformResponse,
+            bool fenceResponse,
+            long? expectedSessionVersion,
+            CancellationToken cancellationToken)
         {
             using (var scope = _scopeFactory.Begin(request.GetType().Name))
             using (var requestScope = _serviceScopeFactory.CreateScope())
@@ -113,6 +129,10 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                 try
                 {
                     var hasActor = _session.TryCaptureActor(out var actor, out var generation);
+                    // The expected owner never supplies an actor. Compare against this core's
+                    // atomically captured actor/generation before any account or handler admission.
+                    if (expectedSessionVersion.HasValue && (!hasActor || generation != expectedSessionVersion.Value))
+                        return SessionChanged<T>(scope);
                     requestScope.ServiceProvider
                         .GetRequiredService<LocalRequestCurrentUserAccessor>()
                         .Initialize(actor);
@@ -145,6 +165,8 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                         }
                         catch (Exception)
                         {
+                            if (fenceResponse && !_session.IsCurrent(generation))
+                                return SessionChanged<T>(scope);
                             var unavailable = ApiResponse<T>.Failure(
                                 new ApiError(
                                     ApiStatusCode.InternalServerError,
@@ -157,6 +179,8 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
 
                         if (!accountIsActive)
                         {
+                            if (fenceResponse && !_session.IsCurrent(generation))
+                                return SessionChanged<T>(scope);
                             _session.RequireReauthentication(generation);
                             var inactive = ApiResponse<T>.Failure(
                                 new ApiError(
@@ -192,6 +216,11 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                         response = transformResponse(response, scope.CorrelationId);
                     }
 
+                    // Fence before expiring this request's own current Unauthorized session.
+                    // A late response says nothing about whether a mutation committed.
+                    if (fenceResponse && hasActor && !_session.IsCurrent(generation))
+                        return SessionChanged<T>(scope);
+
                     if (hasActor &&
                         !response.IsSuccess &&
                         response.Error!.Status == ApiStatusCode.Unauthorized)
@@ -212,6 +241,14 @@ namespace MyDmsVn.Desktop.Infrastructure.Local
                     throw;
                 }
             }
+        }
+
+        private static ApiResponse<T> SessionChanged<T>(IRequestDiagnosticsScope scope)
+        {
+            scope.RecordError("Auth.SessionChanged");
+            return ApiResponse<T>.Failure(new ApiError(ApiStatusCode.Unauthorized,
+                "Auth.SessionChanged", "The session changed before the response could be published.",
+                correlationId: scope.CorrelationId));
         }
     }
 

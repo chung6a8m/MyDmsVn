@@ -6,23 +6,32 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests
 {
     public sealed class GuiOwnedProcessTests : IClassFixture<GuiProcessProbeFixture>
     {
         private readonly GuiProcessProbeFixture _probe;
+        private readonly ITestOutputHelper _output;
 
-        public GuiOwnedProcessTests(GuiProcessProbeFixture probe) => _probe = probe;
+        public GuiOwnedProcessTests(GuiProcessProbeFixture probe, ITestOutputHelper output)
+        {
+            _probe = probe;
+            _output = output;
+        }
 
         [Fact]
         public async Task Packaged_lookup_keyboard_recovers_its_owned_window_from_a_background_editor()
         {
             using var keyboard = new GuiProcessProbeFixture(package: true);
+            PreserveFocusProbe(_probe);
+            PreserveFocusProbe(keyboard);
             var start = keyboard.Start("\"" + _probe.Start("unused").FileName + "\" keyboard-focus-audit Light");
             start.EnvironmentVariables["MYDMSVN_GUI_P5_EXPECTED_SCALE"] =
                 Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
             var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(25));
+            _output.WriteLine(result.StandardOutput);
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("BACKGROUND_TARGET_OBSERVED=PASS", result.StandardOutput);
             Assert.Contains("OWNED_LOOKUP_FOREGROUND_RECOVERED=PASS", result.StandardOutput);
@@ -33,13 +42,35 @@ namespace MyDmsVn.Desktop.Tests
         public async Task Packaged_lookup_input_preserves_value_when_the_editor_refuses_keyboard_focus()
         {
             using var keyboard = new GuiProcessProbeFixture(package: true);
+            PreserveFocusProbe(_probe);
+            PreserveFocusProbe(keyboard);
             var start = keyboard.Start("\"" + _probe.Start("unused").FileName + "\" keyboard-focus-refusal-audit Light");
             start.EnvironmentVariables["MYDMSVN_GUI_P5_EXPECTED_SCALE"] =
                 Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_EXPECTED_SCALE") ?? "100";
             var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(25));
+            _output.WriteLine(result.StandardOutput);
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("REFUSED_LOOKUP_FOCUS_NO_INPUT=PASS", result.StandardOutput);
             Assert.True(result.CleanupVerified);
+        }
+
+        private void PreserveFocusProbe(GuiProcessProbeFixture probe)
+        {
+            var archive = Environment.GetEnvironmentVariable("MYDMSVN_GUI_PROBE_ARCHIVE_DIRECTORY");
+            if (string.IsNullOrWhiteSpace(archive)) return;
+            Assert.True(Path.IsPathRooted(archive), "Probe archive directory must be absolute.");
+            var executable = probe.Start("unused").FileName;
+            var destination = Path.Combine(archive, Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(destination);
+            foreach (var path in new[] { executable, Path.ChangeExtension(executable, ".cs") })
+            {
+                var copy = Path.Combine(destination, Path.GetFileName(path));
+                File.Copy(path, copy);
+                using var hash = System.Security.Cryptography.SHA256.Create();
+                var digest = BitConverter.ToString(hash.ComputeHash(File.ReadAllBytes(copy))).Replace("-", "");
+                File.AppendAllText(Path.Combine(destination, "before-launch.sha256"), Path.GetFileName(copy) + " " + digest + Environment.NewLine);
+                _output.WriteLine("FOCUS_PROBE_BEFORE_LAUNCH_SHA256=" + Path.GetFileName(copy) + ":" + digest);
+            }
         }
 
         [Fact]

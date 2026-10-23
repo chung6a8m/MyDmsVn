@@ -329,7 +329,7 @@ public sealed class InventoryAcceptanceTests
         return ApiResponse<PagedResult<StockBalanceRow>>.Success(new PagedResult<StockBalanceRow>(rows, page, 2, 3));
     }
     private static StockBalanceRow BalanceRow(int product) => new StockBalanceRow(
-        2, "W2", "Historical warehouse", false, product, "P" + product, "Historical product", false, product);
+        2, "W2", "Historical warehouse", false, product, "P" + product, "Historical product", false, product, 0m, 0m);
     private static ApiResponse<PagedResult<StockCardRow>> CardResponse(int page)
     {
         var rows = page == 1 ? new[] { CardRow(42), CardRow(41) } : new[] { CardRow(43) };
@@ -338,7 +338,7 @@ public sealed class InventoryAcceptanceTests
     private static StockCardRow CardRow(int document) => new StockCardRow(
         document, 2, "W2", "Historical warehouse", false, 7, "P7", "Historical product", false,
         new DateTime(2026, 10, 19, 1, 2, 3, DateTimeKind.Utc), "GoodsReceipt", document,
-        "GR" + document.ToString("D10"), document);
+        "GR" + document.ToString("D10"), document, 0m);
 
     private sealed class Pending<T>
     {

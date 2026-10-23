@@ -11,9 +11,9 @@ namespace MyDmsVn.Desktop.Tests;
 // Uses the same WM_CHAR/key primitives as InlineReceiptTestDriver; never assigns query Text.
 internal sealed class NativeLookupTypingDriver
 {
-    private readonly BootstrapLookupBox _lookup;
+    private readonly Control _lookup;
     private readonly IntPtr _edit;
-    internal NativeLookupTypingDriver(BootstrapLookupBox lookup)
+    internal NativeLookupTypingDriver(Control lookup)
     {
         _lookup = lookup;
         if (!lookup.ContainsFocus)
@@ -75,6 +75,18 @@ internal sealed class NativeLookupTypingDriver
             if (previous == null) Clipboard.Clear();
             else Clipboard.SetDataObject(previous, true);
         }
+    }
+    internal static void KeyCharacter(Control owner, Keys key, char character)
+    {
+        var handle = GetFocus();
+        var target = Control.FromHandle(handle);
+        Assert.True(handle != IntPtr.Zero && target != null && (ReferenceEquals(target, owner) || owner.Contains(target)));
+        Assert.Equal(GetCurrentThreadId(), GetWindowThreadProcessId(handle, out var process));
+        Assert.Equal(GetCurrentProcessId(), process);
+        Assert.True(PostMessage(handle, 0x0100, new IntPtr((int)key), IntPtr.Zero));
+        Assert.True(PostMessage(handle, 0x0102, new IntPtr(character), IntPtr.Zero));
+        Assert.True(PostMessage(handle, 0x0101, new IntPtr((int)key), IntPtr.Zero));
+        System.Windows.Forms.Application.DoEvents();
     }
     internal static void Click(Control target, Point point)
     {

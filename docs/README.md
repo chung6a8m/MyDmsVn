@@ -1,6 +1,6 @@
 # Documentation index — v1a-pro
 
-**Updated:** 2026-10-21. Business Compact refinement (BCF) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); **SAL — Direct Sales and moving weighted average** is now the sole ACTIVE roadmap from PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`; SAL-T00 is READY and implementation/evidence are NOT RUN. BCI, RESP, L2DB and GUI-P5 are completed baselines; older unimplemented plans remain retired.
+**Updated:** 2026-10-22. Business Compact refinement (BCF) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); **SAL — Direct Sales and moving weighted average** is now the sole ACTIVE roadmap from PR #41 baseline `35ba2e8a3f37fb07095701eb94f4b56f7941c491`; T00 foundations and [T01 schema/bootstrap checkpoint](evidence/sal/20261022-t01-schema-bootstrap.md) are complete at `b5a2f3f` / `81e8aab`; [T02 valued inventory](evidence/sal/20261022-t02-valued-inventory.md) is complete; [T03 Draft/detail](evidence/sal/20261022-t03-sales-draft.md) is complete; [T04 atomic Post](evidence/sal/20261022-t04-atomic-sales-post.md) is complete; [T05 keyset queries](evidence/sal/20261022-t05-sales-keyset-queries.md) are complete at `f9149a6`; [T06 Local/session/ViewModels](evidence/sal/20261022-t06-local-session-viewmodels.md) is complete at `5fbd6f5`; T07 source is implemented at `879ab7b` ([bounded native100 evidence](evidence/sal/20261022-t07-native-sales-workspace.md)); full T07 remains IN PROGRESS / OPEN with native125 RESOURCE BLOCKED and R4 deferred Minor; T08 is NOT STARTED in the unchanged serial queue. Full SAL/Owner/package acceptance remains incomplete and the development checkpoint is not deployable. BCI, RESP, L2DB and GUI-P5 are completed baselines; older unimplemented plans remain retired.
 
 ## Current work and Codex entry points
 
@@ -13,8 +13,8 @@
 | [Direct Sales design](DIRECT_SALES.md) | Approved business scope, lifecycle, contracts and architecture |
 | [Sales costing](DIRECT_SALES_COSTING.md) | Exact moving-average math, shared locks, schema10 and baseline bootstrap |
 | [Sales query/UI](DIRECT_SALES_QUERY_AND_UI.md) | LINQ/keyset contract and seven-column desktop interaction |
-| [Sales acceptance](DIRECT_SALES_ACCEPTANCE.md) | New SAL evidence obligations; all NOT RUN |
-| [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) | Accepted direction and consequences; not implemented |
+| [Sales acceptance](DIRECT_SALES_ACCEPTANCE.md) | A10–A12 bounded T01 PASS; multi-task/frozen acceptance open |
+| [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) | Accepted direction, T00/T01 checkpoints and remaining implementation |
 | [BCF implementation plan](plans/20261021-001-business-compact-lookup-and-visual-parity.md) | Completed lookup-first sequence, implemented/source distinctions and final bounded acceptance |
 | [BCF design](BUSINESS_COMPACT_REFINEMENT.md) | Three lookup contracts, shell/catalog/receipt composition and guarded navigation |
 | [BCF acceptance ledger](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) | BCF-A01–A23 reconciled; exact candidates, failed trials and Owner-accepted exceptions |

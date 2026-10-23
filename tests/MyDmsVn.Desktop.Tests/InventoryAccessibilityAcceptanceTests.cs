@@ -451,11 +451,11 @@ public sealed class InventoryAccessibilityAcceptanceTests
             "W2 - Warehouse", true, "E5 - Employee", true);
         public Task<ApiResponse<PagedResult<StockBalanceRow>>> GetStockBalancesAsync(StockBalanceQuery request, CancellationToken token) =>
             Task.FromResult(ApiResponse<PagedResult<StockBalanceRow>>.Success(new PagedResult<StockBalanceRow>(
-                new[] { new StockBalanceRow(2, "W2", "Warehouse", true, 7, "P7", "Product", true, 2.5m) }, 1, 25, 1)));
+                new[] { new StockBalanceRow(2, "W2", "Warehouse", true, 7, "P7", "Product", true, 2.5m, 0m, 0m) }, 1, 25, 1)));
         public Task<ApiResponse<PagedResult<StockCardRow>>> GetStockCardAsync(StockCardQuery request, CancellationToken token) =>
             Task.FromResult(ApiResponse<PagedResult<StockCardRow>>.Success(new PagedResult<StockCardRow>(
                 new[] { new StockCardRow(91, 2, "W2", "Warehouse", true, 7, "P7", "Product", true,
-                    new DateTime(2026, 10, 19, 1, 2, 3, DateTimeKind.Utc), "GoodsReceipt", 41, "GR0000000041", 2.5m) }, 1, 25, 1)));
+                    new DateTime(2026, 10, 19, 1, 2, 3, DateTimeKind.Utc), "GoodsReceipt", 41, "GR0000000041", 2.5m, 0m) }, 1, 25, 1)));
         public Task<ApiResponse<PagedResult<GoodsReceiptDto>>> ListAsync(GoodsReceiptListRequest request, CancellationToken token) =>
             Task.FromResult(ApiResponse<PagedResult<GoodsReceiptDto>>.Success(new PagedResult<GoodsReceiptDto>(new[] { Receipt }, 1, 25, 1)));
         public Task<ApiResponse<GoodsReceiptDto>> GetAsync(long id, CancellationToken token) =>

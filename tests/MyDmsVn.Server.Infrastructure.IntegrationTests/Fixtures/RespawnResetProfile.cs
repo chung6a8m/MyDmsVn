@@ -23,11 +23,14 @@ BEGIN
     THROW 51000, 'StockLedger is append-only.', 1;
 END;";
 
+    private static readonly string[] AppendOnlyTables = { "StockLedger", "StockValuationEntries" };
+
     private static readonly string[] MutableTables =
     {
         "Users", "Roles", "UserRoles", "RolePermissions", "UserPermissions", "SystemSecuritySettings",
         "Products", "Warehouses", "Employees", "Customers", "GoodsReceipts", "GoodsReceiptLines",
         "StockLedger", "StockBalances", "SecurityAuditEvents",
+        "SalesReceipts", "SalesReceiptLines", "StockValuationEntries",
     };
 
     private static readonly string[] AllowedConstraints =
@@ -56,9 +59,22 @@ END;";
         "CK_RolePermissions_PermissionKey_NotBlank",
         "CK_Roles_NormalizedRoleName_NotBlank",
         "CK_Roles_RoleName_NotBlank",
+        "CK_SalesReceiptLines_Cost",
+        "CK_SalesReceiptLines_LineAmount",
+        "CK_SalesReceiptLines_LineNo",
+        "CK_SalesReceiptLines_Quantity",
+        "CK_SalesReceiptLines_Unit",
+        "CK_SalesReceiptLines_UnitPrice",
+        "CK_SalesReceipts_PostingAudit",
+        "CK_SalesReceipts_SaleNo_NoNul",
+        "CK_SalesReceipts_SaleNo_NotBlank",
+        "CK_SalesReceipts_Status",
         "CK_SecurityAuditEvents_Operation_NotBlank",
         "CK_SecurityAuditEvents_TargetId",
         "CK_SecurityAuditEvents_TargetType",
+        "CK_StockBalances_EmptyValue",
+        "CK_StockBalances_InventoryValue",
+        "CK_StockBalances_Quantity",
         "CK_StockLedger_DocumentType_NoNul",
         "CK_StockLedger_DocumentType_NotBlank",
         "CK_StockLedger_QuantityChange_NonZero",
@@ -87,6 +103,9 @@ END;";
         "DF_Roles_AssignmentRevision",
         "DF_Roles_CreatedAtUtc",
         "DF_Roles_IsActive",
+        "DF_SalesReceiptLines_CreatedAtUtc",
+        "DF_SalesReceipts_CreatedAtUtc",
+        "DF_SalesReceipts_Status",
         "DF_SecurityAuditEvents_OccurredAtUtc",
         "DF_StockBalances_Quantity",
         "DF_SystemSecuritySettings_CreatedAtUtc",
@@ -108,12 +127,23 @@ END;";
         "FK_GoodsReceipts_UpdatedByUsers",
         "FK_GoodsReceipts_Warehouses",
         "FK_RolePermissions_Roles",
+        "FK_SalesReceiptLines_CreatedByUsers",
+        "FK_SalesReceiptLines_Products",
+        "FK_SalesReceiptLines_SalesReceipts",
+        "FK_SalesReceiptLines_UpdatedByUsers",
+        "FK_SalesReceipts_CreatedByUsers",
+        "FK_SalesReceipts_Customers",
+        "FK_SalesReceipts_Employees",
+        "FK_SalesReceipts_PostedByUsers",
+        "FK_SalesReceipts_UpdatedByUsers",
+        "FK_SalesReceipts_Warehouses",
         "FK_SecurityAuditEvents_Actor",
         "FK_StockBalances_Products",
         "FK_StockBalances_Warehouses",
         "FK_StockLedger_PostedByUsers",
         "FK_StockLedger_Products",
         "FK_StockLedger_Warehouses",
+        "FK_StockValuationEntries_StockLedger",
         "FK_SystemSecuritySettings_Superuser",
         "FK_UserPermissions_Users",
         "FK_UserRoles_Roles",
@@ -125,9 +155,12 @@ END;";
         "PK_Products",
         "PK_RolePermissions",
         "PK_Roles",
+        "PK_SalesReceiptLines",
+        "PK_SalesReceipts",
         "PK_SecurityAuditEvents",
         "PK_StockBalances",
         "PK_StockLedger",
+        "PK_StockValuationEntries",
         "PK_SystemSecuritySettings",
         "PK_UserPermissions",
         "PK_UserRoles",
@@ -141,6 +174,10 @@ END;";
         "IX_GoodsReceipts_EmployeeId",
         "IX_GoodsReceipts_ReceiptDate_ReceiptId",
         "IX_GoodsReceipts_WarehouseId_ReceiptDate",
+        "IX_SalesReceiptLines_ProductId_SaleId",
+        "IX_SalesReceipts_EmployeeId",
+        "IX_SalesReceipts_SaleDate_SaleId",
+        "IX_SalesReceipts_WarehouseId_SaleDate",
         "IX_SecurityAuditEvents_Target",
         "IX_StockBalances_ProductId",
         "IX_StockLedger_ProductId",
@@ -155,6 +192,8 @@ END;";
         "UX_Products_Code",
         "UX_RolePermissions_RoleId_PermissionKey",
         "UX_Roles_NormalizedRoleName",
+        "UX_SalesReceiptLines_SaleId_LineNo",
+        "UX_SalesReceipts_SaleNo",
         "UX_StockLedger_DocumentType_DocumentLineId",
         "UX_SystemSecuritySettings_SuperuserUserId",
         "UX_UserPermissions_UserId_PermissionKey",
@@ -283,7 +322,7 @@ SELECT (SELECT COUNT(*) FROM sys.schemas s WHERE s.principal_id<>s.schema_id OR
                         throw new InvalidOperationException("Unexpected initial schema, principal or permission boundary.");
                     }
                 }
-                await profile.ValidateTriggerAsync(connection, budget.Token).ConfigureAwait(false);
+                await ValidateTriggerAsync(connection, budget.Token).ConfigureAwait(false);
                 await ValidateTablesAndConstraintsAsync(connection, budget.Token).ConfigureAwait(false);
                 await ValidateInitialObjectsAsync(connection, budget.Token).ConfigureAwait(false);
                 profile._boundary = await ReadBoundaryAsync(connection, budget.Token).ConfigureAwait(false);
@@ -354,16 +393,19 @@ SELECT (SELECT COUNT(*) FROM sys.schemas s WHERE s.principal_id<>s.schema_id OR
                 await ValidateBoundaryAsync(connection, budget.Token).ConfigureAwait(false);
                 budget.Token.ThrowIfCancellationRequested();
                 triggerMayBeDisabled = true; // DDL may succeed even if its response is cancelled.
-                await ExecuteAsync(connection,
-                    "DISABLE TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger;", budget.Token).ConfigureAwait(false);
-                if (_afterTriggerDisabled != null)
+                foreach (var table in AppendOnlyTables)
                 {
-                    await _afterTriggerDisabled(connection, budget.Token).ConfigureAwait(false);
+                    await ExecuteAsync(connection, "DISABLE TRIGGER dbo.TR_" + table + "_AppendOnly ON dbo." + table + ";", budget.Token).ConfigureAwait(false);
+                    if (_afterTriggerDisabled != null)
+                    {
+                        await _afterTriggerDisabled(connection, budget.Token).ConfigureAwait(false);
+                    }
+                    budget.Token.ThrowIfCancellationRequested();
                 }
                 await _checkpoint.Reset(connection).ConfigureAwait(false);
                 budget.Token.ThrowIfCancellationRequested();
                 await ExecuteAsync(connection,
-                    "ALTER SEQUENCE dbo.GoodsReceiptNumberSequence RESTART WITH 1;", budget.Token).ConfigureAwait(false);
+                    "ALTER SEQUENCE dbo.GoodsReceiptNumberSequence RESTART WITH 1; ALTER SEQUENCE dbo.SalesReceiptNumberSequence RESTART WITH 1;", budget.Token).ConfigureAwait(false);
             }
         }
         catch (Exception error) { failure = error; }
@@ -374,23 +416,27 @@ SELECT (SELECT COUNT(*) FROM sys.schemas s WHERE s.principal_id<>s.schema_id OR
             connection.Close();
             if (triggerMayBeDisabled)
             {
-                try
+                // Each protection has its own bounded connection and failure boundary. A missing
+                // or damaged trigger must never strand the other protection disabled.
+                foreach (var table in AppendOnlyTables)
                 {
-                    using var restoreBudget = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-                    using var restore = new SqlConnection(_database.ConnectionString);
-                    await restore.OpenAsync(restoreBudget.Token).ConfigureAwait(false);
-                    using (restoreBudget.Token.Register(restore.Close))
+                    try
                     {
-                        await _database.VerifyOwnershipAsync(restore, restoreBudget.Token).ConfigureAwait(false);
-                        await ValidateTriggerDefinitionAsync(restore, restoreBudget.Token).ConfigureAwait(false);
-                        await ExecuteAsync(restore, "ENABLE TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger;",
-                            restoreBudget.Token).ConfigureAwait(false);
-                        await ValidateTriggerAsync(restore, restoreBudget.Token).ConfigureAwait(false);
+                        using var restoreBudget = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+                        using var restore = new SqlConnection(_database.ConnectionString);
+                        await restore.OpenAsync(restoreBudget.Token).ConfigureAwait(false);
+                        using (restoreBudget.Token.Register(restore.Close))
+                        {
+                            await _database.VerifyOwnershipAsync(restore, restoreBudget.Token).ConfigureAwait(false);
+                            await ValidateTriggerDefinitionAsync(restore, table, restoreBudget.Token).ConfigureAwait(false);
+                            await ExecuteAsync(restore, "ENABLE TRIGGER dbo.TR_" + table + "_AppendOnly ON dbo." + table + ";", restoreBudget.Token).ConfigureAwait(false);
+                            await ValidateTriggerAsync(restore, table, restoreBudget.Token).ConfigureAwait(false);
+                        }
                     }
-                }
-                catch (Exception cleanup)
-                {
-                    failure = failure is null ? cleanup : new AggregateException("Reset and trigger restoration failed.", failure, cleanup);
+                    catch (Exception cleanup)
+                    {
+                        failure = failure is null ? cleanup : new AggregateException("Reset and trigger restoration failed.", failure, cleanup);
+                    }
                 }
             }
         }
@@ -423,25 +469,37 @@ SELECT (SELECT COUNT(*) FROM sys.schemas s WHERE s.principal_id<>s.schema_id OR
         }
     }
 
-    private async Task ValidateTriggerAsync(SqlConnection connection, CancellationToken token)
+    private static async Task ValidateTriggerAsync(SqlConnection connection, CancellationToken token)
     {
-        await ValidateTriggerDefinitionAsync(connection, token).ConfigureAwait(false);
-        using var command = new SqlCommand(@"SELECT COUNT(*) FROM sys.triggers
-WHERE object_id=OBJECT_ID(N'dbo.TR_StockLedger_AppendOnly') AND is_disabled=0;", connection) { CommandTimeout = 30 };
-        if (Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false)) != 1)
+        foreach (var table in AppendOnlyTables)
         {
-            throw new InvalidOperationException("The append-only trigger is disabled.");
+            await ValidateTriggerAsync(connection, table, token).ConfigureAwait(false);
         }
     }
 
-    private static async Task ValidateTriggerDefinitionAsync(SqlConnection connection, CancellationToken token)
+    private static async Task ValidateTriggerAsync(SqlConnection connection, string table, CancellationToken token)
+    {
+        await ValidateTriggerDefinitionAsync(connection, table, token).ConfigureAwait(false);
+        using var command = new SqlCommand(@"SELECT COUNT(*) FROM sys.triggers
+WHERE object_id=OBJECT_ID(@trigger) AND is_disabled=0;", connection) { CommandTimeout = 30 };
+        command.Parameters.AddWithValue("@trigger", "dbo.TR_" + table + "_AppendOnly");
+        if (Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false)) != 1)
+        {
+            throw new InvalidOperationException("An append-only trigger is disabled.");
+        }
+    }
+
+    private static async Task ValidateTriggerDefinitionAsync(SqlConnection connection, string table, CancellationToken token)
     {
         using var command = new SqlCommand(@"SELECT m.definition FROM sys.triggers t
 JOIN sys.sql_modules m ON m.object_id=t.object_id
-WHERE t.object_id=OBJECT_ID(N'dbo.TR_StockLedger_AppendOnly')
-AND t.parent_id=OBJECT_ID(N'dbo.StockLedger') AND t.is_instead_of_trigger=1 AND t.is_not_for_replication=0;", connection) { CommandTimeout = 30 };
+WHERE t.object_id=OBJECT_ID(@trigger)
+AND t.parent_id=OBJECT_ID(@table) AND t.is_instead_of_trigger=1 AND t.is_not_for_replication=0;", connection) { CommandTimeout = 30 };
+        command.Parameters.AddWithValue("@trigger", "dbo.TR_" + table + "_AppendOnly");
+        command.Parameters.AddWithValue("@table", "dbo." + table);
         var definition = await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string;
-        if (definition is null || !string.Equals(definition.Replace("\r\n", "\n").Trim(), ExpectedTrigger.Replace("\r\n", "\n").Trim(), StringComparison.Ordinal))
+        var expected = ExpectedTrigger.Replace("StockLedger", table);
+        if (definition is null || !string.Equals(definition.Replace("\r\n", "\n").Trim(), expected.Replace("\r\n", "\n").Trim(), StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The exact append-only trigger definition could not be verified.");
         }
@@ -455,7 +513,7 @@ SELECT (SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trus
  + (SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1);", connection) { CommandTimeout = 30 };
         using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         await reader.ReadAsync(token).ConfigureAwait(false);
-        if (reader.GetInt32(0) != 16) { throw new InvalidOperationException("Unexpected application table boundary."); }
+        if (reader.GetInt32(0) != 19) { throw new InvalidOperationException("Unexpected application table boundary."); }
         await reader.NextResultAsync(token).ConfigureAwait(false);
         var expected = MutableTables.Concat(new[] { "SchemaVersions" }).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         var actual = new System.Collections.Generic.List<string>();
@@ -490,7 +548,8 @@ SELECT (SELECT COUNT(*) FROM sys.triggers WHERE is_ms_shipped=0)
         var modules = new System.Collections.Generic.List<string>();
         var expectedModules = new[] { "FN:CatalogTextContainsNul", "P:ApplySecurityAdministration",
             "P:ApplySecurityPermissionImport", "P:ReadSecurityPermissionImportTarget",
-            "SO:GoodsReceiptNumberSequence", "TR:TR_StockLedger_AppendOnly" };
+            "SO:GoodsReceiptNumberSequence", "SO:SalesReceiptNumberSequence",
+            "TR:TR_StockLedger_AppendOnly", "TR:TR_StockValuationEntries_AppendOnly" };
         while (await reader.ReadAsync(token).ConfigureAwait(false))
         {
             var name = reader.GetString(1);
@@ -526,7 +585,7 @@ SELECT (SELECT COUNT(*) FROM sys.triggers WHERE is_ms_shipped=0)
         }
         await reader.NextResultAsync(token).ConfigureAwait(false);
         await reader.ReadAsync(token).ConfigureAwait(false);
-        if (reader.GetInt32(0) != 1)
+        if (reader.GetInt32(0) != 2)
         {
             throw new InvalidOperationException("Unexpected initial trigger, type or assembly inventory.");
         }
