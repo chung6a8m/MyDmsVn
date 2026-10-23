@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -192,6 +193,41 @@ public sealed partial class GoodsReceiptInlineEditorTests
             Assert.Equal(6m, host.Editor.Lines[0].Quantity);
             host.Adapter.CancelActiveEdit();
             Assert.Equal(6m, host.Grid[1, 2].Value);
+        });
+    }
+
+    [Fact]
+    public void Validated_A_then_native_B_or_failed_revalidation_keeps_the_pending_buffer()
+    {
+        SessionTest(host =>
+        {
+            host.Begin(1, 2);
+            Type("4.5");
+            var session = typeof(GoodsReceiptLinesGridAdapter).GetField("_session", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Adapter)!;
+            var target = (InlineEditTarget<GoodsReceiptLineViewModel>)session.GetType().GetField("Target", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
+            var inline = (InlineEditSession<GoodsReceiptLineViewModel>)typeof(GoodsReceiptLinesGridAdapter)
+                .GetField("_inline", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Adapter)!;
+            var cell = host.Grid[1, 2];
+            var context = host.Context(1, 2);
+            Assert.True(inline.RecordValidatedCandidate(target, 4.5m));
+            var unrelated = host.Context(2, 2);
+            unrelated.Cell.Controller.OnValueChanged(unrelated, EventArgs.Empty);
+            Assert.True(inline.HasValidatedCandidate(target));
+            cell.Controller.OnValueChanged(new SourceGrid.CellContext(host.Grid, new SourceGrid.Position(2, 2), cell), EventArgs.Empty);
+            Assert.True(inline.HasValidatedCandidate(target));
+            host.Editor.Lines[1].Quantity = 5m; // Its projection also emits a native callback.
+            Assert.True(inline.HasValidatedCandidate(target));
+            cell.Value = 3.5m;
+            cell.Controller.OnValueChanged(context, EventArgs.Empty);
+            Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("4.5", host.NativeTextBox().Text);
+            Assert.True(inline.RecordValidatedCandidate(target, 4.5m));
+            inline.InvalidateValidation(target); // The next conversion rejected the pending raw input.
+            cell.Value = 4.5m;
+            cell.Controller.OnValueChanged(context, EventArgs.Empty);
+            Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("4.5", host.NativeTextBox().Text);
+            host.Adapter.CancelActiveEdit();
         });
     }
 

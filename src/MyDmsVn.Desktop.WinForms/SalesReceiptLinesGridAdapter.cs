@@ -28,6 +28,7 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
     private readonly List<SalesReceiptLineViewModel> _lines = new List<SalesReceiptLineViewModel>();
     private readonly List<(Cell Cell, LineController Controller)> _controllers = new List<(Cell, LineController)>();
     private readonly InlineValidationStore _validation = new InlineValidationStore();
+    private readonly InlineEditSession<SalesReceiptLineViewModel> _inline = new InlineEditSession<SalesReceiptLineViewModel>();
     private readonly List<ValidationIssue> _unboundValidation = new List<ValidationIssue>();
     private IReadOnlyList<SalesReceiptValidationIssue>? _serverIssues;
     private long _validationDocument = 1;
@@ -316,6 +317,7 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
     internal void CancelActiveEdit()
     {
         var session = _session;
+        _inline.Invalidate();
         _session = null; // Invalidate callbacks before native cancellation/focus events.
         ClearActiveValidation(session);
         if (session != null) _validation.SetSource(ValidationAddress(session.Line, session.Column), "local", Array.Empty<ValidationIssue>());
@@ -429,7 +431,9 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         if (_session != null) { e.Cancel = true; return; }
         if (controller.Column == 1) BindProductOptions();
         var input = (EditorControlBase)context.Cell.Editor;
-        _session = new Session(controller.Line, controller.Column, _generation, context, input, LineValue(controller.Line, controller.Column));
+        var target = _inline.Begin(ValidationAddress(controller.Line, controller.Column), controller.Line,
+            LineValue(controller.Line, controller.Column), input.Control.Text);
+        _session = new Session(target, controller.Column, _generation, context, input);
         input.Control.AccessibleName = (controller.Column == 1 ? "Product" : controller.Column == 3 ? "Quantity" : "Unit price") +
             " row " + context.Position.Row + " editor";
         input.Control.AccessibleDescription = AccessibleHelp(_generation, controller.Line, controller.Column);
@@ -440,7 +444,7 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
     private void ConvertCandidate(object? sender, DevAge.ComponentModel.ConvertingObjectEventArgs e)
     {
         var session = _session;
-        if (session != null) session.CandidateValidated = false;
+        if (session != null) _inline.InvalidateValidation(session.Target);
         if (session == null || !ReferenceEquals(sender, session.Input) || !Current(session))
         {
             EditError = "The edited line is no longer available.";
@@ -476,38 +480,48 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         }
         e.Value = value;
         e.ConvertingStatus = DevAge.ComponentModel.ConvertingStatus.Completed;
-        session.CandidateValidated = true;
-        session.ValidatedValue = value;
+        _inline.RecordValidatedCandidate(session.Target, value);
         EditError = null;
     }
 
     private void Commit(LineController controller, CellContext context)
     {
         var session = _session;
-        if (_projecting || session == null || !session.CandidateValidated || !Equals(context.Value, session.ValidatedValue) || controller.Generation != session.Generation ||
+        if (_projecting || session == null || controller.Generation != session.Generation ||
             !ReferenceEquals(controller.Line, session.Line) || controller.Column != session.Column ||
-            !ReferenceEquals(context.Cell, session.Context.Cell) || !Current(session)) return;
-        session.CandidateValidated = false;
-        if (controller.Column == 3) session.Line.Quantity = (decimal)context.Value;
-        else if (controller.Column == 4) session.Line.UnitPrice = (decimal)context.Value;
-        else
-        {
-            var changedProduct = session.Line.ProductId != (int)context.Value;
-            var option = _products.Items.FirstOrDefault(item => item.Id == (int)context.Value);
-            session.Line.SetProduct((int)context.Value, option?.DisplayName ?? session.Line.ProductDisplayName,
-                option?.IsAvailableForNewSelection ?? session.Line.ProductIsActive, !changedProduct ? session.Line.Unit : "");
-            if (changedProduct) ProductCommitted?.Invoke(session.Line);
-        }
+            !ReferenceEquals(context.Grid, _grid) || context.Position != session.Context.Position ||
+            !ReferenceEquals(context.Cell, session.Context.Cell) || !ReferenceEquals(context.Cell.Editor, session.Input) ||
+            !Current(session)) return;
+        _inline.TryApplyValidated(session.Target,
+            value => Equals(context.Value, value) && Current(session),
+            value =>
+            {
+                if (controller.Column == 3) session.Line.Quantity = (decimal)value!;
+                else if (controller.Column == 4) session.Line.UnitPrice = (decimal)value!;
+                else
+                {
+                    var changedProduct = session.Line.ProductId != (int)value!;
+                    var option = _products.Items.FirstOrDefault(item => item.Id == (int)value!);
+                    session.Line.SetProduct((int)value!, option?.DisplayName ?? session.Line.ProductDisplayName,
+                        option?.IsAvailableForNewSelection ?? session.Line.ProductIsActive, !changedProduct ? session.Line.Unit : "");
+                    if (changedProduct) ProductCommitted?.Invoke(session.Line);
+                }
+                return true;
+            });
     }
 
     private void End(LineController controller, CellContext context)
     {
-        if (_session != null && _session.CandidateValidated) Commit(controller, context);
-        if (_session != null && controller.Generation == _session.Generation && ReferenceEquals(context.Cell, _session.Context.Cell))
+        if (_session != null && _inline.HasValidatedCandidate(_session.Target)) Commit(controller, context);
+        if (_session != null && controller.Generation == _session.Generation && ReferenceEquals(controller.Line, _session.Line) &&
+            controller.Column == _session.Column && ReferenceEquals(context.Grid, _grid) &&
+            context.Position == _session.Context.Position && ReferenceEquals(context.Cell, _session.Context.Cell) &&
+            ReferenceEquals(context.Cell.Editor, _session.Input))
         {
             var wasProduct = _session.Column == 1;
             _validation.SetSource(ValidationAddress(_session.Line, _session.Column), "local", Array.Empty<ValidationIssue>());
             ClearActiveValidation(_session);
+            _inline.Invalidate();
             _session = null;
             EditError = null;
             if (wasProduct && !_disposed) SearchProducts(null);
@@ -734,18 +748,17 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
 
     private sealed class Session
     {
-        internal Session(SalesReceiptLineViewModel line, int column, long generation, CellContext context, EditorControlBase input, object value)
-        { Line = line; Column = column; Generation = generation; Context = context; Input = input; OriginalValue = value; }
-        internal readonly SalesReceiptLineViewModel Line;
+        internal Session(InlineEditTarget<SalesReceiptLineViewModel> target, int column, long generation, CellContext context, EditorControlBase input)
+        { Target = target; Column = column; Generation = generation; Context = context; Input = input; }
+        internal readonly InlineEditTarget<SalesReceiptLineViewModel> Target;
+        internal SalesReceiptLineViewModel Line => Target.Line;
         internal readonly int Column;
         internal readonly long Generation;
         internal readonly CellContext Context;
         internal readonly EditorControlBase Input;
-        internal readonly object OriginalValue;
-        internal string OriginalRaw = "";
-        internal string RawCandidate = "";
-        internal bool CandidateValidated;
-        internal object? ValidatedValue;
+        internal object? OriginalValue => Target.OriginalValue;
+        internal string OriginalRaw => Target.OriginalRaw;
+        internal string RawCandidate { get => Target.RawCandidate; set => Target.RawCandidate = value; }
     }
     private sealed class LineController : ControllerBase
     {
@@ -758,8 +771,11 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         public override void OnEditStarting(CellContext sender, CancelEventArgs e) => _owner.Begin(this, sender, e);
         public override void OnEditStarted(CellContext sender, EventArgs e)
         {
-            if (_owner._session != null && ReferenceEquals(sender.Cell, _owner._session.Context.Cell))
-                _owner._session.OriginalRaw = _owner._session.RawCandidate = _owner._session.Input.Control.Text;
+            if (_owner._session != null && Generation == _owner._session.Generation &&
+                ReferenceEquals(Line, _owner._session.Line) && Column == _owner._session.Column &&
+                ReferenceEquals(sender.Grid, _owner._grid) && sender.Position == _owner._session.Context.Position &&
+                ReferenceEquals(sender.Cell, _owner._session.Context.Cell) && ReferenceEquals(sender.Cell.Editor, _owner._session.Input))
+                _owner._session.Target.CaptureOriginalRaw(_owner._session.Input.Control.Text);
         }
         public override void OnValueChanged(CellContext sender, EventArgs e) => _owner.Commit(this, sender);
         public override void OnEditEnded(CellContext sender, EventArgs e) => _owner.End(this, sender);

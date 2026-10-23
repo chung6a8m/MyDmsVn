@@ -87,6 +87,48 @@ public sealed class SalesReceiptGridTests
             Assert.Equal(raw, ((Control)host.Adapter.GetType().GetProperty("QuantityControl", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Adapter)!).Text);
         }, TimeSpan.FromSeconds(15));
     }
+
+    [Fact]
+    public void Validated_A_then_native_B_or_failed_revalidation_cannot_change_sales_line()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var position = new SourceGrid.Position(1, 3);
+            Assert.True(host.Grid.Focus());
+            Assert.True(host.Grid.Selection.Focus(position, true));
+            var context = new SourceGrid.CellContext(host.Grid, position, host.Grid[1, 3]);
+            context.StartEdit();
+            Assert.True(context.IsEditing());
+            adapter.QuantityControl.Text = "4.5";
+            var session = typeof(SalesReceiptLinesGridAdapter).GetField("_session", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(adapter)!;
+            var target = (InlineEditTarget<SalesReceiptLineViewModel>)session.GetType().GetField("Target", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
+            var inline = (InlineEditSession<SalesReceiptLineViewModel>)typeof(SalesReceiptLinesGridAdapter)
+                .GetField("_inline", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(adapter)!;
+            Assert.True(inline.RecordValidatedCandidate(target, 4.5m));
+            var unrelated = new SourceGrid.CellContext(host.Grid, new SourceGrid.Position(1, 4), host.Grid[1, 4]);
+            unrelated.Cell.Controller.OnValueChanged(unrelated, EventArgs.Empty);
+            Assert.True(inline.HasValidatedCandidate(target));
+            context.Cell.Controller.OnValueChanged(new SourceGrid.CellContext(host.Grid, new SourceGrid.Position(1, 4), context.Cell), EventArgs.Empty);
+            Assert.True(inline.HasValidatedCandidate(target));
+            host.Editor.Lines[0].UnitPrice = 8m; // Projection of another cell must preserve the active proof.
+            Assert.True(inline.HasValidatedCandidate(target));
+            host.Grid[1, 3].Value = 3.5m;
+            context.Cell.Controller.OnValueChanged(context, EventArgs.Empty);
+            Assert.Equal(1m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("4.5", adapter.QuantityControl.Text);
+            Assert.True(inline.RecordValidatedCandidate(target, 4.5m));
+            inline.InvalidateValidation(target);
+            host.Grid[1, 3].Value = 4.5m;
+            context.Cell.Controller.OnValueChanged(context, EventArgs.Empty);
+            Assert.Equal(1m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("4.5", adapter.QuantityControl.Text);
+            adapter.CancelActiveEdit();
+            Assert.Equal(1m, host.Grid[1, 3].Value);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
 }
 
 internal sealed class SalesGridHost : IDisposable
