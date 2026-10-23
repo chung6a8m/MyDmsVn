@@ -12,7 +12,7 @@
 
 ## Global constraints
 
-- T00–T02 have bounded implementation evidence; T03–T13 remain NOT STARTED. Proposed filenames/types for later tasks are NEW until implemented; existing file paths are baseline anchors, not proof of passing tests.
+- T00–T02 are VERIFIED in their bounded task scope with [current-candidate native100/native125 evidence](evidence/20261023-uin-t00-t02-native-completion.md); T03–T13 remain NOT STARTED. Proposed filenames/types for later tasks are NEW until implemented; existing file paths are baseline anchors, not proof of passing tests.
 - Preserve the current business/runtime/security/decimal/recovery invariants in AGENTS. No schema, business feature, new permission or runtime migration is needed.
 - Archived unfinished SAL/BCF/release work is excluded. Do not make old T07/T08 closure, old full-SQL acceptance or old visual exceptions a prerequisite.
 - Work in small coherent slices; use existing passing characterization for a pure refactor and meaningful failing behavior tests for a demonstrated gap. Do not fabricate RED or broaden runs without a concrete risk.
@@ -77,7 +77,7 @@ The app consumes BSG at `vendor/MyDmsVn.BootstrapSourceGrid`; its UI source is `
 - [x] Compose existing `BootstrapAlert` and `BootstrapToastContainer` in a small local host. Implement the design's bounded success retention and persistent-error policy; do not use monitor-scoped ToastService as tab routing.
 - [x] Pilot Product and Sales outcomes, including denied command and unknown Post/Create recovery. Emit success only from an authoritative mutation response, separately from later refresh failure; never infer it from Task completion or cleared errors. T07 exposes this same outcome to close admission. Remove duplicate display of the same actionable error only after the new local presentation owns it; ordinary Shell Ready refresh must not erase it.
 - [x] Run focused ST/GT cases for hidden/disposed controls, UI dispatch, focus and queued-toast disposal. Retain existing login/session scrubbing and no protected-data leakage.
-- [x] Record ownership/lifetime samples and [evidence](evidence/20261023-uin-t01-workspace-feedback.md), commit app-only changes with current UI pin unchanged. No new global notification centre is needed. Native theme/DPI and later package/Owner acceptance remain separate validation work.
+- [x] Record ownership/lifetime samples and [evidence](evidence/20261023-uin-t01-workspace-feedback.md), commit app-only changes with current UI pin unchanged. No new global notification centre is needed. Native theme/DPI follow-up is [verified separately](evidence/20261023-uin-t00-t02-native-completion.md); package/Owner acceptance remains T13.
 
 ## UIN-T02 — shared field/cell presentation and first user-visible pilot
 
@@ -91,7 +91,7 @@ The app consumes BSG at `vendor/MyDmsVn.BootstrapSourceGrid`; its UI source is `
 - [x] Implement binder subscriptions/disposal and one shared error source; use `ValidationState.Invalid`, readable field help and supplemental ErrorProvider. Unknown fields remain visible at workspace level.
 - [x] Add stable cell/row indicators for inactive editors and summary navigation. Map indexed server errors using the submitted-row snapshot; test duplicate zero-ID lines, remove/reorder and document/session replacement.
 - [x] Preserve current R4 tests: corrected/canceled inline validation clears its own footer/provider without clearing independent operation feedback. Clear only obsolete relevant errors; do not declare server uniqueness valid on local typing.
-- [x] Run focused Product/Sales native and accessibility cases in Light/Dark at measured native100; test keyboard-only access and no passive focus theft. Keep library control defaults unchanged. Native125 remains a validation gap.
+- [x] Run focused Product/Sales native and accessibility cases in Light/Dark at measured native100/native125; test keyboard-only access and no passive focus theft. Keep library control defaults unchanged.
 - [x] Record the Product/Sales pilot [evidence](evidence/20261023-uin-t02-validation-pilot.md) and binding example, then commit. Full catalog/Goods/inventory adoption is T11.
 
 ## UIN-T03 — App-local common inline edit sessions

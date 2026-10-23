@@ -140,7 +140,7 @@ public sealed class InlineValidationPresentationTests
     [InlineData(BootstrapThemeMode.Dark)]
     public void Compact_sales_validation_indicator_and_keyboard_summary_work_in_both_themes(BootstrapThemeMode mode)
     {
-        StaTest.Run(_ =>
+        StaTest.Run(token =>
         {
             var previous = BootstrapThemeManager.CurrentTheme;
             try
@@ -165,6 +165,7 @@ public sealed class InlineValidationPresentationTests
                 var last = grid.PositionToRectangle(new SourceGrid.Position(1, 6));
                 Assert.True(last.Right <= grid.ClientSize.Width, "Last sales column must remain visible; last=" + last + "; grid=" + grid.ClientSize);
                 _output.WriteLine($"Sales validation theme={mode}; DeviceDpi={host.Form.DeviceDpi}; client={host.Form.ClientSize}; grid={grid.ClientSize}; last={last}");
+                _output.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, token));
             }
             finally { BootstrapThemeManager.CurrentTheme = previous; }
         }, TimeSpan.FromSeconds(20));

@@ -5,14 +5,81 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests
 {
     public sealed class WorkspaceFeedbackHostTests
     {
+        private readonly ITestOutputHelper _output;
+
+        public WorkspaceFeedbackHostTests(ITestOutputHelper output) => _output = output;
+
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Native_tab_feedback_keeps_origin_focus_and_bounds_in_both_themes(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using (var guard = new WinFormsTestGuard())
+                    using (var scopeA = new WorkspaceFeedbackScope())
+                    using (var scopeB = new WorkspaceFeedbackScope())
+                    using (var form = new Form { ClientSize = new System.Drawing.Size(940, 700) })
+                    using (var tabs = new TabControl { Dock = DockStyle.Fill })
+                    using (var hostA = new WorkspaceFeedbackHost(new TextBox(), scopeA))
+                    using (var hostB = new WorkspaceFeedbackHost(new TextBox(), scopeB))
+                    {
+                        var pageA = new TabPage("A");
+                        var pageB = new TabPage("B");
+                        pageA.Controls.Add(hostA);
+                        pageB.Controls.Add(hostB);
+                        tabs.TabPages.Add(pageA);
+                        tabs.TabPages.Add(pageB);
+                        form.Controls.Add(tabs);
+                        form.Show();
+                        _output.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
+                        tabs.SelectedTab = pageB;
+                        Assert.True(hostB.Content.Focus());
+
+                        var sinkA = scopeA.Capture(scopeA.BeginOperation("save", WorkspaceOperationKind.Write));
+                        Task.Run(() => sinkA.Publish(new DesktopNotification(DesktopNotificationKind.Error, "Correct A")))
+                            .GetAwaiter().GetResult();
+                        scopeB.Capture(scopeB.BeginOperation("save", WorkspaceOperationKind.Write)).Publish(
+                            new DesktopNotification(DesktopNotificationKind.Success, "Saved B"));
+                        System.Windows.Forms.Application.DoEvents();
+
+                        Assert.Same(pageB, tabs.SelectedTab);
+                        Assert.True(hostB.Content.Focused);
+                        Assert.Equal(string.Empty, hostB.Alert.Text);
+                        var toast = Assert.IsType<BootstrapToast>(Assert.Single(hostB.ToastContainer.Controls.Cast<Control>()));
+                        Assert.Equal("Saved B", toast.Text);
+                        Assert.True(hostB.ToastContainer.Bounds.Right <= hostB.ClientSize.Width);
+                        Assert.True(hostB.ToastContainer.Bounds.Bottom <= hostB.ClientSize.Height);
+
+                        tabs.SelectedTab = pageA;
+                        System.Windows.Forms.Application.DoEvents();
+                        Assert.True(hostA.Alert.Visible);
+                        Assert.Equal("Correct A", hostA.Alert.Text);
+                        Assert.True(hostA.Alert.Bounds.Right <= hostA.ClientSize.Width);
+                        Assert.True(hostA.Alert.Bounds.Bottom <= hostA.ClientSize.Height);
+                        Assert.False(hostB.Alert.Visible);
+                        _output.WriteLine($"Host theme={mode}; DeviceDpi={form.DeviceDpi}; form={form.ClientSize}; host={hostA.ClientSize}; alert={hostA.Alert.Bounds}; toast={hostB.ToastContainer.Bounds}");
+                        Assert.Empty(guard.Exceptions);
+                    }
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
+            }, TimeSpan.FromSeconds(10));
+        }
+
         [Fact]
         public void Recovery_clear_cannot_erase_independent_failure_admitted_after_recovery_started()
         {

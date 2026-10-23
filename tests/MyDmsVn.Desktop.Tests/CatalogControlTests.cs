@@ -187,7 +187,7 @@ namespace MyDmsVn.Desktop.Tests
         [InlineData(BootstrapThemeMode.Dark)]
         public void Compact_product_validation_summary_keeps_bound_and_unknown_errors_visible_with_feedback_host(BootstrapThemeMode mode)
         {
-            StaTest.Run(_ =>
+            StaTest.Run(token =>
             {
                 var oldTheme = BootstrapThemeManager.CurrentTheme;
                 try
@@ -237,6 +237,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.True(control.EditorControls["code"].ContainsFocus);
                         Assert.Equal("DUPLICATE", control.EditorControls["code"].Text);
                         _output.WriteLine($"Product validation theme={mode}; DeviceDpi={form.DeviceDpi}; client={form.ClientSize}; workspace={workspace.ClientSize}; inspector={control.EditorPanelWidth}");
+                        _output.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
                     }
                 }
                 finally { BootstrapThemeManager.CurrentTheme = oldTheme; }
