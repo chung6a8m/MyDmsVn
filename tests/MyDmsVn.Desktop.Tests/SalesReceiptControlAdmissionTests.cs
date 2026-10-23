@@ -8,6 +8,7 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
@@ -160,41 +161,50 @@ public sealed class SalesReceiptControlAdmissionTests
             host.Wait(pending); Assert.False(host.Editor.IsAccessDenied); Assert.Equal(41, host.Editor.SaleId); Assert.Single(host.Editor.Lines);
         }, TimeSpan.FromSeconds(20));
     }
-    [Fact]
-    public void Delayed_list_locks_header_search_commit_date_note_and_commands_then_restores_editing()
+    [Theory]
+    [InlineData(BootstrapThemeMode.Light)]
+    [InlineData(BootstrapThemeMode.Dark)]
+    public void Delayed_list_locks_header_search_commit_date_note_and_commands_then_restores_editing(BootstrapThemeMode mode)
     {
-        StaTest.Run(_ =>
+        StaTest.Run(token =>
         {
-            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
-            var control = (SalesReceiptControl)host.Control; var date = host.Editor.SaleDate; var note = host.Editor.Note;
-            var completion = new TaskCompletionSource<ApiResponse<SalesReceiptListPage>>(); host.Api.ListHandler = t => completion.Task;
-            var pending = List(host).RefreshAsync();
+            var original = BootstrapThemeManager.CurrentTheme;
             try
             {
-                var detailHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>(),
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+                var control = (SalesReceiptControl)host.Control; var date = host.Editor.SaleDate; var note = host.Editor.Note;
+                var completion = new TaskCompletionSource<ApiResponse<SalesReceiptListPage>>(); host.Api.ListHandler = t => completion.Task;
+                var pending = List(host).RefreshAsync();
+                try
+                {
+                    var detailHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>(),
+                        item => item.Content.Controls.Contains(control.LineGrid));
+                    Assert.True(detailHost.Visible);
+                    var overlay = Assert.Single(detailHost.Controls.OfType<Panel>(),
+                        item => !ReferenceEquals(item, detailHost.Content));
+                    Console.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, token));
+                    var until = DateTime.UtcNow.AddSeconds(2);
+                    while (!overlay.Visible && DateTime.UtcNow < until) { System.Windows.Forms.Application.DoEvents(); Thread.Sleep(10); }
+                    Assert.True(overlay.Visible);
+                    Assert.False(detailHost.Contains(control.SaveButton));
+                    Assert.False(control.CustomerLookup.Enabled); Assert.False(control.WarehouseLookup.Enabled); Assert.False(control.EmployeeLookup.Enabled);
+                    Assert.False(control.SaleDateEditor.Enabled); Assert.False(control.NoteEditor.Enabled); Assert.False(control.SearchBox.Enabled);
+                    Assert.False(control.FromDateEditor.Enabled); Assert.False(control.ToDateEditor.Enabled); Assert.False(control.StatusFilter.Enabled); Assert.False(control.PageSizeEditor.Enabled);
+                    foreach (var lookup in new[] { control.CustomerLookup, control.WarehouseLookup, control.EmployeeLookup }) { lookup.Text = "blocked query"; lookup.SelectValue(8); }
+                    control.SaleDateEditor.ProjectAcceptedValue(date.AddDays(1)); control.NoteEditor.Text = "blocked note";
+                    host.CallTask("SaveAsync"); host.CallTask("PostAsync");
+                    Assert.Equal(1, host.Editor.CustomerId); Assert.Equal(2, host.Editor.WarehouseId); Assert.Equal(3, host.Editor.EmployeeId); Assert.Equal(date, host.Editor.SaleDate); Assert.Equal(note, host.Editor.Note);
+                    Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
+                }
+                finally { completion.TrySetResult(ApiResponse<SalesReceiptListPage>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Test.End", "End"))); host.Wait(pending); }
+                var finishedHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>(),
                     item => item.Content.Controls.Contains(control.LineGrid));
-                Assert.True(detailHost.Visible);
-                var overlay = Assert.Single(detailHost.Controls.OfType<Panel>(),
-                    item => !ReferenceEquals(item, detailHost.Content));
-                var until = DateTime.UtcNow.AddSeconds(2);
-                while (!overlay.Visible && DateTime.UtcNow < until) { System.Windows.Forms.Application.DoEvents(); Thread.Sleep(10); }
-                Assert.True(overlay.Visible);
-                Assert.False(detailHost.Contains(control.SaveButton));
-                Assert.False(control.CustomerLookup.Enabled); Assert.False(control.WarehouseLookup.Enabled); Assert.False(control.EmployeeLookup.Enabled);
-                Assert.False(control.SaleDateEditor.Enabled); Assert.False(control.NoteEditor.Enabled); Assert.False(control.SearchBox.Enabled);
-                Assert.False(control.FromDateEditor.Enabled); Assert.False(control.ToDateEditor.Enabled); Assert.False(control.StatusFilter.Enabled); Assert.False(control.PageSizeEditor.Enabled);
-                foreach (var lookup in new[] { control.CustomerLookup, control.WarehouseLookup, control.EmployeeLookup }) { lookup.Text = "blocked query"; lookup.SelectValue(8); }
-                control.SaleDateEditor.ProjectAcceptedValue(date.AddDays(1)); control.NoteEditor.Text = "blocked note";
-                host.CallTask("SaveAsync"); host.CallTask("PostAsync");
-                Assert.Equal(1, host.Editor.CustomerId); Assert.Equal(2, host.Editor.WarehouseId); Assert.Equal(3, host.Editor.EmployeeId); Assert.Equal(date, host.Editor.SaleDate); Assert.Equal(note, host.Editor.Note);
-                Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
+                Assert.False(Assert.Single(finishedHost.Controls.OfType<Panel>(),
+                    item => !ReferenceEquals(item, finishedHost.Content)).Visible);
+                Assert.True(control.NoteEditor.Enabled); control.NoteEditor.Text = "allowed"; Assert.Equal("allowed", host.Editor.Note);
             }
-            finally { completion.TrySetResult(ApiResponse<SalesReceiptListPage>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Test.End", "End"))); host.Wait(pending); }
-            var finishedHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>(),
-                item => item.Content.Controls.Contains(control.LineGrid));
-            Assert.False(Assert.Single(finishedHost.Controls.OfType<Panel>(),
-                item => !ReferenceEquals(item, finishedHost.Content)).Visible);
-            Assert.True(control.NoteEditor.Enabled); control.NoteEditor.Text = "allowed"; Assert.Equal("allowed", host.Editor.Note);
+            finally { BootstrapThemeManager.CurrentTheme = original; }
         }, TimeSpan.FromSeconds(25));
     }
     [Fact]
