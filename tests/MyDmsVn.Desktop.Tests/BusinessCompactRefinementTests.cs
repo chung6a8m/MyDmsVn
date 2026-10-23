@@ -347,6 +347,9 @@ public sealed partial class BusinessCompactRefinementTests : IClassFixture<Refin
             var muted = new BootstrapLabel { Text = "Muted status", TextRole = BootstrapTextRole.Muted };
             content.Controls.Add(muted);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.MutedText, muted.ForeColor);
+            var semanticAlert = new BootstrapLabel { Text = "Needs action", TextRole = BootstrapTextRole.Danger, AccessibleRole = AccessibleRole.Alert };
+            content.Controls.Add(semanticAlert);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Danger, semanticAlert.ForeColor);
             var semantic = new BootstrapPanel { SurfaceRole = BootstrapSurfaceRole.Surface };
             content.Controls.Add(semantic);
             var publicChild = new Label { Text = "Public nested content" };
@@ -358,6 +361,7 @@ public sealed partial class BusinessCompactRefinementTests : IClassFixture<Refin
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Body, content.BackColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, label.ForeColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.MutedText, muted.ForeColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Danger, semanticAlert.ForeColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, semantic.BackColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, publicChild.ForeColor);
             Assert.Equal(10f, publicChild.Font.SizeInPoints);
@@ -377,6 +381,22 @@ public sealed partial class BusinessCompactRefinementTests : IClassFixture<Refin
         root.Dispose();
 
         using var later = new Label { Text = "Added after workspace disposal" };
+        surface.Controls.Add(later);
+        Assert.NotEqual(10f, later.Font.SizeInPoints);
+    }, TimeSpan.FromSeconds(10));
+
+    [Fact]
+    public void Detached_semantic_content_is_not_styled_by_the_former_live_workspace() => StaTest.Run(_ =>
+    {
+        using var originalRoot = new Panel();
+        using var otherRoot = new Panel();
+        using var surface = new BootstrapPanel();
+        BusinessCompactAppearance.Apply(originalRoot);
+        originalRoot.Controls.Add(surface);
+        originalRoot.Controls.Remove(surface);
+        otherRoot.Controls.Add(surface);
+
+        using var later = new Label { Text = "Added in another workspace" };
         surface.Controls.Add(later);
         Assert.NotEqual(10f, later.Font.SizeInPoints);
     }, TimeSpan.FromSeconds(10));

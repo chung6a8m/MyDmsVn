@@ -65,7 +65,15 @@ internal sealed class BusinessCompactAppearance : IDisposable
         if (VendorOwnsChildren(control) && !(control is TabControl) && !(control is BootstrapPanel) && !(control is BootstrapBusyHost)) return;
         if (!_attached.Add(control)) return;
         control.ControlAdded += OnControlAdded;
+        control.ControlRemoved += OnControlRemoved;
         foreach (var child in OwnedChildren(control)) Attach(child);
+    }
+    private void Detach(Control control)
+    {
+        if (!_attached.Remove(control)) return;
+        control.ControlAdded -= OnControlAdded;
+        control.ControlRemoved -= OnControlRemoved;
+        foreach (var child in OwnedChildren(control)) Detach(child);
     }
     // TabPages, a semantic panel's Controls and a busy host's Content are public app content.
     // Other vendor composite children belong to the component and must remain untouched.
@@ -76,10 +84,11 @@ internal sealed class BusinessCompactAppearance : IDisposable
         : VendorOwnsChildren(control) ? Enumerable.Empty<Control>() : control.Controls.Cast<Control>();
     private void OnControlAdded(object? sender, ControlEventArgs e)
     {
-        if (_disposed) return;
+        if (_disposed || sender is not Control owner || !_attached.Contains(owner)) return;
         if (sender is BootstrapBusyHost busy && !ReferenceEquals(e.Control, busy.Content)) return;
         Attach(e.Control); Style(e.Control);
     }
+    private void OnControlRemoved(object? sender, ControlEventArgs e) => Detach(e.Control);
     private void OnTheme(object? sender, BootstrapThemeChangedEventArgs e)
     {
         if (_root.IsDisposed) return;
@@ -115,7 +124,7 @@ internal sealed class BusinessCompactAppearance : IDisposable
         { control.BackColor = colors.Surface; control.ForeColor = colors.Text; }
         if (control is SplitContainer split) split.BackColor = colors.Border;
         if (control is ReceiptResultsGrid receiptResults) StyleReceiptResults(receiptResults);
-        if (control.AccessibleRole == AccessibleRole.Alert) control.ForeColor = dark ? Color.FromArgb(255, 180, 171) : Color.FromArgb(180, 35, 24);
+        if (!semantic && control.AccessibleRole == AccessibleRole.Alert) control.ForeColor = dark ? Color.FromArgb(255, 180, 171) : Color.FromArgb(180, 35, 24);
         // Theme composite internals remain vendor-owned; use public font/palette APIs only.
         if (control is ToolStrip strip)
             foreach (ToolStripItem item in strip.Items)
@@ -145,7 +154,11 @@ internal sealed class BusinessCompactAppearance : IDisposable
         _disposed = true;
         BootstrapThemeManager.ThemeChanged -= OnTheme;
         _root.Disposed -= OnDisposed;
-        foreach (var control in _attached) control.ControlAdded -= OnControlAdded;
+        foreach (var control in _attached)
+        {
+            control.ControlAdded -= OnControlAdded;
+            control.ControlRemoved -= OnControlRemoved;
+        }
         _attached.Clear();
         Owners.Remove(_root);
         _body.Dispose(); _heading.Dispose(); _secondary.Dispose(); _brand.Dispose(); _strong.Dispose();
