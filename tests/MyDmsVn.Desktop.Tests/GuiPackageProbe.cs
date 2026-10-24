@@ -220,6 +220,7 @@ internal static class GuiPackageProbe
             {
                 var shell = Login();
                 Catalog(shell, "Products", "GUI-PROD", "UIA Product", new[] { "Unit" }, new[] { "pcs" });
+                ProductDuplicateCode(shell);
                 Catalog(shell, "Warehouses", "GUI-WH", "UIA Warehouse", new[] { "Address" }, new[] { "GUI address" });
                 Catalog(shell, "Employees", "GUI-EMP", "UIA Employee", new[] { "Phone" }, new[] { "0900123456" });
                 Catalog(shell, "Customers", "GUI-CUST", "UIA Customer", new[] { "Address", "Phone", "Tax code" }, new[] { "GUI address", "0900123456", "P5-TAX" });
@@ -354,6 +355,22 @@ internal static class GuiPackageProbe
             CatalogIds[title] = int.Parse(id.Current.Name, System.Globalization.CultureInfo.InvariantCulture);
         }
         Console.WriteLine("CATALOG_FLOW=" + title + ":PASS");
+    }
+
+    private static void ProductDuplicateCode(AutomationElement shell)
+    {
+        _stage = "product-duplicate-code";
+        var page = Find(shell, "Products", ControlType.TabItem, false);
+        Invoke(Find(page, "Add product", ControlType.Button, false));
+        SetInput(page, "Code", "GUI-PROD", false);
+        SetInput(page, "Name", "Duplicate must remain a draft", false);
+        SetInput(page, "Unit", "pcs", false);
+        Invoke(Find(page, "Save", ControlType.Button, false));
+        Find(page, "Code already exists.", ControlType.Text, true);
+        if (InputValue(page, "Code") != "GUI-PROD" ||
+            InputValue(page, "Name") != "Duplicate must remain a draft")
+            throw new InvalidOperationException("Duplicate Code discarded the typed draft.");
+        Console.WriteLine("PRODUCT_DUPLICATE_CODE_INLINE=PASS");
     }
 
     private static AutomationElement Login()

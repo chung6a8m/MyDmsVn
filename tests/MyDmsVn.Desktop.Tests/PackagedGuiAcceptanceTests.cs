@@ -134,6 +134,7 @@ public sealed partial class PackagedGuiAcceptanceTests
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             Assert.Contains("CATALOG_PRODUCT=PASS", result.StandardOutput);
+            Assert.Contains("PRODUCT_DUPLICATE_CODE_INLINE=PASS", result.StandardOutput);
             Assert.Contains("CATALOGS=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
