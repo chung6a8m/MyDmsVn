@@ -106,6 +106,46 @@ public sealed class SalesReceiptGridTests
         }, TimeSpan.FromSeconds(15));
     }
     [Fact]
+    public void Correcting_the_rejected_paste_cell_clears_only_its_paste_error()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var line = host.Editor.Lines.Single();
+            host.Grid.Selection.ResetSelection(false);
+            host.Grid.Selection.SelectCell(new SourceGrid.Position(1, 3), true);
+            Assert.False(adapter.TryPasteNumeric("bad"));
+            Assert.False(string.IsNullOrEmpty(adapter.ValidationSummaryText));
+
+            host.Set(line, 3, "2");
+
+            Assert.Equal(2m, line.Quantity);
+            Assert.Null(adapter.ValidationSummaryText);
+            Assert.DoesNotContain("Validation error", host.Grid.AccessibilityObject.GetChild(1)!.GetChild(3)!.Help);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
+    public void Accessible_numeric_value_preserves_invalid_grouping_after_formatted_value()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var line = host.Editor.Lines.Single();
+            host.Set(line, 3, "1234");
+            Assert.Equal(1234m, line.Quantity);
+
+            Assert.Throws<TargetInvocationException>(() => host.Set(line, 3, "1,2345"));
+
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            Assert.Equal("1,2345", adapter.QuantityControl.PendingText);
+            Assert.Equal(1234m, line.Quantity);
+            Assert.False(string.IsNullOrEmpty(adapter.EditError));
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
     public void Compact_944_grid_keeps_all_seven_columns_visible()
     {
         StaTest.Run(_ =>

@@ -145,6 +145,8 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         {
             if (!_product.BootstrapControl.SelectValue(key)) _product.Control.Text = raw;
         }
+        else if (column == 2) _quantity.BootstrapControl.SetRawCandidate(raw);
+        else if (column == 3) _cost.BootstrapControl.SetRawCandidate(raw);
         else _session!.Input.Control.Text = raw;
         if (!TryFinishEdit(ReceiptEditIntent.Save)) throw new ArgumentException(EditError ?? "Invalid receipt cell value.", nameof(raw));
     }

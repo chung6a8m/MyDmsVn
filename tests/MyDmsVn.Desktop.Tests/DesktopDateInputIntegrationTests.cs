@@ -73,6 +73,30 @@ public sealed partial class GoodsReceiptControlTests
         });
 
     [Fact]
+    public void Required_date_error_clears_after_native_enter_then_successful_save()
+        => Integrated((fixture, control) =>
+        {
+            var input = control.ReceiptDateEditor;
+            input.Text = "31/11/2026";
+            control.SaveButton.PerformClick();
+            control.LastOperation.GetAwaiter().GetResult();
+            Assert.Equal(BootstrapValidationState.Invalid, input.ValidationState);
+
+            var driver = new NativeLookupTypingDriver(input);
+            driver.SelectRange(0, driver.Text.Length);
+            foreach (var ch in "5/11/2026") driver.TypeCharacter(ch);
+            driver.Key(Keys.Enter);
+            Assert.False(input.HasPendingEdit);
+            control.SaveButton.PerformClick();
+            control.LastOperation.GetAwaiter().GetResult();
+
+            Assert.NotNull(fixture.Api.LastUpdate);
+            Assert.Equal(new DateTime(2026, 11, 5), fixture.Api.LastUpdate!.ReceiptDate);
+            Assert.Equal(BootstrapValidationState.None, input.ValidationState);
+            Assert.DoesNotContain("valid receipt date", input.AccessibleDescription);
+        });
+
+    [Fact]
     public void Goods_authoritative_date_change_cancels_old_pending_candidate()
         => Integrated((fixture, control) =>
         {

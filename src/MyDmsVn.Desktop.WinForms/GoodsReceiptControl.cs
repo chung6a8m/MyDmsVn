@@ -588,7 +588,15 @@ namespace MyDmsVn.Desktop.WinForms
 
         private bool TryCommitReceiptDate()
         {
-            if (!ReceiptDateEditor.HasPendingEdit) return true;
+            if (!ReceiptDateEditor.HasPendingEdit)
+            {
+                if (ReceiptDateEditor.Value.HasValue)
+                {
+                    ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
+                    if (_workflowMessage == "Enter a valid receipt date (day/month/year).") _workflowMessage = null;
+                }
+                return true;
+            }
             if (ReceiptDateEditor.TryCommitPending())
             {
                 ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
@@ -704,6 +712,11 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (!_applyingState && !_editor.IsReadOnly && !_editor.RequiresPostOutcomeReload)
             {
+                if (!ReceiptDateEditor.HasPendingEdit)
+                {
+                    ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
+                    if (_workflowMessage == "Enter a valid receipt date (day/month/year).") _workflowMessage = null;
+                }
                 if (ReceiptDateEditor.Value.HasValue) _editor.ReceiptDate = ReceiptDateEditor.Value.Value;
             }
         }

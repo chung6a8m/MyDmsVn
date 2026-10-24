@@ -89,6 +89,47 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Security_tab_rejects_close_without_dirty_and_busy_admission()
+        {
+            StaTest.Run(_ =>
+            {
+                using var shell = CreateShell();
+                var editor = new TextBox { Text = "unsaved role" };
+                var page = shell.OpenWorkspace("security-administration", "Security", editor, shell.WorkspaceSessionVersion)!;
+                Assert.False(shell.Workspace.IsTabClosable(page));
+                Assert.False(shell.Workspace.RequestTabClose(page));
+                shell.RequestWorkspaceCloseAsync(page).GetAwaiter().GetResult();
+                Assert.False(editor.IsDisposed);
+                Assert.Equal("unsaved role", editor.Text);
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Closing_selected_workspace_allows_the_same_sidebar_item_to_open_it_again()
+        {
+            StaTest.Run(_ =>
+            {
+                var session = new TestDesktopSession();
+                session.SetCurrentUser(new CurrentUserDto(7, "operator", "Operator"));
+                var notifications = new DesktopNotificationCenter();
+                var factory = new RecordingGoodsReceiptControlFactory();
+                using var shell = new FoundationShellForm(new FoundationViewModel(new ReadyApiClient(), notifications),
+                    session, notifications, new EmptyCatalogControlFactory(), factory);
+                var item = shell.Navigation.Items.Cast<BusinessCompactNavigationItem>()
+                    .Single(candidate => string.Equals(candidate.Tag as string, "goods-receipts", StringComparison.Ordinal));
+                shell.Navigation.SelectedItem = item;
+                var first = Assert.Single(shell.Workspace.TabPages.Cast<TabPage>());
+                Assert.True(shell.Workspace.RequestTabClose(first));
+                Assert.Empty(shell.Workspace.TabPages);
+                Assert.Null(shell.Navigation.SelectedItem);
+
+                shell.Navigation.SelectedItem = item;
+                Assert.Single(shell.Workspace.TabPages);
+                Assert.Equal(2, factory.CreateCount);
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
         public void Disposing_shell_twice_after_workspace_cleanup_is_idempotent()
         {
             StaTest.Run(_ =>

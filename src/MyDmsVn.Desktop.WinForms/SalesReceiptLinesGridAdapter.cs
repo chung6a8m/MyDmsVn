@@ -161,6 +161,8 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         {
             if (!_product.BootstrapControl.SelectValue(key)) _product.Control.Text = raw;
         }
+        else if (column == 3) _quantity.BootstrapControl.SetRawCandidate(raw);
+        else if (column == 4) _price.BootstrapControl.SetRawCandidate(raw);
         else _session!.Input.Control.Text = raw;
         if (!TryFinishEdit(ReceiptEditIntent.Save)) throw new ArgumentException(EditError ?? "Invalid receipt cell value.", nameof(raw));
     }
@@ -520,15 +522,15 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         EditError = null;
     }
 
-    private void Commit(LineController controller, CellContext context)
+    private bool Commit(LineController controller, CellContext context)
     {
         var session = _session;
         if (_projecting || session == null || controller.Generation != session.Generation ||
             !ReferenceEquals(controller.Line, session.Line) || controller.Column != session.Column ||
             !ReferenceEquals(context.Grid, _grid) || context.Position != session.Context.Position ||
             !ReferenceEquals(context.Cell, session.Context.Cell) || !ReferenceEquals(context.Cell.Editor, session.Input) ||
-            !Current(session)) return;
-        _inline.TryApplyValidated(session.Target,
+            !Current(session)) return false;
+        var applied = _inline.TryApplyValidated(session.Target,
             value => Equals(context.Value, value) && Current(session),
             value =>
             {
@@ -544,6 +546,8 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
                 }
                 return true;
             });
+        if (applied) _validation.SetSource(ValidationAddress(session.Line, session.Column), "paste", Array.Empty<ValidationIssue>());
+        return applied;
     }
 
     private void End(LineController controller, CellContext context)

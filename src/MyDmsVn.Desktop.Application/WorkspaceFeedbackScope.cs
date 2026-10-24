@@ -121,6 +121,11 @@ namespace MyDmsVn.Desktop.Application
             try { await operation(); }
             finally { _current.Value = previous; }
         }
+        public void ClearActionableForCurrentOperation()
+        {
+            var context = _current.Value;
+            if (context != null && _scope.IsCurrent(context)) _scope.Capture(context).ClearActionable();
+        }
         public void Publish(DesktopNotification notification)
         {
             if (notification == null) throw new ArgumentNullException(nameof(notification));

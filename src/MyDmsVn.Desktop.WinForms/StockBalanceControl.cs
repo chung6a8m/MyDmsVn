@@ -150,9 +150,19 @@ namespace MyDmsVn.Desktop.WinForms
             LastOperation = RunQuery(() => _viewModel.RefreshAsync(CancellationToken.None));
         }
 
-        private Task RunQuery(Func<Task> query) => _feedbackNotifications == null
-            ? query()
-            : _feedbackNotifications.RunAsync("stock-balance-query", WorkspaceOperationKind.Query, query);
+        private Task RunQuery(Func<Task> query)
+        {
+            var notifications = _feedbackNotifications;
+            if (notifications == null) return query();
+            return notifications.RunAsync("stock-balance-query", WorkspaceOperationKind.Query, async () =>
+            {
+                var previousSuccess = _viewModel.SuccessfulQueryGeneration;
+                await query().ConfigureAwait(true);
+                if (_viewModel.SuccessfulQueryGeneration > previousSuccess &&
+                    string.IsNullOrWhiteSpace(_viewModel.ErrorMessage))
+                    notifications.ClearActionableForCurrentOperation();
+            });
+        }
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs) =>
             Render();

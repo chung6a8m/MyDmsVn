@@ -10,6 +10,32 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed partial class SalesReceiptEditorViewModelTests
 {
     [Fact]
+    public async Task Numeric_patch_clears_only_server_issues_for_changed_fields()
+    {
+        var api = new SalesApi();
+        using var vm = Editor(api);
+        await vm.LoadAsync(41);
+        var line = vm.Lines.Single();
+        vm.Note = "changed";
+        api.Update = _ => Task.FromResult(MyDmsVn.Contracts.ApiResponse<MyDmsVn.Contracts.SalesReceiptDto>.Failure(
+            new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.BadRequest, "SalesReceipt.Invalid", "Review line.", new[]
+            {
+                new MyDmsVn.Contracts.ApiErrorDetail("SalesReceipt.ProductInactive", "Product inactive.", "Request.Lines[0].ProductId"),
+                new MyDmsVn.Contracts.ApiErrorDetail("Validation.PrecisionScale", "Quantity invalid.", "Request.Lines[0].Qty"),
+                new MyDmsVn.Contracts.ApiErrorDetail("Validation.PrecisionScale", "Price invalid.", "Request.Lines[0].UnitPrice"),
+            })));
+        await vm.SaveAsync();
+        Assert.Equal(3, vm.ValidationIssues.Count);
+
+        var patch = new NumericDraftPatch<SalesReceiptLineViewModel>(vm.CaptureNumericDraft(),
+            new[] { new NumericDraftChange<SalesReceiptLineViewModel>(line, NumericDraftField.Quantity, line.Quantity + 1m) });
+        Assert.True(vm.TryApplyNumericPatch(patch, out var error), error);
+        Assert.Contains(vm.ValidationIssues, issue => ReferenceEquals(issue.Line, line) && issue.Field == "productId");
+        Assert.Contains(vm.ValidationIssues, issue => ReferenceEquals(issue.Line, line) && issue.Field == "unitPrice");
+        Assert.DoesNotContain(vm.ValidationIssues, issue => ReferenceEquals(issue.Line, line) && issue.Field == "qty");
+    }
+
+    [Fact]
     public async Task NumericDraftPatchTests_ordinary_line_first_notification_rejects_older_patch()
     {
         using var vm = Editor();

@@ -103,6 +103,8 @@ namespace MyDmsVn.Desktop.Application
             private set => SetProperty(ref _isLoading, value);
         }
 
+        public long SuccessfulQueryGeneration { get; private set; }
+
         public bool IsAccessDenied
         {
             get => _isAccessDenied;
@@ -297,6 +299,7 @@ namespace MyDmsVn.Desktop.Application
                 IsAccessDenied = false;
                 Items = response.Data!.Items;
                 TotalCount = response.Data.TotalCount;
+                SuccessfulQueryGeneration = generation;
                 return;
             }
 

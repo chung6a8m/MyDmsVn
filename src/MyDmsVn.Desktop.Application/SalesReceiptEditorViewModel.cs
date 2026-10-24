@@ -519,7 +519,10 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
                     item.Key.ApplyNumericSilently(values.Quantity, values.Price);
                 }
                 Error = null;
-                SetValidationIssues(ValidationIssues.Where(issue => issue.Line == null || !changed.ContainsKey(issue.Line)).ToArray());
+                SetValidationIssues(ValidationIssues.Where(issue => issue.Line == null ||
+                    !changed.TryGetValue(issue.Line, out var fields) ||
+                    !(fields.Quantity && string.Equals(issue.Field, "qty", StringComparison.Ordinal)) &&
+                    !(fields.Price && string.Equals(issue.Field, "unitPrice", StringComparison.Ordinal))).ToArray());
                 foreach (var item in changed) item.Key.NotifyNumeric(item.Value.Quantity, item.Value.Price);
             }
             finally { _mutatingDraft = false; }

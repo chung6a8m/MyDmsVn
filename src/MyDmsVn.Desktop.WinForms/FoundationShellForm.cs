@@ -420,7 +420,8 @@ namespace MyDmsVn.Desktop.WinForms
             page.Controls.Add(feedbackHost);
             _documents.Add(key, page);
             Workspace.TabPages.Add(page);
-            Workspace.SetTabClosable(page, true);
+            // Security administration has its own mutable editors and no close admission yet.
+            Workspace.SetTabClosable(page, !string.Equals(key, "security-administration", StringComparison.Ordinal));
             Workspace.SelectedTab = page;
 
             if (!IsWorkspaceRequestCurrent(sessionVersion))
@@ -593,6 +594,7 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (page == null || IsDisposed || Disposing) return;
             var key = page.Name;
+            if (string.Equals(key, "security-administration", StringComparison.Ordinal)) return;
             if (!_documents.TryGetValue(key, out var current) || !ReferenceEquals(current, page)) return;
             var sessionVersion = WorkspaceSessionVersion;
             var token = _workspaceCloseLifetime.Token;
@@ -610,6 +612,13 @@ namespace MyDmsVn.Desktop.WinForms
                 _documents.Remove(key);
                 Workspace.TabPages.Remove(page);
                 page.Dispose();
+                if (Navigation.SelectedItem?.Tag is CatalogKind selectedKind)
+                {
+                    if (string.Equals(key, "catalog-" + selectedKind.ToString().ToLowerInvariant(), StringComparison.Ordinal))
+                        Navigation.SelectedItem = null;
+                }
+                else if (string.Equals(Navigation.SelectedItem?.Tag as string, key, StringComparison.Ordinal))
+                    Navigation.SelectedItem = null;
             }, token);
         }
 
