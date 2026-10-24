@@ -38,8 +38,9 @@ Inventory remains the existing SQL test owner for sales/value persistence. Do no
 | Schema | `MyDmsVn.Server.Infrastructure.Migrations.Tests` | Clean/no-op migration, partial/unknown/future schema, maintenance principals |
 | SQL infrastructure | `MyDmsVn.Server.Infrastructure.IntegrationTests` | Local fresh-database ownership/cleanup, configuration rejection and concurrency probes; inspect source to distinguish real SQL from pure tests |
 | Desktop | `MyDmsVn.Desktop.Session.Tests`, `MyDmsVn.Desktop.Tests` | Pure session/ViewModel behavior and guarded WinForms interaction respectively |
+| Sales UI Lab | `MyDmsVn.Desktop.Ui.Tests` | Focused fake-contract/scenario and native Sales control checks; moved old coverage requires an explicit old → behavior → replacement mapping |
 
-Paths are under `tests/`. Product and all ten active test projects use `net48`; the former standalone SQL framework and its tests are removed. Historical product .NET 8 coverage is parked.
+Paths are under `tests/`. The A1 Lab adds an eleventh net48 test owner; the ten baseline projects and their historical evidence remain distinct. The former standalone SQL framework and its tests are removed. Historical product .NET 8 coverage is parked. [UI Lab runbook](development/UI_LAB.md) covers its source-bound scenarios and commands.
 
 ## Persistence and migrations
 

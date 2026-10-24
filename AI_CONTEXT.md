@@ -20,7 +20,7 @@ SAL T00–T06 checkpoints and the T07 Sales workspace are implemented in the mer
 
 ## Current source facts
 
-- Product and all ten active test projects target `net48`; package forms are Windows x86 Desktop.App and separate admin DbMigrator. AppCore/net8.0-windows remains PARKED / NOT SHIPPED.
+- Product and all eleven active test projects target `net48`; package forms are Windows x86 Desktop.App and separate admin DbMigrator. AppCore/net8.0-windows remains PARKED / NOT SHIPPED.
 - WinForms invokes Desktop.Application and Server.Application through the in-process Local adapter. Preserve transport-neutral DTOs, Clean Architecture and explicit UoW repository resolution.
 - Catalog/Inventory/Sales persistence uses LINQ to DB; other SQL consumers use typed native SqlClient. One explicit UoW owns the connection/current transaction, and DbUp owns schema scripts. Provider/runtime changes require separately selected scope; the current execution index owns scheduling.
 - Permissions use code-defined Active keys, current identity checks and a configured database-bound superuser. Unknown/deprecated keys deny before superuser; direct Deny wins for ordinary identities. Preserve password hashing/salt and legacy algorithm handling.

@@ -10,7 +10,7 @@ Sales, schema10 and fixed-point valuation are implemented using the existing net
 |---|---|
 | Product/Application/Infrastructure/Contracts | Active `net48`. |
 | Shared WinForms and Desktop.App | Active `net48`, Windows/.NET Framework 4.8. |
-| SQL integration and other product test projects | All ten active test projects target `net48`; use actual project declarations and source cases. |
+| SQL integration and other product test projects | All eleven active test projects target `net48`; use actual project declarations and source cases. |
 | Desktop.AppCore | Retained `net8.0-windows` source, parked outside the active solution/release. |
 | Historical modern product/SQL/GUI cases | `PARKED / NOT RUN`; no current modern product coverage is claimed. |
 | HTTP v2 and modern product runtime | Out of scope; requires a separate runtime decision and new approved plan before implementation. |
