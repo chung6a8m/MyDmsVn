@@ -804,8 +804,7 @@ internal static class GuiPackageProbe
             AwaitSignal("allow-denied-save");
             _stage = "receipt-server-direct-deny";
             Invoke(Find(page, "Save", ControlType.Button, false));
-            try { Find(page, "The operation is not permitted.", ControlType.Text, true); }
-            catch (TimeoutException) { Dump(page); throw; }
+            Find(page, "The operation is not permitted.", ControlType.Pane, true);
             if (InputValue(page, "Note") != "GUI edited" || InputValue(page, "Product") != committedProduct ||
                 decimal.Parse(InputValue(page, "Quantity"), System.Globalization.CultureInfo.CurrentCulture) != 3.125m ||
                 decimal.Parse(InputValue(page, "Unit cost"), System.Globalization.CultureInfo.CurrentCulture) != 4m)
@@ -1033,8 +1032,7 @@ internal static class GuiPackageProbe
         _application = otherClient;
         MainWindow = otherWindow;
         Invoke(otherPost); // This independent client still holds the original Draft version.
-        try { Find(otherPage, "The goods receipt is already posted.", ControlType.Text, true); }
-        catch (TimeoutException) { Dump(otherPage); throw; }
+        Find(otherPage, "The goods receipt is already posted.", ControlType.Pane, true);
         CloseApplication(otherShell);
         otherClient.Dispose();
         _application = firstClient;
@@ -1097,9 +1095,7 @@ internal static class GuiPackageProbe
         Signal("posting");
         AwaitSignal("allow-post");
         Invoke(post);
-        Console.WriteLine("RECEIPT_POST_INVOKE_RETURNED=PASS");
-        try { Find(page, "Posting outcome unknown.", ControlType.Text, true, 45); }
-        catch (TimeoutException) { Dump(page); throw; }
+        Find(page, "Posting outcome unknown.", ControlType.Pane, true, 45);
         foreach (var name in new[] { "Save", "Post", "New" })
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled)
                 throw new InvalidOperationException("Uncertain Post permits a mutation.");
