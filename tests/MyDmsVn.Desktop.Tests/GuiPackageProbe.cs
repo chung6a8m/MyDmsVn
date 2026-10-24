@@ -366,7 +366,7 @@ internal static class GuiPackageProbe
         SetInput(page, "Name", "Duplicate must remain a draft", false);
         SetInput(page, "Unit", "pcs", false);
         Invoke(Find(page, "Save", ControlType.Button, false));
-        Find(page, "Code already exists.", ControlType.Text, true);
+        Find(page, "A product with this code already exists.", ControlType.Text, true);
         if (InputValue(page, "Code") != "GUI-PROD" ||
             InputValue(page, "Name") != "Duplicate must remain a draft")
             throw new InvalidOperationException("Duplicate Code discarded the typed draft.");
