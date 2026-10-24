@@ -37,11 +37,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructu
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "vendor", "vendor", "{E47AAA37-1839-45D6-87FF-4EFD0BA1C328}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.BootstrapSourceGrid", "vendor\MyDmsVn.BootstrapSourceGrid\src\MyDmsVn.BootstrapSourceGrid\MyDmsVn.BootstrapSourceGrid.csproj", "{355EDE33-CE45-4911-BFF9-42158FA0DD25}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.BootstrapSourceGrid", "vendor\MyDmsVn.WinFormsKit\src\MyDmsVn.BootstrapSourceGrid\MyDmsVn.BootstrapSourceGrid.csproj", "{355EDE33-CE45-4911-BFF9-42158FA0DD25}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Bootstrap5WinFormUI", "vendor\MyDmsVn.BootstrapSourceGrid\vendor\Bootstrap5WinFormUI\src\MyDmsVn.Bootstrap5WinFormUI\MyDmsVn.Bootstrap5WinFormUI.csproj", "{0390F5FC-EC3A-48A7-A6F3-6BEA8E1B0307}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Bootstrap5WinFormUI", "vendor\MyDmsVn.WinFormsKit\src\MyDmsVn.Bootstrap5WinFormUI\MyDmsVn.Bootstrap5WinFormUI.csproj", "{0390F5FC-EC3A-48A7-A6F3-6BEA8E1B0307}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SourceGrid", "vendor\MyDmsVn.BootstrapSourceGrid\vendor\sourcegrid\SourceGrid\SourceGrid.csproj", "{9599C0A0-CD54-47A9-8CC2-52D3A6BC9E9D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SourceGrid", "vendor\MyDmsVn.WinFormsKit\vendor\sourcegrid\SourceGrid\SourceGrid.csproj", "{9599C0A0-CD54-47A9-8CC2-52D3A6BC9E9D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Desktop.Session.Tests", "tests\MyDmsVn.Desktop.Session.Tests\MyDmsVn.Desktop.Session.Tests.csproj", "{11DAE03D-4D5B-4344-B91E-EE2C48767A0D}"
 EndProject
