@@ -1,6 +1,6 @@
 # DateInput Unified Compact — Correction Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` when available to implement this plan task-by-task. Equivalent disciplined execution is acceptable when those skills are unavailable. Steps use checkbox syntax for tracking. The Owner has already selected option 01 and approved this scope; do not restart the visual-choice discussion.
+> **Historical correction record.** The original implementation instructions below have been executed within the bounded scope recorded in [candidate evidence](evidence/20261024-dateinput-unified-compact-correction.md). Use the [current execution index](../plans/README.md) for new work; do not resume former PR branches or replay these tasks. Original inspection anchors, checklists, failed candidates and acceptance limits remain provenance.
 
 **Goal:** Deliver the approved one-surface DateInput and preserve native caret/selection through segment stepping in the existing PR chain.
 
@@ -8,17 +8,17 @@
 
 **Tech Stack:** App/test `net48`, Windows x86; UI/BSG `net48;net8.0-windows`; existing WinForms, theme/DPI/icon infrastructure and SourceGrid dependency.
 
-**Spec:** [Owner-approved design](20261024-dateinput-unified-compact-design.md). **Queue/status:** [sole active roadmap](20261023-active-roadmap.md#active-dateinput-correction). **Acceptance:** [UIN-DA01–DA04](20261023-validation-and-handoff.md#dateinput-correction-acceptance).
+**Spec:** [Owner-approved design](20261024-dateinput-unified-compact-design.md). **Historical task record:** [UI-NEXT roadmap](20261023-active-roadmap.md#active-dateinput-correction). **Acceptance:** [UIN-DA01–DA04](20261023-validation-and-handoff.md#dateinput-correction-acceptance).
 
 ## Global constraints
 
-- Continue app PR #45 on `codex/uin-t13`, UI PR #73 on `codex/uin-t10-dgv`, and BSG PR #18 on `codex/uin-t10-parity`; fetch and inspect newer heads without resetting other work. Inspected SHAs are in the design.
+- Original delivery chain: app PR #45 on `codex/uin-t13`, UI PR #73 on `codex/uin-t10-dgv`, and BSG PR #18 on `codex/uin-t10-parity`. These are historical branches; inspected SHAs remain in the design.
 - Option 01 is selected. From/To remain independent; preserve ordinary collapsed caret/selection instead of adding option 02's automatic segment selection.
 - App/test `net48`, Windows x86; libraries retain `net48;net8.0-windows`. Native GUI runs require interactive Windows and existing serialized STA/exception/hang protection.
 - Preserve raw date grammar, profile/bounds, reference-clock rules, pending/accepted separation, commit/cancel and all application editability/recovery guards.
 - Use theme metrics, native text measurements and DPI scaling for the approximately 32-logical-pixel design. No fixed physical-height workaround or hard-coded palette.
 - Preserve standalone CalendarPicker summary/popup behavior and generic TextBox assignment semantics. New private/internal helpers are implementation details, not presumed existing APIs.
-- This planning commit changes documentation only. UIN-D01–D03 are NOT STARTED; new runtime evidence is NOT RUN; design approval does not certify the running build.
+- At the original documentation-only activation UIN-D01–D03 were NOT STARTED and runtime evidence was NOT RUN. The task rows and linked candidate evidence record later results; design approval alone never certified the running build.
 - Preserve historical evidence and archived boundaries. No full SQL/full GUI/Session repetition without a concrete changed risk; follow [TEST_POLICY](../TEST_POLICY.md).
 
 ## Review focus

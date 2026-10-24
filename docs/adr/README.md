@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. [UI-NEXT](../ui-next/20261023-active-roadmap.md) is the sole active queue with all implementation tasks NOT STARTED. The [archive boundary](../archive/20261023-pre-ui-next/README.md) retires prior queues without waiving their unfinished acceptance. [TEST_POLICY](../TEST_POLICY.md) remains the sole test-execution policy.
+Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. Use the [execution index](../plans/README.md) for current work; [UI-NEXT](../ui-next/README.md) retains historical candidate records. The [archive boundary](../archive/20261023-pre-ui-next/README.md) retires earlier queues without waiving unfinished acceptance. [TEST_POLICY](../TEST_POLICY.md) remains the sole test-execution policy.
 
 | ADR | Decision | Current status |
 |---|---|---|

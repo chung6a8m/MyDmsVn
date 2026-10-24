@@ -1,12 +1,12 @@
 # DateInput — Unified Compact correction design
 
-**Date:** 2026-10-24. **Decision:** Owner selected option 01, Unified Compact, and confirmed the scope below. This approves the design; implementation, runtime verification and acceptance of the new running candidate remain pending.
+**Date:** 2026-10-24. **Decision:** Owner selected option 01, Unified Compact. This is the preserved design/inspection record; implementation and running-candidate results were subsequently recorded in [candidate evidence](evidence/20261024-dateinput-unified-compact-correction.md), including the initial failure and bounded acceptance. Current scheduling is owned by the [execution index](../plans/README.md).
 
-**Queue:** [UI-NEXT active roadmap](20261023-active-roadmap.md), correction tasks UIN-D01–D03. **Execution:** [correction plan](20261024-dateinput-unified-compact-correction.md). **Handoff:** [Codex prompt](20261024-dateinput-unified-compact-codex-prompt.md).
+**Historical queue:** [UI-NEXT roadmap](20261023-active-roadmap.md), correction tasks UIN-D01–D03. **Implementation record:** [correction plan](20261024-dateinput-unified-compact-correction.md). **Retired handoff:** [Codex prompt](20261024-dateinput-unified-compact-codex-prompt.md).
 
 ## 1. Intent and inspected baseline
 
-Make the existing DateInput read as one compact field and keep keyboard edits anchored to the intended date segment. Continue the existing PR chain; this is a bounded correction to the DateInput delivered by T06/T11, with affected T13 integration evidence refreshed.
+Make the existing DateInput read as one compact field and keep keyboard edits anchored to the intended date segment. The original scope continued the existing PR chain as a bounded correction to DateInput from T06/T11, with affected T13 integration evidence refreshed. It does not schedule a new correction.
 
 | Repository | PR / branch | Inspected source revision |
 |---|---|---|
@@ -15,7 +15,7 @@ Make the existing DateInput read as one compact field and keep keyboard edits an
 | MyDmsVn.Bootstrap5WinFormUI | [#73](https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI/pull/73), `codex/uin-t10-dgv` → `main` | `c91993f4f44a60210f4c6c4106e82ebc69931a0a` |
 | SourceGrid | Existing nested dependency; no change selected | `f4e457b43582bf01892f50bdc74aa480531e5944` |
 
-These are inspection anchors, not instructions to reset a newer branch. Refresh refs and inspect intervening changes before implementation. The planning commit adds no product implementation or runtime PASS.
+These are inspection anchors, not instructions to reset a newer branch. They describe the original inspection; later implementation/results are in the linked candidate evidence. The original planning commit added no product implementation or runtime PASS.
 
 ### Observed problems and source explanation
 

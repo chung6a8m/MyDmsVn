@@ -1,6 +1,6 @@
 # Direct Sales — query contracts and desktop interaction
 
-> Current scheduling boundary — 2026-10-23: this specification preserves implemented Sales/security/persistence contracts. The former SAL execution plan is [archived](archive/20261023-pre-ui-next/README.md); [UI Next](ui-next/20261023-active-roadmap.md) is the sole active queue and excludes unfinished old-plan work. Later [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) uses product/package `f5039cb` and GUI tests `4697744`; native125, attended observations and dated Owner acceptance remain OPEN. Dated checkpoints below retain their own evidence boundary.
+> Current scheduling boundary — routing updated 2026-10-24: this specification preserves implemented Sales/security/persistence contracts. The former SAL execution plan is [archived](archive/20261023-pre-ui-next/README.md); current work follows the [execution index](plans/README.md), without inheriting unfinished old-plan work. [UI-NEXT](ui-next/README.md) remains a historical reference. Later [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) uses product/package `f5039cb` and GUI tests `4697744`; native125, attended observations and dated Owner acceptance remain OPEN. Dated checkpoints below retain their own evidence boundary.
 
 **Status:** APPROVED DESIGN / NATIVE SOURCE IMPLEMENTED / BOUNDED NATIVE100 CHECKPOINT / FULL T07 OPEN. **Updated:** 2026-10-22.
 **Source baseline:** `MyDmsVn/v1a-pro@35ba2e8a3f37fb07095701eb94f4b56f7941c491`.

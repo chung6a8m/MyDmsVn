@@ -1,24 +1,19 @@
 # Documentation index — v1a-pro-ui-next
 
-**Updated:** 2026-10-24. **UI-NEXT is the sole ACTIVE roadmap**. T00–T13 retain their recorded bounded historical verification; current work is the Owner-approved **DateInput Unified Compact correction, UIN-D01–D03**, implementation **NOT STARTED**, new runtime evidence **NOT RUN** and running-visual acceptance pending. This planning update establishes no runtime PASS. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains previous unfinished work without completing, waiving or rescheduling it.
+**Updated:** 2026-10-24. The [execution index](plans/README.md) selects the sole plan for current scope, task state and verification. This index routes readers by responsibility; historical results stay with their original candidates.
 
 ## Current work and Codex entry points
 
 | Document | Owns |
 |---|---|
-| [AGENTS.md](../AGENTS.md) | Repository instructions, invariants and current work |
-| [AI_CONTEXT.md](../AI_CONTEXT.md) | Current source, archive boundary and implementation handoff |
-| [UI-NEXT active roadmap](ui-next/20261023-active-roadmap.md) | Sole execution queue, dependencies and task status |
-| [DateInput approved design](ui-next/20261024-dateinput-unified-compact-design.md) | Selected option 01, visual reference, caret semantics, source diagnosis and scope |
-| [DateInput correction plan](ui-next/20261024-dateinput-unified-compact-correction.md) | Current UIN-D01–D03 implementation, exact source/test owners and focused commands |
-| [DateInput Codex prompt](ui-next/20261024-dateinput-unified-compact-codex-prompt.md) | Ready-to-use Vietnamese implementation handoff for the existing PR chain |
-| [Design and control policy](ui-next/20261023-design-and-control-policy.md) | Workspace behavior, existing/proposed controls and app/vendor ownership |
-| [Original implementation plan](ui-next/20261023-implementation-plan.md) | T00–T13 task provenance and link to current correction execution |
-| [Validation and handoff](ui-next/20261023-validation-and-handoff.md) | Scoped future verification, evidence and completion boundaries |
-| [Development status](DEVELOPMENT_PLAN.md) | Implemented baseline, historical acceptance and current correction |
+| [AGENTS.md](../AGENTS.md) | Stable repository instructions and invariants |
+| [AI_CONTEXT.md](../AI_CONTEXT.md) | Source context, historical boundaries and evidence distinctions |
+| [Execution index](plans/README.md) | Pointer to the sole current plan |
+| [Development-plan alias](DEVELOPMENT_PLAN.md) | Compatibility entry point to the index; no progress copy |
 | [Test policy](TEST_POLICY.md) | Sole execution policy; focused scope and required safeguards |
 | [Test coverage](TEST_STRATEGY.md) | Required behavior and failure boundaries |
 | [Test commands](../tests/README.md) | Direct projects, SQL ownership and interactive GUI prerequisites |
+| [MyDmsVn.Docs](https://github.com/chung6a8m/MyDmsVn.Docs) | Cross-repository assessments, organization proposals and scoped decisions; no duplicate task status |
 
 ## Product and implementation references
 
@@ -28,13 +23,15 @@ The implemented Sales rules remain in [business design](DIRECT_SALES.md), [costi
 
 ## Archived plans and evidence
 
-[Archive boundary](archive/20261023-pre-ui-next/README.md) · [Former plan index](plans/README.md) · [SAL plan](archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md) · [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) · [T08 integration evidence](evidence/sal/20261021-t08-integrated-acceptance.md)
+[UI-NEXT historical index](ui-next/README.md) · [DateInput candidate evidence](ui-next/evidence/20261024-dateinput-unified-compact-correction.md) · [T13 retained failures and acceptance](ui-next/evidence/20261024-uin-t13-integration.md)
 
-SAL source and reviewed R3/R4 fixes are present. T08 records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific core/SQL/package/native100 runnable automation PASS; native125, attended observations and dated Owner acceptance remain OPEN. Original failures and source/test/package distinctions remain authoritative. Old unfinished acceptance and full integration repeats are excluded from UI-NEXT.
+[Archive boundary](archive/20261023-pre-ui-next/README.md) · [Frozen pre-UI-NEXT plan index](archive/20261023-pre-ui-next/plans/README.md) · [SAL plan](archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md) · [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) · [T08 integration evidence](evidence/sal/20261021-t08-integrated-acceptance.md)
+
+SAL source and reviewed R3/R4 fixes are present. T08 records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific core/SQL/package/native100 runnable automation PASS; native125, attended observations and dated Owner acceptance remain OPEN. Original failures and source/test/package distinctions remain authoritative. Old unfinished acceptance and full integration repeats are not inherited by the current plan.
 
 [BCF final scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) · [BCF acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [BCI final acceptance](BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21) · [RESP verification](RESPAWN_VERIFICATION.md) · [L2DB verification](L2DB_VERIFICATION.md) · [GUI-P5 final verification](GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20)
 
-Historical evidence retains its original dates, revisions, failures and signed exceptions. It does not establish acceptance of UI-NEXT or production release.
+Historical evidence retains its original dates, revisions, failures and signed exceptions. It does not establish acceptance of a later candidate or production release.
 
 ## Operational references and scope limits
 

@@ -1,6 +1,6 @@
 # SME UI foundation assessment
 
-> Historical assessment — 2026-10-22. Scheduling/proposal status below is preserved for that date. The [2026-10-23 active roadmap](20261023-active-roadmap.md) now selects the bounded work, and its refreshed baseline supersedes old T08/R4 status summaries. These source findings do not imply new runtime verification.
+> Historical assessment — 2026-10-22. Scheduling/proposal status below is preserved for that date. The [2026-10-23 UI-NEXT roadmap](20261023-active-roadmap.md) records the subsequent bounded selection and baseline refresh, which superseded old T08/R4 status summaries. New work follows the [execution index](../plans/README.md). These source findings do not imply new runtime verification.
 
 **Date:** 2026-10-22  
 **Status:** Source-backed assessment and recommendations; implementation not selected  

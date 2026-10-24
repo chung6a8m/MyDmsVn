@@ -1,12 +1,14 @@
 # UI Next — validation and cross-session handoff
 
+> **Historical acceptance reference.** This file retains the original candidate rows, failures, commands and limits. It does not schedule a new run; use the [current execution index](../plans/README.md) and TEST_POLICY for authorized work. A0 changes routing only and creates no runtime result.
+
 **Date:** 2026-10-23
 **Status:** DateInput correction UIN-D01–D03 and UIN-DA01–DA04 are VERIFIED/accepted within the exact final candidate's bounded UI scope after physical native100/native125 checks and dated Owner visual acceptance at 125%. The first candidate's 2026-10-24 Owner calendar-highlight failure is retained. T00–T13 remain VERIFIED in their recorded historical bounded scopes; retain the original T13 attended-fixture FAIL, passing control and dated acceptance.
-**Authority:** [TEST_POLICY](../TEST_POLICY.md) remains the sole execution policy. This document selects behavior for the [new active roadmap](20261023-active-roadmap.md), not an additional test framework.
+**Authority:** [TEST_POLICY](../TEST_POLICY.md) remains the sole execution policy. This document records the behavior selected by the [historical UI-NEXT roadmap](20261023-active-roadmap.md), not an additional test framework or current execution queue.
 
 ## DateInput correction acceptance
 
-**Added:** 2026-10-24. The Owner approved [option 01 — Unified Compact](20261024-dateinput-unified-compact-design.md). [UIN-D01–D03](20261024-dateinput-unified-compact-correction.md) now owns the affected DateInput contribution to UIN-A07/A12/A14. Historical rows below remain candidate-specific records; the correction must establish its own results.
+**Added:** 2026-10-24. The Owner approved [option 01 — Unified Compact](20261024-dateinput-unified-compact-design.md). [UIN-D01–D03](20261024-dateinput-unified-compact-correction.md) now owns the affected DateInput contribution to UIN-A07/A12/A14. Historical rows below remain candidate-specific records; the correction established its separate candidate results in the linked evidence.
 
 | ID / owner | Required observable outcome | Required evidence | Current state |
 |---|---|---|---|
@@ -17,7 +19,7 @@
 
 Use the scoped selectors and source-file ownership warning in the correction plan. Run GUI/SQL owners sequentially with existing protection. Record actual selected/discovered/executed rows and skip/failure reasons. Record monitor DPI separately from test-window DPI; a 120-DPI monitor or `native125` directory does not prove 120-DPI window awareness. Never rename a missing prerequisite or zero-test run into PASS.
 
-When work executes, add a sanitized evidence record under `docs/ui-next/evidence/` with the real execution date, exact app/UI/BSG/SourceGrid/test/package identity, original failures, successful repair runs, current limitations and cleanup. Keep previous [T13](evidence/20261024-uin-t13-integration.md), [first-review](evidence/20261024-pr45-review-corrections.md) and [second-review](evidence/20261024-pr45-review-round2.md) evidence intact. This documents-only activation runs no new product/GUI/SQL tests and grants no runtime/production acceptance.
+The original handoff required a sanitized evidence record under `docs/ui-next/evidence/` with the real execution date, exact app/UI/BSG/SourceGrid/test/package identity, original failures, successful repair runs, current limitations and cleanup. Keep previous [T13](evidence/20261024-uin-t13-integration.md), [first-review](evidence/20261024-pr45-review-corrections.md) and [second-review](evidence/20261024-pr45-review-round2.md) evidence intact. The original documentation-only activation ran no product/GUI/SQL tests and granted no runtime/production acceptance.
 
 ## Evidence boundary
 

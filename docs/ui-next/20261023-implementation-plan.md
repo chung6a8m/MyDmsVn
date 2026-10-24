@@ -1,6 +1,6 @@
 # UI Next — Implementation Plan
 
-> For agentic workers: use `superpowers:subagent-driven-development` or `superpowers:executing-plans` for an authorized implementation session. The original activation was documentation only; see the T00/T01 evidence for later implementation.
+> **Historical implementation record.** This plan no longer schedules execution. Use the [current execution index](../plans/README.md); retain the task decomposition and exact-candidate evidence below. Do not replay old checklists or continue former PR branches from this document.
 
 **Goal:** Deliver consistent tab feedback, complete validation, lossless fast input and reusable workspace/grid mechanisms for the existing SME desktop app.
 
@@ -8,13 +8,13 @@
 
 **Tech Stack:** App/test `net48`, Windows x86; libraries retain `net48;net8.0-windows`; existing WinForms, SourceGrid, CommunityToolkit.Mvvm and Local Application boundaries.
 
-**Spec:** [Design and control policy](20261023-design-and-control-policy.md). [Roadmap](20261023-active-roadmap.md) alone owns order/status; [validation](20261023-validation-and-handoff.md) owns acceptance IDs.
+**Spec:** [Design and control policy](20261023-design-and-control-policy.md). [Historical roadmap](20261023-active-roadmap.md) records the original order/status; [validation](20261023-validation-and-handoff.md) owns acceptance IDs.
 
 ## Current execution — DateInput correction
 
-The next work is [UIN-D01–D03: Unified Compact and caret preservation](20261024-dateinput-unified-compact-correction.md), from the [Owner-approved design](20261024-dateinput-unified-compact-design.md). Continue the existing PR #45/#73/#18 branches. The correction is NOT STARTED and its new runtime evidence is NOT RUN; the [roadmap](20261023-active-roadmap.md#active-dateinput-correction) owns status.
+This heading is retained for existing links. The [DateInput correction](20261024-dateinput-unified-compact-correction.md) and [approved design](20261024-dateinput-unified-compact-design.md) describe the historical follow-up; its [candidate evidence](evidence/20261024-dateinput-unified-compact-correction.md) records subsequent verification and bounded acceptance. The initial NOT STARTED/NOT RUN handoff is superseded by those records.
 
-T00–T13 below retain the original task decomposition, checklists and recorded bounded verification. Historical unchecked steps or proposal names do not schedule those tasks again. Preserve their evidence; revalidate only the DateInput behavior and host/package composition selected by the [new acceptance addendum](20261023-validation-and-handoff.md#dateinput-correction-acceptance). Source existence, design approval and older PASS totals do not certify this correction.
+T00–T13 below retain their original task decomposition, checklists and candidate-specific verification. Historical unchecked steps and proposed names do not schedule work again. The [current execution index](../plans/README.md) owns new scheduling; original failures and acceptance limits remain intact.
 
 ## Global constraints
 

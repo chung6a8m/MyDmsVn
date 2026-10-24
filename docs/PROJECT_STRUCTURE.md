@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (includes merged PR #43 and the migrated assessment), refreshed 2026-10-23. All ten active net48 test projects and current LINQ/native/Sales/schema10 source are represented here. [UI-NEXT](ui-next/20261023-active-roadmap.md) is the sole active queue; proposed UI services/controls remain NOT STARTED. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and excludes old unfinished work.
+**Assessment baseline:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43 and migrated assessment), 2026-10-23. The inspected net48 project/source layout is represented below; A0 changes documentation routing only. Current scheduling follows the [execution index](plans/README.md), while [UI-NEXT](ui-next/README.md) retains later implementation evidence. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and unfinished acceptance.
 
 ## Source projects
 
@@ -41,7 +41,7 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 
 Sales uses the existing projects and test owners. Current source includes `Contracts/SalesContracts.cs`, Domain/Application/Infrastructure `Sales/` folders, inventory valuation math/coordinator, `LocalSalesReceiptApiClient.cs`, Sales ViewModels and `SalesReceiptControl.cs` with its app-owned grid/adapter. Schema `010_DirectSalesAndValuation.sql`, preflight/grants and fixture metadata are implemented. The [business](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [archived plan](archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md) retain their source rationale and historical checkpoints.
 
-UI-NEXT's [implementation plan](ui-next/20261023-implementation-plan.md) identifies proposed presentation files and affected existing owners. Proposed paths/types do not exist merely because documentation names them; inspect source before choosing test selectors or using an API. The old SAL native125/attended/Owner gaps do not redefine the implemented project graph.
+UI-NEXT's [historical implementation plan](ui-next/20261023-implementation-plan.md) records proposed presentation files, affected owners and subsequent candidate evidence. Proposed paths/types do not exist merely because documentation names them; inspect source before choosing test selectors or using an API. The old SAL native125/attended/Owner gaps do not redefine the implemented project graph.
 
 ## Actual feature directories
 
@@ -64,7 +64,9 @@ UI-NEXT's [implementation plan](ui-next/20261023-implementation-plan.md) identif
 | `MyDmsVn.sln` | Current declared solution graph; parked AppCore is excluded. |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/ui-next/20261023-active-roadmap.md` | Sole ACTIVE UI-NEXT queue; every implementation task NOT STARTED. |
+| `docs/plans/README.md` | Stable current-work index; points to the sole execution-status owner. |
+| `docs/plans/20261024-001-a0-a1-sales-ui-lab.md` | Selected plan: authorization boundary, tasks and documentation verification; no duplicated status here. |
+| `docs/ui-next/20261023-active-roadmap.md` | Historical UI-NEXT selection, task records and exact-candidate acceptance. |
 | `docs/archive/20261023-pre-ui-next/README.md` | Archive boundary; previous queues and unfinished work are excluded without acceptance or waiver. |
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
@@ -73,4 +75,4 @@ UI-NEXT's [implementation plan](ui-next/20261023-implementation-plan.md) identif
 | `deployment/sql/Provision-MyDmsVnPrincipals.sql` | Explicit runtime/maintenance SQL authority separation. |
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
-Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. UI-NEXT does not reactivate AppCore or upgrade the framework. Sales files are implemented source; new UI-NEXT services/controls remain proposals until implemented. Historical evidence remains tied to its exact revision and scope.
+Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. UI-NEXT does not reactivate AppCore or upgrade the framework. Sales files are implemented source; consult actual source and the linked UI-NEXT records rather than treating historical proposal wording as current implementation status. Historical evidence remains tied to its exact revision and scope.

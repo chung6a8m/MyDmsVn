@@ -1,6 +1,6 @@
 # GUI-P5 verification
 
-> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCF lookup and visual refinement; this record does not satisfy its new obligations or schedule retired plans. Completed BCI remains historical evidence for its own accepted scope.
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. Current work is selected through the [execution index](plans/README.md). This record does not schedule new work or supply acceptance for another candidate.
 
 **Current status: GUI-P5-T00–T06 COMPLETE in the approved scope.** Both attended IDs are Owner-signed; T05 retains the accepted Down NOT TESTED exception. [Final T06 acceptance](#final-t06-acceptance--2026-10-20) records the frozen329-row100/125 gates, separate18-row packaged suite, Session108, review correction and final cleanup. REL/P6 G1–G5 and production readiness remain OPEN. Earlier checkpoints below are historical; their original candidate, failures and scope are retained. [Coverage matrix](GUI_P5_COVERAGE_MATRIX.md), [plan](archive/20261023-pre-ui-next/plans/20261019-001-full-winforms-gui-p5-acceptance.md) and [TEST_POLICY](TEST_POLICY.md) govern.
 

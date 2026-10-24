@@ -2,7 +2,7 @@
 
 **Reset date:** 2026-10-18 · **Branch assessed:** `v1a` · **Baseline:** [c7ad32a4b0040f87417973eabd6c12757c54f7d5](https://github.com/chung6a8m/MyDmsVn/commit/c7ad32a4b0040f87417973eabd6c12757c54f7d5).
 
-This page is historical provenance, not an execution queue or test policy. [UI Next](ui-next/20261023-active-roadmap.md) is the current queue. Historical activation checkpoints below retain their original dates/statuses; [the archive](archive/20261023-pre-ui-next/README.md) records the latest old-plan dispositions. Runtime behavior follows current source/specifications and execution follows [TEST_POLICY](TEST_POLICY.md).
+This page is historical provenance, not an execution queue or test policy. Current scheduling follows the [execution index](plans/README.md). Historical activation checkpoints below retain their original dates/statuses; [the archive](archive/20261023-pre-ui-next/README.md) records the latest old-plan dispositions. Runtime behavior follows current source/specifications and execution follows [TEST_POLICY](TEST_POLICY.md).
 
 ## 2026-10-23 — UI Next selected; prior plans archived
 

@@ -1,6 +1,6 @@
 # Application / Desktop API contracts
 
-**Status:** Current Local v1 contracts on active net48, refreshed 2026-10-23 against merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. [UI-NEXT](ui-next/20261023-active-roadmap.md) is the sole active queue with all implementation tasks NOT STARTED. It preserves public business/transport shapes; proposed workspace/presenter services belong to desktop presentation layers. No WinForms control, vendor type or raw diagnostic is added to a DTO.
+**Inspected contract baseline:** Local v1 on net48, refreshed 2026-10-23 against merged PR #43 `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. Current scheduling follows the [execution index](plans/README.md); [UI-NEXT](ui-next/README.md) retains presentation design/evidence. A0 changes routing, not these public business/transport contracts. Workspace/presenter services belong to desktop presentation layers; no WinForms control, vendor type or raw diagnostic is added to a DTO.
 
 The [archive boundary](archive/20261023-pre-ui-next/README.md) retires old queues while retaining source contracts. [SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific runnable automation PASS; native125, attended observations and dated Owner acceptance remain OPEN. R3/R4 source fixes are reviewed/approved. That historical acceptance boundary is not inherited by UI-NEXT.
 
