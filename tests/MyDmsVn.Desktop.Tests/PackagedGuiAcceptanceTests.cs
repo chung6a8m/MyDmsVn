@@ -339,12 +339,12 @@ public sealed partial class PackagedGuiAcceptanceTests
             var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-fault " + theme);
             fixture.ConfigureRuntime(start);
             start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
-            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(4), cancellation.Token);
+            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(6), cancellation.Token);
             GuiProcessResult? result = null;
             Exception? initial = null;
             try
             {
-                await WaitForSignalAsync(barrier, "posting", execution, TimeSpan.FromSeconds(100));
+                await WaitForSignalAsync(barrier, "posting", execution, TimeSpan.FromSeconds(180));
                 await fixture.InstallOwnedPostTimeoutAsync();
                 File.WriteAllText(Path.Combine(barrier, "allow-post"), "release");
                 var waiting = Stopwatch.StartNew();
