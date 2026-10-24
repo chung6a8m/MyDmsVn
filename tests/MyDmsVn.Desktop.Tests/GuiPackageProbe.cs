@@ -513,7 +513,9 @@ internal static class GuiPackageProbe
         {
             Wait(delegate
             {
-                var value = (ValuePattern)InlineCell(page, field).GetCurrentPattern(ValuePattern.Pattern);
+                AutomationElement cell;
+                if (!TrySalesCell(page, field, out cell)) return false;
+                var value = (ValuePattern)cell.GetCurrentPattern(ValuePattern.Pattern);
                 decimal actual;
                 return decimal.TryParse(value.Current.Value, System.Globalization.NumberStyles.Number,
                     System.Globalization.CultureInfo.CurrentCulture, out actual) && actual == expected;
@@ -555,7 +557,12 @@ internal static class GuiPackageProbe
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Posted Sales mutation enabled.");
         _salesRow = 2;
         AutomationElement giftCell;
-        try { giftCell = InlineCell(page, "Gift"); }
+        try
+        {
+            giftCell = null;
+            Wait(delegate { return TrySalesCell(page, "Gift", out giftCell); },
+                "Posted Sales gift cell unavailable.");
+        }
         catch { Console.WriteLine("SALES_POSTED_GIFT_FAILURE;ROW=" + _salesRow); Dump(page); throw; }
         var gift = (ValuePattern)giftCell.GetCurrentPattern(ValuePattern.Pattern);
         if (!gift.Current.IsReadOnly) throw new InvalidOperationException("Posted gift still editable.");
@@ -1401,6 +1408,18 @@ internal static class GuiPackageProbe
         }
         if (selected == null) throw new InvalidOperationException("Receipt line field absent: " + field);
         return selected;
+    }
+
+    private static bool TrySalesCell(AutomationElement page, string field, out AutomationElement cell)
+    {
+        try { cell = InlineCell(page, field); return true; }
+        catch (InvalidOperationException error) when (
+            error.Message.StartsWith("Receipt line field absent:", StringComparison.Ordinal) ||
+            error.Message == "Receipt line table absent.")
+        {
+            cell = null;
+            return false;
+        }
     }
     private static AutomationElement InlineEditor(AutomationElement root, string field)
     {
