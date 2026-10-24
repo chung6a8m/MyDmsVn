@@ -230,8 +230,8 @@ App removes the superseded `src/MyDmsVn.Desktop.WinForms/ReceiptNumberEditor.cs`
 - [x] Apply the proven shared feedback/validation composition to all four catalogs and Goods Receipt; make general query/permission failures visible locally in stock views. Reuse the host/binders, not per-screen timers and copied error logic.
 - [x] Migrate optional Sales From/To to typed nullable dates with explicit clear, range validation and query admission; preserve partial text across unrelated state refresh. Record null/clear, From > To, pending text and admitted/rejected query cases under UIN-A07 as well as A12. Retain required header behavior already proven in T06 and Stock Card's UTC seconds semantics.
 - [x] Apply closability/busy/theme roles without changing catalog fields, list/read-only contracts, pagination, permissions, seven Sales columns or receipt workflows. Update control usage examples and first-available pins.
-- [ ] Exercise concurrent A/B outcomes, hidden workspace errors, dirty close, session replacement and theme/DPI across the affected shared screens. Inspect existing regressions rather than duplicating every pilot test.
-- [ ] Run focused affected GT/ST scopes and a bounded app-host smoke required by the integration change; record remaining adoption exceptions and commit. Do not resume old visual-reference acceptance or a full SAL matrix.
+- [x] Exercise concurrent A/B outcomes, hidden workspace errors, dirty close, session replacement and theme/DPI across the affected shared screens. Inspect existing regressions rather than duplicating every pilot test.
+- [x] Run focused affected GT/ST scopes and a bounded app-host smoke required by the integration change; record remaining adoption exceptions and commit. Do not resume old visual-reference acceptance or a full SAL matrix.
 
 ## UIN-T12 — Staged numeric paste and measured editing performance
 
