@@ -546,7 +546,15 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
                 }
                 return true;
             });
-        if (applied) _validation.SetSource(ValidationAddress(session.Line, session.Column), "paste", Array.Empty<ValidationIssue>());
+        if (applied)
+        {
+            var address = ValidationAddress(session.Line, session.Column);
+            if (_validation.Get(address).Any(issue => issue.Source == "paste"))
+            {
+                _validation.SetSource(address, "paste", Array.Empty<ValidationIssue>());
+                session.PasteValidationCleared = true;
+            }
+        }
         return applied;
     }
 
@@ -559,11 +567,17 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
             ReferenceEquals(context.Cell.Editor, _session.Input))
         {
             var wasProduct = _session.Column == 1;
+            var pasteValidationCleared = _session.PasteValidationCleared;
             _validation.SetSource(ValidationAddress(_session.Line, _session.Column), "local", Array.Empty<ValidationIssue>());
             ClearActiveValidation(_session);
             _inline.Invalidate();
             _session = null;
             EditError = null;
+            if (pasteValidationCleared)
+            {
+                RefreshValidationAppearance();
+                EditStateChanged?.Invoke(this, EventArgs.Empty);
+            }
             if (wasProduct && !_disposed) SearchProducts(null);
         }
         if (_disposed || _resetting) return;
@@ -824,6 +838,7 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         internal object? OriginalValue => Target.OriginalValue;
         internal string OriginalRaw => Target.OriginalRaw;
         internal string RawCandidate { get => Target.RawCandidate; set => Target.RawCandidate = value; }
+        internal bool PasteValidationCleared;
     }
     private sealed class LineController : ControllerBase
     {

@@ -19,6 +19,48 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SalesReceiptControlTests
 {
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("2", 2)]
+    public void Corrected_paste_refreshes_cell_and_host_validation_without_clearing_other_cells(string correction, int expected)
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost();
+            host.Load();
+            var grid = host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSourceGrid>("LineGrid");
+            var adapter = (SalesReceiptLinesGridAdapter)typeof(SalesReceiptControl)
+                .GetField("_inline", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Control)!;
+            var errors = (ErrorProvider)typeof(SalesReceiptControl)
+                .GetField("_errors", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Control)!;
+            var summary = host.Value<BootstrapButton>("ValidationSummaryButton");
+            var normal = ((SourceGrid.Cells.Views.Cell)grid[1, 3].View).BackColor;
+            var normalPrice = ((SourceGrid.Cells.Views.Cell)grid[1, 4].View).BackColor;
+            grid.Selection.ResetSelection(false);
+            grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 3), new SourceGrid.Position(1, 4)), true);
+            Assert.False(adapter.TryPasteNumeric("bad\tbad"));
+            Assert.NotEqual(normal, ((SourceGrid.Cells.Views.Cell)grid[1, 3].View).BackColor);
+            Assert.Contains("Quantity", summary.Text);
+            Assert.Contains("Unit price", summary.Text);
+            Assert.NotEmpty(errors.GetError(grid));
+
+            host.Begin(3);
+            var driver = new NativeLookupTypingDriver(host.Value<Box>("QuantityEditor"));
+            driver.SelectRange(0, driver.Text.Length);
+            foreach (var character in correction) driver.TypeCharacter(character);
+            driver.Key(Keys.Enter);
+            System.Windows.Forms.Application.DoEvents();
+
+            Assert.Equal(expected, host.Editor.Lines.Single().Quantity);
+            Assert.Equal(normal, ((SourceGrid.Cells.Views.Cell)grid[1, 3].View).BackColor);
+            Assert.NotEqual(normalPrice, ((SourceGrid.Cells.Views.Cell)grid[1, 4].View).BackColor);
+            Assert.DoesNotContain("Quantity", summary.Text);
+            Assert.Contains("Unit price", summary.Text);
+            Assert.Empty(errors.GetError(grid));
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+
     [Fact]
     public void Nullable_sales_date_filters_commit_clear_and_reject_invalid_range_without_query()
     {
