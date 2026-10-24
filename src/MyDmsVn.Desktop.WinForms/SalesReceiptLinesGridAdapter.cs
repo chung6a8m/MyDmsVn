@@ -293,6 +293,41 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         ? !Equals(_product.BootstrapControl.SelectedValue, _session.OriginalValue)
         : !string.Equals(_session.RawCandidate, _session.OriginalRaw, StringComparison.Ordinal));
 
+    internal bool TryPasteNumeric(string tsv)
+    {
+        if (!_grid.IsHandleCreated || _grid.InvokeRequired)
+            throw new InvalidOperationException("Numeric paste requires the grid UI thread.");
+        if (!Editable) { EditError = "This sales receipt is not editable."; return false; }
+        var positions = ReceiptNumericPasteTargets.Capture(_grid);
+        if (!TryFinishEdit(ReceiptEditIntent.Save)) return false;
+        if (!Editable) { EditError = "This sales receipt is not editable."; return false; }
+        var snapshot = _editor.CaptureNumericDraft();
+        var targets = ReceiptNumericPasteTargets.Address(positions, snapshot, FieldForColumn);
+        var planner = new ReceiptNumericPastePlanner(ReceiptNumericField.UnitPrice,
+            ReceiptDecimalInputProfiles.For(ReceiptNumericField.Quantity, _culture),
+            ReceiptDecimalInputProfiles.For(ReceiptNumericField.UnitPrice, _culture));
+        var result = planner.Plan(tsv, snapshot, targets);
+        _validation.ClearSource("paste");
+        if (!result.IsAccepted)
+        {
+            foreach (var failure in result.Failures)
+            {
+                if (!failure.Address.HasValue) continue;
+                var address = failure.Address.Value;
+                _validation.SetSource(new InlineValidationAddress(_validationDocument, address.LineIdentity,
+                    address.Field), "paste", new[] { new ValidationIssue("Desktop.InvalidPaste", failure.Message, "paste") });
+            }
+            EditError = result.Failures.FirstOrDefault()?.Message ?? "The selected numeric paste is invalid.";
+            RefreshValidationAppearance();
+            return false;
+        }
+        if (!_editor.TryApplyNumericPatch(result.Patch!, out var error))
+        { EditError = error; return false; }
+        EditError = null;
+        RefreshValidationAppearance();
+        return true;
+    }
+
     internal bool TryFinishEdit(ReceiptEditIntent intent)
     {
         if (_disposed || _grid.IsDisposed) return false;
@@ -685,12 +720,20 @@ internal sealed class SalesReceiptLinesGridAdapter : IDisposable
         ReferenceEquals(input, _price) ? _price.BootstrapControl.PendingText : input.Control.Text;
     private void OnGridDisposed(object? sender, EventArgs e) => Dispose();
     private void OnLineChanged(object? sender, PropertyChangedEventArgs e) => Dispatch(RefreshProjection);
-    private void OnEditorChanged(object? sender, PropertyChangedEventArgs e) => Dispatch(() =>
+    private void OnEditorChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (_receiptId != _editor.SaleId) Rebuild(_editor.Lines, true);
-        RefreshEditability();
-        RefreshProjection();
-    });
+        // The editor publishes a broad property snapshot for each accepted edit. Line
+        // notifications already project values; repeating a full grid scan for every
+        // unrelated editor property makes one 200-line edit allocate megabytes.
+        if (e.PropertyName != null && e.PropertyName != nameof(SalesReceiptEditorViewModel.SaleId) &&
+            e.PropertyName != nameof(SalesReceiptEditorViewModel.CanEdit)) return;
+        Dispatch(() =>
+        {
+            if (_receiptId != _editor.SaleId) Rebuild(_editor.Lines, true);
+            RefreshEditability();
+            if (e.PropertyName == null) RefreshProjection();
+        });
+    }
     private void OnOptionsChanged(object? sender, PropertyChangedEventArgs e) => Dispatch(() => { BindProductOptions(); RefreshProjection(); });
     private void OnLinesChanged(object? sender, NotifyCollectionChangedEventArgs e) => Dispatch(() =>
     {

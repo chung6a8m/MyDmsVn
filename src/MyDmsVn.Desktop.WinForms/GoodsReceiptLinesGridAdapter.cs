@@ -176,6 +176,28 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         ? !Equals(_product.BootstrapControl.SelectedValue, _session.OriginalValue)
         : !string.Equals(_session.RawCandidate, _session.OriginalRaw, StringComparison.Ordinal));
 
+    internal bool TryPasteNumeric(string tsv)
+    {
+        if (!_grid.IsHandleCreated || _grid.InvokeRequired)
+            throw new InvalidOperationException("Numeric paste requires the grid UI thread.");
+        if (!Editable) { EditError = "This goods receipt is not editable."; return false; }
+        var positions = ReceiptNumericPasteTargets.Capture(_grid);
+        if (!TryFinishEdit(ReceiptEditIntent.Save)) return false;
+        if (!Editable) { EditError = "This goods receipt is not editable."; return false; }
+        var snapshot = _editor.CaptureNumericDraft();
+        var targets = ReceiptNumericPasteTargets.Address(positions, snapshot, FieldForColumn);
+        var planner = new ReceiptNumericPastePlanner(ReceiptNumericField.UnitCost,
+            ReceiptDecimalInputProfiles.For(ReceiptNumericField.Quantity, _culture),
+            ReceiptDecimalInputProfiles.For(ReceiptNumericField.UnitCost, _culture));
+        var result = planner.Plan(tsv, snapshot, targets);
+        if (!result.IsAccepted)
+        { EditError = result.Failures.FirstOrDefault()?.Message ?? "The selected numeric paste is invalid."; return false; }
+        if (!_editor.TryApplyNumericPatch(result.Patch!, out var error))
+        { EditError = error; return false; }
+        EditError = null;
+        return true;
+    }
+
     internal bool TryFinishEdit(ReceiptEditIntent intent)
     {
         if (_disposed || _grid.IsDisposed) return false;

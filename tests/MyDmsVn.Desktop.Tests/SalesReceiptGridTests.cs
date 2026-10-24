@@ -20,6 +20,83 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class SalesReceiptGridTests
 {
     [Fact]
+    public void Numeric_paste_command_applies_selected_sales_rectangle_once()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var second = host.Editor.AddLine()!;
+            host.Grid.Selection.ResetSelection(false);
+            host.Grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 3), new SourceGrid.Position(2, 4)), true);
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            Assert.True(adapter.TryPasteNumeric("2\t4\r\n3\t5\r\n"), adapter.EditError + "; positions=" +
+                string.Join(",", host.Grid.Selection.GetSelectionRegion().GetCellsPositions().Select(p => p.ToString())));
+            Assert.Equal(2m, host.Editor.Lines[0].Quantity);
+            Assert.Equal(4m, host.Editor.Lines[0].UnitPrice);
+            Assert.Equal(3m, second.Quantity);
+            Assert.Equal(5m, second.UnitPrice);
+            Assert.Empty(host.Api.Creates); Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
+    public void Numeric_paste_keyboard_shortcut_uses_clipboard_and_rejects_invalid_active_edit()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var previous = Clipboard.GetDataObject();
+            try
+            {
+                host.Grid.Selection.ResetSelection(false);
+                host.Grid.Selection.SelectCell(new SourceGrid.Position(1, 3), true);
+                Clipboard.SetText("7.5");
+                var key = host.Grid.GetType().GetMethod("ProcessCmdKey", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                var message = Message.Create(host.Grid.Handle, 0x0100, IntPtr.Zero, IntPtr.Zero);
+                Assert.True((bool)key.Invoke(host.Grid, new object[] { message, Keys.Control | Keys.Shift | Keys.V })!);
+                Assert.Equal(7.5m, host.Editor.Lines[0].Quantity);
+
+                var cell = new SourceGrid.CellContext(host.Grid, new SourceGrid.Position(1, 3));
+                host.Grid.Selection.Focus(new SourceGrid.Position(1, 3), true);
+                cell.StartEdit();
+                adapter.QuantityControl.Text = "bad";
+                Clipboard.SetText("8");
+                Assert.True((bool)key.Invoke(host.Grid, new object[] { message, Keys.Control | Keys.Shift | Keys.V })!);
+                Assert.Equal(7.5m, host.Editor.Lines[0].Quantity);
+                Assert.Equal("bad", adapter.QuantityControl.PendingText);
+                Assert.True(adapter.HasPendingEdit);
+                adapter.CancelActiveEdit();
+                Assert.Empty(guard.Exceptions);
+            }
+            finally
+            {
+                if (previous == null) Clipboard.Clear(); else Clipboard.SetDataObject(previous, true);
+            }
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
+    public void Numeric_paste_rejects_one_invalid_cell_without_changing_any_selected_value()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var second = host.Editor.AddLine()!;
+            host.Grid.Selection.ResetSelection(false);
+            host.Grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 3), new SourceGrid.Position(2, 4)), true);
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var revision = host.Editor.EditRevision;
+            Assert.False(adapter.TryPasteNumeric("2\t4\n3\t=5"));
+            Assert.Equal(revision, host.Editor.EditRevision);
+            Assert.All(host.Editor.Lines, line => Assert.Equal(1m, line.Quantity));
+            Assert.Equal(0m, host.Editor.Lines[0].UnitPrice);
+            Assert.Equal(0m, second.UnitPrice);
+            Assert.Contains("Unit price", adapter.ValidationSummaryText ?? adapter.EditError ?? "");
+            Assert.Empty(host.Api.Creates); Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
     public void Compact_944_grid_keeps_all_seven_columns_visible()
     {
         StaTest.Run(_ =>

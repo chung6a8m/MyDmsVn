@@ -16,6 +16,73 @@ namespace MyDmsVn.Desktop.Tests
 {
     public sealed partial class GoodsReceiptControlTests
     {
+        internal static string MeasureGoodsEditingPerformance()
+        {
+            using var fixture = new Fixture();
+            using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+            using var form = new Form { Width = 1000, Height = 650 };
+            form.Controls.Add(control); form.Show(); System.Windows.Forms.Application.DoEvents();
+            fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+            control.ActivateAsync(default).GetAwaiter().GetResult();
+            control.SelectReceiptAsync(41, default).GetAwaiter().GetResult();
+            while (fixture.Editor.Lines.Count < 25) fixture.Editor.AddLine();
+            var line = fixture.Editor.Lines[12];
+            var grid = (GoodsReceiptLinesGrid)control.LineGrid;
+            var adapter = (GoodsReceiptLinesGridAdapter)typeof(GoodsReceiptControl)
+                .GetField("_inline", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(control)!;
+            var refresh = adapter.GetType().GetMethod("RefreshProjection", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var events = 0; var invalidations = 0;
+            fixture.Editor.PropertyChanged += (_, __) => events++;
+            grid.Invalidated += (_, __) => invalidations++;
+            var edits = new List<double>(); var editBytes = new List<double>();
+            var projections = new List<double>(); var projectionBytes = new List<double>();
+            for (var repetition = 0; repetition < 14; ++repetition)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                adapter.SetAccessibleValue(adapter.AccessibleGeneration, line, 2, repetition % 2 == 0 ? "2.5" : "3.5");
+                watch.Stop();
+                if (repetition >= 2) { edits.Add(watch.Elapsed.TotalMilliseconds); editBytes.Add(GC.GetAllocatedBytesForCurrentThread() - before); }
+                before = GC.GetAllocatedBytesForCurrentThread(); watch.Restart();
+                refresh.Invoke(adapter, null);
+                watch.Stop();
+                if (repetition >= 2) { projections.Add(watch.Elapsed.TotalMilliseconds); projectionBytes.Add(GC.GetAllocatedBytesForCurrentThread() - before); }
+            }
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            string Distribution(List<double> values)
+            {
+                var sorted = values.OrderBy(value => value).ToArray();
+                return "p50=" + sorted[(int)Math.Ceiling(sorted.Length * .5) - 1].ToString("F2") +
+                    ",p95=" + sorted[(int)Math.Ceiling(sorted.Length * .95) - 1].ToString("F2");
+            }
+            int CountControls(Control parent) => 1 + parent.Controls.Cast<Control>().Sum(CountControls);
+            return "Goods lines=25; edit/commit=" + Distribution(edits) + "; bytes=" + Distribution(editBytes) +
+                "; projection=" + Distribution(projections) + "; projectionBytes=" + Distribution(projectionBytes) +
+                "; editorEvents=" + events + "; gridInvalidations=" + invalidations + "; retainedControls=" + CountControls(form);
+        }
+        [Fact]
+        public void Numeric_paste_command_applies_goods_quantity_and_cost_without_api_call()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                using var form = new Form { Width = 1000, Height = 650 };
+                form.Controls.Add(control); form.Show(); System.Windows.Forms.Application.DoEvents();
+                fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();
+                var grid = (GoodsReceiptLinesGrid)control.LineGrid;
+                var adapter = (GoodsReceiptLinesGridAdapter)typeof(GoodsReceiptControl)
+                    .GetField("_inline", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(control)!;
+                grid.Selection.ResetSelection(false);
+                grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 2), new SourceGrid.Position(1, 3)), true);
+                Assert.True(adapter.TryPasteNumeric("2\t7"), adapter.EditError);
+                Assert.Equal(2m, fixture.Editor.Lines[0].Quantity);
+                Assert.Equal(7m, fixture.Editor.Lines[0].UnitCost);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(15));
+        }
         [Fact]
         public void Factory_goods_query_failure_is_visible_in_its_own_workspace()
         {
