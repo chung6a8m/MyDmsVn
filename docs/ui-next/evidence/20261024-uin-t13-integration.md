@@ -1,6 +1,6 @@
 # UIN-T13 — UI Next integration and handoff
 
-Date: 2026-10-24. Acceptance: UIN-A14 and reconciliation of UIN-A01–A13. Status: **IN PROGRESS**. Native125 and attended dated Owner disposition remain open. This ledger concerns UI Next only; archived SAL acceptance and production release remain separate.
+Date: 2026-10-24. Acceptance: UIN-A14 and reconciliation of UIN-A01–A13. Status: **IN PROGRESS**. Attended observations and dated Owner disposition remain open. This ledger concerns UI Next only; archived SAL acceptance and production release remain separate.
 
 ## Candidate identity and change
 
@@ -10,17 +10,20 @@ T00–T12 retain their linked bounded evidence in the [active roadmap](../202610
 
 ## Environment, selection and actual outcomes
 
-Interactive Windows 2026-10-24, SDK 8.0.426, .NET Framework 4.8. Native100 probes measured PerMonitorV2 window and monitor at 96 DPI in both themes. Package/testhost bitness was 32. The designated `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` targeted non-production SQL with effective `master`, no attach/user-instance. Each selected package case allocated its own database, used the existing ownership token and runtime identity separation, drained workers and verified disposal. No raw database names, login secrets, Support IDs or proprietary TRX are published here.
+Interactive Windows 2026-10-24, SDK 8.0.426, .NET Framework 4.8. Native100 probes measured PerMonitorV2 monitor at 96 DPI in both themes. Native125 probes measured monitor at 120 DPI/125% in both themes; the Windows host separately reported `WINDOW_DPI=96`, as in prior T11 evidence. Package/testhost bitness was 32. The designated `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` targeted non-production SQL with effective `master`, no attach/user-instance. Each selected package case allocated its own database, used the existing ownership token and runtime identity separation, drained workers and verified disposal. No raw database names, login secrets, Support IDs or proprietary TRX are published here.
 
 | Scope and selection | Local TRX | Actual result |
 |---|---|---|
 | Complete Desktop.Session project | `TestResults/t13-session-recovery/t13-session-recovery.trx` | 216 discovered/executed, 216 PASS, no skip |
 | Server Application Catalog/API mapper | `TestResults/t13-server-app/t13-server-app.trx` | 41 discovered/executed, 41 PASS, no skip |
 | Affected Catalog, shell, Goods/Sales, dates, numeric, close/busy, feedback and Goods ViewModel at native100 | `TestResults/t13-native100-final/t13-native100-final.trx` | 332 discovered/executed, 332 PASS, no skip; earlier 305/305 was superseded by the new Goods fix |
+| Same affected native GUI selection at native125 | `TestResults/t13-native125-final/t13-native125-final.trx` | 332 discovered/executed, 332 PASS, no skip; 28 PerMonitorV2 observations at monitor 120 DPI, zero 96-DPI observations |
 | Product duplicate-Code actual-Login package, Light/Dark native100 | `TestResults/t13-package-product-100-fix/t13-package-product-100-fix.trx` | 2/2 PASS on earlier product-equivalent package |
 | Seven actual-Login package scenarios × Light/Dark native100: Login, Product Catalog, Sales page size/audit/timeout, Goods inline/audit | `TestResults/t13-package-matrix-v2-100/t13-package-matrix-v2-100.trx` | 14 discovered/executed: 11 PASS, 3 FAIL at transient Sales line UIA lookup after Save/Post |
 | Sales audit/timeout after bounded UIA transition wait, Light/Dark native100 | `TestResults/t13-sales-transition-v2-100/t13-sales-transition-v2-100.trx` | 4/4 PASS on package v2; independent SQL oracle and process cleanup checked |
+| Same seven actual-Login package scenarios × Light/Dark native125 on final test driver | `TestResults/t13-package-matrix-v2-125/t13-package-matrix-v2-125.trx` | 14 discovered/executed, 14 PASS, no skip; all rows observed monitor 120 DPI |
 | Goods unknown-Post package timeout, Light then Dark native100 | `TestResults/t13-package-goods-fault-v2-light-100/t13-package-goods-fault-v2-light-100.trx`, `TestResults/t13-package-goods-fault-v2-dark-100/t13-package-goods-fault-v2-dark-100.trx` | 1/1 + 1/1 PASS; actionable error and explicit reload/retry |
+| Goods unknown-Post package timeout, Light/Dark native125 | `TestResults/t13-package-goods-fault-v2-125/t13-package-goods-fault-v2-125.trx` | 2 discovered/executed, 2 PASS, no skip; monitor 120 DPI, actionable error and explicit reload/retry |
 
 Selection used ordinary `dotnet test` Release/net48/x86 with nonempty `FullyQualifiedName` filters, TRX, `--blame-hang --blame-hang-timeout 5m` and serialized GUI. The final native100 filter selected 16 affected classes; actual TRX row counts were CatalogControl 19, DesktopDateInputIntegration 8, FoundationShellForm 21, GoodsReceiptControl 59, GoodsReceiptEditorViewModel 27, GoodsReceiptInlineEditor 18, InlineValidationPresentation 7, ReceiptNumericInput 37, ReceiptNumericPaste 12, SalesReceiptControlAdmission 15, SalesReceiptGrid 14, SalesReceiptLookupNativeInput 66, UiNextWorkspaceAdoption 3, WorkspaceBusyBinder 5, WorkspaceCloseAdmission 4 and WorkspaceFeedbackHost 17. The package filter selected the seven methods listed above, with two Theory rows per method. The package executable and manifest hashes were checked by the probe before launch. Package source and test driver revisions are separate as recorded above.
 
@@ -28,4 +31,4 @@ The first package trial declared 125% while the monitor was actually 96 DPI; its
 
 ## Remaining acceptance boundary
 
-Native125 Light/Dark on the same package and source, short attended keyboard/error/contrast/close/busy observations, and a dated bounded Owner decision are **NOT RUN / OPEN**. UIN-A14 is not yet VERIFIED. The earlier T00–T12 native125 records are task-level evidence, not a replacement for this final candidate. The archive and release prerequisites remain outside this task and unchanged.
+Short attended keyboard/error/contrast/close/busy observations and a dated bounded Owner decision are **NOT RUN / OPEN**. UIN-A14 is not yet VERIFIED. The automated native100/native125 results do not substitute for a human observation. The archive and release prerequisites remain outside this task and unchanged.
