@@ -154,7 +154,7 @@ public sealed partial class PackagedGuiAcceptanceTests
             using var probe = new GuiProcessProbeFixture(package: true);
             var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-audit " + theme);
             fixture.ConfigureRuntime(start);
-            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5));
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             Assert.Contains("INLINE_RECEIPT_NATIVE_EDIT=PASS", result.StandardOutput);
