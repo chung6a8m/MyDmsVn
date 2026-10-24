@@ -152,6 +152,33 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public async Task Unknown_post_response_publishes_actionable_reload_notice_and_blocks_retry()
+        {
+            var api = new EditorApiClient
+            {
+                PostResponse = ApiResponse<PostGoodsReceiptResponse>.Failure(
+                    new ApiError(ApiStatusCode.InternalServerError, "Desktop.UnexpectedError",
+                        "An unexpected error occurred.", correlationId: "test-recovery")),
+            };
+            using (var fixture = Create(api))
+            {
+                fixture.Editor.Load(Receipt("draft", "AQIDBAUGBwg="));
+
+                Assert.False(await fixture.Editor.PostAsync(CancellationToken.None));
+
+                Assert.True(fixture.Editor.RequiresPostOutcomeReload);
+                Assert.Equal("AQIDBAUGBwg=", fixture.Editor.Version);
+                Assert.StartsWith("Posting outcome unknown. Refresh to reload the receipt",
+                    fixture.Editor.ErrorMessage);
+                Assert.Contains("Support ID: test-recovery", fixture.Editor.ErrorMessage);
+                Assert.Equal(DesktopNotificationKind.Error, fixture.Notifications.LastNotification!.Kind);
+                Assert.Equal(fixture.Editor.ErrorMessage, fixture.Notifications.LastNotification.Message);
+                Assert.False(await fixture.Editor.PostAsync(CancellationToken.None));
+                Assert.Equal(1, api.PostCalls);
+            }
+        }
+
+        [Fact]
         public async Task Update_reuses_opaque_version_and_conflict_preserves_user_input()
         {
             var api = new EditorApiClient
@@ -672,6 +699,8 @@ namespace MyDmsVn.Desktop.Tests
             public SaveGoodsReceiptRequest? LastCreate { get; private set; }
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
             public PostGoodsReceiptRequest? LastPost { get; private set; }
+            public ApiResponse<PostGoodsReceiptResponse>? PostResponse { get; set; }
+            public int PostCalls { get; private set; }
             public IList<long> GetIds { get; } = new List<long>();
             public int CreateCalls { get; private set; }
             public bool ControlCreateResponse { get; set; }
@@ -740,6 +769,8 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken token)
             {
                 LastPost = request;
+                PostCalls++;
+                if (PostResponse != null) return Task.FromResult(PostResponse);
                 return Task.FromResult(
                     ApiResponse<PostGoodsReceiptResponse>.Success(
                         new PostGoodsReceiptResponse(

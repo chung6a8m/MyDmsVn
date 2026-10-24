@@ -865,7 +865,9 @@ namespace MyDmsVn.Desktop.WinForms
                 var requiresPostReload = _editor.RequiresPostOutcomeReload;
                 BusyIndicator.Visible = busy;
                 OperationStatusLabel.Text = requiresPostReload
-                    ? "Posting outcome unknown. Refresh to reload the receipt before making further changes. " + _editor.ErrorMessage
+                    ? _editor.ErrorMessage != null && _editor.ErrorMessage.StartsWith("Posting outcome unknown.", StringComparison.Ordinal)
+                        ? _editor.ErrorMessage
+                        : "Posting outcome unknown. Refresh to reload the receipt before making further changes. " + _editor.ErrorMessage
                     : _inline.EditError ?? _workflowMessage ??
                     _editor.ErrorMessage ??
                     _list.ErrorMessage ??

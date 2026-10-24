@@ -619,8 +619,14 @@ namespace MyDmsVn.Desktop.Application
                             error.Status == ApiStatusCode.Unspecified)
                         {
                             RequirePostOutcomeReload(receiptId);
+                            ApplyApiError(new ApiError(error.Status, error.Code,
+                                "Posting outcome unknown. Refresh to reload the receipt before making further changes.",
+                                error.Details, error.CorrelationId));
                         }
-                        ApplyApiError(error);
+                        else
+                        {
+                            ApplyApiError(error);
+                        }
                     },
                     lifetimeToken).ConfigureAwait(false);
                 return false;
