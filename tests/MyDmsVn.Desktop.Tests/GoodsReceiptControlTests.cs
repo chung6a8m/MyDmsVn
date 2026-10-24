@@ -60,27 +60,36 @@ namespace MyDmsVn.Desktop.Tests
                 "; projection=" + Distribution(projections) + "; projectionBytes=" + Distribution(projectionBytes) +
                 "; editorEvents=" + events + "; gridInvalidations=" + invalidations + "; retainedControls=" + CountControls(form);
         }
-        [Fact]
-        public void Numeric_paste_command_applies_goods_quantity_and_cost_without_api_call()
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Numeric_paste_command_applies_goods_quantity_and_cost_without_api_call(BootstrapThemeMode mode)
         {
             StaTest.Run(token =>
             {
-                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
-                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
-                using var form = new Form { Width = 1000, Height = 650 };
-                form.Controls.Add(control); form.Show(); System.Windows.Forms.Application.DoEvents();
-                fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
-                control.ActivateAsync(token).GetAwaiter().GetResult();
-                control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();
-                var grid = (GoodsReceiptLinesGrid)control.LineGrid;
-                var adapter = (GoodsReceiptLinesGridAdapter)typeof(GoodsReceiptControl)
-                    .GetField("_inline", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(control)!;
-                grid.Selection.ResetSelection(false);
-                grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 2), new SourceGrid.Position(1, 3)), true);
-                Assert.True(adapter.TryPasteNumeric("2\t7"), adapter.EditError);
-                Assert.Equal(2m, fixture.Editor.Lines[0].Quantity);
-                Assert.Equal(7m, fixture.Editor.Lines[0].UnitCost);
-                Assert.Empty(guard.Exceptions);
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                    using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                    using var form = new Form { Width = 1000, Height = 650 };
+                    form.Controls.Add(control); form.Show(); System.Windows.Forms.Application.DoEvents();
+                    fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                    control.ActivateAsync(token).GetAwaiter().GetResult();
+                    control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();
+                    var grid = (GoodsReceiptLinesGrid)control.LineGrid;
+                    var adapter = (GoodsReceiptLinesGridAdapter)typeof(GoodsReceiptControl)
+                        .GetField("_inline", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(control)!;
+                    grid.Selection.ResetSelection(false);
+                    grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 2), new SourceGrid.Position(1, 3)), true);
+                    Assert.True(adapter.TryPasteNumeric("2\t7"), adapter.EditError);
+                    Assert.Equal(2m, fixture.Editor.Lines[0].Quantity);
+                    Assert.Equal(7m, fixture.Editor.Lines[0].UnitCost);
+                    Console.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
+                    Assert.Empty(guard.Exceptions);
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
             }, TimeSpan.FromSeconds(15));
         }
         [Fact]

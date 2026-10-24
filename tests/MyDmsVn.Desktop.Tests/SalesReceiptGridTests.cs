@@ -19,24 +19,33 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SalesReceiptGridTests
 {
-    [Fact]
-    public void Numeric_paste_command_applies_selected_sales_rectangle_once()
+    [Theory]
+    [InlineData(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Light)]
+    [InlineData(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark)]
+    public void Numeric_paste_command_applies_selected_sales_rectangle_once(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode mode)
     {
         StaTest.Run(_ =>
         {
-            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
-            var second = host.Editor.AddLine()!;
-            host.Grid.Selection.ResetSelection(false);
-            host.Grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 3), new SourceGrid.Position(2, 4)), true);
-            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
-            Assert.True(adapter.TryPasteNumeric("2\t4\r\n3\t5\r\n"), adapter.EditError + "; positions=" +
-                string.Join(",", host.Grid.Selection.GetSelectionRegion().GetCellsPositions().Select(p => p.ToString())));
-            Assert.Equal(2m, host.Editor.Lines[0].Quantity);
-            Assert.Equal(4m, host.Editor.Lines[0].UnitPrice);
-            Assert.Equal(3m, second.Quantity);
-            Assert.Equal(5m, second.UnitPrice);
-            Assert.Empty(host.Api.Creates); Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
-            Assert.Empty(guard.Exceptions);
+            var original = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme =
+                    MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapTheme.CreateDefault(mode);
+                using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+                var second = host.Editor.AddLine()!;
+                host.Grid.Selection.ResetSelection(false);
+                host.Grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 3), new SourceGrid.Position(2, 4)), true);
+                var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+                Assert.True(adapter.TryPasteNumeric("2\t4\r\n3\t5\r\n"), adapter.EditError);
+                Assert.Equal(2m, host.Editor.Lines[0].Quantity);
+                Assert.Equal(4m, host.Editor.Lines[0].UnitPrice);
+                Assert.Equal(3m, second.Quantity);
+                Assert.Equal(5m, second.UnitPrice);
+                Assert.Empty(host.Api.Creates); Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
+                Console.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, System.Threading.CancellationToken.None));
+                Assert.Empty(guard.Exceptions);
+            }
+            finally { MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme = original; }
         }, TimeSpan.FromSeconds(15));
     }
     [Fact]
