@@ -1,10 +1,10 @@
 # Retired directions and scope boundaries
 
-**Updated:** 2026-10-23 at merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This page is a non-executable scope record. [UI-NEXT](ui-next/20261023-active-roadmap.md) is the sole active roadmap; all implementation tasks are NOT STARTED. There are no tasks to execute from this page.
+**Routing updated:** 2026-10-24; the prior scope record used merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This page remains non-executable. Use the [execution index](plans/README.md) for current work; there are no tasks to execute from this page.
 
 ## Active scope is recorded elsewhere
 
-UI-NEXT covers workspace feedback, validation, tab close/busy presentation and theme infrastructure under its [design and control policy](ui-next/20261023-design-and-control-policy.md). The [archive boundary](archive/20261023-pre-ui-next/README.md) retires prior queues and excludes their unfinished work, including SAL native125/attended/Owner acceptance and complete integration repeats. Exclusion does not complete or waive those gaps. Current Sales/schema10 and other business contracts remain implemented source behavior.
+UI-NEXT's workspace feedback, validation, tab close/busy and theme work remains recorded in its [historical reference index](ui-next/README.md). The [execution index](plans/README.md) selects current scope. The [archive boundary](archive/20261023-pre-ui-next/README.md) retires prior queues and excludes their unfinished work, including SAL native125/attended/Owner acceptance and complete integration repeats. Exclusion does not complete or waive those gaps. Current Sales/schema10 and other business contracts remain implemented source behavior.
 
 [SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) retains product/package `f5039cb`, separate GUI test `4697744`, candidate-specific runnable automation PASS and its OPEN acceptance boundary. BCF/BCI/GUI-P5/L2DB/RESP retain their recorded signed scopes and exceptions. The broader operational rollout, support and recovery requirements below remain unscheduled and cannot be inferred from feature tests.
 
@@ -36,4 +36,4 @@ This historical metadata defect is CLOSED in its narrow scope: the publisher rea
 
 The former `tests/test-gates.v1.json`, SqlTestHarness, standalone SQL runner/runner tests, approval-file flow and related command wrappers remain removed. STAB-T03/T04 manifest-v2/fingerprint work remains cancelled. Respawn ownership stays inside existing SQL test owners; bounded GUI-owned processes do not recreate a global runner or authorize cleanup by database-name prefix.
 
-[History](HISTORY.md#2026-10-20--business-compact-roadmap-reset) preserves immutable links to the retired plans and earlier decisions. Historical commands are not current execution authority. Use [the UI-NEXT roadmap](ui-next/20261023-active-roadmap.md) and the sole [TEST_POLICY](TEST_POLICY.md).
+[History](HISTORY.md#2026-10-20--business-compact-roadmap-reset) preserves immutable links to the retired plans and earlier decisions. Historical commands are not current execution authority. Use the [current execution index](plans/README.md) and the sole [TEST_POLICY](TEST_POLICY.md).

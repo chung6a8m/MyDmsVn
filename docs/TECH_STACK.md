@@ -1,8 +1,8 @@
 # Technical stack and compatibility baseline
 
-**Current baseline:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (includes merged PR #43 and the migrated assessment), refreshed 2026-10-23. [UI-NEXT](ui-next/20261023-active-roadmap.md) is the sole active roadmap with all implementation tasks NOT STARTED. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves prior evidence and excludes unfinished work without waiving it. Production release prerequisites remain [UNACCEPTED / UNSCHEDULED](DEFERRED_WORK.md#release-prerequisites).
+**Inspected stack baseline:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43 and migrated assessment), 2026-10-23. Current scheduling follows the [execution index](plans/README.md); [UI-NEXT](ui-next/README.md) retains later UI implementation evidence. A0 changes routing, not runtime or package choices. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains prior evidence and unfinished acceptance. Production release prerequisites remain [UNACCEPTED / UNSCHEDULED](DEFERRED_WORK.md#release-prerequisites).
 
-Sales, schema10 and fixed-point valuation are implemented using the existing net48/provider graph; valuation uses `System.Numerics.BigInteger`, not a framework upgrade. [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) remains the architecture decision. [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`, with candidate-specific runnable automation PASS and native125/attended/Owner acceptance OPEN. UI-NEXT proposes narrow UI infrastructure changes; it does not upgrade the runtime, SQL provider or dependencies by documentation alone.
+Sales, schema10 and fixed-point valuation are implemented using the existing net48/provider graph; valuation uses `System.Numerics.BigInteger`, not a framework upgrade. [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) remains the architecture decision. [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`, with candidate-specific runnable automation PASS and native125/attended/Owner acceptance OPEN. The historical UI-NEXT records describe its UI infrastructure changes; documentation alone does not upgrade runtime, SQL provider or dependencies.
 
 ## Runtime matrix
 
@@ -55,7 +55,7 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 
 ## Test configuration and verification
 
-[Test policy](TEST_POLICY.md) and [UI-NEXT validation](ui-next/20261023-validation-and-handoff.md) define focused task scope and dependency-based broadening; archived integration gates are not inherited. Run test projects directly and preserve the local allocation/cleanup guards. Mandatory SQL acceptance with missing configuration, Windows or targeting resources is `BLOCKED / NOT RUN`, not PASS; a skipped optional/local diagnostic is not mandatory coverage.
+[Test policy](TEST_POLICY.md) and the plan selected by the [execution index](plans/README.md) define focused task scope and dependency-based broadening; archived integration gates are not inherited. Run test projects directly and preserve the local allocation/cleanup guards. Mandatory SQL acceptance with missing configuration, Windows or targeting resources is `BLOCKED / NOT RUN`, not PASS; a skipped optional/local diagnostic is not mandatory coverage.
 
 `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` explicitly identifies the designated non-production SQL instance and `master` catalog. The local IntegrationTests helper validates the live allocation before drop. There is no approval-file or external runner requirement. The product migrator instead requires an explicit application database and rejects system databases. Never confuse these configurations, print credentials or silently fall back to a developer/production database.
 

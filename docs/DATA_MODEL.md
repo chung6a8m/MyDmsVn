@@ -1,6 +1,6 @@
 # SQL data model — baseline and schema10 checkpoint
 
-> Current scheduling boundary — 2026-10-23: this specification preserves implemented Sales/security/persistence contracts. The former SAL execution plan is [archived](archive/20261023-pre-ui-next/README.md); [UI Next](ui-next/20261023-active-roadmap.md) is the sole active queue and excludes unfinished old-plan work. Later [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) uses product/package `f5039cb` and GUI tests `4697744`; native125, attended observations and dated Owner acceptance remain OPEN. Dated checkpoints below retain their own evidence boundary.
+> Current scheduling boundary — routing updated 2026-10-24: this specification preserves implemented Sales/security/persistence contracts. The former SAL execution plan is [archived](archive/20261023-pre-ui-next/README.md); current work follows the [execution index](plans/README.md), without inheriting unfinished old-plan work. [UI-NEXT](ui-next/README.md) remains a historical reference. Later [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) uses product/package `f5039cb` and GUI tests `4697744`; native125, attended observations and dated Owner acceptance remain OPEN. Dated checkpoints below retain their own evidence boundary.
 
 **Status:** Implemented schema at `v1a` commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5`, refreshed from source on 2026-10-18. The baseline descriptions are retained below; the reviewed T01 schema10 additions and bounded SQL evidence are identified separately.
 

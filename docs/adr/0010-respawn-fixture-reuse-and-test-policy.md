@@ -2,7 +2,7 @@
 
 **Status:** Accepted decision, selected 2026-10-18; RESP-T00–T05 implemented and accepted in recorded scope. [Current evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
 **Scope:** Active net48 integration-test fixture policy; originally planned on `v1a`, retained on `v1a-pro`.
-**Completed plan:** [RESP](../archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md). The [current execution index](../plans/README.md) now schedules BCF lookup and visual refinement; completed BCI remains historical evidence.
+**Completed plan:** [RESP](../archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md). Use the [current execution index](../plans/README.md) for new work; completed BCI/BCF remain historical evidence for their own scopes.
 **Execution policy:** [TEST_POLICY](../TEST_POLICY.md).
 
 ## Original context — 2026-10-18

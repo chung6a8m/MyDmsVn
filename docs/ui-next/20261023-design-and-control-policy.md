@@ -1,7 +1,7 @@
 # UI Next — design and control policy
 
 **Date:** 2026-10-23
-**Status:** Design policy for the [active roadmap](20261023-active-roadmap.md). Initial proposal language below retains its planning context; current implementation/evidence is recorded by the roadmap. The 2026-10-24 [DateInput Unified Compact design](20261024-dateinput-unified-compact-design.md) is the approved correction, with implementation/runtime verification pending.
+**Status:** Preserved design policy for the [historical UI-NEXT roadmap](20261023-active-roadmap.md). Initial proposal language retains its planning context; later implementation/results belong to the linked candidate evidence. The approved [DateInput Unified Compact design](20261024-dateinput-unified-compact-design.md) has subsequent [candidate evidence](evidence/20261024-dateinput-unified-compact-correction.md), including the original failure and bounded acceptance. New work follows the [execution index](../plans/README.md).
 **Baseline:** `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` and its three pinned UI repositories
 
 ## 1. Ownership and reuse
@@ -113,7 +113,7 @@ Initial external paste grammar remains strict ungrouped text in the captured cul
 
 ## 6. Typed date input with a themed calendar
 
-The implemented `BootstrapDateInput` composes native text entry and `BootstrapCalendarPicker`. The Owner-approved [Unified Compact correction](20261024-dateinput-unified-compact-design.md) governs its new visual and caret behavior; execute [UIN-D01–D03](20261024-dateinput-unified-compact-correction.md). CalendarPicker is sealed and has no free-text parser; reuse its engine through reviewed internal/public seams, not application access to private popup controls. Do not put partial-date completion inside `IInputFormatter.Format`, which is invoked on partial prefixes during caret mapping.
+The implemented `BootstrapDateInput` composes native text entry and `BootstrapCalendarPicker`. The Owner-approved [Unified Compact correction](20261024-dateinput-unified-compact-design.md) records its visual and caret behavior; [UIN-D01–D03](20261024-dateinput-unified-compact-correction.md) is the historical implementation record, not an instruction to execute again. CalendarPicker is sealed and has no free-text parser; reuse its engine through reviewed internal/public seams, not application access to private popup controls. Do not put partial-date completion inside `IInputFormatter.Format`, which is invoked on partial prefixes during caret mapping.
 
 The date control follows the same explicit profile/session initialization and read-only accepted Value contract as decimal input. Capture its profile at an admitted session boundary. Capture the injected local reference date when a fresh pending candidate begins, including a successful Up/Down step; retain it while that candidate is pending. Opening the calendar without a pending candidate uses the current date; popup focus movement does not recapture a pending candidate's clock. Resolve missing parts on explicit commit or deliberate segment stepping; stepping normalizes only the pending display and does not accept a new Value. The app uses `DateTime` at midnight with `Kind.Unspecified` for date-only values, without UTC conversion.
 

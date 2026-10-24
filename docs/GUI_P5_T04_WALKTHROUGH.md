@@ -1,6 +1,6 @@
 # GUI-P5-T04 — Attended Catalog/Lookup walkthrough
 
-> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. The [current execution index](plans/README.md) now schedules BCF only; BCI is completed history, and this record does not certify the new lookup/visual obligations or schedule retired plans.
+> Historical evidence record. Original checkpoints, failures, exceptions and task handoffs retain their dated scope. Current work is selected through the [execution index](plans/README.md). This record does not schedule new work or supply acceptance for another candidate.
 
 **Status: COMPLETE / OWNER ACCEPTED — baseline49/49 and supplemental24/24 observations PASS; REMAIN-P5-GUI-01 PASS. Owner signature recorded2026-10-19. T05/T06/overallP5/P6 remain OPEN.**
 

@@ -1,6 +1,6 @@
 # Prompt giao Codex — DateInput Unified Compact
 
-Prompt dưới đây giao việc triển khai phạm vi đã được Owner duyệt. Đọc thiết kế và plan trong repo; không dùng ảnh phác họa hoặc kết quả test cũ để suy ra bản sửa đã đạt.
+> **Prompt lịch sử — không thực thi lại.** Phạm vi DateInput đã có [bằng chứng theo candidate](evidence/20261024-dateinput-unified-compact-correction.md), gồm failure ban đầu và acceptance có giới hạn về sau. Nội dung bên dưới được giữ nguyên như handoff tại thời điểm đó; các câu giao việc/nhánh PR không còn là chỉ dẫn hiện hành. Công việc mới đi qua [execution index](../plans/README.md).
 
 ---
 
