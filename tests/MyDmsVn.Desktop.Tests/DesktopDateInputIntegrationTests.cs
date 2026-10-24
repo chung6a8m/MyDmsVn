@@ -87,6 +87,13 @@ public sealed partial class GoodsReceiptControlTests
 
 public sealed class DesktopDateInputIntegrationTests
 {
+    private static void AssertDateFitsField(BootstrapDateInput input)
+    {
+        var field = input.Parent!.RectangleToScreen(input.Parent.ClientRectangle);
+        var editor = input.RectangleToScreen(input.ClientRectangle);
+        Assert.True(field.Contains(editor), "Date input must fit its field: field=" + field + "; input=" + editor);
+    }
+
     [Theory]
     [InlineData("Light")]
     [InlineData("Dark")]
@@ -101,6 +108,7 @@ public sealed class DesktopDateInputIntegrationTests
                 BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(theme == "Dark" ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
                 using var host = new SalesControlHost();
                 var input = ((SalesReceiptControl)host.Control).FromDateEditor;
+                AssertDateFitsField(input);
                 var before = host.Api.Lists.Count;
                 var driver = new NativeLookupTypingDriver(input);
                 driver.SelectRange(0, driver.Text.Length);
@@ -155,6 +163,7 @@ public sealed class DesktopDateInputIntegrationTests
                 BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(theme == "Dark" ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
                 using var host = new SalesControlHost(); host.Load();
                 var input = ((SalesReceiptControl)host.Control).SaleDateEditor;
+                AssertDateFitsField(input);
                 var original = host.Editor.SaleDate;
                 var driver = new NativeLookupTypingDriver(input);
                 driver.SelectRange(0, driver.Text.Length);
