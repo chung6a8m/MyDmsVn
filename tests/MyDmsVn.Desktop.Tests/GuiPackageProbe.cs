@@ -509,13 +509,22 @@ internal static class GuiPackageProbe
 
     private static void AssertSalesCell(AutomationElement page, string field, decimal expected)
     {
-        Wait(delegate
+        try
         {
-            var value = (ValuePattern)InlineCell(page, field).GetCurrentPattern(ValuePattern.Pattern);
-            decimal actual;
-            return decimal.TryParse(value.Current.Value, System.Globalization.NumberStyles.Number,
-                System.Globalization.CultureInfo.CurrentCulture, out actual) && actual == expected;
-        }, "Sales cell value differs: " + field);
+            Wait(delegate
+            {
+                var value = (ValuePattern)InlineCell(page, field).GetCurrentPattern(ValuePattern.Pattern);
+                decimal actual;
+                return decimal.TryParse(value.Current.Value, System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.CurrentCulture, out actual) && actual == expected;
+            }, "Sales cell value differs: " + field);
+        }
+        catch
+        {
+            Console.WriteLine("SALES_CELL_FAILURE=" + field + ";ROW=" + _salesRow);
+            Dump(page);
+            throw;
+        }
     }
 
     private static AutomationElement SalesOpenAction(AutomationElement page)
@@ -545,7 +554,10 @@ internal static class GuiPackageProbe
         foreach (var name in new[] { "Save", "Post", "Add line", "Remove line" })
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Posted Sales mutation enabled.");
         _salesRow = 2;
-        var gift = (ValuePattern)InlineCell(page, "Gift").GetCurrentPattern(ValuePattern.Pattern);
+        AutomationElement giftCell;
+        try { giftCell = InlineCell(page, "Gift"); }
+        catch { Console.WriteLine("SALES_POSTED_GIFT_FAILURE;ROW=" + _salesRow); Dump(page); throw; }
+        var gift = (ValuePattern)giftCell.GetCurrentPattern(ValuePattern.Pattern);
         if (!gift.Current.IsReadOnly) throw new InvalidOperationException("Posted gift still editable.");
         AssertSalesCell(page, "Unit price", 40m);
     }
