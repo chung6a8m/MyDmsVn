@@ -4,7 +4,7 @@
 
 ## Current plan
 
-[A0 — current context cleanup; A1 — proposed Sales UI Lab](20261024-001-a0-a1-sales-ui-lab.md) is the sole execution-status owner. Read its authorization boundary, task table and verification before acting. This index selects the plan; it does not copy task progress or authorize every phase named in a proposal.
+[A0 — current context cleanup; A1 — authorized Sales UI Lab](20261024-001-a0-a1-sales-ui-lab.md) is the sole execution-status owner. Read its A1 authorization boundary, task table and verification before acting. This index selects the plan; it does not copy task progress or authorize every phase named in a proposal.
 
 [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → selected plan → [TEST_POLICY](../TEST_POLICY.md), then the source/reference needed for the task. [TEST_STRATEGY](../TEST_STRATEGY.md) owns coverage and [tests/README](../../tests/README.md) owns commands.
 

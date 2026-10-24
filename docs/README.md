@@ -13,6 +13,7 @@
 | [Test policy](TEST_POLICY.md) | Sole execution policy; focused scope and required safeguards |
 | [Test coverage](TEST_STRATEGY.md) | Required behavior and failure boundaries |
 | [Test commands](../tests/README.md) | Direct projects, SQL ownership and interactive GUI prerequisites |
+| [Sales UI Lab runbook](development/UI_LAB.md) | Developer host, scenarios, reset and focused Lab commands |
 | [MyDmsVn.Docs](https://github.com/chung6a8m/MyDmsVn.Docs) | Cross-repository assessments, organization proposals and scoped decisions; no duplicate task status |
 
 ## Product and implementation references

@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>MyDmsVn.Desktop.UiLab</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MyDmsVn.Desktop.WinForms\MyDmsVn.Desktop.WinForms.csproj" />
+    <ProjectReference Include="..\MyDmsVn.Desktop.UiLab.Scenarios\MyDmsVn.Desktop.UiLab.Scenarios.csproj" />
+  </ItemGroup>
+</Project>

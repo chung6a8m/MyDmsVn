@@ -6,7 +6,7 @@
 
 ## Selecting commands and evidence
 
-Use the current ten net48 projects with the changed-behavior scope selected by [TEST_POLICY](../docs/TEST_POLICY.md) and the plan reached through the [execution index](../docs/plans/README.md). Safe field metadata/mapping belongs to Server.Application.Tests; workspace state/lifetime belongs to Desktop.Session.Tests where controls are unnecessary; native control composition, focus and disposal belong to Desktop.Tests. Shared controls also require their upstream owner's affected tests/targets. Select real source cases, verify nonempty discovery and inspect actual TRX; proposed class names in a plan are not runnable tests and a successful zero-test filter is not PASS.
+Use the ten baseline net48 projects plus the A1 Sales UI Lab test owner with the changed-behavior scope selected by [TEST_POLICY](../docs/TEST_POLICY.md) and the plan reached through the [execution index](../docs/plans/README.md). Safe field metadata/mapping belongs to Server.Application.Tests; workspace state/lifetime belongs to Desktop.Session.Tests where controls are unnecessary; native control composition, focus and disposal belong to Desktop.Tests. Shared controls also require their upstream owner's affected tests/targets. Select real source cases, verify nonempty discovery and inspect actual TRX; proposed class names in a plan are not runnable tests and a successful zero-test filter is not PASS.
 
 When DateInput behavior changes, use source-verified fixture/method selectors; the [historical correction plan](../docs/ui-next/20261024-dateinput-unified-compact-correction.md) records relevant anchors. `DesktopDateInputIntegrationTests.cs` contains both a partial `GoodsReceiptControlTests` class and the `DesktopDateInputIntegrationTests` class that owns the Sales date integration cases. Filtering only `FullyQualifiedName~DesktopDateInputIntegrationTests` omits the Goods cases in the same file. Select the required classes/methods explicitly and verify discovery against source before collecting runtime evidence; filenames do not define test ownership or complete coverage.
 
@@ -18,7 +18,7 @@ For documentation-only changes, run diff/link/status/encoding checks only. No fu
 
 Run test projects directly with `dotnet test` or Test Explorer. The standalone SQL framework, its projects/tests, gate and invocation manifests, and command wrappers have been removed. The local [SqlTestDatabase](MyDmsVn.Server.Infrastructure.IntegrationTests/SqlTestDatabase.cs) helper creates a fresh uniquely owned database per call. RESP-T01 pins Respawn 4.0.0 and verifies the test-only application reset profile on net48. RESP-T02 implements exclusive collection lifecycle and the fixture-mode setting; RESP-T03 adopts all five Catalog business methods in one collection with its adapter/contamination probes. RESP-T04 also adopts seven Inventory and eight Identity/Security data-only cases; reviewed lifecycle/schema/principal/trigger/contention exceptions remain fresh.
 
-All ten active test projects target **net48**:
+The ten baseline test projects and the new Sales UI Lab test project target **net48**:
 
 | Responsibility | Project under `tests/` |
 |---|---|
@@ -26,6 +26,7 @@ All ten active test projects target **net48**:
 | Architecture | `MyDmsVn.Architecture.Tests` |
 | Pure Desktop/session | `MyDmsVn.Desktop.Session.Tests` |
 | Desktop/WinForms | `MyDmsVn.Desktop.Tests` |
+| Sales UI Lab scenario/native | `MyDmsVn.Desktop.Ui.Tests` |
 | SQL foundation | `MyDmsVn.Server.Infrastructure.Foundation.Tests` |
 | SQL catalogs | `MyDmsVn.Server.Infrastructure.Catalog.Tests` |
 | SQL inventory | `MyDmsVn.Server.Infrastructure.Inventory.Tests` |
@@ -51,6 +52,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Application tests failed.' }
 ```
 
 Select a real source/discovered class or method, then review the executed cases; an empty selection is not a successful check. Pure ViewModel/session tests use their actual project. Controls/focus tests use the Desktop section below.
+
+## Sales UI Lab
+
+The [UI Lab runbook](../docs/development/UI_LAB.md) gives the small-solution locked restore, host build/open steps, six scenarios and the whole new test-project command. Run that project once for the candidate and review actual TRX rows, then use nonempty source-verified filters for affected later edits. It needs interactive Windows/STA for native cases and no SQL connection or actual Login. Historical Desktop.Tests and Session.Tests remain separate owners. In the initial A1 source delta, 0 cases are retired or moved; `NativeLookupTypingDriver` is linked after removing its call into the Goods Receipt fixture, and the new native independence case checks that adapter. Move any later case only with old → behavior → replacement evidence.
 
 ## SQL configuration
 

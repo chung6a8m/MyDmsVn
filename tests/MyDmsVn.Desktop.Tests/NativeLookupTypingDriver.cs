@@ -57,7 +57,18 @@ internal sealed class NativeLookupTypingDriver
     internal void Key(Keys key)
     {
         AssertFocused();
-        GoodsReceiptInlineEditorTests.Key(key);
+        KeyOnFocusedOwnedWindow(key);
+    }
+    internal static void KeyOnFocusedOwnedWindow(Keys key)
+    {
+        var handle = GetFocus();
+        Assert.True(handle != IntPtr.Zero, "No native focus for " + key);
+        Assert.Equal(GetCurrentThreadId(), GetWindowThreadProcessId(handle, out var process));
+        Assert.Equal(GetCurrentProcessId(), process);
+        // Posted messages traverse WinForms preprocessing for popup, Enter and Escape routing.
+        Assert.True(PostMessage(handle, 0x0100, new IntPtr((int)key), IntPtr.Zero), "No native keydown focus for " + key);
+        Assert.True(PostMessage(handle, 0x0101, new IntPtr((int)key), IntPtr.Zero), "No native keyup focus for " + key);
+        System.Windows.Forms.Application.DoEvents();
     }
     internal void Paste(string text)
     {

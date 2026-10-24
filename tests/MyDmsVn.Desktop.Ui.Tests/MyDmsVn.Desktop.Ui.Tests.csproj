@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MyDmsVn.Desktop.WinForms\MyDmsVn.Desktop.WinForms.csproj" />
+    <ProjectReference Include="..\..\samples\MyDmsVn.Desktop.UiLab.Scenarios\MyDmsVn.Desktop.UiLab.Scenarios.csproj" />
+    <ProjectReference Include="..\..\samples\MyDmsVn.Desktop.UiLab\MyDmsVn.Desktop.UiLab.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\MyDmsVn.Desktop.Tests\StaTest.cs" Link="Support\StaTest.cs" />
+    <Compile Include="..\MyDmsVn.Desktop.Tests\WinFormsTestGuard.cs" Link="Support\WinFormsTestGuard.cs" />
+    <Compile Include="..\MyDmsVn.Desktop.Tests\GuiOwnedProcess.cs" Link="Support\GuiOwnedProcess.cs" />
+    <Compile Include="..\MyDmsVn.Desktop.Tests\NativeLookupTypingDriver.cs" Link="Support\NativeLookupTypingDriver.cs" />
+  </ItemGroup>
+</Project>
