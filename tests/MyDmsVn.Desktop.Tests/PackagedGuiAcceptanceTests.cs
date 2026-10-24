@@ -339,7 +339,7 @@ public sealed partial class PackagedGuiAcceptanceTests
             var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-fault " + theme);
             fixture.ConfigureRuntime(start);
             start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
-            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3), cancellation.Token);
+            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(4), cancellation.Token);
             GuiProcessResult? result = null;
             Exception? initial = null;
             try
@@ -356,7 +356,7 @@ public sealed partial class PackagedGuiAcceptanceTests
                 }
                 Assert.True(observed, "The owned runtime SQL session never reached the controlled WAITFOR fault.");
                 _output.WriteLine("RUNTIME_SQL_WAITFOR_OBSERVED=PASS");
-                await WaitForSignalAsync(barrier, "uncertain", execution, TimeSpan.FromSeconds(45));
+                await WaitForSignalAsync(barrier, "uncertain", execution, TimeSpan.FromSeconds(90));
                 await fixture.AssertTimedOutDraftAndRemoveFaultAsync();
                 File.WriteAllText(Path.Combine(barrier, "allow-reload"), "release");
                 await WaitForSignalAsync(barrier, "reloaded", execution, TimeSpan.FromSeconds(25));

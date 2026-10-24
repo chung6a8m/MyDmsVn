@@ -1032,7 +1032,8 @@ internal static class GuiPackageProbe
         _application = otherClient;
         MainWindow = otherWindow;
         Invoke(otherPost); // This independent client still holds the original Draft version.
-        Find(otherPage, "The goods receipt is already posted.", ControlType.Text, true);
+        try { Find(otherPage, "The goods receipt is already posted.", ControlType.Text, true); }
+        catch (TimeoutException) { Dump(otherPage); throw; }
         CloseApplication(otherShell);
         otherClient.Dispose();
         _application = firstClient;
@@ -1095,7 +1096,9 @@ internal static class GuiPackageProbe
         Signal("posting");
         AwaitSignal("allow-post");
         Invoke(post);
-        Find(page, "Posting outcome unknown.", ControlType.Text, true, 45);
+        Console.WriteLine("RECEIPT_POST_INVOKE_RETURNED=PASS");
+        try { Find(page, "Posting outcome unknown.", ControlType.Text, true, 45); }
+        catch (TimeoutException) { Dump(page); throw; }
         foreach (var name in new[] { "Save", "Post", "New" })
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled)
                 throw new InvalidOperationException("Uncertain Post permits a mutation.");
