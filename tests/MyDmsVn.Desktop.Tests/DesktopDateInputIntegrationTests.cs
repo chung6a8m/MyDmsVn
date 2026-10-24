@@ -121,6 +121,74 @@ public sealed class DesktopDateInputIntegrationTests
     [Theory]
     [InlineData("Light")]
     [InlineData("Dark")]
+    public void DateInputCorrection_Sales_filter_arrows_keep_both_carets_until_apply(string theme)
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard();
+            var previous = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(
+                    theme == "Dark" ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+                using var host = new SalesControlHost();
+                var control = (SalesReceiptControl)host.Control;
+                var from = control.FromDateEditor;
+                var to = control.ToDateEditor;
+                to.ReferenceDateProvider = () => new DateTime(2026, 10, 23);
+                var before = host.Api.Lists.Count;
+
+                from.Text = "12/10/2025";
+                var fromKeys = new NativeLookupTypingDriver(from);
+                fromKeys.SelectRange(4, 0);
+                fromKeys.Key(Keys.Up);
+                Assert.Equal("12/11/2025", from.PendingText);
+                Assert.Equal(4, fromKeys.SelectionStart);
+                Assert.Equal(0, fromKeys.SelectionLength);
+                fromKeys.Key(Keys.Up);
+                Assert.Equal("12/12/2025", from.PendingText);
+                Assert.Equal(4, fromKeys.SelectionStart);
+                Assert.Equal(0, fromKeys.SelectionLength);
+                fromKeys.SelectRange(8, 0);
+                fromKeys.Key(Keys.Up);
+                Assert.Equal("12/12/2026", from.PendingText);
+                Assert.Equal(8, fromKeys.SelectionStart);
+                fromKeys.Key(Keys.Down);
+                Assert.Equal("12/12/2025", from.PendingText);
+                Assert.Equal(8, fromKeys.SelectionStart);
+
+                to.Text = "5/1";
+                var toKeys = new NativeLookupTypingDriver(to);
+                toKeys.SelectRange(3, 0);
+                toKeys.Key(Keys.Up);
+                Assert.Equal("05/02/2026", to.PendingText);
+                Assert.Equal(5, toKeys.SelectionStart);
+                Assert.Equal(0, toKeys.SelectionLength);
+                toKeys.Key(Keys.Up);
+                Assert.Equal("05/03/2026", to.PendingText);
+                Assert.Equal(5, toKeys.SelectionStart);
+                Assert.Equal(0, toKeys.SelectionLength);
+
+                host.Call("ApplyState");
+                Assert.Equal(5, toKeys.SelectionStart);
+                var fromAfterProjection = new NativeLookupTypingDriver(from);
+                Assert.Equal(8, fromAfterProjection.SelectionStart);
+                Assert.Null(from.Value);
+                Assert.Null(to.Value);
+                Assert.Equal(before, host.Api.Lists.Count);
+
+                host.CallTask("ApplyFiltersAsync");
+                Assert.Equal(new DateTime(2025, 12, 12), host.Api.Lists.Last().FromDate);
+                Assert.Equal(new DateTime(2026, 3, 5), host.Api.Lists.Last().ToDate);
+                Assert.Empty(guard.Exceptions);
+            }
+            finally { BootstrapThemeManager.CurrentTheme = previous; }
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Theory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
     public void Sales_nullable_filter_native_characters_keep_query_closed_until_apply(string theme)
     {
         StaTest.Run(_ =>

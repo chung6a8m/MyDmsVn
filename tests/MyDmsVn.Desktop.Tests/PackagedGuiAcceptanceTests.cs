@@ -159,6 +159,33 @@ public sealed partial class PackagedGuiAcceptanceTests
     [InlineData("Light")]
     [InlineData("Dark")]
     [Trait("Category", "GuiSql")]
+    public async Task DateInputCorrection_Actual_login_keeps_native_date_segments_and_compact_trigger(string theme)
+    {
+        var package = Candidate();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") +
+                "\" dateinput-audit " + theme);
+            fixture.ConfigureRuntime(start);
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("DATEINPUT_ACTUAL_LOGIN=PASS", result.StandardOutput);
+            Assert.Contains("DATEINPUT_SALES_FILTERS_NATIVE=PASS", result.StandardOutput);
+            Assert.Contains("DATEINPUT_SALES_REQUIRED_NATIVE=PASS", result.StandardOutput);
+            Assert.Contains("DATEINPUT_GOODS_REQUIRED_NATIVE=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.VerifySeparationAsync();
+            await fixture.AssertNoInventoryAsync();
+        });
+    }
+
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
     public async Task Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes(string theme)
     {
         var package = Candidate();
