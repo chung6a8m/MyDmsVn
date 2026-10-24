@@ -63,7 +63,7 @@ namespace MyDmsVn.Desktop.Tests
         [Theory]
         [InlineData(BootstrapThemeMode.Light)]
         [InlineData(BootstrapThemeMode.Dark)]
-        public void Numeric_paste_command_applies_goods_quantity_and_cost_without_api_call(BootstrapThemeMode mode)
+        public void Numeric_paste_command_applies_goods_quantity_and_cost_without_write_api_call(BootstrapThemeMode mode)
         {
             StaTest.Run(token =>
             {
@@ -86,6 +86,9 @@ namespace MyDmsVn.Desktop.Tests
                     Assert.True(adapter.TryPasteNumeric("2\t7"), adapter.EditError);
                     Assert.Equal(2m, fixture.Editor.Lines[0].Quantity);
                     Assert.Equal(7m, fixture.Editor.Lines[0].UnitCost);
+                    Assert.Equal(0, fixture.Api.CreateCalls);
+                    Assert.Null(fixture.Api.LastUpdate);
+                    Assert.Null(fixture.Api.LastPost);
                     Console.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
                     Assert.Empty(guard.Exceptions);
                 }
