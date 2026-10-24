@@ -12,6 +12,36 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed partial class GoodsReceiptControlTests
 {
+    [Fact]
+    public void DateInputCorrection_Goods_required_date_step_waits_for_admitted_save()
+        => Integrated((fixture, control) =>
+        {
+            var input = control.ReceiptDateEditor;
+            input.Text = "31/11/2026";
+            control.PostButton.PerformClick();
+            control.LastOperation.GetAwaiter().GetResult();
+            Assert.Null(fixture.Api.LastPost);
+            Assert.Equal(BootstrapValidationState.Invalid, input.ValidationState);
+
+            var original = fixture.Editor.ReceiptDate;
+            input.Text = "12/10/2026";
+            var driver = new NativeLookupTypingDriver(input);
+            driver.SelectRange(4, 0);
+            driver.Key(Keys.Up);
+            Assert.Equal("12/11/2026", input.PendingText);
+            Assert.Equal(4, driver.SelectionStart);
+            Assert.Equal(0, driver.SelectionLength);
+            Assert.Equal(original, fixture.Editor.ReceiptDate);
+            Assert.Null(fixture.Api.LastUpdate);
+            typeof(GoodsReceiptControl).GetMethod("ApplyState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(control, null);
+            Assert.Equal(4, driver.SelectionStart);
+
+            control.SaveButton.PerformClick();
+            control.LastOperation.GetAwaiter().GetResult();
+            Assert.Equal(new DateTime(2026, 11, 12), fixture.Api.LastUpdate!.ReceiptDate);
+            Assert.Equal(BootstrapValidationState.None, input.ValidationState);
+        });
+
     [Theory]
     [InlineData("Light")]
     [InlineData("Dark")]
@@ -111,6 +141,39 @@ public sealed partial class GoodsReceiptControlTests
 
 public sealed class DesktopDateInputIntegrationTests
 {
+    [Fact]
+    public void DateInputCorrection_Sales_required_date_step_waits_for_admitted_save()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard();
+            using var host = new SalesControlHost(); host.Load();
+            var input = ((SalesReceiptControl)host.Control).SaleDateEditor;
+            input.Text = "31/11/2026";
+            host.CallTask("PostAsync");
+            Assert.Empty(host.Api.Posts);
+            Assert.Equal(BootstrapValidationState.Invalid, input.ValidationState);
+
+            var original = host.Editor.SaleDate;
+            input.Text = "12/10/2026";
+            var driver = new NativeLookupTypingDriver(input);
+            driver.SelectRange(4, 0);
+            driver.Key(Keys.Up);
+            Assert.Equal("12/11/2026", input.PendingText);
+            Assert.Equal(4, driver.SelectionStart);
+            Assert.Equal(0, driver.SelectionLength);
+            Assert.Equal(original, host.Editor.SaleDate);
+            Assert.Empty(host.Api.Updates);
+            host.Call("ApplyState");
+            Assert.Equal(4, driver.SelectionStart);
+
+            host.CallTask("SaveAsync");
+            Assert.Equal(new DateTime(2026, 11, 12), host.Api.Updates.Single().SaleDate);
+            Assert.Equal(BootstrapValidationState.None, input.ValidationState);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
     private static void AssertDateFitsField(BootstrapDateInput input)
     {
         var field = input.Parent!.RectangleToScreen(input.Parent.ClientRectangle);

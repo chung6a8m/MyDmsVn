@@ -504,6 +504,7 @@ internal static class GuiPackageProbe
         _detail = name + " trigger cancel";
         ClickOwnedDateTrigger(trigger);
         Wait(delegate { return NativeDefaultAction(trigger) == "Open calendar"; }, "Date popup did not close from the embedded trigger.");
+        Wait(delegate { return editor.Current.HasKeyboardFocus; }, "Pointer calendar cancel did not restore native date focus.");
         if (DateValue(editor) != pending)
             throw new InvalidOperationException("Calendar dismissal changed pending date text.");
 
@@ -513,6 +514,7 @@ internal static class GuiPackageProbe
         Wait(delegate { return NativeDefaultAction(trigger) == "Close calendar"; }, "Date popup did not open from F4.");
         ClickOwnedDateTrigger(trigger);
         Wait(delegate { return NativeDefaultAction(trigger) == "Open calendar"; }, "F4 date popup did not cancel.");
+        Wait(delegate { return editor.Current.HasKeyboardFocus; }, "F4 calendar cancel did not restore native date focus.");
         if (DateValue(editor) != pending)
             throw new InvalidOperationException("F4 calendar dismissal changed pending date text.");
 
