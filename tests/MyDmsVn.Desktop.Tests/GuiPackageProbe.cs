@@ -477,41 +477,49 @@ internal static class GuiPackageProbe
     private static void AuditPackagedDateField(AutomationElement page, string name, string raw,
         int caret, string first, string second, string accepted)
     {
-        var editor = InputEditor(page, name);
-        var original = InputValue(page, name);
+        var editor = DateNativeEditor(page, name);
+        var original = DateValue(editor);
         if (accepted != null && original != accepted)
             throw new InvalidOperationException("Nullable date did not begin empty.");
         var trigger = DateTrigger(page, name);
         AssertDateGeometry(page, name, editor, trigger);
-        SetInput(page, name, raw, false); // Setup only; subsequent steps use owned native keys.
+        _detail = name + " setup";
+        ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).SetValue(raw); // Setup only; subsequent steps use owned native keys.
+        Wait(delegate { return DateValue(editor) == raw; }, "Date setup did not reach the native editor.");
+        _detail = name + " step 1";
         FocusOwnedEditor(editor, name);
         SetOwnedSelection(editor, caret);
         SendOwnedKey(editor, 0x26); // VK_UP
         AssertOwnedDateStep(editor, name, first, caret);
+        _detail = name + " step 2";
         SendOwnedKey(editor, 0x26);
         AssertOwnedDateStep(editor, name, second, caret);
 
-        var pending = InputValue(page, name);
+        _detail = name + " trigger click";
+        var pending = DateValue(editor);
         if (NativeDefaultAction(trigger) != "Open calendar")
             throw new InvalidOperationException("Date trigger did not begin collapsed.");
         ClickOwnedDateTrigger(trigger);
         Wait(delegate { return NativeDefaultAction(trigger) == "Close calendar"; }, "Date popup did not open from the embedded trigger.");
+        _detail = name + " trigger cancel";
         ClickOwnedDateTrigger(trigger);
         Wait(delegate { return NativeDefaultAction(trigger) == "Open calendar"; }, "Date popup did not close from the embedded trigger.");
-        if (InputValue(page, name) != pending)
+        if (DateValue(editor) != pending)
             throw new InvalidOperationException("Calendar dismissal changed pending date text.");
 
+        _detail = name + " F4";
         FocusOwnedEditor(editor, name);
         SendOwnedKey(editor, 0x73); // VK_F4 opens the same popup from the native editor.
         Wait(delegate { return NativeDefaultAction(trigger) == "Close calendar"; }, "Date popup did not open from F4.");
         ClickOwnedDateTrigger(trigger);
         Wait(delegate { return NativeDefaultAction(trigger) == "Open calendar"; }, "F4 date popup did not cancel.");
-        if (InputValue(page, name) != pending)
+        if (DateValue(editor) != pending)
             throw new InvalidOperationException("F4 calendar dismissal changed pending date text.");
 
+        _detail = name + " escape";
         FocusOwnedEditor(editor, name);
         SendOwnedKey(editor, 0x1B); // VK_ESCAPE cancels the pending text before leaving the page.
-        Wait(delegate { return InputValue(page, name) == original; }, "Date cancel did not restore the accepted display.");
+        Wait(delegate { return DateValue(editor) == original; }, "Date cancel did not restore the accepted display.");
         Console.WriteLine("DATEINPUT_FIELD=" + name + ";NATIVE_STEPS=2;TRIGGER_CANCEL=PASS");
     }
 
@@ -541,9 +549,44 @@ internal static class GuiPackageProbe
         }, "Native date caret could not be positioned.");
     }
 
+    private static string DateValue(AutomationElement editor)
+    {
+        return ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).Current.Value;
+    }
+
+    private static AutomationElement DateNativeEditor(AutomationElement page, string name)
+    {
+        var field = new IntPtr(DateField(page, name).Current.NativeWindowHandle);
+        uint fieldProcess;
+        GetWindowThreadProcessId(field, out fieldProcess);
+        if (field == IntPtr.Zero || fieldProcess != _application.Id)
+            throw new InvalidOperationException("Date field is not an owned HWND.");
+        var edits = new System.Collections.Generic.List<IntPtr>();
+        EnumChildWindows(field, delegate(IntPtr window, IntPtr ignored)
+        {
+            var className = new System.Text.StringBuilder(256);
+            GetClassName(window, className, className.Capacity);
+            uint process;
+            GetWindowThreadProcessId(window, out process);
+            if (process == _application.Id && className.ToString().StartsWith("WindowsForms10.EDIT.", StringComparison.Ordinal))
+                edits.Add(window);
+            return true;
+        }, IntPtr.Zero);
+        if (edits.Count != 1) throw new InvalidOperationException("Date field did not own exactly one native editor.");
+        var editor = AutomationElement.FromHandle(edits[0]);
+        if (editor.Current.ControlType != ControlType.Edit)
+            throw new InvalidOperationException("Date native editor has an unexpected UIA type.");
+        return editor;
+    }
+
+    private static AutomationElement DateField(AutomationElement page, string name)
+    {
+        return Find(page, name, ControlType.Edit, false);
+    }
+
     private static AutomationElement DateTrigger(AutomationElement page, string name)
     {
-        var field = Named(page, name);
+        var field = DateField(page, name);
         var triggers = field.FindAll(TreeScope.Descendants,
             new PropertyCondition(AutomationElement.NameProperty, "Open calendar"));
         if (triggers.Count != 1) throw new InvalidOperationException("Date field must own one calendar trigger.");
@@ -568,12 +611,19 @@ internal static class GuiPackageProbe
     private static void AssertDateGeometry(AutomationElement page, string name,
         AutomationElement editor, AutomationElement trigger)
     {
-        var outer = Named(page, name).Current.BoundingRectangle;
+        var outer = DateField(page, name).Current.BoundingRectangle;
         var edit = editor.Current.BoundingRectangle;
         var action = trigger.Current.BoundingRectangle;
         var windowDpi = GetDpiForWindow(MainWindow);
         if (windowDpi == 0) throw new InvalidOperationException("Date window DPI is unavailable.");
         var scale = windowDpi / 96.0;
+        Console.WriteLine("DATEINPUT_GEOMETRY_OBSERVED=" + name + ";WINDOW_DPI=" + windowDpi +
+            ";FIELD=" + (int)outer.Width + "x" + (int)outer.Height +
+            ";TEXT=" + (int)edit.Width + "x" + (int)edit.Height +
+            ";TRIGGER=" + (int)action.Width + "x" + (int)action.Height +
+            ";TEXT_RIGHT_BEFORE_TRIGGER=" + (edit.Right <= action.Left) +
+            ";TRIGGER_WITHIN_FIELD=" + (action.Left >= outer.Left && action.Right <= outer.Right &&
+                action.Top >= outer.Top && action.Bottom <= outer.Bottom));
         if (outer.Height < 28 * scale || outer.Height > 60 * scale ||
             edit.Width < 70 * scale || edit.Right > action.Left ||
             action.Left < outer.Left || action.Right > outer.Right ||
