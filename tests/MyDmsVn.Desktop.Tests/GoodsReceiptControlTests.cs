@@ -89,6 +89,12 @@ namespace MyDmsVn.Desktop.Tests
                     Assert.Equal(0, fixture.Api.CreateCalls);
                     Assert.Null(fixture.Api.LastUpdate);
                     Assert.Null(fixture.Api.LastPost);
+                    var revision = fixture.Editor.EditRevision;
+                    grid.Selection.ResetSelection(false);
+                    grid.Selection.SelectCell(new SourceGrid.Position(1, 4), true); // Read-only total.
+                    Assert.False(adapter.TryPasteNumeric("9"));
+                    Assert.Equal(revision, fixture.Editor.EditRevision);
+                    Assert.Equal(7m, fixture.Editor.Lines[0].UnitCost);
                     Console.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
                     Assert.Empty(guard.Exceptions);
                 }

@@ -332,7 +332,8 @@ internal sealed class GoodsReceiptLinesGridAdapter : IDisposable
         session.Context.Position.Row > 0 && session.Context.Position.Row < _grid.RowsCount &&
         ReferenceEquals(_grid[session.Context.Position.Row, session.Column], session.Context.Cell);
 
-    private static string FieldForColumn(int column) => column == 1 ? "productId" : column == 2 ? "quantity" : "unitCost";
+    private static string FieldForColumn(int column) => column == 1 ? "productId" : column == 2 ? "quantity" :
+        column == 3 ? "unitCost" : "unknown";
 
     private void Begin(LineController controller, CellContext context, CancelEventArgs e)
     {
