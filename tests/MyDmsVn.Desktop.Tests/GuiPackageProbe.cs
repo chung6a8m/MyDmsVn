@@ -804,7 +804,8 @@ internal static class GuiPackageProbe
             AwaitSignal("allow-denied-save");
             _stage = "receipt-server-direct-deny";
             Invoke(Find(page, "Save", ControlType.Button, false));
-            Find(page, "The operation is not permitted.", ControlType.Text, true);
+            try { Find(page, "The operation is not permitted.", ControlType.Text, true); }
+            catch (TimeoutException) { Dump(page); throw; }
             if (InputValue(page, "Note") != "GUI edited" || InputValue(page, "Product") != committedProduct ||
                 decimal.Parse(InputValue(page, "Quantity"), System.Globalization.CultureInfo.CurrentCulture) != 3.125m ||
                 decimal.Parse(InputValue(page, "Unit cost"), System.Globalization.CultureInfo.CurrentCulture) != 4m)
