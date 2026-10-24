@@ -1095,7 +1095,8 @@ internal static class GuiPackageProbe
         Signal("posting");
         AwaitSignal("allow-post");
         Invoke(post);
-        Find(page, "Posting outcome unknown.", ControlType.Pane, true, 45);
+        try { Find(page, "Posting outcome unknown.", ControlType.Pane, true, 45); }
+        catch (TimeoutException) { Dump(page); throw; }
         foreach (var name in new[] { "Save", "Post", "New" })
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled)
                 throw new InvalidOperationException("Uncertain Post permits a mutation.");
