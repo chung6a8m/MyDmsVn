@@ -47,7 +47,7 @@ Do not edit vendored source without committing the corresponding owning reposito
 
 ## UIN-D01 — Preserve caret and selection through segment steps
 
-**State:** NOT STARTED. **Depends on:** approved design. **Acceptance:** UIN-DA01.
+**State:** IMPLEMENTED; bounded verification recorded in [candidate evidence](evidence/20261024-dateinput-unified-compact-correction.md). **Depends on:** approved design. **Acceptance:** UIN-DA01.
 
 **Interfaces:** Consume existing `OnEntryKeyDown(object? sender, KeyEventArgs e)`, `CurrentSegment()`, `SetCandidate(string candidate, bool pending)`, native `SelectionStart`/`SelectionLength` and `QuickDateParser.Step`. Produce the same public DateInput API with logical selection restoration before `PendingTextChanged`; do not invent a new application binding contract.
 
@@ -63,7 +63,7 @@ Do not edit vendored source without committing the corresponding owning reposito
 
 ## UIN-D02 — Implement the Unified Compact visual
 
-**State:** NOT STARTED. **Depends on:** D01. **Acceptance:** UIN-DA02.
+**State:** IMPLEMENTED; native125 acceptance pending. **Depends on:** D01. **Acceptance:** UIN-DA02.
 
 **Interfaces:** Preserve `Text`, `PendingText`, `Value`, `Profile`, `ReadOnly`, `ValidationState`, `BeginEditSession`, `ProjectAcceptedValue`, `TryParsePending`, `TryCommitPending`, `ShowCalendar` and existing events. Add only a justified internal composition/rendering seam if required. An icon-only mode is proposed behavior; it is not a current public property.
 
@@ -78,7 +78,7 @@ Do not edit vendored source without committing the corresponding owning reposito
 
 ## UIN-D03 — Pin, integrate and verify the running candidate
 
-**State:** NOT STARTED. **Depends on:** D01/D02. **Acceptance:** UIN-DA03/UIN-DA04.
+**State:** ACTIVE; final pins, hosted and native100 checks recorded; native125 and Owner visual disposition pending. **Depends on:** D01/D02. **Acceptance:** UIN-DA03/UIN-DA04.
 
 **Interfaces:** Consume the reviewed, pushed UI commit; BSG produces a gitlink update; the application consumes the resulting pushed BSG commit. Required header dates and nullable From/To profiles keep their current app-owned admission semantics.
 
