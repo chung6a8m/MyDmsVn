@@ -1413,10 +1413,10 @@ internal static class GuiPackageProbe
     private static bool TrySalesCell(AutomationElement page, string field, out AutomationElement cell)
     {
         try { cell = InlineCell(page, field); return true; }
-        catch (InvalidOperationException error) when (
-            error.Message.StartsWith("Receipt line field absent:", StringComparison.Ordinal) ||
-            error.Message == "Receipt line table absent.")
+        catch (InvalidOperationException error)
         {
+            if (!error.Message.StartsWith("Receipt line field absent:", StringComparison.Ordinal) &&
+                error.Message != "Receipt line table absent.") throw;
             cell = null;
             return false;
         }
