@@ -106,6 +106,23 @@ internal static class GuiPackageProbe
                     throw new InvalidOperationException("Startup application did not exit safely.");
                 Console.WriteLine("STARTUP_SAFE_ERROR=PASS");
             }
+            else if (args[1] == "uin-t13-attended")
+            {
+                _stage = "uin-t13-attended-setup";
+                var shell = Login();
+                Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+                var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+                Invoke(Find(page, "New", ControlType.Button, false));
+                Find(page, "Note", ControlType.Edit, false);
+                var barrier = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER");
+                File.WriteAllText(Path.Combine(barrier, "ready"), "Goods draft ready for human observation.");
+                Console.WriteLine("UIN_T13_ATTENDED_READY=PASS");
+                _stage = "uin-t13-attended-human";
+                Wait(delegate { return File.Exists(Path.Combine(barrier, "complete")); },
+                    "UI Next T13 attended walkthrough was not completed within its owned budget.", 1200);
+                CloseApplication(shell);
+                Console.WriteLine("UIN_T13_ATTENDED_DRAINED=PASS");
+            }
             else if (args[1] == "bcf-lookup-attended")
             {
                 _stage = "bcf-attended-setup";

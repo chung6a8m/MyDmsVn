@@ -39,6 +39,15 @@ public sealed class BcfAttendedLookupFactAttribute : FactAttribute
     }
 }
 
+public sealed class UinT13AttendedFactAttribute : FactAttribute
+{
+    public UinT13AttendedFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MYDMSVN_UIN_T13_ATTENDED_DIRECTORY")))
+            Skip = "ATTENDED ONLY: requires an owned UI Next T13 walkthrough directory.";
+    }
+}
+
 public sealed partial class PackagedGuiAcceptanceTests
 {
     private readonly ITestOutputHelper _output;
@@ -48,6 +57,34 @@ public sealed partial class PackagedGuiAcceptanceTests
         _output.WriteLine("TESTHOST_BITNESS=" + (IntPtr.Size * 8));
         Assert.Equal(4, IntPtr.Size);
         Assert.True(Environment.Is64BitOperatingSystem);
+    }
+
+    [UinT13AttendedFact]
+    [Trait("Category", "GuiSql")]
+    public async Task Uin_t13_attended_package_walkthrough_keeps_human_observation_separate()
+    {
+        var package = Candidate();
+        var barrier = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_UIN_T13_ATTENDED_DIRECTORY")!);
+        Assert.True(Directory.Exists(barrier));
+        Assert.Empty(Directory.GetFileSystemEntries(barrier));
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            await fixture.SeedReceiptWriterAsync();
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" uin-t13-attended");
+            fixture.ConfigureRuntime(start);
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
+            var result = await GuiOwnedProcess.RunAttendedAsync(start, TimeSpan.FromMinutes(22));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.CleanupVerified);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + result.StandardError);
+            Assert.Contains("UIN_T13_ATTENDED_READY=PASS", result.StandardOutput);
+            Assert.Contains("UIN_T13_ATTENDED_DRAINED=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertNoInventoryAsync();
+        });
+        foreach (var name in new[] { "ready", "complete" }) File.Delete(Path.Combine(barrier, name));
+        Directory.Delete(barrier);
     }
 
     [BcfAttendedLookupFact]
