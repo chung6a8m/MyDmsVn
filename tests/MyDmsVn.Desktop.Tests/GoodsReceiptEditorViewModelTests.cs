@@ -12,7 +12,7 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
 {
-    public sealed class GoodsReceiptEditorViewModelTests
+    public sealed partial class GoodsReceiptEditorViewModelTests
     {
         [Fact]
         public async Task Save_for_close_keeps_confirmed_write_separate_from_failed_refresh()

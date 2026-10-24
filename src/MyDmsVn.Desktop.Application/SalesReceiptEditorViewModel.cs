@@ -28,6 +28,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     private long _document;
     private Guid _editorIdentity = Guid.NewGuid();
     private long _editRevision;
+    private bool _mutatingDraft;
     private WorkspaceSaveStatus _lastSaveStatus = WorkspaceSaveStatus.CanceledBeforeMutation;
     private long _lastSubmittedRevision;
     private bool _disposed;
@@ -69,11 +70,11 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     public bool CustomerIsActive { get; private set; } = true;
     public bool WarehouseIsActive { get; private set; } = true;
     public bool EmployeeIsActive { get; private set; } = true;
-    public DateTime SaleDate { get => _saleDate; set { if (CanEdit && SetProperty(ref _saleDate, value.Date)) Dirty(); } }
-    public int CustomerId { get => _customerId; set { if (CanEdit && _customerId != value) { _customerId = value; CustomerDisplayName = null; CustomerIsActive = true; Dirty(); } } }
-    public int WarehouseId { get => _warehouseId; set { if (CanEdit && _warehouseId != value) { _warehouseId = value; WarehouseDisplayName = null; WarehouseIsActive = true; Dirty(); } } }
-    public int EmployeeId { get => _employeeId; set { if (CanEdit && _employeeId != value) { _employeeId = value; EmployeeDisplayName = null; EmployeeIsActive = true; Dirty(); } } }
-    public string? Note { get => _note; set { if (CanEdit && SetProperty(ref _note, value)) Dirty(); } }
+    public DateTime SaleDate { get => _saleDate; set { if (CanEdit && _saleDate != value.Date) { AdvanceDraftRevision(); _saleDate = value.Date; OnPropertyChanged(); Dirty(revisionAdvanced: true); } } }
+    public int CustomerId { get => _customerId; set { if (CanEdit && _customerId != value) { AdvanceDraftRevision(); _customerId = value; CustomerDisplayName = null; CustomerIsActive = true; Dirty(revisionAdvanced: true); } } }
+    public int WarehouseId { get => _warehouseId; set { if (CanEdit && _warehouseId != value) { AdvanceDraftRevision(); _warehouseId = value; WarehouseDisplayName = null; WarehouseIsActive = true; Dirty(revisionAdvanced: true); } } }
+    public int EmployeeId { get => _employeeId; set { if (CanEdit && _employeeId != value) { AdvanceDraftRevision(); _employeeId = value; EmployeeDisplayName = null; EmployeeIsActive = true; Dirty(revisionAdvanced: true); } } }
+    public string? Note { get => _note; set { if (CanEdit && _note != value) { AdvanceDraftRevision(); _note = value; OnPropertyChanged(); Dirty(revisionAdvanced: true); } } }
     public bool IsDirty { get; private set; }
     public Guid EditorIdentity => _editorIdentity;
     public long EditRevision => _editRevision;
@@ -84,7 +85,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     public bool RequiresPostOutcomeReload { get; private set; }
     private bool CanUseDraft => SessionCurrent && _read && !_denied && !IsBusy && Status == "Draft" &&
         !RequiresCreateOutcomeReview && !RequiresPostOutcomeReload;
-    public bool CanEdit => CanUseDraft && _write;
+    public bool CanEdit => CanUseDraft && _write && !_mutatingDraft;
     private bool CanCommand(SalesCommandIntent intent) => CanUseDraft && (intent == SalesCommandIntent.Save ? _write : _post);
     public decimal? TotalAmount
     {
@@ -109,19 +110,19 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
     {
         if (!CanEdit) return false;
         if (_customerId == id && CustomerDisplayName == displayName && CustomerIsActive == isActive) return true;
-        _customerId = id; CustomerDisplayName = displayName; CustomerIsActive = isActive; Dirty(); return true;
+        AdvanceDraftRevision(); _customerId = id; CustomerDisplayName = displayName; CustomerIsActive = isActive; Dirty(revisionAdvanced: true); return true;
     }
     public bool SetWarehouse(int id, string? displayName, bool isActive)
     {
         if (!CanEdit) return false;
         if (_warehouseId == id && WarehouseDisplayName == displayName && WarehouseIsActive == isActive) return true;
-        _warehouseId = id; WarehouseDisplayName = displayName; WarehouseIsActive = isActive; Dirty(); return true;
+        AdvanceDraftRevision(); _warehouseId = id; WarehouseDisplayName = displayName; WarehouseIsActive = isActive; Dirty(revisionAdvanced: true); return true;
     }
     public bool SetEmployee(int id, string? displayName, bool isActive)
     {
         if (!CanEdit) return false;
         if (_employeeId == id && EmployeeDisplayName == displayName && EmployeeIsActive == isActive) return true;
-        _employeeId = id; EmployeeDisplayName = displayName; EmployeeIsActive = isActive; Dirty(); return true;
+        AdvanceDraftRevision(); _employeeId = id; EmployeeDisplayName = displayName; EmployeeIsActive = isActive; Dirty(revisionAdvanced: true); return true;
     }
 
     public void SetAccess(bool read, bool write, bool post)
@@ -139,24 +140,25 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         lock (_sync)
         {
             if (!CanEdit || _lines.Count >= SalesContractLimits.MaximumLines) return null;
-            var row = CreateRow(); _lines.Add(row); SelectedLine = row; Dirty(); return row;
+            var row = CreateRow(); AdvanceDraftRevision(); _lines.Add(row); SelectedLine = row; Dirty(revisionAdvanced: true); return row;
         }
     }
     private SalesReceiptLineViewModel CreateRow()
     {
         SalesReceiptLineViewModel? row = null;
         row = new SalesReceiptLineViewModel(() => CanEdit && _lines.Contains(row!),
-            field => Dirty(row, field), _calculator);
+            AdvanceDraftRevision, field => Dirty(row, field, revisionAdvanced: true), _calculator);
         return row;
     }
     public bool RemoveLine(SalesReceiptLineViewModel line)
     {
         lock (_sync)
         {
-            if (!CanEdit || !_lines.Remove(line)) return false;
+            if (!CanEdit || !_lines.Contains(line)) return false;
+            AdvanceDraftRevision(); _lines.Remove(line);
             SetValidationIssues(ValidationIssues.Where(issue => !ReferenceEquals(issue.Line, line)).ToArray());
             if (ReferenceEquals(SelectedLine, line)) SelectedLine = null;
-            Dirty(); return true;
+            Dirty(revisionAdvanced: true); return true;
         }
     }
     public bool MoveLine(SalesReceiptLineViewModel line, int index)
@@ -164,7 +166,7 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         lock (_sync)
         {
             if (!CanEdit || !_lines.Contains(line) || index < 0 || index >= _lines.Count) return false;
-            _lines.Move(_lines.IndexOf(line), index); Dirty(); return true;
+            AdvanceDraftRevision(); _lines.Move(_lines.IndexOf(line), index); Dirty(revisionAdvanced: true); return true;
         }
     }
     public void SelectLine(SalesReceiptLineViewModel? line)
@@ -447,12 +449,94 @@ public sealed class SalesReceiptEditorViewModel : ObservableObject, IDisposable
         foreach (var row in rows) row.Notify();
         Notify();
     }
-    private void Dirty(SalesReceiptLineViewModel? line = null, string? field = null)
+    public NumericDraftSnapshot<SalesReceiptLineViewModel> CaptureNumericDraft()
+    {
+        lock (_sync) return new NumericDraftSnapshot<SalesReceiptLineViewModel>(
+            _editorIdentity, _document, _editRevision, _lines.ToArray());
+    }
+
+    public bool TryApplyNumericPatch(NumericDraftPatch<SalesReceiptLineViewModel> patch, out string error)
+    {
+        if (patch == null) throw new ArgumentNullException(nameof(patch));
+        lock (_sync)
+        {
+            error = "The numeric draft changed; select the cells again.";
+            if (!CanEdit || _mutatingDraft || patch.Snapshot.EditorIdentity != _editorIdentity ||
+                patch.Snapshot.DocumentGeneration != _document || patch.Snapshot.Revision != _editRevision ||
+                patch.Snapshot.Lines.Count != _lines.Count ||
+                patch.Snapshot.Lines.Where((line, index) => !ReferenceEquals(line, _lines[index])).Any() ||
+                patch.Changes.Count == 0) return false;
+
+            var proposed = new Dictionary<SalesReceiptLineViewModel, (decimal Quantity, decimal Price)>();
+            var changed = new Dictionary<SalesReceiptLineViewModel, (bool Quantity, bool Price)>();
+            foreach (var line in _lines) proposed.Add(line, (line.Quantity, line.UnitPrice));
+            var seen = new HashSet<(SalesReceiptLineViewModel Line, NumericDraftField Field)>();
+            foreach (var change in patch.Changes)
+            {
+                if (!proposed.TryGetValue(change.Line, out var values) || !seen.Add((change.Line, change.Field)) ||
+                    decimal.Round(change.Value, GoodsReceiptContractLimits.DecimalPlaces) != change.Value)
+                { error = "The numeric patch contains an unavailable, duplicate or over-scale cell."; return false; }
+                if (change.Field == NumericDraftField.Quantity)
+                {
+                    if (change.Value <= 0m || change.Value > SalesContractLimits.MaximumQuantity)
+                    { error = "Quantity is outside the receipt bounds."; return false; }
+                    values.Quantity = change.Value;
+                }
+                else if (change.Field == NumericDraftField.UnitPrice)
+                {
+                    if (change.Value < 0m || change.Value > SalesContractLimits.MaximumUnitPrice)
+                    { error = "Unit price is outside the receipt bounds."; return false; }
+                    values.Price = change.Value;
+                }
+                else { error = "This field does not belong to a sale."; return false; }
+                proposed[change.Line] = values;
+            }
+            try
+            {
+                _calculator.SumAmounts(_lines.Select(line =>
+                {
+                    var values = proposed[line];
+                    return _calculator.CalculateRevenue(values.Quantity, values.Price, line.IsGift);
+                }));
+            }
+            catch (Exception exception) when (exception is ArgumentException || exception is OverflowException)
+            { error = "The numeric patch would exceed the receipt amount bounds."; return false; }
+
+            foreach (var line in _lines)
+            {
+                var values = proposed[line];
+                if (line.Quantity != values.Quantity || line.UnitPrice != values.Price)
+                    changed.Add(line, (line.Quantity != values.Quantity, line.UnitPrice != values.Price));
+            }
+            if (changed.Count == 0) { error = string.Empty; return true; }
+            _mutatingDraft = true;
+            try
+            {
+                AdvanceDraftRevision();
+                foreach (var item in changed)
+                {
+                    var values = proposed[item.Key];
+                    item.Key.ApplyNumericSilently(values.Quantity, values.Price);
+                }
+                Error = null;
+                SetValidationIssues(ValidationIssues.Where(issue => issue.Line == null || !changed.ContainsKey(issue.Line)).ToArray());
+                foreach (var item in changed) item.Key.NotifyNumeric(item.Value.Quantity, item.Value.Price);
+            }
+            finally { _mutatingDraft = false; }
+            Notify();
+            error = string.Empty;
+            return true;
+        }
+    }
+
+    private void AdvanceDraftRevision() { ++_editRevision; IsDirty = true; }
+    private void Dirty(SalesReceiptLineViewModel? line = null, string? field = null, bool revisionAdvanced = false)
     {
         if (line != null)
             SetValidationIssues(ValidationIssues.Where(issue => !ReferenceEquals(issue.Line, line) ||
                 !string.Equals(issue.Field, field, StringComparison.Ordinal)).ToArray());
-        ++_editRevision; IsDirty = true; Error = null; Notify();
+        if (!revisionAdvanced) AdvanceDraftRevision();
+        Error = null; Notify();
     }
     private Operation Begin(CancellationToken token, int busy)
     {

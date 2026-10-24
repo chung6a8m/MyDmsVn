@@ -9,7 +9,7 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 
-public sealed class SalesReceiptEditorViewModelTests
+public sealed partial class SalesReceiptEditorViewModelTests
 {
     [Fact]
     public async Task Save_for_close_reports_unknown_create_after_transport_failure_and_keeps_review_lock()
