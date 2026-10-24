@@ -67,6 +67,8 @@ public sealed class BusinessCompactLayoutTests
             Assert.True(receipt.Controls.OfType<SplitContainer>().Single().Panel1Collapsed, "T05 detail uses the full workspace; the historical 260-pixel master split is retired.");
             Assert.True(receipt.ReceiptGrid.Rows[1].Height >= 36 * receipt.DeviceDpi / 96);
             Assert.True(ScreenBounds(receipt.WarehouseLookup).Bottom < ScreenBounds(receipt.LineGrid).Top, "Metadata must be above the dominant lines.");
+            Assert.True(ScreenBounds(receipt.ReceiptDateEditor.Parent!).Contains(ScreenBounds(receipt.ReceiptDateEditor)),
+                "The receipt date input must fit inside its compact metadata field: field=" + ScreenBounds(receipt.ReceiptDateEditor.Parent!) + "; input=" + ScreenBounds(receipt.ReceiptDateEditor));
             var caption = receipt.WarehouseLookup.Parent!.Controls.OfType<Label>().Single();
             Assert.InRange(ScreenBounds(receipt.WarehouseLookup).Top - ScreenBounds(caption).Bottom, 0, 8 * receipt.DeviceDpi / 96);
             Assert.True(receipt.LineGrid.Width > receipt.Width / 2);

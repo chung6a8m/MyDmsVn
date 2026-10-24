@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace MyDmsVn.Desktop.Application
@@ -11,6 +11,13 @@ namespace MyDmsVn.Desktop.Application
         private bool _productIsAvailable = true;
         private decimal _quantity = 1m;
         private decimal _unitCost;
+        private Func<bool>? _canMutate;
+        private Action? _beforeMutation;
+
+        internal void AttachOwner(Func<bool> canMutate, Action beforeMutation)
+        { _canMutate = canMutate; _beforeMutation = beforeMutation; }
+        internal void DetachOwner() { _canMutate = null; _beforeMutation = null; }
+        private bool CanMutate => _canMutate?.Invoke() ?? true;
 
         public long Id
         {
@@ -41,8 +48,10 @@ namespace MyDmsVn.Desktop.Application
             get => _quantity;
             set
             {
-                if (SetProperty(ref _quantity, value))
+                if (CanMutate && _quantity != value)
                 {
+                    _beforeMutation?.Invoke(); _quantity = value;
+                    OnPropertyChanged();
                     OnPropertyChanged(nameof(LineTotal));
                 }
             }
@@ -53,8 +62,10 @@ namespace MyDmsVn.Desktop.Application
             get => _unitCost;
             set
             {
-                if (SetProperty(ref _unitCost, value))
+                if (CanMutate && _unitCost != value)
                 {
+                    _beforeMutation?.Invoke(); _unitCost = value;
+                    OnPropertyChanged();
                     OnPropertyChanged(nameof(LineTotal));
                 }
             }
@@ -77,9 +88,24 @@ namespace MyDmsVn.Desktop.Application
 
         public void SetProduct(int productId, string? displayName, bool isAvailable)
         {
-            ProductId = productId;
+            if (_productId != productId)
+            {
+                if (!CanMutate) return;
+                _beforeMutation?.Invoke();
+                _productId = productId;
+                OnPropertyChanged(nameof(ProductId));
+            }
             ProductDisplayName = displayName;
             ProductIsAvailable = isAvailable;
+        }
+
+        internal void ApplyNumericSilently(decimal quantity, decimal unitCost)
+        { _quantity = quantity; _unitCost = unitCost; }
+        internal void NotifyNumeric(bool quantityChanged, bool costChanged)
+        {
+            if (quantityChanged) OnPropertyChanged(nameof(Quantity));
+            if (costChanged) OnPropertyChanged(nameof(UnitCost));
+            if (quantityChanged || costChanged) OnPropertyChanged(nameof(LineTotal));
         }
     }
 }

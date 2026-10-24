@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.WinForms;
 using Xunit;
@@ -8,6 +9,36 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed class ReceiptNumericInputTests
 {
+    [Fact]
+    public void Ui_decimal_profiles_match_existing_receipt_numeric_admission()
+    {
+        foreach (var cultureName in new[] { "en-US", "vi-VN" })
+        foreach (var field in new[] { ReceiptNumericField.Quantity, ReceiptNumericField.UnitCost, ReceiptNumericField.UnitPrice })
+        {
+            var culture = CultureInfo.GetCultureInfo(cultureName);
+            var maximum = field == ReceiptNumericField.Quantity ? GoodsReceiptContractLimits.MaximumQuantity :
+                field == ReceiptNumericField.UnitCost ? GoodsReceiptContractLimits.MaximumUnitCost : SalesContractLimits.MaximumUnitPrice;
+            var profile = new DecimalInputProfile(culture, false, GoodsReceiptContractLimits.DecimalPlaces,
+                field == ReceiptNumericField.Quantity ? 0.0001m : 0m, maximum);
+            var separator = culture.NumberFormat.NumberDecimalSeparator;
+            foreach (var raw in new[]
+            {
+                separator + "5", "1" + separator, "1" + separator + "23000",
+                "00000000000000000001" + separator + "2345" + new string('0', 80),
+                "1" + separator + "2300" + new string('0', 80) + "1",
+                "0", "-0", maximum.ToString(culture), (maximum + 0.0001m).ToString(culture),
+                "1" + culture.NumberFormat.NumberGroupSeparator + "234", "1e2", " \t "
+            })
+            {
+                var admitted = ReceiptNumericInput.TryParse(raw, field, culture, out var appValue, out _);
+                var parsed = DecimalInputParser.TryParsePending(raw, profile);
+                Assert.Equal(admitted, parsed.State == InputParseState.Valid);
+                if (admitted) Assert.Equal(appValue, parsed.Value);
+                else Assert.Null(parsed.Value);
+            }
+        }
+    }
+
     [Theory]
     [InlineData("en-US", false)]
     [InlineData("en-US", true)]

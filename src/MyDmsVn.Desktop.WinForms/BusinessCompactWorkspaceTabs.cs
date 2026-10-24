@@ -37,6 +37,11 @@ internal sealed class BusinessCompactWorkspaceTabs : BootstrapTabControl
         // pen extent outside our caption fill, including both horizontal edges.
         var verticalInset = Math.Max(2, BootstrapThemeManager.CurrentTheme.Metrics.FocusBorderWidth * 2 + 1);
         var text = Rectangle.Inflate(e.Bounds, -BusinessCompactAppearance.Scale(this, BootstrapThemeManager.CurrentTheme.Metrics.SpacingMD), -BusinessCompactAppearance.Scale(this, verticalInset));
+        if (IsTabClosable(TabPages[e.Index]))
+        {
+            var close = GetTabCloseButtonBounds(e.Index);
+            text.Width = Math.Max(0, Math.Min(text.Right, close.Left - 2) - text.Left);
+        }
         if (text.Width <= 0 || text.Height <= 0) return;
         using var brush = new SolidBrush(background);
         e.Graphics.FillRectangle(brush, text);

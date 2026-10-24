@@ -19,6 +19,132 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SalesReceiptGridTests
 {
+    [Theory]
+    [InlineData(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Light)]
+    [InlineData(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark)]
+    public void Numeric_paste_command_applies_selected_sales_rectangle_once(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode mode)
+    {
+        StaTest.Run(_ =>
+        {
+            var original = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme =
+                    MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapTheme.CreateDefault(mode);
+                using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+                var second = host.Editor.AddLine()!;
+                host.Grid.Selection.ResetSelection(false);
+                host.Grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 3), new SourceGrid.Position(2, 4)), true);
+                var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+                Assert.True(adapter.TryPasteNumeric("2\t4\r\n3\t5\r\n"), adapter.EditError);
+                Assert.Equal(2m, host.Editor.Lines[0].Quantity);
+                Assert.Equal(4m, host.Editor.Lines[0].UnitPrice);
+                Assert.Equal(3m, second.Quantity);
+                Assert.Equal(5m, second.UnitPrice);
+                Assert.Empty(host.Api.Creates); Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
+                Console.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, System.Threading.CancellationToken.None));
+                Assert.Empty(guard.Exceptions);
+            }
+            finally { MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme = original; }
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
+    public void Numeric_paste_keyboard_shortcut_uses_clipboard_and_rejects_invalid_active_edit()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var previous = Clipboard.GetDataObject();
+            try
+            {
+                host.Grid.Selection.ResetSelection(false);
+                host.Grid.Selection.SelectCell(new SourceGrid.Position(1, 3), true);
+                Clipboard.SetText("7.5");
+                var key = host.Grid.GetType().GetMethod("ProcessCmdKey", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                var message = Message.Create(host.Grid.Handle, 0x0100, IntPtr.Zero, IntPtr.Zero);
+                Assert.True((bool)key.Invoke(host.Grid, new object[] { message, Keys.Control | Keys.Shift | Keys.V })!);
+                Assert.Equal(7.5m, host.Editor.Lines[0].Quantity);
+
+                var cell = new SourceGrid.CellContext(host.Grid, new SourceGrid.Position(1, 3));
+                host.Grid.Selection.Focus(new SourceGrid.Position(1, 3), true);
+                cell.StartEdit();
+                adapter.QuantityControl.Text = "bad";
+                Clipboard.SetText("8");
+                Assert.True((bool)key.Invoke(host.Grid, new object[] { message, Keys.Control | Keys.Shift | Keys.V })!);
+                Assert.Equal(7.5m, host.Editor.Lines[0].Quantity);
+                Assert.Equal("bad", adapter.QuantityControl.PendingText);
+                Assert.True(adapter.HasPendingEdit);
+                adapter.CancelActiveEdit();
+                Assert.Empty(guard.Exceptions);
+            }
+            finally
+            {
+                if (previous == null) Clipboard.Clear(); else Clipboard.SetDataObject(previous, true);
+            }
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
+    public void Numeric_paste_rejects_one_invalid_cell_without_changing_any_selected_value()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var second = host.Editor.AddLine()!;
+            host.Grid.Selection.ResetSelection(false);
+            host.Grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 3), new SourceGrid.Position(2, 4)), true);
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var revision = host.Editor.EditRevision;
+            Assert.False(adapter.TryPasteNumeric("2\t4\n3\t=5"));
+            Assert.Equal(revision, host.Editor.EditRevision);
+            Assert.All(host.Editor.Lines, line => Assert.Equal(1m, line.Quantity));
+            Assert.Equal(0m, host.Editor.Lines[0].UnitPrice);
+            Assert.Equal(0m, second.UnitPrice);
+            Assert.Contains("Unit price", adapter.ValidationSummaryText ?? adapter.EditError ?? "");
+            Assert.Empty(host.Api.Creates); Assert.Empty(host.Api.Updates); Assert.Empty(host.Api.Posts);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
+    public void Correcting_the_rejected_paste_cell_clears_only_its_paste_error()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var line = host.Editor.Lines.Single();
+            host.Grid.Selection.ResetSelection(false);
+            host.Grid.Selection.SelectCell(new SourceGrid.Position(1, 3), true);
+            Assert.False(adapter.TryPasteNumeric("bad"));
+            Assert.False(string.IsNullOrEmpty(adapter.ValidationSummaryText));
+
+            host.Set(line, 3, "2");
+
+            Assert.Equal(2m, line.Quantity);
+            Assert.Null(adapter.ValidationSummaryText);
+            Assert.DoesNotContain("Validation error", host.Grid.AccessibilityObject.GetChild(1)!.GetChild(3)!.Help);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+    [Fact]
+    public void Accessible_numeric_value_preserves_invalid_grouping_after_formatted_value()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var line = host.Editor.Lines.Single();
+            host.Set(line, 3, "1234");
+            Assert.Equal(1234m, line.Quantity);
+
+            Assert.Throws<TargetInvocationException>(() => host.Set(line, 3, "1,2345"));
+
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            Assert.Equal("1,2345", adapter.QuantityControl.PendingText);
+            Assert.Equal(1234m, line.Quantity);
+            Assert.False(string.IsNullOrEmpty(adapter.EditError));
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
     [Fact]
     public void Compact_944_grid_keeps_all_seven_columns_visible()
     {
@@ -38,7 +164,7 @@ public sealed class SalesReceiptGridTests
             using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
             Assert.Equal(new[] { "STT", "Product", "Unit", "Quantity", "Unit price", "Gift", "Line amount" },
                 Enumerable.Range(0, host.Grid.ColumnsCount).Select(c => host.Grid[0, c].DisplayText));
-            foreach (var c in new[] { 0, 2, 6 }) Assert.Null(host.Grid[1, c].Editor);
+            foreach (var c in new[] { 0, 2, 6 }) Assert.True(host.Grid[1, c].Editor == null, $"Read-only column {c} has editor {host.Grid[1, c].Editor?.GetType().Name}.");
             Assert.Null(host.Editor.TotalCost); Assert.Null(host.Editor.GrossProfit);
         }, TimeSpan.FromSeconds(15));
     }
@@ -85,6 +211,70 @@ public sealed class SalesReceiptGridTests
             Assert.Throws<TargetInvocationException>(() => host.Set(host.Editor.Lines[0], 3, raw));
             Assert.Equal(1m, host.Editor.Lines[0].Quantity);
             Assert.Equal(raw, ((Control)host.Adapter.GetType().GetProperty("QuantityControl", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Adapter)!).Text);
+        }, TimeSpan.FromSeconds(15));
+    }
+
+    [Fact]
+    public void Document_reset_cancels_pending_numeric_candidate_before_reconfiguring_profile()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var position = new SourceGrid.Position(1, 3);
+            Assert.True(host.Grid.Focus());
+            Assert.True(host.Grid.Selection.Focus(position, true));
+            var context = new SourceGrid.CellContext(host.Grid, position);
+            context.StartEdit();
+            Assert.True(context.IsEditing());
+            adapter.QuantityControl.Text = "4.5";
+            Assert.Equal("4.5", adapter.QuantityControl.PendingText);
+            adapter.ResetDocument(host.Editor.Lines);
+            Assert.False(context.IsEditing());
+            Assert.Equal(1m, host.Editor.Lines[0].Quantity);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+
+    [Fact]
+    public void Validated_A_then_native_B_or_failed_revalidation_cannot_change_sales_line()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesGridHost();
+            var adapter = (SalesReceiptLinesGridAdapter)host.Adapter;
+            var position = new SourceGrid.Position(1, 3);
+            Assert.True(host.Grid.Focus());
+            Assert.True(host.Grid.Selection.Focus(position, true));
+            var context = new SourceGrid.CellContext(host.Grid, position, host.Grid[1, 3]);
+            context.StartEdit();
+            Assert.True(context.IsEditing());
+            adapter.QuantityControl.Text = "4.5";
+            var session = typeof(SalesReceiptLinesGridAdapter).GetField("_session", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(adapter)!;
+            var target = (InlineEditTarget<SalesReceiptLineViewModel>)session.GetType().GetField("Target", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
+            var inline = (InlineEditSession<SalesReceiptLineViewModel>)typeof(SalesReceiptLinesGridAdapter)
+                .GetField("_inline", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(adapter)!;
+            Assert.True(inline.RecordValidatedCandidate(target, 4.5m));
+            var unrelated = new SourceGrid.CellContext(host.Grid, new SourceGrid.Position(1, 4), host.Grid[1, 4]);
+            unrelated.Cell.Controller.OnValueChanged(unrelated, EventArgs.Empty);
+            Assert.True(inline.HasValidatedCandidate(target));
+            context.Cell.Controller.OnValueChanged(new SourceGrid.CellContext(host.Grid, new SourceGrid.Position(1, 4), context.Cell), EventArgs.Empty);
+            Assert.True(inline.HasValidatedCandidate(target));
+            host.Editor.Lines[0].UnitPrice = 8m; // Projection of another cell must preserve the active proof.
+            Assert.True(inline.HasValidatedCandidate(target));
+            host.Grid[1, 3].Value = 3.5m;
+            context.Cell.Controller.OnValueChanged(context, EventArgs.Empty);
+            Assert.Equal(1m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("4.5", adapter.QuantityControl.Text);
+            Assert.True(inline.RecordValidatedCandidate(target, 4.5m));
+            inline.InvalidateValidation(target);
+            host.Grid[1, 3].Value = 4.5m;
+            context.Cell.Controller.OnValueChanged(context, EventArgs.Empty);
+            Assert.Equal(1m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("4.5", adapter.QuantityControl.Text);
+            adapter.CancelActiveEdit();
+            Assert.Equal(1m, host.Grid[1, 3].Value);
+            Assert.Empty(guard.Exceptions);
         }, TimeSpan.FromSeconds(15));
     }
 }
@@ -141,6 +331,7 @@ internal sealed class SalesGuiApi : ISalesReceiptApiClient
     internal bool UnknownCreate;
     internal readonly List<SalesReceiptListRequest> Lists = new List<SalesReceiptListRequest>();
     internal SalesReceiptDto? NextUpdate;
+    internal ApiError? UpdateError;
     internal SalesReceiptDto? Current = null;
     internal TaskCompletionSource<ApiResponse<SalesReceiptDto>>? SaveBarrier;
     public readonly List<SaveSalesReceiptRequest> Creates = new List<SaveSalesReceiptRequest>();
@@ -153,7 +344,7 @@ internal sealed class SalesGuiApi : ISalesReceiptApiClient
     public Task<ApiResponse<SalesReceiptListPage>> ListAsync(SalesReceiptListRequest r, CancellationToken t) { Lists.Add(r); if (ListHandler != null) return ListHandler(t); return Task.FromResult(ApiResponse<SalesReceiptListPage>.Success(new SalesReceiptListPage(new[] { new SalesReceiptListRow(41, "SA0000000041", new DateTime(2026, 10, 22), 1, "C1 - Customer", 2, "W2 - Warehouse", 3, "E3 - Employee", "Draft", Current?.Lines.Count ?? 1, Current?.TotalAmount ?? 4m) }, "next", null))); }
     public Task<ApiResponse<SalesReceiptDto>> GetAsync(long id, CancellationToken t) { Gets.Add(id); if (GetHandler != null) return GetHandler(id); return Task.FromResult(ApiResponse<SalesReceiptDto>.Success(Current ?? Receipt(id, Posted))); }
     public Task<ApiResponse<SalesReceiptDto>> CreateDraftAsync(SaveSalesReceiptRequest r, CancellationToken t) { Creates.Add(r); if (UnknownCreate) return Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Test.UnknownCreate", "Review outcome"))); return Task.FromResult(ApiResponse<SalesReceiptDto>.Success(Receipt(41))); }
-    public Task<ApiResponse<SalesReceiptDto>> UpdateDraftAsync(UpdateSalesReceiptDraftRequest r, CancellationToken t) { Updates.Add(r); if (SaveBarrier != null) return SaveBarrier.Task; return Task.FromResult(ApiResponse<SalesReceiptDto>.Success(NextUpdate ?? Receipt(r.SaleId))); }
+    public Task<ApiResponse<SalesReceiptDto>> UpdateDraftAsync(UpdateSalesReceiptDraftRequest r, CancellationToken t) { Updates.Add(r); if (SaveBarrier != null) return SaveBarrier.Task; if (UpdateError != null) return Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(UpdateError)); return Task.FromResult(ApiResponse<SalesReceiptDto>.Success(NextUpdate ?? Receipt(r.SaleId))); }
     public Task<ApiResponse<PostSalesReceiptResponse>> PostAsync(PostSalesReceiptRequest r, CancellationToken t) { Posts.Add(r); if (PostHandler != null) return PostHandler(); return Task.FromResult(ApiResponse<PostSalesReceiptResponse>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Test.Unknown", "Unknown outcome"))); }
     public static SalesReceiptDto Receipt(long id, bool posted = false, bool active = true) => new SalesReceiptDto(id, "SA0000000041", new DateTime(2026, 10, 22), 1, 2, 3, posted ? "Posted" : "Draft", "note", posted ? new DateTime(2026, 10, 22, 0, 0, 0, DateTimeKind.Utc) : (DateTime?)null, "AQIDBAUGBwg=",
         new[] { new SalesReceiptLineDto(91, 1, 7, "box", 1m, 4m, false, 4m, posted ? 2m : (decimal?)null, posted ? 2m : (decimal?)null, "P7 - Product", active) }, 4m, posted ? 2m : (decimal?)null, posted ? 2m : (decimal?)null, "C1 - Customer", active, "W2 - Warehouse", active, "E3 - Employee", active);

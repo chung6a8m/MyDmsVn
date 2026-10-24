@@ -56,6 +56,19 @@ internal static class GuiPackageProbe
         finally { if (Marshal.IsComObject(accessible)) Marshal.ReleaseComObject(accessible); }
     }
 
+    private static string NativeDefaultAction(AutomationElement element)
+    {
+        var window = new IntPtr(element.Current.NativeWindowHandle);
+        uint owner;
+        GetWindowThreadProcessId(window, out owner);
+        if (window == IntPtr.Zero || owner != _application.Id) throw new InvalidOperationException("Accessible action HWND ownership mismatch.");
+        var id = typeof(Accessibility.IAccessible).GUID;
+        Accessibility.IAccessible accessible;
+        Marshal.ThrowExceptionForHR(AccessibleObjectFromWindow(window, 0xfffffffc, ref id, out accessible));
+        try { return accessible.get_accDefaultAction(0) ?? ""; }
+        finally { if (Marshal.IsComObject(accessible)) Marshal.ReleaseComObject(accessible); }
+    }
+
     [STAThread]
     private static int Main(string[] args)
     {
@@ -105,6 +118,23 @@ internal static class GuiPackageProbe
                 if (!_application.WaitForExit(5000) || _application.ExitCode != 2)
                     throw new InvalidOperationException("Startup application did not exit safely.");
                 Console.WriteLine("STARTUP_SAFE_ERROR=PASS");
+            }
+            else if (args[1] == "uin-t13-attended")
+            {
+                _stage = "uin-t13-attended-setup";
+                var shell = Login();
+                Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+                var page = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+                Invoke(Find(page, "New", ControlType.Button, false));
+                Find(page, "Note", ControlType.Edit, false);
+                var barrier = Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_BARRIER");
+                File.WriteAllText(Path.Combine(barrier, "ready"), "Goods draft ready for human observation.");
+                Console.WriteLine("UIN_T13_ATTENDED_READY=PASS");
+                _stage = "uin-t13-attended-human";
+                Wait(delegate { return File.Exists(Path.Combine(barrier, "complete")); },
+                    "UI Next T13 attended walkthrough was not completed within its owned budget.", 1200);
+                CloseApplication(shell);
+                Console.WriteLine("UIN_T13_ATTENDED_DRAINED=PASS");
             }
             else if (args[1] == "bcf-lookup-attended")
             {
@@ -220,6 +250,7 @@ internal static class GuiPackageProbe
             {
                 var shell = Login();
                 Catalog(shell, "Products", "GUI-PROD", "UIA Product", new[] { "Unit" }, new[] { "pcs" });
+                ProductDuplicateCode(shell);
                 Catalog(shell, "Warehouses", "GUI-WH", "UIA Warehouse", new[] { "Address" }, new[] { "GUI address" });
                 Catalog(shell, "Employees", "GUI-EMP", "UIA Employee", new[] { "Phone" }, new[] { "0900123456" });
                 Catalog(shell, "Customers", "GUI-CUST", "UIA Customer", new[] { "Address", "Phone", "Tax code" }, new[] { "GUI address", "0900123456", "P5-TAX" });
@@ -244,6 +275,13 @@ internal static class GuiPackageProbe
                 CloseApplication(shell);
                 Console.WriteLine("REAL_LOGIN=PASS");
                 Console.WriteLine("LOGOUT_RELOGIN_RESTART=PASS");
+            }
+            else if (args[1] == "dateinput-audit")
+            {
+                var shell = Login();
+                AuditPackagedDateInputs(shell);
+                CloseApplication(shell);
+                Console.WriteLine("DATEINPUT_ACTUAL_LOGIN=PASS");
             }
             else throw new ArgumentException("Unknown scenario.");
             if (!_application.HasExited) throw new InvalidOperationException("Application still running.");
@@ -356,6 +394,22 @@ internal static class GuiPackageProbe
         Console.WriteLine("CATALOG_FLOW=" + title + ":PASS");
     }
 
+    private static void ProductDuplicateCode(AutomationElement shell)
+    {
+        _stage = "product-duplicate-code";
+        var page = Find(shell, "Products", ControlType.TabItem, false);
+        Invoke(Find(page, "Add product", ControlType.Button, false));
+        SetInput(page, "Code", "GUI-PROD", false);
+        SetInput(page, "Name", "Duplicate must remain a draft", false);
+        SetInput(page, "Unit", "pcs", false);
+        Invoke(Find(page, "Save", ControlType.Button, false));
+        Find(page, "A product with this code already exists.", ControlType.Text, true);
+        if (InputValue(page, "Code") != "GUI-PROD" ||
+            InputValue(page, "Name") != "Duplicate must remain a draft")
+            throw new InvalidOperationException("Duplicate Code discarded the typed draft.");
+        Console.WriteLine("PRODUCT_DUPLICATE_CODE_INLINE=PASS");
+    }
+
     private static AutomationElement Login()
     {
         return Login("gui.p5.owner", Environment.GetEnvironmentVariable("MYDMSVN_GUI_P5_OWNER_PASSWORD"), "GUI P5 Owner");
@@ -392,6 +446,194 @@ internal static class GuiPackageProbe
         Console.WriteLine("THEME_STATE_PROVIDER=MSAA.Description");
         Console.WriteLine("APPLICATION_THEME=" + _theme);
         return shell;
+    }
+
+    private static void AuditPackagedDateInputs(AutomationElement shell)
+    {
+        _stage = "dateinput-sales-filters";
+        Invoke(Find(shell, "Sales Receipts", ControlType.Button, false));
+        var sales = Find(shell, "Sales Receipts", ControlType.TabItem, false);
+        AuditPackagedDateField(sales, "From date", "12/10/2025", 4,
+            "12/11/2025", "12/12/2025", "");
+        AuditPackagedDateField(sales, "To date", "05/01/2026", 4,
+            "05/02/2026", "05/03/2026", "");
+        Console.WriteLine("DATEINPUT_SALES_FILTERS_NATIVE=PASS");
+
+        _stage = "dateinput-sales-required";
+        Invoke(Find(sales, "New", ControlType.Button, false));
+        AuditPackagedDateField(sales, "Sale date", "12/10/2026", 4,
+            "12/11/2026", "12/12/2026", null);
+        Console.WriteLine("DATEINPUT_SALES_REQUIRED_NATIVE=PASS");
+
+        _stage = "dateinput-goods-required";
+        Invoke(Find(shell, "Goods Receipts", ControlType.Button, false));
+        var goods = Find(shell, "Goods Receipts", ControlType.TabItem, false);
+        Invoke(Find(goods, "New", ControlType.Button, false));
+        AuditPackagedDateField(goods, "Receipt date", "12/10/2026", 4,
+            "12/11/2026", "12/12/2026", null);
+        Console.WriteLine("DATEINPUT_GOODS_REQUIRED_NATIVE=PASS");
+    }
+
+    private static void AuditPackagedDateField(AutomationElement page, string name, string raw,
+        int caret, string first, string second, string accepted)
+    {
+        var editor = DateNativeEditor(page, name);
+        var original = DateValue(editor);
+        if (accepted != null && original != accepted)
+            throw new InvalidOperationException("Nullable date did not begin empty.");
+        var trigger = DateTrigger(page, name);
+        AssertDateGeometry(page, name, editor, trigger);
+        _detail = name + " setup";
+        ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).SetValue(raw); // Setup only; subsequent steps use owned native keys.
+        Wait(delegate { return DateValue(editor) == raw; }, "Date setup did not reach the native editor.");
+        _detail = name + " step 1";
+        FocusOwnedEditor(editor, name);
+        SetOwnedSelection(editor, caret);
+        SendOwnedKey(editor, 0x26); // VK_UP
+        AssertOwnedDateStep(editor, name, first, caret);
+        _detail = name + " step 2";
+        SendOwnedKey(editor, 0x26);
+        AssertOwnedDateStep(editor, name, second, caret);
+
+        _detail = name + " trigger click";
+        var pending = DateValue(editor);
+        if (NativeDefaultAction(trigger) != "Open calendar")
+            throw new InvalidOperationException("Date trigger did not begin collapsed.");
+        ClickOwnedDateTrigger(trigger);
+        Wait(delegate { return NativeDefaultAction(trigger) == "Close calendar"; }, "Date popup did not open from the embedded trigger.");
+        _detail = name + " trigger cancel";
+        ClickOwnedDateTrigger(trigger);
+        Wait(delegate { return NativeDefaultAction(trigger) == "Open calendar"; }, "Date popup did not close from the embedded trigger.");
+        Wait(delegate { return editor.Current.HasKeyboardFocus; }, "Pointer calendar cancel did not restore native date focus.");
+        if (DateValue(editor) != pending)
+            throw new InvalidOperationException("Calendar dismissal changed pending date text.");
+
+        _detail = name + " F4";
+        FocusOwnedEditor(editor, name);
+        SendOwnedKey(editor, 0x73); // VK_F4 opens the same popup from the native editor.
+        Wait(delegate { return NativeDefaultAction(trigger) == "Close calendar"; }, "Date popup did not open from F4.");
+        ClickOwnedDateTrigger(trigger);
+        Wait(delegate { return NativeDefaultAction(trigger) == "Open calendar"; }, "F4 date popup did not cancel.");
+        Wait(delegate { return editor.Current.HasKeyboardFocus; }, "F4 calendar cancel did not restore native date focus.");
+        if (DateValue(editor) != pending)
+            throw new InvalidOperationException("F4 calendar dismissal changed pending date text.");
+
+        _detail = name + " escape";
+        FocusOwnedEditor(editor, name);
+        SendOwnedKey(editor, 0x1B); // VK_ESCAPE cancels the pending text before leaving the page.
+        Wait(delegate { return DateValue(editor) == original; }, "Date cancel did not restore the accepted display.");
+        Console.WriteLine("DATEINPUT_FIELD=" + name + ";NATIVE_STEPS=2;TRIGGER_CANCEL=PASS");
+    }
+
+    private static void AssertOwnedDateStep(AutomationElement editor, string name, string expected, int caret)
+    {
+        Wait(delegate { return ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).Current.Value == expected; },
+            "Native date step did not produce the expected segment value.");
+        int start, end;
+        SendMessageSelection(new IntPtr(editor.Current.NativeWindowHandle), 0x00B0, out start, out end); // EM_GETSEL
+        if (start != caret || end != caret || !editor.Current.HasKeyboardFocus)
+            throw new InvalidOperationException("Native date step changed caret, selection or focus: " + name);
+    }
+
+    private static void SetOwnedSelection(AutomationElement editor, int caret)
+    {
+        var handle = new IntPtr(editor.Current.NativeWindowHandle);
+        uint owner;
+        GetWindowThreadProcessId(handle, out owner);
+        if (handle == IntPtr.Zero || owner != _application.Id || !editor.Current.HasKeyboardFocus ||
+            !PostMessage(handle, 0x00B1, new IntPtr(caret), new IntPtr(caret))) // EM_SETSEL
+            throw new InvalidOperationException("Owned native date selection failed.");
+        Wait(delegate
+        {
+            int start, end;
+            SendMessageSelection(handle, 0x00B0, out start, out end);
+            return start == caret && end == caret;
+        }, "Native date caret could not be positioned.");
+    }
+
+    private static string DateValue(AutomationElement editor)
+    {
+        return ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).Current.Value;
+    }
+
+    private static AutomationElement DateNativeEditor(AutomationElement page, string name)
+    {
+        var field = new IntPtr(DateField(page, name).Current.NativeWindowHandle);
+        uint fieldProcess;
+        GetWindowThreadProcessId(field, out fieldProcess);
+        if (field == IntPtr.Zero || fieldProcess != _application.Id)
+            throw new InvalidOperationException("Date field is not an owned HWND.");
+        var edits = new System.Collections.Generic.List<IntPtr>();
+        EnumChildWindows(field, delegate(IntPtr window, IntPtr ignored)
+        {
+            var className = new System.Text.StringBuilder(256);
+            GetClassName(window, className, className.Capacity);
+            uint process;
+            GetWindowThreadProcessId(window, out process);
+            if (process == _application.Id && className.ToString().StartsWith("WindowsForms10.EDIT.", StringComparison.Ordinal))
+                edits.Add(window);
+            return true;
+        }, IntPtr.Zero);
+        if (edits.Count != 1) throw new InvalidOperationException("Date field did not own exactly one native editor.");
+        var editor = AutomationElement.FromHandle(edits[0]);
+        if (editor.Current.ControlType != ControlType.Edit)
+            throw new InvalidOperationException("Date native editor has an unexpected UIA type.");
+        return editor;
+    }
+
+    private static AutomationElement DateField(AutomationElement page, string name)
+    {
+        return Find(page, name, ControlType.Edit, false);
+    }
+
+    private static AutomationElement DateTrigger(AutomationElement page, string name)
+    {
+        var field = DateField(page, name);
+        var triggers = field.FindAll(TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.NameProperty, "Open calendar"));
+        if (triggers.Count != 1) throw new InvalidOperationException("Date field must own one calendar trigger.");
+        return triggers[0];
+    }
+
+    private static void ClickOwnedDateTrigger(AutomationElement trigger)
+    {
+        var handle = new IntPtr(trigger.Current.NativeWindowHandle);
+        uint owner;
+        GetWindowThreadProcessId(handle, out owner);
+        if (handle == IntPtr.Zero || owner != _application.Id || !trigger.Current.IsEnabled)
+            throw new InvalidOperationException("Date trigger is not an owned enabled HWND.");
+        var rectangle = trigger.Current.BoundingRectangle;
+        if (rectangle.Width < 24 || rectangle.Height < 24)
+            throw new InvalidOperationException("Calendar trigger hit area is too small.");
+        var client = new IntPtr(((int)(rectangle.Height / 2) << 16) | ((int)(rectangle.Width / 2) & 0xffff));
+        if (!PostMessage(handle, 0x0201, new IntPtr(1), client) || !PostMessage(handle, 0x0202, IntPtr.Zero, client))
+            throw new InvalidOperationException("Owned date trigger click failed.");
+    }
+
+    private static void AssertDateGeometry(AutomationElement page, string name,
+        AutomationElement editor, AutomationElement trigger)
+    {
+        var outer = DateField(page, name).Current.BoundingRectangle;
+        var edit = editor.Current.BoundingRectangle;
+        var action = trigger.Current.BoundingRectangle;
+        var windowDpi = GetDpiForWindow(MainWindow);
+        if (windowDpi == 0) throw new InvalidOperationException("Date window DPI is unavailable.");
+        var scale = windowDpi / 96.0;
+        Console.WriteLine("DATEINPUT_GEOMETRY_OBSERVED=" + name + ";WINDOW_DPI=" + windowDpi +
+            ";FIELD=" + (int)outer.Width + "x" + (int)outer.Height +
+            ";TEXT=" + (int)edit.Width + "x" + (int)edit.Height +
+            ";TRIGGER=" + (int)action.Width + "x" + (int)action.Height +
+            ";TEXT_RIGHT_BEFORE_TRIGGER=" + (edit.Right <= action.Left) +
+            ";TRIGGER_WITHIN_FIELD=" + (action.Left >= outer.Left && action.Right <= outer.Right &&
+                action.Top >= outer.Top && action.Bottom <= outer.Bottom));
+        if (outer.Height < 28 * scale || outer.Height > 60 * scale ||
+            edit.Width < 70 * scale || edit.Right > action.Left ||
+            action.Left < outer.Left || action.Right > outer.Right ||
+            action.Top < outer.Top || action.Bottom > outer.Bottom)
+            throw new InvalidOperationException("Date text or trigger geometry is clipped/overlapping.");
+        Console.WriteLine("DATEINPUT_GEOMETRY=" + name + ";WINDOW_DPI=" + windowDpi +
+            ";FIELD=" + (int)outer.Width + "x" + (int)outer.Height +
+            ";TEXT_WIDTH=" + (int)edit.Width + ";TRIGGER=" + (int)action.Width + "x" + (int)action.Height);
     }
 
     private static void Sales(AutomationElement shell, string executable, string scenario)
@@ -492,13 +734,24 @@ internal static class GuiPackageProbe
 
     private static void AssertSalesCell(AutomationElement page, string field, decimal expected)
     {
-        Wait(delegate
+        try
         {
-            var value = (ValuePattern)InlineCell(page, field).GetCurrentPattern(ValuePattern.Pattern);
-            decimal actual;
-            return decimal.TryParse(value.Current.Value, System.Globalization.NumberStyles.Number,
-                System.Globalization.CultureInfo.CurrentCulture, out actual) && actual == expected;
-        }, "Sales cell value differs: " + field);
+            Wait(delegate
+            {
+                AutomationElement cell;
+                if (!TrySalesCell(page, field, out cell)) return false;
+                var value = (ValuePattern)cell.GetCurrentPattern(ValuePattern.Pattern);
+                decimal actual;
+                return decimal.TryParse(value.Current.Value, System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.CurrentCulture, out actual) && actual == expected;
+            }, "Sales cell value differs: " + field);
+        }
+        catch
+        {
+            Console.WriteLine("SALES_CELL_FAILURE=" + field + ";ROW=" + _salesRow);
+            Dump(page);
+            throw;
+        }
     }
 
     private static AutomationElement SalesOpenAction(AutomationElement page)
@@ -528,7 +781,15 @@ internal static class GuiPackageProbe
         foreach (var name in new[] { "Save", "Post", "Add line", "Remove line" })
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled) throw new InvalidOperationException("Posted Sales mutation enabled.");
         _salesRow = 2;
-        var gift = (ValuePattern)InlineCell(page, "Gift").GetCurrentPattern(ValuePattern.Pattern);
+        AutomationElement giftCell;
+        try
+        {
+            giftCell = null;
+            Wait(delegate { return TrySalesCell(page, "Gift", out giftCell); },
+                "Posted Sales gift cell unavailable.");
+        }
+        catch { Console.WriteLine("SALES_POSTED_GIFT_FAILURE;ROW=" + _salesRow); Dump(page); throw; }
+        var gift = (ValuePattern)giftCell.GetCurrentPattern(ValuePattern.Pattern);
         if (!gift.Current.IsReadOnly) throw new InvalidOperationException("Posted gift still editable.");
         AssertSalesCell(page, "Unit price", 40m);
     }
@@ -787,7 +1048,7 @@ internal static class GuiPackageProbe
             AwaitSignal("allow-denied-save");
             _stage = "receipt-server-direct-deny";
             Invoke(Find(page, "Save", ControlType.Button, false));
-            Find(page, "The operation is not permitted.", ControlType.Text, true);
+            Find(page, "The operation is not permitted.", ControlType.Pane, true);
             if (InputValue(page, "Note") != "GUI edited" || InputValue(page, "Product") != committedProduct ||
                 decimal.Parse(InputValue(page, "Quantity"), System.Globalization.CultureInfo.CurrentCulture) != 3.125m ||
                 decimal.Parse(InputValue(page, "Unit cost"), System.Globalization.CultureInfo.CurrentCulture) != 4m)
@@ -1015,7 +1276,7 @@ internal static class GuiPackageProbe
         _application = otherClient;
         MainWindow = otherWindow;
         Invoke(otherPost); // This independent client still holds the original Draft version.
-        Find(otherPage, "The goods receipt is already posted.", ControlType.Text, true);
+        Find(otherPage, "The goods receipt is already posted.", ControlType.Pane, true);
         CloseApplication(otherShell);
         otherClient.Dispose();
         _application = firstClient;
@@ -1078,7 +1339,8 @@ internal static class GuiPackageProbe
         Signal("posting");
         AwaitSignal("allow-post");
         Invoke(post);
-        Find(page, "Posting outcome unknown.", ControlType.Text, true, 45);
+        try { Find(page, "Posting outcome unknown.", ControlType.Pane, true, 45); }
+        catch (TimeoutException) { Dump(page); throw; }
         foreach (var name in new[] { "Save", "Post", "New" })
             if (Find(page, name, ControlType.Button, false).Current.IsEnabled)
                 throw new InvalidOperationException("Uncertain Post permits a mutation.");
@@ -1371,6 +1633,18 @@ internal static class GuiPackageProbe
         }
         if (selected == null) throw new InvalidOperationException("Receipt line field absent: " + field);
         return selected;
+    }
+
+    private static bool TrySalesCell(AutomationElement page, string field, out AutomationElement cell)
+    {
+        try { cell = InlineCell(page, field); return true; }
+        catch (InvalidOperationException error)
+        {
+            if (!error.Message.StartsWith("Receipt line field absent:", StringComparison.Ordinal) &&
+                error.Message != "Receipt line table absent.") throw;
+            cell = null;
+            return false;
+        }
     }
     private static AutomationElement InlineEditor(AutomationElement root, string field)
     {

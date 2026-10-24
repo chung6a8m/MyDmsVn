@@ -10,8 +10,25 @@ namespace MyDmsVn.Desktop.WinForms;
 
 internal sealed class SalesReceiptLinesGrid : BootstrapGrid
 {
-    internal SalesReceiptLinesGrid() { AccessibleName = "Sales receipt lines"; BusinessCompactAppearance.Apply(this); }
+    internal SalesReceiptLinesGrid()
+    {
+        AccessibleName = "Sales receipt lines";
+        AccessibleDescription = "Select existing quantity and unit price cells, then press Ctrl+Shift+V to paste tab-separated numbers.";
+        BusinessCompactAppearance.Apply(this);
+    }
     internal SalesReceiptLinesGridAdapter? Adapter { get; set; }
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == (Keys.Control | Keys.Shift | Keys.V))
+        {
+            string text;
+            try { text = Clipboard.ContainsText() ? Clipboard.GetText() : string.Empty; }
+            catch (ExternalException) { text = string.Empty; }
+            Adapter?.TryPasteNumeric(text);
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
     protected override AccessibleObject CreateAccessibilityInstance() => new ReceiptAccessibleObject(this);
 
     private Rectangle CellBounds(int row, int column)
@@ -85,7 +102,18 @@ internal sealed class SalesReceiptLinesGrid : BootstrapGrid
         internal int CurrentRow => Grid.IsDisposed || Grid.Adapter == null ? -1 : Line == null ? 0 : Grid.Adapter.AccessibleRow(Generation, Line);
         public override AccessibleObject Parent => _parent;
         public override AccessibleRole Role => AccessibleRole.Row;
-        public override string? Name { get => CurrentRow < 0 ? "Unavailable receipt line" : Line == null ? "Columns" : "Line " + CurrentRow + ": " + (Line.ProductDisplayName ?? "New line"); set { } }
+        public override string? Name
+        {
+            get
+            {
+                if (CurrentRow < 0) return "Unavailable receipt line";
+                if (Line == null) return "Columns";
+                var issue = Grid.Adapter?.AccessibleRowValidation(Generation, Line);
+                return "Line " + CurrentRow + ": " + (Line.ProductDisplayName ?? "New line") +
+                    (string.IsNullOrEmpty(issue) ? "" : "; Validation error: " + issue);
+            }
+            set { }
+        }
         public override AccessibleStates State => CurrentRow < 0 ? AccessibleStates.Unavailable : AccessibleStates.None;
         public override Rectangle Bounds
         {

@@ -4,9 +4,11 @@ Windows desktop-first SME business software for Sales and Inventory. Local v1 in
 
 ## Current roadmap — v1a-pro-ui-next
 
-**Updated:** 2026-10-23. **UI-NEXT is the sole ACTIVE roadmap**, based on merged PR #43 at `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. It covers workspace-owned Toast/Alert feedback, field/cell validation, closable tabs and busy presentation, and semantic theme surfaces. Every implementation task is **NOT STARTED**; this documentation change establishes no runtime PASS.
+**Updated:** 2026-10-24. **UI-NEXT is the sole ACTIVE roadmap**, originally activated from merged PR #43 at `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. UIN-T00–T13 are VERIFIED in their recorded bounded scopes and exact revisions, including the retained failures and acceptance limits in the [T13 ledger](docs/ui-next/evidence/20261024-uin-t13-integration.md). Current work is the **DateInput Unified Compact correction, UIN-D01–UIN-D03**, continuing PR #45 on `codex/uin-t13`. The Owner approved visual option 01 on 2026-10-24; correction implementation is **NOT STARTED**, runtime checks are **NOT RUN**, and acceptance of the implemented candidate remains pending.
 
 [Active roadmap](docs/ui-next/20261023-active-roadmap.md) · [Design and control policy](docs/ui-next/20261023-design-and-control-policy.md) · [Implementation plan](docs/ui-next/20261023-implementation-plan.md) · [Validation and handoff](docs/ui-next/20261023-validation-and-handoff.md)
+
+[DateInput approved design](docs/ui-next/20261024-dateinput-unified-compact-design.md) · [Active correction plan](docs/ui-next/20261024-dateinput-unified-compact-correction.md) · [Codex handoff prompt](docs/ui-next/20261024-dateinput-unified-compact-codex-prompt.md)
 
 The [archive boundary](docs/archive/20261023-pre-ui-next/README.md) retires previous execution queues and excludes their unfinished work from UI-NEXT. SAL source is present in the merged baseline; [T08 evidence](docs/evidence/sal/20261021-t08-integrated-acceptance.md) records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific runnable automation PASS. Native125, attended observations and dated Owner acceptance remain OPEN in the archive. Archiving does not complete or waive those gaps. Production release prerequisites remain UNACCEPTED / UNSCHEDULED.
 

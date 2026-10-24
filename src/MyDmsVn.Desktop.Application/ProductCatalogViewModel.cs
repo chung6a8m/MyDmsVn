@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Messaging;
@@ -14,8 +15,11 @@ namespace MyDmsVn.Desktop.Application
         private string _unit = string.Empty;
 
         public ProductCatalogViewModel(IProductApiClient client, IMessenger messenger, IUiDispatcher dispatcher, IDesktopNotificationService notifications, IAsyncDelay delay, TimeSpan? debounceInterval = null, IDesktopExceptionReporter? exceptionReporter = null)
-            : base(CatalogKind.Product, messenger, dispatcher, notifications, delay, debounceInterval, exceptionReporter) =>
+            : base(CatalogKind.Product, messenger, dispatcher, notifications, delay, debounceInterval, exceptionReporter)
+        {
             _client = client ?? throw new ArgumentNullException(nameof(client));
+            InitializeAcceptedEditor();
+        }
 
         public string Code { get => _code; set => SetProperty(ref _code, value ?? string.Empty); }
         public string Name { get => _name; set => SetProperty(ref _name, value ?? string.Empty); }
@@ -30,5 +34,15 @@ namespace MyDmsVn.Desktop.Application
         protected override ProductDto WithActiveStatus(ProductDto item, bool isActive) => new ProductDto(item.Id, item.Code, item.Name, item.Unit, isActive);
         protected override void PopulateEditor(ProductDto item) { Code = item.Code; Name = item.Name; Unit = item.Unit; }
         protected override void ClearEditor() { Code = string.Empty; Name = string.Empty; Unit = string.Empty; }
+        protected override IReadOnlyDictionary<string, string> CaptureEditorFields() =>
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [nameof(Code)] = Code, [nameof(Name)] = Name, [nameof(Unit)] = Unit,
+            };
+        protected override IReadOnlyDictionary<string, string> CaptureAcceptedFields(ProductDto item) =>
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [nameof(Code)] = item.Code, [nameof(Name)] = item.Name, [nameof(Unit)] = item.Unit,
+            };
     }
 }

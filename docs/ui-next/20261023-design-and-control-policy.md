@@ -1,7 +1,7 @@
 # UI Next — design and control policy
 
 **Date:** 2026-10-23
-**Status:** SELECTED DESIGN for the [active roadmap](20261023-active-roadmap.md); proposed APIs are not implemented
+**Status:** Design policy for the [active roadmap](20261023-active-roadmap.md). Initial proposal language below retains its planning context; current implementation/evidence is recorded by the roadmap. The 2026-10-24 [DateInput Unified Compact design](20261024-dateinput-unified-compact-design.md) is the approved correction, with implementation/runtime verification pending.
 **Baseline:** `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` and its three pinned UI repositories
 
 ## 1. Ownership and reuse
@@ -25,7 +25,7 @@ Reuse `BootstrapToastContainer`, `BootstrapAlert`, `BootstrapValidationState`, `
 | Receipt quantity/price/cost | Proposed `BootstrapDecimalInput` after T04/T05 | Existing `ReceiptNumberEditor` + `ReceiptNumericInput` remain until compatible behavior passes |
 | Small bounded integer setting | `BootstrapNumericBox` with explicit range/step | Display DecimalPlaces is not a precision validator; do not inherit a default range blindly |
 | Selection-only date | Existing `BootstrapCalendarPicker` | Calendar selection is date-only, not a text-entry replacement |
-| Document date/nullable date filter | Proposed `BootstrapDateInput` composing the calendar | Current native wrapper/filter remains a recorded interim exception until T06/T11 |
+| Document date/nullable date filter | Implemented `BootstrapDateInput` with required header / nullable filter profiles | [Unified Compact correction](20261024-dateinput-unified-compact-design.md): one surface, icon-only trigger and logical caret preservation; new acceptance pending |
 | UTC date-time/seconds | Existing explicit compatible native input | Stock Card keeps time, UTC and inclusive displayed-second upper-bound semantics |
 | Tab success | Local `BootstrapToastContainer` | `BootstrapToastService(relativeTo)` selects a monitor, not a TabPage |
 | Actionable failure/recovery | Persistent `BootstrapAlert` in the owning workspace | Shell StatusBar is not the only presentation of an actionable tab error |
@@ -34,6 +34,14 @@ Reuse `BootstrapToastContainer`, `BootstrapAlert`, `BootstrapValidationState`, `
 | Blocking local operation | Proposed `BootstrapBusyHost` around a content region | Lookup/query progress stays local where whole-tab blocking is unnecessary |
 
 Each adopted pattern needs a short sample, supported behavior, fallback and first available upstream pin. No proposed API is described as current source. Source evidence is in the [refreshed assessment](20261023-active-roadmap.md#refreshed-source-baseline) and [original control assessment](20261022-ui-foundation-assessment.md).
+
+### T11 adoption examples and retained native controls
+
+The four `CatalogKind` variants (Product, Warehouse, Employee and Customer) share `CatalogControl`: its factory creates one `WorkspaceFeedbackScope` and scoped notification adapter per open control, while `FieldValidationBinder`, `WorkspaceBusyBinder` and the semantic inspector handle local errors, blocking operations and theme roles. Goods Receipt uses the same per-control scope for list, editor and lookup ViewModels. A factory-created Stock Balance/Card control routes query failures to its own scope; the shell hosts that scope with its tab. A hidden tab retains its own error until selected or closed, and disposal invalidates it. These app compositions require no new upstream pin; the first feedback/binder pins are recorded with T01/T02/T08, and semantic controls first appear in UI `15ef4032e9420a04bb4c6279704406c8d7424859` (current UI pin `910c19493b36d1db2fb0b92b7fc436f263ec564d`, BSG pin `a2c2cb749ac5656a56b1cfebfc7718b889d95152`).
+
+Sales From/To use `BootstrapDateInput` with a nullable profile: begin a null edit session, retain raw pending text through unrelated projections, then parse both candidates on Apply. An explicit empty candidate commits null; invalid input or From > To leaves the prior query criteria and raw text intact. The required Sales/Goods document dates retain their T06 behavior. The first date-input UI pin is `78c1673e1125b72ba282b6ab9254bafc642cec80`; the app uses the current pin above. When typed date entry cannot represent the required UTC time and seconds, Stock Card retains its native `DateTimePicker` and existing displayed-second upper-bound conversion.
+
+Native layout panels and grid controls remain where no shared semantic behavior is needed. Stock Balance/Card retain a native `ProgressBar` for query-only progress; it does not authorize commands or block the whole tab. Sales/Goods preserve their established receipt grids and inline adapters. Operation labels use `BootstrapLabel` semantic roles where their text reports state or error; `ErrorProvider` continues to supplement persistent, accessible field feedback.
 
 ## 3. Feedback scope and error presentation
 
@@ -105,9 +113,9 @@ Initial external paste grammar remains strict ungrouped text in the captured cul
 
 ## 6. Typed date input with a themed calendar
 
-The proposed `BootstrapDateInput` composes text entry and `BootstrapCalendarPicker` through reviewed public seams. CalendarPicker is sealed and has no free-text parser; do not reach into private popup controls or put partial-date completion inside `IInputFormatter.Format`, which is invoked on partial prefixes during caret mapping.
+The implemented `BootstrapDateInput` composes native text entry and `BootstrapCalendarPicker`. The Owner-approved [Unified Compact correction](20261024-dateinput-unified-compact-design.md) governs its new visual and caret behavior; execute [UIN-D01–D03](20261024-dateinput-unified-compact-correction.md). CalendarPicker is sealed and has no free-text parser; reuse its engine through reviewed internal/public seams, not application access to private popup controls. Do not put partial-date completion inside `IInputFormatter.Format`, which is invoked on partial prefixes during caret mapping.
 
-The date control follows the same explicit profile/session initialization and read-only accepted Value contract as decimal input. Capture its immutable profile and a local reference date when editing starts, using an injectable provider for tests. Neither focus movement within its popup nor an unrelated projection starts a new session or changes that reference. Complete missing parts only on explicit commit. The app uses `DateTime` at midnight with `Kind.Unspecified` for date-only values, without UTC conversion.
+The date control follows the same explicit profile/session initialization and read-only accepted Value contract as decimal input. Capture its profile at an admitted session boundary. Capture the injected local reference date when a fresh pending candidate begins, including a successful Up/Down step; retain it while that candidate is pending. Opening the calendar without a pending candidate uses the current date; popup focus movement does not recapture a pending candidate's clock. Resolve missing parts on explicit commit or deliberate segment stepping; stepping normalizes only the pending display and does not accept a new Value. The app uses `DateTime` at midnight with `Kind.Unspecified` for date-only values, without UTC conversion.
 
 | Input at reference date 23/10/2026 | Result at commit |
 |---|---|
@@ -120,11 +128,11 @@ The date control follows the same explicit profile/session initialization and re
 
 DMY is explicit even under an en-US numeric culture. Slash is the initial accepted separator. Min/max apply equally to typed input, calendar choice and segment steps. Display uses `dd/MM/yyyy`; help announces short forms and required/optional behavior. Compact `ddMM`/`ddMMyyyy` and time input remain future explicit profiles.
 
-Left/Right/Home/End retain native text selection semantics; a selected day/month/year segment can use Up/Down. Day stepping deliberately moves one calendar day; month/year stepping preserves the day and refuses an impossible date instead of clamping. Incomplete/invalid pending text must first be resolved; arrows cannot discard it. Mouse wheel does not alter a date accidentally.
+Left/Right/Home/End retain native text selection semantics; the day/month/year segment at the caret or selection can use Up/Down. Day stepping deliberately moves one calendar day; month/year stepping preserves the day and refuses an impossible date instead of clamping. The correction preserves logical caret/selection through normalization before host notification, keeps a collapsed caret collapsed, and rejects mutation for readonly/disabled/IME states. Parsable partial DMY may be normalized by a deliberate segment step using the candidate's reference date. Invalid input or a rejected step keeps the raw text and selection. Mouse wheel does not alter a date accidentally.
 
 F4/Alt+Down opens the calendar. Popup arrows navigate the calendar, not text segments. Selection is previewed in the pending buffer and accepted once; Escape restores pre-popup text, and a subsequent Escape can cancel the field. Tab validates before traversal. Popup focus loss must not double-commit or trap focus.
 
-Sales and Goods Receipt currently assign native date Value on ordinary `ApplyState`. Typed-input adoption must add unchanged-value/document projection guards: unrelated notifications/theme refresh cannot overwrite pending date text or caret. Pending date changes participate in dirty/close/navigation admission and Save/Post buffer resolution. Sales From/To retain null semantics and validate order before an admitted query.
+Sales and Goods Receipt have typed date-input adoption and identity-aware projection guards. Preserve them: unrelated notifications/theme refresh cannot overwrite pending date text or caret. Pending date changes participate in dirty/close/navigation admission and Save/Post buffer resolution. Sales From/To retain null semantics, remain independent fields and validate order before an admitted query. DateInput owns one border/focus/validation surface and an embedded calendar icon without a date caption; standalone CalendarPicker summary behavior remains compatible.
 
 Stock Card's UTC date-time filter, displayed seconds and inclusive upper-bound conversion remain unchanged. A typed time/timezone editor is a separate future consumer-driven design, not a hidden dependency of T06.
 

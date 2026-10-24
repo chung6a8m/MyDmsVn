@@ -20,6 +20,48 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class SalesReceiptLookupNativeInputTests
 {
     [Theory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    public void Numeric_native_grouping_preserves_model_and_external_same_display_paste_is_rejected(string theme)
+    {
+        SalesNativeHost.Run((token, guard) =>
+        {
+            using var host = new SalesNativeHost("ProductLookup", theme, token, _output.WriteLine); host.AttachGuard(guard);
+            host.Driver.Key(Keys.Escape);
+            var position = new SourceGrid.Position(1, 3);
+            host.Control.LineGrid.Focus();
+            Assert.True(host.Control.LineGrid.Selection.Focus(position, true));
+            new SourceGrid.CellContext(host.Control.LineGrid, position).StartEdit();
+            var driver = new NativeLookupTypingDriver(host.Control.QuantityEditor);
+            driver.SelectRange(0, driver.Text.Length);
+            var candidate = string.Empty;
+            foreach (var value in "1234")
+            {
+                driver.TypeCharacter(value);
+                candidate += value;
+                driver.AssertFocused();
+                Assert.Equal(candidate, host.Control.QuantityEditor.PendingText);
+                Assert.Equal(driver.Text.Length, driver.SelectionStart);
+                Assert.Equal(0, driver.SelectionLength);
+                Assert.Equal(1m, host.Control.Editor.Lines.Single().Quantity);
+            }
+            Assert.Equal("1,234", driver.Text);
+            Assert.Equal(5, driver.SelectionStart);
+            Assert.Equal(0, driver.SelectionLength);
+            driver.SelectRange(0, driver.Text.Length);
+            driver.Paste("1,234");
+            Assert.Equal("1,234", driver.Text);
+            Assert.Equal("1,234", host.Control.QuantityEditor.PendingText);
+            host.Wait(host.Control.SaveAsync());
+            Assert.Equal("1,234", driver.Text);
+            Assert.Equal(1m, host.Control.Editor.Lines.Single().Quantity);
+            Assert.Empty(host.Api.Updates);
+            _output.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, token));
+            _output.WriteLine("UIN_T05_SALES_NUMERIC_NATIVE;theme=" + theme + ";windowDpi=" + host.Form.DeviceDpi + ";actualTestBitness=" + IntPtr.Size * 8);
+        });
+    }
+
+    [Theory]
     [InlineData("Light", false)]
     [InlineData("Dark", false)]
     [InlineData("Light", true)]
@@ -109,7 +151,7 @@ public sealed class SalesReceiptLookupNativeInputTests
                     var lookup = (BootstrapLookupBox)typeof(SalesReceiptControl).GetProperty(name)!.GetValue(control)!;
                     Assert.False(lookup.Enabled); lookup.Text = "blocked"; lookup.AccessibilityObject.Value = "blocked accessibility"; lookup.SelectValue(8);
                 }
-                Assert.False(control.SaleDateEditor.Enabled); Assert.False(control.NoteEditor.Enabled); control.SaleDateEditor.Value = date.AddDays(1); control.NoteEditor.Text = "blocked"; control.NoteEditor.AccessibilityObject.Value = "blocked accessibility";
+                Assert.False(control.SaleDateEditor.Enabled); Assert.False(control.NoteEditor.Enabled); control.SaleDateEditor.ProjectAcceptedValue(date.AddDays(1)); control.NoteEditor.Text = "blocked"; control.NoteEditor.AccessibilityObject.Value = "blocked accessibility";
                 var gift = control.LineGrid.AccessibilityObject.GetChild(1)!.GetChild(5)!; Assert.Throws<InvalidOperationException>(() => gift.Value = "true");
                 host.Wait(control.SaveAsync()); host.Wait(control.PostAsync()); host.Pump();
                 Assert.Equal(counts, names.Select(host.Calls).ToArray()); Assert.Equal(1, control.Editor.CustomerId); Assert.Equal(2, control.Editor.WarehouseId); Assert.Equal(3, control.Editor.EmployeeId); Assert.Equal(date, control.Editor.SaleDate); Assert.Equal(note, control.Editor.Note); Assert.False(control.Editor.Lines.Single().IsGift);

@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using CommunityToolkit.Mvvm.Messaging;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
@@ -16,6 +18,40 @@ namespace MyDmsVn.Desktop.Tests;
 
 public sealed partial class GoodsReceiptInlineEditorTests
 {
+    [Theory]
+    [InlineData(BootstrapThemeMode.Light)]
+    [InlineData(BootstrapThemeMode.Dark)]
+    public void Native_numeric_grouping_preserves_pending_value_and_rejects_same_display_external_paste(BootstrapThemeMode theme)
+    {
+        SessionTest(host =>
+        {
+            host.Begin(1, 2);
+            var driver = new NativeLookupTypingDriver(host.Adapter.QuantityControl);
+            driver.SelectRange(0, driver.Text.Length);
+            var candidate = string.Empty;
+            foreach (var value in "1234")
+            {
+                driver.TypeCharacter(value);
+                candidate += value;
+                driver.AssertFocused();
+                Assert.Equal(candidate, host.Adapter.QuantityControl.PendingText);
+                Assert.Equal(driver.Text.Length, driver.SelectionStart);
+                Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
+            }
+            Assert.Equal("1,234", driver.Text);
+            Assert.Equal(5, driver.SelectionStart);
+            driver.SelectRange(0, driver.Text.Length);
+            driver.Paste("1,234");
+            Assert.Equal("1,234", driver.Text);
+            Assert.Equal("1,234", host.Adapter.QuantityControl.PendingText);
+            Assert.False(host.Adapter.TryFinishEdit(ReceiptEditIntent.Save));
+            Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("1,234", host.Adapter.QuantityControl.Text);
+            _output.WriteLine(UiNextNativeScaleObservation.Observe(host.Form, CancellationToken.None));
+            _output.WriteLine("UIN_T05_GOODS_NUMERIC_NATIVE;theme=" + theme + ";windowDpi=" + host.WindowDpi + ";actualTestBitness=" + IntPtr.Size * 8);
+        }, theme);
+    }
+
     [Fact]
     public void State_refresh_does_not_replace_the_active_cell()
     {
@@ -196,6 +232,41 @@ public sealed partial class GoodsReceiptInlineEditorTests
     }
 
     [Fact]
+    public void Validated_A_then_native_B_or_failed_revalidation_keeps_the_pending_buffer()
+    {
+        SessionTest(host =>
+        {
+            host.Begin(1, 2);
+            Type("4.5");
+            var session = typeof(GoodsReceiptLinesGridAdapter).GetField("_session", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Adapter)!;
+            var target = (InlineEditTarget<GoodsReceiptLineViewModel>)session.GetType().GetField("Target", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
+            var inline = (InlineEditSession<GoodsReceiptLineViewModel>)typeof(GoodsReceiptLinesGridAdapter)
+                .GetField("_inline", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Adapter)!;
+            var cell = host.Grid[1, 2];
+            var context = host.Context(1, 2);
+            Assert.True(inline.RecordValidatedCandidate(target, 4.5m));
+            var unrelated = host.Context(2, 2);
+            unrelated.Cell.Controller.OnValueChanged(unrelated, EventArgs.Empty);
+            Assert.True(inline.HasValidatedCandidate(target));
+            cell.Controller.OnValueChanged(new SourceGrid.CellContext(host.Grid, new SourceGrid.Position(2, 2), cell), EventArgs.Empty);
+            Assert.True(inline.HasValidatedCandidate(target));
+            host.Editor.Lines[1].Quantity = 5m; // Its projection also emits a native callback.
+            Assert.True(inline.HasValidatedCandidate(target));
+            cell.Value = 3.5m;
+            cell.Controller.OnValueChanged(context, EventArgs.Empty);
+            Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("4.5", host.NativeTextBox().Text);
+            Assert.True(inline.RecordValidatedCandidate(target, 4.5m));
+            inline.InvalidateValidation(target); // The next conversion rejected the pending raw input.
+            cell.Value = 4.5m;
+            cell.Controller.OnValueChanged(context, EventArgs.Empty);
+            Assert.Equal(2.5m, host.Editor.Lines[0].Quantity);
+            Assert.Equal("4.5", host.NativeTextBox().Text);
+            host.Adapter.CancelActiveEdit();
+        });
+    }
+
+    [Fact]
     public void Invalid_candidate_does_not_roll_back_a_concurrent_model_update()
     {
         SessionTest(host =>
@@ -285,12 +356,18 @@ public sealed partial class GoodsReceiptInlineEditorTests
         });
     }
 
-    private static void SessionTest(Action<SessionHost> action) => StaTest.Run(_ =>
+    private static void SessionTest(Action<SessionHost> action, BootstrapThemeMode? theme = null) => StaTest.Run(_ =>
     {
-        using var guard = new WinFormsTestGuard();
-        using var host = new SessionHost();
-        action(host);
-        Assert.Empty(guard.Exceptions);
+        var original = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            if (theme.HasValue) BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(theme.Value);
+            using var guard = new WinFormsTestGuard();
+            using var host = new SessionHost();
+            action(host);
+            Assert.Empty(guard.Exceptions);
+        }
+        finally { BootstrapThemeManager.CurrentTheme = original; }
     }, TimeSpan.FromSeconds(15));
 
     internal sealed class SessionHost : IDisposable
@@ -299,7 +376,9 @@ public sealed partial class GoodsReceiptInlineEditorTests
         internal readonly GoodsReceiptLinesGrid Grid = new GoodsReceiptLinesGrid { Dock = DockStyle.Fill };
         internal readonly GoodsReceiptLinesGridAdapter Adapter;
         private readonly Form _form = new Form { ClientSize = new Size(850, 260), ShowInTaskbar = false };
+        internal Form Form => _form;
         internal IntPtr FormHandle => _form.Handle;
+        internal int WindowDpi => _form.DeviceDpi;
         internal bool CanEdit = true;
         internal readonly SessionLookup ProductSource = new SessionLookup(CatalogKind.Product);
         internal SessionHost()

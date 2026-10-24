@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using CommunityToolkit.Mvvm.Messaging;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
@@ -343,13 +344,62 @@ public sealed partial class BusinessCompactRefinementTests : IClassFixture<Refin
             var late = new Panel();
             content.Controls.Add(late);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Body, late.BackColor);
+            var muted = new BootstrapLabel { Text = "Muted status", TextRole = BootstrapTextRole.Muted };
+            content.Controls.Add(muted);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.MutedText, muted.ForeColor);
+            var semanticAlert = new BootstrapLabel { Text = "Needs action", TextRole = BootstrapTextRole.Danger, AccessibleRole = AccessibleRole.Alert };
+            content.Controls.Add(semanticAlert);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Danger, semanticAlert.ForeColor);
+            var semantic = new BootstrapPanel { SurfaceRole = BootstrapSurfaceRole.Surface };
+            content.Controls.Add(semantic);
+            var publicChild = new Label { Text = "Public nested content" };
+            semantic.Controls.Add(publicChild);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, semantic.BackColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, publicChild.ForeColor);
+            Assert.Equal(10f, publicChild.Font.SizeInPoints);
             shell.ToggleTheme();
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Body, content.BackColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, label.ForeColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.MutedText, muted.ForeColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Danger, semanticAlert.ForeColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, semantic.BackColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, publicChild.ForeColor);
+            Assert.Equal(10f, publicChild.Font.SizeInPoints);
             Assert.Empty(guard.Exceptions);
         }
         finally { BootstrapThemeManager.CurrentTheme = original; }
     });
+
+    [Fact]
+    public void Disposed_appearance_stops_styling_detached_semantic_content() => StaTest.Run(_ =>
+    {
+        using var surface = new BootstrapPanel();
+        var root = new Panel();
+        BusinessCompactAppearance.Apply(root);
+        root.Controls.Add(surface);
+        root.Controls.Remove(surface);
+        root.Dispose();
+
+        using var later = new Label { Text = "Added after workspace disposal" };
+        surface.Controls.Add(later);
+        Assert.NotEqual(10f, later.Font.SizeInPoints);
+    }, TimeSpan.FromSeconds(10));
+
+    [Fact]
+    public void Detached_semantic_content_is_not_styled_by_the_former_live_workspace() => StaTest.Run(_ =>
+    {
+        using var originalRoot = new Panel();
+        using var otherRoot = new Panel();
+        using var surface = new BootstrapPanel();
+        BusinessCompactAppearance.Apply(originalRoot);
+        originalRoot.Controls.Add(surface);
+        originalRoot.Controls.Remove(surface);
+        otherRoot.Controls.Add(surface);
+
+        using var later = new Label { Text = "Added in another workspace" };
+        surface.Controls.Add(later);
+        Assert.NotEqual(10f, later.Font.SizeInPoints);
+    }, TimeSpan.FromSeconds(10));
 
     private string Capture(Form shell, string name, CancellationToken token, bool screen = false)
     {

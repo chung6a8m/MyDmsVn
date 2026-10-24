@@ -193,6 +193,17 @@ namespace MyDmsVn.Desktop.Application
             ErrorMessage = null;
         }
 
+        protected void ClearFieldError(string field)
+        {
+            if (!_fieldErrors.Remove(field))
+            {
+                return;
+            }
+
+            ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(field));
+            OnPropertyChanged(nameof(HasErrors));
+        }
+
         private void ClearErrors()
         {
             if (_fieldErrors.Count == 0)

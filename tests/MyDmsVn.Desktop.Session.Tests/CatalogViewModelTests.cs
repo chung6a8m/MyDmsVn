@@ -13,6 +13,246 @@ namespace MyDmsVn.Desktop.Tests
     public sealed class CatalogViewModelTests
     {
         [Fact]
+        public void Fresh_catalog_editors_track_raw_text_before_New_is_clicked()
+        {
+            using var product = CreateProduct(new FakeProductClient(), new ControllableDelay());
+            using var customer = new CustomerCatalogViewModel(new SuccessfulCustomerClient(),
+                new WeakReferenceMessenger(), new ImmediateUiDispatcher(), new DesktopNotificationCenter(), new ControllableDelay());
+            using var employee = new EmployeeCatalogViewModel(new SuccessfulEmployeeClient(),
+                new WeakReferenceMessenger(), new ImmediateUiDispatcher(), new DesktopNotificationCenter(), new ControllableDelay());
+            using var warehouse = new WarehouseCatalogViewModel(new SuccessfulWarehouseClient(),
+                new WeakReferenceMessenger(), new ImmediateUiDispatcher(), new DesktopNotificationCenter(), new ControllableDelay());
+            Assert.False(product.IsDirty); Assert.False(customer.IsDirty);
+            Assert.False(employee.IsDirty); Assert.False(warehouse.IsDirty);
+            product.Code = "raw"; customer.Code = "raw"; employee.Code = "raw"; warehouse.Code = "raw";
+            Assert.True(product.IsDirty); Assert.True(customer.IsDirty);
+            Assert.True(employee.IsDirty); Assert.True(warehouse.IsDirty);
+            product.Code = string.Empty; customer.Code = string.Empty;
+            employee.Code = string.Empty; warehouse.Code = string.Empty;
+            Assert.False(product.IsDirty); Assert.False(customer.IsDirty);
+            Assert.False(employee.IsDirty); Assert.False(warehouse.IsDirty);
+        }
+
+        [Fact]
+        public async Task Selected_product_stays_clean_until_a_field_changes_and_reverts()
+        {
+            using var vm = CreateProduct(new FakeProductClient(), new ControllableDelay());
+            await vm.SelectAsync(1, CancellationToken.None);
+            var accepted = vm.CaptureEditSnapshot();
+            Assert.False(vm.IsDirty);
+            vm.Name = "changed";
+            Assert.True(vm.IsDirty);
+            Assert.True(vm.EditorRevision > accepted.Revision);
+            vm.Name = "P1 name";
+            Assert.False(vm.IsDirty);
+            Assert.True(vm.EditorRevision > accepted.Revision);
+        }
+
+        [Fact]
+        public async Task Save_for_close_reports_confirmed_write_even_when_list_refresh_fails()
+        {
+            var client = new FakeProductClient
+            {
+                ListResponse = ApiResponse<PagedResult<ProductDto>>.Failure(
+                    new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Refresh failed.")),
+            };
+            using var vm = CreateProduct(client, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "P1";
+            var snapshot = vm.CaptureEditSnapshot();
+            var outcome = await vm.SaveForCloseAsync(CancellationToken.None);
+            Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+            Assert.True(outcome.RefreshFailed);
+            Assert.Equal(snapshot.EditorIdentity, outcome.EditorIdentity);
+            Assert.Equal(snapshot.Revision, outcome.SubmittedRevision);
+            Assert.False(vm.IsDirty);
+        }
+
+        [Fact]
+        public async Task Rejected_save_retains_raw_editor_text_and_dirty_state()
+        {
+            var client = new FakeProductClient { CreateResponse = ApiResponse<ProductDto>.Failure(DuplicateCodeError()) };
+            using var vm = CreateProduct(client, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "DUPLICATE";
+            var outcome = await vm.SaveForCloseAsync(CancellationToken.None);
+            Assert.Equal(WorkspaceSaveStatus.Rejected, outcome.Status);
+            Assert.Equal("DUPLICATE", vm.Code);
+            Assert.True(vm.IsDirty);
+        }
+
+        [Fact]
+        public async Task Save_outcome_carries_submitted_revision_without_overwriting_newer_edits()
+        {
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            using var vm = CreateProduct(client, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "P1";
+            var snapshot = vm.CaptureEditSnapshot();
+            var save = vm.SaveForCloseAsync(CancellationToken.None);
+            vm.Name = "newer edit";
+            client.CompleteCreate(Product(1, "P1"));
+            var outcome = await save;
+            Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+            Assert.Equal(snapshot.Revision, outcome.SubmittedRevision);
+            Assert.Equal("newer edit", vm.Name);
+            Assert.True(vm.IsDirty);
+        }
+
+        [Fact]
+        public void Optional_fields_and_invalid_employee_user_text_drive_dirty_state_in_all_catalogs()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var dispatcher = new ImmediateUiDispatcher();
+            var notifications = new DesktopNotificationCenter();
+            var delay = new SystemAsyncDelay();
+            using var customer = new CustomerCatalogViewModel(new SuccessfulCustomerClient(), messenger,
+                dispatcher, notifications, delay);
+            using var warehouse = new WarehouseCatalogViewModel(new SuccessfulWarehouseClient(), messenger,
+                dispatcher, notifications, delay);
+            using var employee = new EmployeeCatalogViewModel(new SuccessfulEmployeeClient(), messenger,
+                dispatcher, notifications, delay);
+            customer.BeginCreate(); warehouse.BeginCreate(); employee.BeginCreate();
+            Assert.False(customer.IsDirty); Assert.False(warehouse.IsDirty); Assert.False(employee.IsDirty);
+            customer.TaxCode = "raw tax";
+            warehouse.Address = "raw address";
+            employee.UserIdText = "invalid user id";
+            Assert.True(customer.IsDirty); Assert.True(warehouse.IsDirty); Assert.True(employee.IsDirty);
+            customer.TaxCode = null;
+            warehouse.Address = null;
+            employee.UserIdText = string.Empty;
+            Assert.False(customer.IsDirty); Assert.False(warehouse.IsDirty); Assert.False(employee.IsDirty);
+        }
+
+        [Fact]
+        public async Task Selected_customer_warehouse_and_employee_accept_every_loaded_field_as_clean()
+        {
+            var messenger = new WeakReferenceMessenger();
+            var dispatcher = new ImmediateUiDispatcher();
+            var notifications = new DesktopNotificationCenter();
+            var delay = new SystemAsyncDelay();
+            using var customer = new CustomerCatalogViewModel(new SuccessfulCustomerClient(), messenger,
+                dispatcher, notifications, delay);
+            using var warehouse = new WarehouseCatalogViewModel(new SuccessfulWarehouseClient(), messenger,
+                dispatcher, notifications, delay);
+            using var employee = new EmployeeCatalogViewModel(new SuccessfulEmployeeClient(), messenger,
+                dispatcher, notifications, delay);
+            await customer.SelectAsync(13, CancellationToken.None);
+            await warehouse.SelectAsync(11, CancellationToken.None);
+            await employee.SelectAsync(12, CancellationToken.None);
+            Assert.False(customer.IsDirty); Assert.False(warehouse.IsDirty); Assert.False(employee.IsDirty);
+            customer.TaxCode = "T2";
+            warehouse.Address = "A2";
+            employee.UserIdText = "22";
+            Assert.True(customer.IsDirty); Assert.True(warehouse.IsDirty); Assert.True(employee.IsDirty);
+        }
+
+        [Fact]
+        public async Task Canceled_before_write_and_indeterminate_write_have_distinct_outcomes()
+        {
+            var client = new FakeProductClient();
+            using var vm = CreateProduct(client, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "P1";
+            using (var canceled = new CancellationTokenSource())
+            {
+                canceled.Cancel();
+                var before = await vm.SaveForCloseAsync(canceled.Token);
+                Assert.Equal(WorkspaceSaveStatus.CanceledBeforeMutation, before.Status);
+            }
+            client.CreateException = new InvalidOperationException("connection lost");
+            var unknown = await vm.SaveForCloseAsync(CancellationToken.None);
+            Assert.Equal(WorkspaceSaveStatus.Unknown, unknown.Status);
+            Assert.True(vm.IsDirty);
+        }
+        [Fact]
+        public async Task Busy_rejected_save_does_not_supersede_admitted_write_feedback()
+        {
+            using var scope = new WorkspaceFeedbackScope();
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var notices = new List<DesktopNotification>();
+            scope.Published += (_, e) => notices.Add(e.Notification);
+            using var vm = new ProductCatalogViewModel(client, new WeakReferenceMessenger(), new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "P1";
+            var admitted = vm.SaveAsync(CancellationToken.None);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => vm.SaveAsync(CancellationToken.None));
+            client.CompleteCreate(Product(1, "P1")); await admitted;
+            Assert.Equal(DesktopNotificationKind.Success, Assert.Single(notices).Kind);
+        }
+        [Fact]
+        public async Task Old_document_success_does_not_emit_feedback_or_reload_new_document()
+        {
+            using var scope = new WorkspaceFeedbackScope(4);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var messenger = new WeakReferenceMessenger();
+            var messages = new List<CatalogChangedMessage>();
+            messenger.Register<CatalogChangedMessage>(messages, (_, message) => messages.Add(message));
+            int notices = 0; scope.Published += (_, __) => notices++;
+            using var vm = new ProductCatalogViewModel(client, messenger, new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "OLD";
+            var save = vm.SaveAsync(CancellationToken.None);
+            vm.BeginCreate(); vm.Code = "NEW";
+            client.CompleteCreate(Product(1, "OLD")); await save;
+            Assert.Empty(messages); Assert.Empty(client.ListRequests); Assert.Equal(0, notices);
+            Assert.Equal("NEW", vm.Code); Assert.Null(vm.SelectedId);
+        }
+        [Fact]
+        public async Task Workspace_feedback_reports_authoritative_save_before_refresh_failure()
+        {
+            using var scope = new WorkspaceFeedbackScope(4);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient
+            {
+                ListResponse = ApiResponse<PagedResult<ProductDto>>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Refresh failed.")),
+            };
+            var notices = new List<DesktopNotification>();
+            scope.Published += (_, e) => notices.Add(e.Notification);
+            using var vm = new ProductCatalogViewModel(client, new WeakReferenceMessenger(), new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            vm.BeginCreate(); vm.Code = "P1"; vm.Name = "Product"; vm.Unit = "pcs";
+            await vm.SaveAsync(CancellationToken.None);
+            Assert.Equal(new[] { DesktopNotificationKind.Success, DesktopNotificationKind.Error,
+                DesktopNotificationKind.Warning }, notices.Select(n => n.Kind));
+            Assert.Equal(1, vm.SelectedId);
+            Assert.Equal("Refresh failed.", notices[1].Message);
+            Assert.Contains("was saved", notices[2].Message);
+        }
+
+        [Fact]
+        public async Task Workspace_feedback_reports_authoritative_active_change_before_refresh_failure()
+        {
+            using var scope = new WorkspaceFeedbackScope(4);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient
+            {
+                ListResponse = ApiResponse<PagedResult<ProductDto>>.Failure(
+                    new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Refresh failed.")),
+            };
+            var notices = new List<DesktopNotification>();
+            scope.Published += (_, e) => notices.Add(e.Notification);
+            using var vm = new ProductCatalogViewModel(client, new WeakReferenceMessenger(),
+                new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            await vm.SetActiveAsync(1, false, CancellationToken.None);
+            Assert.Equal(new[] { DesktopNotificationKind.Success, DesktopNotificationKind.Error },
+                notices.Select(n => n.Kind));
+            Assert.Equal("Deactivated successfully.", notices[0].Message);
+            Assert.Equal("Refresh failed.", notices[1].Message);
+        }
+
+        [Fact]
+        public async Task Workspace_feedback_captures_query_without_control_or_selected_tab()
+        {
+            using var scope = new WorkspaceFeedbackScope(4);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            var client = new FakeProductClient
+            {
+                ListResponse = ApiResponse<PagedResult<ProductDto>>.Failure(new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Refresh failed.")),
+            };
+            var notices = new List<WorkspaceFeedbackEventArgs>();
+            scope.Published += (_, e) => notices.Add(e);
+            using var vm = new ProductCatalogViewModel(client, new WeakReferenceMessenger(), new ImmediateUiDispatcher(), notifications, new ControllableDelay());
+            await vm.RefreshAsync(CancellationToken.None);
+            Assert.Equal(scope.WorkspaceId, Assert.Single(notices).Context.WorkspaceId);
+            Assert.Equal(WorkspaceOperationKind.Query, notices[0].Context.Kind);
+        }
+        [Fact]
         public async Task Product_create_update_and_set_active_publish_one_typed_message_after_each_success()
         {
             var client = new FakeProductClient
@@ -540,6 +780,92 @@ namespace MyDmsVn.Desktop.Tests
             }
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public async Task Delayed_save_error_cannot_restore_validation_after_editor_replacement(bool select, bool unexpected)
+        {
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var notifications = new DesktopNotificationCenter();
+            using (var viewModel = new ProductCatalogViewModel(client, new WeakReferenceMessenger(),
+                new ImmediateUiDispatcher(), notifications, new ControllableDelay()))
+            {
+                viewModel.Code = "DUP";
+                var saving = viewModel.SaveAsync(CancellationToken.None);
+                if (select) await viewModel.SelectAsync(2, CancellationToken.None);
+                else viewModel.BeginCreate();
+                if (unexpected) client.FailCreate(new InvalidOperationException("old save failed"));
+                else client.CompleteCreateError(DuplicateCodeError());
+                await saving;
+                Assert.False(viewModel.HasErrors);
+                Assert.Null(viewModel.ErrorMessage);
+                Assert.Null(notifications.LastNotification);
+                Assert.Equal(select ? "P1" : string.Empty, viewModel.Code);
+            }
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public async Task Queued_save_error_is_rechecked_at_dispatch_after_new_document_or_disposal(bool unexpected, bool dispose)
+        {
+            var client = new FakeProductClient { ControlCreateResponse = true };
+            var dispatcher = new SwitchableUiDispatcher { Defer = true };
+            var notifications = new DesktopNotificationCenter();
+            using (var viewModel = new ProductCatalogViewModel(client, new WeakReferenceMessenger(),
+                dispatcher, notifications, new ControllableDelay()))
+            {
+                var saving = viewModel.SaveAsync(CancellationToken.None);
+                if (unexpected) client.FailCreate(new InvalidOperationException("old failure"));
+                else client.CompleteCreateError(DuplicateCodeError());
+                await WaitUntilAsync(() => dispatcher.PendingCount == 1);
+                if (dispose) viewModel.Dispose();
+                else viewModel.BeginCreate();
+                dispatcher.RunNext();
+                await saving;
+                Assert.False(viewModel.HasErrors);
+                Assert.Null(viewModel.ErrorMessage);
+                Assert.Null(notifications.LastNotification);
+            }
+        }
+
+        [Fact]
+        public async Task Editing_code_clears_only_its_error_and_retains_attempted_fields_and_summary()
+        {
+            var error = new ApiError(ApiStatusCode.Conflict, "Product.DuplicateCode", "Correct fields.",
+                new[] { new ApiErrorDetail("Product.DuplicateCode", "Duplicate code.", "code"),
+                    new ApiErrorDetail("Validation.Required", "Name error.", "name") });
+            var client = new FakeProductClient { CreateResponse = ApiResponse<ProductDto>.Failure(error) };
+            using (var viewModel = CreateProduct(client, new ControllableDelay()))
+            {
+                viewModel.Code = "DUP";
+                viewModel.Name = "Attempted name";
+                viewModel.Unit = "Box";
+                await viewModel.SaveAsync(CancellationToken.None);
+                Assert.Equal("DUP", viewModel.Code);
+                Assert.Equal("Attempted name", viewModel.Name);
+                Assert.Equal("Box", viewModel.Unit);
+                var changed = new List<string?>();
+                viewModel.ErrorsChanged += (_, args) => changed.Add(args.PropertyName);
+                viewModel.Code = "DUP";
+                Assert.Single(viewModel.GetErrors("code"));
+                viewModel.Code = "NEW";
+                Assert.Empty(viewModel.GetErrors("code"));
+                Assert.Single(viewModel.GetErrors("name"));
+                Assert.True(viewModel.HasErrors);
+                Assert.Equal("Correct fields.", viewModel.ErrorMessage);
+                Assert.Equal(new[] { "code" }, changed);
+            }
+        }
+
+        private static ApiError DuplicateCodeError() => new ApiError(ApiStatusCode.Conflict,
+            "Product.DuplicateCode", "Duplicate code.",
+            new[] { new ApiErrorDetail("Product.DuplicateCode", "Duplicate code.", "code") });
+
         [Fact]
         public async Task Begin_create_clears_validation_from_the_previous_editor_context()
         {
@@ -933,6 +1259,8 @@ namespace MyDmsVn.Desktop.Tests
                     : CreateException == null
                     ? Task.FromResult(CreateResponse)
                     : Task.FromException<ApiResponse<ProductDto>>(CreateException);
+            public void CompleteCreateError(ApiError error) =>
+                _controlledCreate!.TrySetResult(ApiResponse<ProductDto>.Failure(error));
             public void CompleteCreate(ProductDto item) =>
                 _controlledCreate!.TrySetResult(ApiResponse<ProductDto>.Success(item));
             public void FailCreate(Exception exception) =>
@@ -977,7 +1305,8 @@ namespace MyDmsVn.Desktop.Tests
         private sealed class SuccessfulWarehouseClient : IWarehouseApiClient
         {
             public Task<ApiResponse<PagedResult<WarehouseDto>>> ListAsync(CatalogListRequest request, CancellationToken token) => Task.FromResult(ApiResponse<PagedResult<WarehouseDto>>.Success(new PagedResult<WarehouseDto>(Array.Empty<WarehouseDto>(), request.PageNumber, request.PageSize, 0)));
-            public Task<ApiResponse<WarehouseDto>> GetAsync(int id, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<WarehouseDto>> GetAsync(int id, CancellationToken token) =>
+                Task.FromResult(ApiResponse<WarehouseDto>.Success(new WarehouseDto(id, "W11", "Warehouse", "A1", true)));
             public Task<ApiResponse<WarehouseDto>> CreateAsync(SaveWarehouseRequest request, CancellationToken token) => Task.FromResult(ApiResponse<WarehouseDto>.Success(new WarehouseDto(11, request.Code, request.Name, request.Address, true)));
             public Task<ApiResponse<WarehouseDto>> UpdateAsync(int id, SaveWarehouseRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
@@ -989,7 +1318,8 @@ namespace MyDmsVn.Desktop.Tests
             public int CreateCount { get; private set; }
             public SaveEmployeeRequest? LastRequest { get; private set; }
             public Task<ApiResponse<PagedResult<EmployeeDto>>> ListAsync(CatalogListRequest request, CancellationToken token) => Task.FromResult(ApiResponse<PagedResult<EmployeeDto>>.Success(new PagedResult<EmployeeDto>(Array.Empty<EmployeeDto>(), request.PageNumber, request.PageSize, 0)));
-            public Task<ApiResponse<EmployeeDto>> GetAsync(int id, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<EmployeeDto>> GetAsync(int id, CancellationToken token) =>
+                Task.FromResult(ApiResponse<EmployeeDto>.Success(new EmployeeDto(id, "E12", "Employee", "123", 12, true)));
             public Task<ApiResponse<EmployeeDto>> CreateAsync(SaveEmployeeRequest request, CancellationToken token) { CreateCount++; LastRequest = request; return Task.FromResult(ApiResponse<EmployeeDto>.Success(new EmployeeDto(12, request.Code, request.Name, request.Phone, request.UserId, true))); }
             public Task<ApiResponse<EmployeeDto>> UpdateAsync(int id, SaveEmployeeRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => Task.FromResult(ApiResponse<UnitResponse>.Success(UnitResponse.Value));
@@ -999,7 +1329,8 @@ namespace MyDmsVn.Desktop.Tests
         private sealed class SuccessfulCustomerClient : ICustomerApiClient
         {
             public Task<ApiResponse<PagedResult<CustomerDto>>> ListAsync(CatalogListRequest request, CancellationToken token) => Task.FromResult(ApiResponse<PagedResult<CustomerDto>>.Success(new PagedResult<CustomerDto>(Array.Empty<CustomerDto>(), request.PageNumber, request.PageSize, 0)));
-            public Task<ApiResponse<CustomerDto>> GetAsync(int id, CancellationToken token) => throw new NotSupportedException();
+            public Task<ApiResponse<CustomerDto>> GetAsync(int id, CancellationToken token) =>
+                Task.FromResult(ApiResponse<CustomerDto>.Success(new CustomerDto(id, "C13", "Customer", "A1", "123", "T1", true)));
             public Task<ApiResponse<CustomerDto>> CreateAsync(SaveCustomerRequest request, CancellationToken token) => Task.FromResult(ApiResponse<CustomerDto>.Success(new CustomerDto(13, request.Code, request.Name, request.Address, request.Phone, request.TaxCode, true)));
             public Task<ApiResponse<CustomerDto>> UpdateAsync(int id, SaveCustomerRequest request, CancellationToken token) => throw new NotSupportedException();
             public Task<ApiResponse<UnitResponse>> SetActiveAsync(int id, bool active, CancellationToken token) => throw new NotSupportedException();

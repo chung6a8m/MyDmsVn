@@ -11,12 +11,176 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
 using Xunit;
-using Box = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapFormattedTextBox;
+using Box = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDecimalInput;
+using DateInput = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDateInput;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SalesReceiptControlTests
 {
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("2", 2)]
+    public void Corrected_paste_refreshes_cell_and_host_validation_without_clearing_other_cells(string correction, int expected)
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost();
+            host.Load();
+            var grid = host.Value<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSourceGrid>("LineGrid");
+            var adapter = (SalesReceiptLinesGridAdapter)typeof(SalesReceiptControl)
+                .GetField("_inline", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Control)!;
+            var errors = (ErrorProvider)typeof(SalesReceiptControl)
+                .GetField("_errors", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host.Control)!;
+            var summary = host.Value<BootstrapButton>("ValidationSummaryButton");
+            var normal = ((SourceGrid.Cells.Views.Cell)grid[1, 3].View).BackColor;
+            var normalPrice = ((SourceGrid.Cells.Views.Cell)grid[1, 4].View).BackColor;
+            grid.Selection.ResetSelection(false);
+            grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 3), new SourceGrid.Position(1, 4)), true);
+            Assert.False(adapter.TryPasteNumeric("bad\tbad"));
+            Assert.NotEqual(normal, ((SourceGrid.Cells.Views.Cell)grid[1, 3].View).BackColor);
+            Assert.Contains("Quantity", summary.Text);
+            Assert.Contains("Unit price", summary.Text);
+            Assert.NotEmpty(errors.GetError(grid));
+
+            host.Begin(3);
+            var driver = new NativeLookupTypingDriver(host.Value<Box>("QuantityEditor"));
+            driver.SelectRange(0, driver.Text.Length);
+            foreach (var character in correction) driver.TypeCharacter(character);
+            driver.Key(Keys.Enter);
+            System.Windows.Forms.Application.DoEvents();
+
+            Assert.Equal(expected, host.Editor.Lines.Single().Quantity);
+            Assert.Equal(normal, ((SourceGrid.Cells.Views.Cell)grid[1, 3].View).BackColor);
+            Assert.NotEqual(normalPrice, ((SourceGrid.Cells.Views.Cell)grid[1, 4].View).BackColor);
+            Assert.DoesNotContain("Quantity", summary.Text);
+            Assert.Contains("Unit price", summary.Text);
+            Assert.Empty(errors.GetError(grid));
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(15));
+    }
+
+    [Fact]
+    public void Nullable_sales_date_filters_commit_clear_and_reject_invalid_range_without_query()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost();
+            var from = Assert.IsType<DateInput>(host.Value<Control>("FromDateEditor"));
+            var to = Assert.IsType<DateInput>(host.Value<Control>("ToDateEditor"));
+            var before = host.Api.Lists.Count;
+
+            from.Text = "23/10/2026"; to.Text = "22/10/2026";
+            host.CallTask("ApplyFiltersAsync");
+            Assert.Equal(before, host.Api.Lists.Count);
+            Assert.Equal("23/10/2026", from.PendingText);
+            Assert.Equal("22/10/2026", to.PendingText);
+            Assert.Equal(BootstrapValidationState.Invalid, from.ValidationState);
+            Assert.Equal(BootstrapValidationState.Invalid, to.ValidationState);
+            Assert.Equal(AccessibleRole.Alert, host.Value<Label>("OperationStatusLabel").AccessibleRole);
+
+            to.Text = "24/10/2026";
+            Assert.Equal(BootstrapValidationState.None, from.ValidationState);
+            Assert.Equal(BootstrapValidationState.None, to.ValidationState);
+            host.CallTask("ApplyFiltersAsync");
+            Assert.Equal(new DateTime(2026, 10, 23), host.Api.Lists.Last().FromDate);
+            Assert.Equal(new DateTime(2026, 10, 24), host.Api.Lists.Last().ToDate);
+
+            from.Text = ""; to.Text = "";
+            host.CallTask("ApplyFiltersAsync");
+            Assert.Null(host.Api.Lists.Last().FromDate);
+            Assert.Null(host.Api.Lists.Last().ToDate);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Pending_sales_date_filter_survives_unrelated_state_projection_and_rejected_apply()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost();
+            var from = Assert.IsType<DateInput>(host.Value<Control>("FromDateEditor"));
+            var before = host.Api.Lists.Count;
+            from.Text = "31/02/2026";
+            host.Value<NumericUpDown>("PageSizeEditor").Value = 26;
+            Assert.Equal("31/02/2026", from.PendingText);
+            host.CallTask("ApplyFiltersAsync");
+            Assert.Equal(before, host.Api.Lists.Count);
+            Assert.Equal("31/02/2026", from.PendingText);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Unknown_post_alert_clears_only_after_authoritative_reload()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var cleared = 0;
+            host.Value<WorkspaceFeedbackScope>("FeedbackScope").ActionableCleared += (_, __) => cleared++;
+            host.CallTask("PostAsync");
+            Assert.True(host.Editor.RequiresPostOutcomeReload);
+            host.Api.GetHandler = _ => Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+                new ApiError(ApiStatusCode.InternalServerError, "Test.RefreshFailed", "Refresh failed.")));
+
+            host.CallTask("ReloadAsync");
+            Assert.Equal(0, cleared);
+            Assert.True(host.Editor.RequiresPostOutcomeReload);
+            host.Api.GetHandler = id => Task.FromResult(ApiResponse<SalesReceiptDto>.Success(SalesGuiApi.Receipt(id)));
+            host.CallTask("ReloadAsync");
+
+            Assert.Equal(1, cleared);
+            Assert.False(host.Editor.RequiresPostOutcomeReload);
+            Assert.Single(host.Api.Posts);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Editor_read_denial_invalidates_previous_sales_feedback()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var scope = host.Value<WorkspaceFeedbackScope>("FeedbackScope");
+            var old = scope.BeginOperation("old", WorkspaceOperationKind.Write);
+            scope.Capture(old).Publish(new DesktopNotification(DesktopNotificationKind.Success, "Old sale"));
+            host.Api.GetHandler = _ => Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+                new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "The operation is not permitted.")));
+
+            host.CallTask("ReloadAsync");
+
+            Assert.True(host.Editor.IsAccessDenied);
+            Assert.False(scope.IsCurrent(old));
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Confirmed_post_reports_to_its_sales_scope_before_detail_refresh_failure()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard(); using var host = new SalesControlHost(); host.Load();
+            var notices = new System.Collections.Generic.List<DesktopNotification>();
+            host.Value<WorkspaceFeedbackScope>("FeedbackScope").Published += (_, eventArgs) => notices.Add(eventArgs.Notification);
+            host.Api.PostHandler = () => Task.FromResult(ApiResponse<PostSalesReceiptResponse>.Success(
+                new PostSalesReceiptResponse(41, "Posted", DateTime.UtcNow, "known-post-version")));
+            host.Api.GetHandler = _ => Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+                new ApiError(ApiStatusCode.InternalServerError, "Test.RefreshFailed", "Refresh failed.")));
+
+            host.CallTask("PostAsync");
+
+            Assert.Equal(new[] { DesktopNotificationKind.Success, DesktopNotificationKind.Error }, notices.Select(notice => notice.Kind));
+            Assert.True(host.Editor.RequiresPostOutcomeReload);
+            Assert.Single(host.Api.Posts);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
     [Fact]
     public void Saved_read_and_post_only_draft_posts_through_real_buffer_admission_without_write()
     {

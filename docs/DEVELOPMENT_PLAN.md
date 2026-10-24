@@ -1,6 +1,6 @@
 # Development status — v1a-pro-ui-next
 
-**Updated:** 2026-10-23. The [UI-NEXT roadmap](ui-next/20261023-active-roadmap.md) is the sole execution queue, based on merged PR #43 at `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This page distinguishes implemented source, historical acceptance and proposed work; it defines no separate task order.
+**Updated:** 2026-10-24. The [UI-NEXT roadmap](ui-next/20261023-active-roadmap.md) remains the sole execution queue, originally activated from merged PR #43 at `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This page distinguishes implemented source, historical acceptance and proposed work; it defines no separate task order.
 
 ## Implemented baseline
 
@@ -20,7 +20,9 @@ Product and all ten active test projects target `net48`. Package forms remain Wi
 
 ## Active work — UI-NEXT
 
-The [design and control policy](ui-next/20261023-design-and-control-policy.md) covers workspace-owned feedback, field/cell validation, tab close and busy presentation, and semantic theme surfaces. The [implementation plan](ui-next/20261023-implementation-plan.md) owns concrete work; all implementation tasks are **NOT STARTED**. Proposed controls/services and documentation examples are not delivered APIs or runtime PASS.
+The [design and control policy](ui-next/20261023-design-and-control-policy.md) and [implementation plan](ui-next/20261023-implementation-plan.md) cover workspace-owned feedback, field/cell validation, typed input, tab close and busy presentation, and semantic theme surfaces. UIN-T00–T13 are VERIFIED in their recorded bounded scopes and exact revisions; preserve the [T13 ledger](ui-next/evidence/20261024-uin-t13-integration.md), original failures and later PR review correction evidence.
+
+**Current work: DateInput correction UIN-D01–UIN-D03**, continuing application PR #45 on `codex/uin-t13`. The Owner approved [01 — Unified Compact](ui-next/20261024-dateinput-unified-compact-design.md) on 2026-10-24. Follow the [active correction plan](ui-next/20261024-dateinput-unified-compact-correction.md) for segment-preserving caret behavior, unified border/icon-only trigger, exact dependency pins and affected-host verification. Correction implementation is **NOT STARTED**, runtime checks are **NOT RUN**, and Owner visual acceptance of the implemented candidate remains pending. The design and documentation handoff establish no runtime PASS.
 
 Shared UI owns reusable control rendering/theme/lifecycle. MyDmsVn retains workspace/session/document identity, dirty/close and operation policy, validation mapping, security denial and uncertain-Post recovery. No new business workflow, runtime, provider or production-release initiative is activated.
 

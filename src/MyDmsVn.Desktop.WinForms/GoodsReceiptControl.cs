@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using BootstrapGrid = MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSourceGrid;
@@ -20,10 +21,12 @@ namespace MyDmsVn.Desktop.WinForms
         Control Create();
     }
 
-    public sealed partial class GoodsReceiptControl : UserControl
+    public sealed partial class GoodsReceiptControl : UserControl, IWorkspaceCloseParticipant
     {
         private readonly GoodsReceiptListViewModel _list;
         private readonly GoodsReceiptEditorViewModel _editor;
+        private readonly WorkspaceFeedbackNotificationService? _feedbackNotifications;
+        public WorkspaceFeedbackScope FeedbackScope { get; }
         private readonly ErrorProvider _errors;
         private readonly Dictionary<string, Control> _errorControls;
         private readonly List<GoodsReceiptLineViewModel> _subscribedLines =
@@ -39,13 +42,18 @@ namespace MyDmsVn.Desktop.WinForms
         private bool _isAccessDeniedEditorLocked;
         private bool _applyingState;
         private int _lookupBoundaryGeneration;
+        private long _closeBufferRevision;
+        private bool _projectingSavedReceipt;
 
         public GoodsReceiptControl(
             GoodsReceiptListViewModel list,
-            GoodsReceiptEditorViewModel editor)
+            GoodsReceiptEditorViewModel editor,
+            WorkspaceFeedbackNotificationService? feedbackNotifications = null)
         {
             _list = list ?? throw new ArgumentNullException(nameof(list));
             _editor = editor ?? throw new ArgumentNullException(nameof(editor));
+            _feedbackNotifications = feedbackNotifications;
+            FeedbackScope = feedbackNotifications?.Scope ?? new WorkspaceFeedbackScope();
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
             Dock = DockStyle.Fill;
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -60,11 +68,11 @@ namespace MyDmsVn.Desktop.WinForms
             };
             StatusFilter.Items.AddRange(new object[] { "All", "Draft", "Posted" });
             StatusFilter.SelectedIndex = 0;
-            RefreshButton = CreateButton("Refresh", () => SetOperation(RefreshAsync()));
+            RefreshButton = CreateButton("Refresh", () => SetOperation(RunFeedback("goods-refresh", WorkspaceOperationKind.Query, RefreshAsync)));
             NewButton = CreateButton("New", BeginNew);
             PreviousPageButton = CreateButton("Previous", () => MovePage(-1));
             NextPageButton = CreateButton("Next", () => MovePage(1));
-            PageLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
+            PageLabel = new BootstrapLabel { TextRole = BootstrapTextRole.Muted, AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
             ReceiptGrid = new ReceiptResultsGrid { Dock = DockStyle.Fill, TabStop = true, AccessibleName = "Goods receipt results", CausesValidation = false };
             ((AccessibleActionGrid)ReceiptGrid).ConfigureRowActions(
                 row => row > 0 && row <= _receiptIds.Count ? (object)_receiptIds[row - 1] : null,
@@ -81,14 +89,19 @@ namespace MyDmsVn.Desktop.WinForms
             ReceiptGrid.DoubleClick += (_, __) => SelectActiveReceipt();
             ReceiptGrid.KeyDown += OnReceiptGridKeyDown;
 
-            ReceiptDateEditor = new BootstrapDatePicker { Dock = DockStyle.Top, AccessibleName = "Receipt date" };
+            ReceiptDateEditor = new BootstrapDateInput
+            {
+                Dock = DockStyle.Top, AccessibleName = "Receipt date",
+                AccessibleDescription = "Type day, day/month or day/month/four-digit-year.",
+                Profile = new DateInputProfile(false, DateTimePicker.MinimumDateTime, DateTimePicker.MaximumDateTime)
+            };
             WarehouseLookup = CreateLookup("Warehouse");
             EmployeeLookup = CreateLookup("Employee");
             NoteEditor = new BootstrapTextBox { Dock = DockStyle.Top, AccessibleName = "Note" };
-            StatusLabel = new Label { AutoSize = true };
-            VersionLabel = new Label { AutoSize = true };
-            TotalLabel = new Label { AutoSize = true, TextAlign = ContentAlignment.MiddleRight };
-            OperationStatusLabel = new Label { AutoSize = true, Text = "Ready" };
+            StatusLabel = new BootstrapLabel { AutoSize = true, TextRole = BootstrapTextRole.Muted };
+            VersionLabel = new BootstrapLabel { AutoSize = true, TextRole = BootstrapTextRole.Muted };
+            TotalLabel = new BootstrapLabel { AutoSize = true, TextAlign = ContentAlignment.MiddleRight };
+            OperationStatusLabel = new BootstrapLabel { AutoSize = true, Text = "Ready", TextRole = BootstrapTextRole.Muted, AccessibleName = "Goods receipt operation status" };
             BusyIndicator = new BootstrapProgressBar
             {
                 Width = 100,
@@ -98,8 +111,8 @@ namespace MyDmsVn.Desktop.WinForms
                 ShowText = false,
                 Visible = false,
             };
-            SaveButton = CreateButton("Save", () => SetOperation(SaveAsync()));
-            PostButton = CreateButton("Post", () => SetOperation(PostAsync()));
+            SaveButton = CreateButton("Save", () => SetOperation(RunFeedback("goods-save", WorkspaceOperationKind.Write, SaveAsync)));
+            PostButton = CreateButton("Post", () => SetOperation(RunFeedback("goods-post", WorkspaceOperationKind.Write, PostAsync)));
 
             LineGrid = new GoodsReceiptLinesGrid { Dock = DockStyle.Fill, TabStop = true, CausesValidation = false };
             _inline = new GoodsReceiptLinesGridAdapter((GoodsReceiptLinesGrid)LineGrid, _editor, CanEditLines);
@@ -128,6 +141,7 @@ namespace MyDmsVn.Desktop.WinForms
             WarehouseFilterLookup.SelectedValueChanged += OnWarehouseFilterChanged;
             StatusFilter.SelectedValueChanged += OnStatusFilterChanged;
             ReceiptDateEditor.ValueChanged += OnReceiptDateChanged;
+            ReceiptDateEditor.PendingTextChanged += OnPendingReceiptDateChanged;
             WarehouseLookup.SelectedValueChanged += OnWarehouseChanged;
             WarehouseLookup.TextChanged += OnWarehouseLookupSearchChanged;
             EmployeeLookup.SelectedValueChanged += OnEmployeeChanged;
@@ -149,13 +163,13 @@ namespace MyDmsVn.Desktop.WinForms
         public ComboBox StatusFilter { get; }
         public BootstrapGrid ReceiptGrid { get; }
         public BootstrapGrid LineGrid { get; }
-        public BootstrapDatePicker ReceiptDateEditor { get; }
+        public BootstrapDateInput ReceiptDateEditor { get; }
         public BootstrapLookupBox WarehouseLookup { get; }
         public BootstrapLookupBox EmployeeLookup { get; }
         public BootstrapLookupBox ProductLookup => _inline.ProductControl;
         public BootstrapTextBox NoteEditor { get; }
-        public BootstrapFormattedTextBox QuantityEditor => _inline.QuantityControl;
-        public BootstrapFormattedTextBox UnitCostEditor => _inline.CostControl;
+        public BootstrapDecimalInput QuantityEditor => _inline.QuantityControl;
+        public BootstrapDecimalInput UnitCostEditor => _inline.CostControl;
         public BootstrapButton RefreshButton { get; }
         public BootstrapButton PreviousPageButton { get; }
         public BootstrapButton NextPageButton { get; }
@@ -174,15 +188,18 @@ namespace MyDmsVn.Desktop.WinForms
 
         public Task ActivateAsync(CancellationToken cancellationToken)
         {
-            LastOperation = ActivateCoreAsync(cancellationToken);
+            LastOperation = RunFeedback("goods-activate", WorkspaceOperationKind.Query, () => ActivateCoreAsync(cancellationToken));
             return LastOperation;
         }
 
         public Task SelectReceiptAsync(long id, CancellationToken cancellationToken)
         {
-            LastOperation = SelectReceiptCoreAsync(id, cancellationToken);
+            LastOperation = RunFeedback("goods-select", WorkspaceOperationKind.Query, () => SelectReceiptCoreAsync(id, cancellationToken));
             return LastOperation;
         }
+
+        private Task RunFeedback(string key, WorkspaceOperationKind kind, Func<Task> operation) =>
+            _feedbackNotifications == null ? operation() : _feedbackNotifications.RunAsync(key, kind, operation);
 
         public string GetFieldError(string field)
         {
@@ -214,6 +231,7 @@ namespace MyDmsVn.Desktop.WinForms
                 WarehouseFilterLookup.SelectedValueChanged -= OnWarehouseFilterChanged;
                 StatusFilter.SelectedValueChanged -= OnStatusFilterChanged;
                 ReceiptDateEditor.ValueChanged -= OnReceiptDateChanged;
+                ReceiptDateEditor.PendingTextChanged -= OnPendingReceiptDateChanged;
                 WarehouseLookup.SelectedValueChanged -= OnWarehouseChanged;
                 WarehouseLookup.TextChanged -= OnWarehouseLookupSearchChanged;
                 EmployeeLookup.SelectedValueChanged -= OnEmployeeChanged;
@@ -229,6 +247,9 @@ namespace MyDmsVn.Desktop.WinForms
                 UnsubscribeLines();
                 _inline.EditStateChanged -= OnInlineEditStateChanged;
                 _inline.Dispose();
+                _masterBusyBinder.Dispose();
+                _detailBusyBinder.Dispose();
+                FeedbackScope.Dispose();
                 VersionLabel.Dispose(); // Retained compatibility control is deliberately outside the visible tree.
                 _errors.Dispose();
                 _list.Dispose();
@@ -272,6 +293,7 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     if (await _editor.RefreshAsync(CancellationToken.None).ConfigureAwait(true))
                     {
+                        BeginReceiptDateSession();
                         RebindSelectedLine(selectedLineId, selectedLineIndex);
                         _inline.ResetDocument(_editor.Lines);
                     }
@@ -317,44 +339,91 @@ namespace MyDmsVn.Desktop.WinForms
             _workflowMessage = null;
             CancelEditorLookupEdits();
             _editor.Load(selected);
+            FeedbackScope.AdvanceDocument();
+            BeginReceiptDateSession();
             _selectedLine = _editor.Lines.FirstOrDefault();
             _inline.ResetDocument(_editor.Lines);
             ShowReceiptDetail();
             ApplyState();
         }
 
-        private async Task SaveAsync()
+        private async Task SaveAsync() => await SaveCoreAsync(CancellationToken.None, false).ConfigureAwait(true);
+
+        internal WorkspaceCloseState CaptureCloseState()
         {
+            var pending = WorkspaceMode == ReceiptWorkspaceMode.Detail &&
+                (_inline.HasPendingDataEdit || ReceiptDateEditor.HasPendingEdit ||
+                 WarehouseLookup.HasPendingText || EmployeeLookup.HasPendingText);
+            return new WorkspaceCloseState(_editor.EditorIdentity, _editor.EditRevision + _closeBufferRevision,
+                WorkspaceMode == ReceiptWorkspaceMode.Detail && (_editor.IsDirty || pending),
+                _editor.IsMutationBusy, _editor.RequiresPostOutcomeReload,
+                WorkspaceMode == ReceiptWorkspaceMode.Detail && !IsOperationBusy &&
+                !_editor.IsReadOnly && !_isAccessDeniedEditorLocked);
+        }
+        WorkspaceCloseState IWorkspaceCloseParticipant.CaptureCloseState() => CaptureCloseState();
+
+        internal async Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token)
+        {
+            var outcome = default(WorkspaceSaveOutcome);
+            await RunFeedback("goods-close-save", WorkspaceOperationKind.Write,
+                async () => outcome = await SaveCoreAsync(token, true).ConfigureAwait(true)).ConfigureAwait(true);
+            return outcome!;
+        }
+
+        private async Task<WorkspaceSaveOutcome> SaveCoreAsync(CancellationToken token, bool forClose)
+        {
+            var before = CaptureCloseState();
+            if (!before.CanSave || token.IsCancellationRequested)
+                return new WorkspaceSaveOutcome(WorkspaceSaveStatus.CanceledBeforeMutation, before.EditorIdentity, before.Revision);
             if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Save) ||
-                !await FinishHeaderLookupsAsync(SaveButton).ConfigureAwait(true)) return;
+                !await FinishHeaderLookupsAsync(SaveButton).ConfigureAwait(true))
+                return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected, before.EditorIdentity, before.Revision);
+            if (!TryCommitReceiptDate())
+                return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected, before.EditorIdentity, before.Revision);
             if (ApplyEditorsToViewModel())
             {
                 var selectedLineId = _selectedLine?.Id;
                 var selectedLineIndex = _selectedLine == null
                     ? -1
                     : _editor.Lines.IndexOf(_selectedLine);
-                var saved = await _editor.SaveAsync(CancellationToken.None).ConfigureAwait(true);
-                if (IsDisposed || Disposing) return;
-                if (saved)
+                var submittedRevision = _editor.EditRevision + _closeBufferRevision;
+                var outcome = await _editor.SaveForCloseAsync(token).ConfigureAwait(true);
+                if (IsDisposed || Disposing) return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Unknown, before.EditorIdentity, submittedRevision);
+                var refreshFailed = outcome.RefreshFailed;
+                if (outcome.Status == WorkspaceSaveStatus.Saved && !_editor.IsDirty)
                 {
-                    RebindSelectedLine(selectedLineId, selectedLineIndex);
-                    _inline.ResetDocument(_editor.Lines);
+                    _projectingSavedReceipt = true;
+                    try
+                    {
+                        RebindSelectedLine(selectedLineId, selectedLineIndex);
+                        _inline.ResetDocument(_editor.Lines);
+                    }
+                    finally { _projectingSavedReceipt = false; }
                     _workflowMessage = null;
-                    await _list.RefreshAsync(CancellationToken.None).ConfigureAwait(true);
+                    if (!outcome.RefreshFailed || !forClose) await _list.RefreshAsync(token).ConfigureAwait(true);
                     if (_list.IsAccessDenied)
                     {
                         EnterAccessDeniedEditorState(true);
+                        refreshFailed = true;
                     }
+                    else if (_list.ErrorMessage != null) refreshFailed = true;
                 }
+                ApplyState();
+                if (_editor.HasErrors) FocusFirstLineError();
+                return new WorkspaceSaveOutcome(outcome.Status, before.EditorIdentity,
+                    submittedRevision, refreshFailed);
             }
             ApplyState();
             if (_editor.HasErrors) FocusFirstLineError();
+            return new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected, before.EditorIdentity, before.Revision);
         }
+        Task<WorkspaceSaveOutcome> IWorkspaceCloseParticipant.SaveForCloseAsync(CancellationToken token) => SaveForCloseAsync(token);
 
         private async Task PostAsync()
         {
             if (!CanEditLines() || !FinishInline(ReceiptEditIntent.Post) ||
                 !await FinishHeaderLookupsAsync(PostButton).ConfigureAwait(true)) return;
+            if (!TryCommitReceiptDate()) return;
             if (_editor.IsDirty)
             {
                 _workflowMessage = "Save the current draft before posting it.";
@@ -402,6 +471,8 @@ namespace MyDmsVn.Desktop.WinForms
             CancelEditorLookupEdits();
             _list.NewDraft();
             _editor.Load(null);
+            FeedbackScope.AdvanceDocument();
+            BeginReceiptDateSession();
             _selectedLine = null;
             _inline.ResetDocument(_editor.Lines);
             ShowReceiptDetail();
@@ -410,14 +481,15 @@ namespace MyDmsVn.Desktop.WinForms
 
         private bool CanAbandonEditor(ReceiptEditIntent intent)
         {
-            if (!_editor.IsDirty)
+            if (!_editor.IsDirty && !ReceiptDateEditor.HasPendingEdit)
             {
                 return FinishInline(intent);
             }
 
             _workflowMessage = "Save the current draft before leaving it.";
             ApplyState();
-            _inline.FocusActiveEdit();
+            if (ReceiptDateEditor.HasPendingEdit) ReceiptDateEditor.Focus();
+            else _inline.FocusActiveEdit();
             return false;
         }
 
@@ -427,6 +499,8 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 CancelEditorLookupEdits();
                 _editor.Load(null);
+                FeedbackScope.AdvanceDocument();
+                BeginReceiptDateSession();
                 _selectedLine = null;
             }
         }
@@ -442,6 +516,7 @@ namespace MyDmsVn.Desktop.WinForms
 
             if (!_editor.Id.HasValue)
             {
+                BeginReceiptDateSession();
                 return;
             }
 
@@ -476,7 +551,8 @@ namespace MyDmsVn.Desktop.WinForms
             if (target >= 1 && target <= pageCount)
             {
                 _list.PageNumber = target;
-                SetOperation(_list.RefreshAsync(CancellationToken.None));
+                SetOperation(RunFeedback("goods-page", WorkspaceOperationKind.Query,
+                    () => _list.RefreshAsync(CancellationToken.None)));
             }
         }
 
@@ -504,9 +580,40 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 return false;
             }
-            _editor.ReceiptDate = ReceiptDateEditor.Value;
+            if (!ReceiptDateEditor.Value.HasValue) return false;
+            _editor.ReceiptDate = ReceiptDateEditor.Value.Value;
             _editor.Note = NoteEditor.Text;
             return true;
+        }
+
+        private bool TryCommitReceiptDate()
+        {
+            if (!ReceiptDateEditor.HasPendingEdit)
+            {
+                if (ReceiptDateEditor.Value.HasValue)
+                {
+                    ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
+                    if (_workflowMessage == "Enter a valid receipt date (day/month/year).") _workflowMessage = null;
+                }
+                return true;
+            }
+            if (ReceiptDateEditor.TryCommitPending())
+            {
+                ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
+                if (_workflowMessage == "Enter a valid receipt date (day/month/year).") _workflowMessage = null;
+                return true;
+            }
+            _workflowMessage = "Enter a valid receipt date (day/month/year).";
+            ReceiptDateEditor.ValidationState = BootstrapValidationState.Invalid;
+            ApplyState();
+            ReceiptDateEditor.Focus();
+            return false;
+        }
+
+        private void BeginReceiptDateSession()
+        {
+            ReceiptDateEditor.BeginEditSession(_editor.ReceiptDate);
+            ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
         }
 
         private void SelectActiveReceipt()
@@ -514,7 +621,7 @@ namespace MyDmsVn.Desktop.WinForms
             var row = ReceiptGrid.Selection.ActivePosition.Row;
             if (row > 0 && row - 1 < _receiptIds.Count)
             {
-                SetOperation(SelectReceiptCoreAsync(_receiptIds[row - 1], CancellationToken.None));
+                SelectReceiptAsync(_receiptIds[row - 1], CancellationToken.None);
             }
         }
 
@@ -532,7 +639,8 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (!_applyingState && !_isApplyingWarehouseFilter)
             {
-                SetOperation(_list.SetSearch(SearchBox.Text));
+                SetOperation(RunFeedback("goods-search", WorkspaceOperationKind.Query,
+                    () => _list.SetSearch(SearchBox.Text)));
             }
         }
 
@@ -542,7 +650,9 @@ namespace MyDmsVn.Desktop.WinForms
             var canSearch = ReferenceEquals(lookup, WarehouseFilterLookup) ? !IsOperationBusy : CanEditLines();
             if (!_applyingState && canSearch && lookup.HasPendingText)
             {
-                SetOperation(_editor.WarehouseLookup.SetSearch(lookup.Text));
+                if (!ReferenceEquals(lookup, WarehouseFilterLookup)) ++_closeBufferRevision;
+                SetOperation(RunFeedback("goods-warehouse-lookup", WorkspaceOperationKind.Query,
+                    () => _editor.WarehouseLookup.SetSearch(lookup.Text)));
             }
         }
 
@@ -550,7 +660,9 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (!_applyingState && CanEditLines() && EmployeeLookup.HasPendingText)
             {
-                SetOperation(_editor.EmployeeLookup.SetSearch(EmployeeLookup.Text));
+                ++_closeBufferRevision;
+                SetOperation(RunFeedback("goods-employee-lookup", WorkspaceOperationKind.Query,
+                    () => _editor.EmployeeLookup.SetSearch(EmployeeLookup.Text)));
             }
         }
 
@@ -562,7 +674,8 @@ namespace MyDmsVn.Desktop.WinForms
             }
 
             _warehouseFilterId = WarehouseFilterLookup.SelectedValue as int?;
-            SetOperation(ApplyWarehouseFilterAsync(_warehouseFilterId));
+            SetOperation(RunFeedback("goods-warehouse-filter", WorkspaceOperationKind.Query,
+                () => ApplyWarehouseFilterAsync(_warehouseFilterId)));
         }
 
         private async Task ApplyWarehouseFilterAsync(int? warehouseId)
@@ -591,18 +704,26 @@ namespace MyDmsVn.Desktop.WinForms
             _statusFilter = string.Equals(StatusFilter.SelectedItem as string, "All", StringComparison.Ordinal)
                 ? null
                 : StatusFilter.SelectedItem as string;
-            SetOperation(
-                _list.SetStatusFilterAsync(
-                    _statusFilter,
-                    CancellationToken.None));
+            SetOperation(RunFeedback("goods-status-filter", WorkspaceOperationKind.Query,
+                () => _list.SetStatusFilterAsync(_statusFilter, CancellationToken.None)));
         }
 
         private void OnReceiptDateChanged(object? sender, EventArgs eventArgs)
         {
             if (!_applyingState && !_editor.IsReadOnly && !_editor.RequiresPostOutcomeReload)
             {
-                _editor.ReceiptDate = ReceiptDateEditor.Value;
+                if (!ReceiptDateEditor.HasPendingEdit)
+                {
+                    ReceiptDateEditor.ValidationState = BootstrapValidationState.None;
+                    if (_workflowMessage == "Enter a valid receipt date (day/month/year).") _workflowMessage = null;
+                }
+                if (ReceiptDateEditor.Value.HasValue) _editor.ReceiptDate = ReceiptDateEditor.Value.Value;
             }
+        }
+
+        private void OnPendingReceiptDateChanged(object? sender, EventArgs eventArgs)
+        {
+            if (!_applyingState) { ++_closeBufferRevision; ApplyState(); }
         }
 
         private void OnWarehouseChanged(object? sender, EventArgs eventArgs)
@@ -738,7 +859,8 @@ namespace MyDmsVn.Desktop.WinForms
                 BindEditorLookup(WarehouseLookup, _editor.WarehouseLookup.Items, _editor.WarehouseId);
                 BindEditorLookup(EmployeeLookup, _editor.EmployeeLookup.Items, _editor.EmployeeId);
                 StatusFilter.SelectedItem = _statusFilter ?? "All";
-                ReceiptDateEditor.Value = _editor.ReceiptDate;
+                if (ReceiptDateEditor.Value != _editor.ReceiptDate)
+                    ReceiptDateEditor.ProjectAcceptedValue(_editor.ReceiptDate);
                 NoteEditor.Text = _editor.Note ?? string.Empty;
                 StatusLabel.Text = _editor.Status;
                 if (_compactTitle != null) _compactTitle.Text = _editor.ReceiptNumber ?? "Goods receipt — New";
@@ -748,20 +870,25 @@ namespace MyDmsVn.Desktop.WinForms
                     : "Amount too large";
 
                 var busy = _isRefreshing || _list.IsLoading || _list.IsBusy || _editor.IsBusy;
+                var owner = _masterBusyBinder.CaptureOwner();
+                _masterBusyBinder.Project(owner, busy && WorkspaceMode == ReceiptWorkspaceMode.List,
+                    "Loading goods receipts…");
+                _detailBusyBinder.Project(owner, busy && WorkspaceMode == ReceiptWorkspaceMode.Detail,
+                    _editor.IsBusy ? "Saving goods receipt…" : "Loading goods receipt…");
                 var requiresPostReload = _editor.RequiresPostOutcomeReload;
                 BusyIndicator.Visible = busy;
                 OperationStatusLabel.Text = requiresPostReload
-                    ? "Posting outcome unknown. Refresh to reload the receipt before making further changes. " + _editor.ErrorMessage
+                    ? _editor.ErrorMessage != null && _editor.ErrorMessage.StartsWith("Posting outcome unknown.", StringComparison.Ordinal)
+                        ? _editor.ErrorMessage
+                        : "Posting outcome unknown. Refresh to reload the receipt before making further changes. " + _editor.ErrorMessage
                     : _inline.EditError ?? _workflowMessage ??
                     _editor.ErrorMessage ??
                     _list.ErrorMessage ??
                     (busy ? "Loading..." : "Ready");
-                OperationStatusLabel.AccessibleRole = requiresPostReload || _inline.EditError != null || _editor.ErrorMessage != null || _list.ErrorMessage != null
+                OperationStatusLabel.AccessibleRole = requiresPostReload || _inline.EditError != null || _workflowMessage != null || _editor.ErrorMessage != null || _list.ErrorMessage != null
                     ? AccessibleRole.Alert : AccessibleRole.StaticText;
-                OperationStatusLabel.ForeColor = OperationStatusLabel.AccessibleRole == AccessibleRole.Alert
-                    ? MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Mode == MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark
-                        ? Color.FromArgb(255, 180, 171) : Color.FromArgb(180, 35, 24)
-                    : ForeColor;
+                ((BootstrapLabel)OperationStatusLabel).TextRole = OperationStatusLabel.AccessibleRole == AccessibleRole.Alert
+                    ? BootstrapTextRole.Danger : BootstrapTextRole.Muted;
                 ReceiptGrid.Enabled = !busy && !requiresPostReload;
                 LineGrid.Enabled = !busy && !requiresPostReload;
                 RefreshButton.Enabled = !busy;
@@ -843,7 +970,15 @@ namespace MyDmsVn.Desktop.WinForms
         private void SetError(string field, Control control)
         {
             var messages = ((IEnumerable)_editor.GetErrors(field)).Cast<string>();
-            _errors.SetError(control, string.Join(Environment.NewLine, messages));
+            var error = string.Join(Environment.NewLine, messages);
+            if (field == "receiptDate")
+            {
+                if (error.Length == 0 && ReceiptDateEditor.ValidationState == BootstrapValidationState.Invalid)
+                    error = "Enter a valid receipt date (day/month/year).";
+                ReceiptDateEditor.AccessibleDescription = error.Length == 0
+                    ? "Type day, day/month or day/month/four-digit-year." : error;
+            }
+            _errors.SetError(control, error);
         }
 
         private bool TryGetLineErrorControl(string field, out Control control)

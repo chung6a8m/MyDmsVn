@@ -31,6 +31,18 @@ namespace MyDmsVn.Desktop.Application
         private long? _uncertainPostReceiptId;
         private bool _disposed;
         private long _documentGeneration;
+        private Guid _editorIdentity = Guid.NewGuid();
+        private long _editRevision;
+        private bool _mutatingDraft;
+        private bool _internalCollectionMutation;
+        private readonly HashSet<GoodsReceiptLineViewModel> _trackedLines = new HashSet<GoodsReceiptLineViewModel>();
+        private WorkspaceSaveStatus _lastSaveStatus = WorkspaceSaveStatus.CanceledBeforeMutation;
+        private bool _lastSaveRefreshFailed;
+        private bool _preserveCloseIdentityForSaveRefresh;
+
+        public Guid EditorIdentity => _editorIdentity;
+        public long EditRevision => Interlocked.Read(ref _editRevision);
+        public bool IsMutationBusy => Volatile.Read(ref _saveInFlight) != 0 || Volatile.Read(ref _postInFlight) != 0;
 
         public GoodsReceiptEditorViewModel(
             IGoodsReceiptApiClient apiClient,
@@ -47,10 +59,10 @@ namespace MyDmsVn.Desktop.Application
             EmployeeLookup = employeeLookup ?? throw new ArgumentNullException(nameof(employeeLookup));
             ProductOptions = productOptions ?? throw new ArgumentNullException(nameof(productOptions));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+            Lines = new DraftLineCollection(BeforeCollectionMutation, AfterCollectionMutation);
         }
 
-        public ObservableCollection<GoodsReceiptLineViewModel> Lines { get; } =
-            new ObservableCollection<GoodsReceiptLineViewModel>();
+        public ObservableCollection<GoodsReceiptLineViewModel> Lines { get; }
 
         public CatalogLookupViewModel WarehouseLookup { get; }
         public CatalogLookupViewModel EmployeeLookup { get; }
@@ -73,9 +85,12 @@ namespace MyDmsVn.Desktop.Application
             get => _receiptDate;
             set
             {
-                if (SetProperty(ref _receiptDate, value.Date))
+                if (!_mutatingDraft && _receiptDate != value.Date)
                 {
-                    MarkDirty();
+                    if (!_isApplyingReceipt) AdvanceDraftRevision();
+                    _receiptDate = value.Date;
+                    OnPropertyChanged();
+                    MarkDirty(revisionAdvanced: true);
                 }
             }
         }
@@ -97,9 +112,12 @@ namespace MyDmsVn.Desktop.Application
             get => _note;
             set
             {
-                if (SetProperty(ref _note, value))
+                if (!_mutatingDraft && _note != value)
                 {
-                    MarkDirty();
+                    if (!_isApplyingReceipt) AdvanceDraftRevision();
+                    _note = value;
+                    OnPropertyChanged();
+                    MarkDirty(revisionAdvanced: true);
                 }
             }
         }
@@ -160,9 +178,91 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
+        public NumericDraftSnapshot<GoodsReceiptLineViewModel> CaptureNumericDraft() =>
+            new NumericDraftSnapshot<GoodsReceiptLineViewModel>(
+                _editorIdentity, Interlocked.Read(ref _documentGeneration), EditRevision, Lines.ToArray());
+
+        public bool TryApplyNumericPatch(NumericDraftPatch<GoodsReceiptLineViewModel> patch, out string error)
+        {
+            if (patch == null) throw new ArgumentNullException(nameof(patch));
+            error = "The numeric draft changed; select the cells again.";
+            if (_disposed || _mutatingDraft || IsReadOnly || RequiresPostOutcomeReload || IsMutationBusy ||
+                patch.Snapshot.EditorIdentity != _editorIdentity ||
+                patch.Snapshot.DocumentGeneration != Interlocked.Read(ref _documentGeneration) ||
+                patch.Snapshot.Revision != EditRevision || patch.Snapshot.Lines.Count != Lines.Count ||
+                Lines.Distinct().Count() != Lines.Count ||
+                patch.Snapshot.Lines.Where((line, index) => !ReferenceEquals(line, Lines[index])).Any() ||
+                patch.Changes.Count == 0) return false;
+
+            var proposed = new Dictionary<GoodsReceiptLineViewModel, (decimal Quantity, decimal Cost)>();
+            foreach (var line in Lines) proposed.Add(line, (line.Quantity, line.UnitCost));
+            var seen = new HashSet<(GoodsReceiptLineViewModel Line, NumericDraftField Field)>();
+            foreach (var change in patch.Changes)
+            {
+                if (!proposed.TryGetValue(change.Line, out var values) || !seen.Add((change.Line, change.Field)) ||
+                    decimal.Round(change.Value, GoodsReceiptContractLimits.DecimalPlaces) != change.Value)
+                { error = "The numeric patch contains an unavailable, duplicate or over-scale cell."; return false; }
+                if (change.Field == NumericDraftField.Quantity)
+                {
+                    if (change.Value <= 0m || change.Value > GoodsReceiptContractLimits.MaximumQuantity)
+                    { error = "Quantity is outside the receipt bounds."; return false; }
+                    values.Quantity = change.Value;
+                }
+                else if (change.Field == NumericDraftField.UnitCost)
+                {
+                    if (change.Value < 0m || change.Value > GoodsReceiptContractLimits.MaximumUnitCost)
+                    { error = "Unit cost is outside the receipt bounds."; return false; }
+                    values.Cost = change.Value;
+                }
+                else { error = "This field does not belong to a goods receipt."; return false; }
+                proposed[change.Line] = values;
+            }
+            try
+            {
+                var total = 0m;
+                foreach (var line in Lines)
+                {
+                    var values = proposed[line];
+                    total = checked(total + checked(values.Quantity * values.Cost));
+                }
+            }
+            catch (OverflowException)
+            { error = "The numeric patch would exceed the receipt amount bounds."; return false; }
+
+            var changed = new Dictionary<GoodsReceiptLineViewModel, (bool Quantity, bool Cost)>();
+            foreach (var line in Lines)
+            {
+                var values = proposed[line];
+                if (line.Quantity != values.Quantity || line.UnitCost != values.Cost)
+                    changed.Add(line, (line.Quantity != values.Quantity, line.UnitCost != values.Cost));
+            }
+            if (changed.Count == 0) { error = string.Empty; return true; }
+            _mutatingDraft = true;
+            try
+            {
+                AdvanceDraftRevision();
+                foreach (var item in changed)
+                {
+                    var values = proposed[item.Key];
+                    item.Key.ApplyNumericSilently(values.Quantity, values.Cost);
+                }
+                foreach (var item in changed) item.Key.NotifyNumeric(item.Value.Quantity, item.Value.Cost);
+            }
+            finally { _mutatingDraft = false; }
+            OnPropertyChanged(nameof(IsDirty));
+            OnPropertyChanged(nameof(Total));
+            error = string.Empty;
+            return true;
+        }
+
         public void Load(GoodsReceiptDto? receipt)
         {
             ThrowIfDisposed();
+            if (!_preserveCloseIdentityForSaveRefresh)
+            {
+                _editorIdentity = Guid.NewGuid();
+                Interlocked.Increment(ref _editRevision);
+            }
             Interlocked.Increment(ref _documentGeneration);
             _isApplyingReceipt = true;
             try
@@ -232,23 +332,27 @@ namespace MyDmsVn.Desktop.Application
 
         public void SetWarehouse(int id, string? displayName, bool isAvailable)
         {
+            if (_mutatingDraft) return;
             var changed = WarehouseId != id;
+            if (changed && !_isApplyingReceipt) AdvanceDraftRevision();
             WarehouseId = id;
             WarehouseLookup.SetSelection(id, displayName, isAvailable);
             if (changed)
             {
-                MarkDirty();
+                MarkDirty(revisionAdvanced: true);
             }
         }
 
         public void SetEmployee(int id, string? displayName, bool isAvailable)
         {
+            if (_mutatingDraft) return;
             var changed = EmployeeId != id;
+            if (changed && !_isApplyingReceipt) AdvanceDraftRevision();
             EmployeeId = id;
             EmployeeLookup.SetSelection(id, displayName, isAvailable);
             if (changed)
             {
-                MarkDirty();
+                MarkDirty(revisionAdvanced: true);
             }
         }
 
@@ -256,22 +360,27 @@ namespace MyDmsVn.Desktop.Application
         {
             ThrowIfReadOnly();
             var line = new GoodsReceiptLineViewModel();
+            AdvanceDraftRevision();
             AddLineCore(line);
             ProductOptions.TrackLines(Lines);
             OnPropertyChanged(nameof(Total));
-            MarkDirty();
+            MarkDirty(revisionAdvanced: true);
             return line;
         }
 
         public void RemoveLine(GoodsReceiptLineViewModel line)
         {
             ThrowIfReadOnly();
-            if (Lines.Remove(line))
+            if (Lines.Contains(line))
             {
-                line.PropertyChanged -= OnLinePropertyChanged;
+                AdvanceDraftRevision();
+                _internalCollectionMutation = true;
+                try { Lines.Remove(line); }
+                finally { _internalCollectionMutation = false; }
+                DetachLine(line);
                 ProductOptions.TrackLines(Lines);
                 OnPropertyChanged(nameof(Total));
-                MarkDirty();
+                MarkDirty(revisionAdvanced: true);
             }
         }
 
@@ -389,6 +498,8 @@ namespace MyDmsVn.Desktop.Application
             {
                 return false;
             }
+            _lastSaveStatus = WorkspaceSaveStatus.CanceledBeforeMutation;
+            _lastSaveRefreshFailed = false;
 
             var lifetimeToken = _lifetimeCancellation.Token;
             using (var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -409,6 +520,15 @@ namespace MyDmsVn.Desktop.Application
                     Volatile.Write(ref _saveInFlight, 0);
                 }
             }
+        }
+
+        public async Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken cancellationToken)
+        {
+            var identity = EditorIdentity;
+            var revision = EditRevision;
+            try { await SaveAsync(cancellationToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+            return new WorkspaceSaveOutcome(_lastSaveStatus, identity, revision, _lastSaveRefreshFailed);
         }
 
         public async Task<bool> PostAsync(CancellationToken cancellationToken)
@@ -499,8 +619,14 @@ namespace MyDmsVn.Desktop.Application
                             error.Status == ApiStatusCode.Unspecified)
                         {
                             RequirePostOutcomeReload(receiptId);
+                            ApplyApiError(new ApiError(error.Status, error.Code,
+                                "Posting outcome unknown. Refresh to reload the receipt before making further changes.",
+                                error.Details, error.CorrelationId));
                         }
-                        ApplyApiError(error);
+                        else
+                        {
+                            ApplyApiError(error);
+                        }
                     },
                     lifetimeToken).ConfigureAwait(false);
                 return false;
@@ -591,6 +717,7 @@ namespace MyDmsVn.Desktop.Application
             var document = new DocumentDispatch(this);
             if (IsReadOnly || !ValidateForSave())
             {
+                _lastSaveStatus = WorkspaceSaveStatus.Rejected;
                 return false;
             }
 
@@ -598,9 +725,11 @@ namespace MyDmsVn.Desktop.Application
                 line.ProductId,
                 line.Quantity,
                 line.UnitCost)).ToArray();
+            var submittedRevision = EditRevision;
             ApiResponse<GoodsReceiptDto> response;
             try
             {
+                _lastSaveStatus = WorkspaceSaveStatus.Unknown;
                 if (Id.HasValue)
                 {
                     response = await _apiClient.UpdateDraftAsync(
@@ -641,6 +770,8 @@ namespace MyDmsVn.Desktop.Application
             if (!document.IsCurrent) return false;
             if (!response.IsSuccess)
             {
+                _lastSaveStatus = response.Error!.Status == ApiStatusCode.InternalServerError
+                    ? WorkspaceSaveStatus.Unknown : WorkspaceSaveStatus.Rejected;
                 await document.InvokeAsync(
                     () => ApplyApiError(response.Error!),
                     cancellationToken).ConfigureAwait(false);
@@ -658,7 +789,8 @@ namespace MyDmsVn.Desktop.Application
                     }
 
                     ApplyPersistedIdentity(persisted);
-                    IsDirty = false;
+                    IsDirty = EditRevision != submittedRevision;
+                    _lastSaveStatus = WorkspaceSaveStatus.Saved;
                     identityApplied = true;
                 },
                 lifetimeToken).ConfigureAwait(false);
@@ -667,9 +799,18 @@ namespace MyDmsVn.Desktop.Application
                 return false;
             }
 
+            if (IsDirty)
+            {
+                _lastSaveRefreshFailed = true;
+                await document.InvokeAsync(() => PublishNotification(DesktopNotificationKind.Warning,
+                    "Goods receipt was saved. Newer edits remain unsaved; refresh was deferred."), lifetimeToken).ConfigureAwait(false);
+                return true;
+            }
+
             if (!document.IsCurrent) return false;
             if (cancellationToken.IsCancellationRequested)
             {
+                _lastSaveRefreshFailed = true;
                 await document.InvokeAsync(() => PublishSavedWithoutRefresh(), lifetimeToken).ConfigureAwait(false);
                 return true;
             }
@@ -683,11 +824,13 @@ namespace MyDmsVn.Desktop.Application
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                _lastSaveRefreshFailed = true;
                 await document.InvokeAsync(() => PublishSavedWithoutRefresh(), lifetimeToken).ConfigureAwait(false);
                 return true;
             }
             catch (Exception exception)
             {
+                _lastSaveRefreshFailed = true;
                 await document.InvokeAsync(
                     () =>
                     {
@@ -703,6 +846,7 @@ namespace MyDmsVn.Desktop.Application
             if (!document.IsCurrent) return false;
             if (!refresh.IsSuccess)
             {
+                _lastSaveRefreshFailed = true;
                 await document.InvokeAsync(
                     () =>
                     {
@@ -719,7 +863,9 @@ namespace MyDmsVn.Desktop.Application
             await document.InvokeAsync(
                 () =>
                 {
-                    Load(refresh.Data);
+                    _preserveCloseIdentityForSaveRefresh = true;
+                    try { Load(refresh.Data); }
+                    finally { _preserveCloseIdentityForSaveRefresh = false; }
                     loaded = true;
                     PublishNotification(DesktopNotificationKind.Success, "Goods receipt saved.");
                 },
@@ -837,26 +983,80 @@ namespace MyDmsVn.Desktop.Application
 
         private void AddLineCore(GoodsReceiptLineViewModel line)
         {
-            line.PropertyChanged += OnLinePropertyChanged;
-            Lines.Add(line);
+            AttachLine(line);
+            _internalCollectionMutation = true;
+            try { Lines.Add(line); }
+            finally { _internalCollectionMutation = false; }
         }
 
         private void ClearLines()
         {
             foreach (var line in Lines)
             {
-                line.PropertyChanged -= OnLinePropertyChanged;
+                DetachLine(line);
             }
-            Lines.Clear();
+            _internalCollectionMutation = true;
+            try { Lines.Clear(); }
+            finally { _internalCollectionMutation = false; }
+        }
+
+        private void AttachLine(GoodsReceiptLineViewModel line)
+        {
+            if (!_trackedLines.Add(line)) return;
+            line.AttachOwner(() => !_mutatingDraft && !_disposed && !IsReadOnly &&
+                !RequiresPostOutcomeReload && Lines.Contains(line), AdvanceDraftRevision);
+            line.PropertyChanged += OnLinePropertyChanged;
+        }
+
+        private void DetachLine(GoodsReceiptLineViewModel line)
+        {
+            if (!_trackedLines.Remove(line)) return;
+            line.PropertyChanged -= OnLinePropertyChanged;
+            line.DetachOwner();
+        }
+
+        private void BeforeCollectionMutation()
+        {
+            if (_internalCollectionMutation || _isApplyingReceipt) return;
+            ThrowIfReadOnly();
+            AdvanceDraftRevision();
+        }
+
+        private void AfterCollectionMutation()
+        {
+            if (_internalCollectionMutation || _isApplyingReceipt) return;
+            foreach (var line in _trackedLines.Where(line => !Lines.Contains(line)).ToArray()) DetachLine(line);
+            foreach (var line in Lines) AttachLine(line);
+            ProductOptions.TrackLines(Lines);
+            OnPropertyChanged(nameof(Total));
+            MarkDirty(revisionAdvanced: true);
+        }
+
+        private sealed class DraftLineCollection : ObservableCollection<GoodsReceiptLineViewModel>
+        {
+            private readonly Action _before;
+            private readonly Action _after;
+            internal DraftLineCollection(Action before, Action after) { _before = before; _after = after; }
+            protected override void InsertItem(int index, GoodsReceiptLineViewModel item)
+            { _before(); base.InsertItem(index, item); _after(); }
+            protected override void RemoveItem(int index)
+            { _before(); base.RemoveItem(index); _after(); }
+            protected override void SetItem(int index, GoodsReceiptLineViewModel item)
+            { _before(); base.SetItem(index, item); _after(); }
+            protected override void MoveItem(int oldIndex, int newIndex)
+            { _before(); base.MoveItem(oldIndex, newIndex); _after(); }
+            protected override void ClearItems()
+            { _before(); base.ClearItems(); _after(); }
         }
 
         private void OnLinePropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
         {
+            if (_mutatingDraft) return;
             if (eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.ProductId) ||
                 eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.Quantity) ||
                 eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.UnitCost))
             {
-                MarkDirty();
+                MarkDirty(revisionAdvanced: true);
             }
 
             if (eventArgs.PropertyName == nameof(GoodsReceiptLineViewModel.LineTotal) ||
@@ -867,16 +1067,26 @@ namespace MyDmsVn.Desktop.Application
             }
         }
 
-        private void MarkDirty()
+        private void AdvanceDraftRevision()
+        {
+            Interlocked.Increment(ref _editRevision);
+            _isDirty = true;
+        }
+
+        private void MarkDirty(bool revisionAdvanced = false)
         {
             if (!_isApplyingReceipt)
             {
-                IsDirty = true;
+                if (!revisionAdvanced) Interlocked.Increment(ref _editRevision);
+                _isDirty = true;
+                OnPropertyChanged(nameof(IsDirty));
             }
         }
 
         private void ThrowIfReadOnly()
         {
+            if (_mutatingDraft)
+                throw new InvalidOperationException("Finish the current draft mutation before editing again.");
             if (RequiresPostOutcomeReload)
             {
                 throw new InvalidOperationException("Reload the receipt to confirm the posting outcome before making further changes.");

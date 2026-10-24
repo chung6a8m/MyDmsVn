@@ -12,8 +12,84 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
 {
-    public sealed class GoodsReceiptEditorViewModelTests
+    public sealed partial class GoodsReceiptEditorViewModelTests
     {
+        [Fact]
+        public async Task Save_for_close_keeps_confirmed_write_separate_from_failed_refresh()
+        {
+            var api = new EditorApiClient
+            {
+                GetResponse = ApiResponse<GoodsReceiptDto>.Failure(
+                    new ApiError(ApiStatusCode.InternalServerError, "Refresh.Failed", "Could not refresh.")),
+            };
+            using (var fixture = Create(api))
+            {
+                PopulateValidDraft(fixture.Editor);
+                var outcome = await fixture.Editor.SaveForCloseAsync(CancellationToken.None);
+
+                Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+                Assert.True(outcome.RefreshFailed);
+                Assert.Equal(fixture.Editor.EditorIdentity, outcome.EditorIdentity);
+                Assert.False(fixture.Editor.IsDirty);
+                Assert.Equal(41, fixture.Editor.Id);
+            }
+        }
+
+        [Fact]
+        public async Task Save_for_close_rejects_conflict_and_retains_attempted_note()
+        {
+            var api = new EditorApiClient
+            {
+                UpdateResponse = ApiResponse<GoodsReceiptDto>.Failure(
+                    new ApiError(ApiStatusCode.Conflict, "GoodsReceipt.ConcurrencyConflict", "Changed elsewhere.")),
+            };
+            using (var fixture = Create(api))
+            {
+                fixture.Editor.Load(Receipt("original", "AQIDBAUGBwg="));
+                fixture.Editor.Note = "my unsaved edit";
+
+                var outcome = await fixture.Editor.SaveForCloseAsync(CancellationToken.None);
+
+                Assert.Equal(WorkspaceSaveStatus.Rejected, outcome.Status);
+                Assert.Equal("my unsaved edit", fixture.Editor.Note);
+                Assert.True(fixture.Editor.IsDirty);
+            }
+        }
+
+        [Fact]
+        public async Task Newer_goods_edit_during_save_remains_dirty_after_confirmed_write()
+        {
+            var api = new EditorApiClient { ControlCreateResponse = true };
+            using (var fixture = Create(api))
+            {
+                PopulateValidDraft(fixture.Editor);
+                fixture.Editor.Note = "submitted";
+                var pending = fixture.Editor.SaveForCloseAsync(CancellationToken.None);
+                fixture.Editor.Note = "newer edit";
+                api.CompleteCreate();
+
+                var outcome = await pending;
+
+                Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+                Assert.True(outcome.RefreshFailed);
+                Assert.True(fixture.Editor.IsDirty);
+                Assert.Equal("newer edit", fixture.Editor.Note);
+                Assert.Equal(41, fixture.Editor.Id);
+                Assert.Empty(api.GetIds);
+            }
+        }
+
+        [Fact]
+        public void Explicit_goods_document_reload_changes_close_identity_even_for_same_receipt_id()
+        {
+            using (var fixture = Create(new EditorApiClient()))
+            {
+                fixture.Editor.Load(Receipt("first", "AQIDBAUGBwg="));
+                var first = fixture.Editor.EditorIdentity;
+                fixture.Editor.Load(Receipt("again", "AQIDBAUGBwg="));
+                Assert.NotEqual(first, fixture.Editor.EditorIdentity);
+            }
+        }
         [Fact]
         public async Task Create_sends_current_lines_then_refreshes_the_persisted_aggregate()
         {
@@ -72,6 +148,33 @@ namespace MyDmsVn.Desktop.Tests
                 Assert.Equal(
                     "Goods receipt posted.",
                     fixture.Notifications.LastNotification.Message);
+            }
+        }
+
+        [Fact]
+        public async Task Unknown_post_response_publishes_actionable_reload_notice_and_blocks_retry()
+        {
+            var api = new EditorApiClient
+            {
+                PostResponse = ApiResponse<PostGoodsReceiptResponse>.Failure(
+                    new ApiError(ApiStatusCode.InternalServerError, "Desktop.UnexpectedError",
+                        "An unexpected error occurred.", correlationId: "test-recovery")),
+            };
+            using (var fixture = Create(api))
+            {
+                fixture.Editor.Load(Receipt("draft", "AQIDBAUGBwg="));
+
+                Assert.False(await fixture.Editor.PostAsync(CancellationToken.None));
+
+                Assert.True(fixture.Editor.RequiresPostOutcomeReload);
+                Assert.Equal("AQIDBAUGBwg=", fixture.Editor.Version);
+                Assert.StartsWith("Posting outcome unknown. Refresh to reload the receipt",
+                    fixture.Editor.ErrorMessage);
+                Assert.Contains("Support ID: test-recovery", fixture.Editor.ErrorMessage);
+                Assert.Equal(DesktopNotificationKind.Error, fixture.Notifications.LastNotification!.Kind);
+                Assert.Equal(fixture.Editor.ErrorMessage, fixture.Notifications.LastNotification.Message);
+                Assert.False(await fixture.Editor.PostAsync(CancellationToken.None));
+                Assert.Equal(1, api.PostCalls);
             }
         }
 
@@ -596,6 +699,8 @@ namespace MyDmsVn.Desktop.Tests
             public SaveGoodsReceiptRequest? LastCreate { get; private set; }
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
             public PostGoodsReceiptRequest? LastPost { get; private set; }
+            public ApiResponse<PostGoodsReceiptResponse>? PostResponse { get; set; }
+            public int PostCalls { get; private set; }
             public IList<long> GetIds { get; } = new List<long>();
             public int CreateCalls { get; private set; }
             public bool ControlCreateResponse { get; set; }
@@ -664,6 +769,8 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken token)
             {
                 LastPost = request;
+                PostCalls++;
+                if (PostResponse != null) return Task.FromResult(PostResponse);
                 return Task.FromResult(
                     ApiResponse<PostGoodsReceiptResponse>.Success(
                         new PostGoodsReceiptResponse(

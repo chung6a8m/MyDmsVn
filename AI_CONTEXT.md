@@ -1,10 +1,12 @@
 # MyDmsVn — Current context for Codex
 
-**Active base:** `v1a-pro-ui-next` · **Updated:** 2026-10-23 · **Source baseline:** `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (includes merged PR #43 and the migrated assessment). This handoff distinguishes source facts, historical evidence and proposed work.
+**Active base:** `v1a-pro-ui-next` · **Updated:** 2026-10-24 · **Inspected correction baseline:** `codex/uin-t13@6ff4b9829a4b69f992d75fb52047e991c1843b96` in application PR #45. The original UI-NEXT activation baseline remains `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This handoff distinguishes source facts, historical evidence and proposed work.
 
 ## Owner decision and next work
 
-**UI-NEXT is the sole ACTIVE roadmap.** Read the [roadmap](docs/ui-next/20261023-active-roadmap.md), [design and control policy](docs/ui-next/20261023-design-and-control-policy.md), [implementation plan](docs/ui-next/20261023-implementation-plan.md) and [validation and handoff](docs/ui-next/20261023-validation-and-handoff.md). All implementation tasks are **NOT STARTED** and no UI-NEXT runtime PASS is claimed. Scope covers workspace-owned Toast/Alert feedback, field/cell validation, closable tabs and busy presentation, and semantic theme surfaces with less repeated application code.
+**UI-NEXT is the sole ACTIVE roadmap.** Read the [roadmap](docs/ui-next/20261023-active-roadmap.md), [design and control policy](docs/ui-next/20261023-design-and-control-policy.md), [implementation plan](docs/ui-next/20261023-implementation-plan.md) and [validation and handoff](docs/ui-next/20261023-validation-and-handoff.md). UIN-T00–T13 are VERIFIED in the bounded scopes and exact revisions recorded by their evidence. The [T13 ledger](docs/ui-next/evidence/20261024-uin-t13-integration.md) retains the attended zero-document FAIL after Owner Save, the passing no-interaction control and dated bounded Owner acceptance. [Review corrections](docs/ui-next/evidence/20261024-pr45-review-corrections.md) and [round-2 corrections](docs/ui-next/evidence/20261024-pr45-review-round2.md) have their own candidate-specific evidence; none is a PASS for the next DateInput revision.
+
+**DateInput correction UIN-D01–UIN-D03 is VERIFIED in its bounded UI-NEXT scope.** The Owner selected and approved **01 — Unified Compact** on 2026-10-24. Use the [approved design](docs/ui-next/20261024-dateinput-unified-compact-design.md), [correction plan](docs/ui-next/20261024-dateinput-unified-compact-correction.md), [Codex handoff](docs/ui-next/20261024-dateinput-unified-compact-codex-prompt.md) and [candidate evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md). D01 preserves caret/selection in the logical segment after Up/Down; D02 provides one visual border, an icon-only trigger and a moving keyboard day highlight; D03 pins and verifies the affected hosts/package. The Owner found a highlight fault on the first candidate, then accepted the repaired visual package at physical 125% on 2026-10-24. The final package passed measured physical native100/native125 Light/Dark checks with owned cleanup. The net48 app window reports 96 DPI even on the 120-DPI physical monitor. The PR chain is UI #73 (`codex/uin-t10-dgv`) → BSG #18 (`codex/uin-t10-parity`) → app #45 (`codex/uin-t13`); no merge or production-release approval is implied.
 
 The [archive boundary](docs/archive/20261023-pre-ui-next/README.md) retires the six previous plan files and their execution index. Old unfinished acceptance, full SAL integration repeats and production release work are excluded from the new queue; they are neither completed nor waived. The [former index](docs/plans/README.md), design documents and evidence remain historical or source-contract references.
 
@@ -28,11 +30,13 @@ SAL T00–T06 checkpoints and the T07 Sales workspace are implemented in the mer
 
 | Dependency | Inspected pin |
 |---|---|
-| MyDmsVn.BootstrapSourceGrid | `2bd7874f7e80b22ef181763749c2a2938ab7f16e` |
-| Bootstrap5WinFormUI nested dependency | `2be9a4d778fda7016207b75470020be6126f2f3f` |
+| MyDmsVn.BootstrapSourceGrid | `02888dec75878a081f2caac9b22829ae3a2f7d72` |
+| Bootstrap5WinFormUI nested dependency | `c91993f4f44a60210f4c6c4106e82ebc69931a0a` |
 | SourceGrid nested dependency | `f4e457b43582bf01892f50bdc74aa480531e5944` |
 
-Existing shared primitives include `BootstrapToastContainer`, `BootstrapAlert`, input `ValidationState` and `BootstrapSpinner`. `BootstrapToastService` resolves a screen for its top-level host; passing a control does not create tab scope. The tab control has no close-request contract, and the grid's loading implementation is not a generic busy host. UI-NEXT's proposed services, close affordances, busy host and semantic surface APIs remain unimplemented until their owning tasks provide source and evidence.
+These are the consumed pins at the inspected correction baseline, not assertions about mutable upstream HEADs. Refresh the exact PR heads before implementation and preserve any intervening work.
+
+The pinned shared UI includes `BootstrapToastContainer`, `BootstrapAlert`, input `ValidationState`, `BootstrapSpinner`, typed decimal/date input, the request-only tab close affordance, busy host and semantic panel/label controls. Their source and bounded verification belong to the corresponding [UI-NEXT task and acceptance rows](docs/ui-next/20261023-active-roadmap.md). `BootstrapToastService` still resolves a screen for its top-level host; passing a control does not create tab scope. The application supplies workspace-owned feedback and admission policy. DateInput Unified Compact and segment-preserving caret correction are implemented at the exact pins in the [candidate evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md); the repaired running visual received dated, bounded Owner acceptance at physical 125%.
 
 MyDmsVn owns workspace-instance identity and session/document generations, message/validation routing, command admission and dirty/recovery policy. Shared UI owns generic rendering, theme behavior and lifecycle. Keep controls out of Desktop.Application/public DTOs. Do not route late results by whichever tab happens to be selected, use a module key as a replacement for instance identity, or let a busy veil replace authorization/editability checks. Cancellation does not prove a mutation rolled back.
 

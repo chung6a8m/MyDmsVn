@@ -3,15 +3,125 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 
 public sealed class InventoryControlTests
 {
+    [Fact]
+    public void Factory_stock_card_query_failure_is_visible_in_its_own_workspace()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard();
+            var api = new InventoryApiClient();
+            var global = new DesktopNotificationCenter();
+            var globalNotices = 0;
+            global.NotificationPublished += (_, __) => globalNotices++;
+            var factory = new InventoryControlFactory(api, new ImmediateUiDispatcher(), global,
+                new SilentReporter(), new ImmediateDelay());
+            var card = Assert.IsType<StockCardControl>(factory.CreateStockCard());
+            var scope = Assert.IsType<WorkspaceFeedbackScope>(card.GetType().GetProperty("FeedbackScope")?.GetValue(card));
+            using var host = new WorkspaceFeedbackHost(card, scope);
+            using var form = new Form { Width = 900, Height = 600 };
+            form.Controls.Add(host); form.Show(); System.Windows.Forms.Application.DoEvents();
+            card.WarehouseFilter.Value = 2; card.ProductFilter.Value = 7;
+            card.LastOperation.GetAwaiter().GetResult();
+            api.CardError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Denied.");
+            card.RefreshButton.PerformClick(); card.LastOperation.GetAwaiter().GetResult();
+            System.Windows.Forms.Application.DoEvents();
+
+            Assert.True(host.Alert.Visible);
+            Assert.Contains("Denied.", host.Alert.Text);
+            Assert.Equal(BootstrapTextRole.Danger, Assert.IsType<BootstrapLabel>(card.OperationStatusLabel).TextRole);
+            Assert.Equal(0, globalNotices);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Factory_stock_balance_query_failure_is_visible_in_its_own_workspace()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard();
+            var api = new InventoryApiClient { BalanceError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Balance denied.") };
+            var global = new DesktopNotificationCenter();
+            var globalNotices = 0;
+            global.NotificationPublished += (_, __) => globalNotices++;
+            var factory = new InventoryControlFactory(api, new ImmediateUiDispatcher(), global,
+                new SilentReporter(), new ImmediateDelay());
+            var balance = Assert.IsType<StockBalanceControl>(factory.CreateStockBalances());
+            using var host = new WorkspaceFeedbackHost(balance, balance.FeedbackScope);
+            using var form = new Form { Width = 900, Height = 600 };
+            form.Controls.Add(host); form.Show(); System.Windows.Forms.Application.DoEvents();
+
+            balance.ActivateAsync(CancellationToken.None).GetAwaiter().GetResult();
+            System.Windows.Forms.Application.DoEvents();
+
+            Assert.True(host.Alert.Visible);
+            Assert.Contains("Balance denied.", host.Alert.Text);
+            Assert.Equal(BootstrapTextRole.Danger, Assert.IsType<BootstrapLabel>(balance.OperationStatusLabel).TextRole);
+            Assert.Equal(0, globalNotices);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Stock_balance_successful_retry_clears_its_old_actionable_query_alert()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard();
+            var api = new InventoryApiClient { BalanceError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Balance denied.") };
+            var factory = new InventoryControlFactory(api, new ImmediateUiDispatcher(), new DesktopNotificationCenter(),
+                new SilentReporter(), new ImmediateDelay());
+            var balance = Assert.IsType<StockBalanceControl>(factory.CreateStockBalances());
+            using var host = new WorkspaceFeedbackHost(balance, balance.FeedbackScope);
+            using var form = new Form { Width = 900, Height = 600 };
+            form.Controls.Add(host); form.Show(); System.Windows.Forms.Application.DoEvents();
+            balance.ActivateAsync(CancellationToken.None).GetAwaiter().GetResult(); System.Windows.Forms.Application.DoEvents();
+            Assert.True(host.Alert.Visible);
+
+            api.BalanceError = null;
+            balance.RefreshButton.PerformClick(); balance.LastOperation.GetAwaiter().GetResult(); System.Windows.Forms.Application.DoEvents();
+            Assert.False(host.Alert.Visible);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Stock_card_successful_retry_clears_its_old_actionable_query_alert()
+    {
+        StaTest.Run(_ =>
+        {
+            using var guard = new WinFormsTestGuard();
+            var api = new InventoryApiClient();
+            var factory = new InventoryControlFactory(api, new ImmediateUiDispatcher(), new DesktopNotificationCenter(),
+                new SilentReporter(), new ImmediateDelay());
+            var card = Assert.IsType<StockCardControl>(factory.CreateStockCard());
+            using var host = new WorkspaceFeedbackHost(card, card.FeedbackScope);
+            using var form = new Form { Width = 900, Height = 600 };
+            form.Controls.Add(host); form.Show(); System.Windows.Forms.Application.DoEvents();
+            card.WarehouseFilter.Value = 2; card.ProductFilter.Value = 7;
+            card.LastOperation.GetAwaiter().GetResult();
+            api.CardError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Card denied.");
+            card.RefreshButton.PerformClick(); card.LastOperation.GetAwaiter().GetResult(); System.Windows.Forms.Application.DoEvents();
+            Assert.True(host.Alert.Visible);
+
+            api.CardError = null;
+            card.RefreshButton.PerformClick(); card.LastOperation.GetAwaiter().GetResult(); System.Windows.Forms.Application.DoEvents();
+            Assert.False(host.Alert.Visible);
+            Assert.Empty(guard.Exceptions);
+        }, TimeSpan.FromSeconds(20));
+    }
+
     [Fact]
     public void Balance_control_shows_empty_state_after_first_successful_zero_row_query()
     {
@@ -179,17 +289,23 @@ public sealed class InventoryControlTests
             TimeSpan.FromSeconds(10));
     }
 
-    private sealed class ImmediateDelay : IAsyncDelay
+    internal sealed class ImmediateDelay : IAsyncDelay
     {
         public Task DelayAsync(TimeSpan interval, CancellationToken cancellationToken) =>
             Task.CompletedTask;
     }
 
-    private sealed class InventoryApiClient : IInventoryApiClient
+    internal sealed class SilentReporter : IDesktopExceptionReporter
+    {
+        public string Report(string operationName, Exception exception) => "test-report";
+    }
+
+    internal sealed class InventoryApiClient : IInventoryApiClient
     {
         public IList<StockBalanceQuery> BalanceRequests { get; } = new List<StockBalanceQuery>();
         public IList<StockCardQuery> CardRequests { get; } = new List<StockCardQuery>();
         public ApiError? CardError { get; set; }
+        public ApiError? BalanceError { get; set; }
         public bool ReturnEmptyBalances { get; set; }
         public bool ReturnEmptyCards { get; set; }
 
@@ -198,6 +314,8 @@ public sealed class InventoryControlTests
             CancellationToken cancellationToken)
         {
             BalanceRequests.Add(request);
+            if (BalanceError != null)
+                return Task.FromResult(ApiResponse<PagedResult<StockBalanceRow>>.Failure(BalanceError));
             if (ReturnEmptyBalances)
             {
                 return Task.FromResult(ApiResponse<PagedResult<StockBalanceRow>>.Success(

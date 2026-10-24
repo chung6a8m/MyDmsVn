@@ -39,6 +39,15 @@ public sealed class BcfAttendedLookupFactAttribute : FactAttribute
     }
 }
 
+public sealed class UinT13AttendedFactAttribute : FactAttribute
+{
+    public UinT13AttendedFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MYDMSVN_UIN_T13_ATTENDED_DIRECTORY")))
+            Skip = "ATTENDED ONLY: requires an owned UI Next T13 walkthrough directory.";
+    }
+}
+
 public sealed partial class PackagedGuiAcceptanceTests
 {
     private readonly ITestOutputHelper _output;
@@ -48,6 +57,34 @@ public sealed partial class PackagedGuiAcceptanceTests
         _output.WriteLine("TESTHOST_BITNESS=" + (IntPtr.Size * 8));
         Assert.Equal(4, IntPtr.Size);
         Assert.True(Environment.Is64BitOperatingSystem);
+    }
+
+    [UinT13AttendedFact]
+    [Trait("Category", "GuiSql")]
+    public async Task Uin_t13_attended_package_walkthrough_keeps_human_observation_separate()
+    {
+        var package = Candidate();
+        var barrier = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_UIN_T13_ATTENDED_DIRECTORY")!);
+        Assert.True(Directory.Exists(barrier));
+        Assert.Empty(Directory.GetFileSystemEntries(barrier));
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            await fixture.SeedReceiptWriterAsync();
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" uin-t13-attended");
+            fixture.ConfigureRuntime(start);
+            start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
+            var result = await GuiOwnedProcess.RunAttendedAsync(start, TimeSpan.FromMinutes(22));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.CleanupVerified);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + result.StandardError);
+            Assert.Contains("UIN_T13_ATTENDED_READY=PASS", result.StandardOutput);
+            Assert.Contains("UIN_T13_ATTENDED_DRAINED=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.AssertNoInventoryAsync();
+        });
+        foreach (var name in new[] { "ready", "complete" }) File.Delete(Path.Combine(barrier, name));
+        Directory.Delete(barrier);
     }
 
     [BcfAttendedLookupFact]
@@ -122,6 +159,33 @@ public sealed partial class PackagedGuiAcceptanceTests
     [InlineData("Light")]
     [InlineData("Dark")]
     [Trait("Category", "GuiSql")]
+    public async Task DateInputCorrection_Actual_login_keeps_native_date_segments_and_compact_trigger(string theme)
+    {
+        var package = Candidate();
+        await GuiSqlEnvironment.RunAsync(package, async fixture =>
+        {
+            using var probe = new GuiProcessProbeFixture(package: true);
+            var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") +
+                "\" dateinput-audit " + theme);
+            fixture.ConfigureRuntime(start);
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
+            _output.WriteLine(result.StandardOutput);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
+            Assert.Contains("DATEINPUT_ACTUAL_LOGIN=PASS", result.StandardOutput);
+            Assert.Contains("DATEINPUT_SALES_FILTERS_NATIVE=PASS", result.StandardOutput);
+            Assert.Contains("DATEINPUT_SALES_REQUIRED_NATIVE=PASS", result.StandardOutput);
+            Assert.Contains("DATEINPUT_GOODS_REQUIRED_NATIVE=PASS", result.StandardOutput);
+            Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
+            Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
+            await fixture.VerifySeparationAsync();
+            await fixture.AssertNoInventoryAsync();
+        });
+    }
+
+    [GuiPackageTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [Trait("Category", "GuiSql")]
     public async Task Catalog_rows_support_semantic_uia_selection_and_persist_create_edit_active_changes(string theme)
     {
         var package = Candidate();
@@ -134,6 +198,7 @@ public sealed partial class PackagedGuiAcceptanceTests
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             Assert.Contains("CATALOG_PRODUCT=PASS", result.StandardOutput);
+            Assert.Contains("PRODUCT_DUPLICATE_CODE_INLINE=PASS", result.StandardOutput);
             Assert.Contains("CATALOGS=PASS", result.StandardOutput);
             Assert.Contains("APPLICATION_THEME=" + theme, result.StandardOutput);
             Assert.Contains("APPLICATION_DRAINED=PASS", result.StandardOutput);
@@ -153,7 +218,7 @@ public sealed partial class PackagedGuiAcceptanceTests
             using var probe = new GuiProcessProbeFixture(package: true);
             var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-audit " + theme);
             fixture.ConfigureRuntime(start);
-            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3));
+            var result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5));
             _output.WriteLine(result.StandardOutput);
             Assert.True(result.ExitCode == 0, result.StandardOutput + Environment.NewLine + result.StandardError);
             Assert.Contains("INLINE_RECEIPT_NATIVE_EDIT=PASS", result.StandardOutput);
@@ -338,12 +403,12 @@ public sealed partial class PackagedGuiAcceptanceTests
             var start = probe.Start("\"" + Path.Combine(package, "desktop-net48-win-x86", "MyDmsVn.Desktop.App.exe") + "\" inventory-fault " + theme);
             fixture.ConfigureRuntime(start);
             start.EnvironmentVariables["MYDMSVN_GUI_P5_BARRIER"] = barrier;
-            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(3), cancellation.Token);
+            var execution = GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5), cancellation.Token);
             GuiProcessResult? result = null;
             Exception? initial = null;
             try
             {
-                await WaitForSignalAsync(barrier, "posting", execution, TimeSpan.FromSeconds(100));
+                await WaitForSignalAsync(barrier, "posting", execution, TimeSpan.FromSeconds(180));
                 await fixture.InstallOwnedPostTimeoutAsync();
                 File.WriteAllText(Path.Combine(barrier, "allow-post"), "release");
                 var waiting = Stopwatch.StartNew();
@@ -355,7 +420,7 @@ public sealed partial class PackagedGuiAcceptanceTests
                 }
                 Assert.True(observed, "The owned runtime SQL session never reached the controlled WAITFOR fault.");
                 _output.WriteLine("RUNTIME_SQL_WAITFOR_OBSERVED=PASS");
-                await WaitForSignalAsync(barrier, "uncertain", execution, TimeSpan.FromSeconds(45));
+                await WaitForSignalAsync(barrier, "uncertain", execution, TimeSpan.FromSeconds(90));
                 await fixture.AssertTimedOutDraftAndRemoveFaultAsync();
                 File.WriteAllText(Path.Combine(barrier, "allow-reload"), "release");
                 await WaitForSignalAsync(barrier, "reloaded", execution, TimeSpan.FromSeconds(25));

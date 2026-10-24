@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
@@ -8,8 +9,175 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 
-public sealed class SalesReceiptEditorViewModelTests
+public sealed partial class SalesReceiptEditorViewModelTests
 {
+    [Fact]
+    public async Task Save_for_close_reports_unknown_create_after_transport_failure_and_keeps_review_lock()
+    {
+        var api = new SalesApi { Create = _ => throw new InvalidOperationException("ambiguous") };
+        using var vm = Editor(api);
+        Valid(vm);
+        var row = vm.AddLine()!;
+        row.ProductId = 7;
+
+        var outcome = await vm.SaveForCloseAsync();
+
+        Assert.Equal(WorkspaceSaveStatus.Unknown, outcome.Status);
+        Assert.True(vm.RequiresCreateOutcomeReview);
+        Assert.Equal(vm.EditorIdentity, outcome.EditorIdentity);
+        Assert.Single(api.Creates);
+    }
+
+    [Fact]
+    public async Task Server_line_details_follow_submitted_reordered_references_and_leave_unknown_fields_unbound()
+    {
+        var api = new SalesApi();
+        using var vm = Editor(api);
+        await vm.LoadAsync(41);
+        var first = vm.Lines[0];
+        var second = vm.AddLine()!;
+        second.ProductId = first.ProductId;
+        vm.MoveLine(second, 0);
+        api.Update = _ => Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+            new ApiError(ApiStatusCode.BadRequest, "SalesReceipt.Invalid", "Correct the sale.", new[]
+            {
+                new ApiErrorDetail("Validation.PrecisionScale", "Second row quantity is invalid.", "Request.Lines[0].Qty"),
+                new ApiErrorDetail("Validation.PrecisionScale", "First row price is invalid.", "request.lines[1].unitPrice"),
+                new ApiErrorDetail("Validation.Unknown", "Unknown row.", "Request.Lines[9].Qty"),
+                new ApiErrorDetail("SalesReceipt.AmountOutOfRange", "Line amount is invalid.", "Request.Lines[1]"),
+            })));
+
+        await vm.SaveAsync();
+
+        Assert.Same(second, vm.ValidationIssues[0].Line);
+        Assert.Equal("qty", vm.ValidationIssues[0].Field);
+        Assert.Same(first, vm.ValidationIssues[1].Line);
+        Assert.Equal("unitPrice", vm.ValidationIssues[1].Field);
+        Assert.Null(vm.ValidationIssues[2].Line);
+        Assert.Equal("Request.Lines[9].Qty", vm.ValidationIssues[2].Field);
+        Assert.Same(first, vm.ValidationIssues[3].Line);
+        Assert.Equal("line", vm.ValidationIssues[3].Field);
+        Assert.All(vm.ValidationIssues, issue => Assert.Equal("server", issue.Source));
+        second.Quantity = 2m;
+        Assert.DoesNotContain(vm.ValidationIssues, issue => ReferenceEquals(issue.Line, second) && issue.Field == "qty");
+        Assert.Contains(vm.ValidationIssues, issue => ReferenceEquals(issue.Line, first) && issue.Field == "unitPrice");
+        Assert.Contains(vm.ValidationIssues, issue => ReferenceEquals(issue.Line, first) && issue.Field == "line");
+        Assert.Contains(vm.ValidationIssues, issue => issue.Line == null);
+        Assert.True(first.SetProduct(first.ProductId, "Updated caption", true, first.Unit));
+        first.Quantity = 3m;
+        Assert.Contains(vm.ValidationIssues, issue => ReferenceEquals(issue.Line, first) && issue.Field == "line");
+    }
+
+    [Fact]
+    public async Task Post_line_error_targets_current_reference_without_reusing_a_saved_line_id()
+    {
+        var api = new SalesApi();
+        using var vm = Editor(api);
+        await vm.LoadAsync(41);
+        var row = vm.Lines.Single();
+        api.Post = _ => Task.FromResult(ApiResponse<PostSalesReceiptResponse>.Failure(
+            new ApiError(ApiStatusCode.BadRequest, "SalesReceipt.Invalid", "Review product.", new[]
+            {
+                new ApiErrorDetail("SalesReceipt.ProductInactive", "Product is inactive.", "Request.Lines[0].ProductId"),
+            })));
+
+        await vm.PostAsync();
+
+        var issue = Assert.Single(vm.ValidationIssues);
+        Assert.Same(row, issue.Line);
+        Assert.Equal("productId", issue.Field);
+        Assert.Equal("Product is inactive.", issue.Message);
+        Assert.True(row.SetProduct(row.ProductId, "Refreshed caption", true, row.Unit));
+        Assert.Single(vm.ValidationIssues);
+        row.ProductId = row.ProductId + 1;
+        Assert.Empty(vm.ValidationIssues);
+    }
+
+    [Fact]
+    public async Task Queued_server_validation_from_old_session_does_not_target_new_document()
+    {
+        var api = new SalesApi(); var session = new SalesSession(); var ui = new SalesQueuedUi();
+        using var vm = Editor(api, session, ui);
+        await vm.LoadAsync(41);
+        vm.Lines.Single().Quantity = 2m;
+        api.Update = _ =>
+        {
+            ui.Queue = true;
+            return Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+                new ApiError(ApiStatusCode.BadRequest, "SalesReceipt.Invalid", "Old error.", new[]
+                {
+                    new ApiErrorDetail("Validation.PrecisionScale", "Old quantity.", "Request.Lines[0].Qty"),
+                })));
+        };
+
+        var pending = vm.SaveAsync();
+        session.Replace();
+        ui.Queue = false; ui.Drain();
+        await LocalSalesReceiptApiClientTests.Within(pending);
+
+        Assert.Empty(vm.ValidationIssues);
+        Assert.Empty(vm.Lines);
+    }
+
+    [Fact]
+    public async Task Duplicate_product_zero_id_lines_keep_distinct_server_targets_and_document_replacement_clears_them()
+    {
+        var api = new SalesApi();
+        using var vm = Editor(api);
+        Valid(vm);
+        var first = vm.AddLine()!; first.ProductId = 7;
+        var second = vm.AddLine()!; second.ProductId = 7;
+        api.Create = _ => Task.FromResult(ApiResponse<SalesReceiptDto>.Failure(
+            new ApiError(ApiStatusCode.BadRequest, "SalesReceipt.Invalid", "Correct the sale.", new[]
+            {
+                new ApiErrorDetail("Validation.PrecisionScale", "First quantity.", "Request.Lines[0].Qty"),
+                new ApiErrorDetail("Validation.PrecisionScale", "Second quantity.", "Request.Lines[1].Qty"),
+            })));
+
+        await vm.SaveAsync();
+
+        Assert.Same(first, vm.ValidationIssues[0].Line);
+        Assert.Same(second, vm.ValidationIssues[1].Line);
+        Assert.NotSame(vm.ValidationIssues[0].Line, vm.ValidationIssues[1].Line);
+        Assert.True(vm.NewDraft());
+        Assert.Empty(vm.ValidationIssues);
+    }
+    [Fact]
+    public async Task Confirmed_post_publishes_success_before_failed_detail_refresh_and_keeps_recovery()
+    {
+        var api = new SalesApi();
+        var feedback = new RecordedFeedback();
+        using var vm = Editor(api);
+        await vm.LoadAsync(41);
+        api.Get = _ => Task.FromResult(SalesApi.Error<SalesReceiptDto>());
+
+        await vm.PostAsync(feedback: feedback);
+
+        Assert.Equal(new[] { DesktopNotificationKind.Success, DesktopNotificationKind.Error },
+            feedback.Notices.Select(notice => notice.Kind));
+        Assert.Equal("Posted", vm.Status);
+        Assert.True(vm.RequiresPostOutcomeReload);
+        Assert.Single(api.Posts);
+    }
+
+    [Fact]
+    public async Task Ambiguous_create_publishes_no_success_and_keeps_review_lock()
+    {
+        var api = new SalesApi { Create = _ => throw new InvalidOperationException("ambiguous") };
+        var feedback = new RecordedFeedback();
+        using var vm = Editor(api);
+        Valid(vm);
+        var row = vm.AddLine()!;
+        row.ProductId = 7;
+
+        await vm.SaveAsync(feedback: feedback);
+
+        Assert.DoesNotContain(feedback.Notices, notice => notice.Kind == DesktopNotificationKind.Success);
+        Assert.Contains(feedback.Notices, notice => notice.Kind == DesktopNotificationKind.Error);
+        Assert.True(vm.RequiresCreateOutcomeReview);
+        Assert.Single(api.Creates);
+    }
+
     [Fact]
     public async Task Changing_product_identity_clears_old_unit_and_keeps_manual_price()
     {
@@ -230,4 +398,12 @@ public sealed class SalesReceiptEditorViewModelTests
         vm.SetAccess(true, true, true); return vm;
     }
     private static void Valid(SalesReceiptEditorViewModel vm) { vm.CustomerId = 1; vm.WarehouseId = 2; vm.EmployeeId = 3; }
+
+    private sealed class RecordedFeedback : IWorkspaceFeedbackSink
+    {
+        public List<DesktopNotification> Notices { get; } = new List<DesktopNotification>();
+
+        public void Publish(DesktopNotification notice) => Notices.Add(notice);
+        public void ClearActionable() { }
+    }
 }

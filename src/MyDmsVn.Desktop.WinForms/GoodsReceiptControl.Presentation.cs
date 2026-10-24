@@ -8,6 +8,10 @@ namespace MyDmsVn.Desktop.WinForms;
 public sealed partial class GoodsReceiptControl
 {
     private SplitContainer _workspaceSplit = null!;
+    private BootstrapBusyHost _masterBusyHost = null!;
+    private BootstrapBusyHost _detailBusyHost = null!;
+    private WorkspaceBusyBinder _masterBusyBinder = null!;
+    private WorkspaceBusyBinder _detailBusyBinder = null!;
     private FlowLayoutPanel _workspaceCommands = null!;
     private TableLayoutPanel _workspaceFooter = null!;
     private Label _workspaceTitle = null!;
@@ -74,7 +78,7 @@ public sealed partial class GoodsReceiptControl
         TotalLabel.Visible = _totalCaption.Visible = detail;
         _compactTitle!.Visible = detail;
         _workspaceTitle.Text = detail ? "Goods receipt" : "Goods receipts";
-        _savedState.Text = _editor.RequiresPostOutcomeReload ? "Reload required" : _editor.IsBusy ? "Working…" : _editor.IsDirty || _inline.HasPendingDataEdit ? "Unsaved changes" : _editor.Id.HasValue ? "Saved" : "Not saved";
+        _savedState.Text = _editor.RequiresPostOutcomeReload ? "Reload required" : _editor.IsBusy ? "Working…" : _editor.IsDirty || _inline.HasPendingDataEdit || ReceiptDateEditor.HasPendingEdit ? "Unsaved changes" : _editor.Id.HasValue ? "Saved" : "Not saved";
         _lineCount.Text = _editor.Lines.Count + (_editor.Lines.Count == 1 ? " line" : " lines");
         _workspaceCommands.PerformLayout();
         _layoutReceipt();
@@ -107,7 +111,7 @@ public sealed partial class GoodsReceiptControl
         paging.Controls.AddRange(new Control[] { PreviousPageButton, PageLabel, NextPageButton });
         master.Controls.Add(ReceiptGrid); master.Controls.Add(paging); master.Controls.Add(masterBar);
 
-        var detail = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        var detail = new BootstrapPanel { Name = "GoodsDetailSurface", SurfaceRole = BootstrapSurfaceRole.Surface, Dock = DockStyle.Fill, AutoScroll = true };
         var content = new Panel { Dock = DockStyle.Fill };
         var metadata = new TableLayoutPanel { Name = "ReceiptMetadata", Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3 };
         var fields = new[] { CompactField("Receipt date", ReceiptDateEditor, 0), CompactField("Warehouse", WarehouseLookup, 1), CompactField("Employee", EmployeeLookup, 2), CompactField("Note", NoteEditor, 3) };
@@ -179,7 +183,11 @@ public sealed partial class GoodsReceiptControl
         header.FontChanged += (_, __) => _layoutReceipt();
         OperationStatusLabel.TextChanged += (_, __) => _layoutReceipt();
         _workspaceSplit = new SplitContainer { Dock = DockStyle.Fill, Size = new Size(1200, 600), SplitterDistance = 260, TabIndex = 1 };
-        _workspaceSplit.Panel1.Controls.Add(master); _workspaceSplit.Panel2.Controls.Add(detail);
+        _masterBusyHost = new BootstrapBusyHost(master) { Dock = DockStyle.Fill };
+        _detailBusyHost = new BootstrapBusyHost(detail) { Dock = DockStyle.Fill };
+        _masterBusyBinder = new WorkspaceBusyBinder(FeedbackScope, _masterBusyHost.Begin, DispatchToUi);
+        _detailBusyBinder = new WorkspaceBusyBinder(FeedbackScope, _detailBusyHost.Begin, DispatchToUi);
+        _workspaceSplit.Panel1.Controls.Add(_masterBusyHost); _workspaceSplit.Panel2.Controls.Add(_detailBusyHost);
         _workspaceSplit.SizeChanged += (_, __) => _layoutReceipt();
         return _workspaceSplit;
     }
