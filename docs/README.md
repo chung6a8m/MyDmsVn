@@ -1,6 +1,6 @@
 # Documentation index — v1a-pro-ui-next
 
-**Updated:** 2026-10-23. **UI-NEXT is the sole ACTIVE roadmap**, based on `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (includes merged PR #43 and the migrated assessment). All implementation tasks are **NOT STARTED**; no new runtime PASS is claimed. The [archive boundary](archive/20261023-pre-ui-next/README.md) retires previous queues and excludes their unfinished work without completing or waiving it.
+**Updated:** 2026-10-24. **UI-NEXT is the sole ACTIVE roadmap**. T00–T13 retain their recorded bounded historical verification; current work is the Owner-approved **DateInput Unified Compact correction, UIN-D01–D03**, implementation **NOT STARTED**, new runtime evidence **NOT RUN** and running-visual acceptance pending. This planning update establishes no runtime PASS. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains previous unfinished work without completing, waiving or rescheduling it.
 
 ## Current work and Codex entry points
 
@@ -9,10 +9,13 @@
 | [AGENTS.md](../AGENTS.md) | Repository instructions, invariants and current work |
 | [AI_CONTEXT.md](../AI_CONTEXT.md) | Current source, archive boundary and implementation handoff |
 | [UI-NEXT active roadmap](ui-next/20261023-active-roadmap.md) | Sole execution queue, dependencies and task status |
+| [DateInput approved design](ui-next/20261024-dateinput-unified-compact-design.md) | Selected option 01, visual reference, caret semantics, source diagnosis and scope |
+| [DateInput correction plan](ui-next/20261024-dateinput-unified-compact-correction.md) | Current UIN-D01–D03 implementation, exact source/test owners and focused commands |
+| [DateInput Codex prompt](ui-next/20261024-dateinput-unified-compact-codex-prompt.md) | Ready-to-use Vietnamese implementation handoff for the existing PR chain |
 | [Design and control policy](ui-next/20261023-design-and-control-policy.md) | Workspace behavior, existing/proposed controls and app/vendor ownership |
-| [Implementation plan](ui-next/20261023-implementation-plan.md) | Task-owned source/test work and concrete implementation steps |
+| [Original implementation plan](ui-next/20261023-implementation-plan.md) | T00–T13 task provenance and link to current correction execution |
 | [Validation and handoff](ui-next/20261023-validation-and-handoff.md) | Scoped future verification, evidence and completion boundaries |
-| [Development status](DEVELOPMENT_PLAN.md) | Implemented baseline versus unstarted UI-NEXT work |
+| [Development status](DEVELOPMENT_PLAN.md) | Implemented baseline, historical acceptance and current correction |
 | [Test policy](TEST_POLICY.md) | Sole execution policy; focused scope and required safeguards |
 | [Test coverage](TEST_STRATEGY.md) | Required behavior and failure boundaries |
 | [Test commands](../tests/README.md) | Direct projects, SQL ownership and interactive GUI prerequisites |

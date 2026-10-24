@@ -1,8 +1,23 @@
 # UI Next — validation and cross-session handoff
 
 **Date:** 2026-10-23
-**Status:** T00–T13 VERIFIED in their recorded bounded UI Next scopes; T13 retains the attended zero-document FAIL caused by Owner Save, with a passing no-interaction control and dated Owner acceptance
+**Status:** DateInput correction UIN-D01–D03 is ACTIVE / NOT STARTED, new evidence NOT RUN and new running-visual Owner disposition pending. T00–T13 remain VERIFIED in their recorded historical bounded scopes; retain the original T13 attended-fixture FAIL, passing control and dated acceptance.
 **Authority:** [TEST_POLICY](../TEST_POLICY.md) remains the sole execution policy. This document selects behavior for the [new active roadmap](20261023-active-roadmap.md), not an additional test framework.
+
+## DateInput correction acceptance
+
+**Added:** 2026-10-24. The Owner approved [option 01 — Unified Compact](20261024-dateinput-unified-compact-design.md). [UIN-D01–D03](20261024-dateinput-unified-compact-correction.md) now owns the affected DateInput contribution to UIN-A07/A12/A14. Historical rows below remain candidate-specific records; the correction must establish its own results.
+
+| ID / owner | Required observable outcome | Required evidence | Current state |
+|---|---|---|---|
+| UIN-DA01 / D01 | Repeated Day/Month/Year Up/Down retains logical caret/selection, including short DMY normalization and cross-separator selection; rejected/readonly/disabled/IME input does not mutate; clock and pending/accepted rules preserved | Native key/selection assertions, actual behavioral RED where meaningful, affected UI tests on net48/x86 and net8.0-windows/x64 | NOT RUN |
+| UIN-DA02 / D02 | One exterior border, date displayed once, icon-only trigger before/after open/preview/accept/cancel, coherent focus/validation and readable geometry; standalone picker compatible | Rendered outcome/layout plus native popup/focus/accessibility/lifecycle tests, Light/Dark and measured native100/native125, larger-font check; affected default TextBox cases if its rendering seam changes | NOT RUN |
+| UIN-DA03 / D03 | Exact UI → BSG → app pins; Sales From/To and Goods/Sales required dates preserve caret through host projection, admit changes only at the existing query/commit boundaries and retain guards | App Release net48/x86 build, focused native integration cases, new bounded actual-Login DateInput package smoke, source/test/package hashes and owned cleanup | NOT RUN |
+| UIN-DA04 / D03 | Owner inspects the corrected running visual against option 01; remaining environment/scale/behavior limits are explicit | Dated disposition on an identified new build, separately recording which scale/theme was observed and the automated matrix | PENDING — design selected; running candidate not accepted |
+
+Use the scoped selectors and source-file ownership warning in the correction plan. Run GUI/SQL owners sequentially with existing protection. Record actual selected/discovered/executed rows and skip/failure reasons. Record monitor DPI separately from test-window DPI; a 120-DPI monitor or `native125` directory does not prove 120-DPI window awareness. Never rename a missing prerequisite or zero-test run into PASS.
+
+When work executes, add a sanitized evidence record under `docs/ui-next/evidence/` with the real execution date, exact app/UI/BSG/SourceGrid/test/package identity, original failures, successful repair runs, current limitations and cleanup. Keep previous [T13](evidence/20261024-uin-t13-integration.md), [first-review](evidence/20261024-pr45-review-corrections.md) and [second-review](evidence/20261024-pr45-review-round2.md) evidence intact. This documents-only activation runs no new product/GUI/SQL tests and grants no runtime/production acceptance.
 
 ## Evidence boundary
 

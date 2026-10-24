@@ -1,11 +1,25 @@
 # UI Next — active roadmap for the SME desktop foundation
 
 **Date:** 2026-10-23
-**Status:** SOLE ACTIVE ROADMAP — T00–T13 VERIFIED in their recorded bounded UI Next scopes; T13 retains an attended zero-document FAIL after Owner-confirmed Save, with a passing no-interaction control and dated Owner UI acceptance
+**Status:** SOLE ACTIVE ROADMAP — DateInput correction UIN-D01–D03 is ACTIVE / NOT STARTED; its runtime evidence is NOT RUN. T00–T13 remain VERIFIED only in their recorded historical bounded scopes, including the retained T13 attended-fixture FAIL and separate passing control.
 **Base:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`
 **Design:** [Design and control policy](20261023-design-and-control-policy.md)
 **Execution:** [Implementation plan](20261023-implementation-plan.md)
 **Evidence:** [Validation and handoff](20261023-validation-and-handoff.md)
+
+## Active DateInput correction
+
+**Updated:** 2026-10-24. The Owner selected and confirmed **option 01 — Unified Compact** after observing clipped date text in the calendar trigger and caret reset after Up/Down. Continue the open UI #73 → BSG #18 → MyDmsVn #45 chain. This correction is the next execution queue within UI-NEXT; do not restart T00–T13 from historical checklists.
+
+Read the [approved design](20261024-dateinput-unified-compact-design.md), [correction implementation plan](20261024-dateinput-unified-compact-correction.md), [acceptance addendum](20261023-validation-and-handoff.md#dateinput-correction-acceptance) and [Codex handoff prompt](20261024-dateinput-unified-compact-codex-prompt.md).
+
+| Task | Outcome / ownership | Depends on | Implementation | New evidence |
+|---|---|---|---|---|
+| UIN-D01 | Preserve logical segment, caret and selection through native date steps — UI | Approved design | NOT STARTED | UIN-DA01: NOT RUN |
+| UIN-D02 | One DateInput surface and icon-only calendar trigger; standalone compatibility — UI | D01 | NOT STARTED | UIN-DA02: NOT RUN |
+| UIN-D03 | UI → BSG → app pins, hosted/package validation and new Owner visual disposition | D01, D02 | NOT STARTED | UIN-DA03/DA04: NOT RUN / pending |
+
+Inspection anchors are app `6ff4b9829a4b69f992d75fb52047e991c1843b96`, BSG `02888dec75878a081f2caac9b22829ae3a2f7d72`, UI `c91993f4f44a60210f4c6c4106e82ebc69931a0a` and unchanged SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. Fetch and inspect newer heads; do not reset them. Historical T06/T11/T13 evidence and review-correction results remain attached to their exact candidates. Design approval is recorded; corrected runtime/Owner acceptance remains pending. Only affected DateInput evidence is reopened. This documentation update establishes no new runtime PASS.
 
 ## Selection and scheduling boundary
 

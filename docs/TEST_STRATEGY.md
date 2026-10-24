@@ -1,12 +1,12 @@
 # Test coverage — MyDmsVn
 
-**Updated:** 2026-10-23. This document owns behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) has direct commands. The [UI-NEXT roadmap](ui-next/20261023-active-roadmap.md) is the sole active queue at `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. All implementation tasks are NOT STARTED; new runtime validation is NOT RUN.
+**Updated:** 2026-10-24. This document owns behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) has direct commands. The [UI-NEXT roadmap](ui-next/20261023-active-roadmap.md) remains the sole active queue, originally activated from `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. UIN-T00–T13 retain their recorded bounded verification. Current work is the [DateInput correction UIN-D01–UIN-D03](ui-next/20261024-dateinput-unified-compact-correction.md): implementation **NOT STARTED**, runtime checks **NOT RUN**, and implemented-candidate Owner visual acceptance pending.
 
 The [archive boundary](archive/20261023-pre-ui-next/README.md) retires old queues without completing their open acceptance. [SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`; candidate-specific runnable automation passed, while native125, attended observations and dated Owner acceptance remain OPEN. R3/R4 source fixes are reviewed/approved. BCF/BCI/GUI-P5/L2DB/RESP retain their exact historical signed scopes and exceptions.
 
 ## Active UI-NEXT coverage
 
-The [design and control policy](ui-next/20261023-design-and-control-policy.md) and [validation and handoff](ui-next/20261023-validation-and-handoff.md) own the current behavioral and evidence boundary. Verify the following when the owning task is implemented:
+The [design and control policy](ui-next/20261023-design-and-control-policy.md) and [validation and handoff](ui-next/20261023-validation-and-handoff.md) own the current behavioral and evidence boundary. Preserve the following coverage and select affected cases for the current changed behavior:
 
 - Safe error field metadata survives mapping; field and stable-row cell messages align with invalid visual state and clear correctly without losing raw input. Fieldless errors remain visible; duplicate Product rows and reorder cannot misroute a line error.
 - Feedback belongs to the originating workspace instance/session/document generation. Tab switching, concurrent operations, hidden tabs, close/reopen and logout reject stale callbacks and do not leak protected data or steal focus.
@@ -14,6 +14,7 @@ The [design and control policy](ui-next/20261023-design-and-control-policy.md) a
 - Busy leases/lifecycle survive nested operations, cancellation and disposal without flicker, premature unlock or stale focus restoration. Query cancellation does not imply mutation rollback. Native keyboard and existing command admission continue to enforce Posted/busy/denied/recovery restrictions.
 - Normal tab close resolves pending edits and honors app-owned dirty/recovery admission before disposal; rejected close retains buffers. Forced session cleanup remains independent of ordinary close veto. Shared close affordances preserve native selection, overflow, keyboard and accessibility semantics.
 - Theme surfaces use semantic tokens while preserving font ownership, high contrast, Light/Dark behavior, DPI/layout and native accessible names/focus. New generic UI APIs preserve the shared library's supported targets and existing toast/input/spinner contracts.
+- DateInput correction preserves caret/selection in the same logical day/month/year segment through repeated Up/Down and short-input normalization; rejected steps preserve text and selection. Unified Compact provides one border and an icon-only calendar trigger before/after opening, selecting and canceling; retain popup/focus/validation behavior and standalone CalendarPicker compatibility. Cover affected hosts, Light/Dark and measured native100/native125 using the correction plan's focused scope, with design approval separate from new-candidate runtime/Owner acceptance.
 
 Use existing Application/Session/WinForms/vendor test owners. Proposed cases/selectors are not runnable until implemented and discovered. Archived SAL-T08, the full six-owner fresh/reuse round and old unfinished acceptance are excluded; broaden only for the actual changed dependency under TEST_POLICY.
 
