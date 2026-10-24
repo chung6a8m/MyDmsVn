@@ -102,19 +102,56 @@ public sealed class SalesScenarioBehaviorTests
     }
 
     [Fact]
-    public void S02_invalid_native_sale_date_keeps_raw_text_and_prevents_mutation()
+    public void S02_invalid_native_sale_date_is_the_only_save_blocker()
     {
         ScenarioControlHost.Run(SalesScenarioId.S02Validation, (host, guard) =>
         {
+            var editor = host.Control.Editor;
+            editor.SetCustomer(1, "Demo Customer", true);
+            editor.SetWarehouse(2, "Demo Warehouse", true);
+            editor.SetEmployee(3, "Demo Employee", true);
+            var line = editor.AddLine()!;
+            line.SetProduct(11, "Demo Product A", true, "pcs");
+            line.Quantity = 3m;
+            line.UnitPrice = 12m;
+            Assert.Equal(0, editor.SaleId);
+            Assert.True(editor.IsDirty);
+            Assert.Equal(36m, editor.TotalAmount);
             host.Control.SaleDateEditor.ReferenceDateProvider = () => SalesScenarioData.ReferenceDate;
             var date = new NativeLookupTypingDriver(host.Control.SaleDateEditor);
             date.SelectRange(0, date.Text.Length);
             foreach (var character in "31/02/2026") date.TypeCharacter(character);
             host.Wait(host.Control.SaveAsync());
+            Assert.Equal("31/02/2026", date.Text);
+            Assert.Equal("31/02/2026", host.Control.SaleDateEditor.PendingText);
+            Assert.Equal(BootstrapValidationState.Invalid, host.Control.SaleDateEditor.ValidationState);
+            Assert.DoesNotContain(host.Data.Journal.Entries, entry => entry.Operation == "Create.request");
+            Assert.Equal(0, editor.SaleId);
+            Assert.Equal(3m, line.Quantity);
+            Assert.Empty(guard.Exceptions);
+        });
+    }
+
+    [Fact]
+    public void S02_invalid_native_sale_date_is_the_only_post_blocker()
+    {
+        ScenarioControlHost.Run(SalesScenarioId.S01Draft, (host, guard) =>
+        {
+            var editor = host.Control.Editor;
+            Assert.Equal(SalesScenarioData.SeedSaleId, editor.SaleId);
+            Assert.False(editor.IsDirty);
+            Assert.Equal(24m, editor.TotalAmount);
+            host.Control.SaleDateEditor.ReferenceDateProvider = () => SalesScenarioData.ReferenceDate;
+            var date = new NativeLookupTypingDriver(host.Control.SaleDateEditor);
+            date.SelectRange(0, date.Text.Length);
+            foreach (var character in "31/02/2026") date.TypeCharacter(character);
             host.Wait(host.Control.PostAsync());
             Assert.Equal("31/02/2026", date.Text);
             Assert.Equal("31/02/2026", host.Control.SaleDateEditor.PendingText);
-            Assert.DoesNotContain(host.Data.Journal.Entries, entry => entry.Operation == "Create.request" || entry.Operation == "Post.request");
+            Assert.Equal(BootstrapValidationState.Invalid, host.Control.SaleDateEditor.ValidationState);
+            Assert.False(editor.IsDirty);
+            Assert.False(editor.RequiresPostOutcomeReload);
+            Assert.DoesNotContain(host.Data.Journal.Entries, entry => entry.Operation == "Post.request");
             Assert.Empty(guard.Exceptions);
         });
     }
@@ -141,15 +178,15 @@ public sealed class SalesScenarioBehaviorTests
             native.TypeCharacter('B');
             host.Until(() => source.LookupCalls.Count >= before + 2, "Lookup B was not dispatched.");
             Assert.True(race.A.IgnoreCancellation);
-            race.CompleteB();
-            host.Until(() => model.Items.Any(option => option.Id == 12),
+            const int bOnlyProductId = 1203;
+            Assert.True(race.B.Complete(ApiResponse<System.Collections.Generic.IReadOnlyList<CatalogLookupDto>>.Success(
+                new[] { new CatalogLookupDto(bOnlyProductId, "B-1203", "Only B returned this", true) })));
+            host.Until(() => model.Items.Any(option => option.Id == bOnlyProductId),
                 "Lookup B did not publish its result before A completed.");
             race.CompleteA();
-            host.Until(() => source.OutstandingOperations.All(task => task.IsCompleted),
-                "Lookup A did not finish after its delayed completion.");
-            host.Pump(); host.Pump();
-            Assert.Contains(model.Items, option => option.Id == 12);
-            Assert.Contains(((System.Collections.IEnumerable)lookup.DataSource!).Cast<CatalogLookupOption>(), option => option.Id == 12);
+            host.WaitLast(); // Includes CatalogLookupViewModel and UI continuations, beyond fake API completion.
+            Assert.Contains(model.Items, option => option.Id == bOnlyProductId);
+            Assert.Contains(((System.Collections.IEnumerable)lookup.DataSource!).Cast<CatalogLookupOption>(), option => option.Id == bOnlyProductId);
             Assert.Equal("PB", native.Text);
             Assert.Equal(11, lookup.SelectedValue);
             Assert.Equal(11, host.Control.Editor.Lines[0].ProductId);

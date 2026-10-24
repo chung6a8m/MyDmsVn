@@ -189,6 +189,7 @@ public sealed class SalesReceiptControl : UserControl, IActivatableDesktopContro
     internal ReceiptWorkspaceMode WorkspaceMode { get; private set; } = ReceiptWorkspaceMode.List;
     private bool Current => !_disposed && _session.IsAuthenticated && _session.Version == _sessionVersion;
     private bool Busy => !Current || Editor.IsBusy || _list.IsBusy;
+    internal bool CanRefreshPermissions => Current && !Busy;
     private bool CanEditHeader => Current && !Busy && WorkspaceMode == ReceiptWorkspaceMode.Detail && Editor.CanEdit;
 
     public async Task ActivateAsync(CancellationToken cancellationToken)

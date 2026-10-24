@@ -15,7 +15,8 @@ internal sealed class UiLabForm : Form
 {
     private readonly ComboBox _scenario = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190 };
     private readonly Button _reset = new Button { Text = "Reset", AutoSize = true };
-    private readonly Button _closeWorkspace = new Button { Text = "Close workspace", AutoSize = true };
+    private readonly ReceiptCommandButton _closeWorkspace = new ReceiptCommandButton
+        { Text = "Close workspace", AutoSize = true, CausesValidation = false };
     private readonly Button _replaceSession = new Button { Text = "Replace session", AutoSize = true };
     private readonly Button _failSave = new Button { Text = "Fail next Save", AutoSize = true };
     private readonly Button _armRace = new Button { Text = "Arm lookup A/B", AutoSize = true };
@@ -45,13 +46,26 @@ internal sealed class UiLabForm : Form
     internal bool IsResetting => _resetting;
     internal bool IsPoisoned => _poisoned;
     internal Task ResetForTestAsync() => ResetSafelyAsync();
+    internal ComboBox ScenarioSelector => _scenario;
+    internal ReceiptCommandButton CloseWorkspaceButton => _closeWorkspace;
+    internal Button HoldReloadButton => _holdReload;
+    internal Button ReleaseReloadButton => _releaseReload;
+    internal Button ArmRaceButton => _armRace;
+    internal Button CompleteAButton => _completeA;
+    internal Button CompleteBButton => _completeB;
+    internal Button ApplyAccessButton => _applyPermission;
+    internal ComboBox PermissionVariantSelector => _permissionVariant;
+    internal string StatusText => _status.Text;
 
-    public UiLabForm()
+    public UiLabForm() : this(PromptCloseAsync) { }
+
+    internal UiLabForm(Func<WorkspaceCloseState, CancellationToken, Task<WorkspaceCloseChoice>> closePrompt)
     {
         Text = "MyDmsVn Sales UI Lab";
         Size = new Size(1250, 850);
         StartPosition = FormStartPosition.CenterScreen;
-        _closeCoordinator = new WorkspaceCloseCoordinator(PromptCloseAsync);
+        _closeCoordinator = new WorkspaceCloseCoordinator(closePrompt);
+        _closeWorkspace.RetainEditorFocus = () => _control?.CaptureCloseState().IsDirty == true;
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 68, WrapContents = true, Padding = new Padding(6) };
         toolbar.Controls.AddRange(new Control[] { _scenario, _reset, _closeWorkspace, _replaceSession,
             _failSave, _armRace, _completeB, _completeA, _permissionVariant, _applyPermission,
@@ -74,7 +88,11 @@ internal sealed class UiLabForm : Form
         _applyPermission.Click += async (_, __) => await ApplyPermissionAsync();
         _holdReload.Click += (_, __) => ArmBusyReload();
         _releaseReload.Click += (_, __) => ReleaseBusyReload();
-        _diagnostics.Tick += (_, __) => RefreshDiagnostics();
+        _diagnostics.Tick += (_, __) =>
+        {
+            RefreshDiagnostics();
+            SetCommands(!_resetting && !_closingWorkspace && !_poisoned);
+        };
         Shown += async (_, __) => { _diagnostics.Start(); await ResetSafelyAsync(); };
         FormClosing += OnFormClosing;
     }
@@ -190,6 +208,7 @@ internal sealed class UiLabForm : Form
     private void ArmLookupRace()
     {
         if (_data == null) return;
+        if (_race != null) { _status.Text = "Lookup A/B is already armed. Reset to arm it again."; return; }
         _race = _data.ArmLookupRace();
         _status.Text = "Type product search A, then B. Complete B before A.";
         SetCommands(true);
@@ -207,6 +226,11 @@ internal sealed class UiLabForm : Form
     private async Task ApplyPermissionAsync()
     {
         if (_data == null || _control == null || _lifetime == null) return;
+        if (!_control.CanRefreshPermissions)
+        {
+            _status.Text = "Access not applied while the workspace is busy. Release the operation and apply again.";
+            return;
+        }
         var keys = new[] { "Sales.Receipts.Read", "Sales.Receipts.Write", "Sales.Receipts.Post" };
         foreach (var key in keys) _data.Permissions.Set(key, true);
         if (_permissionVariant.SelectedIndex > 0) _data.Permissions.Set(keys[_permissionVariant.SelectedIndex - 1], false);
@@ -217,6 +241,7 @@ internal sealed class UiLabForm : Form
     private void ArmBusyReload()
     {
         if (_data == null) return;
+        if (_reloadGate != null) { _status.Text = "Reload is already held. Reset to hold it again."; return; }
         _reloadGate = new ScenarioGate<ApiResponse<SalesReceiptDto>>();
         _data.SalesApi.EnqueueGetGate(_reloadGate);
         _status.Text = "Next Reload is held. Press Release Reload to return its response.";
@@ -238,12 +263,12 @@ internal sealed class UiLabForm : Form
         _closeWorkspace.Enabled = enabled && _control != null;
         _replaceSession.Enabled = enabled && _control != null;
         _failSave.Enabled = enabled && _control != null;
-        _armRace.Enabled = enabled && _control != null && _data?.Id == SalesScenarioId.S03LookupRace;
+        _armRace.Enabled = enabled && _control != null && _data?.Id == SalesScenarioId.S03LookupRace && _race == null;
         _completeA.Enabled = enabled && _race != null && !_race.A.IsCompleted;
         _completeB.Enabled = enabled && _race != null && !_race.B.IsCompleted;
         _permissionVariant.Enabled = enabled && _control != null;
-        _applyPermission.Enabled = enabled && _control != null;
-        _holdReload.Enabled = enabled && _control != null;
+        _applyPermission.Enabled = enabled && _control?.CanRefreshPermissions == true;
+        _holdReload.Enabled = enabled && _control != null && _reloadGate == null;
         _releaseReload.Enabled = enabled && _reloadGate != null && !_reloadGate.IsCompleted;
     }
 
