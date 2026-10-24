@@ -1,7 +1,7 @@
 # UI Next — active roadmap for the SME desktop foundation
 
 **Date:** 2026-10-23
-**Status:** SOLE ACTIVE ROADMAP — DateInput correction UIN-D01/D02 is implemented with bounded UI evidence; UIN-D03 remains active pending native125 and running-visual Owner disposition. T00–T13 remain VERIFIED only in their recorded historical bounded scopes, including the retained T13 attended-fixture FAIL and separate passing control.
+**Status:** SOLE ACTIVE ROADMAP — DateInput correction UIN-D01–D03 is VERIFIED within its recorded bounded scope after final-candidate native100/native125 checks and dated Owner visual acceptance. T00–T13 remain VERIFIED only in their recorded historical bounded scopes, including the retained T13 attended-fixture FAIL and separate passing control.
 **Base:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`
 **Design:** [Design and control policy](20261023-design-and-control-policy.md)
 **Execution:** [Implementation plan](20261023-implementation-plan.md)
@@ -15,9 +15,9 @@ Read the [approved design](20261024-dateinput-unified-compact-design.md), [corre
 
 | Task | Outcome / ownership | Depends on | Implementation | New evidence |
 |---|---|---|---|---|
-| UIN-D01 | Preserve logical segment, caret and selection through native date steps — UI | Approved design | IMPLEMENTED; bounded verification | UIN-DA01: UI dual-target pass in [candidate evidence](evidence/20261024-dateinput-unified-compact-correction.md) |
-| UIN-D02 | One DateInput surface and icon-only calendar trigger; standalone compatibility — UI | D01 | IMPLEMENTED; native125 pending | UIN-DA02: UI dual-target and native100 pass; native125 pending |
-| UIN-D03 | UI → BSG → app pins, hosted/package validation and new Owner visual disposition | D01, D02 | ACTIVE; final pins/hosted/native100 done | UIN-DA03: native125 pending; UIN-DA04: Owner disposition pending |
+| UIN-D01 | Preserve logical segment, caret and selection through native date steps — UI | Approved design | VERIFIED in bounded scope | UIN-DA01: UI dual-target pass in [candidate evidence](evidence/20261024-dateinput-unified-compact-correction.md) |
+| UIN-D02 | One DateInput surface and icon-only calendar trigger; standalone compatibility — UI | D01 | VERIFIED in bounded scope | UIN-DA02: first-candidate Owner FAIL retained; repaired candidate native100/native125 PASS and bounded Owner acceptance at 125% |
+| UIN-D03 | UI → BSG → app pins, hosted/package validation and new Owner visual disposition | D01, D02 | VERIFIED in bounded scope | UIN-DA03: final package physical native100/native125 PASS; UIN-DA04: dated bounded Owner acceptance at 125% |
 
 Initial inspection anchors were app `6ff4b9829a4b69f992d75fb52047e991c1843b96`, BSG `02888dec75878a081f2caac9b22829ae3a2f7d72`, UI `c91993f4f44a60210f4c6c4106e82ebc69931a0a` and unchanged SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. The current correction candidate and its actual test/package identity are recorded in the [new evidence](evidence/20261024-dateinput-unified-compact-correction.md). Historical T06/T11/T13 and review-correction results remain attached to their exact candidates. Design approval does not supply running-visual Owner acceptance.
 
