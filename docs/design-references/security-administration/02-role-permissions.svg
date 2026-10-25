@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-labelledby="title desc"><title id="title">Vai trò — Quyền của vai trò</title><desc id="desc">Precise UI wireframe based on the reviewed Security administration design. Illustrative data; not an implemented application screenshot or UI Labs evidence.</desc>
+<rect x="0" y="0" width="1440" height="960" rx="0" fill="#0d1b29" stroke="none"/>
+<rect x="0" y="36" width="220" height="898" rx="0" fill="#102233" stroke="#2c465d"/>
+<path d="M0 36H1440" fill="none" stroke="#2c465d"/>
+<text x="18" y="24" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="700" text-anchor="start">MyDmsVn</text>
+<text x="144" y="24" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="11" font-weight="400" text-anchor="start">QUẢN TRỊ TRUY CẬP</text>
+<text x="1418" y="24" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="16" font-weight="400" text-anchor="end">−    □    ×</text>
+<rect x="229" y="44" width="207" height="34" rx="5" fill="#1a3651" stroke="#2c465d"/>
+<text x="244" y="66" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Quản trị truy cập</text>
+<text x="418" y="66" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="18" font-weight="400" text-anchor="start">×</text>
+<path d="M220 79H1440" fill="none" stroke="#2c465d"/>
+<text x="24" y="91" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="24" font-weight="700" text-anchor="start">MyDmsVn</text>
+<rect x="25" y="133" width="17" height="17" rx="3" fill="none" stroke="#8eaecb"/>
+<path d="M29 139H38" fill="none" stroke="#8eaecb"/>
+<text x="58" y="146" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Sản phẩm</text>
+<rect x="25" y="181" width="17" height="17" rx="3" fill="none" stroke="#8eaecb"/>
+<path d="M29 187H38" fill="none" stroke="#8eaecb"/>
+<text x="58" y="194" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Kho hàng</text>
+<rect x="25" y="229" width="17" height="17" rx="3" fill="none" stroke="#8eaecb"/>
+<path d="M29 235H38" fill="none" stroke="#8eaecb"/>
+<text x="58" y="242" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Nhân viên</text>
+<rect x="25" y="277" width="17" height="17" rx="3" fill="none" stroke="#8eaecb"/>
+<path d="M29 283H38" fill="none" stroke="#8eaecb"/>
+<text x="58" y="290" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Khách hàng</text>
+<rect x="25" y="325" width="17" height="17" rx="3" fill="none" stroke="#8eaecb"/>
+<path d="M29 331H38" fill="none" stroke="#8eaecb"/>
+<text x="58" y="338" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Phiếu bán hàng</text>
+<rect x="25" y="373" width="17" height="17" rx="3" fill="none" stroke="#8eaecb"/>
+<path d="M29 379H38" fill="none" stroke="#8eaecb"/>
+<text x="58" y="386" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Phiếu nhập kho</text>
+<rect x="25" y="421" width="17" height="17" rx="3" fill="none" stroke="#8eaecb"/>
+<path d="M29 427H38" fill="none" stroke="#8eaecb"/>
+<text x="58" y="434" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Tồn kho</text>
+<rect x="25" y="469" width="17" height="17" rx="3" fill="none" stroke="#8eaecb"/>
+<path d="M29 475H38" fill="none" stroke="#8eaecb"/>
+<text x="58" y="482" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Thẻ kho</text>
+<text x="24" y="550" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="11" font-weight="700" text-anchor="start">HỆ THỐNG</text>
+<rect x="8" y="570" width="204" height="44" rx="5" fill="#234d77" stroke="#2c5f92"/>
+<text x="26" y="598" fill="#58b2ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="24" font-weight="400" text-anchor="start">◇</text>
+<text x="58" y="598" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Quản trị truy cập</text>
+<text x="26" y="841" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="16" font-weight="400" text-anchor="start">●</text>
+<text x="58" y="841" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="700" text-anchor="start">Quản trị viên</text>
+<text x="26" y="884" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Giao diện tối</text>
+<text x="26" y="916" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Đăng xuất</text>
+<text x="244" y="117" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="25" font-weight="700" text-anchor="start">Quản trị truy cập</text>
+<text x="244" y="159" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="400" text-anchor="start">Người dùng</text>
+<text x="389" y="159" fill="#58b2ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="700" text-anchor="start">Vai trò</text>
+<rect x="386" y="172" width="75" height="3" rx="0" fill="#3c9bff" stroke="none"/>
+<text x="483" y="159" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="400" text-anchor="start">Danh mục quyền</text>
+<path d="M220 176H1440" fill="none" stroke="#2c465d"/>
+<rect x="0" y="934" width="1440" height="26" rx="0" fill="#122638" stroke="#2c465d"/>
+<text x="14" y="952" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="11" font-weight="400" text-anchor="start">MyDmsVn · Security administration</text>
+<text x="720" y="952" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="11" font-weight="400" text-anchor="middle">PHÁC THẢO UI · DỮ LIỆU MINH HỌA</text>
+<text x="1424" y="952" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="11" font-weight="400" text-anchor="end">Không phải UI đã triển khai</text>
+<rect x="1280" y="91" width="140" height="36" rx="5" fill="#287ee8" stroke="#398ce9"/>
+<text x="1350.0" y="114.0" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="600" text-anchor="middle">+ Tạo vai trò</text>
+<rect x="240" y="188" width="280" height="732" rx="6" fill="#14283a" stroke="#2c465d"/>
+<text x="256" y="222" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="20" font-weight="700" text-anchor="start">Vai trò</text>
+<rect x="256" y="248" width="248" height="35" rx="5" fill="#102334" stroke="#39576e"/>
+<text x="269" y="271" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Tìm vai trò…</text>
+<rect x="241" y="309" width="278" height="78" rx="0" fill="#234e7d" stroke="none"/>
+<rect x="241" y="309" width="4" height="78" rx="0" fill="#459aff" stroke="none"/>
+<text x="263" y="344" fill="#58b2ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="25" font-weight="400" text-anchor="start">◇</text>
+<text x="305" y="340" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="700" text-anchor="start">Bán hàng</text>
+<text x="305" y="363" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">8 thành viên</text>
+<path d="M256 387H504" fill="none" stroke="#2c465d"/>
+<text x="263" y="425" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="25" font-weight="400" text-anchor="start">◇</text>
+<text x="305" y="421" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="400" text-anchor="start">Kho — chỉ xem</text>
+<text x="305" y="444" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">5 thành viên</text>
+<path d="M256 468H504" fill="none" stroke="#2c465d"/>
+<text x="263" y="506" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="25" font-weight="400" text-anchor="start">◇</text>
+<text x="305" y="502" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="400" text-anchor="start">Kế toán</text>
+<text x="305" y="525" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">3 thành viên</text>
+<path d="M256 549H504" fill="none" stroke="#2c465d"/>
+<text x="263" y="587" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="25" font-weight="400" text-anchor="start">◇</text>
+<text x="305" y="583" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="15" font-weight="400" text-anchor="start">Administrator</text>
+<text x="305" y="606" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">1 thành viên</text>
+<path d="M256 630H504" fill="none" stroke="#2c465d"/>
+<text x="256" y="898" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">4 vai trò</text>
+<rect x="540" y="188" width="880" height="732" rx="6" fill="#14283a" stroke="#2c465d"/>
+<text x="565" y="231" fill="#58b2ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="38" font-weight="400" text-anchor="start">◇</text>
+<text x="623" y="216" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="10" font-weight="700" text-anchor="start">VAI TRÒ</text>
+<text x="623" y="249" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="27" font-weight="700" text-anchor="start">Bán hàng</text>
+<rect x="795" y="226" width="161" height="25" rx="5" fill="#123e32" stroke="#45d49b"/>
+<text x="875.5" y="243" fill="#45d49b" font-family="Arial, DejaVu Sans, sans-serif" font-size="11" font-weight="600" text-anchor="middle">●  Đang hoạt động</text>
+<rect x="1196" y="213" width="137" height="33" rx="5" fill="#172e42" stroke="#53748f"/>
+<text x="1264.5" y="234.5" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Sửa tên</text>
+<text x="1390" y="236" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="22" font-weight="400" text-anchor="middle">⋯</text>
+<text x="563" y="304" fill="#58b2ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="700" text-anchor="start">Quyền của vai trò</text>
+<text x="801" y="304" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="start">Thành viên (8)</text>
+<path d="M560 321H1400" fill="none" stroke="#2c465d"/>
+<rect x="559" y="318" width="190" height="3" rx="0" fill="#3c9bff" stroke="none"/>
+<text x="560" y="358" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="20" font-weight="700" text-anchor="start">Quyền được cấp cho Bán hàng</text>
+<rect x="560" y="378" width="840" height="40" rx="5" fill="#173b5c" stroke="#317cb7"/>
+<text x="576" y="403" fill="#bedcff" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Cấp quyền cho vai trò. Quyền riêng của từng người dùng được ưu tiên.</text>
+<rect x="560" y="434" width="300" height="35" rx="5" fill="#102334" stroke="#39576e"/>
+<text x="573" y="457" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Tìm quyền…</text>
+<rect x="873" y="434" width="260" height="35" rx="5" fill="#102334" stroke="#39576e"/>
+<text x="886" y="457" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Tất cả nhóm</text>
+<text x="1117" y="457" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" font-weight="400" text-anchor="end">▾</text>
+<rect x="1161" y="444" width="17" height="17" rx="3" fill="#112638" stroke="#8aa6bc"/>
+<text x="1189" y="457" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Chỉ quyền đã cấp</text>
+<rect x="560" y="486" width="840" height="324" rx="4" fill="#112536" stroke="#2c465d"/>
+<rect x="561" y="487" width="838" height="34" rx="3" fill="#254158" stroke="none"/>
+<text x="573" y="510" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="700" text-anchor="start">Cấp</text>
+<text x="620" y="510" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="700" text-anchor="start">Quyền</text>
+<text x="1260" y="510" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="700" text-anchor="start">Nhóm</text>
+<rect x="575" y="531" width="17" height="17" rx="3" fill="#3298f5" stroke="#75b6e8"/>
+<path d="M579 539l3 4 6-8" fill="none" stroke="#09253c" stroke-width="2"/>
+<text x="620" y="536" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Xem phiếu bán</text>
+<text x="620" y="551" fill="#9eb5cb" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="400" text-anchor="start">Sales.Receipts.Read</text>
+<text x="1260" y="544" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Bán hàng</text>
+<path d="M560 557H1400" fill="none" stroke="#2c465d"/>
+<rect x="575" y="567" width="17" height="17" rx="3" fill="#3298f5" stroke="#75b6e8"/>
+<path d="M579 575l3 4 6-8" fill="none" stroke="#09253c" stroke-width="2"/>
+<text x="620" y="572" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Sửa phiếu bán</text>
+<text x="620" y="587" fill="#9eb5cb" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="400" text-anchor="start">Sales.Receipts.Write</text>
+<text x="1260" y="580" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Bán hàng</text>
+<path d="M560 593H1400" fill="none" stroke="#2c465d"/>
+<rect x="575" y="603" width="17" height="17" rx="3" fill="#3298f5" stroke="#75b6e8"/>
+<path d="M579 611l3 4 6-8" fill="none" stroke="#09253c" stroke-width="2"/>
+<text x="620" y="608" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Ghi sổ phiếu bán</text>
+<text x="620" y="623" fill="#9eb5cb" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="400" text-anchor="start">Sales.Receipts.Post</text>
+<text x="1260" y="616" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Bán hàng</text>
+<path d="M560 629H1400" fill="none" stroke="#2c465d"/>
+<rect x="575" y="639" width="17" height="17" rx="3" fill="#3298f5" stroke="#75b6e8"/>
+<path d="M579 647l3 4 6-8" fill="none" stroke="#09253c" stroke-width="2"/>
+<text x="620" y="644" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Xem sản phẩm</text>
+<text x="620" y="659" fill="#9eb5cb" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="400" text-anchor="start">Catalog.Products.Read</text>
+<text x="1260" y="652" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Danh mục</text>
+<path d="M560 665H1400" fill="none" stroke="#2c465d"/>
+<rect x="561" y="665" width="838" height="36" rx="0" fill="#3a3526" stroke="none"/>
+<rect x="575" y="675" width="17" height="17" rx="3" fill="#3298f5" stroke="#75b6e8"/>
+<path d="M579 683l3 4 6-8" fill="none" stroke="#09253c" stroke-width="2"/>
+<text x="620" y="680" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Sửa sản phẩm</text>
+<text x="620" y="695" fill="#9eb5cb" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="400" text-anchor="start">Catalog.Products.Write</text>
+<text x="1260" y="688" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Danh mục</text>
+<text x="1130" y="688" fill="#ffc65a" font-family="Arial, DejaVu Sans, sans-serif" font-size="11" font-weight="400" text-anchor="start">Chưa lưu</text>
+<path d="M560 701H1400" fill="none" stroke="#2c465d"/>
+<rect x="575" y="711" width="17" height="17" rx="3" fill="#3298f5" stroke="#75b6e8"/>
+<path d="M579 719l3 4 6-8" fill="none" stroke="#09253c" stroke-width="2"/>
+<text x="620" y="716" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Xem khách hàng</text>
+<text x="620" y="731" fill="#9eb5cb" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="400" text-anchor="start">Catalog.Customers.Read</text>
+<text x="1260" y="724" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Danh mục</text>
+<path d="M560 737H1400" fill="none" stroke="#2c465d"/>
+<rect x="575" y="747" width="17" height="17" rx="3" fill="#112638" stroke="#8aa6bc"/>
+<text x="620" y="752" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Sửa khách hàng</text>
+<text x="620" y="767" fill="#9eb5cb" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="400" text-anchor="start">Catalog.Customers.Write</text>
+<text x="1260" y="760" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Danh mục</text>
+<path d="M560 773H1400" fill="none" stroke="#2c465d"/>
+<rect x="575" y="783" width="17" height="17" rx="3" fill="#112638" stroke="#8aa6bc"/>
+<text x="620" y="788" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="400" text-anchor="start">Xem tồn kho</text>
+<text x="620" y="803" fill="#9eb5cb" font-family="DejaVu Sans Mono, monospace" font-size="10.5" font-weight="400" text-anchor="start">Inventory.Balances.Read</text>
+<text x="1260" y="796" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Kho</text>
+<path d="M560 809H1400" fill="none" stroke="#2c465d"/>
+<path d="M606 486L606 810" fill="none" stroke="#2c465d"/>
+<path d="M1245 486L1245 810" fill="none" stroke="#2c465d"/>
+<text x="560" y="834" fill="#9eb5cb" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="start">Bỏ chọn là gỡ cấp quyền từ vai trò này.</text>
+<text x="1400" y="834" fill="#58b2ff" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" font-weight="400" text-anchor="end">Xem thành viên của vai trò →</text>
+<rect x="560" y="853" width="840" height="50" rx="5" fill="#132a3e" stroke="#2c465d"/>
+<circle cx="581" cy="878" r="7" fill="#ffc65a"/>
+<text x="598" y="883" fill="#ffc65a" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="700" text-anchor="start">1 thay đổi chưa lưu</text>
+<rect x="1055" y="861" width="142" height="36" rx="5" fill="#172e42" stroke="#53748f"/>
+<text x="1126.0" y="884.0" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Hủy thay đổi</text>
+<rect x="1210" y="861" width="177" height="36" rx="5" fill="#287ee8" stroke="#398ce9"/>
+<text x="1298.5" y="884.0" fill="#edf4fb" font-family="Arial, DejaVu Sans, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Lưu quyền vai trò</text>
+</svg>

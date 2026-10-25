@@ -2,7 +2,7 @@
 
 **Design basis:** Owner-reviewed conversation and mockups, 2026-10-25. **Inspected source:** `0216701835cc3326124a94760186989c1ac4f729` on `v1a-pro-ui-next`. **Implementation state:** proposed; this document does not report a running UI or SQL acceptance.
 
-The [implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) owns task state and verification. The [visual references](../design-references/security-administration/README.md) illustrate composition; this specification and the Owner's explicit corrections take precedence over generated text, sample numbers and obsolete details in those images. The [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) defines the repeatable review exercises.
+The [implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) owns task state and verification. The [visual references](../design-references/security-administration/README.md) illustrate composition; this specification and the Owner's explicit corrections take precedence over illustrative values in the wireframes and original conversation mockups. The [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) defines the repeatable review exercises.
 
 ## 1. Intent, scope and decisions
 
@@ -58,7 +58,7 @@ The Lab references Contracts/Desktop.Application/WinForms and its sample scenari
 - Search/filter rebinding must preserve raw text, caret/range and stable selected identity. Changing a filter cannot erase hidden draft changes or change the mutation target.
 - Use one clear create action per object context. Use explicit action names: **Lưu thông tin**, **Lưu quyền vai trò**, **Lưu quyền này**, **Gán vai trò**, **Gỡ vai trò**, **Hủy thay đổi**. Put activate/deactivate/password actions in contextual menus/dialogs, with target names visible.
 
-Generated image captions and sample counts are not runtime copy or fixed data. Display canonical permission keys from the catalog/assignment data; never implement shortened example keys such as `Products.Read` or `Inventory.Read`.
+Conversation mockup captions and illustrative counts are not runtime copy or fixed data. Display canonical permission keys from the catalog/assignment data; never implement shortened example keys such as `Products.Read` or `Inventory.Read`.
 
 ## 4. Người dùng
 
@@ -133,7 +133,7 @@ This tab is read-only in this scope. **Mở người dùng** navigates to that u
 
 ## 6. Danh mục quyền
 
-Use the [catalog reference](../design-references/security-administration/04-permission-catalog.png). The left panel filters modules; the right panel has **Danh mục quyền**, a **Chỉ xem** badge, search by friendly name/canonical key, lifecycle filter and a definition grid. Columns: **Tên quyền | Mã quyền | Nhóm | Trạng thái**. The selected-row details show full key, module, description, lifecycle and **Sao chép mã quyền**.
+Use the [catalog reference](../design-references/security-administration/04-permission-catalog.svg). The left panel filters modules; the right panel has **Danh mục quyền**, a **Chỉ xem** badge, search by friendly name/canonical key, lifecycle filter and a definition grid. Columns: **Tên quyền | Mã quyền | Nhóm | Trạng thái**. The selected-row details show full key, module, description, lifecycle and **Sao chép mã quyền**.
 
 Copy: **Tra cứu quyền của hệ thống. Gán quyền tại Người dùng hoặc Vai trò.** Active is **Đang dùng**, Deprecated is **Ngừng dùng**. These are definition lifecycle labels, not grant/deny results. No user identity, user child tabs, target selector, assignment checkboxes, direct editor, Save, registry Create/Delete or assignment import appears in this tab.
 

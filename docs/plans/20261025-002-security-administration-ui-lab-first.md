@@ -8,7 +8,7 @@
 
 **Tech stack:** C# / WinForms / .NET Framework 4.8 (`net48`), existing WinFormsKit controls, xUnit and the serialized STA/native-input harness. No new runtime dependency, database schema or permission-registry mutation.
 
-**Spec:** [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md), [reviewed visual references](../design-references/security-administration/README.md) and [Security UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md). The specification and explicit Owner corrections take precedence over generated image text and illustrative counts.
+**Spec:** [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md), [visual references based on the reviewed layouts](../design-references/security-administration/README.md) and [Security UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md). The specification and explicit Owner corrections take precedence over generated image text and illustrative counts.
 
 **Status:** PLANNED / NOT STARTED. This planning PR contains documentation and reference images only. No candidate implementation, GUI/SQL execution or Owner approval of a running candidate is claimed. This is an additional selected workstream in the [execution index](README.md); the existing [Sidebar plan](20261025-001-sidebar-navigation-horizontal-scrollbar.md) retains its own scope and state.
 
@@ -217,7 +217,7 @@ Update this record in the same change that records the Owner's decision. Keep th
 
 ### Documentation-only PR
 
-Check changed-path scope, `git diff --check`, UTF-8/no-BOM/working-tree line endings, relative Markdown links/anchors, source-versus-proposed names, image byte identity/hashes, current-work routing and preserved Sidebar task state. No application build, GUI/native exercise or SQL test is required or claimed by this planning PR.
+Check changed-path scope, `git diff --check`, UTF-8/no-BOM/working-tree line endings, relative Markdown links/anchors, source-versus-proposed names, SVG structure/rendering and fidelity to the reviewed layouts, current-work routing and preserved Sidebar task state. No application build, GUI/native exercise or SQL test is required or claimed by this planning PR.
 
 ### Before the Owner gate
 
