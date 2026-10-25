@@ -149,6 +149,8 @@ public sealed class SecurityWorkspaceLifetimeTests
             control.RecoveryConfirmationOverride = () => true;
 
             var review = Find(control).Single(button => button.Text == "Đã đối chiếu — lập diff mới");
+            Assert.Same(control.UserDetail.Tabs.TabPages[3], review.Parent!.Parent);
+            Assert.True(review.Parent.Visible);
             review.PerformClick();
             Pump(control.LastOperation);
             Assert.True(control.ViewModel.RequiresRecovery);
@@ -159,6 +161,7 @@ public sealed class SecurityWorkspaceLifetimeTests
             Pump(control.LastOperation);
 
             Assert.False(control.ViewModel.RequiresRecovery);
+            Assert.False(review.Parent!.Visible);
             Assert.True(control.ViewModel.HasDirtyEditor);
             Assert.Equal(3, control.UserDetail.Tabs.SelectedIndex);
         });

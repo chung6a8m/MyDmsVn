@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
@@ -22,6 +23,8 @@ public sealed class SecurityPaneStateTests
             scene.Administration.UsersError = new ApiError(status, "PaneUnavailable", "Cannot load this pane.");
             Wait(control.ActivateAsync(default));
             Assert.Equal(expected, control.ViewModel.Users.State);
+            Assert.Contains(expected == SecurityDatasetState.Forbidden ? "Không có quyền xem" : "Tải dữ liệu thất bại", control.UserPaneStatus.Text);
+            Assert.DoesNotContain(expected.ToString(), control.DatasetStatus.Text);
             Assert.Empty(control.Users.Items);
             Assert.Null(control.ViewModel.SelectedUser);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
@@ -45,6 +48,8 @@ public sealed class SecurityPaneStateTests
             scene.Administration.RolesError = new ApiError(status, "PaneUnavailable", "Cannot load this pane.");
             Wait(control.ActivateAsync(default));
             Assert.Equal(expected, control.ViewModel.Roles.State);
+            Assert.Contains(expected == SecurityDatasetState.Forbidden ? "Không có quyền xem" : "Tải dữ liệu thất bại", control.RolePaneStatus.Text);
+            Assert.DoesNotContain(expected.ToString(), control.DatasetStatus.Text);
             Assert.Empty(control.Roles.Items);
             Assert.Null(control.ViewModel.SelectedRole);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
@@ -66,6 +71,11 @@ public sealed class SecurityPaneStateTests
             scene.Catalog.Error = new ApiError(status, "PaneUnavailable", "Cannot load this pane.");
             Wait(control.ActivateAsync(default));
             Assert.Equal(expected, control.ViewModel.Catalog.State);
+            Assert.Contains(expected == SecurityDatasetState.Forbidden ? "Không có quyền xem" : "Tải dữ liệu thất bại", control.PermissionCatalog.Details.Text);
+            Assert.DoesNotContain(expected.ToString(), control.DatasetStatus.Text);
+            Assert.Equal("Nhóm quyền chưa khả dụng", control.PermissionCatalog.ModuleGroups.Items[0]);
+            Assert.Contains("Danh mục chưa khả dụng", control.RoleDetail.HistoryTitle.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(control.RoleDetail.Permissions.Items.Cast<object>(), item => item.ToString()!.Contains("Không còn trong danh mục"));
             Assert.Empty(control.PermissionCatalog.Keys.Rows);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);

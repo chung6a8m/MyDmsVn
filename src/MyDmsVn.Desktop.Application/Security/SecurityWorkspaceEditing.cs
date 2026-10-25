@@ -27,6 +27,7 @@ public sealed partial class SecurityWorkspaceViewModel
     public long EditorRevision => RoleDraft?.LocalEditRevision ?? (DirectPermissionKey != null ? _directEditRevision : _completedEditRevision);
     public bool IsBusy { get; private set; }
     public bool RequiresRecovery { get; private set; }
+    public SecurityAdministrationTargetDto? RecoveryTarget => _recoveryTarget;
     public bool HasDirtyEditor => RoleDraft?.IsDirty == true || (DirectPermissionKey != null && DirectDecision != _originalDirectDecision);
     public bool CanNavigate => !IsBusy && !HasDirtyEditor && !RequiresRecovery;
     public SecuritySaveOutcome? LastSaveOutcome { get; private set; }

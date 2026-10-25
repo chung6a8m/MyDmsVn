@@ -56,11 +56,20 @@ public sealed class SecurityWorkspaceControlTests
             System.Windows.Forms.Application.DoEvents();
             Assert.True(form.ClientSize.Width > 0 && form.ClientSize.Height > 0);
             Assert.True(control.PermissionCatalog.Keys.Width > 0);
+            Assert.True(control.PermissionCatalog.ModuleGroups.Width >= 150);
             Assert.True(control.PermissionCatalog.CopyKey.Visible);
             Assert.True(control.PermissionCatalog.CopyKey.Bottom <= control.PermissionCatalog.ClientSize.Height);
             Assert.True(control.PermissionCatalog.Details.Bottom <= control.PermissionCatalog.ClientSize.Height);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, control.PermissionCatalog.Keys.BackgroundColor);
             Assert.False(control.HorizontalScroll.Visible);
+            control.Tabs.SelectedIndex = 0;
+            System.Windows.Forms.Application.DoEvents();
+            Assert.InRange(control.Users.Width, 175, 285);
+            Assert.True(control.UserDetail.HeaderActions.Controls.Cast<Control>().Last().Right <= control.UserDetail.HeaderActions.ClientSize.Width);
+            control.Tabs.SelectedIndex = 1;
+            System.Windows.Forms.Application.DoEvents();
+            Assert.True(control.RoleDetail.GrantArea.Width > 0);
+            Assert.True(control.RoleDetail.HeaderActions.Controls.Cast<Control>().Last().Right <= control.RoleDetail.HeaderActions.ClientSize.Width);
         }
         finally { BootstrapThemeManager.CurrentTheme = theme; }
     });
@@ -90,9 +99,10 @@ public sealed class SecurityWorkspaceControlTests
         control.UserDetail.Result.SelectedIndex = 2;
         Assert.True(control.UserDetail.Effective.ReadOnly);
         Assert.True(control.UserDetail.Effective.Rows.Count > 0);
-        var row = System.Linq.Enumerable.Single(control.UserDetail.Effective.Rows.Cast<DataGridViewRow>(), item => Equals(item.Cells[0].Value, "Sales.Receipts.Post"));
+        var row = System.Linq.Enumerable.Single(control.UserDetail.Effective.Rows.Cast<DataGridViewRow>(), item => Equals(item.Tag, "Sales.Receipts.Post"));
         control.UserDetail.Effective.CurrentCell = row.Cells[0];
-        Assert.Contains("DirectDeny", control.UserDetail.Explanation.Text);
+        Assert.Contains("Quyền riêng: Từ chối", control.UserDetail.Explanation.Text);
+        Assert.DoesNotContain("DirectDeny", control.UserDetail.Explanation.Text);
         Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
     });
 
@@ -110,8 +120,78 @@ public sealed class SecurityWorkspaceControlTests
         control.Tabs.SelectedIndex = 2;
         Assert.Equal(data.Data.Catalog.Items.Count, control.PermissionCatalog.Keys.Rows.Count);
         Assert.Single(Descendants(control.PermissionCatalog, typeof(Button)));
+        Assert.Equal(data.Data.Catalog.Items.Select(item => item.Module).Distinct().Count() + 1, control.PermissionCatalog.ModuleGroups.Items.Count);
+        Assert.Contains("Tất cả", control.PermissionCatalog.ModuleGroups.Items[0]!.ToString());
+        control.PermissionCatalog.ModuleGroups.SelectedIndex = 1;
+        Assert.All(control.PermissionCatalog.Keys.Rows.Cast<DataGridViewRow>(), row => Assert.Equal(control.PermissionCatalog.Module.Text, row.Cells[2].Value));
+        control.PermissionCatalog.ModuleGroups.SelectedIndex = 0;
         control.PermissionCatalog.Keys.CurrentCell = control.PermissionCatalog.Keys.Rows[0].Cells[0];
         Assert.Contains("Sales.Receipts.Read", control.PermissionCatalog.Details.Text);
+        Assert.Contains("CHI TIẾT QUYỀN", control.PermissionCatalog.Details.Text);
+    });
+    [Fact]
+    public void Master_and_identity_views_show_separate_hierarchy() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        Assert.Equal(DrawMode.OwnerDrawFixed, control.Users.DrawMode);
+        Assert.True(control.Users.ItemHeight >= 50);
+        Assert.Equal(DrawMode.OwnerDrawFixed, control.Roles.DrawMode);
+        Assert.NotEmpty(control.UserDetail.Header.Text);
+        Assert.Contains("@", control.UserDetail.HeaderMetadata.Text);
+        Assert.Contains("hoạt động", control.UserDetail.HeaderState.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("THÔNG TIN TÀI KHOẢN", control.UserDetail.Tabs.TabPages[0].Controls.Cast<Control>().OfType<Label>().First(item => item.Text.Contains("THÔNG TIN TÀI KHOẢN")).Text);
+        Assert.DoesNotContain("Vai trò", control.UserDetail.Header.Text);
+        Assert.DoesNotContain("Thành viên", control.RoleDetail.Header.Text);
+    });
+    [Fact]
+    public void Direct_row_opens_the_same_key_and_previews_without_mutating_effective_result() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
+    {
+        var key = "Sales.Receipts.Post";
+        var committed = Assert.Single(control.UserDetail.Effective.Rows.Cast<DataGridViewRow>(), row => Equals(row.Tag, key)).Cells[1].Value;
+        control.UserDetail.Tabs.SelectedIndex = 3;
+        control.UserDetail.DirectDecisions.SelectedIndex = 0;
+        Until(() => control.ViewModel.DirectPermissionKey == key);
+        Assert.Equal(key, control.ViewModel.DirectPermissionKey);
+        var preview = control.UserDetail.Tabs.TabPages[3].Controls.Cast<Control>().OfType<Label>().First(item => item.Text.Contains("Đã lưu:"));
+        Assert.Contains("Đã lưu:", preview.Text);
+        Assert.Single(Descendants(control.UserDetail, typeof(RadioButton)).Cast<RadioButton>(), radio => radio.Text == "Cho phép").Checked = true;
+        Assert.True(control.ViewModel.HasDirtyEditor);
+        Assert.Contains("Kết quả dự kiến (chưa lưu): ✓ Cho phép", preview.Text);
+        Assert.Equal(committed, Assert.Single(control.UserDetail.Effective.Rows.Cast<DataGridViewRow>(), row => Equals(row.Tag, key)).Cells[1].Value);
+        control.ViewModel.DiscardEditor();
+        Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
+    });
+    [Fact]
+    public void Role_editor_has_filters_history_and_contextual_recovery() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        Assert.Equal("", control.RolePaneStatus.Text);
+        Assert.Contains("Sửa quyền", control.RoleDetail.HeaderActions.Controls.Cast<Control>().OfType<Button>().Select(button => button.Text));
+        Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(CheckedListBox)));
+        Assert.NotEmpty(Descendants(control.RoleDetail.GrantArea, typeof(TextBox)));
+        Assert.NotEmpty(Descendants(control.RoleDetail.GrantArea, typeof(ComboBox)));
+        Assert.NotEmpty(Descendants(control.RoleDetail.GrantArea, typeof(CheckBox)));
+        Assert.DoesNotContain(Descendants(control, typeof(FlowLayoutPanel)).Cast<FlowLayoutPanel>(), panel => panel.Visible && panel.Controls.Cast<Control>().OfType<Button>().Any(button => button.Text == "Tải lại để đối chiếu"));
+    });
+    [Fact]
+    public void Role_filter_retains_hidden_draft_and_read_only_orphan() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        Assert.Contains("Legacy.Orphan", control.RoleDetail.Permissions.Items[0]!.ToString());
+        var edit = Assert.Single(Descendants(control.RoleDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Sửa quyền");
+        edit.PerformClick();
+        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(CheckedListBox)).Cast<CheckedListBox>());
+        Assert.Contains("Xem phiếu bán hàng", grants.GetItemText(grants.Items[0]));
+        var index = grants.Items.IndexOf("Sales.Receipts.Post");
+        grants.SetItemChecked(index, true);
+        Until(() => control.ViewModel.RoleDraft?.Changes.Count == 1);
+        Assert.Contains("Chưa lưu", grants.GetItemText(grants.Items[index]));
+        var search = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(TextBox)).Cast<TextBox>());
+        search.Text = "Read";
+        Assert.Single(grants.Items);
+        Assert.Equal("Sales.Receipts.Read", grants.Items[0]);
+        Assert.Single(control.ViewModel.RoleDraft!.Changes);
+        Assert.Contains("1 thay đổi", control.RoleDetail.GrantArea.Controls.Cast<Control>().OfType<Label>().Single().Text);
+        Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
     });
     [Fact]
     public void Unmapped_catalog_key_with_no_description_keeps_its_canonical_name() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
@@ -134,6 +214,7 @@ public sealed class SecurityWorkspaceControlTests
         {
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
             control.Tabs.SelectedIndex = 1;
+            Assert.True(control.RoleDetail.Header.Font.Bold);
             var grants = Assert.Single(Descendants(control.RoleDetail, typeof(CheckedListBox)).Cast<CheckedListBox>());
             Assert.True(grants.Enabled);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, grants.ForeColor);
