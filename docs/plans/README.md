@@ -10,7 +10,7 @@ Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this ind
 
 ## Selecting the next roadmap
 
-When the Owner selects new scope, create a dated plan from the then-current source and point this index to that single execution-status owner. Record its boundaries, task order and focused verification there. Cross-repository decisions belong to [MyDmsVn.Docs](https://github.com/chung6a8m/MyDmsVn.Docs); source contracts and commands remain in their code repositories.
+When the Owner selects new scope, create a dated plan from the then-current source and point this index to that single execution-status owner. Record its boundaries, task order and focused verification there. Record decisions needed for this repository in its local [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md) and authorized plan. Source contracts and commands remain here with their owners. Historical external proposals or publication status do not add required reading, synchronization, approval or implementation work.
 
 Do not carry forward unfinished UI-NEXT/SAL acceptance, old integration repeats, release prerequisites or other proposed phases automatically. Any selected follow-up must cite the original evidence and define its own scope; archival neither completes nor waives it.
 

@@ -6,7 +6,7 @@ Windows desktop-first SME business software for Sales and Inventory. Local v1 in
 
 **Updated:** 2026-10-25. The [current execution index](docs/plans/README.md) records **no active execution plan; the next roadmap has not been selected**. The [archive boundary](docs/archive/20261025-pre-next-roadmap/README.md) preserves prior work and exact-candidate limits after merged PR #48. Read [AGENTS](AGENTS.md), [AI_CONTEXT](AI_CONTEXT.md) and the sole [TEST_POLICY](docs/TEST_POLICY.md) before acting on that scope.
 
-[Documentation index](docs/README.md) · [Development-plan alias](docs/DEVELOPMENT_PLAN.md) · [Organization proposals and decisions](https://github.com/chung6a8m/MyDmsVn.Docs)
+[Documentation index](docs/README.md) · [Development-plan alias](docs/DEVELOPMENT_PLAN.md) · [Architecture decisions](docs/adr/README.md)
 
 [UI-NEXT](docs/ui-next/README.md) is retained as a historical design and acceptance reference. Its [DateInput candidate evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md) and [T13 ledger](docs/ui-next/evidence/20261024-uin-t13-integration.md) retain exact revisions, original failures and bounded acceptance; their former prompts do not schedule new work.
 

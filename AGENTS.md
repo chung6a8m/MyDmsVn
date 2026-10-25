@@ -16,6 +16,8 @@ SAL source is present in the merged baseline. R3/R4 source fixes were reviewed/a
 
 Read in order: (1) this file and [AI_CONTEXT](AI_CONTEXT.md), (2) the [execution index](docs/plans/README.md), explicitly authorized task and its relevant design/verification references, (3) sole [TEST_POLICY](docs/TEST_POLICY.md), [TEST_STRATEGY](docs/TEST_STRATEGY.md), [tests/README](tests/README.md), (4) relevant [Architecture](docs/ARCHITECTURE.md), [Persistence](docs/PERSISTENCE.md), [Contracts](docs/CONTRACTS.md), [Security](docs/SECURITY.md), [Data model](docs/DATA_MODEL.md), [PRD](docs/PRD.md) and runbooks. The archive, [History](docs/HISTORY.md) and historical evidence are not current execution instructions.
 
+The reading route is self-contained. Record decisions needed for this repository in its local architecture/ADR documents and authorized plans. Historical references to a separate proposal/documentation repository do not assign current decision ownership, require reading or synchronization, or add approval/publication prerequisites. Explicit Owner instructions determine scope; external proposal contents and PR status do not activate or expand it. Pinned dependency API/compatibility documentation and exact-candidate evidence remain relevant when a task needs them.
+
 Source code/actual project graph and explicit owner decisions override stale examples. Plan/spec documentation alone is not implemented behavior or runtime verification. Label proposed types/APIs and record missing evidence honestly.
 
 ## Current code invariants

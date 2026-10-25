@@ -31,10 +31,10 @@ Historical phrases such as “current plan,” “review pending,” “NOT STAR
 |---|---|---|
 | A0 documentation cleanup | [PR #46](https://github.com/chung6a8m/MyDmsVn/pull/46) merged at `d827bbbfdf2a55c1d55537cf7c4b3a4963234aa3`. | Documentation verification only; original source/runtime NOT RUN status remains. |
 | A1 Sales UI Lab | [Product PR #47](https://github.com/chung6a8m/MyDmsVn/pull/47) merged at `6c385d7630b6b21e915e244113c214aa616327f6`. The historical plan's product “review pending / neither merged” wording is superseded by this merge fact. | Initial 27/27 and corrected 32/32 belong to their distinct candidates in the archived plan; this archive does not rerun or transfer those results to HEAD. |
-| Separate Docs publication | [MyDmsVn.Docs PR #1](https://github.com/chung6a8m/MyDmsVn.Docs/pull/1) remains OPEN / UNMERGED when inspected on 2026-10-25, at head `2b9686c33a04eb416c2b9863ee83da53d1c8ccdc`. | Product PR #47 merging does not imply the separate Docs PR merged or authorize other phases. |
+| Historical Docs publication | [MyDmsVn.Docs PR #1](https://github.com/chung6a8m/MyDmsVn.Docs/pull/1) remains OPEN / UNMERGED when inspected on 2026-10-25, at head `2b9686c33a04eb416c2b9863ee83da53d1c8ccdc`. | This is a dated publication fact only; it is not required reading, an approval dependency or pending work for this repository. |
 | A3 WinFormsKit consumer | [PR #48](https://github.com/chung6a8m/MyDmsVn/pull/48) merged at the inspected HEAD. The sole app gitlink is `vendor/MyDmsVn.WinFormsKit@c232a4c09dc0386a5bd8bb484a5c991acae827d5`; SourceGrid remains `f4e457b43582bf01892f50bdc74aa480531e5944`. | Source cutover is merged. The pinned [A3 plan](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/c232a4c09dc0386a5bd8bb484a5c991acae827d5/docs/plans/20261024-001-a3-winformskit.md) and [verification ledger](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/c232a4c09dc0386a5bd8bb484a5c991acae827d5/docs/verification/20261024-a3-bootstrap.md) own toolkit/consumer evidence and limits. |
 
-The current product remains net48 with the Local production composition. Lab scenarios remain developer fakes. UI library assembly identities remain compatible; the old nested BootstrapSourceGrid/UI checkout paths are historical. [UI Lab usage](../../development/UI_LAB.md), [project structure](../../PROJECT_STRUCTURE.md), [technical stack](../../TECH_STACK.md), business contracts, ADRs and operational/test runbooks remain current technical references. Cross-repository organization decisions remain owned by [MyDmsVn.Docs](https://github.com/chung6a8m/MyDmsVn.Docs).
+The current product remains net48 with the Local production composition. Lab scenarios remain developer fakes. UI library assembly identities remain compatible; the old nested BootstrapSourceGrid/UI checkout paths are historical. [UI Lab usage](../../development/UI_LAB.md), [project structure](../../PROJECT_STRUCTURE.md), [technical stack](../../TECH_STACK.md), business contracts, ADRs and operational/test runbooks remain current technical references. Current decision ownership and work selection follow this repository's [AGENTS](../../../AGENTS.md), local [ADRs](../../adr/README.md), [execution index](../../plans/README.md) and explicit Owner instructions. The Owner has detached the external documentation route. References to the former documentation repository in archived records preserve provenance only; they create no current ownership, required-reading, synchronization or publication dependency.
 
 ## Retained acceptance limits
 
@@ -54,7 +54,7 @@ There is no active successor task list. Unfinished acceptance and previously pro
 
 ## Documentation verification
 
-Checks on the archival candidate against the inspected HEAD:
+Historical checks on archive commit `461a72be3623b394dd3e8f54424dd75d3c5714ef` against the inspected `6ee6951` HEAD (before the later documentation-route detachment):
 
 - **40 changed paths, all Markdown:** 26 existing documents updated and 14 archive/index documents added; no source/test/configuration/gitlink delta.
 - **134 Markdown files / 2,676 local path-and-anchor occurrences:** no unresolved target, anchor or reference definition. Source/asset paths were checked against the complete repository tree at the inspected HEAD.

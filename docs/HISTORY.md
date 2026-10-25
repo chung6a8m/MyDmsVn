@@ -4,11 +4,15 @@
 
 This page is historical provenance, not an execution queue or test policy. Current scheduling follows the [execution index](plans/README.md). Historical activation checkpoints below retain their original dates/statuses; [the archive index](archive/README.md) records the dated boundaries. Runtime behavior follows current source/specifications and execution follows [TEST_POLICY](TEST_POLICY.md).
 
+## 2026-10-25 — local documentation authority
+
+After the archive, the Owner requested removal of directions tied to the separate documentation repository. Current reading, decision ownership and work selection now use local [AGENTS](../AGENTS.md), [Architecture](ARCHITECTURE.md), [ADRs](adr/README.md) and the [execution index](plans/README.md), under explicit Owner authorization. External links in historical records remain provenance only; they add no required reading, synchronization, approval or publication dependency. The next roadmap remains unselected.
+
 ## 2026-10-25 — archive before the next roadmap
 
 The Owner requested documentation archival on `v1a-pro-ui-next` after merged PR #48. The inspected HEAD is `6ee6951c58f6e4ad92f991521ff5c553d2d22526`. The [archive boundary](archive/20261025-pre-next-roadmap/README.md) preserves ten UI-NEXT records, the A0/A1 plan and former selector, with old-path compatibility anchors. The [execution index](plans/README.md) selects no active plan; the next roadmap has not been chosen.
 
-Product PR #47 and consumer PR #48 are merged; the separate Docs PR #1 was still open at inspection. Their exact candidate results, earlier full Desktop failures and NOT RUN scopes remain separate from merge status. Existing evidence, earlier archives, current technical runbooks and source behavior are preserved. Unfinished acceptance and release prerequisites are not completed, waived or automatically queued. This Markdown-only change supplies no runtime acceptance.
+Product PR #47 and consumer PR #48 are merged; the separate Docs PR #1 was still open at inspection. That dated external publication status is historical context, not a dependency or pending local backlog. Their exact candidate results, earlier full Desktop failures and NOT RUN scopes remain separate from merge status. Existing evidence, earlier archives, current technical runbooks and source behavior are preserved. Unfinished acceptance and release prerequisites are not completed, waived or automatically queued. This Markdown-only change supplies no runtime acceptance.
 
 ## 2026-10-23 — UI Next selected; prior plans archived
 
