@@ -75,9 +75,24 @@ public sealed class SecurityAdministrationFormTests
                     new EmptyInventoryFactory(),
                     securityFactory);
 
-                Assert.NotNull(shell.OpenSecurityAdministration());
+                var first = shell.OpenSecurityAdministration();
+                Assert.NotNull(first);
                 Assert.Single(shell.Workspace.TabPages);
+                var firstControl = Assert.IsType<SecurityWorkspaceControl>(
+                    Assert.IsType<WorkspaceFeedbackHost>(first!.Controls[0]).Content);
+                Assert.True(shell.Workspace.IsTabClosable(first));
+                shell.RequestWorkspaceCloseAsync(first).GetAwaiter().GetResult();
+                Assert.True(firstControl.IsDisposed);
+                Assert.Empty(shell.Workspace.TabPages);
+
+                var second = shell.OpenSecurityAdministration();
+                Assert.NotNull(second);
+                Assert.NotSame(first, second);
+                var secondControl = Assert.IsType<SecurityWorkspaceControl>(
+                    Assert.IsType<WorkspaceFeedbackHost>(second!.Controls[0]).Content);
+                Assert.NotSame(firstControl, secondControl);
                 shell.SignOut();
+                Assert.True(secondControl.IsDisposed);
                 Assert.Empty(shell.Workspace.TabPages);
                 Assert.Null(shell.OpenSecurityAdministration());
                 Assert.Empty(guard.DrainExceptions());
