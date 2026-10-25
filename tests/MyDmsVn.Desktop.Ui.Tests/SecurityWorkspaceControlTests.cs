@@ -113,6 +113,28 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Contains("Sales.Receipts.Read", control.PermissionCatalog.Details.Text);
     });
     [Fact]
+    public void Dark_role_grants_remain_readable_and_read_only_until_edit() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
+    {
+        var priorTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+            control.Tabs.SelectedIndex = 1;
+            var grants = Assert.Single(Descendants(control.RoleDetail, typeof(CheckedListBox)).Cast<CheckedListBox>());
+            Assert.True(grants.Enabled);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, grants.ForeColor);
+            var before = grants.GetItemChecked(0);
+            grants.SetItemChecked(0, !before);
+            Assert.Equal(before, grants.GetItemChecked(0));
+            Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
+            var edit = Assert.Single(Descendants(control.RoleDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Sửa quyền");
+            edit.PerformClick();
+            grants.SetItemChecked(0, !before);
+            Assert.Equal(!before, grants.GetItemChecked(0));
+        }
+        finally { BootstrapThemeManager.CurrentTheme = priorTheme; }
+    });
+    [Fact]
     public void Members_open_the_authorized_user_roles_tab() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
     {
         control.Tabs.SelectedIndex = 1;

@@ -10,12 +10,18 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.UiLab;
 using MyDmsVn.Desktop.UiLab.Scenarios;
+using MyDmsVn.Desktop.WinForms.Features.Security;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests;
 
 public sealed class SecurityNativeAndResetTests
 {
+    readonly ITestOutputHelper output;
+
+    public SecurityNativeAndResetTests(ITestOutputHelper output) => this.output = output;
+
     [Theory]
     [InlineData(900, 600, false)]
     [InlineData(900, 600, true)]
@@ -31,6 +37,7 @@ public sealed class SecurityNativeAndResetTests
                 var form = control.FindForm()!;
                 form.ClientSize = new Size(width, height);
                 NativeLookupTypingDriver.Activate(form);
+                ObserveNativeScale(form, control);
                 var owner = control.ViewModel.SelectedUserId;
                 var search = control.UserSearch;
                 Assert.True(search.Focus());
@@ -115,4 +122,22 @@ public sealed class SecurityNativeAndResetTests
 
     [DllImport("user32.dll")] static extern IntPtr GetFocus();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+    [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr window);
+    [DllImport("shcore.dll")] static extern int GetScaleFactorForMonitor(IntPtr monitor, out int scale);
+    [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint x, out uint y);
+
+    void ObserveNativeScale(Form form, SecurityWorkspaceControl control)
+    {
+        var monitor = MonitorFromWindow(form.Handle, 2);
+        Assert.NotEqual(IntPtr.Zero, monitor);
+        Assert.Equal(0, GetScaleFactorForMonitor(monitor, out var scale));
+        Assert.Equal(0, GetDpiForMonitor(monitor, 0, out var dpiX, out var dpiY));
+        var expected = Environment.GetEnvironmentVariable("MYDMSVN_UIN_EXPECTED_SCALE");
+        if (!string.IsNullOrWhiteSpace(expected))
+            Assert.Equal(int.Parse(expected), scale);
+        output.WriteLine("PHYSICAL_SCALE={0};MONITOR_EFFECTIVE_DPI={1}x{2};WINDOW_DPI={3};CLIENT={4}x{5};WORKSPACE={6};LIST={7};DETAIL={8};TABS={9}",
+            scale, dpiX, dpiY, GetDpiForWindow(form.Handle), form.ClientSize.Width, form.ClientSize.Height,
+            control.Bounds, control.Users.Bounds, control.UserDetail.Bounds, control.Tabs.Bounds);
+    }
 }

@@ -35,7 +35,13 @@ internal sealed class SecurityWorkspaceEditorBindings
         control.RoleDetail.Tabs.TabPages[0].Controls.Add(roleCommands);
         _grants.ItemCheck += (_, e) =>
         {
-            if (_rendering || Vm.RoleDraft == null || _grants.Items[e.Index] is not string key) return;
+            if (_rendering) return;
+            if (Vm.RoleDraft == null)
+            {
+                e.NewValue = e.CurrentValue;
+                return;
+            }
+            if (_grants.Items[e.Index] is not string key) return;
             // ItemCheck precedes the native list update; render only after that update.
             _control.BeginInvoke(new Action(() => Vm.SetRoleGranted(key, e.NewValue == CheckState.Checked)));
         };
@@ -123,7 +129,8 @@ internal sealed class SecurityWorkspaceEditorBindings
             var role = Vm.SelectedRole;
             foreach (var key in Vm.Catalog.Items.Where(k => k.Status == "Active")) _grants.Items.Add(key.Key,
                 Vm.RoleDraft?.RoleId == role?.RoleId ? Vm.RoleDraft!.DesiredKeys.Contains(key.Key) : role?.PermissionKeys.Contains(key.Key) == true);
-            _grants.Enabled = Vm.RoleDraft != null && !Vm.IsBusy && !Vm.RequiresRecovery;
+            _grants.Enabled = role != null && Vm.Catalog.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
+            _grants.AccessibleDescription = Vm.RoleDraft == null ? "Chỉ xem. Chọn Sửa quyền để thay đổi." : "Đang sửa quyền của vai trò.";
             var selected = Vm.DirectPermissionKey;
             _directKey.Items.Clear();
             foreach (var key in Vm.Catalog.Items.Where(k => k.Status == "Active")) _directKey.Items.Add(key.Key);
