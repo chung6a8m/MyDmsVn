@@ -1,6 +1,6 @@
 # Documentation index — v1a-pro-ui-next
 
-**Updated:** 2026-10-25. The [execution index](plans/README.md) records **no active execution plan; the next roadmap has not been selected** after the [latest archive boundary](archive/20261025-pre-next-roadmap/README.md). This index routes readers by responsibility; historical results stay with their original candidates.
+**Updated:** 2026-10-25. The [execution index](plans/README.md) routes to the selected Owner-authorized follow-up after the [latest archive boundary](archive/20261025-pre-next-roadmap/README.md). This index routes readers by responsibility; historical results stay with their original candidates.
 
 ## Current work and Codex entry points
 
@@ -8,7 +8,7 @@
 |---|---|
 | [AGENTS.md](../AGENTS.md) | Stable repository instructions and invariants |
 | [AI_CONTEXT.md](../AI_CONTEXT.md) | Source context, historical boundaries and evidence distinctions |
-| [Execution index](plans/README.md) | Current selection state; pointer to a plan only after new scope is selected |
+| [Execution index](plans/README.md) | Current selection state and pointer to the sole plan that owns task status and verification |
 | [Development-plan alias](DEVELOPMENT_PLAN.md) | Compatibility entry point to the index; no progress copy |
 | [Test policy](TEST_POLICY.md) | Sole execution policy; focused scope and required safeguards |
 | [Test coverage](TEST_STRATEGY.md) | Required behavior and failure boundaries |

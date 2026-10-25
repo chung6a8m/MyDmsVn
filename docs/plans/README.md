@@ -4,15 +4,19 @@
 
 ## Current plan
 
-**No active execution plan. The next roadmap has not been selected.** The Owner requested documentation archival to prepare for the next roadmap. The [2026-10-25 archive boundary](../archive/20261025-pre-next-roadmap/README.md) records the inspected source after PR #48, the retired UI-NEXT/A0/A1 records and their remaining acceptance limits.
+The Owner requested a fix plan for horizontal scrolling in the left Sidebar after opening a workspace. The selected follow-up is [Sidebar Navigation Horizontal Scrollbar](20261025-001-sidebar-navigation-horizontal-scrollbar.md).
 
-Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the explicitly requested scope and [TEST_POLICY](../TEST_POLICY.md). [TEST_STRATEGY](../TEST_STRATEGY.md) owns coverage and [tests/README](../../tests/README.md) owns commands. Continue only work authorized by the Owner; archived tasks and prompts do not supply that authorization.
+That plan is the sole owner of its diagnosis, task state and focused verification. Its initial scope is planning only; implementation and runtime acceptance are recorded there when performed. The [reviewed screenshots](../design-references/sidebar-horizontal-scrollbar/README.md) preserve the reported zero-tab and Products-tab states.
+
+Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the selected plan and [TEST_POLICY](../TEST_POLICY.md). [TEST_STRATEGY](../TEST_STRATEGY.md) owns coverage and [tests/README](../../tests/README.md) owns commands. Continue only work authorized by the Owner; archived tasks and prompts do not supply that authorization.
 
 ## Selecting the next roadmap
 
-When the Owner selects new scope, create a dated plan from the then-current source and point this index to that single execution-status owner. Record its boundaries, task order and focused verification there. Record decisions needed for this repository in its local [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md) and authorized plan. Source contracts and commands remain here with their owners. Historical external proposals or publication status do not add required reading, synchronization, approval or implementation work.
+This is a bounded navigation-layout follow-up after the [2026-10-25 archive boundary](../archive/20261025-pre-next-roadmap/README.md), not a selection of the next broader product roadmap. The plan starts from the inspected current source, confirms the failure on Windows and targets the app-owned control with focused GUI checks.
 
-Do not carry forward unfinished UI-NEXT/SAL acceptance, old integration repeats, release prerequisites or other proposed phases automatically. Any selected follow-up must cite the original evidence and define its own scope; archival neither completes nor waives it.
+Do not carry forward unfinished UI-NEXT/SAL acceptance, old integration repeats, release prerequisites or other proposed phases automatically. Any additional selected follow-up must cite the original evidence and define its own scope; archival neither completes nor waives it.
+
+Future scope is selected explicitly by the Owner and recorded in a dated plan based on the then-current source. Point this index to the single execution-status owner. Record decisions needed for this repository in its local [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md) and authorized plan. Historical external proposals or publication status do not add required reading, synchronization, approval or implementation work.
 
 ## Historical plans and acceptance
 

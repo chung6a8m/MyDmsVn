@@ -4,7 +4,7 @@ Windows desktop-first SME business software for Sales and Inventory. Local v1 in
 
 ## Current development status — v1a-pro-ui-next
 
-**Updated:** 2026-10-25. The [current execution index](docs/plans/README.md) records **no active execution plan; the next roadmap has not been selected**. The [archive boundary](docs/archive/20261025-pre-next-roadmap/README.md) preserves prior work and exact-candidate limits after merged PR #48. Read [AGENTS](AGENTS.md), [AI_CONTEXT](AI_CONTEXT.md) and the sole [TEST_POLICY](docs/TEST_POLICY.md) before acting on that scope.
+**Updated:** 2026-10-25. The [current execution index](docs/plans/README.md) selects the Owner-requested Sidebar horizontal-scrollbar follow-up and routes to its sole plan; that plan owns task state and verification. The [archive boundary](docs/archive/20261025-pre-next-roadmap/README.md) preserves prior work and exact-candidate limits after merged PR #48. Read [AGENTS](AGENTS.md), [AI_CONTEXT](AI_CONTEXT.md) and the sole [TEST_POLICY](docs/TEST_POLICY.md) before acting on that scope.
 
 [Documentation index](docs/README.md) · [Development-plan alias](docs/DEVELOPMENT_PLAN.md) · [Architecture decisions](docs/adr/README.md)
 

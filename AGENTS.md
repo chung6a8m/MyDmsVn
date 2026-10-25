@@ -4,7 +4,7 @@ Applies to the whole repository. Human-facing discussion is Vietnamese; technica
 
 ## First read — current work selection (2026-10-25)
 
-Read the [current execution index](docs/plans/README.md) first. It currently selects **no active execution plan** after the [2026-10-25 archive](docs/archive/20261025-pre-next-roadmap/README.md); the next roadmap has not been selected. Work only within explicit Owner authorization. When a new plan is selected, that plan owns its scope, task state and verification. Archived prompts, proposed successor phases and unfinished acceptance do not authorize implementation. Keep task progress out of this file and other entry pages.
+Read the [current execution index](docs/plans/README.md) first. It selects the Owner-requested Sidebar horizontal-scrollbar follow-up after the [2026-10-25 archive](docs/archive/20261025-pre-next-roadmap/README.md). Work only within explicit Owner authorization; the selected plan owns its scope, task state and verification. Planning does not establish implementation or runtime acceptance. Archived prompts, proposed successor phases and unfinished acceptance do not authorize implementation. Keep task progress out of this file and other entry pages.
 
 [UI-NEXT](docs/ui-next/README.md) is a historical implementation/acceptance reference, not the current queue. Preserve its [T13 retained failures and bounded acceptance](docs/ui-next/evidence/20261024-uin-t13-integration.md), review-correction evidence and [DateInput candidate evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md). Its completed handoff prompts do not authorize continuing old PR branches or replaying tasks.
 

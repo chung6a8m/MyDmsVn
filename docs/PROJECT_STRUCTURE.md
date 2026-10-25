@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Audited source baseline:** `v1a-pro-ui-next@6ee6951c58f6e4ad92f991521ff5c553d2d22526` (merged PR #48), 2026-10-25. The net48 project/source orientation is represented below; this refresh supplies no new runtime acceptance. The [execution index](plans/README.md) records that no execution plan is active, while [UI-NEXT](ui-next/README.md) retains historical implementation evidence. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and unfinished acceptance.
+**Audited source baseline:** `v1a-pro-ui-next@6ee6951c58f6e4ad92f991521ff5c553d2d22526` (merged PR #48), 2026-10-25. The net48 project/source orientation is represented below; this refresh supplies no new runtime acceptance. The [execution index](plans/README.md) selects current authorized work, while [UI-NEXT](ui-next/README.md) retains historical implementation evidence. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and unfinished acceptance.
 
 ## Source projects
 
@@ -66,7 +66,7 @@ UI-NEXT's [historical implementation plan](archive/20261025-pre-next-roadmap/ui-
 | `MyDmsVn.UiLab.sln`, `samples/MyDmsVn.Desktop.UiLab*` | Separate A1 WinForms Lab and fixture graph; [runbook](development/UI_LAB.md). |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/plans/README.md` | Stable current-work index; records no active plan and requires explicit activation of any successor. |
+| `docs/plans/README.md` | Stable current-work index; points to the selected scope's sole plan and requires explicit activation of any successor. |
 | `docs/archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md` | Archived A0/A1 authorization, tasks and candidate verification; no current execution authority. |
 | `docs/archive/20261025-pre-next-roadmap/ui-next/20261023-active-roadmap.md` | Historical UI-NEXT selection, task records and exact-candidate acceptance. |
 | `docs/archive/README.md` | Dated archive boundaries, including the 2026-10-25 reset and retained acceptance limits. |
