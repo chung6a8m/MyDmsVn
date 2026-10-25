@@ -31,6 +31,40 @@ public sealed class SecurityPaneStateTests
             Assert.False(control.ViewModel.BeginDirectPermission("Sales.Receipts.Read"));
         });
 
+    [Theory]
+    [InlineData(ApiStatusCode.Forbidden, SecurityDatasetState.Forbidden)]
+    [InlineData(ApiStatusCode.InternalServerError, SecurityDatasetState.Failed)]
+    public void Revoked_or_failed_roles_clear_old_role_details_without_clearing_users(ApiStatusCode status, SecurityDatasetState expected) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            Assert.NotEmpty(control.Roles.Items);
+            scene.Administration.RolesError = new ApiError(status, "PaneUnavailable", "Cannot load this pane.");
+            Wait(control.ActivateAsync(default));
+            Assert.Equal(expected, control.ViewModel.Roles.State);
+            Assert.Empty(control.Roles.Items);
+            Assert.Null(control.ViewModel.SelectedRole);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
+            Assert.Equal(3, control.Users.Items.Count);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
+        });
+
+    [Theory]
+    [InlineData(ApiStatusCode.Forbidden, SecurityDatasetState.Forbidden)]
+    [InlineData(ApiStatusCode.InternalServerError, SecurityDatasetState.Failed)]
+    public void Revoked_or_failed_catalog_clears_old_keys_without_clearing_accounts(ApiStatusCode status, SecurityDatasetState expected) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            Assert.NotEmpty(control.PermissionCatalog.Keys.Rows);
+            scene.Catalog.Error = new ApiError(status, "PaneUnavailable", "Cannot load this pane.");
+            Wait(control.ActivateAsync(default));
+            Assert.Equal(expected, control.ViewModel.Catalog.State);
+            Assert.Empty(control.PermissionCatalog.Keys.Rows);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
+            Assert.Equal(3, control.Users.Items.Count);
+            Assert.Equal(3, control.Roles.Items.Count);
+        });
+
     [Fact]
     public void Held_read_exposes_loading_then_successful_empty_without_inventing_permission_denial() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>

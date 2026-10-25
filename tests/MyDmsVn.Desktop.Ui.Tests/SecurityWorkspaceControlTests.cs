@@ -135,6 +135,74 @@ public sealed class SecurityWorkspaceControlTests
         finally { BootstrapThemeManager.CurrentTheme = priorTheme; }
     });
     [Fact]
+    public void User_create_dialog_rejects_missing_and_oversize_fields_before_dispatch() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var create = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Tạo người dùng…");
+        ExceptionDispatchInfo? dialogError = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo người dùng");
+            if (dialog == null) return;
+            timer.Stop();
+            try
+            {
+                var save = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu thông tin");
+                save.PerformClick();
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                Assert.True(dialog.Visible);
+                var name = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên đăng nhập");
+                var display = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên hiển thị");
+                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu tạm");
+                name.Text = "new-user";
+                display.Text = "New User";
+                password.Text = new string('x', 73);
+                save.PerformClick();
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                Assert.Empty(password.Text);
+                Assert.True(password.Focused);
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); }
+            finally { dialog.Close(); }
+        };
+        timer.Start();
+        create.PerformClick();
+        Assert.False(timer.Enabled, "The create dialog did not open within the pumped test window.");
+        dialogError?.Throw();
+    });
+    [Fact]
+    public void Password_reset_dialog_rejects_invalid_input_before_dispatch() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đặt lại mật khẩu…");
+        ExceptionDispatchInfo? dialogError = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) return;
+            timer.Stop();
+            try
+            {
+                var save = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận");
+                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                save.PerformClick();
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                Assert.True(dialog.Visible);
+                password.Text = new string('x', 73);
+                save.PerformClick();
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                Assert.Empty(password.Text);
+                Assert.True(password.Focused);
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); }
+            finally { dialog.Close(); }
+        };
+        timer.Start();
+        reset.PerformClick();
+        Assert.False(timer.Enabled, "The password reset dialog did not open within the pumped test window.");
+        dialogError?.Throw();
+    });
+    [Fact]
     public void Members_open_the_authorized_user_roles_tab() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
     {
         control.Tabs.SelectedIndex = 1;

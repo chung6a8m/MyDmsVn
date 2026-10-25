@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -128,7 +129,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             _grants.Items.Clear();
             var role = Vm.SelectedRole;
             foreach (var key in Vm.Catalog.Items.Where(k => k.Status == "Active")) _grants.Items.Add(key.Key,
-                Vm.RoleDraft?.RoleId == role?.RoleId ? Vm.RoleDraft!.DesiredKeys.Contains(key.Key) : role?.PermissionKeys.Contains(key.Key) == true);
+                Vm.RoleDraft != null && Vm.RoleDraft.RoleId == role?.RoleId ? Vm.RoleDraft.DesiredKeys.Contains(key.Key) : role?.PermissionKeys.Contains(key.Key) == true);
             _grants.Enabled = role != null && Vm.Catalog.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
             _grants.AccessibleDescription = Vm.RoleDraft == null ? "Chỉ xem. Chọn Sửa quyền để thay đổi." : "Đang sửa quyền của vai trò.";
             var selected = Vm.DirectPermissionKey;
@@ -166,13 +167,44 @@ internal sealed class SecurityWorkspaceEditorBindings
         var password = new TextBox { Width = 380, AccessibleName = "Mật khẩu tạm", UseSystemPasswordChar = true };
         fields.Controls.Add(name);
         if (userTarget) { fields.Controls.Add(display); fields.Controls.Add(email); if (create) fields.Controls.Add(password); }
+        var validation = new Label { AutoSize = true, AccessibleName = "Lỗi thông tin" };
+        fields.Controls.Add(validation);
         var save = new Button { Text = "Lưu thông tin", AutoSize = true };
-        fields.Controls.Add(save); dialog.Controls.Add(fields);
+        var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
+        fields.Controls.Add(save); fields.Controls.Add(cancel); dialog.Controls.Add(fields);
+        dialog.CancelButton = cancel;
         save.Click += async (_, _) =>
         {
             save.Enabled = false;
             try
             {
+                TextBox? invalid = null;
+                if (string.IsNullOrWhiteSpace(name.Text) || name.Text.Length > 100)
+                {
+                    invalid = name;
+                    validation.Text = "Tên phải có từ 1 đến 100 ký tự.";
+                }
+                else if (userTarget && (string.IsNullOrWhiteSpace(display.Text) || display.Text.Length > 100))
+                {
+                    invalid = display;
+                    validation.Text = "Tên hiển thị phải có từ 1 đến 100 ký tự.";
+                }
+                else if (userTarget && email.Text.Length > 254)
+                {
+                    invalid = email;
+                    validation.Text = "Email không được vượt quá 254 ký tự.";
+                }
+                else if (userTarget && create && (password.Text.Length == 0 || Encoding.UTF8.GetByteCount(password.Text) > 72))
+                {
+                    invalid = password;
+                    validation.Text = "Mật khẩu tạm phải có từ 1 đến 72 byte UTF-8.";
+                }
+                if (invalid != null)
+                {
+                    invalid.Focus();
+                    return;
+                }
+                validation.Text = "";
                 var saved = await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(userTarget ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role,
                     create ? SecurityAdministrationOperationDto.Create : SecurityAdministrationOperationDto.Update,
                     create ? 0 : userTarget ? user!.UserId : role!.RoleId, name: name.Text, displayName: userTarget ? display.Text : null, email: userTarget ? email.Text : null,
@@ -190,9 +222,29 @@ internal sealed class SecurityWorkspaceEditorBindings
         if (!await AdmitAsync() || Vm.SelectedUser is not { IsProtectedAccount: false } user) return;
         using var dialog = new Form { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 160, StartPosition = FormStartPosition.CenterParent };
         var password = new TextBox { Dock = DockStyle.Top, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới" };
-        var save = new Button { Text = "Xác nhận", Dock = DockStyle.Bottom, DialogResult = DialogResult.OK };
-        dialog.Controls.Add(password); dialog.Controls.Add(save);
-        try { if (dialog.ShowDialog(_control) == DialogResult.OK) await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, user.UserId, password: password.Text, expectedRevision: user.AssignmentRevision), default); }
+        var validation = new Label { Dock = DockStyle.Top, AccessibleName = "Lỗi mật khẩu" };
+        var save = new Button { Text = "Xác nhận", Dock = DockStyle.Bottom };
+        var cancel = new Button { Text = "Hủy", Dock = DockStyle.Bottom, DialogResult = DialogResult.Cancel };
+        dialog.Controls.Add(password); dialog.Controls.Add(validation); dialog.Controls.Add(save); dialog.Controls.Add(cancel);
+        dialog.CancelButton = cancel;
+        save.Click += async (_, _) =>
+        {
+            save.Enabled = false;
+            try
+            {
+                if (password.Text.Length == 0 || Encoding.UTF8.GetByteCount(password.Text) > 72)
+                {
+                    validation.Text = "Mật khẩu phải có từ 1 đến 72 byte UTF-8.";
+                    password.Focus();
+                    return;
+                }
+                validation.Text = "";
+                if (await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, user.UserId, password: password.Text, expectedRevision: user.AssignmentRevision), default))
+                    dialog.Close();
+            }
+            finally { password.Clear(); save.Enabled = true; }
+        };
+        try { dialog.ShowDialog(_control); }
         finally { password.Clear(); }
     }
 

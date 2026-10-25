@@ -23,6 +23,72 @@ public sealed class SecurityNativeAndResetTests
     public SecurityNativeAndResetTests(ITestOutputHelper output) => this.output = output;
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Native_tab_moves_from_search_through_filter_to_master_list(bool roles) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, _) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            var form = control.FindForm()!;
+            NativeLookupTypingDriver.Activate(form);
+            var search = roles ? control.RoleSearch : control.UserSearch;
+            var activity = roles ? control.RoleActivity : control.UserActivity;
+            var list = roles ? control.Roles : control.Users;
+            Assert.True(search.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.True(activity.ContainsFocus, "Tab from search should focus the activity filter.");
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.True(list.ContainsFocus, "Tab from activity filter should focus the master list.");
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Native_enter_activates_explicit_create_without_mutating_on_cancel(bool roles) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            var form = control.FindForm()!;
+            NativeLookupTypingDriver.Activate(form);
+            var detail = roles ? (Control)control.RoleDetail : control.UserDetail;
+            var button = Descendants(detail).OfType<Button>()
+                .Single(item => item.Text == (roles ? "Tạo vai trò…" : "Tạo người dùng…"));
+            var opened = false;
+            Exception? dialogError = null;
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>()
+                    .FirstOrDefault(item => item.Text == (roles ? "Tạo vai trò" : "Tạo người dùng"));
+                if (dialog == null) return;
+                timer.Stop();
+                try
+                {
+                    opened = true;
+                    Assert.True(dialog.Controls.Cast<Control>().SelectMany(Descendants).OfType<TextBox>().First().Focus());
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                    Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
+                }
+                catch (Exception error) { dialogError = error; dialog.Close(); }
+            };
+            Assert.True(button.Focus());
+            timer.Start();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(opened, "Native Enter did not activate the focused create action.");
+            if (dialogError != null) throw dialogError;
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    static System.Collections.Generic.IEnumerable<Control> Descendants(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            yield return child;
+            foreach (var nested in Descendants(child)) yield return nested;
+        }
+    }
+
+    [Theory]
     [InlineData(900, 600, false)]
     [InlineData(900, 600, true)]
     [InlineData(1200, 760, false)]

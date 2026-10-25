@@ -105,6 +105,9 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
     static Control Master(Control list, TextBox search, ComboBox activity)
     {
         var panel = new Panel { Dock = DockStyle.Fill };
+        search.TabIndex = 0;
+        activity.TabIndex = 1;
+        list.TabIndex = 2;
         activity.Items.AddRange(new object[] { "Tất cả trạng thái", "Đang hoạt động", "Ngừng hoạt động" });
         activity.SelectedIndex = 0;
         panel.Controls.Add(list);
