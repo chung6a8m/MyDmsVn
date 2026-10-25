@@ -63,6 +63,29 @@ public sealed class SecurityReviewScenarioTests
         });
 
     [Fact]
+    public void Import_review_dialog_target_switch_sends_no_apply_to_new_role()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            const string json = "{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}";
+            control.ViewModel.SelectRole(202);
+            Assert.True(control.ViewModel.PreviewImportAsync(PermissionImportTargetTypeDto.Role, json, default).GetAwaiter().GetResult());
+
+            using var dialog = new SecurityImportReviewDialog("Preview #202",
+                () => scene.AdvanceImportTargetRevision(PermissionImportTargetTypeDto.Role, 202),
+                scene.RotateCatalogDigest,
+                () => control.ViewModel.SelectRole(201));
+            dialog.Show();
+            dialog.SwitchTargetButton.PerformClick();
+            dialog.ConfirmButton.PerformClick();
+
+            Assert.Equal(DialogResult.OK, dialog.DialogResult);
+            Assert.False(control.ViewModel.ApplyImportPreviewAsync(PermissionImportTargetTypeDto.Role,
+                json, true, default).GetAwaiter().GetResult());
+            Assert.Equal(201, control.ViewModel.SelectedRoleId);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.ImportApply");
+        });
+
+    [Fact]
     public void Explicit_review_mutation_replaces_scenario_preset()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {

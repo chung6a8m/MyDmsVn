@@ -10,15 +10,18 @@ internal sealed class SecurityImportReviewDialog : Form
         { Text = "Đổi revision đối tượng", AutoSize = true };
     internal Button RotateCatalogDigestButton { get; } = new()
         { Text = "Đổi catalog digest", AutoSize = true };
+    internal Button SwitchTargetButton { get; } = new()
+        { Text = "Đổi đối tượng", AutoSize = true };
     internal Button ConfirmButton { get; } = new()
         { Text = "Áp dụng", AutoSize = true };
 
-    internal SecurityImportReviewDialog(string summary, Action advanceTargetRevision, Action rotateCatalogDigest)
+    internal SecurityImportReviewDialog(string summary, Action advanceTargetRevision,
+        Action rotateCatalogDigest, Action? switchTarget = null)
     {
         Text = "Xem trước nhập quyền — UI Lab";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(440, 260);
-        Size = new Size(510, 300);
+        MinimumSize = new Size(530, 260);
+        Size = new Size(610, 300);
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = false;
 
@@ -40,7 +43,7 @@ internal sealed class SecurityImportReviewDialog : Form
         };
         controls.Controls.AddRange(new Control[]
         {
-            AdvanceTargetRevisionButton, RotateCatalogDigestButton, ConfirmButton, cancel
+            AdvanceTargetRevisionButton, RotateCatalogDigestButton, SwitchTargetButton, ConfirmButton, cancel
         });
         Controls.Add(details);
         Controls.Add(controls);
@@ -55,6 +58,12 @@ internal sealed class SecurityImportReviewDialog : Form
         {
             rotateCatalogDigest();
             RotateCatalogDigestButton.Enabled = false;
+        };
+        SwitchTargetButton.Enabled = switchTarget != null;
+        SwitchTargetButton.Click += (_, _) =>
+        {
+            switchTarget?.Invoke();
+            SwitchTargetButton.Enabled = false;
         };
         ConfirmButton.Click += (_, _) => { DialogResult = DialogResult.OK; Close(); };
         cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };

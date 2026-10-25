@@ -387,7 +387,20 @@ internal sealed class UiLabForm : Form
             "Preview catalog digest: " + preview.CatalogDigest;
         using var dialog = new SecurityImportReviewDialog(reviewSummary,
             () => scene.AdvanceImportTargetRevision(preview.Import.TargetType, preview.Import.TargetId),
-            scene.RotateCatalogDigest);
+            scene.RotateCatalogDigest,
+            () =>
+            {
+                var targetType = preview.Import.TargetType;
+                var alternateId = targetType == PermissionImportTargetTypeDto.Role ?
+                    (preview.Import.TargetId == 201 ? 202 : 201) :
+                    (preview.Import.TargetId == 101 ? 102 : 101);
+                if (targetType == PermissionImportTargetTypeDto.Role)
+                    _securityControl?.ViewModel.SelectRole(alternateId);
+                else
+                    _securityControl?.ViewModel.SelectUser(alternateId);
+                scene.Journal.Record("Security.ReviewTargetSwitch", new
+                    { Target = targetType, OriginalTargetId = preview.Import.TargetId, AlternateTargetId = alternateId });
+            });
         return dialog.ShowDialog(this) == DialogResult.OK;
     }
 
