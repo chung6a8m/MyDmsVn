@@ -13,10 +13,10 @@ internal sealed class SecurityWorkspaceEditorBindings
 {
     readonly SecurityWorkspaceControl _control;
     readonly RoleGrantList _grants = new() { Dock = DockStyle.Fill, CheckOnClick = true, AccessibleName = "Cấp quyền cho vai trò" };
-    readonly TextBox _grantSearch = new() { Width = 180, AccessibleName = "Tìm quyền vai trò" };
-    readonly ComboBox _grantModule = new() { Width = 130, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Nhóm quyền vai trò" };
+    readonly TextBox _grantSearch = new() { Width = 145, AccessibleName = "Tìm quyền vai trò" };
+    readonly ComboBox _grantModule = new() { Width = 115, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Nhóm quyền vai trò" };
     readonly CheckBox _grantedOnly = new() { Text = "Chỉ quyền đã cấp", AutoSize = true };
-    readonly Label _grantSummary = new() { Dock = DockStyle.Bottom, Height = 26 };
+    readonly Label _grantSummary = new() { Dock = DockStyle.Bottom, Height = 20 };
     readonly ComboBox _directKey = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Quyền riêng" };
     readonly RadioButton _inherit = new() { Text = "Theo vai trò", AutoSize = true };
     readonly RadioButton _allow = new() { Text = "Cho phép", AutoSize = true };
@@ -41,6 +41,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         Add(roleCommands, "Đổi trạng thái…", () => ActivationAsync(false));
         Add(roleCommands, "Sửa quyền", () => { Vm.BeginRolePermissions(); return Task.CompletedTask; });
         var grantFilters = Commands();
+        grantFilters.Height = 38;
         grantFilters.Controls.AddRange(new Control[] { _grantSearch, _grantModule, _grantedOnly });
         var grantActions = Commands();
         grantActions.Dock = DockStyle.Bottom;

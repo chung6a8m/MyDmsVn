@@ -76,6 +76,33 @@ public sealed class SecurityWorkspaceControlTests
     });
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Minimum_role_view_keeps_grant_choices_visible(bool dark) => Run(SecurityScenarioId.SEC_L01, (_, _) =>
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            using var lab = new MyDmsVn.Desktop.UiLab.UiLabForm { ClientSize = new System.Drawing.Size(900, 600) };
+            lab.ModuleSelector.SelectedIndex = 1;
+            lab.Show();
+            Until(() => lab.CurrentSecurityControl is { IsDisposed: false } && !lab.IsResetting && lab.StatusText.Contains("ready"));
+            var workspace = lab.CurrentSecurityControl!;
+            workspace.Tabs.SelectedIndex = 1;
+            workspace.RoleDetail.Tabs.SelectedIndex = 0;
+            lab.PerformLayout();
+            System.Windows.Forms.Application.DoEvents();
+            var grants = workspace.RoleDetail.GrantArea.Controls.OfType<CheckedListBox>().Single();
+            Assert.True(grants.Visible);
+            Assert.True(grants.Height >= 60,
+                $"Grant list height {grants.Height}; area {workspace.RoleDetail.GrantArea.Height}; tab {workspace.RoleDetail.Tabs.Height}");
+            lab.CloseWorkspaceButton.PerformClick();
+        }
+        finally { BootstrapThemeManager.CurrentTheme = theme; }
+    });
+
+    [Theory]
     [InlineData(900, 600, false)]
     [InlineData(900, 600, true)]
     [InlineData(1200, 760, false)]

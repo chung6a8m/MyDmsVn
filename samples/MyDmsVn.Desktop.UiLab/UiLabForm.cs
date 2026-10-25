@@ -168,6 +168,7 @@ internal sealed class UiLabForm : Form
         try
         {
             await TearDownOrPoisonAsync();
+            _journal.Height = _module.SelectedIndex == 1 ? 70 : 110;
             _releaseSecurityRead = null;
             _releaseSecurityMutation = null;
             var context = SynchronizationContext.Current as WindowsFormsSynchronizationContext

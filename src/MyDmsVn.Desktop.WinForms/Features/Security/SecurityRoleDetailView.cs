@@ -23,7 +23,7 @@ public sealed class SecurityRoleDetailView : UserControl
     public ListBox Permissions { get; } = new()
     {
         Dock = DockStyle.Bottom,
-        Height = 64,
+        Height = 30,
         AccessibleName = "Quyền cũ hoặc không còn trong danh mục"
     };
     public ListBox Members { get; } = new()
