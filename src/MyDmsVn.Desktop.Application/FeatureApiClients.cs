@@ -88,11 +88,13 @@ namespace MyDmsVn.Desktop.Application
 
     public interface IPermissionCatalogApiClient
     {
+        IPermissionCatalogApiClient ForSession(long expectedSessionVersion);
         Task<ApiResponse<PermissionCatalogDto>> GetCatalogAsync(CancellationToken cancellationToken);
     }
 
     public interface ISecurityAdministrationApiClient
     {
+        ISecurityAdministrationApiClient ForSession(long expectedSessionVersion);
         Task<ApiResponse<IReadOnlyList<SecurityUserDto>>> ListUsersAsync(CancellationToken cancellationToken);
         Task<ApiResponse<IReadOnlyList<SecurityRoleDto>>> ListRolesAsync(CancellationToken cancellationToken);
         Task<ApiResponse<SecurityAdministrationResultDto>> MutateAsync(

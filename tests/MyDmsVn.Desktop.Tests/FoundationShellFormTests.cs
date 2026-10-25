@@ -91,18 +91,18 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
-        public void Security_tab_rejects_close_without_dirty_and_busy_admission()
+        public void Clean_security_tab_uses_normal_workspace_close_lifecycle()
         {
             StaTest.Run(_ =>
             {
                 using var shell = CreateShell();
-                var editor = new TextBox { Text = "unsaved role" };
+                var editor = new TextBox { Text = "read only detail" };
                 var page = shell.OpenWorkspace("security-administration", "Security", editor, shell.WorkspaceSessionVersion)!;
-                Assert.False(shell.Workspace.IsTabClosable(page));
-                Assert.False(shell.Workspace.RequestTabClose(page));
+                Assert.True(shell.Workspace.IsTabClosable(page));
+                Assert.True(shell.Workspace.RequestTabClose(page));
                 shell.RequestWorkspaceCloseAsync(page).GetAwaiter().GetResult();
-                Assert.False(editor.IsDisposed);
-                Assert.Equal("unsaved role", editor.Text);
+                Assert.True(editor.IsDisposed);
+                Assert.Empty(shell.Workspace.TabPages);
             }, TimeSpan.FromSeconds(10));
         }
 

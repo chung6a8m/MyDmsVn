@@ -420,8 +420,7 @@ namespace MyDmsVn.Desktop.WinForms
             page.Controls.Add(feedbackHost);
             _documents.Add(key, page);
             Workspace.TabPages.Add(page);
-            // Security administration has its own mutable editors and no close admission yet.
-            Workspace.SetTabClosable(page, !string.Equals(key, "security-administration", StringComparison.Ordinal));
+            Workspace.SetTabClosable(page, true);
             Workspace.SelectedTab = page;
 
             if (!IsWorkspaceRequestCurrent(sessionVersion))
@@ -594,7 +593,6 @@ namespace MyDmsVn.Desktop.WinForms
         {
             if (page == null || IsDisposed || Disposing) return;
             var key = page.Name;
-            if (string.Equals(key, "security-administration", StringComparison.Ordinal)) return;
             if (!_documents.TryGetValue(key, out var current) || !ReferenceEquals(current, page)) return;
             var sessionVersion = WorkspaceSessionVersion;
             var token = _workspaceCloseLifetime.Token;

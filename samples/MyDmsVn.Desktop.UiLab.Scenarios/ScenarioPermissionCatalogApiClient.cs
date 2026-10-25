@@ -20,6 +20,9 @@ public sealed class ScenarioPermissionCatalogApiClient : IPermissionCatalogApiCl
         this.journal = journal;
     }
 
+    public IPermissionCatalogApiClient ForSession(long expectedSessionVersion) =>
+        expectedSessionVersion == owner ? this : throw new InvalidOperationException("The Lab catalog client belongs to another session.");
+
     public ApiError? Error { get; set; }
 
     private readonly System.Collections.Generic.List<ScenarioGate<ApiResponse<PermissionCatalogDto>>> gates = new System.Collections.Generic.List<ScenarioGate<ApiResponse<PermissionCatalogDto>>>();

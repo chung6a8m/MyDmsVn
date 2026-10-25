@@ -160,6 +160,7 @@ public sealed class SecurityPermissionImportTests
 
     private sealed class ImportClient : ISecurityAdministrationApiClient
     {
+        public ISecurityAdministrationApiClient ForSession(long expectedSessionVersion) => this;
         public int ApplyCount { get; private set; }
         public int AppliedTargetId { get; private set; }
         public PermissionAssignmentImportRequest? AppliedRequest { get; private set; }

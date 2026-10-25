@@ -125,6 +125,7 @@ public sealed class SecurityAssignmentSaveTests
 
     private sealed class RecordingClient : ISecurityAdministrationApiClient
     {
+        public ISecurityAdministrationApiClient ForSession(long expectedSessionVersion) => this;
         public readonly List<SecurityAdministrationMutationRequest> Requests = new();
         public readonly Queue<ApiResponse<SecurityAdministrationResultDto>> Replies = new();
         public int ThrowOnCall { get; set; }

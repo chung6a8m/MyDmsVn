@@ -71,6 +71,9 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
         this.journal = journal;
     }
 
+    public ISecurityAdministrationApiClient ForSession(long expectedSessionVersion) =>
+        expectedSessionVersion == owner ? this : throw new InvalidOperationException("The Lab administration client belongs to another session.");
+
     bool Admitted => session.Version == owner && session.IsAuthenticated;
     public ApiError? UsersError { get; set; }
     public ApiError? RolesError { get; set; }
