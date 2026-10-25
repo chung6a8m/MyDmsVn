@@ -61,7 +61,7 @@ public sealed class BusinessCompactNavigation : UserControl
             if (_selected != null) _selected.Selected = false;
             _selected = value;
             if (value != null) value.Selected = true;
-            Render(); SelectedItemChanged?.Invoke(this, EventArgs.Empty);
+            RefreshSelectionPresentation(); SelectedItemChanged?.Invoke(this, EventArgs.Empty);
         }
     }
     public event EventHandler? SelectedItemChanged;
@@ -71,8 +71,20 @@ public sealed class BusinessCompactNavigation : UserControl
     internal void SetToolTip(Control control, string text) => _toolTips.SetToolTip(control, text);
     private void LayoutRows()
     {
-        var width = Math.Max(1, _itemsHost.ClientSize.Width - BusinessCompactAppearance.Scale(this, 8));
+        var width = RowWidth();
         foreach (Control child in _itemsHost.Controls) if (child.Width != width) child.Width = width;
+    }
+    private int RowWidth() => Math.Max(1, _itemsHost.ClientSize.Width - _itemsHost.Padding.Horizontal - BusinessCompactAppearance.Scale(this, 8));
+    private void RefreshSelectionPresentation()
+    {
+        foreach (var button in _itemsHost.Controls.OfType<Button>())
+        {
+            var item = (BusinessCompactNavigationItem)button.Tag;
+            button.AccessibleDescription = (item.Selected ? "Selected. " : "") +
+                (item.Items.Count == 0 ? "" : item.Expanded ? "Section expanded" : "Section collapsed");
+            button.Invalidate();
+        }
+        ApplyPalette();
     }
     private static IEnumerable<BusinessCompactNavigationItem> All(IEnumerable<BusinessCompactNavigationItem> items) => items.SelectMany(item => new[] { item }.Concat(All(item.Items)));
     private static bool Admitted(BusinessCompactNavigationItem target, IEnumerable<BusinessCompactNavigationItem> items, bool parentEnabled)
@@ -103,16 +115,21 @@ public sealed class BusinessCompactNavigation : UserControl
             { _selected.Selected = false; _selected = null; removedSelection = true; }
             var focused = _itemsHost.Controls.Cast<Control>().FirstOrDefault(button => button.ContainsFocus)?.Tag;
             _itemsHost.SuspendLayout();
-            foreach (Control control in _itemsHost.Controls.Cast<Control>().ToArray()) control.Dispose();
-            Width = BusinessCompactAppearance.Scale(this, Expanded ? ExpandedWidth : CollapsedWidth);
-            _toggle.Height = BusinessCompactAppearance.Scale(this, 64);
-            _toggle.Text = Expanded ? "MyDmsVn" : "";
-            _toggle.Padding = new Padding(BusinessCompactAppearance.Scale(this, Expanded ? 40 : 0), 0, 0, 0);
-            _toggle.AccessibleName = Expanded ? "Collapse navigation" : "Expand navigation";
-            _toolTips.SetToolTip(_toggle, _toggle.AccessibleName);
-            AddRows(Items, 0, true);
-            _itemsHost.ResumeLayout();
+            try
+            {
+                foreach (Control control in _itemsHost.Controls.Cast<Control>().ToArray()) control.Dispose();
+                Width = BusinessCompactAppearance.Scale(this, Expanded ? ExpandedWidth : CollapsedWidth);
+                _toggle.Height = BusinessCompactAppearance.Scale(this, 64);
+                _toggle.Text = Expanded ? "MyDmsVn" : "";
+                _toggle.Padding = new Padding(BusinessCompactAppearance.Scale(this, Expanded ? 40 : 0), 0, 0, 0);
+                _toggle.AccessibleName = Expanded ? "Collapse navigation" : "Expand navigation";
+                _toolTips.SetToolTip(_toggle, _toggle.AccessibleName);
+                AddRows(Items, 0, true);
+                LayoutRows();
+            }
+            finally { _itemsHost.ResumeLayout(); }
             LayoutRows();
+            _itemsHost.PerformLayout();
             ApplyPalette();
             if (focused != null) _itemsHost.Controls.Cast<Control>().FirstOrDefault(button => ReferenceEquals(button.Tag, focused))?.Focus();
         }
@@ -130,7 +147,7 @@ public sealed class BusinessCompactNavigation : UserControl
                 _itemsHost.Controls.Add(new Label
                 {
                     Text = Expanded ? group.ToUpperInvariant() : "", Name = "CompactSection", AccessibleName = group + " section",
-                    Width = Width - BusinessCompactAppearance.Scale(this, 16), Height = BusinessCompactAppearance.Scale(this, Expanded ? 34 : 12),
+                    Width = RowWidth(), Height = BusinessCompactAppearance.Scale(this, Expanded ? 34 : 12),
                     Padding = new Padding(BusinessCompactAppearance.Scale(this, 16), BusinessCompactAppearance.Scale(this, 12), 0, 0),
                     Margin = Padding.Empty, AutoEllipsis = true,
                 });
@@ -141,7 +158,7 @@ public sealed class BusinessCompactNavigation : UserControl
                 AccessibleName = item.Text, Tag = item, Enabled = enabled && item.Enabled,
                 AutoEllipsis = true,
                 AccessibleDescription = (item.Selected ? "Selected. " : "") + (item.Items.Count == 0 ? "" : item.Expanded ? "Section expanded" : "Section collapsed"),
-                Width = Width - BusinessCompactAppearance.Scale(this, 8), Height = BusinessCompactAppearance.Scale(this, 40),
+                Width = RowWidth(), Height = BusinessCompactAppearance.Scale(this, 40),
                 Margin = new Padding(0, 0, 0, BusinessCompactAppearance.Scale(this, 4)),
                 Padding = new Padding(BusinessCompactAppearance.Scale(this, Expanded ? 12 + depth * 16 + (item.Icon != null ? 32 : 0) : 0), 0, 0, 0),
                 FlatStyle = FlatStyle.Flat, TextAlign = Expanded ? ContentAlignment.MiddleLeft : ContentAlignment.MiddleCenter,

@@ -8,7 +8,7 @@ The Owner-requested Sidebar follow-up and the planned Security workspace are sep
 
 | Workstream | Scope and status owner | Design/review references |
 |---|---|---|
-| Sidebar navigation | [Sidebar Navigation Horizontal Scrollbar](20261025-001-sidebar-navigation-horizontal-scrollbar.md): the existing bounded diagnosis/fix plan remains in place. | [Reviewed zero-tab and Products-tab screenshots](../design-references/sidebar-horizontal-scrollbar/README.md) |
+| Sidebar navigation | [Sidebar Navigation Horizontal Scrollbar](20261025-001-sidebar-navigation-horizontal-scrollbar.md): complete within the Owner-selected SQL-free hosted-shell scope; the plan owns exact evidence and limitations. | [Reviewed zero-tab and Products-tab screenshots](../design-references/sidebar-horizontal-scrollbar/README.md) |
 | Planned Security workspace | [Security Administration — UI Lab First](20261025-002-security-administration-ui-lab-first.md): UI/behavior design, implementation sequence and the Owner review dependency. | [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) · [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) |
 
 The current UI Lab remains Sales-only. The planned Security extension must exercise the actual candidate component in the SQL-free Lab and obtain dated explicit Owner approval at **SEC-T05** before **SEC-T06 Local cutover** or **SEC-T07 SQL integration** begins. This documentation PR and its mockups do not approve that gate or establish implementation/runtime acceptance. Record any future task execution and gate decision only in the plan that owns that scope.
