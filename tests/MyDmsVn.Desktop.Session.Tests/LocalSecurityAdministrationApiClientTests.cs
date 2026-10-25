@@ -171,6 +171,44 @@ public sealed class LocalSecurityAdministrationApiClientTests
         Assert.True(session.IsAuthenticated);
     }
 
+    [Fact]
+    public async Task Bound_operations_preserve_request_fields_and_permission_keys()
+    {
+        var state = new State();
+        using var provider = Provider(state);
+        await Login(provider, "first");
+        var session = provider.GetRequiredService<IDesktopSession>();
+        var administration = provider.GetRequiredService<ISecurityAdministrationApiClient>().ForSession(session.Version);
+        var catalog = provider.GetRequiredService<IPermissionCatalogApiClient>().ForSession(session.Version);
+        var mutation = new SecurityAdministrationMutationRequest(
+            SecurityAdministrationTargetDto.Role, SecurityAdministrationOperationDto.SetPermission,
+            targetId: 201, permissionKey: "Catalog.Products.Read", decision: true, expectedRevision: 7);
+        var import = new PermissionAssignmentImportRequest("{}", 8, "digest-8");
+
+        Assert.True((await administration.ListUsersAsync(default)).IsSuccess);
+        Assert.True((await administration.ListRolesAsync(default)).IsSuccess);
+        Assert.True((await administration.MutateAsync(mutation, default)).IsSuccess);
+        Assert.True((await administration.PreviewPermissionImportAsync(PermissionImportTargetTypeDto.Role, 201, "{}", default)).IsSuccess);
+        Assert.True((await administration.ApplyPermissionImportAsync(PermissionImportTargetTypeDto.Role, 201, import, default)).IsSuccess);
+        Assert.True((await catalog.GetCatalogAsync(default)).IsSuccess);
+
+        Assert.Equal(new[] { "Security.Users.Manage", "Security.Roles.Manage", "Security.Roles.Manage",
+            "Security.Roles.Manage", "Security.Roles.Manage", "Security.Permissions.Read" }, state.Keys);
+        var sent = Assert.IsType<MutateSecurityAdministrationCommand>(state.Requests[2]);
+        Assert.Equal(201, sent.TargetId);
+        Assert.Equal("Catalog.Products.Read", sent.PermissionKeyValue);
+        Assert.True(sent.Decision);
+        Assert.Equal(7, sent.ExpectedRevision);
+        var preview = Assert.IsType<PreviewPermissionAssignmentImportQuery>(state.Requests[3]);
+        Assert.Equal(PermissionImportTargetTypeDto.Role, preview.TargetType);
+        Assert.Equal(201, preview.TargetId);
+        Assert.Equal("{}", preview.Json);
+        var apply = Assert.IsType<ApplyPermissionAssignmentImportCommand>(state.Requests[4]);
+        Assert.Equal(8, apply.ExpectedTargetRevision);
+        Assert.Equal("digest-8", apply.ExpectedCatalogDigest);
+        Assert.Equal("{}", apply.Json);
+    }
+
     private static async Task SessionChanged<T>(Task<ApiResponse<T>> request) =>
         await SessionChanged(await Within(request));
 
@@ -204,6 +242,10 @@ public sealed class LocalSecurityAdministrationApiClientTests
         services.AddSingleton<IPermissionStore, Grants>();
         services.AddTransient<IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>, LoginHandler>();
         services.AddTransient<IRequestHandler<ListSecurityUsersQuery, ErrorOr<IReadOnlyList<SecurityUserDto>>>, UserHandler>();
+        services.AddTransient<IRequestHandler<ListSecurityRolesQuery, ErrorOr<IReadOnlyList<SecurityRoleDto>>>, RoleHandler>();
+        services.AddTransient<IRequestHandler<MutateSecurityAdministrationCommand, ErrorOr<SecurityAdministrationResultDto>>, MutationHandler>();
+        services.AddTransient<IRequestHandler<PreviewPermissionAssignmentImportQuery, ErrorOr<PermissionAssignmentImportPreviewDto>>, PreviewHandler>();
+        services.AddTransient<IRequestHandler<ApplyPermissionAssignmentImportCommand, ErrorOr<PermissionAssignmentImportResultDto>>, ApplyHandler>();
         services.AddTransient<IRequestHandler<ListPermissionCatalogQuery, ErrorOr<PermissionCatalogDto>>, CatalogHandler>();
         return services.BuildServiceProvider();
     }
@@ -217,6 +259,7 @@ public sealed class LocalSecurityAdministrationApiClientTests
         public int AccountValidations;
         public readonly List<string> Keys = new();
         public readonly List<int> Actors = new();
+        public readonly List<object> Requests = new();
         public readonly TaskCompletionSource<bool> ValidationStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly TaskCompletionSource<bool> ValidationRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly TaskCompletionSource<bool> HandlerStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -266,6 +309,7 @@ public sealed class LocalSecurityAdministrationApiClientTests
         public UserHandler(State state, ICurrentUserAccessor actor) { _state = state; _actor = actor; }
         public async Task<ErrorOr<IReadOnlyList<SecurityUserDto>>> Handle(ListSecurityUsersQuery request, CancellationToken token)
         {
+            _state.Requests.Add(request);
             _state.Actors.Add(_actor.Current.UserId!.Value);
             _state.HandlerStarted.TrySetResult(true);
             if (_state.PauseHandler) await Within(_state.HandlerRelease.Task);
@@ -282,11 +326,59 @@ public sealed class LocalSecurityAdministrationApiClientTests
         public CatalogHandler(State state, ICurrentUserAccessor actor) { _state = state; _actor = actor; }
         public async Task<ErrorOr<PermissionCatalogDto>> Handle(ListPermissionCatalogQuery request, CancellationToken token)
         {
+            _state.Requests.Add(request);
             _state.Actors.Add(_actor.Current.UserId!.Value);
             _state.CatalogStarted.TrySetResult(true);
             if (_state.PauseCatalog) await Within(_state.CatalogRelease.Task);
             _state.Actors.Add(_actor.Current.UserId!.Value);
             return new PermissionCatalogDto("1.0", "digest", Array.Empty<PermissionCatalogItemDto>());
+        }
+    }
+
+    private sealed class RoleHandler : IRequestHandler<ListSecurityRolesQuery, ErrorOr<IReadOnlyList<SecurityRoleDto>>>
+    {
+        private readonly State _state;
+        public RoleHandler(State state) => _state = state;
+        public Task<ErrorOr<IReadOnlyList<SecurityRoleDto>>> Handle(ListSecurityRolesQuery request, CancellationToken token)
+        {
+            _state.Requests.Add(request);
+            return Task.FromResult<ErrorOr<IReadOnlyList<SecurityRoleDto>>>(Array.Empty<SecurityRoleDto>());
+        }
+    }
+
+    private sealed class MutationHandler : IRequestHandler<MutateSecurityAdministrationCommand, ErrorOr<SecurityAdministrationResultDto>>
+    {
+        private readonly State _state;
+        public MutationHandler(State state) => _state = state;
+        public Task<ErrorOr<SecurityAdministrationResultDto>> Handle(MutateSecurityAdministrationCommand request, CancellationToken token)
+        {
+            _state.Requests.Add(request);
+            return Task.FromResult<ErrorOr<SecurityAdministrationResultDto>>(new SecurityAdministrationResultDto(8, true));
+        }
+    }
+
+    private sealed class PreviewHandler : IRequestHandler<PreviewPermissionAssignmentImportQuery, ErrorOr<PermissionAssignmentImportPreviewDto>>
+    {
+        private readonly State _state;
+        public PreviewHandler(State state) => _state = state;
+        public Task<ErrorOr<PermissionAssignmentImportPreviewDto>> Handle(PreviewPermissionAssignmentImportQuery request, CancellationToken token)
+        {
+            _state.Requests.Add(request);
+            var parsed = new ParsedPermissionAssignmentImportDto(1, request.TargetType, request.TargetId,
+                Array.Empty<PermissionAssignmentImportEntryDto>());
+            return Task.FromResult<ErrorOr<PermissionAssignmentImportPreviewDto>>(
+                new PermissionAssignmentImportPreviewDto(parsed, "Role", 8, "digest-8", Array.Empty<PermissionAssignmentImportEntryDto>()));
+        }
+    }
+
+    private sealed class ApplyHandler : IRequestHandler<ApplyPermissionAssignmentImportCommand, ErrorOr<PermissionAssignmentImportResultDto>>
+    {
+        private readonly State _state;
+        public ApplyHandler(State state) => _state = state;
+        public Task<ErrorOr<PermissionAssignmentImportResultDto>> Handle(ApplyPermissionAssignmentImportCommand request, CancellationToken token)
+        {
+            _state.Requests.Add(request);
+            return Task.FromResult<ErrorOr<PermissionAssignmentImportResultDto>>(new PermissionAssignmentImportResultDto(8, 0, false));
         }
     }
 }
