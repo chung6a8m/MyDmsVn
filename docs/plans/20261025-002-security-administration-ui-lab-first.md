@@ -10,7 +10,7 @@
 
 **Spec:** [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md), [visual references based on the reviewed layouts](../design-references/security-administration/README.md) and [Security UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md). The specification and explicit Owner corrections take precedence over generated image text and illustrative counts.
 
-**Status:** PLANNED / NOT STARTED. This planning PR contains documentation and reference images only. No candidate implementation, GUI/SQL execution or Owner approval of a running candidate is claimed. This is an additional selected workstream in the [execution index](README.md); the existing [Sidebar plan](20261025-001-sidebar-navigation-horizontal-scrollbar.md) retains its own scope and state.
+**Status (2026-10-25):** SEC-T00–SEC-T03 have a SQL-free candidate in an isolated Security worktree. SEC-T04 has bounded automated evidence but remains open for the unavailable native125/High Contrast contexts and full attended SEC-L review preparation. SEC-T05 is NOT APPROVED; SEC-T06–SEC-T08 remain BLOCKED. The [Sidebar plan](20261025-001-sidebar-navigation-horizontal-scrollbar.md) retains its own scope and state. Exact candidate execution evidence appears in section 1A below; the original planning text and proposed names remain historical until verified there.
 
 **Inspected baseline:** `chung6a8m/MyDmsVn@0216701835cc3326124a94760186989c1ac4f729` on `v1a-pro-ui-next`. WinFormsKit gitlink: `c232a4c09dc0386a5bd8bb484a5c991acae827d5`; nested SourceGrid: `f4e457b43582bf01892f50bdc74aa480531e5944`. Re-read current source, active plans and pins before implementation and record relevant drift.
 
@@ -48,6 +48,22 @@
 | SEC-T08 | Reconcile bounded acceptance and handoff | SEC-T06, SEC-T07 | BLOCKED BY SEC-T05 |
 
 SEC-T00 foundation work and SEC-T01 fixture preparation may overlap after their interfaces are agreed. Shared host/control edits require a single owner or isolated branches. Sidebar implementation is independent, but both workstreams serialize GUI runs and recheck shared shell geometry if either changes it. No completion in one workstream establishes acceptance in the other.
+
+### 1A. SEC-T00–SEC-T04 candidate execution record — 2026-10-25
+
+**Authorization and boundary:** The Owner explicitly selected SEC-T00–SEC-T04 and an isolated worktree. The candidate started from product `021856bcce6672659f026da88e4c56d8b3a6a5b9` on `v1a-pro-ui-next` (the plan's inspected documentation baseline was `0216701835cc3326124a94760186989c1ac4f729`). Candidate source/test commit: `7ef118aba279f731c1c19ed893c1334aecc1c73e`. Recursive gitlinks remained WinFormsKit `c232a4c09dc0386a5bd8bb484a5c991acae827d5` and SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. The production Security factory still creates the legacy control. No Local, SQL, schema, transport or permission-registry change was made.
+
+| Task | Candidate result | Bounded verification / remaining gap |
+|---|---|---|
+| SEC-T00 | Application-only independent dataset/freshness state, permission explanation, immutable role draft and orthogonal save outcome implemented. | T00 RED boundary 19 PASS / 1 expected FAIL; GREEN 20/20 PASS. No live authorization assertion. |
+| SEC-T01 | Deterministic Security fakes, bound workspace session, revisioned commands/import, gates, redacted journal and fixed fixture aliases implemented. | Final source-verified scenario tests 22/22 PASS after correcting held-commit state, schema-v1 parser and import error parity. Fake tests do not prove SQL commits or Login. |
+| SEC-T02 | Candidate views and Sales/Security Lab composition implemented; production factory remains legacy. | Light/Dark at 900×600 and 1200×760, catalog/effective/read-only/header/member controls and Sales toolbar preservation exercised. A source-first UI skeleton did not establish an independent TDD RED; the final project run below is the runtime evidence. |
+| SEC-T03 | Explicit role/direct drafts, one-key ordered Save, membership revisions, profile actions, close admission, session invalidation and recovery/rebase implemented. | Review-found owner, scrub, uncertain and recovery bypass defects were corrected and retested. Single-command fake responses remain separate from real Local admission and SQL audit proof. |
+| SEC-T04 | Contextual JSON preview/apply, target/revision/digest invalidation, native text tests, Reset/drain and pane-state tests implemented; candidate remains SQL-free. | **OPEN:** physical 125%, changed High Contrast semantics and full attended SEC-L01–SEC-L12 visual review have no evidence. Reset poison-timeout and native keyboard activation of every action are not yet proven. Do not mark the T04 review-ready exit complete. |
+
+**Current automated evidence:** Locked restore of `MyDmsVn.UiLab.sln` passed; Release/net48 full `MyDmsVn.Desktop.Ui.Tests` discovery was nonempty and the final TRX at `TestResults/security-ui-lab-candidate/security-ui-lab-candidate.trx` records **128 discovered/executed, 128 PASS, 0 failed/skipped/not-executed** for source/test commit `7ef118aba279f731c1c19ed893c1334aecc1c73e`. This includes 26 retained Sales/driver rows, 6 retained Sales Reset/toolbar rows, and 96 Security rows (projection/draft, scenario/fake, control, lifetime/save/import, pane and native/Reset). Focused post-change selectors passed 7/7 Security host/native and 26/26 lifetime/import; the full project was rerun after review corrections. Tooling: Windows interactive net48, SDK `8.0.426`, VSTest `17.11.1` x64. Evaluated Lab/Ui.Tests graph contained nine projects and excluded Local/Server/DbMigrator/SQL; evaluated Desktop.App + DbMigrator graph contained 13 projects and no sample/test/fake reference. Actual primary monitor effective DPI was 96 (100%), bounds 1920×1080, work area 1920×1032. Native tests observed per-character `WM_CHAR`, raw text/caret/selection/focus in that context; they do not establish physical 125%. Raw TRX remains local and uncommitted.
+
+**Scenario mapping:** SEC-L01/05/09 structure and read-only explanations/catalog: `SecurityWorkspaceControlTests`, `SecurityPermissionProjectionTests`; L02 independent denied/loading/empty state: `SecurityPaneStateTests`; L03 profile/protection: `SecurityWorkspaceLifetimeTests.Profile_create_rename_activation_and_password_use_explicit_commands` and pane tests; L04 membership/read-only members: `Membership_uses_both_loaded_revisions_and_refreshes_both_entities` plus control member navigation; L06 direct tri-state: lifetime direct and import tests; L07/08 serial/partial/uncertain Save: `SecurityAssignmentSaveTests` and lifetime recovery tests; L10 dirty close: lifetime close tests; L11 session replacement: lifetime/control tests; L12 Reset/native: `SecurityNativeAndResetTests` plus retained `UiLabResetTests`. This maps automated behavior only. Scenario IDs L03–L07/L09–L12 share a base fixture; selecting an ID does not execute or pass that scenario. Full attended matrix evidence and Owner decision belong to SEC-T05, which has not started.
 
 ### Baseline contracts that constrain implementation
 
@@ -203,10 +219,10 @@ All new type, file and test names below are **proposed** until implemented and d
 
 | Required field | Current value |
 |---|---|
-| UI Lab candidate/source/test SHA | Pending — candidate not implemented |
-| Evidence record and actual native contexts | Pending — not run |
-| Evaluated SQL-free Lab and production factory isolation | Pending — candidate not built |
-| SEC-L01–SEC-L12 results / blocking findings | Pending — not run |
+| UI Lab candidate/source/test SHA | `7ef118aba279f731c1c19ed893c1334aecc1c73e`; bounded implementation evidence in section 1A, not an approved reviewed candidate |
+| Evidence record and actual native contexts | Section 1A; interactive physical 100% automation only, physical 125% and changed High Contrast NOT RUN |
+| Evaluated SQL-free Lab and production factory isolation | Nine-project Lab graph excludes Local/Server/SQL; production factory remains legacy and release graph excludes fake/sample dependencies |
+| SEC-L01–SEC-L12 results / blocking findings | Automated behavior mapped in section 1A; full attended matrix, physical 125%, High Contrast and remaining T04 review checks OPEN |
 | Owner identity and dated decision | Pending — no running-candidate decision |
 | Approved scope / declared exceptions | Pending |
 | Integration admission | BLOCKED until all required evidence and explicit approval are recorded |
