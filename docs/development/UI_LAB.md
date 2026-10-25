@@ -1,12 +1,12 @@
-# Sales UI Lab — developer runbook
+# UI Lab — developer runbook
 
-The Sales UI Lab is a separate net48 WinForms development host for the existing `SalesReceiptControl`. It is intended for inspecting list/editor input, session and response races without a SQL instance or real Login. The Lab does not run the production Local adapter or prove Server authorization, SQL valuation, posting atomicity or a release package. The [archived A0/A1 record](../archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md) retains historical implementation state and candidate evidence; this page owns repeatable use and commands.
+The UI Lab is a separate net48 WinForms development host for the existing `SalesReceiptControl` and the Security workspace candidate. It is intended for inspecting input, session and response races without a SQL instance or real Login. The Lab does not run the production Local adapter or prove Server authorization, SQL behavior or a release package. The [archived A0/A1 record](../archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md) retains historical Sales evidence; this page owns repeatable use and commands.
 
-## Planned Security extension
+## Security candidate boundary
 
-The current host and scenarios described below remain Sales-only. The [Security UI specification](../design/SECURITY_ADMINISTRATION_UI.md) and [Security UI Labs review guide](SECURITY_UI_LAB_REVIEW.md) describe a planned extension using the actual candidate production components with fake ports. The [Security implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) alone owns its task state and gate decision; the review guide does not describe an already available Security scene picker.
+The host now offers a **Sales / Security** module picker. Security constructs the candidate `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` from the production source assemblies with deterministic fake ports. The [Security UI specification](../design/SECURITY_ADMINISTRATION_UI.md), [review guide](SECURITY_UI_LAB_REVIEW.md) and [implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) define the target, exercises and sole task/gate state. Scenario IDs alone do not establish that their exercises passed.
 
-The extension must stay SQL-free through UI Labs review and dated explicit Owner approval at SEC-T05. SEC-T06 Local cutover and SEC-T07 SQL integration depend on that approval. This documentation PR, mockups and historical Sales Lab passes do not approve Security or prove its implementation. Preserve the Sales scenarios and commands below while implementing the separately authorized extension.
+The candidate remains SQL-free and the production Security factory still creates the legacy control. SEC-T05 requires a dated explicit Owner decision after review of the running candidate; SEC-T06 Local cutover and SEC-T07 SQL integration depend on that approval. Historical Sales Lab passes do not approve Security.
 
 ## Prerequisites and source boundaries
 
@@ -17,7 +17,7 @@ Use an interactive Windows desktop with .NET Framework 4.8 targeting/runtime sup
 - [`MyDmsVn.Desktop.Ui.Tests`](../../tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj): focused scenario and native WinForms checks.
 - [`MyDmsVn.UiLab.sln`](../../MyDmsVn.UiLab.sln): the small solution for Visual Studio and locked restore.
 
-The Lab constructs the real [`SalesReceiptControl`](../../src/MyDmsVn.Desktop.WinForms/SalesReceiptControl.cs) with its seven API/session/dispatcher/preview/lookup/permission/product dependencies. The existing [`WorkspaceCloseCoordinator`](../../src/MyDmsVn.Desktop.WinForms/WorkspaceCloseCoordinator.cs) owns ordinary dirty-close admission. A real Windows Forms synchronization context and message loop must stay active during async operations and reset drain. The Lab is a developer executable; do not add fake service switches to Desktop.App.
+The Lab constructs the real [`SalesReceiptControl`](../../src/MyDmsVn.Desktop.WinForms/SalesReceiptControl.cs) or candidate [`SecurityWorkspaceControl`](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceControl.cs) with fake dependencies. The existing [`WorkspaceCloseCoordinator`](../../src/MyDmsVn.Desktop.WinForms/WorkspaceCloseCoordinator.cs) owns ordinary dirty-close admission. A real Windows Forms synchronization context and message loop must stay active during async operations and reset drain. The Lab is a developer executable; do not add fake service switches to Desktop.App.
 
 ## Build and open
 
@@ -52,6 +52,14 @@ Each scenario starts from a deterministic fixture and a fresh session/workspace 
 | S06 Unknown Post | Post the seeded Draft once. Press Reload twice: the first recovery Get is configured to fail, and the second returns Posted for the same sale ID. | Recovery blocks unsafe commands; Post journal count remains one; only authoritative reload establishes Posted state. |
 
 For denied Read/Write/Post variants, choose the matching dropdown item and press `Apply access`; choose `Allow all` and apply it to restore the fake grants. For busy presentation, arm `Hold next Reload`, start Reload in the Sales control, then press `Release Reload` after inspecting the held state. These fake responses exercise UI presentation/admission and do not establish Server permission enforcement. Empty-list coverage uses fixture/test setup rather than a dedicated toolbar choice. Preview arithmetic is a published small-demo range and should visibly recalculate quantity/price/gift totals; SQL moving-average cost remains outside the Lab.
+
+## Security candidate exercises
+
+Choose **Security** in the module picker, then a `SEC_L01`–`SEC_L12` fixture and Reset. The same toolbar offers Light/Dark, Reset, Close workspace and Replace session. Sales-specific lookup, Save-failure and permission controls apply only to Sales. The Security workspace opens **Người dùng**, **Vai trò** and read-only **Danh mục quyền**. User details contain **Thông tin**, **Vai trò (n)**, **Quyền hiệu lực** and **Quyền riêng (n)**; role details contain **Quyền của vai trò** and read-only **Thành viên (n)**. Use user-owned membership actions in **Vai trò (n)**. Role grant changes remain a draft until **Lưu quyền vai trò**; a user's direct choice remains a draft until **Lưu quyền này**. The JSON import buttons in those two editors preview the selected target and additions, then request explicit confirmation before Apply.
+
+The Security fixtures publish fixed users `101` (active), `102` (inactive) and `103` (protected), roles `201` (active), `202` (active) and `203` (inactive), plus Active and Deprecated keys. `SEC_L02` initially denies Users; `SEC_L08` queues one successful mutation followed by a conflict. Other IDs share the populated fixture and expose fake gates and errors for controlled exercises. To reproduce a particular [SEC-L scenario](SECURITY_UI_LAB_REVIEW.md#scenario-matrix), follow its action order and configure the required fake responses through a focused test or debugger; selecting an ID alone does not run or pass that scenario. The lower journal displays sanitized operation names and order. It excludes password text and raw import JSON.
+
+On a partial, conflicting or uncertain Save, use **Tải lại để đối chiếu** and explicitly review the new diff. A current value matching the intended value does not prove an earlier uncertain write committed. Close remains blocked while a write is busy or recovery is required. Reset cancels and drains the old graph before replacing it; a timed-out drain poisons the host instance. Security Lab observations do not prove Local admission, SQL behavior, actual Login or production acceptance. Record physical monitor scale separately from WinForms `DeviceDpi` and identify any native input or attended checks that were unavailable.
 
 ## Reset, close and diagnostics
 

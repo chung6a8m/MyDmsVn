@@ -8,12 +8,19 @@ using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.UiLab.Scenarios;
 using MyDmsVn.Desktop.WinForms;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
+using MyDmsVn.Desktop.Application.Security;
+using MyDmsVn.Desktop.WinForms.Features.Security;
 
 namespace MyDmsVn.Desktop.UiLab;
 
 internal sealed class UiLabForm : Form
 {
+    private readonly ComboBox _module = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110 };
+    private SecurityScenario? _securityData;
+    private SecurityWorkspaceControl? _securityControl;
     private readonly ComboBox _scenario = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190 };
+    private readonly Button _theme = new Button { Text = "Light / Dark", AutoSize = true };
     private readonly Button _reset = new Button { Text = "Reset", AutoSize = true };
     private readonly ReceiptCommandButton _closeWorkspace = new ReceiptCommandButton
         { Text = "Close workspace", AutoSize = true, CausesValidation = false };
@@ -41,6 +48,9 @@ internal sealed class UiLabForm : Form
     private ScenarioLookupRace? _race;
     private ScenarioGate<ApiResponse<SalesReceiptDto>>? _reloadGate;
 
+    internal ComboBox ModuleSelector => _module;
+    internal SecurityScenario? CurrentSecurityScenarioData => _securityData;
+    internal SecurityWorkspaceControl? CurrentSecurityControl => _securityControl;
     internal SalesScenarioData? CurrentScenarioData => _data;
     internal SalesReceiptControl? CurrentSalesControl => _control;
     internal bool IsResetting => _resetting;
@@ -61,26 +71,30 @@ internal sealed class UiLabForm : Form
 
     internal UiLabForm(Func<WorkspaceCloseState, CancellationToken, Task<WorkspaceCloseChoice>> closePrompt)
     {
-        Text = "MyDmsVn Sales UI Lab";
+        Text = "MyDmsVn UI Lab";
         Size = new Size(1250, 850);
         StartPosition = FormStartPosition.CenterScreen;
         _closeCoordinator = new WorkspaceCloseCoordinator(closePrompt);
         _closeWorkspace.RetainEditorFocus = () => _control?.CaptureCloseState().IsDirty == true;
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 68, WrapContents = true, Padding = new Padding(6) };
-        toolbar.Controls.AddRange(new Control[] { _scenario, _reset, _closeWorkspace, _replaceSession,
+        toolbar.Controls.AddRange(new Control[] { _module, _scenario, _theme, _reset, _closeWorkspace, _replaceSession,
             _failSave, _armRace, _completeB, _completeA, _permissionVariant, _applyPermission,
             _holdReload, _releaseReload, _status });
         Controls.Add(_workspace);
         Controls.Add(_journal);
         Controls.Add(toolbar);
+        _module.Items.AddRange(new object[] { "Sales", "Security" });
+        _module.SelectedIndex = 0;
         _scenario.Items.AddRange(Enum.GetValues(typeof(SalesScenarioId)).Cast<object>().ToArray());
         _scenario.SelectedIndex = 0;
         _permissionVariant.Items.AddRange(new object[] { "Allow all", "Deny Read", "Deny Write", "Deny Post" });
         _permissionVariant.SelectedIndex = 0;
+        _module.SelectedIndexChanged += async (_, __) => { if (_resetting) return; _scenario.Items.Clear(); _scenario.Items.AddRange(Enum.GetValues(_module.SelectedIndex == 1 ? typeof(SecurityScenarioId) : typeof(SalesScenarioId)).Cast<object>().ToArray()); _scenario.SelectedIndex = 0; if (IsHandleCreated) await ResetSafelyAsync(); };
+        _theme.Click += (_, __) => BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
         _reset.Click += async (_, __) => await ResetSafelyAsync();
         _scenario.SelectedIndexChanged += async (_, __) => { if (IsHandleCreated) await ResetSafelyAsync(); };
         _closeWorkspace.Click += async (_, __) => await CloseWorkspaceSafelyAsync();
-        _replaceSession.Click += (_, __) => { _data?.Session.Replace(); RefreshDiagnostics(); };
+        _replaceSession.Click += (_, __) => { _data?.Session.Replace(); _securityData?.Session.Replace(); RefreshDiagnostics(); };
         _failSave.Click += (_, __) => ArmSaveError();
         _armRace.Click += (_, __) => ArmLookupRace();
         _completeB.Click += (_, __) => CompleteRace(false);
@@ -109,6 +123,16 @@ internal sealed class UiLabForm : Form
                 ?? throw new InvalidOperationException("UI Lab requires a running Windows Forms synchronization context.");
             _lifetime = new CancellationTokenSource();
             _race = null; _reloadGate = null;
+            if (_module.SelectedIndex == 1)
+            {
+                _securityData = SecurityScenarioCatalog.Create((SecurityScenarioId)_scenario.SelectedItem!);
+                _securityControl = new SecurityWorkspaceControl(new SecurityWorkspaceViewModel(_securityData.Administration, _securityData.Catalog, _securityData.Session, new SynchronizationContextUiDispatcher(context), _securityData.Session.Version));
+                _workspace.Controls.Add(_securityControl);
+                await _securityControl.ActivateAsync(_lifetime.Token);
+                _status.Text = _scenario.SelectedItem + " — ready (SQL-free Security)";
+                RefreshDiagnostics();
+                return;
+            }
             _data = SalesScenarioData.Create((SalesScenarioId)_scenario.SelectedItem!);
             var ui = new SynchronizationContextUiDispatcher(context);
             var data = _data;
@@ -144,6 +168,18 @@ internal sealed class UiLabForm : Form
     {
         _lifetime?.Cancel();
         _data?.CancelPending();
+        if (_securityData != null)
+        {
+            _securityData.Dispose();
+            if (_securityControl != null) {
+                var pending = _securityControl.LastOperation;
+                if (await Task.WhenAny(pending, Task.Delay(5000)) != pending) throw new TimeoutException("Security workspace did not drain.");
+                try { await pending; } catch (OperationCanceledException) { }
+                _workspace.Controls.Remove(_securityControl); _securityControl.Dispose(); _securityControl = null;
+            }
+            if (!await _securityData.DrainAsync(5000)) throw new TimeoutException("Security fixture did not drain.");
+            _securityData = null;
+        }
         if (_control != null)
         {
             var pending = _control.LastOperation;
@@ -169,12 +205,12 @@ internal sealed class UiLabForm : Form
 
     private async Task CloseWorkspaceSafelyAsync()
     {
-        if (_resetting || _closingWorkspace || _control == null) return;
+        if (_resetting || _closingWorkspace || (_control == null && _securityControl == null)) return;
         _closingWorkspace = true;
         SetCommands(false);
         try
         {
-            var decision = await _closeCoordinator.RequestCloseAsync(_control, _lifetime!.Token);
+            var decision = await _closeCoordinator.RequestCloseAsync((IWorkspaceCloseParticipant?)_securityControl ?? _control!, _lifetime!.Token);
             if (decision != WorkspaceCloseDecision.Admitted) { _status.Text = "Close rejected; edits retained."; return; }
             await TearDownOrPoisonAsync();
             _status.Text = "Workspace closed. Reset to reopen.";
@@ -187,13 +223,14 @@ internal sealed class UiLabForm : Form
     {
         if (token.IsCancellationRequested) return Task.FromResult(WorkspaceCloseChoice.Cancel);
         var answer = MessageBox.Show("Save changes before closing? Yes = Save, No = Discard, Cancel = keep open.",
-            "Sales UI Lab", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            "UI Lab", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
         return Task.FromResult(answer == DialogResult.Yes ? WorkspaceCloseChoice.Save :
             answer == DialogResult.No ? WorkspaceCloseChoice.Discard : WorkspaceCloseChoice.Cancel);
     }
 
     private void RefreshDiagnostics()
     {
+        if (_securityData != null) { _journal.Lines = _securityData.Journal.Entries.Select(entry => entry.Sequence + " " + entry.Operation).ToArray(); return; }
         if (_data == null) { _journal.Clear(); return; }
         _journal.Lines = _data.Journal.Entries.Select(entry => entry.Sequence + " " + entry.Operation).ToArray();
     }
@@ -258,10 +295,11 @@ internal sealed class UiLabForm : Form
 
     private void SetCommands(bool enabled)
     {
+        _module.Enabled = enabled;
         _scenario.Enabled = enabled;
         _reset.Enabled = enabled;
-        _closeWorkspace.Enabled = enabled && _control != null;
-        _replaceSession.Enabled = enabled && _control != null;
+        _closeWorkspace.Enabled = enabled && (_control != null || _securityControl != null);
+        _replaceSession.Enabled = enabled && (_control != null || _securityControl != null);
         _failSave.Enabled = enabled && _control != null;
         _armRace.Enabled = enabled && _control != null && _data?.Id == SalesScenarioId.S03LookupRace && _race == null;
         _completeA.Enabled = enabled && _race != null && !_race.A.IsCompleted;
@@ -291,10 +329,10 @@ internal sealed class UiLabForm : Form
             finally { _resetting = false; }
             return;
         }
-        if (_control != null)
+        if (_control != null || _securityControl != null)
         {
             await CloseWorkspaceSafelyAsync();
-            if (_control != null) return;
+            if (_control != null || _securityControl != null) return;
         }
         else if (_data != null || _lifetime != null)
         {
