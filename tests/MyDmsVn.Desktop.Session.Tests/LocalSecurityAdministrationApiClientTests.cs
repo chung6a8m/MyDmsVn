@@ -108,6 +108,46 @@ public sealed class LocalSecurityAdministrationApiClientTests
         Assert.Single(state.Keys);
     }
 
+    [Fact]
+    public async Task Serial_bound_operations_stop_at_replacement_boundary()
+    {
+        var state = new State();
+        using var provider = Provider(state);
+        await Login(provider, "first");
+        var session = provider.GetRequiredService<IDesktopSession>();
+        var administration = provider.GetRequiredService<ISecurityAdministrationApiClient>().ForSession(session.Version);
+        Assert.True((await administration.ListUsersAsync(default)).IsSuccess);
+        Assert.Equal(new[] { 11, 11 }, state.Actors);
+        session.SignOut();
+        await Login(provider, "second");
+        var admissions = state.AccountValidations;
+
+        await SessionChanged(administration.ListRolesAsync(default));
+        Assert.Equal(admissions, state.AccountValidations);
+        Assert.Single(state.Keys);
+        Assert.Equal(new[] { 11, 11 }, state.Actors);
+        Assert.Equal(22, session.CurrentUser!.UserId);
+    }
+
+    [Fact]
+    public async Task Catalog_result_admitted_by_old_actor_is_fenced_after_replacement()
+    {
+        var state = new State { PauseCatalog = true };
+        using var provider = Provider(state);
+        await Login(provider, "first");
+        var session = provider.GetRequiredService<IDesktopSession>();
+        var catalog = provider.GetRequiredService<IPermissionCatalogApiClient>().ForSession(session.Version);
+        var pending = catalog.GetCatalogAsync(default);
+        await Within(state.CatalogStarted.Task);
+        session.SignOut();
+        await Login(provider, "second");
+        state.CatalogRelease.TrySetResult(true);
+
+        await SessionChanged(await Within(pending));
+        Assert.Equal(new[] { 11, 11 }, state.Actors);
+        Assert.Equal(22, session.CurrentUser!.UserId);
+    }
+
     private static async Task SessionChanged<T>(Task<ApiResponse<T>> request) =>
         await SessionChanged(await Within(request));
 
@@ -141,6 +181,7 @@ public sealed class LocalSecurityAdministrationApiClientTests
         services.AddSingleton<IPermissionStore, Grants>();
         services.AddTransient<IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>, LoginHandler>();
         services.AddTransient<IRequestHandler<ListSecurityUsersQuery, ErrorOr<IReadOnlyList<SecurityUserDto>>>, UserHandler>();
+        services.AddTransient<IRequestHandler<ListPermissionCatalogQuery, ErrorOr<PermissionCatalogDto>>, CatalogHandler>();
         return services.BuildServiceProvider();
     }
 
@@ -148,6 +189,7 @@ public sealed class LocalSecurityAdministrationApiClientTests
     {
         public bool PauseValidation;
         public bool PauseHandler;
+        public bool PauseCatalog;
         public int AccountValidations;
         public readonly List<string> Keys = new();
         public readonly List<int> Actors = new();
@@ -155,6 +197,8 @@ public sealed class LocalSecurityAdministrationApiClientTests
         public readonly TaskCompletionSource<bool> ValidationRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly TaskCompletionSource<bool> HandlerStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly TaskCompletionSource<bool> HandlerRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public readonly TaskCompletionSource<bool> CatalogStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public readonly TaskCompletionSource<bool> CatalogRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     private sealed class LoginHandler : IRequestHandler<LoginCommand, ErrorOr<CurrentUserDto>>
@@ -203,6 +247,21 @@ public sealed class LocalSecurityAdministrationApiClientTests
             if (_state.PauseHandler) await Within(_state.HandlerRelease.Task);
             _state.Actors.Add(_actor.Current.UserId!.Value);
             return Array.Empty<SecurityUserDto>();
+        }
+    }
+
+    private sealed class CatalogHandler : IRequestHandler<ListPermissionCatalogQuery, ErrorOr<PermissionCatalogDto>>
+    {
+        private readonly State _state;
+        private readonly ICurrentUserAccessor _actor;
+        public CatalogHandler(State state, ICurrentUserAccessor actor) { _state = state; _actor = actor; }
+        public async Task<ErrorOr<PermissionCatalogDto>> Handle(ListPermissionCatalogQuery request, CancellationToken token)
+        {
+            _state.Actors.Add(_actor.Current.UserId!.Value);
+            _state.CatalogStarted.TrySetResult(true);
+            if (_state.PauseCatalog) await Within(_state.CatalogRelease.Task);
+            _state.Actors.Add(_actor.Current.UserId!.Value);
+            return new PermissionCatalogDto("1.0", "digest", Array.Empty<PermissionCatalogItemDto>());
         }
     }
 }
