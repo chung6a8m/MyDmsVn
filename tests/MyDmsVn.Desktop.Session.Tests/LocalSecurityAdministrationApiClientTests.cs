@@ -148,6 +148,29 @@ public sealed class LocalSecurityAdministrationApiClientTests
         Assert.Equal(22, session.CurrentUser!.UserId);
     }
 
+    [Fact]
+    public async Task Late_old_unauthorized_completion_does_not_expire_replacement_session()
+    {
+        var state = new State
+        {
+            PauseHandler = true,
+            HandlerError = Error.Unauthorized("Auth.Unauthorized", "Old actor lost access.")
+        };
+        using var provider = Provider(state);
+        await Login(provider, "first");
+        var session = provider.GetRequiredService<IDesktopSession>();
+        var administration = provider.GetRequiredService<ISecurityAdministrationApiClient>().ForSession(session.Version);
+        var pending = administration.ListUsersAsync(default);
+        await Within(state.HandlerStarted.Task);
+        session.SignOut();
+        await Login(provider, "second");
+        state.HandlerRelease.TrySetResult(true);
+
+        await SessionChanged(await Within(pending));
+        Assert.Equal(22, session.CurrentUser!.UserId);
+        Assert.True(session.IsAuthenticated);
+    }
+
     private static async Task SessionChanged<T>(Task<ApiResponse<T>> request) =>
         await SessionChanged(await Within(request));
 
@@ -190,6 +213,7 @@ public sealed class LocalSecurityAdministrationApiClientTests
         public bool PauseValidation;
         public bool PauseHandler;
         public bool PauseCatalog;
+        public Error? HandlerError;
         public int AccountValidations;
         public readonly List<string> Keys = new();
         public readonly List<int> Actors = new();
@@ -246,6 +270,7 @@ public sealed class LocalSecurityAdministrationApiClientTests
             _state.HandlerStarted.TrySetResult(true);
             if (_state.PauseHandler) await Within(_state.HandlerRelease.Task);
             _state.Actors.Add(_actor.Current.UserId!.Value);
+            if (_state.HandlerError.HasValue) return _state.HandlerError.Value;
             return Array.Empty<SecurityUserDto>();
         }
     }
