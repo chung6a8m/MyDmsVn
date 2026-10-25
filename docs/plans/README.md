@@ -4,19 +4,24 @@
 
 ## Current plan
 
-The Owner requested a fix plan for horizontal scrolling in the left Sidebar after opening a workspace. The selected follow-up is [Sidebar Navigation Horizontal Scrollbar](20261025-001-sidebar-navigation-horizontal-scrollbar.md).
+The Owner-requested Sidebar follow-up and the planned Security workspace are separate workstreams. Each linked plan is the sole owner of task state, dependencies and verification within its scope; this index contains no duplicate task ledger.
 
-That plan is the sole owner of its diagnosis, task state and focused verification. Its initial scope is planning only; implementation and runtime acceptance are recorded there when performed. The [reviewed screenshots](../design-references/sidebar-horizontal-scrollbar/README.md) preserve the reported zero-tab and Products-tab states.
+| Workstream | Scope and status owner | Design/review references |
+|---|---|---|
+| Sidebar navigation | [Sidebar Navigation Horizontal Scrollbar](20261025-001-sidebar-navigation-horizontal-scrollbar.md): the existing bounded diagnosis/fix plan remains in place. | [Reviewed zero-tab and Products-tab screenshots](../design-references/sidebar-horizontal-scrollbar/README.md) |
+| Planned Security workspace | [Security Administration — UI Lab First](20261025-002-security-administration-ui-lab-first.md): UI/behavior design, implementation sequence and the Owner review dependency. | [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) · [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) |
 
-Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the selected plan and [TEST_POLICY](../TEST_POLICY.md). [TEST_STRATEGY](../TEST_STRATEGY.md) owns coverage and [tests/README](../../tests/README.md) owns commands. Continue only work authorized by the Owner; archived tasks and prompts do not supply that authorization.
+The current UI Lab remains Sales-only. The planned Security extension must exercise the actual candidate component in the SQL-free Lab and obtain dated explicit Owner approval at **SEC-T05** before **SEC-T06 Local cutover** or **SEC-T07 SQL integration** begins. This documentation PR and its mockups do not approve that gate or establish implementation/runtime acceptance. Record any future task execution and gate decision only in the plan that owns that scope.
+
+Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the plan for the authorized scope and [TEST_POLICY](../TEST_POLICY.md). [TEST_STRATEGY](../TEST_STRATEGY.md) owns coverage and [tests/README](../../tests/README.md) owns commands. Continue only work authorized by the Owner; archived tasks and prompts do not supply that authorization.
 
 ## Selecting the next roadmap
 
-This is a bounded navigation-layout follow-up after the [2026-10-25 archive boundary](../archive/20261025-pre-next-roadmap/README.md), not a selection of the next broader product roadmap. The plan starts from the inspected current source, confirms the failure on Windows and targets the app-owned control with focused GUI checks.
+These are bounded, separately owned follow-ups after the [2026-10-25 archive boundary](../archive/20261025-pre-next-roadmap/README.md). The Sidebar plan retains its source-based diagnosis and focused Windows verification. The Security plan adds the requested workspace design and UI-Labs-first implementation sequence without replacing Sidebar tasks or activating a broader product/release roadmap.
 
 Do not carry forward unfinished UI-NEXT/SAL acceptance, old integration repeats, release prerequisites or other proposed phases automatically. Any additional selected follow-up must cite the original evidence and define its own scope; archival neither completes nor waives it.
 
-Future scope is selected explicitly by the Owner and recorded in a dated plan based on the then-current source. Point this index to the single execution-status owner. Record decisions needed for this repository in its local [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md) and authorized plan. Historical external proposals or publication status do not add required reading, synchronization, approval or implementation work.
+Future scope is selected explicitly by the Owner and recorded in a dated plan based on the then-current source. Point this index to one execution-status owner for each selected scope. Record decisions needed for this repository in its local [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md) and authorized plan. Historical external proposals or publication status do not add required reading, synchronization, approval or implementation work.
 
 ## Historical plans and acceptance
 

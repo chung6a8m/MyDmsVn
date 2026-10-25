@@ -1,6 +1,6 @@
 # Documentation index — v1a-pro-ui-next
 
-**Updated:** 2026-10-25. The [execution index](plans/README.md) routes to the selected Owner-authorized follow-up after the [latest archive boundary](archive/20261025-pre-next-roadmap/README.md). This index routes readers by responsibility; historical results stay with their original candidates.
+**Updated:** 2026-10-25. The [execution index](plans/README.md) routes the Sidebar follow-up and planned Security workstream after the [latest archive boundary](archive/20261025-pre-next-roadmap/README.md); each plan owns status and verification for its scope. This index routes readers by responsibility; historical results stay with their original candidates.
 
 ## Current work and Codex entry points
 
@@ -8,13 +8,17 @@
 |---|---|
 | [AGENTS.md](../AGENTS.md) | Stable repository instructions and invariants |
 | [AI_CONTEXT.md](../AI_CONTEXT.md) | Source context, historical boundaries and evidence distinctions |
-| [Execution index](plans/README.md) | Current selection state and pointer to the sole plan that owns task status and verification |
+| [Execution index](plans/README.md) | Current workstream routing; one task-status and verification owner per scope |
 | [Development-plan alias](DEVELOPMENT_PLAN.md) | Compatibility entry point to the index; no progress copy |
 | [Test policy](TEST_POLICY.md) | Sole execution policy; focused scope and required safeguards |
 | [Test coverage](TEST_STRATEGY.md) | Required behavior and failure boundaries |
 | [Test commands](../tests/README.md) | Direct projects, SQL ownership and interactive GUI prerequisites |
-| [Sales UI Lab runbook](development/UI_LAB.md) | Developer host, scenarios, reset and focused Lab commands |
-| [Architecture](ARCHITECTURE.md) and [ADRs](adr/README.md) | Local architecture rationale and recorded decisions; authorized task scope stays with the plan selected by the execution index |
+| [Sales UI Lab runbook](development/UI_LAB.md) | Current Sales-only developer host, scenarios, reset and focused Lab commands |
+| [Planned Security UI specification](design/SECURITY_ADMINISTRATION_UI.md) | Target UI and behavior; existing source versus proposed components |
+| [Planned Security UI Labs review](development/SECURITY_UI_LAB_REVIEW.md) | Repeatable scenarios and gate evidence procedure; no duplicate task ledger |
+| [Architecture](ARCHITECTURE.md) and [ADRs](adr/README.md) | Local architecture rationale and recorded decisions; each authorized scope stays with its plan in the execution index |
+
+The [Security plan](plans/20261025-002-security-administration-ui-lab-first.md) requires review of the actual candidate in the SQL-free UI Lab and dated explicit Owner approval at SEC-T05 before SEC-T06 Local cutover or SEC-T07 SQL integration. The current Lab remains Sales-only; this documentation PR and mockups do not approve the planned extension.
 
 ## Product and implementation references
 
