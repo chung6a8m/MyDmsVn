@@ -38,7 +38,7 @@ public sealed class SecurityPermissionCatalogView : UserControl
         Lifecycle.SelectedIndexChanged += (_, _) => Filter();
         foreach (var title in new[] { "Tên quyền", "Mã quyền", "Nhóm", "Trạng thái" }) Keys.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = title, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
         CopyKey.Click += (_, _) => { if (Keys.CurrentRow?.Tag is PermissionCatalogItemDto selected) Clipboard.SetText(selected.Key); };
-        Keys.SelectionChanged += (_, _) =>
+        Keys.CurrentCellChanged += (_, _) =>
         {
             if (Keys.CurrentRow?.Tag is PermissionCatalogItemDto key)
                 Details.Text = key.Key + Environment.NewLine + key.Description + Environment.NewLine + key.Module + " · " + (key.Status == "Active" ? "Đang dùng" : "Ngừng dùng");

@@ -9,7 +9,8 @@ public sealed class SecurityRoleDetailView : UserControl
     public Label Header { get; } = new()
     {
         Dock = DockStyle.Top,
-        Height = 55
+        Height = 55,
+        AutoEllipsis = true
     };
     public TabControl Tabs { get; } = new()
     {

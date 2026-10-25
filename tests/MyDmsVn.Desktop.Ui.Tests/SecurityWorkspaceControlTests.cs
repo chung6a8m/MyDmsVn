@@ -5,6 +5,7 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.Application.Security;
 using MyDmsVn.Desktop.UiLab.Scenarios;
@@ -111,6 +112,19 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Single(Descendants(control.PermissionCatalog, typeof(Button)));
         control.PermissionCatalog.Keys.CurrentCell = control.PermissionCatalog.Keys.Rows[0].Cells[0];
         Assert.Contains("Sales.Receipts.Read", control.PermissionCatalog.Details.Text);
+    });
+    [Fact]
+    public void Unmapped_catalog_key_with_no_description_keeps_its_canonical_name() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
+    {
+        var future = new PermissionCatalogItemDto("Future.Module.Read", "Future", "", "Active");
+        data.Data.Catalog = new PermissionCatalogDto("UI Lab", "future-key", data.Data.Catalog.Items.Concat(new[] { future }).ToArray());
+        Wait(control.ActivateAsync(default));
+        control.Tabs.SelectedIndex = 2;
+        var row = Assert.Single(control.PermissionCatalog.Keys.Rows.Cast<DataGridViewRow>(), item => (string?)item.Cells[1].Value == future.Key);
+        Assert.Equal(future.Key, row.Cells[0].Value);
+        control.PermissionCatalog.Keys.CurrentCell = row.Cells[0];
+        Assert.Contains(future.Key, control.PermissionCatalog.Details.Text);
+        Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
     [Fact]
     public void Dark_role_grants_remain_readable_and_read_only_until_edit() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
