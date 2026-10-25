@@ -164,6 +164,47 @@ namespace MyDmsVn.Desktop.Tests
             finally { BootstrapThemeManager.CurrentTheme = original; }
         }, TimeSpan.FromSeconds(15));
 
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Vertical_scrollbar_threshold_preserves_horizontal_fit_at_fixed_viewport(BootstrapThemeMode mode) => StaTest.Run(_ =>
+        {
+            var original = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                using var guard = new WinFormsTestGuard();
+                var fixedSize = new Size(900, 600);
+                using var form = new Form { ClientSize = fixedSize };
+                using var navigation = new BusinessCompactNavigation { Dock = DockStyle.Left };
+                form.Controls.Add(navigation);
+                form.Show(); Pump();
+                var host = navigation.Controls.OfType<FlowLayoutPanel>().Single();
+                Assert.False(host.VerticalScroll.Visible);
+                AssertHorizontalFit(host);
+
+                for (var index = 0; index < 30 && !host.VerticalScroll.Visible; index++)
+                {
+                    navigation.Items.Add(new BusinessCompactNavigationItem { Text = "Row " + index });
+                    Pump();
+                    Assert.Equal(fixedSize, form.ClientSize);
+                    AssertHorizontalFit(host);
+                }
+                Assert.True(host.VerticalScroll.Visible, "Expected the vertical scrollbar to appear while adding one row at a time.");
+
+                while (navigation.Items.Count > 0 && host.VerticalScroll.Visible)
+                {
+                    navigation.Items.RemoveAt(navigation.Items.Count - 1);
+                    Pump();
+                    Assert.Equal(fixedSize, form.ClientSize);
+                    AssertHorizontalFit(host);
+                }
+                Assert.False(host.VerticalScroll.Visible, "Expected the vertical scrollbar to disappear while removing one row at a time.");
+                Assert.Empty(guard.Exceptions);
+            }
+            finally { BootstrapThemeManager.CurrentTheme = original; }
+        }, TimeSpan.FromSeconds(15));
+
         internal static void AssertHorizontalFit(FlowLayoutPanel host)
         {
             Assert.True(!host.HorizontalScroll.Visible,
