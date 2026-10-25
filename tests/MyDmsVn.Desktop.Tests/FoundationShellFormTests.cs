@@ -129,6 +129,69 @@ namespace MyDmsVn.Desktop.Tests
             }, TimeSpan.FromSeconds(10));
         }
 
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Products_navigation_keeps_sidebar_vertical_only_through_open_close_and_reopen(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using var guard = new WinFormsTestGuard();
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(7, "operator", "Operator"));
+                    var notifications = new DesktopNotificationCenter();
+                    var factory = new RecordingCatalogControlFactory();
+                    using var shell = new FoundationShellForm(new FoundationViewModel(new ReadyApiClient(), notifications),
+                        session, notifications, factory);
+                    shell.Show();
+                    BusinessCompactNavigationTests.Pump();
+                    _output.WriteLine(UiNextNativeScaleObservation.Observe(shell, token));
+                    var host = shell.Navigation.Controls.OfType<FlowLayoutPanel>().Single();
+                    _output.WriteLine($"normal outer={shell.Size}; client={shell.ClientSize}; navigation={shell.Navigation.Bounds}; host={host.ClientSize}; footer={shell.Navigation.SessionArea.Bounds}");
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    shell.Size = new System.Drawing.Size(900, 600);
+                    BusinessCompactNavigationTests.Pump();
+                    _output.WriteLine($"constrained outer={shell.Size}; client={shell.ClientSize}; navigation={shell.Navigation.Bounds}; host={host.ClientSize}; footer={shell.Navigation.SessionArea.Bounds}");
+                    var sidebarWidth = shell.Navigation.Width;
+                    var products = shell.Navigation.Items.Cast<BusinessCompactNavigationItem>()
+                        .Single(item => item.Tag is CatalogKind kind && kind == CatalogKind.Product);
+                    Assert.Empty(shell.Workspace.TabPages);
+                    Assert.True(host.VerticalScroll.Visible);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+
+                    shell.Navigation.SelectedItem = products;
+                    BusinessCompactNavigationTests.Pump();
+                    var first = Assert.Single(shell.Workspace.TabPages.Cast<TabPage>());
+                    Assert.Equal("catalog-product", first.Name);
+                    Assert.Equal(1, factory.CreateCount);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    var duplicate = shell.OpenCatalog(CatalogKind.Product);
+                    Assert.Same(first, duplicate);
+                    Assert.Equal(1, factory.CreateCount);
+                    shell.OpenWorkspace("second", "Second", new Panel(), shell.WorkspaceSessionVersion);
+                    BusinessCompactNavigationTests.Pump();
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    Assert.True(shell.Workspace.RequestTabClose(first));
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.True(first.IsDisposed);
+                    Assert.Null(shell.Navigation.SelectedItem);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    shell.Navigation.SelectedItem = products;
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.Equal(2, factory.CreateCount);
+                    Assert.Equal("catalog-product", shell.Workspace.SelectedTab!.Name);
+                    Assert.Equal(sidebarWidth, shell.Navigation.Width);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    Assert.Empty(guard.Exceptions);
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
+            }, TimeSpan.FromSeconds(25));
+        }
+
         [Fact]
         public void Disposing_shell_twice_after_workspace_cleanup_is_idempotent()
         {
@@ -752,6 +815,17 @@ namespace MyDmsVn.Desktop.Tests
         private sealed class EmptyCatalogControlFactory : ICatalogControlFactory
         {
             public Control Create(CatalogKind kind) => new Panel();
+        }
+
+        private sealed class RecordingCatalogControlFactory : ICatalogControlFactory
+        {
+            public int CreateCount { get; private set; }
+            public Control Create(CatalogKind kind)
+            {
+                Assert.Equal(CatalogKind.Product, kind);
+                CreateCount++;
+                return new Panel();
+            }
         }
 
         private sealed class DirtyCloseContent : Panel, IWorkspaceCloseParticipant
