@@ -57,9 +57,11 @@ public sealed class SecurityRoleDetailView : UserControl
         Controls.Add(identity);
         OpenUser.Click += (_, __) =>
         {
-            if (Members.SelectedItem is SecurityMemberItem member)
+            if (Members.SelectedItem is SecurityMemberItem { CanOpen: true } member)
                 OpenUserRequested?.Invoke(member.Id);
         };
+        Members.SelectedIndexChanged += (_, _) =>
+            OpenUser.Enabled = Members.SelectedItem is SecurityMemberItem { CanOpen: true };
     }
 
     public void Render(SecurityWorkspaceViewModel vm)
@@ -80,24 +82,27 @@ public sealed class SecurityRoleDetailView : UserControl
             {
                 var user = vm.Users.Items.FirstOrDefault(u => u.UserId == id);
                 Members.Items.Add(new SecurityMemberItem(id, user == null ? "#" + id + " — Chi tiết không khả dụng" :
-                    user.DisplayName + " · @" + user.Username + " · " + (user.IsActive ? "Đang hoạt động" : "Ngừng hoạt động")));
+                    user.DisplayName + " · @" + user.Username + " · " + (user.IsActive ? "Đang hoạt động" : "Ngừng hoạt động"),
+                    user != null && vm.Users.IsCurrent(vm.OwnerVersion)));
             }
         }
 
-        OpenUser.Enabled = vm.Users.IsCurrent(vm.OwnerVersion) && role != null;
+        OpenUser.Enabled = Members.SelectedItem is SecurityMemberItem { CanOpen: true };
         Permissions.Visible = HistoryTitle.Visible = Permissions.Items.Count > 0;
     }
 
     sealed class SecurityMemberItem
     {
-        public SecurityMemberItem(int id, string text)
+        public SecurityMemberItem(int id, string text, bool canOpen)
         {
             Id = id;
             Text = text;
+            CanOpen = canOpen;
         }
 
         public int Id { get; }
         public string Text { get; }
+        public bool CanOpen { get; }
         public override string ToString() => Text;
     }
 }

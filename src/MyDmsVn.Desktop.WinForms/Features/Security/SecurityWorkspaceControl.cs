@@ -87,7 +87,8 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         };
         RoleDetail.OpenUserRequested += id =>
         {
-            if (!ViewModel.Users.IsCurrent(ViewModel.OwnerVersion))
+            if (!ViewModel.Users.IsCurrent(ViewModel.OwnerVersion) ||
+                !ViewModel.Users.Items.Any(user => user.UserId == id))
                 return;
             ViewModel.SelectUser(id);
             Tabs.SelectedIndex = 0;

@@ -685,6 +685,21 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Equal(101, control.ViewModel.SelectedUserId);
     });
     [Fact]
+    public void Missing_member_profile_does_not_offer_user_navigation() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        scene.Data.Users.Clear();
+        Wait(control.ActivateAsync(default));
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Members.SelectedIndex = 0;
+
+        Assert.Contains("Chi tiết không khả dụng", control.RoleDetail.Members.GetItemText(control.RoleDetail.Members.SelectedItem));
+        Assert.False(control.RoleDetail.OpenUser.Enabled);
+        control.RoleDetail.OpenUser.PerformClick();
+        Assert.Equal(1, control.Tabs.SelectedIndex);
+        Assert.Null(control.ViewModel.SelectedUserId);
+    });
+    [Fact]
     public void Unknown_data_is_not_presented_as_an_empty_success() => Run(SecurityScenarioId.SEC_L09, (control, data) =>
     {
         Assert.Equal(SecurityDatasetState.Forbidden, control.ViewModel.Catalog.State);
