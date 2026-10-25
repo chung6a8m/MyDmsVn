@@ -117,6 +117,52 @@ public sealed class SecurityNativeAndResetTests
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
+    [Fact]
+    public void Native_keyboard_selects_direct_key_and_tri_state_without_implicit_write() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 0;
+            control.UserDetail.Tabs.SelectedIndex = 3;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var controls = Descendants(control.UserDetail).ToArray();
+            var key = Assert.Single(controls.OfType<ComboBox>(), item => item.AccessibleName == "Quyền riêng");
+            Assert.True(key.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Equal("Sales.Receipts.Read", control.ViewModel.DirectPermissionKey);
+            var deny = Assert.Single(controls.OfType<RadioButton>(), item => item.Text == "Từ chối");
+            Assert.True(deny.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.Equal(false, control.ViewModel.DirectDecision);
+            Assert.True(control.ViewModel.HasDirtyEditor);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            var allow = Assert.Single(controls.OfType<RadioButton>(), item => item.Text == "Cho phép");
+            Assert.True(allow.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.Equal(true, control.ViewModel.DirectDecision);
+            var inherit = Assert.Single(controls.OfType<RadioButton>(), item => item.Text == "Theo vai trò");
+            Assert.True(inherit.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.Null(control.ViewModel.DirectDecision);
+            Assert.False(control.ViewModel.HasDirtyEditor);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
+    public void Native_catalog_navigation_never_dispatches_an_assignment() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 2;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var grid = control.PermissionCatalog.Keys;
+            grid.CurrentCell = grid.Rows[0].Cells[0];
+            Assert.True(grid.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Contains("Sales.Receipts.Write", control.PermissionCatalog.Details.Text);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
     static System.Collections.Generic.IEnumerable<Control> Descendants(Control root)
     {
         foreach (Control child in root.Controls)
