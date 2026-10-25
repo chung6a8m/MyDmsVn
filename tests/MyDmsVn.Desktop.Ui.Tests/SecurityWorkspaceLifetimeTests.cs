@@ -272,6 +272,70 @@ public sealed class SecurityWorkspaceLifetimeTests
         Assert.Contains("Đã lưu", vm.EditingStatus);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Confirmed_save_with_forbidden_required_refresh_scrubs_target_and_keeps_close_blocked(bool role)
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);
+        using var vm = Model(scene);
+        await vm.LoadAsync(default);
+        if (role)
+        {
+            Assert.True(vm.BeginRolePermissions());
+            vm.SetRoleGranted("Sales.Receipts.Post", true);
+            scene.Administration.RolesError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Denied");
+        }
+        else
+        {
+            Assert.True(vm.BeginDirectPermission("Sales.Receipts.Post"));
+            vm.SetDirectDecision(true);
+            scene.Administration.UsersError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Denied");
+        }
+
+        await vm.SaveEditorAsync(default);
+
+        Assert.Equal(SecuritySaveCompletion.Complete, vm.LastSaveOutcome?.Completion);
+        Assert.Equal(SecurityRefreshOutcome.Failed, vm.LastSaveOutcome?.RefreshOutcome);
+        Assert.True(vm.RequiresRecovery);
+        Assert.False(vm.CanNavigate);
+        Assert.False(await vm.ResolveDraftAsync(SecurityDraftResolution.Discard, default));
+        Assert.Contains("Đã lưu, chưa tải lại được", vm.EditingStatus);
+        Assert.Null(vm.RoleDraft);
+        Assert.Null(vm.DirectPermissionKey);
+        Assert.Empty(role ? vm.Roles.Items : vm.Users.Items);
+        Assert.Equal(SecurityDatasetState.Forbidden, role ? vm.Roles.State : vm.Users.State);
+        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        scene.Administration.RolesError = null;
+        scene.Administration.UsersError = null;
+        Assert.True(await vm.ReloadForComparisonAsync(default));
+        Assert.True(vm.ReviewRecoveryAndRebase());
+        Assert.True(vm.CanNavigate);
+        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    }
+
+    [Fact]
+    public async Task Confirmed_profile_mutation_with_forbidden_refresh_keeps_recovery_after_clean_editor_scrub()
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);
+        using var vm = Model(scene);
+        await vm.LoadAsync(default);
+        Assert.True(vm.BeginRolePermissions());
+        var role = vm.SelectedRole!;
+        scene.Administration.RolesError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Denied");
+
+        Assert.False(await vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(
+            SecurityAdministrationTargetDto.Role, SecurityAdministrationOperationDto.Update,
+            role.RoleId, name: role.Name + " changed", expectedRevision: role.AssignmentRevision), default));
+
+        Assert.Null(vm.RoleDraft);
+        Assert.Empty(vm.Roles.Items);
+        Assert.True(vm.RequiresRecovery);
+        Assert.False(vm.CanNavigate);
+        Assert.Contains("Đã lưu, chưa tải lại được", vm.LastMutationFeedback!.Message);
+        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    }
+
     [Fact]
     public async Task Direct_tri_state_does_not_change_committed_projection_before_save()
     {

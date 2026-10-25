@@ -72,7 +72,7 @@ public sealed partial class SecurityWorkspaceViewModel : IDisposable
 
     public Task LoadAsync(CancellationToken token) => !CanNavigate ? Task.CompletedTask : LoadCoreAsync(token);
 
-    async Task LoadCoreAsync(CancellationToken token)
+    async Task LoadCoreAsync(CancellationToken token, bool requiredSaveRefresh = false)
     {
         if (!IsCurrent)
             return;
@@ -106,7 +106,7 @@ public sealed partial class SecurityWorkspaceViewModel : IDisposable
                 {
                     Users = Dataset(r);
                     if (Users.State == SecurityDatasetState.Forbidden)
-                        RevokeTargetData(SecurityAdministrationTargetDto.User);
+                        RevokeTargetData(SecurityAdministrationTargetDto.User, requiredSaveRefresh);
                     else
                         InvalidateCleanEditorForRead(SecurityAdministrationTargetDto.User);
                     if (SelectedUser == null)
@@ -131,7 +131,7 @@ public sealed partial class SecurityWorkspaceViewModel : IDisposable
                 {
                     Roles = Dataset(r);
                     if (Roles.State == SecurityDatasetState.Forbidden)
-                        RevokeTargetData(SecurityAdministrationTargetDto.Role);
+                        RevokeTargetData(SecurityAdministrationTargetDto.Role, requiredSaveRefresh);
                     else
                         InvalidateCleanEditorForRead(SecurityAdministrationTargetDto.Role);
                     if (SelectedRole == null)
@@ -181,6 +181,7 @@ public sealed partial class SecurityWorkspaceViewModel : IDisposable
         ++_generation;
         InvalidateImportPreview();
         CatalogDigest = null;
+        LastMutationFeedback = null;
         ClearEditorForLifetime();
         Users = Empty<SecurityUserDto>();
         Roles = Empty<SecurityRoleDto>();
@@ -197,6 +198,7 @@ public sealed partial class SecurityWorkspaceViewModel : IDisposable
         _disposed = true;
         InvalidateImportPreview();
         CatalogDigest = null;
+        LastMutationFeedback = null;
         ClearEditorForLifetime();
         ++_generation;
         _session.SessionChanged -= SessionChanged;

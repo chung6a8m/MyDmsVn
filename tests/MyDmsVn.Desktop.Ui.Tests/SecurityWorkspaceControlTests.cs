@@ -711,7 +711,8 @@ public sealed class SecurityWorkspaceControlTests
     [InlineData(MyDmsVn.Contracts.ApiStatusCode.Conflict)]
     public void User_create_server_rejection_keeps_safe_fields_and_clears_secret(MyDmsVn.Contracts.ApiStatusCode status) => Run(SecurityScenarioId.SEC_L03, (control, data) =>
     {
-        data.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(status, status == MyDmsVn.Contracts.ApiStatusCode.Conflict ? "Security.RevisionConflict" : "ValidationError", "Check the entered fields."));
+        data.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(status, status == MyDmsVn.Contracts.ApiStatusCode.Conflict ? "Security.RevisionConflict" : "ValidationError", "raw server secret",
+            new[] { new MyDmsVn.Contracts.ApiErrorDetail("PredicateValidator", "raw detail secret", "name") }));
         var create = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Tạo người dùng…");
         ExceptionDispatchInfo? dialogError = null;
         var phase = 0;
@@ -720,7 +721,7 @@ public sealed class SecurityWorkspaceControlTests
         timer.Tick += (_, _) =>
         {
             var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo người dùng");
-            if (dialog == null) return;
+            if (dialog == null) { if (phase == 2) timer.Stop(); return; }
             try
             {
                 if (phase == 0)
@@ -731,11 +732,36 @@ public sealed class SecurityWorkspaceControlTests
                     Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu tạm").Text = "temporary-password";
                     Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu thông tin").PerformClick();
                 }
+                else if (phase == 2)
+                {
+                    if (++ticks > 50) throw new Xunit.Sdk.XunitException("The conflict reload did not close the dialog.");
+                }
                 else if (data.Journal.Entries.Count(entry => entry.Operation == "Security.Mutate") == 1)
                 {
                     Assert.True(dialog.Visible);
                     Assert.Equal("rejected-user", Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên đăng nhập").Text);
                     Assert.Empty(Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu tạm").Text);
+                    var error = Assert.Single(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.AccessibleName == "Lỗi thông tin");
+                    Assert.True(error.Visible);
+                    Assert.NotEmpty(error.Text);
+                    Assert.DoesNotContain("raw", error.Text);
+                    Assert.True(status == MyDmsVn.Contracts.ApiStatusCode.Conflict
+                        ? error.Text.Contains("Xung đột")
+                        : error.Text.Contains("tên"));
+                    if (status == MyDmsVn.Contracts.ApiStatusCode.Conflict)
+                    {
+                        var reload = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Tải lại để đối chiếu");
+                        Assert.True(reload.Visible);
+                        Assert.False(Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu thông tin").Enabled);
+                        reload.PerformClick();
+                        phase = 2;
+                        return;
+                    }
+                    else
+                    {
+                        Assert.True(Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên đăng nhập").Focused);
+                        Assert.True(Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu thông tin").Enabled);
+                    }
                     timer.Stop();
                     dialog.Close();
                 }
@@ -745,9 +771,11 @@ public sealed class SecurityWorkspaceControlTests
         };
         timer.Start();
         create.PerformClick();
+        if (phase == 2 && !System.Windows.Forms.Application.OpenForms.Cast<Form>().Any(form => form.Text == "Tạo người dùng")) timer.Stop();
         Assert.False(timer.Enabled, "The rejected create dialog did not finish within the pumped test window.");
         dialogError?.Throw();
         Assert.DoesNotContain(data.Data.Users, user => user.Username == "rejected-user");
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
     [Fact]
     public void User_create_held_save_rejects_duplicate_submission() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
@@ -854,6 +882,70 @@ public sealed class SecurityWorkspaceControlTests
         dialogError?.Throw();
         Assert.NotNull(secret);
         Assert.Empty(secret!.Text);
+    });
+
+    [Theory]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.BadRequest)]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.Conflict)]
+    public void Password_reset_server_rejection_is_visible_and_never_replays_secret(MyDmsVn.Contracts.ApiStatusCode status) => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        data.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(status,
+            status == MyDmsVn.Contracts.ApiStatusCode.Conflict ? "Security.RevisionConflict" : "ValidationError",
+            "raw server secret", new[] { new MyDmsVn.Contracts.ApiErrorDetail("PredicateValidator", "raw detail secret", "password") }));
+        var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đặt lại mật khẩu…");
+        ExceptionDispatchInfo? dialogError = null;
+        var phase = 0;
+        var ticks = 0;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) { if (phase == 2) timer.Stop(); return; }
+            try
+            {
+                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                if (phase == 0)
+                {
+                    phase = 1;
+                    password.Text = "temporary-password";
+                    Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận").PerformClick();
+                }
+                else if (phase == 2)
+                {
+                    if (++ticks > 50) throw new Xunit.Sdk.XunitException("The conflict reload did not close the password dialog.");
+                }
+                else if (data.Journal.Entries.Count(entry => entry.Operation == "Security.Mutate") == 1)
+                {
+                    var error = Assert.Single(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.AccessibleName == "Lỗi mật khẩu");
+                    Assert.True(error.Visible);
+                    Assert.Contains(status == MyDmsVn.Contracts.ApiStatusCode.Conflict ? "Xung đột" : "mật khẩu", error.Text);
+                    Assert.DoesNotContain("raw", error.Text);
+                    Assert.Empty(password.Text);
+                    Assert.True(dialog.Visible);
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                    if (status == MyDmsVn.Contracts.ApiStatusCode.Conflict)
+                    {
+                        var reload = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Tải lại để đối chiếu");
+                        Assert.True(reload.Visible);
+                        Assert.False(Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận").Enabled);
+                        reload.PerformClick();
+                        phase = 2;
+                        return;
+                    }
+                    else Assert.True(password.Focused);
+                    timer.Stop();
+                    dialog.Close();
+                }
+                else if (++ticks > 50) throw new Xunit.Sdk.XunitException("The rejected password mutation did not reach the fake journal.");
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); timer.Stop(); dialog.Close(); }
+        };
+        timer.Start();
+        reset.PerformClick();
+        if (phase == 2 && !System.Windows.Forms.Application.OpenForms.Cast<Form>().Any(form => form.Text.StartsWith("Đặt lại mật khẩu — "))) timer.Stop();
+        Assert.False(timer.Enabled, "The rejected password dialog did not finish within the pumped test window.");
+        dialogError?.Throw();
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
     [Fact]
     public void Members_open_the_authorized_user_roles_tab() => Run(SecurityScenarioId.SEC_L01, (control, data) =>

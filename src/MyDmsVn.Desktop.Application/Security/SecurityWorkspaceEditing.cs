@@ -9,6 +9,47 @@ namespace MyDmsVn.Desktop.Application.Security;
 
 public enum SecurityDraftResolution { Save, Discard, Stay }
 
+public sealed class SecurityMutationFeedback
+{
+    public SecurityMutationFeedback(ApiStatusCode status, string message, string? field = null)
+    {
+        Status = status;
+        Message = message;
+        Field = field;
+    }
+
+    public ApiStatusCode Status { get; }
+    public string Message { get; }
+    public string? Field { get; }
+
+    public static SecurityMutationFeedback From(ApiError? error)
+    {
+        var field = error?.Details.Select(detail => detail.Field).FirstOrDefault(IsKnownField);
+        var label = field switch
+        {
+            "name" => "tên",
+            "displayName" => "tên hiển thị",
+            "email" => "email",
+            "password" => "mật khẩu",
+            _ => null
+        };
+        var status = error?.Status ?? ApiStatusCode.InternalServerError;
+        var message = status switch
+        {
+            ApiStatusCode.BadRequest => label == null ? "Dữ liệu không hợp lệ. Kiểm tra các trường đã nhập." :
+                "Dữ liệu không hợp lệ. Kiểm tra " + label + ".",
+            ApiStatusCode.Conflict => "Xung đột: dữ liệu đã thay đổi. Tải lại để đối chiếu trước khi nhập lại.",
+            ApiStatusCode.Forbidden => "Không đủ quyền thực hiện thao tác.",
+            ApiStatusCode.Unauthorized => "Phiên đăng nhập đã thay đổi. Đóng hộp thoại và đăng nhập lại.",
+            ApiStatusCode.NotFound => "Đối tượng không còn khả dụng. Tải lại dữ liệu.",
+            _ => "Không lưu được thay đổi. Tải lại dữ liệu trước khi thử tiếp."
+        };
+        return new SecurityMutationFeedback(status, message, field);
+    }
+
+    static bool IsKnownField(string? field) => field is "name" or "displayName" or "email" or "password";
+}
+
 public sealed partial class SecurityWorkspaceViewModel
 {
     public SecurityRolePermissionDraft? RoleDraft { get; private set; }
@@ -33,6 +74,7 @@ public sealed partial class SecurityWorkspaceViewModel
     public SecuritySaveOutcome? LastSaveOutcome { get; private set; }
     public SecurityAdministrationTargetDto? LastSaveTarget { get; private set; }
     public string EditingStatus { get; private set; } = "";
+    public SecurityMutationFeedback? LastMutationFeedback { get; private set; }
 
     public bool BeginRolePermissions()
     {
@@ -105,6 +147,7 @@ public sealed partial class SecurityWorkspaceViewModel
         if (!IsCurrent || !CanNavigate) return false;
         if (request.Target == SecurityAdministrationTargetDto.User && Users.Items.Any(u => u.UserId == request.TargetId && u.IsProtectedAccount)) return false;
         IsBusy = true;
+        LastMutationFeedback = null;
         var editor = _editorId;
         var submittedRevision = EditorRevision;
         EditingStatus = "Đang lưu";
@@ -115,6 +158,7 @@ public sealed partial class SecurityWorkspaceViewModel
             if (!IsCurrent || _editorId != editor) return false;
             if (!response.IsSuccess)
             {
+                LastMutationFeedback = SecurityMutationFeedback.From(response.Error);
                 if (response.Error?.Status == ApiStatusCode.Forbidden)
                     RevokeTargetData(request.Target);
                 else if (response.Error?.Status == ApiStatusCode.Conflict)
@@ -124,7 +168,7 @@ public sealed partial class SecurityWorkspaceViewModel
                 Notify();
                 return false;
             }
-            await LoadCoreAsync(token);
+            await LoadCoreAsync(token, requiredSaveRefresh: true);
             if (!IsCurrent || _editorId != editor) return false;
             if (request.Operation == SecurityAdministrationOperationDto.Create)
             {
@@ -144,11 +188,20 @@ public sealed partial class SecurityWorkspaceViewModel
             RequiresRecovery = !refreshed;
             if (!refreshed) MarkRecovery(request.Target, request.Operation == SecurityAdministrationOperationDto.SetMembership);
             EditingStatus = refreshed ? "Đã lưu" : "Đã lưu, chưa tải lại được";
+            if (!refreshed)
+                LastMutationFeedback = new SecurityMutationFeedback(ApiStatusCode.Conflict,
+                    "Đã lưu, chưa tải lại được. Tải lại để đối chiếu; không gửi lại thao tác.");
             return refreshed;
         }
         catch
         {
-            if (IsCurrent && _editorId == editor) { MarkRecovery(request.Target, request.Operation == SecurityAdministrationOperationDto.SetMembership); EditingStatus = "Cần đối chiếu kết quả"; }
+            if (IsCurrent && _editorId == editor)
+            {
+                MarkRecovery(request.Target, request.Operation == SecurityAdministrationOperationDto.SetMembership);
+                EditingStatus = "Cần đối chiếu kết quả";
+                LastMutationFeedback = new SecurityMutationFeedback(ApiStatusCode.InternalServerError,
+                    "Chưa rõ kết quả. Tải lại để đối chiếu; không gửi lại thao tác.");
+            }
             return false;
         }
         finally
@@ -240,9 +293,9 @@ public sealed partial class SecurityWorkspaceViewModel
         {
             try
             {
-                await LoadCoreAsync(token);
+                await LoadCoreAsync(token, requiredSaveRefresh: true);
                 refreshed = !token.IsCancellationRequested && Catalog.IsCurrent(OwnerVersion) &&
-                    (RoleDraft != null ? Roles.IsCurrent(OwnerVersion) : Users.IsCurrent(OwnerVersion));
+                    (saveTarget == SecurityAdministrationTargetDto.Role ? Roles.IsCurrent(OwnerVersion) : Users.IsCurrent(OwnerVersion));
             }
             catch { refreshed = false; }
             outcome = new SecuritySaveOutcome(outcome.Completion, outcome.StopReason,
@@ -257,7 +310,7 @@ public sealed partial class SecurityWorkspaceViewModel
             LastSaveTarget = saveTarget;
             if (outcome.StopReason == SecuritySaveStopReason.Forbidden)
             {
-                RevokeTargetData(RoleDraft != null ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User);
+                RevokeTargetData(saveTarget);
                 EditingStatus = RecoveryStatus(outcome);
             }
             else if (outcome.StopReason == SecuritySaveStopReason.None)
@@ -272,9 +325,9 @@ public sealed partial class SecurityWorkspaceViewModel
                     _completedEditRevision = submittedRevision;
                     EditingStatus = "Đã lưu";
                 }
-                else { MarkRecovery(RoleDraft != null ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User); EditingStatus = "Đã lưu, chưa tải lại được"; }
+                else { MarkRecovery(saveTarget); EditingStatus = "Đã lưu, chưa tải lại được"; }
             }
-            else { MarkRecovery(RoleDraft != null ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User); EditingStatus = RecoveryStatus(outcome); }
+            else { MarkRecovery(saveTarget); EditingStatus = RecoveryStatus(outcome); }
             Notify();
         }, CancellationToken.None);
     }
@@ -329,12 +382,23 @@ public sealed partial class SecurityWorkspaceViewModel
         _recoveryMarkedGeneration = _generation;
     }
 
-    void RevokeTargetData(SecurityAdministrationTargetDto target)
+    void RevokeTargetData(SecurityAdministrationTargetDto target, bool requiredSaveRefresh = false)
     {
         InvalidateImportPreview();
         if ((target == SecurityAdministrationTargetDto.Role ? RoleDraft != null : DirectPermissionKey != null) ||
             _recoveryTarget == target)
-            ClearEditorForLifetime();
+        {
+            if (requiredSaveRefresh || RequiresRecovery)
+            {
+                // The target is forbidden, but the committed/unknown outcome still needs
+                // an authoritative refresh before ordinary close can be admitted.
+                RoleDraft = null;
+                DirectPermissionKey = null;
+                DirectDecision = _originalDirectDecision = null;
+            }
+            else
+                ClearEditorForLifetime();
+        }
         if (target == SecurityAdministrationTargetDto.User)
         {
             Users = Empty<SecurityUserDto>(SecurityDatasetState.Forbidden);

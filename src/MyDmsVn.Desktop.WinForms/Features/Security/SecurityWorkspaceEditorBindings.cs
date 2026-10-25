@@ -328,8 +328,8 @@ internal sealed class SecurityWorkspaceEditorBindings
         var user = Vm.SelectedUser;
         var role = Vm.SelectedRole;
         if (!create && (userTarget ? user == null || user.IsProtectedAccount : role == null)) return;
-        using var dialog = new Form { Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name), Width = 440, Height = userTarget ? 280 : 180, StartPosition = FormStartPosition.CenterParent };
-        var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        using var dialog = new Form { Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name), Width = 440, Height = userTarget ? 320 : 220, StartPosition = FormStartPosition.CenterParent };
+        var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
         var name = new TextBox { Width = 380, AccessibleName = userTarget ? "Tên đăng nhập" : "Tên vai trò", Text = create ? "" : userTarget ? user!.Username : role!.Name };
         var display = new TextBox { Width = 380, AccessibleName = "Tên hiển thị", Text = create ? "" : user?.DisplayName ?? "" };
         var email = new TextBox { Width = 380, AccessibleName = "Email", Text = create ? "" : user?.Email ?? "" };
@@ -338,11 +338,14 @@ internal sealed class SecurityWorkspaceEditorBindings
         if (userTarget) { fields.Controls.Add(display); fields.Controls.Add(email); if (create) fields.Controls.Add(password); }
         var validation = new Label { AutoSize = true, AccessibleName = "Lỗi thông tin" };
         fields.Controls.Add(validation);
+        var reload = new Button { Text = "Tải lại để đối chiếu", AutoSize = true, Visible = false };
+        fields.Controls.Add(reload);
         var save = new Button { Text = "Lưu thông tin", AutoSize = true };
         var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
         fields.Controls.Add(save); fields.Controls.Add(cancel); dialog.Controls.Add(fields);
         dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
+        reload.Click += async (_, _) => await ReloadDialogAsync(dialog, validation, reload);
         save.Click += async (_, _) =>
         {
             save.Enabled = false;
@@ -380,8 +383,23 @@ internal sealed class SecurityWorkspaceEditorBindings
                     create ? 0 : userTarget ? user!.UserId : role!.RoleId, name: name.Text, displayName: userTarget ? display.Text : null, email: userTarget ? email.Text : null,
                     password: create && userTarget ? password.Text : null, expectedRevision: create ? null : userTarget ? user!.AssignmentRevision : role!.AssignmentRevision), default);
                 if (saved) dialog.Close();
+                else if (!dialog.IsDisposed)
+                {
+                    var feedback = Vm.LastMutationFeedback;
+                    validation.Text = feedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
+                    reload.Visible = Vm.RequiresRecovery;
+                    var field = feedback?.Field switch
+                    {
+                        "name" => name,
+                        "displayName" => display,
+                        "email" => email,
+                        "password" => password,
+                        _ => null
+                    };
+                    ((Control?)field ?? (Vm.RequiresRecovery ? reload : name)).Focus();
+                }
             }
-            finally { password.Clear(); save.Enabled = true; }
+            finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
         };
         dialog.ShowDialog(_control);
         password.Clear();
@@ -390,14 +408,16 @@ internal sealed class SecurityWorkspaceEditorBindings
     async Task PasswordAsync()
     {
         if (!await AdmitAsync() || Vm.SelectedUser is not { IsProtectedAccount: false } user) return;
-        using var dialog = new Form { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 160, StartPosition = FormStartPosition.CenterParent };
+        using var dialog = new Form { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 200, StartPosition = FormStartPosition.CenterParent };
         var password = new TextBox { Dock = DockStyle.Top, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới" };
-        var validation = new Label { Dock = DockStyle.Top, AccessibleName = "Lỗi mật khẩu" };
+        var validation = new Label { Dock = DockStyle.Top, Height = 40, AccessibleName = "Lỗi mật khẩu" };
+        var reload = new Button { Text = "Tải lại để đối chiếu", Dock = DockStyle.Bottom, Visible = false };
         var save = new Button { Text = "Xác nhận", Dock = DockStyle.Bottom };
         var cancel = new Button { Text = "Hủy", Dock = DockStyle.Bottom, DialogResult = DialogResult.Cancel };
-        dialog.Controls.Add(password); dialog.Controls.Add(validation); dialog.Controls.Add(save); dialog.Controls.Add(cancel);
+        dialog.Controls.Add(password); dialog.Controls.Add(validation); dialog.Controls.Add(reload); dialog.Controls.Add(save); dialog.Controls.Add(cancel);
         dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
+        reload.Click += async (_, _) => await ReloadDialogAsync(dialog, validation, reload);
         save.Click += async (_, _) =>
         {
             save.Enabled = false;
@@ -412,11 +432,30 @@ internal sealed class SecurityWorkspaceEditorBindings
                 validation.Text = "";
                 if (await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, user.UserId, password: password.Text, expectedRevision: user.AssignmentRevision), default))
                     dialog.Close();
+                else if (!dialog.IsDisposed)
+                {
+                    validation.Text = Vm.LastMutationFeedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
+                    reload.Visible = Vm.RequiresRecovery;
+                    (Vm.RequiresRecovery ? (Control)reload : password).Focus();
+                }
             }
-            finally { password.Clear(); save.Enabled = true; }
+            finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
         };
         try { dialog.ShowDialog(_control); }
         finally { password.Clear(); }
+    }
+
+    async Task ReloadDialogAsync(Form dialog, Label validation, Button reload)
+    {
+        reload.Enabled = false;
+        try
+        {
+            if (await Vm.ReloadForComparisonAsync(default) && Vm.ReviewRecoveryAndRebase())
+                dialog.Close();
+            else if (!dialog.IsDisposed)
+                validation.Text = "Chưa tải lại được dữ liệu có quyền truy cập. Hãy thử lại hoặc hủy.";
+        }
+        finally { if (!dialog.IsDisposed) reload.Enabled = true; }
     }
 
     async Task ActivationAsync(bool userTarget)
