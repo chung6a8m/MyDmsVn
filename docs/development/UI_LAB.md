@@ -6,7 +6,7 @@ The UI Lab is a separate net48 WinForms development host for the existing `Sales
 
 The host now offers a **Sales / Security** module picker. Security constructs the candidate `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` from the production source assemblies with deterministic fake ports. The [Security UI specification](../design/SECURITY_ADMINISTRATION_UI.md), [review guide](SECURITY_UI_LAB_REVIEW.md) and [implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) define the target, exercises and sole task/gate state. Scenario IDs alone do not establish that their exercises passed.
 
-The candidate remains SQL-free and the production Security factory still creates the legacy control. SEC-T05 requires a dated explicit Owner decision after review of the running candidate; SEC-T06 Local cutover and SEC-T07 SQL integration depend on that approval. Historical Sales Lab passes do not approve Security.
+The Lab candidate remains SQL-free. The Owner approved its reviewed source at SEC-T05 on 2026-10-26, and the production Security factory now creates the same `SecurityWorkspaceControl` through session-bound Local ports. SEC-T06–SEC-T08 results and remaining limits are recorded in the [plan](../plans/20261025-002-security-administration-ui-lab-first.md) and [post-gate evidence](../evidence/security/20261025-security-local-sql.md). Historical Sales Lab passes do not approve Security.
 
 ## Prerequisites and source boundaries
 

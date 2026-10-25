@@ -10,10 +10,8 @@ change runs no GUI or SQL checks and establishes no runtime acceptance.
 
 - Baseline: `v1a-pro-ui-next` at `0216701835cc3326124a94760186989c1ac4f729`; baseline WinFormsKit gitlink: `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Record the actual candidate and gitlinks for every
   review; baseline facts are not candidate evidence.
-- `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` are proposed new types in the existing production WinForms and Desktop.Application assemblies. They do not exist in that baseline. The Lab must
-  construct those actual candidate types, not a sample-only imitation.
-- Keep the production factory on legacy `SecurityAdministrationControl` through the Owner review gate. SEC-T00–SEC-T04 produce the reviewable candidate; SEC-T05 obtains the explicit Owner decision. SEC-T06
-  performs Local cutover only after approval, reusing the reviewed candidate. SEC-T07 owns focused SQL integration; SEC-T08 owns handoff.
+- `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` were proposed relative to that baseline and are now implemented in the production WinForms and Desktop.Application assemblies. The Lab constructs those actual types, not a sample-only imitation.
+- The production factory stayed on the legacy control until the Owner approved SEC-T05 on 2026-10-26. SEC-T06 then cut over to the reviewed candidate; SEC-T07 focused SQL integration and SEC-T08 handoff are recorded in the [plan](../plans/20261025-002-security-administration-ui-lab-first.md) and [post-gate evidence](../evidence/security/20261025-security-local-sql.md).
 - Use interactive Windows, .NET Framework 4.8, the pinned SDK/submodules and a real WinForms message pump. No connection string, SQL instance or real Login is required for this review.
 - New security fakes implement the existing `ISecurityAdministrationApiClient` and `IPermissionCatalogApiClient` ports. Reuse `ScenarioGate<T>`, `ScenarioJournal`, `ScenarioDesktopSession` and the scenario
   assembly's `ScenarioTaskTracker` where appropriate.
@@ -203,10 +201,9 @@ if ($LASTEXITCODE -ne 0) { throw 'UiLab tests failed.' }
 ```
 
 Existing `UiLabResetTests` and `UiLabToolbarReviewTests` are valid preservation selectors. New Security case names/selectors must be verified against implemented source and discovered cases before use.
-Record actual Facts/Theory rows, outcomes and skipped/missing cases; zero discovery or an unexplained skip cannot establish a pass. Keep legacy `SecurityAdministrationViewModelTests`,
-`SecurityControlAcceptanceTests` and `SecurityAdministrationFormTests` in their existing owners and run only the affected scope under [TEST_POLICY](../TEST_POLICY.md).
+Record actual Facts/Theory rows, outcomes and skipped/missing cases; zero discovery or an unexplained skip cannot establish a pass. SEC-T06 retired the duplicate legacy control/view-model and mapped their tests to the candidate owners in the [post-gate evidence](../evidence/security/20261025-security-local-sql.md); `SecurityAdministrationFormTests` now exercises the candidate. Run only the affected scope under [TEST_POLICY](../TEST_POLICY.md).
 
-No Lab result proves Server authorization, SQL transaction behavior, real Login, production wiring or package acceptance. No SQL test or adapter cutover belongs before the Owner UI Labs gate.
+No Lab result alone proves Server authorization, SQL transaction behavior, real Login, production wiring or package acceptance. The Owner gate was approved on 2026-10-26; the later Local/SQL results are recorded separately in the plan and post-gate evidence.
 
 ## Gate evidence template
 

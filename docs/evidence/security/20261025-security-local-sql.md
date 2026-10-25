@@ -1,6 +1,6 @@
 # Security Administration — Local and SQL integration evidence
 
-This record covers the post-gate SEC-T06/SEC-T07 candidate. The [Security plan](../../plans/20261025-002-security-administration-ui-lab-first.md) owns task state and the Owner decision. The Owner approved the SQL-free UI Lab source/test `8804cc181193c96c2cbb0a4626c68faf933627f9` on 2026-10-26, with the incomplete attended matrix retained as a limitation.
+This record covers the post-gate SEC-T06–SEC-T08 candidate. The [Security plan](../../plans/20261025-002-security-administration-ui-lab-first.md) owns task state and the Owner decision. The Owner approved the SQL-free UI Lab source/test `8804cc181193c96c2cbb0a4626c68faf933627f9` on 2026-10-26, with the incomplete attended matrix retained as a limitation.
 
 ## SEC-T06 — session-bound Local cutover, 2026-10-26
 
@@ -35,6 +35,21 @@ The factory type test and shell close test were observed RED against the old pro
 
 No SQL command was run for SEC-T06. This Local cutover does not establish real Login, package, SQL or product acceptance.
 
-## SEC-T07 — focused SQL integration
+## SEC-T07 — focused SQL integration, 2026-10-26
 
-Pending execution on the post-gate Local candidate.
+Source/test `c09feb51ca079ce20b2b45d4fe0ad50c5e0b4908` adds four `SecurityWorkspaceSqlIntegrationTests` against the real session-bound Local port and application SQL fixture. The fourth test was added after the initial three-case SQL run. The effective test connection was verified as explicitly configured, nonproduction, `master`, without AttachDbFilename or User Instance; the value and proprietary identifiers are not recorded. The existing APP reusable fixture ran serially with owned allocation, reset/seed/verify and successful fixture drop. No schema, procedure, transport or vendor pin changed.
+
+| Verification | Actual result | Local raw TRX |
+|---|---|---|
+| Four new Local/SQL methods: serial no-op and revision chain, partial conflict after committed first item, membership revision invalidating a draft, validation envelope without write | 4 discovered/executed, 4 PASS, 0 failed/skipped/not-executed; fixture drop succeeded | `TestResults/sec-t07-final-new/sec-t07-final-new.trx` |
+| Final selected set: four new methods plus five existing Security SQL methods specified by plan section 4 | 9 discovered/executed, 9 PASS, 0 failed/skipped/not-executed; fixture drop succeeded | `TestResults/sec-t07-final-focused/sec-t07-final-focused.trx` |
+| Three directly relevant existing import preview/apply, actor recheck and inactive/stale cases | 3 discovered/executed, 3 PASS, 0 failed/skipped/not-executed; fixture drop succeeded | `TestResults/sec-t07-import-sql/sec-t07-import-sql.trx` |
+| `SecurityAdministrationTests` application authorization and validation selector | 5 discovered/executed, 5 PASS, 0 failed/skipped/not-executed | `TestResults/sec-t07-application/sec-t07-application.trx` |
+
+The serial Save confirmed a no-op first key at revision 0, committed the second at revision 1, and matched final grants and one actor-linked audit. In the interleaved Save, the first key committed, a competing Local command committed at revision 2, the next key conflicted and the third was never attempted; two actor-linked audit events and database grants show that the first transaction was retained. A membership mutation advanced both user and role revisions, created membership and audit, then rejected the old role draft without a permission write. Existing selected SQL cases cover direct Deny precedence, inactive/protected targets, audit-failure rollback for one command, concurrency, and import revision/digest rechecks. The new Local invalid-key response was `BadRequest` / aggregate `ValidationError`, with `PredicateValidator` detail on `permissionKeyValue`; it made no assignment or audit write. The initial test expected the handler code `Security.PermissionKeyInvalid` and failed, establishing the actual validator-before-handler normalization; the corrected assertion passed. No lost-response commit conclusion is inferred from a UI value.
+
+## SEC-T08 — bounded integration handoff, 2026-10-26
+
+Final test-source candidate `a0a906c50ad4795295ea9b4689b50e7d4727a2c9` adds a mounted candidate shell test: clean close disposes the first `SecurityWorkspaceControl`, reopening creates a distinct control, and sign-out disposes the second and prevents another open. `TestResults/sec-t08-shell/sec-t08-shell.trx` reports 2 discovered/executed, 2 PASS. The earlier SEC-T06 full SQL-free Ui.Tests run was 196/196 at physical100; SEC-T05's exact approved SQL-free candidate was 196/196 at physical100 and physical125. Post-gate changes bind Local ports and shell close admission; no candidate rendering/layout change was made. Candidate lifetime tests and bound Local late-response tests cover protected-data clearing; the real SQL envelope test above establishes the error shape consumed by existing candidate error presentation tests. This is a focused integration recheck, not a new attended Lab review.
+
+SEC-UI-01–08 remain tied to the approved candidate source and the [SEC-T05 review record](20261025-security-ui-lab.md); that record traces SEC-L01–SEC-L12 and keeps the complete attended matrix and narrower keyboard/review gaps open. The Owner's High Contrast exception applies to SEC-T04 only. Real Login, installer/package, full product and production-release acceptance were not exercised. Raw TRX and test SQL resources remain local and ignored.
