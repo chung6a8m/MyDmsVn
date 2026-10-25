@@ -21,6 +21,7 @@ public sealed class SecurityMutationJournalEntry
         TargetId = r.TargetId;
         RelatedId = r.RelatedId;
         PermissionKey = r.PermissionKey;
+        Decision = r.Decision;
         ExpectedRevision = r.ExpectedRevision;
         ExpectedRelatedRevision = r.ExpectedRelatedRevision;
     }
@@ -30,8 +31,28 @@ public sealed class SecurityMutationJournalEntry
     public int TargetId { get; }
     public int RelatedId { get; }
     public string? PermissionKey { get; }
+    public bool? Decision { get; }
     public long? ExpectedRevision { get; }
     public long? ExpectedRelatedRevision { get; }
+
+    public override string ToString() => $"{Target}/{Operation} target={TargetId} related={RelatedId} key={PermissionKey ?? "—"} decision={(Operation == SecurityAdministrationOperationDto.SetPermission ? Decision?.ToString().ToLowerInvariant() ?? "null" : "—")} revision={ExpectedRevision?.ToString() ?? "—"} relatedRevision={ExpectedRelatedRevision?.ToString() ?? "—"}";
+}
+
+public sealed class SecurityResponseJournalEntry
+{
+    public SecurityResponseJournalEntry(string outcome, long? assignmentRevision = null, long? relatedRevision = null, int? count = null)
+    {
+        Outcome = outcome;
+        AssignmentRevision = assignmentRevision;
+        RelatedRevision = relatedRevision;
+        Count = count;
+    }
+
+    public string Outcome { get; }
+    public long? AssignmentRevision { get; }
+    public long? RelatedRevision { get; }
+    public int? Count { get; }
+    public override string ToString() => $"outcome={Outcome} count={Count?.ToString() ?? "—"} revision={AssignmentRevision?.ToString() ?? "—"} relatedRevision={RelatedRevision?.ToString() ?? "—"}";
 }
 
 public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministrationApiClient
@@ -112,8 +133,20 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
             return ScenarioErrors.SessionChanged<IReadOnlyList<SecurityUserDto>>();
         token.ThrowIfCancellationRequested();
         journal.Record("Security.Users");
-        var r = UsersGate != null ? await UsersGate.WaitAsync(token) : UsersError != null ? ApiResponse<IReadOnlyList<SecurityUserDto>>.Failure(UsersError) : ApiResponse<IReadOnlyList<SecurityUserDto>>.Success(data.Users.ToArray());
-        return Admitted ? r : ScenarioErrors.SessionChanged<IReadOnlyList<SecurityUserDto>>();
+        var gate = usersGate;
+        usersGate = null;
+        try
+        {
+            var r = gate != null ? await gate.WaitAsync(token) : UsersError != null ? ApiResponse<IReadOnlyList<SecurityUserDto>>.Failure(UsersError) : ApiResponse<IReadOnlyList<SecurityUserDto>>.Success(data.Users.ToArray());
+            r = Admitted ? r : ScenarioErrors.SessionChanged<IReadOnlyList<SecurityUserDto>>();
+            journal.Record("Security.Users.Result", new SecurityResponseJournalEntry(r.IsSuccess ? "Success" : r.Error?.Status.ToString() ?? "Failure", count: r.Data?.Count));
+            return r;
+        }
+        catch (OperationCanceledException)
+        {
+            journal.Record("Security.Users.Result", new SecurityResponseJournalEntry("Canceled"));
+            throw;
+        }
     }
 
     public Task<ApiResponse<IReadOnlyList<SecurityRoleDto>>> ListRolesAsync(CancellationToken token) => tasks.Track(ReadRoles(token));
@@ -123,8 +156,20 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
             return ScenarioErrors.SessionChanged<IReadOnlyList<SecurityRoleDto>>();
         token.ThrowIfCancellationRequested();
         journal.Record("Security.Roles");
-        var r = RolesGate != null ? await RolesGate.WaitAsync(token) : RolesError != null ? ApiResponse<IReadOnlyList<SecurityRoleDto>>.Failure(RolesError) : ApiResponse<IReadOnlyList<SecurityRoleDto>>.Success(data.Roles.ToArray());
-        return Admitted ? r : ScenarioErrors.SessionChanged<IReadOnlyList<SecurityRoleDto>>();
+        var gate = rolesGate;
+        rolesGate = null;
+        try
+        {
+            var r = gate != null ? await gate.WaitAsync(token) : RolesError != null ? ApiResponse<IReadOnlyList<SecurityRoleDto>>.Failure(RolesError) : ApiResponse<IReadOnlyList<SecurityRoleDto>>.Success(data.Roles.ToArray());
+            r = Admitted ? r : ScenarioErrors.SessionChanged<IReadOnlyList<SecurityRoleDto>>();
+            journal.Record("Security.Roles.Result", new SecurityResponseJournalEntry(r.IsSuccess ? "Success" : r.Error?.Status.ToString() ?? "Failure", count: r.Data?.Count));
+            return r;
+        }
+        catch (OperationCanceledException)
+        {
+            journal.Record("Security.Roles.Result", new SecurityResponseJournalEntry("Canceled"));
+            throw;
+        }
     }
 
     public Task<ApiResponse<SecurityAdministrationResultDto>> MutateAsync(SecurityAdministrationMutationRequest request, CancellationToken token)
@@ -138,16 +183,33 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
         nextMutation = null;
         if (gate != null)
             return tasks.Track(CompleteHeld(gate, new SecurityAdministrationMutationRequest(request.Target, request.Operation, request.TargetId, request.RelatedId, request.Name, request.DisplayName, request.Email, request.IsActive, !string.IsNullOrEmpty(request.Password) && Encoding.UTF8.GetByteCount(request.Password!) <= 72 ? "redacted-valid-password" : null, request.PermissionKey, request.Decision, request.ExpectedRevision, request.ExpectedRelatedRevision, request.CorrelationId), token));
-        return Task.FromResult(Mutate(request));
+        var result = Mutate(request);
+        RecordMutationResult(result);
+        return Task.FromResult(result);
     }
 
     async Task<ApiResponse<SecurityAdministrationResultDto>> CompleteHeld(ScenarioGate<ApiResponse<SecurityAdministrationResultDto>> gate, SecurityAdministrationMutationRequest sanitizedRequest, CancellationToken token)
     {
-        var r = await gate.WaitAsync(token);
-        if (r.IsSuccess)
-            r = Mutate(sanitizedRequest);
-        return Admitted ? r : ScenarioErrors.SessionChanged<SecurityAdministrationResultDto>();
+        try
+        {
+            var r = await gate.WaitAsync(token);
+            if (r.IsSuccess)
+                r = Mutate(sanitizedRequest);
+            r = Admitted ? r : ScenarioErrors.SessionChanged<SecurityAdministrationResultDto>();
+            RecordMutationResult(r);
+            return r;
+        }
+        catch (OperationCanceledException)
+        {
+            journal.Record("Security.Mutate.Result", new SecurityResponseJournalEntry("OutcomeUnknown"));
+            throw;
+        }
     }
+
+    void RecordMutationResult(ApiResponse<SecurityAdministrationResultDto> result) =>
+        journal.Record("Security.Mutate.Result", new SecurityResponseJournalEntry(
+            result.IsSuccess ? "Success" : result.Error?.Status.ToString() ?? "Failure",
+            result.Data?.AssignmentRevision, result.Data?.RelatedAssignmentRevision));
 
     static ApiResponse<SecurityAdministrationResultDto> Fail(ApiStatusCode status, string code) => ApiResponse<SecurityAdministrationResultDto>.Failure(new ApiError(status, code, "UI Lab controlled response.", status == ApiStatusCode.BadRequest ? new[] { new ApiErrorDetail("Security.InvalidInput", "The command is invalid.", "request") } : null));
     ApiResponse<SecurityAdministrationResultDto> Mutate(SecurityAdministrationMutationRequest r)

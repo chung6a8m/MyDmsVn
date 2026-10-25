@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Drawing;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyDmsVn.Contracts;
+using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.UiLab.Scenarios;
 using MyDmsVn.Desktop.WinForms;
@@ -33,6 +35,20 @@ internal sealed class UiLabForm : Form
     private readonly Button _applyPermission = new Button { Text = "Apply access", AutoSize = true };
     private readonly Button _holdReload = new Button { Text = "Hold next Reload", AutoSize = true };
     private readonly Button _releaseReload = new Button { Text = "Release Reload", AutoSize = true };
+    private readonly Button _securityReviewToggle = new Button { Text = "Security review tools", AutoSize = true };
+    private readonly FlowLayoutPanel _securityReviewPanel = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 76, WrapContents = true, AutoScroll = true, Padding = new Padding(4), Visible = false };
+    private readonly Panel _toolbarHost = new Panel { Dock = DockStyle.Top, Height = 68 };
+    private readonly ComboBox _securityReadSource = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 90 };
+    private readonly ComboBox _securityReadOutcome = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 95 };
+    private readonly CheckBox _securityHoldRead = new CheckBox { Text = "Hold read", AutoSize = true };
+    private readonly CheckBox _securityIgnoreCancellation = new CheckBox { Text = "Ignore cancel", AutoSize = true };
+    private readonly CheckBox _securityIgnoreOwnerRelease = new CheckBox { Text = "Ignore owner release", AutoSize = true };
+    private readonly Button _securityArmRead = new Button { Text = "Arm read", AutoSize = true };
+    private readonly Button _securityReload = new Button { Text = "Reload Security", AutoSize = true };
+    private readonly Button _securityReleaseRead = new Button { Text = "Release read", AutoSize = true };
+    private readonly ComboBox _securityMutationOutcome = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 115 };
+    private readonly Button _securityArmMutation = new Button { Text = "Arm mutation", AutoSize = true };
+    private readonly Button _securityReleaseMutation = new Button { Text = "Release mutation", AutoSize = true };
     private readonly Label _status = new Label { AutoSize = true, Text = "Starting...", Padding = new Padding(8) };
     private readonly TextBox _journal = new TextBox { ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Bottom, Height = 110 };
     private readonly Panel _workspace = new Panel { Dock = DockStyle.Fill };
@@ -47,6 +63,8 @@ internal sealed class UiLabForm : Form
     private bool _poisoned;
     private ScenarioLookupRace? _race;
     private ScenarioGate<ApiResponse<SalesReceiptDto>>? _reloadGate;
+    private Action? _releaseSecurityRead;
+    private Action? _releaseSecurityMutation;
 
     internal ComboBox ModuleSelector => _module;
     internal SecurityScenario? CurrentSecurityScenarioData => _securityData;
@@ -66,6 +84,19 @@ internal sealed class UiLabForm : Form
     internal Button ApplyAccessButton => _applyPermission;
     internal ComboBox PermissionVariantSelector => _permissionVariant;
     internal string StatusText => _status.Text;
+    internal ComboBox SecurityReadSourceSelector => _securityReadSource;
+    internal ComboBox SecurityReadOutcomeSelector => _securityReadOutcome;
+    internal ComboBox SecurityMutationOutcomeSelector => _securityMutationOutcome;
+    internal CheckBox SecurityHoldReadCheckBox => _securityHoldRead;
+    internal CheckBox SecurityIgnoreCancellationCheckBox => _securityIgnoreCancellation;
+    internal CheckBox SecurityIgnoreOwnerReleaseCheckBox => _securityIgnoreOwnerRelease;
+    internal Button SecurityArmReadButton => _securityArmRead;
+    internal Button SecurityReloadButton => _securityReload;
+    internal Button SecurityReleaseReadButton => _securityReleaseRead;
+    internal Button SecurityArmMutationButton => _securityArmMutation;
+    internal Button SecurityReleaseMutationButton => _securityReleaseMutation;
+    internal Button SecurityReviewToggleButton => _securityReviewToggle;
+    internal string JournalText => _journal.Text;
 
     public UiLabForm() : this(PromptCloseAsync) { }
 
@@ -79,16 +110,28 @@ internal sealed class UiLabForm : Form
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 68, WrapContents = true, Padding = new Padding(6) };
         toolbar.Controls.AddRange(new Control[] { _module, _scenario, _theme, _reset, _closeWorkspace, _replaceSession,
             _failSave, _armRace, _completeB, _completeA, _permissionVariant, _applyPermission,
-            _holdReload, _releaseReload, _status });
+            _holdReload, _releaseReload, _securityReviewToggle, _status });
+        _securityReviewPanel.Controls.AddRange(new Control[] { _securityReadSource, _securityReadOutcome,
+            _securityHoldRead, _securityIgnoreCancellation, _securityIgnoreOwnerRelease,
+            _securityArmRead, _securityReload, _securityReleaseRead, _securityMutationOutcome,
+            _securityArmMutation, _securityReleaseMutation });
+        _toolbarHost.Controls.Add(_securityReviewPanel);
+        _toolbarHost.Controls.Add(toolbar);
         Controls.Add(_workspace);
         Controls.Add(_journal);
-        Controls.Add(toolbar);
+        Controls.Add(_toolbarHost);
         _module.Items.AddRange(new object[] { "Sales", "Security" });
         _module.SelectedIndex = 0;
         _scenario.Items.AddRange(Enum.GetValues(typeof(SalesScenarioId)).Cast<object>().ToArray());
         _scenario.SelectedIndex = 0;
         _permissionVariant.Items.AddRange(new object[] { "Allow all", "Deny Read", "Deny Write", "Deny Post" });
         _permissionVariant.SelectedIndex = 0;
+        _securityReadSource.Items.AddRange(new object[] { "Users", "Roles", "Catalog" });
+        _securityReadSource.SelectedIndex = 0;
+        _securityReadOutcome.Items.AddRange(new object[] { "Success", "Empty", "Forbidden", "Failure" });
+        _securityReadOutcome.SelectedIndex = 0;
+        _securityMutationOutcome.Items.AddRange(new object[] { "Success", "Validation", "Forbidden", "Conflict", "Hold success", "Hold failure", "Uncertain" });
+        _securityMutationOutcome.SelectedIndex = 0;
         _module.SelectedIndexChanged += async (_, __) => { if (_resetting) return; _scenario.Items.Clear(); _scenario.Items.AddRange(Enum.GetValues(_module.SelectedIndex == 1 ? typeof(SecurityScenarioId) : typeof(SalesScenarioId)).Cast<object>().ToArray()); _scenario.SelectedIndex = 0; if (IsHandleCreated) await ResetSafelyAsync(); };
         _theme.Click += (_, __) => BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
         _reset.Click += async (_, __) => await ResetSafelyAsync();
@@ -102,6 +145,12 @@ internal sealed class UiLabForm : Form
         _applyPermission.Click += async (_, __) => await ApplyPermissionAsync();
         _holdReload.Click += (_, __) => ArmBusyReload();
         _releaseReload.Click += (_, __) => ReleaseBusyReload();
+        _securityReviewToggle.Click += (_, __) => ToggleSecurityReview();
+        _securityArmRead.Click += (_, __) => ArmSecurityRead();
+        _securityReload.Click += async (_, __) => await ReloadSecurityAsync();
+        _securityReleaseRead.Click += (_, __) => ReleaseSecurityRead();
+        _securityArmMutation.Click += (_, __) => ArmSecurityMutation();
+        _securityReleaseMutation.Click += (_, __) => ReleaseSecurityMutation();
         _diagnostics.Tick += (_, __) =>
         {
             RefreshDiagnostics();
@@ -119,6 +168,8 @@ internal sealed class UiLabForm : Form
         try
         {
             await TearDownOrPoisonAsync();
+            _releaseSecurityRead = null;
+            _releaseSecurityMutation = null;
             var context = SynchronizationContext.Current as WindowsFormsSynchronizationContext
                 ?? throw new InvalidOperationException("UI Lab requires a running Windows Forms synchronization context.");
             _lifetime = new CancellationTokenSource();
@@ -133,6 +184,8 @@ internal sealed class UiLabForm : Form
                 RefreshDiagnostics();
                 return;
             }
+            _securityReviewPanel.Visible = false;
+            _toolbarHost.Height = 68;
             _data = SalesScenarioData.Create((SalesScenarioId)_scenario.SelectedItem!);
             var ui = new SynchronizationContextUiDispatcher(context);
             var data = _data;
@@ -175,9 +228,14 @@ internal sealed class UiLabForm : Form
                 var pending = _securityControl.LastOperation;
                 if (await Task.WhenAny(pending, Task.Delay(5000)) != pending) throw new TimeoutException("Security workspace did not drain.");
                 try { await pending; } catch (OperationCanceledException) { }
-                _workspace.Controls.Remove(_securityControl); _securityControl.Dispose(); _securityControl = null;
             }
             if (!await _securityData.DrainAsync(5000)) throw new TimeoutException("Security fixture did not drain.");
+            if (_securityControl != null)
+            {
+                _workspace.Controls.Remove(_securityControl);
+                _securityControl.Dispose();
+                _securityControl = null;
+            }
             _securityData = null;
         }
         if (_control != null)
@@ -230,7 +288,13 @@ internal sealed class UiLabForm : Form
 
     private void RefreshDiagnostics()
     {
-        if (_securityData != null) { _journal.Lines = _securityData.Journal.Entries.Select(entry => entry.Sequence + " " + entry.Operation).ToArray(); return; }
+        if (_securityData != null)
+        {
+            _journal.Lines = _securityData.Journal.Entries.Select(entry => entry.Sequence + " " + entry.Operation +
+                (entry.Request is SecurityMutationJournalEntry || entry.Request is SecurityResponseJournalEntry
+                    ? " " + entry.Request : "")).ToArray();
+            return;
+        }
         if (_data == null) { _journal.Clear(); return; }
         _journal.Lines = _data.Journal.Entries.Select(entry => entry.Sequence + " " + entry.Operation).ToArray();
     }
@@ -293,6 +357,143 @@ internal sealed class UiLabForm : Form
         SetCommands(true);
     }
 
+    private void ToggleSecurityReview()
+    {
+        if (_securityData == null) return;
+        _securityReviewPanel.Visible = !_securityReviewPanel.Visible;
+        _toolbarHost.Height = _securityReviewPanel.Visible ? 144 : 68;
+    }
+
+    private static ApiError ReviewError(ApiStatusCode status) => new ApiError(status,
+        status == ApiStatusCode.Conflict ? "Security.RevisionConflict" : status == ApiStatusCode.BadRequest ? "ValidationError" :
+        status == ApiStatusCode.Forbidden ? "Forbidden" : "ReviewFailure", "UI Lab controlled response.");
+
+    private ApiResponse<T> ReviewReadResult<T>(T success, T empty)
+    {
+        return _securityReadOutcome.Text switch
+        {
+            "Empty" => ApiResponse<T>.Success(empty),
+            "Forbidden" => ApiResponse<T>.Failure(ReviewError(ApiStatusCode.Forbidden)),
+            "Failure" => ApiResponse<T>.Failure(ReviewError(ApiStatusCode.InternalServerError)),
+            _ => ApiResponse<T>.Success(success),
+        };
+    }
+
+    private void ArmSecurityRead()
+    {
+        var scene = _securityData;
+        if (scene == null || _releaseSecurityRead != null) return;
+        if (scene.Administration.UsersGate != null || scene.Administration.RolesGate != null || scene.Catalog.Gate != null)
+        {
+            _status.Text = "A Security read is already armed. Reload or Reset before arming another.";
+            return;
+        }
+        bool hold = _securityHoldRead.Checked;
+        bool ignoreCancellation = _securityIgnoreCancellation.Checked;
+        bool ignoreOwnerRelease = _securityIgnoreOwnerRelease.Checked;
+        switch (_securityReadSource.Text)
+        {
+            case "Users":
+            {
+                scene.Administration.UsersError = null;
+                var gate = new ScenarioGate<ApiResponse<IReadOnlyList<SecurityUserDto>>> { IgnoreCancellation = ignoreCancellation, IgnoreOwnerRelease = ignoreOwnerRelease };
+                scene.Administration.UsersGate = gate;
+                var result = ReviewReadResult<IReadOnlyList<SecurityUserDto>>(scene.Data.Users.ToArray(), Array.Empty<SecurityUserDto>());
+                if (hold) _releaseSecurityRead = () => gate.Complete(result);
+                else gate.Complete(result);
+                break;
+            }
+            case "Roles":
+            {
+                scene.Administration.RolesError = null;
+                var gate = new ScenarioGate<ApiResponse<IReadOnlyList<SecurityRoleDto>>> { IgnoreCancellation = ignoreCancellation, IgnoreOwnerRelease = ignoreOwnerRelease };
+                scene.Administration.RolesGate = gate;
+                var result = ReviewReadResult<IReadOnlyList<SecurityRoleDto>>(scene.Data.Roles.ToArray(), Array.Empty<SecurityRoleDto>());
+                if (hold) _releaseSecurityRead = () => gate.Complete(result);
+                else gate.Complete(result);
+                break;
+            }
+            case "Catalog":
+            {
+                scene.Catalog.Error = null;
+                var gate = new ScenarioGate<ApiResponse<PermissionCatalogDto>> { IgnoreCancellation = ignoreCancellation, IgnoreOwnerRelease = ignoreOwnerRelease };
+                scene.Catalog.Gate = gate;
+                var empty = new PermissionCatalogDto(scene.Data.Catalog.ApplicationVersion, "empty-review-catalog", Array.Empty<PermissionCatalogItemDto>());
+                var result = ReviewReadResult(scene.Data.Catalog, empty);
+                if (hold) _releaseSecurityRead = () => gate.Complete(result);
+                else gate.Complete(result);
+                break;
+            }
+        }
+        _status.Text = $"Security {_securityReadSource.Text}: next read {_securityReadOutcome.Text}{(hold ? " held" : "")}.";
+        SetCommands(!_poisoned);
+    }
+
+    private async Task ReloadSecurityAsync()
+    {
+        if (_securityControl == null || _lifetime == null) return;
+        var origin = _securityControl;
+        try
+        {
+            await origin.ActivateAsync(_lifetime.Token);
+            if (!_poisoned && ReferenceEquals(origin, _securityControl)) _status.Text = "Security reload completed.";
+        }
+        catch (OperationCanceledException) { if (!_poisoned && ReferenceEquals(origin, _securityControl)) _status.Text = "Security reload canceled."; }
+        catch (Exception exception) { if (!_poisoned && ReferenceEquals(origin, _securityControl)) _status.Text = "Security reload failed: " + exception.Message; }
+        finally { RefreshDiagnostics(); SetCommands(!_poisoned); }
+    }
+
+    private void ReleaseSecurityRead()
+    {
+        var release = _releaseSecurityRead;
+        if (release == null) return;
+        _releaseSecurityRead = null;
+        release();
+        if (!_poisoned) _status.Text = "Held Security read released.";
+        SetCommands(!_poisoned);
+    }
+
+    private void ArmSecurityMutation()
+    {
+        var scene = _securityData;
+        if (scene == null || _releaseSecurityMutation != null) return;
+        // An explicit reviewer choice replaces the scenario's pending preset response.
+        scene.Administration.MutationErrors.Clear();
+        switch (_securityMutationOutcome.Text)
+        {
+            case "Validation": scene.Administration.MutationErrors.Enqueue(ReviewError(ApiStatusCode.BadRequest)); break;
+            case "Forbidden": scene.Administration.MutationErrors.Enqueue(ReviewError(ApiStatusCode.Forbidden)); break;
+            case "Conflict": scene.Administration.MutationErrors.Enqueue(ReviewError(ApiStatusCode.Conflict)); break;
+            case "Hold success":
+            case "Hold failure":
+            case "Uncertain":
+            {
+                var gate = scene.Administration.HoldNextMutation(_securityIgnoreCancellation.Checked || _securityMutationOutcome.Text == "Uncertain");
+                gate.IgnoreOwnerRelease = _securityMutationOutcome.Text != "Uncertain" && _securityIgnoreOwnerRelease.Checked;
+                _releaseSecurityMutation = _securityMutationOutcome.Text switch
+                {
+                    "Hold failure" => () => gate.Complete(ApiResponse<SecurityAdministrationResultDto>.Failure(ReviewError(ApiStatusCode.Conflict))),
+                    "Uncertain" => () => gate.Cancel(),
+                    _ => () => gate.Complete(ApiResponse<SecurityAdministrationResultDto>.Success(new SecurityAdministrationResultDto(0, true))),
+                };
+                break;
+            }
+            default: scene.Administration.MutationErrors.Enqueue(null); break;
+        }
+        _status.Text = "Security next mutation: " + _securityMutationOutcome.Text + ".";
+        SetCommands(!_poisoned);
+    }
+
+    private void ReleaseSecurityMutation()
+    {
+        var release = _releaseSecurityMutation;
+        if (release == null) return;
+        _releaseSecurityMutation = null;
+        release();
+        if (!_poisoned) _status.Text = "Held Security mutation released.";
+        SetCommands(!_poisoned);
+    }
+
     private void SetCommands(bool enabled)
     {
         _module.Enabled = enabled;
@@ -308,6 +509,13 @@ internal sealed class UiLabForm : Form
         _applyPermission.Enabled = enabled && _control?.CanRefreshPermissions == true;
         _holdReload.Enabled = enabled && _control != null && _reloadGate == null;
         _releaseReload.Enabled = enabled && _reloadGate != null && !_reloadGate.IsCompleted;
+        _securityReviewToggle.Enabled = (enabled || _poisoned) && _securityData != null;
+        _securityReviewPanel.Enabled = _securityData != null && (!_resetting || _poisoned);
+        _securityArmRead.Enabled = enabled && _securityControl != null && _releaseSecurityRead == null;
+        _securityReload.Enabled = enabled && _securityControl != null;
+        _securityReleaseRead.Enabled = _releaseSecurityRead != null;
+        _securityArmMutation.Enabled = enabled && _securityControl != null && _releaseSecurityMutation == null;
+        _securityReleaseMutation.Enabled = _releaseSecurityMutation != null;
     }
 
     private async void OnFormClosing(object? sender, FormClosingEventArgs args)

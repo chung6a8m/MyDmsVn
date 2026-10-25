@@ -1,4 +1,5 @@
 ﻿using System.Threading;
+using System.Linq;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
 using MyDmsVn.Contracts.Security;
@@ -8,6 +9,40 @@ using Xunit;
 namespace MyDmsVn.Desktop.Tests;
 public sealed class SecurityScenarioBehaviorTests
 {
+    [Fact]
+    public void Review_fixture_aliases_have_required_assignments_and_catalog_states()
+    {
+        using var s = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);
+        var active = Assert.Single(s.Data.Users, user => user.UserId == 101);
+        var inactive = Assert.Single(s.Data.Users, user => user.UserId == 102);
+        var protectedUser = Assert.Single(s.Data.Users, user => user.UserId == 103);
+        var activeRole = Assert.Single(s.Data.Roles, role => role.RoleId == 201);
+        var otherRole = Assert.Single(s.Data.Roles, role => role.RoleId == 202);
+        var inactiveRole = Assert.Single(s.Data.Roles, role => role.RoleId == 203);
+
+        Assert.True(active.IsActive);
+        Assert.Equal(2, active.RoleIds.Count);
+        Assert.Contains(active.DirectDecisions, decision => decision.Decision == true);
+        Assert.Contains(active.DirectDecisions, decision => decision.Decision == false);
+        Assert.DoesNotContain(active.DirectDecisions, decision => decision.PermissionKey == "Sales.Receipts.Read");
+        Assert.False(inactive.IsActive);
+        Assert.NotEmpty(inactive.RoleIds);
+        Assert.True(protectedUser.IsProtectedAccount);
+
+        Assert.True(activeRole.IsActive);
+        Assert.True(activeRole.MemberUserIds.Count >= 2);
+        Assert.True(activeRole.PermissionKeys.Count >= 2);
+        Assert.True(otherRole.IsActive);
+        Assert.False(inactiveRole.IsActive);
+        Assert.Contains("Sales.Receipts.Read", inactiveRole.PermissionKeys);
+        Assert.Contains("Inventory.Stock.Audit", inactiveRole.PermissionKeys);
+        Assert.DoesNotContain("Inventory.Stock.Audit", activeRole.PermissionKeys);
+
+        Assert.True(s.Data.Catalog.Items.Select(item => item.Module).Distinct().Count() >= 2);
+        Assert.Contains(s.Data.Catalog.Items, item => item.Key == "Legacy.Deprecated" && item.Status == "Deprecated");
+        Assert.Contains(s.Data.Catalog.Items, item => item.Key == "Inventory.Stock.Export" && item.Status == "Active" && s.Data.Roles.All(role => !role.PermissionKeys.Contains(item.Key)) && s.Data.Users.All(user => user.DirectDecisions.All(decision => decision.PermissionKey != item.Key)));
+    }
+
     [Fact]
     public async Task Independent_reads_preserve_authorized_panes()
     {

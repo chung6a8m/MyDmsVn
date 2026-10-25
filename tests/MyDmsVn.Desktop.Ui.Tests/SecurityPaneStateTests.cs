@@ -30,7 +30,7 @@ public sealed class SecurityPaneStateTests
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
             Assert.Equal(3, control.Roles.Items.Count);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
-            Assert.Equal(4, control.PermissionCatalog.Keys.Rows.Count);
+            Assert.Equal(7, control.PermissionCatalog.Keys.Rows.Count);
             Assert.False(control.ViewModel.BeginDirectPermission("Sales.Receipts.Read"));
             scene.Administration.UsersError = null;
             Wait(control.ActivateAsync(default));
@@ -86,7 +86,7 @@ public sealed class SecurityPaneStateTests
             control.PermissionCatalog.RefreshButton.PerformClick();
             Wait(control.LastOperation);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
-            Assert.Equal(4, control.PermissionCatalog.Keys.Rows.Count);
+            Assert.Equal(7, control.PermissionCatalog.Keys.Rows.Count);
             Assert.Equal(3, control.Users.Items.Count);
             Assert.Equal(3, control.Roles.Items.Count);
         });
@@ -165,7 +165,7 @@ public sealed class SecurityPaneStateTests
             control.ViewModel.DiscardEditor();
             control.ViewModel.SelectRole(203);
             Assert.True(control.ViewModel.BeginRolePermissions());
-            control.ViewModel.SetRoleGranted("Sales.Receipts.Read", true);
+            control.ViewModel.SetRoleGranted("Sales.Receipts.Write", true);
             Assert.True(control.ViewModel.HasDirtyEditor);
             control.ViewModel.DiscardEditor();
             control.ViewModel.SelectUser(103);

@@ -31,6 +31,7 @@ public sealed partial class SecurityWorkspaceViewModel
     public bool HasDirtyEditor => RoleDraft?.IsDirty == true || (DirectPermissionKey != null && DirectDecision != _originalDirectDecision);
     public bool CanNavigate => !IsBusy && !HasDirtyEditor && !RequiresRecovery;
     public SecuritySaveOutcome? LastSaveOutcome { get; private set; }
+    public SecurityAdministrationTargetDto? LastSaveTarget { get; private set; }
     public string EditingStatus { get; private set; } = "";
 
     public bool BeginRolePermissions()
@@ -216,6 +217,7 @@ public sealed partial class SecurityWorkspaceViewModel
         EditingStatus = "Đang lưu";
         Notify();
         var submittedRevision = EditorRevision;
+        var saveTarget = RoleDraft != null ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User;
         SecuritySaveOutcome outcome;
         if (RoleDraft != null)
             outcome = await new SecurityAssignmentSaveCoordinator(_administration,
@@ -251,10 +253,11 @@ public sealed partial class SecurityWorkspaceViewModel
             if (!IsCurrent || _editorId != editor) return;
             IsBusy = false;
             LastSaveOutcome = outcome;
+            LastSaveTarget = saveTarget;
             if (outcome.StopReason == SecuritySaveStopReason.Forbidden)
             {
                 RevokeTargetData(RoleDraft != null ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User);
-                EditingStatus = "Không đủ quyền";
+                EditingStatus = RecoveryStatus(outcome);
             }
             else if (outcome.StopReason == SecuritySaveStopReason.None)
             {
@@ -270,9 +273,30 @@ public sealed partial class SecurityWorkspaceViewModel
                 }
                 else { MarkRecovery(RoleDraft != null ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User); EditingStatus = "Đã lưu, chưa tải lại được"; }
             }
-            else { MarkRecovery(RoleDraft != null ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User); EditingStatus = outcome.StopReason == SecuritySaveStopReason.Conflict ? "Xung đột — tải lại để đối chiếu" : "Cần đối chiếu kết quả"; }
+            else { MarkRecovery(RoleDraft != null ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User); EditingStatus = RecoveryStatus(outcome); }
             Notify();
         }, CancellationToken.None);
+    }
+
+    static string RecoveryStatus(SecuritySaveOutcome outcome)
+    {
+        var stop = outcome.StopReason switch
+        {
+            SecuritySaveStopReason.Forbidden => "Không đủ quyền",
+            SecuritySaveStopReason.Conflict => "xung đột",
+            SecuritySaveStopReason.OutcomeUnknown => "cần đối chiếu kết quả",
+            _ => "cần đối chiếu kết quả"
+        };
+        if (outcome.Completion != SecuritySaveCompletion.Partial)
+            return outcome.StopReason == SecuritySaveStopReason.Conflict ? "Xung đột — tải lại để đối chiếu" : stop;
+        var counts = new[]
+        {
+            outcome.ConfirmedKeys.Count > 0 ? "Đã lưu " + outcome.ConfirmedKeys.Count : null,
+            outcome.RejectedKeys.Count > 0 ? "không lưu " + outcome.RejectedKeys.Count : null,
+            outcome.UncertainKeys.Count > 0 ? "chưa rõ " + outcome.UncertainKeys.Count : null,
+            outcome.UnattemptedKeys.Count > 0 ? "chưa gửi " + outcome.UnattemptedKeys.Count : null
+        };
+        return string.Join("; ", counts.Where(count => count != null)) + " — " + stop;
     }
 
     static SecuritySaveOutcome SingleOutcome(ApiResponse<SecurityAdministrationResultDto> response, string key)

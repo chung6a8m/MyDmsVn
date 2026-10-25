@@ -74,6 +74,66 @@ public sealed class SecurityWorkspaceControlTests
         }
         finally { BootstrapThemeManager.CurrentTheme = theme; }
     });
+
+    [Theory]
+    [InlineData(900, 600, false)]
+    [InlineData(900, 600, true)]
+    [InlineData(1200, 760, false)]
+    [InlineData(1200, 760, true)]
+    public void Partial_save_recovery_actions_fit_at_review_sizes(int width, int height, bool dark) => Run(SecurityScenarioId.SEC_L08, (control, _) =>
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            var form = control.FindForm()!;
+            form.Size = new System.Drawing.Size(width, height);
+            control.Tabs.SelectedIndex = 1;
+            control.ViewModel.BeginRolePermissions();
+            control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+            control.ViewModel.SetRoleGranted("Sales.Receipts.Read", false);
+            control.ViewModel.SetRoleGranted("Sales.Receipts.Write", false);
+            Wait(control.ViewModel.SaveEditorAsync(default));
+            form.PerformLayout();
+            System.Windows.Forms.Application.DoEvents();
+
+            var status = Descendants(control.RoleDetail, typeof(Label)).Cast<Label>()
+                .Single(label => label.Text.StartsWith("Đã lưu 1;", StringComparison.Ordinal));
+            var recovery = status.Parent!;
+            Assert.True(recovery.Visible);
+            Assert.All(recovery.Controls.Cast<Control>().Where(item => item.Visible), item =>
+            {
+                Assert.InRange(item.Right, 1, recovery.ClientSize.Width);
+                Assert.InRange(item.Bottom, 1, recovery.ClientSize.Height);
+            });
+        }
+        finally { BootstrapThemeManager.CurrentTheme = theme; }
+    });
+
+    [Fact]
+    public void Partial_forbidden_notice_remains_visible_after_role_data_is_revoked() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        scene.Administration.MutationErrors.Enqueue(null);
+        scene.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(
+            MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Forbidden", "Review response."));
+        control.ViewModel.BeginRolePermissions();
+        control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+        control.ViewModel.SetRoleGranted("Sales.Receipts.Read", false);
+        control.ViewModel.SetRoleGranted("Sales.Receipts.Write", false);
+        Wait(control.ViewModel.SaveEditorAsync(default));
+        System.Windows.Forms.Application.DoEvents();
+
+        Assert.Equal(SecurityDatasetState.Forbidden, control.ViewModel.Roles.State);
+        Assert.Equal(SecuritySaveCompletion.Partial, control.ViewModel.LastSaveOutcome!.Completion);
+        var notice = Descendants(control.RoleDetail, typeof(Label)).Cast<Label>()
+            .Single(label => label.Text.Contains("Đã lưu 1") && label.Text.Contains("Không đủ quyền"));
+        Assert.True(notice.Visible);
+        Assert.All(notice.Parent!.Controls.OfType<Button>(), button => Assert.False(button.Visible));
+        Wait(control.ViewModel.LoadAsync(default));
+        System.Windows.Forms.Application.DoEvents();
+        Assert.False(notice.Parent.Visible);
+    });
     [Theory]
     [InlineData(900, 600)]
     [InlineData(1200, 760)]
@@ -204,8 +264,8 @@ public sealed class SecurityWorkspaceControlTests
     public void Headers_do_not_duplicate_child_tab_membership() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
     {
         Assert.DoesNotContain("Nhân viên bán hàng", control.UserDetail.Header.Text);
-        Assert.Equal("Vai trò (1)", control.UserDetail.Tabs.TabPages[1].Text);
-        Assert.Equal("Thành viên (1)", control.RoleDetail.Tabs.TabPages[1].Text);
+        Assert.Equal("Vai trò (2)", control.UserDetail.Tabs.TabPages[1].Text);
+        Assert.Equal("Thành viên (2)", control.RoleDetail.Tabs.TabPages[1].Text);
         Assert.DoesNotContain("Thành viên", control.RoleDetail.Header.Text);
     });
     [Fact]
@@ -322,7 +382,7 @@ public sealed class SecurityWorkspaceControlTests
         Until(() => control.ViewModel.RoleDraft?.Changes.Count == 1);
         Assert.Contains("Chưa lưu", grants.GetItemText(grants.Items[index]));
         var search = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(TextBox)).Cast<TextBox>());
-        search.Text = "Read";
+        search.Text = "Receipts.Read";
         Assert.Single(grants.Items);
         Assert.Equal("Sales.Receipts.Read", grants.Items[0]);
         Assert.Single(control.ViewModel.RoleDraft!.Changes);
@@ -630,7 +690,7 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Equal(SecurityDatasetState.Forbidden, control.ViewModel.Catalog.State);
         Assert.Contains("không khả dụng", control.PermissionCatalog.Details.Text);
         Assert.Equal(3, control.Users.Items.Count);
-        Assert.Equal("Vai trò (1)", control.UserDetail.Tabs.TabPages[1].Text);
+        Assert.Equal("Vai trò (2)", control.UserDetail.Tabs.TabPages[1].Text);
     });
     [Fact]
     public void Session_replacement_clears_presentation() => Run(SecurityScenarioId.SEC_L01, (control, data) =>

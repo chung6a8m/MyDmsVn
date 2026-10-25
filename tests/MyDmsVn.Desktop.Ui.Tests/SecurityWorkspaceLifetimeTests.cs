@@ -212,7 +212,7 @@ public sealed class SecurityWorkspaceLifetimeTests
         Assert.Same(draft, vm.RoleDraft);
         Assert.True(await vm.ResolveDraftAsync(SecurityDraftResolution.Discard, default));
         Assert.True(vm.CanNavigate);
-        Assert.DoesNotContain(scene.Journal.Entries, e => e.Operation.Contains("Mutate"));
+        Assert.DoesNotContain(scene.Journal.Entries, e => e.Operation == "Security.Mutate");
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public sealed class SecurityWorkspaceLifetimeTests
         Assert.Null(vm.LastSaveOutcome);
         Assert.Empty(vm.Users.Items);
         Assert.Empty(vm.Roles.Items);
-        Assert.Single(scene.Journal.Entries, e => e.Operation.Contains("Mutate"));
+        Assert.Single(scene.Journal.Entries, e => e.Operation == "Security.Mutate");
     }
 
     [Fact]
@@ -330,14 +330,36 @@ public sealed class SecurityWorkspaceLifetimeTests
         await vm.SaveEditorAsync(default);
         Assert.True(vm.RequiresRecovery);
         var outcome = vm.LastSaveOutcome;
-        var calls = scene.Journal.Entries.Count(e => e.Operation.Contains("Mutate"));
+        var calls = scene.Journal.Entries.Count(e => e.Operation == "Security.Mutate");
         await vm.ReloadForComparisonAsync(default);
-        Assert.Equal(calls, scene.Journal.Entries.Count(e => e.Operation.Contains("Mutate")));
+        Assert.Equal(calls, scene.Journal.Entries.Count(e => e.Operation == "Security.Mutate"));
         Assert.True(vm.RequiresRecovery);
         Assert.True(vm.ReviewRecoveryAndRebase());
         Assert.Same(outcome, vm.LastSaveOutcome);
         Assert.False(vm.RequiresRecovery);
         Assert.Single(vm.RoleDraft!.Changes);
+    }
+
+    [Fact]
+    public async Task Partial_conflict_status_shows_confirmed_rejected_and_unsent_counts()
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L08);
+        using var vm = Model(scene);
+        await vm.LoadAsync(default);
+        vm.BeginRolePermissions();
+        vm.SetRoleGranted("Sales.Receipts.Post", true);
+        vm.SetRoleGranted("Sales.Receipts.Read", false);
+        vm.SetRoleGranted("Sales.Receipts.Write", false);
+
+        await vm.SaveEditorAsync(default);
+
+        Assert.Equal(SecuritySaveCompletion.Partial, vm.LastSaveOutcome!.Completion);
+        Assert.Single(vm.LastSaveOutcome.ConfirmedKeys);
+        Assert.Single(vm.LastSaveOutcome.RejectedKeys);
+        Assert.Single(vm.LastSaveOutcome.UnattemptedKeys);
+        Assert.Contains("Đã lưu 1", vm.EditingStatus);
+        Assert.Contains("chưa gửi 1", vm.EditingStatus);
+        Assert.Contains("xung đột", vm.EditingStatus, StringComparison.CurrentCultureIgnoreCase);
     }
 
     [Fact]
@@ -392,9 +414,9 @@ public sealed class SecurityWorkspaceLifetimeTests
         await saving;
         Assert.Equal(SecuritySaveStopReason.OutcomeUnknown, vm.LastSaveOutcome!.StopReason);
         Assert.Single(vm.LastSaveOutcome.UncertainKeys);
-        var count = scene.Journal.Entries.Count(e => e.Operation.Contains("Mutate"));
+        var count = scene.Journal.Entries.Count(e => e.Operation == "Security.Mutate");
         await vm.ReloadForComparisonAsync(default);
-        Assert.Equal(count, scene.Journal.Entries.Count(e => e.Operation.Contains("Mutate")));
+        Assert.Equal(count, scene.Journal.Entries.Count(e => e.Operation == "Security.Mutate"));
         Assert.Equal(SecuritySaveStopReason.OutcomeUnknown, vm.LastSaveOutcome.StopReason);
         Assert.True(vm.ReviewRecoveryAndRebase());
         Assert.Equal(SecuritySaveStopReason.OutcomeUnknown, vm.LastSaveOutcome.StopReason);

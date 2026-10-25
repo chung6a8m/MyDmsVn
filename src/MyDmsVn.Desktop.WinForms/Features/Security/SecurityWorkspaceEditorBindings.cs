@@ -186,14 +186,19 @@ internal sealed class SecurityWorkspaceEditorBindings
                 action.AccessibleDescription = maintenanceHint;
                 _maintenanceTip.SetToolTip(action, maintenanceHint);
             }
-            var recoveryOwner = Vm.RecoveryTarget == SecurityAdministrationTargetDto.Role
+            var partialForbidden = Vm.LastSaveOutcome?.Completion == SecuritySaveCompletion.Partial &&
+                Vm.LastSaveOutcome.StopReason == SecuritySaveStopReason.Forbidden &&
+                (Vm.LastSaveTarget == SecurityAdministrationTargetDto.Role ? Vm.Roles.State == SecurityDatasetState.Forbidden :
+                    Vm.Users.State == SecurityDatasetState.Forbidden);
+            var recoveryOwner = (Vm.RequiresRecovery ? Vm.RecoveryTarget : Vm.LastSaveTarget) == SecurityAdministrationTargetDto.Role
                 ? (Control)_control.RoleDetail : _control.UserDetail;
             if (_recovery.Parent != recoveryOwner)
             {
                 recoveryOwner.Controls.Add(_recovery);
                 _recovery.BringToFront();
             }
-            _recovery.Visible = Vm.RequiresRecovery;
+            _recovery.Visible = Vm.RequiresRecovery || partialForbidden;
+            foreach (var button in _recovery.Controls.OfType<Button>()) button.Visible = Vm.RequiresRecovery;
             _grantSummary.Text = Vm.RoleDraft == null ? "Chọn Sửa quyền để bắt đầu bản nháp" : Vm.RoleDraft.Changes.Count + " thay đổi chưa lưu trong toàn bộ danh mục";
             var selectedGrant = _grants.SelectedItem as string;
             var role = Vm.SelectedRole;

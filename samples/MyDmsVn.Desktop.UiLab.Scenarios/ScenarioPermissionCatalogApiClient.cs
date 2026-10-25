@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
+using System;
 using MyDmsVn.Contracts;
 using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application;
@@ -50,7 +51,19 @@ public sealed class ScenarioPermissionCatalogApiClient : IPermissionCatalogApiCl
             return ScenarioErrors.SessionChanged<PermissionCatalogDto>();
         token.ThrowIfCancellationRequested();
         journal.Record("Security.Catalog");
-        var result = Gate != null ? await Gate.WaitAsync(token) : Error != null ? ApiResponse<PermissionCatalogDto>.Failure(Error) : ApiResponse<PermissionCatalogDto>.Success(data.Catalog);
-        return session.Version == owner && session.IsAuthenticated ? result : ScenarioErrors.SessionChanged<PermissionCatalogDto>();
+        var next = gate;
+        gate = null;
+        try
+        {
+            var result = next != null ? await next.WaitAsync(token) : Error != null ? ApiResponse<PermissionCatalogDto>.Failure(Error) : ApiResponse<PermissionCatalogDto>.Success(data.Catalog);
+            result = session.Version == owner && session.IsAuthenticated ? result : ScenarioErrors.SessionChanged<PermissionCatalogDto>();
+            journal.Record("Security.Catalog.Result", new SecurityResponseJournalEntry(result.IsSuccess ? "Success" : result.Error?.Status.ToString() ?? "Failure", count: result.Data?.Items.Count));
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            journal.Record("Security.Catalog.Result", new SecurityResponseJournalEntry("Canceled"));
+            throw;
+        }
     }
 }
