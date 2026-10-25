@@ -29,6 +29,12 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly Button _editUser;
     readonly Button _resetPassword;
     readonly Button _changeUserState;
+    readonly Button _editRolePermissions;
+    readonly Button _grantDiscard;
+    readonly Button _grantSave;
+    readonly Button _assignRole;
+    readonly Button _removeRole;
+    readonly Label _membershipHint = new() { AutoSize = true };
     bool _rendering;
     SecurityWorkspaceViewModel Vm => _control.ViewModel;
 
@@ -39,15 +45,15 @@ internal sealed class SecurityWorkspaceEditorBindings
         Add(roleCommands, "Tạo vai trò…", () => IdentityDialogAsync(false, true));
         Add(roleCommands, "Sửa tên…", () => IdentityDialogAsync(false, false));
         Add(roleCommands, "Đổi trạng thái…", () => ActivationAsync(false));
-        Add(roleCommands, "Sửa quyền", () => { Vm.BeginRolePermissions(); return Task.CompletedTask; });
+        _editRolePermissions = Add(roleCommands, "Sửa quyền", () => { Vm.BeginRolePermissions(); return Task.CompletedTask; });
         var grantFilters = Commands();
         grantFilters.Height = 38;
         grantFilters.Controls.AddRange(new Control[] { _grantSearch, _grantModule, _grantedOnly });
         var grantActions = Commands();
         grantActions.Dock = DockStyle.Bottom;
         grantActions.Height = 42;
-        Add(grantActions, "Hủy thay đổi", () => { Vm.DiscardEditor(); return Task.CompletedTask; });
-        Add(grantActions, "Lưu quyền vai trò", () => Vm.SaveEditorAsync(default));
+        _grantDiscard = Add(grantActions, "Hủy thay đổi", () => { Vm.DiscardEditor(); return Task.CompletedTask; });
+        _grantSave = Add(grantActions, "Lưu quyền vai trò", () => Vm.SaveEditorAsync(default));
         control.RoleDetail.GrantArea.Controls.Add(_grants);
         control.RoleDetail.GrantArea.Controls.Add(_grantSummary);
         control.RoleDetail.GrantArea.Controls.Add(grantActions);
@@ -112,26 +118,32 @@ internal sealed class SecurityWorkspaceEditorBindings
             if (!_rendering && radio.Checked) Vm.SetDirectDecision(_inherit.Checked ? null : _allow.Checked);
         };
         var membership = Commands();
-        Add(membership, "Gán vai trò…", async () =>
+        _assignRole = Add(membership, "Gán vai trò…", async () =>
         {
-            if (!await AdmitAsync() || Vm.SelectedUser == null) return;
-            using var dialog = new Form { Text = "Gán vai trò — " + Vm.SelectedUser.DisplayName, Width = 450, Height = 180, StartPosition = FormStartPosition.CenterParent };
+            var userId = Vm.SelectedUserId;
+            if (!CanManageMembership() || !await AdmitAsync() || Vm.SelectedUserId != userId || !CanManageMembership()) return;
+            using var dialog = new Form { Text = "Gán vai trò — " + Vm.SelectedUser!.DisplayName, Width = 450, Height = 180, StartPosition = FormStartPosition.CenterParent };
             var roles = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Name" };
             foreach (var role in Vm.Roles.Items) roles.Items.Add(role);
             var ok = new Button { Text = "Xác nhận gán", Dock = DockStyle.Bottom, DialogResult = DialogResult.OK };
             dialog.Controls.Add(roles); dialog.Controls.Add(ok);
             if (dialog.ShowDialog(control) == DialogResult.OK && roles.SelectedItem is SecurityRoleDto selected) await Vm.SetMembershipAsync(selected.RoleId, true, default);
         });
-        Add(membership, "Gỡ vai trò", async () =>
+        _removeRole = Add(membership, "Gỡ vai trò", async () =>
         {
             var user = Vm.SelectedUser;
             var index = control.UserDetail.Memberships.SelectedIndex;
-            if (user == null || index < 0 || index >= user.RoleIds.Count || !await AdmitAsync()) return;
+            if (!CanManageMembership() || user == null || index < 0 || index >= user.RoleIds.Count || !await AdmitAsync() ||
+                Vm.SelectedUserId != user.UserId || !CanManageMembership()) return;
             var roleId = user.RoleIds[index];
-            var name = Vm.Roles.Items.FirstOrDefault(r => r.RoleId == roleId)?.Name ?? "#" + roleId;
+            var role = Vm.Roles.Items.FirstOrDefault(r => r.RoleId == roleId);
+            if (role == null) return;
+            var name = role.Name;
             if (MessageBox.Show(control, "Gỡ " + name + " khỏi " + user.DisplayName + "?", "Gỡ vai trò", MessageBoxButtons.OKCancel) == DialogResult.OK) await Vm.SetMembershipAsync(roleId, false, default);
         });
+        membership.Controls.Add(_membershipHint);
         control.UserDetail.Tabs.TabPages[1].Controls.Add(membership);
+        control.UserDetail.Memberships.SelectedIndexChanged += (_, _) => RenderMembershipActions();
         var profile = control.UserDetail.HeaderActions;
         _createUser = Add(profile, "Tạo người dùng…", () => IdentityDialogAsync(true, true));
         _editUser = Add(profile, "Sửa thông tin…", () => IdentityDialogAsync(true, false));
@@ -187,6 +199,7 @@ internal sealed class SecurityWorkspaceEditorBindings
                 action.AccessibleDescription = maintenanceHint;
                 _maintenanceTip.SetToolTip(action, maintenanceHint);
             }
+            RenderMembershipActions();
             var partialForbidden = Vm.LastSaveOutcome?.Completion == SecuritySaveCompletion.Partial &&
                 Vm.LastSaveOutcome.StopReason == SecuritySaveStopReason.Forbidden &&
                 (Vm.LastSaveTarget == SecurityAdministrationTargetDto.Role ? Vm.Roles.State == SecurityDatasetState.Forbidden :
@@ -201,6 +214,11 @@ internal sealed class SecurityWorkspaceEditorBindings
             _recovery.Visible = Vm.RequiresRecovery || partialForbidden;
             foreach (var button in _recovery.Controls.OfType<Button>()) button.Visible = Vm.RequiresRecovery;
             _grantSummary.Text = Vm.RoleDraft == null ? "Chọn Sửa quyền để bắt đầu bản nháp" : Vm.RoleDraft.Changes.Count + " thay đổi chưa lưu trong toàn bộ danh mục";
+            var roleEditorAvailable = Vm.IsCurrent && Vm.Roles.IsCurrent(Vm.OwnerVersion) && Vm.Catalog.IsCurrent(Vm.OwnerVersion) &&
+                Vm.SelectedRole != null && !Vm.IsBusy && !Vm.RequiresRecovery;
+            _editRolePermissions.Enabled = roleEditorAvailable && Vm.RoleDraft == null;
+            _grantDiscard.Enabled = roleEditorAvailable && Vm.RoleDraft != null;
+            _grantSave.Enabled = roleEditorAvailable && Vm.RoleDraft?.IsDirty == true;
             var selectedGrant = _grants.SelectedItem as string;
             var role = Vm.SelectedRole;
             var selectedModule = _grantModule.SelectedItem as string;
@@ -243,6 +261,32 @@ internal sealed class SecurityWorkspaceEditorBindings
         finally { _rendering = false; }
     }
 
+    bool CanManageMembership() => Vm.IsCurrent && Vm.Users.IsCurrent(Vm.OwnerVersion) && Vm.Roles.IsCurrent(Vm.OwnerVersion) &&
+        Vm.SelectedUser is { IsProtectedAccount: false } && !Vm.IsBusy && !Vm.RequiresRecovery;
+
+    void RenderMembershipActions()
+    {
+        var user = Vm.SelectedUser;
+        var hint = !Vm.IsCurrent || !Vm.Users.IsCurrent(Vm.OwnerVersion) ? "Người dùng chưa khả dụng." :
+            user == null ? "Chọn người dùng để quản lý vai trò." :
+            user.IsProtectedAccount ? "Tài khoản được bảo vệ — bảo trì bên ngoài màn này." :
+            !Vm.Roles.IsCurrent(Vm.OwnerVersion) ? "Vai trò chưa khả dụng — tải lại dữ liệu trước khi thay đổi." :
+            Vm.IsBusy ? "Đang xử lý thay đổi." :
+            Vm.RequiresRecovery ? "Cần đối chiếu kết quả trước khi thay đổi." : "";
+        var canManage = CanManageMembership();
+        _assignRole.Enabled = canManage;
+        var index = _control.UserDetail.Memberships.SelectedIndex;
+        var canRemove = canManage && index >= 0 && index < user!.RoleIds.Count &&
+            Vm.Roles.Items.Any(role => role.RoleId == user.RoleIds[index]);
+        _removeRole.Enabled = canRemove;
+        _assignRole.AccessibleDescription = hint;
+        _removeRole.AccessibleDescription = canRemove ? "" : hint.Length > 0 ? hint : "Chọn vai trò để gỡ.";
+        _membershipHint.Text = hint;
+        _membershipHint.Visible = hint.Length > 0;
+        _maintenanceTip.SetToolTip(_assignRole, hint);
+        _maintenanceTip.SetToolTip(_removeRole, _removeRole.AccessibleDescription);
+    }
+
     async Task OpenDirectAsync(string key)
     {
         if (!await AdmitAsync()) return;
@@ -267,13 +311,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             "Kết quả dự kiến (chưa lưu): " + SecurityPresentation.Result(preview.Result) + " · " + SecurityPresentation.Source(preview);
     }
 
-    async Task<bool> AdmitAsync()
-    {
-        if (Vm.CanNavigate) return true;
-        if (Vm.IsBusy || Vm.RequiresRecovery) return false;
-        var answer = MessageBox.Show(_control, "Lưu thay đổi trước khi tiếp tục?", "Thay đổi chưa lưu", MessageBoxButtons.YesNoCancel);
-        return await Vm.ResolveDraftAsync(answer == DialogResult.Yes ? SecurityDraftResolution.Save : answer == DialogResult.No ? SecurityDraftResolution.Discard : SecurityDraftResolution.Stay, CancellationToken.None);
-    }
+    Task<bool> AdmitAsync() => _control.AdmitNavigationAsync();
 
     async Task IdentityDialogAsync(bool userTarget, bool create)
     {

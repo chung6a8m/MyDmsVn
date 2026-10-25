@@ -13,10 +13,10 @@ public sealed class SecurityRoleDetailView : UserControl
         AutoEllipsis = true
     };
     public Label HeaderState { get; } = new() { Dock = DockStyle.Top, Height = 25, AutoEllipsis = true };
-    public FlowLayoutPanel HeaderActions { get; } = new() { Dock = DockStyle.Top, Height = 76, AutoScroll = false, WrapContents = true };
+    public FlowLayoutPanel HeaderActions { get; } = new() { Dock = DockStyle.Top, Height = 32, AutoScroll = false, WrapContents = true };
     public Panel GrantArea { get; } = new() { Dock = DockStyle.Fill };
     public Label HistoryTitle { get; } = new() { Dock = DockStyle.Bottom, Height = 22, Text = "Quyền cũ / không còn trong danh mục — chỉ xem" };
-    public TabControl Tabs { get; } = new()
+    public TabControl Tabs { get; } = new BusinessCompactWorkspaceTabs
     {
         Dock = DockStyle.Fill
     };
@@ -50,10 +50,11 @@ public sealed class SecurityRoleDetailView : UserControl
         Tabs.TabPages[1].Controls.Add(Members);
         Tabs.TabPages[1].Controls.Add(OpenUser);
         Controls.Add(Tabs);
-        var identity = new Panel { Dock = DockStyle.Top, Height = 142, Padding = new Padding(10, 5, 10, 4) };
+        var identity = new Panel { Dock = DockStyle.Top, Height = 95, Padding = new Padding(10, 5, 10, 4) };
         identity.Controls.Add(HeaderActions);
         identity.Controls.Add(HeaderState);
         identity.Controls.Add(Header);
+        _ = new SecurityHeaderLayout(identity, HeaderActions);
         Controls.Add(identity);
         OpenUser.Click += (_, __) =>
         {

@@ -13,10 +13,22 @@ using MyDmsVn.Desktop.WinForms;
 using MyDmsVn.Desktop.WinForms.Features.Security;
 using Xunit;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 namespace MyDmsVn.Desktop.Tests;
 public sealed class SecurityWorkspaceControlTests
 {
+    [Fact]
+    public void Security_tabs_use_themed_native_headers_at_every_level() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        foreach (var tabs in new[] { control.Tabs, control.UserDetail.Tabs, control.RoleDetail.Tabs })
+        {
+            var themed = Assert.IsType<BusinessCompactWorkspaceTabs>(tabs);
+            Assert.Equal(TabDrawMode.OwnerDrawFixed, themed.DrawMode);
+            Assert.Equal(BootstrapTabStyle.Underline, themed.TabStyle);
+        }
+    });
+
     [Fact]
     public void Lab_module_selection_mounts_candidate_and_preserves_sales_reset() => Run(SecurityScenarioId.SEC_L01, (_, _) =>
     {
@@ -67,10 +79,12 @@ public sealed class SecurityWorkspaceControlTests
             System.Windows.Forms.Application.DoEvents();
             Assert.InRange(control.Users.Width, 175, 285);
             Assert.True(control.UserDetail.HeaderActions.Controls.Cast<Control>().Last().Right <= control.UserDetail.HeaderActions.ClientSize.Width);
+            AssertHeaderUsesActionRows(control.UserDetail.HeaderActions);
             control.Tabs.SelectedIndex = 1;
             System.Windows.Forms.Application.DoEvents();
             Assert.True(control.RoleDetail.GrantArea.Width > 0);
             Assert.True(control.RoleDetail.HeaderActions.Controls.Cast<Control>().Last().Right <= control.RoleDetail.HeaderActions.ClientSize.Width);
+            AssertHeaderUsesActionRows(control.RoleDetail.HeaderActions);
         }
         finally { BootstrapThemeManager.CurrentTheme = theme; }
     });
@@ -396,6 +410,70 @@ public sealed class SecurityWorkspaceControlTests
         Assert.DoesNotContain(Descendants(control, typeof(FlowLayoutPanel)).Cast<FlowLayoutPanel>(), panel => panel.Visible && panel.Controls.Cast<Control>().OfType<Button>().Any(button => button.Text == "Tải lại để đối chiếu"));
     });
     [Fact]
+    public void Role_grant_actions_follow_draft_and_busy_state() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        var buttons = Descendants(control.RoleDetail.GrantArea, typeof(Button)).Cast<Button>().ToArray();
+        var save = Assert.Single(buttons, button => button.Text == "Lưu quyền vai trò");
+        var discard = Assert.Single(buttons, button => button.Text == "Hủy thay đổi");
+        Assert.False(save.Enabled);
+        Assert.False(discard.Enabled);
+
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        Assert.False(save.Enabled);
+        Assert.True(discard.Enabled);
+        control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+        Assert.True(save.Enabled);
+        var gate = scene.Administration.HoldNextMutation(true);
+        save.PerformClick();
+        Assert.True(control.ViewModel.IsBusy);
+        Assert.False(save.Enabled);
+        Assert.False(discard.Enabled);
+        gate.Complete(MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Success(new SecurityAdministrationResultDto(22, true)));
+        Wait(control.LastOperation);
+        Assert.False(save.Enabled);
+        Assert.False(discard.Enabled);
+
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        control.ViewModel.SetRoleGranted("Inventory.Stock.Read", true);
+        Assert.True(discard.Enabled);
+        discard.PerformClick();
+        Assert.False(save.Enabled);
+        Assert.False(discard.Enabled);
+    });
+
+    [Theory]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.Forbidden)]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.InternalServerError)]
+    public void Membership_actions_disable_when_roles_are_unavailable_or_user_is_protected(MyDmsVn.Contracts.ApiStatusCode unavailable) => Run(SecurityScenarioId.SEC_L04, (control, scene) =>
+    {
+        control.UserDetail.Tabs.SelectedIndex = 1;
+        var buttons = Descendants(control.UserDetail.Tabs.TabPages[1], typeof(Button)).Cast<Button>().ToArray();
+        var assign = Assert.Single(buttons, button => button.Text == "Gán vai trò…");
+        var remove = Assert.Single(buttons, button => button.Text == "Gỡ vai trò");
+        Assert.True(assign.Enabled);
+        Assert.False(remove.Enabled);
+        control.UserDetail.Memberships.SelectedIndex = 0;
+        Assert.True(remove.Enabled);
+
+        control.ViewModel.SelectUser(103);
+        Assert.False(assign.Enabled);
+        Assert.False(remove.Enabled);
+        Assert.Contains("bảo vệ", assign.AccessibleDescription);
+        assign.PerformClick();
+        remove.PerformClick();
+        control.ViewModel.SelectUser(101);
+
+        scene.Administration.RolesError = new MyDmsVn.Contracts.ApiError(unavailable, "RolesUnavailable", "Review response.");
+        Wait(control.ActivateAsync(default));
+        Assert.False(assign.Enabled);
+        Assert.False(remove.Enabled);
+        Assert.Contains("Vai trò", assign.AccessibleDescription);
+        assign.PerformClick();
+        remove.PerformClick();
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+    [Fact]
     public void Role_filter_retains_hidden_draft_and_read_only_orphan() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
     {
         control.Tabs.SelectedIndex = 1;
@@ -711,6 +789,70 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Equal(1, control.UserDetail.Tabs.SelectedIndex);
         Assert.Equal(101, control.ViewModel.SelectedUserId);
     });
+    [Theory]
+    [InlineData(SecurityDraftResolution.Save)]
+    [InlineData(SecurityDraftResolution.Discard)]
+    [InlineData(SecurityDraftResolution.Stay)]
+    public void Member_navigation_resolves_role_draft_before_selecting_requested_user(SecurityDraftResolution resolution) => Run(SecurityScenarioId.SEC_L01, (control, data) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+        control.RoleDetail.Members.SelectedIndex = 1;
+        control.UserSearch.Text = "protected";
+        control.NavigationResolutionOverride = () => resolution;
+
+        control.RoleDetail.OpenUser.PerformClick();
+        Wait(control.LastOperation);
+
+        if (resolution == SecurityDraftResolution.Stay)
+        {
+            Assert.Equal(1, control.Tabs.SelectedIndex);
+            Assert.Equal(101, control.ViewModel.SelectedUserId);
+            Assert.True(control.ViewModel.RoleDraft?.IsDirty);
+            Assert.Equal("protected", control.UserSearch.Text);
+        }
+        else
+        {
+            Assert.Equal(0, control.Tabs.SelectedIndex);
+            Assert.Equal(1, control.UserDetail.Tabs.SelectedIndex);
+            Assert.Equal(102, control.ViewModel.SelectedUserId);
+            Assert.Equal("", control.UserSearch.Text);
+            Assert.Same(control.ViewModel.SelectedUser, control.Users.SelectedItem);
+            Assert.Null(control.ViewModel.RoleDraft);
+        }
+        Assert.Equal(resolution == SecurityDraftResolution.Save ? 1 : 0,
+            data.Journal.Entries.Count(entry => entry.Operation == "Security.Mutate"));
+    });
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Member_navigation_waits_for_role_save_and_keeps_origin_on_failure(bool succeeds) => Run(SecurityScenarioId.SEC_L01, (control, data) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+        control.RoleDetail.Members.SelectedIndex = 1;
+        control.NavigationResolutionOverride = () => SecurityDraftResolution.Save;
+        var gate = data.Administration.HoldNextMutation(true);
+
+        control.RoleDetail.OpenUser.PerformClick();
+        Assert.True(control.ViewModel.IsBusy);
+        Assert.Equal(1, control.Tabs.SelectedIndex);
+        Assert.Equal(101, control.ViewModel.SelectedUserId);
+        Assert.True(control.ViewModel.RoleDraft?.IsDirty);
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+
+        gate.Complete(succeeds
+            ? MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Success(new SecurityAdministrationResultDto(22, true))
+            : MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Failure(new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Conflict, "Conflict", "Review response.")));
+        Wait(control.LastOperation);
+        Assert.Equal(succeeds ? 0 : 1, control.Tabs.SelectedIndex);
+        Assert.Equal(succeeds ? 102 : 101, control.ViewModel.SelectedUserId);
+        Assert.Equal(succeeds ? null : true, control.ViewModel.RoleDraft?.IsDirty);
+    });
     [Fact]
     public void Missing_member_profile_does_not_offer_user_navigation() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
     {
@@ -752,6 +894,16 @@ public sealed class SecurityWorkspaceControlTests
             foreach (var nested in Descendants(child, type))
                 yield return nested;
         }
+    }
+
+    static void AssertHeaderUsesActionRows(FlowLayoutPanel actions)
+    {
+        var identity = actions.Parent!;
+        var buttons = actions.Controls.Cast<Control>().Where(item => item.Visible).ToArray();
+        Assert.NotEmpty(buttons);
+        Assert.All(buttons, button => Assert.True(button.Bottom <= actions.ClientSize.Height));
+        var unused = identity.ClientSize.Height - actions.Top - buttons.Max(button => button.Bottom);
+        Assert.InRange(unused, 0, 16);
     }
 
     internal static void Run(SecurityScenarioId id, Action<SecurityWorkspaceControl, SecurityScenario> action)

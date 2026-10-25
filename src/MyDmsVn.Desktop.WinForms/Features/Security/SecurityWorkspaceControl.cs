@@ -12,7 +12,7 @@ namespace MyDmsVn.Desktop.WinForms.Features.Security;
 public sealed partial class SecurityWorkspaceControl : UserControl, IActivatableDesktopControl
 {
     public SecurityWorkspaceViewModel ViewModel { get; }
-    public TabControl Tabs { get; } = new()
+    public TabControl Tabs { get; } = new BusinessCompactWorkspaceTabs
     {
         Dock = DockStyle.Fill
     };
@@ -85,15 +85,7 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
                 ViewModel.SelectRole(r.RoleId);
             }
         };
-        RoleDetail.OpenUserRequested += id =>
-        {
-            if (!ViewModel.Users.IsCurrent(ViewModel.OwnerVersion) ||
-                !ViewModel.Users.Items.Any(user => user.UserId == id))
-                return;
-            ViewModel.SelectUser(id);
-            Tabs.SelectedIndex = 0;
-            UserDetail.Tabs.SelectedIndex = 1;
-        };
+        RoleDetail.OpenUserRequested += id => TrackOperation(OpenRoleMemberAsync(id));
         UserSearch.TextChanged += (_, _) => FilterMasters();
         RoleSearch.TextChanged += (_, _) => FilterMasters();
         UserActivity.SelectedIndexChanged += (_, _) => FilterMasters();
@@ -125,6 +117,21 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         panel.Controls.Add(search);
         panel.Controls.Add(status);
         return panel;
+    }
+
+    async Task OpenRoleMemberAsync(int id)
+    {
+        var roleId = ViewModel.SelectedRoleId;
+        if (!ViewModel.IsCurrent || !await AdmitNavigationAsync() || IsDisposed || !ViewModel.IsCurrent ||
+            ViewModel.SelectedRoleId != roleId || ViewModel.SelectedRole?.MemberUserIds.Contains(id) != true ||
+            !ViewModel.Users.IsCurrent(ViewModel.OwnerVersion) || !ViewModel.Users.Items.Any(user => user.UserId == id))
+            return;
+        ViewModel.SelectUser(id);
+        if (ViewModel.SelectedUserId != id) return;
+        UserSearch.Clear();
+        UserActivity.SelectedIndex = 0;
+        Tabs.SelectedIndex = 0;
+        UserDetail.Tabs.SelectedIndex = 1;
     }
 
     void FilterMasters()
