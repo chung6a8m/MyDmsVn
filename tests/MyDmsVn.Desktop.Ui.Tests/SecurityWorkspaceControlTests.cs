@@ -185,6 +185,127 @@ public sealed class SecurityWorkspaceControlTests
         dialogError?.Throw();
     });
     [Fact]
+    public void User_create_dialog_accepts_valid_fields_by_native_enter_once() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var create = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Tạo người dùng…");
+        ExceptionDispatchInfo? dialogError = null;
+        TextBox? secret = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo người dùng");
+            if (dialog == null) return;
+            timer.Stop();
+            try
+            {
+                Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên đăng nhập").Text = "keyboard-user";
+                Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên hiển thị").Text = "Keyboard User";
+                secret = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu tạm");
+                secret.Text = "temporary-password";
+                Assert.True(secret.Focus());
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); dialog.Close(); }
+        };
+        timer.Start();
+        create.PerformClick();
+        Assert.False(timer.Enabled, "The create dialog did not open within the pumped test window.");
+        dialogError?.Throw();
+        Assert.NotNull(secret);
+        Assert.Empty(secret!.Text);
+        Assert.Contains(data.Data.Users, user => user.Username == "keyboard-user");
+        Assert.Equal(4, control.Users.Items.Count);
+    });
+    [Theory]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.BadRequest)]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.Conflict)]
+    public void User_create_server_rejection_keeps_safe_fields_and_clears_secret(MyDmsVn.Contracts.ApiStatusCode status) => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        data.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(status, status == MyDmsVn.Contracts.ApiStatusCode.Conflict ? "Security.RevisionConflict" : "ValidationError", "Check the entered fields."));
+        var create = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Tạo người dùng…");
+        ExceptionDispatchInfo? dialogError = null;
+        var phase = 0;
+        var ticks = 0;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo người dùng");
+            if (dialog == null) return;
+            try
+            {
+                if (phase == 0)
+                {
+                    phase = 1;
+                    Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên đăng nhập").Text = "rejected-user";
+                    Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên hiển thị").Text = "Rejected User";
+                    Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu tạm").Text = "temporary-password";
+                    Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu thông tin").PerformClick();
+                }
+                else if (data.Journal.Entries.Count(entry => entry.Operation == "Security.Mutate") == 1)
+                {
+                    Assert.True(dialog.Visible);
+                    Assert.Equal("rejected-user", Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên đăng nhập").Text);
+                    Assert.Empty(Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu tạm").Text);
+                    timer.Stop();
+                    dialog.Close();
+                }
+                else if (++ticks > 50) throw new Xunit.Sdk.XunitException("The rejected mutation did not reach the fake journal.");
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); timer.Stop(); dialog.Close(); }
+        };
+        timer.Start();
+        create.PerformClick();
+        Assert.False(timer.Enabled, "The rejected create dialog did not finish within the pumped test window.");
+        dialogError?.Throw();
+        Assert.DoesNotContain(data.Data.Users, user => user.Username == "rejected-user");
+    });
+    [Fact]
+    public void User_create_held_save_rejects_duplicate_submission() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var gate = data.Administration.HoldNextMutation();
+        var create = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Tạo người dùng…");
+        ExceptionDispatchInfo? dialogError = null;
+        var phase = 0;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo người dùng");
+            if (dialog == null) return;
+            try
+            {
+                var fields = Descendants(dialog, typeof(TextBox)).Cast<TextBox>().ToArray();
+                var secret = Assert.Single(fields, field => field.AccessibleName == "Mật khẩu tạm");
+                if (phase == 0)
+                {
+                    phase = 1;
+                    Assert.Single(fields, field => field.AccessibleName == "Tên đăng nhập").Text = "held-user";
+                    Assert.Single(fields, field => field.AccessibleName == "Tên hiển thị").Text = "Held User";
+                    secret.Text = "temporary-password";
+                    var save = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu thông tin");
+                    save.PerformClick();
+                    Assert.False(save.Enabled);
+                    save.PerformClick();
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                    gate.Complete(MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Failure(new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.BadRequest, "ValidationError", "Rejected.")));
+                }
+                else
+                {
+                    Assert.True(dialog.Visible);
+                    Assert.Empty(secret.Text);
+                    timer.Stop();
+                    dialog.Close();
+                }
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); timer.Stop(); dialog.Close(); }
+        };
+        timer.Start();
+        create.PerformClick();
+        Assert.False(timer.Enabled, "The held create dialog did not finish within the pumped test window.");
+        dialogError?.Throw();
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+    [Fact]
     public void Password_reset_dialog_rejects_invalid_input_before_dispatch() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
     {
         var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đặt lại mật khẩu…");
@@ -215,6 +336,35 @@ public sealed class SecurityWorkspaceControlTests
         reset.PerformClick();
         Assert.False(timer.Enabled, "The password reset dialog did not open within the pumped test window.");
         dialogError?.Throw();
+    });
+    [Fact]
+    public void Password_reset_dialog_accepts_native_enter_once_and_clears_secret() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đặt lại mật khẩu…");
+        ExceptionDispatchInfo? dialogError = null;
+        TextBox? secret = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) return;
+            timer.Stop();
+            try
+            {
+                secret = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                secret.Text = "new-temporary-password";
+                Assert.True(secret.Focus());
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); dialog.Close(); }
+        };
+        timer.Start();
+        reset.PerformClick();
+        Assert.False(timer.Enabled, "The password reset dialog did not open within the pumped test window.");
+        dialogError?.Throw();
+        Assert.NotNull(secret);
+        Assert.Empty(secret!.Text);
     });
     [Fact]
     public void Members_open_the_authorized_user_roles_tab() => Run(SecurityScenarioId.SEC_L01, (control, data) =>

@@ -189,6 +189,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         var save = new Button { Text = "Lưu thông tin", AutoSize = true };
         var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
         fields.Controls.Add(save); fields.Controls.Add(cancel); dialog.Controls.Add(fields);
+        dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
         save.Click += async (_, _) =>
         {
@@ -243,6 +244,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         var save = new Button { Text = "Xác nhận", Dock = DockStyle.Bottom };
         var cancel = new Button { Text = "Hủy", Dock = DockStyle.Bottom, DialogResult = DialogResult.Cancel };
         dialog.Controls.Add(password); dialog.Controls.Add(validation); dialog.Controls.Add(save); dialog.Controls.Add(cancel);
+        dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
         save.Click += async (_, _) =>
         {
