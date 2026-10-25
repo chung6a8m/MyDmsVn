@@ -10,7 +10,7 @@
 
 **Spec:** [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md), [visual references based on the reviewed layouts](../design-references/security-administration/README.md) and [Security UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md). The specification and explicit Owner corrections take precedence over generated image text and illustrative counts.
 
-**Status (2026-10-25):** SEC-T00–SEC-T03 have a SQL-free candidate in an isolated Security worktree. SEC-T04 now has physical native100/native125 evidence, keyboard Tab/Enter/Escape/Space corrections, independent-pane access/empty/reload coverage and bounded Reset poison-timeout evidence. The Owner waived High Contrast testing for SEC-T04 on 2026-10-25; the task remains open for the complete SEC-L01–SEC-L12 review rehearsal and remaining keyboard actions. SEC-T05 is NOT APPROVED; SEC-T06–SEC-T08 remain BLOCKED. The [Sidebar plan](20261025-001-sidebar-navigation-horizontal-scrollbar.md) retains its own scope and state. Exact candidate execution evidence appears in section 1A below; the original planning text and proposed names remain historical until verified there.
+**Status (2026-10-25):** SEC-T00–SEC-T03 have a SQL-free candidate in an isolated Security worktree. SEC-T04 has physical native100/native125 evidence, keyboard Tab/Enter/Escape/Space corrections, independent-pane access/empty/reload coverage and bounded Reset poison-timeout evidence. The Owner waived High Contrast testing for SEC-T04 on 2026-10-25. SEC-T05 is **IN PROGRESS / NOT APPROVED**: the [candidate review evidence](../evidence/security/20261025-security-ui-lab.md) records a corrected SQL-free review candidate, physical100 automation and bounded live observations; final-revision native125, complete attended SEC-L01–SEC-L12 actions and an explicit Owner decision remain open. SEC-T04 review/keyboard gaps remain open as detailed in section 1A. SEC-T06–SEC-T08 remain BLOCKED. The [Sidebar plan](20261025-001-sidebar-navigation-horizontal-scrollbar.md) retains its own scope and state.
 
 **Inspected baseline:** `chung6a8m/MyDmsVn@0216701835cc3326124a94760186989c1ac4f729` on `v1a-pro-ui-next`. WinFormsKit gitlink: `c232a4c09dc0386a5bd8bb484a5c991acae827d5`; nested SourceGrid: `f4e457b43582bf01892f50bdc74aa480531e5944`. Re-read current source, active plans and pins before implementation and record relevant drift.
 
@@ -42,7 +42,7 @@
 | SEC-T02 | Real candidate views and Lab composition | SEC-T00, SEC-T01 | PLANNED / NOT STARTED |
 | SEC-T03 | Editors, serial Save, membership and close/lifetime behavior | SEC-T02 | PLANNED / NOT STARTED |
 | SEC-T04 | Import, access/error states and native-review readiness | SEC-T03 | PLANNED / NOT STARTED |
-| SEC-T05 | Attended UI Labs review and explicit Owner decision | SEC-T00–SEC-T04 | NOT APPROVED / NOT STARTED |
+| SEC-T05 | Attended UI Labs review and explicit Owner decision | SEC-T00–SEC-T04 | IN PROGRESS / NOT APPROVED; evidence linked in section 3 |
 | SEC-T06 | Session-bound Local admission and factory cutover | Approved SEC-T05 | BLOCKED BY SEC-T05 |
 | SEC-T07 | Focused Local/SQL integration and regression evidence | Approved SEC-T05, SEC-T06 | BLOCKED BY SEC-T05 |
 | SEC-T08 | Reconcile bounded acceptance and handoff | SEC-T06, SEC-T07 | BLOCKED BY SEC-T05 |
@@ -262,14 +262,14 @@ All new type, file and test names below are **proposed** until implemented and d
 
 ## 3. Mandatory Owner gate record
 
-**Current decision: NOT APPROVED. Integration is BLOCKED.** The Owner requested this design/plan PR; that request is not approval of an implemented candidate.
+**Current decision: NOT APPROVED. Integration is BLOCKED.** The Owner authorized SEC-T05 execution, but has not approved the running candidate.
 
 | Required field | Current value |
 |---|---|
-| UI Lab candidate/source/test SHA | `09de7efd98cbea977373524861ef4229e6dd00a0`; bounded implementation evidence in section 1A, not an approved reviewed candidate |
-| Evidence record and actual native contexts | Section 1A; current third-review candidate has full Ui.Tests PASS at physical 100% and 125%. High Contrast NOT RUN / OWNER-WAIVED for SEC-T04 only |
+| UI Lab candidate/source/test SHA | `b4968072bff74145571a0ca63f7d97a2e3e1c566`; SQL-free SEC-T05 review candidate, not approved. Earlier T04 source `09de7efd98cbea977373524861ef4229e6dd00a0` remains historical evidence in section 1A. |
+| Evidence record and actual native contexts | [SEC-T05 candidate evidence](../evidence/security/20261025-security-ui-lab.md): final-revision Ui.Tests 179/179 PASS at physical 100% (Light/Dark, minimum/normal); physical 125% for this revision NOT RUN. High Contrast NOT RUN / OWNER-WAIVED for SEC-T04 only. |
 | Evaluated SQL-free Lab and production factory isolation | Nine-project Lab graph excludes Local/Server/SQL; production factory remains legacy and release graph excludes fake/sample dependencies |
-| SEC-L01–SEC-L12 results / blocking findings | Automated behavior mapped in section 1A; full attended matrix and remaining T04 keyboard/review checks OPEN; High Contrast exception recorded in section 1A |
+| SEC-L01–SEC-L12 results / blocking findings | Bounded L01/L05 final-revision live observations and preliminary L02/L08 walkthrough in the SEC-T05 evidence. Fixture richness, review controls, partial-save status and poisoned Reset findings corrected at `b496807`; complete attended matrix, final-revision native125 and remaining T04 keyboard/review checks OPEN. Selecting scenario IDs or a green fake suite does not complete the matrix. |
 | SEC-T04 High Contrast exception | Owner direction dated 2026-10-25: no High Contrast test required for SEC-T04; no test result or SEC-T05 approval inferred |
 | Owner identity and dated decision | Pending — no running-candidate decision |
 | Approved scope / declared exceptions | Pending |
