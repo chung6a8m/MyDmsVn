@@ -91,15 +91,81 @@ public sealed class SecurityWorkspaceControlTests
         System.Windows.Forms.Application.DoEvents();
         control.Tabs.SelectedIndex = 0;
         System.Windows.Forms.Application.DoEvents();
-        Assert.True(control.Users.ClientSize.Width - 20 >= 100, "Master secondary text needs a visible line in the expanded shell.");
+        Console.WriteLine("SHELL_GEOMETRY=" + shell.ClientSize.Width + "x" + shell.ClientSize.Height +
+            ";NAV=" + shell.Navigation.Width + ";MASTER=" + control.Users.Parent!.Width +
+            ";LIST=" + control.Users.Width + ";DETAIL=" + control.UserDetail.Width +
+            ";ACTIONS=" + control.UserDetail.HeaderActions.ClientSize.Width);
+        Assert.InRange(control.Users.Parent!.Width, width == 900 ? 180 : 240, width == 900 ? 220 : 280);
+        Assert.True(control.Users.ClientSize.Width - 20 >= 150, "Master secondary text needs a visible line in the expanded shell.");
         Assert.True(control.Users.ItemHeight >= 69);
         Assert.Contains("lan", control.Users.GetItemText(control.Users.Items[0]));
         AssertActionReachable(control.UserDetail.HeaderActions);
         control.Tabs.SelectedIndex = 1;
         System.Windows.Forms.Application.DoEvents();
-        Assert.True(control.Roles.ClientSize.Width - 20 >= 100);
+        Assert.InRange(control.Roles.Parent!.Width, width == 900 ? 180 : 240, width == 900 ? 220 : 280);
+        Assert.True(control.Roles.ClientSize.Width - 20 >= 150);
         Assert.Contains("thành viên", control.Roles.GetItemText(control.Roles.Items[0]));
         AssertActionReachable(control.RoleDetail.HeaderActions);
+    });
+    [Fact]
+    public void Master_tooltip_scrubs_identity_on_rebind_forbidden_and_session_replacement() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        HoverFirstRow(control.Users);
+        Assert.Contains("lan", TooltipText(control.Users));
+        var original = scene.Data.Users[0];
+        scene.Data.Users[0] = new SecurityUserDto(original.UserId, "replacement", "Người dùng mới", original.Email,
+            original.IsActive, original.AssignmentRevision, original.RoleIds, original.DirectDecisions, original.IsProtectedAccount);
+        Wait(control.ActivateAsync(default));
+        Assert.Equal("", TooltipText(control.Users));
+        HoverFirstRow(control.Users);
+        Assert.Contains("replacement", TooltipText(control.Users));
+        Assert.DoesNotContain("lan", TooltipText(control.Users));
+        scene.Administration.UsersError = new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Denied", "Denied");
+        Wait(control.ActivateAsync(default));
+        Assert.Empty(control.Users.Items);
+        Assert.Equal("", TooltipText(control.Users));
+        Assert.Equal("", control.Users.AccessibleDescription);
+        HoverFirstRow(control.Roles);
+        Assert.NotEmpty(TooltipText(control.Roles));
+        scene.Session.Replace();
+        Assert.Equal("", TooltipText(control.Roles));
+        Assert.Equal("", control.Roles.AccessibleDescription);
+    });
+
+    [Fact]
+    public void Effective_search_matches_friendly_name_without_changing_owner_or_explanation() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        scene.Data.Catalog = new PermissionCatalogDto("UI Lab", "different-description",
+            scene.Data.Catalog.Items.Select(item => item.Key == "Sales.Receipts.Read"
+                ? new PermissionCatalogItemDto(item.Key, item.Module, "Other description", item.Status) : item).ToArray());
+        Wait(control.ActivateAsync(default));
+        var owner = control.ViewModel.SelectedUserId;
+        control.UserDetail.Tabs.SelectedIndex = 2;
+        control.UserDetail.Search.Text = "Xem phiếu bán hàng";
+        var row = Assert.Single(control.UserDetail.Effective.Rows.Cast<DataGridViewRow>());
+        Assert.Equal("Sales.Receipts.Read", row.Tag);
+        Assert.Contains("Sales.Receipts.Read", control.UserDetail.Explanation.Text);
+        Assert.Equal(owner, control.ViewModel.SelectedUserId);
+    });
+
+    [Fact]
+    public void Protected_user_disables_maintenance_actions_but_keeps_create_available() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.ViewModel.SelectUser(103);
+        var actions = control.UserDetail.HeaderActions.Controls.Cast<Control>().OfType<Button>().ToArray();
+        Assert.True(Assert.Single(actions, button => button.Text == "Tạo người dùng…").Enabled);
+        foreach (var name in new[] { "Sửa thông tin…", "Đặt lại mật khẩu…", "Đổi trạng thái…" })
+        {
+            var action = Assert.Single(actions, button => button.Text == name);
+            Assert.False(action.Enabled);
+            Assert.Contains("Tài khoản được bảo vệ", action.AccessibleDescription);
+            action.PerformClick();
+        }
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        control.ViewModel.SelectUser(101);
+        Assert.All(actions.Skip(1), action => Assert.True(action.Enabled));
+        scene.Session.Replace();
+        Assert.All(actions, action => Assert.False(action.Enabled));
     });
     [Fact]
     public void Filters_preserve_selected_owner_and_show_catalog_lifecycle() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
@@ -652,12 +718,26 @@ public sealed class SecurityWorkspaceControlTests
 
     static void AssertActionReachable(FlowLayoutPanel actions)
     {
-        Assert.True(actions.AutoScroll);
-        var last = actions.Controls.Cast<Control>().OfType<Button>().Last();
-        actions.ScrollControlIntoView(last);
-        System.Windows.Forms.Application.DoEvents();
-        Assert.InRange(last.Left, 0, actions.ClientSize.Width);
-        Assert.InRange(last.Right, 1, actions.ClientSize.Width);
+        Assert.False(actions.AutoScroll);
+        Assert.True(actions.WrapContents);
+        foreach (var action in actions.Controls.Cast<Control>().OfType<Button>())
+        {
+            Assert.InRange(action.Left, 0, actions.ClientSize.Width);
+            Assert.InRange(action.Right, 1, actions.ClientSize.Width);
+            Assert.InRange(action.Bottom, 1, actions.ClientSize.Height);
+        }
+    }
+
+    static void HoverFirstRow(ListBox list)
+    {
+        var method = list.GetType().GetMethod("OnMouseMove", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        method.Invoke(list, new object[] { new MouseEventArgs(MouseButtons.None, 0, 5, list.ItemHeight / 2, 0) });
+    }
+
+    static string TooltipText(ListBox list)
+    {
+        var field = list.GetType().GetField("_itemTip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        return ((ToolTip)field.GetValue(list)!).GetToolTip(list);
     }
 
     sealed class UnusedFoundationApi : IFoundationApiClient

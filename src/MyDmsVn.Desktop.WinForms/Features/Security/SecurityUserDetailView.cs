@@ -10,7 +10,7 @@ public sealed class SecurityUserDetailView : UserControl
     public Label Header { get; } = new() { Dock = DockStyle.Top, Height = 27, AutoEllipsis = true };
     public Label HeaderMetadata { get; } = new() { Dock = DockStyle.Top, Height = 23, AutoEllipsis = true };
     public Label HeaderState { get; } = new() { Dock = DockStyle.Top, Height = 24, AutoEllipsis = true };
-    public FlowLayoutPanel HeaderActions { get; } = new() { Dock = DockStyle.Top, Height = 42, AutoScroll = true, WrapContents = false };
+    public FlowLayoutPanel HeaderActions { get; } = new() { Dock = DockStyle.Top, Height = 76, AutoScroll = false, WrapContents = true };
     public TabControl Tabs { get; } = new() { Dock = DockStyle.Fill };
     public ListBox Memberships { get; } = new() { Dock = DockStyle.Fill };
     public DataGridView Effective { get; } = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoGenerateColumns = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false };
@@ -48,7 +48,7 @@ public sealed class SecurityUserDetailView : UserControl
         Tabs.TabPages[2].Controls.Add(filters);
         Tabs.TabPages[3].Controls.Add(DirectDecisions);
         Controls.Add(Tabs);
-        var identity = new Panel { Dock = DockStyle.Top, Height = 120, Padding = new Padding(10, 5, 10, 4) };
+        var identity = new Panel { Dock = DockStyle.Top, Height = 164, Padding = new Padding(10, 5, 10, 4) };
         identity.Controls.Add(HeaderActions);
         identity.Controls.Add(HeaderState);
         identity.Controls.Add(HeaderMetadata);
@@ -139,7 +139,7 @@ public sealed class SecurityUserDetailView : UserControl
         foreach (var key in _viewModel.Catalog.Items)
         {
             if (Module.SelectedIndex > 0 && key.Module != Module.Text) continue;
-            if (Search.Text.Length > 0 && (key.Key + " " + key.Description).IndexOf(Search.Text, StringComparison.CurrentCultureIgnoreCase) < 0) continue;
+            if (Search.Text.Length > 0 && (key.Key + " " + SecurityPresentation.Name(key) + " " + key.Description).IndexOf(Search.Text, StringComparison.CurrentCultureIgnoreCase) < 0) continue;
             var explanation = SecurityPermissionProjection.Evaluate(_viewModel.Snapshot, key.Key);
             var result = ResultText(explanation.Result);
             if (Result.SelectedIndex > 0 && !result.EndsWith(Result.Text, StringComparison.Ordinal)) continue;

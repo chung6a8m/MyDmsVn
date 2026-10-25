@@ -24,6 +24,11 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly Label _status = new() { AutoSize = true };
     readonly Label _directPreview = new() { Dock = DockStyle.Bottom, Height = 58, AutoEllipsis = true };
     readonly FlowLayoutPanel _recovery = Commands();
+    readonly ToolTip _maintenanceTip = new();
+    readonly Button _createUser;
+    readonly Button _editUser;
+    readonly Button _resetPassword;
+    readonly Button _changeUserState;
     bool _rendering;
     SecurityWorkspaceViewModel Vm => _control.ViewModel;
 
@@ -127,10 +132,10 @@ internal sealed class SecurityWorkspaceEditorBindings
         });
         control.UserDetail.Tabs.TabPages[1].Controls.Add(membership);
         var profile = control.UserDetail.HeaderActions;
-        Add(profile, "Tạo người dùng…", () => IdentityDialogAsync(true, true));
-        Add(profile, "Sửa thông tin…", () => IdentityDialogAsync(true, false));
-        Add(profile, "Đặt lại mật khẩu…", () => PasswordAsync());
-        Add(profile, "Đổi trạng thái…", () => ActivationAsync(true));
+        _createUser = Add(profile, "Tạo người dùng…", () => IdentityDialogAsync(true, true));
+        _editUser = Add(profile, "Sửa thông tin…", () => IdentityDialogAsync(true, false));
+        _resetPassword = Add(profile, "Đặt lại mật khẩu…", () => PasswordAsync());
+        _changeUserState = Add(profile, "Đổi trạng thái…", () => ActivationAsync(true));
         _recovery.Dock = DockStyle.Bottom;
         _recovery.Height = 54;
         _recovery.Controls.Add(_status);
@@ -148,7 +153,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         GuardTabs(control.UserDetail.Tabs);
         GuardTabs(control.RoleDetail.Tabs);
         Vm.Changed += Changed;
-        control.Disposed += (_, _) => Vm.Changed -= Changed;
+        control.Disposed += (_, _) => { Vm.Changed -= Changed; _maintenanceTip.Dispose(); };
         Render();
     }
 
@@ -169,6 +174,18 @@ internal sealed class SecurityWorkspaceEditorBindings
         try
         {
             _status.Text = Vm.EditingStatus;
+            var user = Vm.SelectedUser;
+            var usersAvailable = Vm.IsCurrent && Vm.Users.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
+            _createUser.Enabled = usersAvailable;
+            var canMaintainUser = usersAvailable && user is { IsProtectedAccount: false };
+            var maintenanceHint = user?.IsProtectedAccount == true ? "Tài khoản được bảo vệ — bảo trì bên ngoài màn này." :
+                user == null ? "Chọn người dùng để thực hiện." : "";
+            foreach (var action in new[] { _editUser, _resetPassword, _changeUserState })
+            {
+                action.Enabled = canMaintainUser;
+                action.AccessibleDescription = maintenanceHint;
+                _maintenanceTip.SetToolTip(action, maintenanceHint);
+            }
             var recoveryOwner = Vm.RecoveryTarget == SecurityAdministrationTargetDto.Role
                 ? (Control)_control.RoleDetail : _control.UserDetail;
             if (_recovery.Parent != recoveryOwner)
@@ -363,11 +380,12 @@ internal sealed class SecurityWorkspaceEditorBindings
     }
 
     static FlowLayoutPanel Commands() => new() { Dock = DockStyle.Top, Height = 70, AutoScroll = true, WrapContents = true };
-    void Add(FlowLayoutPanel panel, string text, Func<Task> action)
+    Button Add(FlowLayoutPanel panel, string text, Func<Task> action)
     {
         var button = new Button { Text = text, AutoSize = true };
         panel.Controls.Add(button);
         button.Click += async (_, _) => await _control.TrackOperation(action());
+        return button;
     }
 }
 

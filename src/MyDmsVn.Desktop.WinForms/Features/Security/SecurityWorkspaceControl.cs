@@ -132,6 +132,8 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         _rendering = true;
         try
         {
+            (Users as SecurityMasterListBox)?.ClearHoverDescription();
+            (Roles as SecurityMasterListBox)?.ClearHoverDescription();
             Users.Items.Clear();
             Roles.Items.Clear();
             foreach (var user in ViewModel.Users.Items.Where(user => (UserActivity.SelectedIndex < 1 || user.IsActive == (UserActivity.SelectedIndex == 1)) && (user.DisplayName + " " + user.Username).IndexOf(UserSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0)) Users.Items.Add(user);
@@ -150,8 +152,10 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
             ColumnCount = 2,
             RowCount = 1
         };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 23));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 77));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 196));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.SizeChanged += (_, _) =>
+            layout.ColumnStyles[0].Width = Math.Max(196, Math.Min(280, (int)Math.Round(layout.ClientSize.Width * 0.27)));
         layout.Controls.Add(list, 0, 0);
         layout.Controls.Add(detail, 1, 0);
         page.Controls.Add(layout);

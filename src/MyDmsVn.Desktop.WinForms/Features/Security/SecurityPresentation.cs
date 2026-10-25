@@ -55,6 +55,7 @@ internal sealed class SecurityMasterListBox : ListBox
 {
     readonly ToolTip _itemTip = new();
     int _tipIndex = -1;
+    string _tipText = "";
 
     internal SecurityMasterListBox()
     {
@@ -67,21 +68,36 @@ internal sealed class SecurityMasterListBox : ListBox
     {
         base.OnMouseMove(e);
         var index = IndexFromPoint(e.Location);
-        if (index == _tipIndex) return;
+        var tooltip = index < 0 || index >= Items.Count ? "" : FullText(Items[index]);
+        if (index == _tipIndex && string.Equals(tooltip, _tipText, StringComparison.Ordinal)) return;
         _tipIndex = index;
-        _itemTip.SetToolTip(this, index < 0 || index >= Items.Count ? "" : FullText(Items[index]));
+        _tipText = tooltip;
+        AccessibleDescription = tooltip;
+        _itemTip.SetToolTip(this, tooltip);
     }
 
     protected override void OnMouseLeave(EventArgs e)
     {
-        _tipIndex = -1;
-        _itemTip.SetToolTip(this, "");
+        ClearHoverDescription();
         base.OnMouseLeave(e);
+    }
+
+    internal void ClearHoverDescription()
+    {
+        _tipIndex = -1;
+        _tipText = "";
+        AccessibleDescription = "";
+        _itemTip.Hide(this);
+        _itemTip.SetToolTip(this, "");
     }
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _itemTip.Dispose();
+        if (disposing)
+        {
+            ClearHoverDescription();
+            _itemTip.Dispose();
+        }
         base.Dispose(disposing);
     }
 
