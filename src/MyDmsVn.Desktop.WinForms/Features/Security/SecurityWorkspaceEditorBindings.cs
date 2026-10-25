@@ -130,11 +130,17 @@ internal sealed class SecurityWorkspaceEditorBindings
         {
             var userId = Vm.SelectedUserId;
             if (!CanManageMembership() || !await AdmitAsync() || Vm.SelectedUserId != userId || !CanManageMembership()) return;
-            using var dialog = new Form { Text = "Gán vai trò — " + Vm.SelectedUser!.DisplayName, Width = 450, Height = 180, StartPosition = FormStartPosition.CenterParent };
-            var roles = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Name" };
+            using var dialog = new Form { Text = "Gán vai trò — " + Vm.SelectedUser!.DisplayName, Width = 450, Height = 210, StartPosition = FormStartPosition.CenterParent };
+            var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+            var roles = new ComboBox { Width = 390, DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Name", AccessibleName = "Vai trò" };
             foreach (var role in Vm.Roles.Items) roles.Items.Add(role);
-            var ok = new Button { Text = "Xác nhận gán", Dock = DockStyle.Bottom, DialogResult = DialogResult.OK };
-            dialog.Controls.Add(roles); dialog.Controls.Add(ok);
+            var ok = new Button { Text = "Xác nhận gán", AutoSize = true, DialogResult = DialogResult.OK };
+            var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
+            fields.Controls.Add(new Label { Text = "Vai trò", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
+            fields.Controls.Add(roles); fields.Controls.Add(ok); fields.Controls.Add(cancel);
+            dialog.Controls.Add(fields);
+            dialog.AcceptButton = ok;
+            dialog.CancelButton = cancel;
             if (dialog.ShowDialog(control) == DialogResult.OK && roles.SelectedItem is SecurityRoleDto selected) await Vm.SetMembershipAsync(selected.RoleId, true, default);
         });
         _removeRole = Add(membership, "Gỡ vai trò", async () =>
@@ -328,14 +334,24 @@ internal sealed class SecurityWorkspaceEditorBindings
         var user = Vm.SelectedUser;
         var role = Vm.SelectedRole;
         if (!create && (userTarget ? user == null || user.IsProtectedAccount : role == null)) return;
-        using var dialog = new Form { Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name), Width = 440, Height = userTarget ? 320 : 220, StartPosition = FormStartPosition.CenterParent };
+        using var dialog = new Form { Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name), Width = 440, Height = userTarget ? (create ? 430 : 380) : 240, StartPosition = FormStartPosition.CenterParent };
         var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
         var name = new TextBox { Width = 380, AccessibleName = userTarget ? "Tên đăng nhập" : "Tên vai trò", Text = create ? "" : userTarget ? user!.Username : role!.Name };
         var display = new TextBox { Width = 380, AccessibleName = "Tên hiển thị", Text = create ? "" : user?.DisplayName ?? "" };
         var email = new TextBox { Width = 380, AccessibleName = "Email", Text = create ? "" : user?.Email ?? "" };
         var password = new TextBox { Width = 380, AccessibleName = "Mật khẩu tạm", UseSystemPasswordChar = true };
-        fields.Controls.Add(name);
-        if (userTarget) { fields.Controls.Add(display); fields.Controls.Add(email); if (create) fields.Controls.Add(password); }
+        void AddField(string caption, TextBox field)
+        {
+            fields.Controls.Add(new Label { Text = caption, AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
+            fields.Controls.Add(field);
+        }
+        AddField(userTarget ? "Tên đăng nhập" : "Tên vai trò", name);
+        if (userTarget)
+        {
+            AddField("Tên hiển thị", display);
+            AddField("Email", email);
+            if (create) AddField("Mật khẩu tạm", password);
+        }
         var validation = new Label { AutoSize = true, AccessibleName = "Lỗi thông tin" };
         fields.Controls.Add(validation);
         var reload = new Button { Text = "Tải lại để đối chiếu", AutoSize = true, Visible = false };
@@ -408,13 +424,16 @@ internal sealed class SecurityWorkspaceEditorBindings
     async Task PasswordAsync()
     {
         if (!await AdmitAsync() || Vm.SelectedUser is not { IsProtectedAccount: false } user) return;
-        using var dialog = new Form { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 200, StartPosition = FormStartPosition.CenterParent };
-        var password = new TextBox { Dock = DockStyle.Top, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới" };
-        var validation = new Label { Dock = DockStyle.Top, Height = 40, AccessibleName = "Lỗi mật khẩu" };
-        var reload = new Button { Text = "Tải lại để đối chiếu", Dock = DockStyle.Bottom, Visible = false };
-        var save = new Button { Text = "Xác nhận", Dock = DockStyle.Bottom };
-        var cancel = new Button { Text = "Hủy", Dock = DockStyle.Bottom, DialogResult = DialogResult.Cancel };
-        dialog.Controls.Add(password); dialog.Controls.Add(validation); dialog.Controls.Add(reload); dialog.Controls.Add(save); dialog.Controls.Add(cancel);
+        using var dialog = new Form { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 230, StartPosition = FormStartPosition.CenterParent };
+        var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var password = new TextBox { Width = 360, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới" };
+        var validation = new Label { AutoSize = true, AccessibleName = "Lỗi mật khẩu" };
+        var reload = new Button { Text = "Tải lại để đối chiếu", AutoSize = true, Visible = false };
+        var save = new Button { Text = "Xác nhận", AutoSize = true };
+        var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
+        fields.Controls.Add(new Label { Text = "Mật khẩu mới", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
+        fields.Controls.Add(password); fields.Controls.Add(validation); fields.Controls.Add(reload); fields.Controls.Add(save); fields.Controls.Add(cancel);
+        dialog.Controls.Add(fields);
         dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
         reload.Click += async (_, _) => await ReloadDialogAsync(dialog, validation, reload);

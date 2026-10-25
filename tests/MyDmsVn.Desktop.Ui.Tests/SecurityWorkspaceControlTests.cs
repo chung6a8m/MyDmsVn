@@ -651,6 +651,8 @@ public sealed class SecurityWorkspaceControlTests
             try
             {
                 var save = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu thông tin");
+                foreach (var caption in new[] { "Tên đăng nhập", "Tên hiển thị", "Email", "Mật khẩu tạm" })
+                    Assert.Contains(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.Visible && label.Text == caption);
                 save.PerformClick();
                 Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                 Assert.True(dialog.Visible);
@@ -836,6 +838,7 @@ public sealed class SecurityWorkspaceControlTests
             try
             {
                 var save = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận");
+                Assert.Contains(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.Visible && label.Text == "Mật khẩu mới");
                 var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
                 save.PerformClick();
                 Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");

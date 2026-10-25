@@ -80,6 +80,88 @@ public sealed class SecurityNativeAndResetTests
         });
 
     [Fact]
+    public void Native_membership_dialog_names_role_and_escape_cancels_without_dispatch() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (control, scene) =>
+        {
+            control.UserDetail.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var button = Descendants(control.UserDetail).OfType<Button>().Single(item => item.Text == "Gán vai trò…");
+            var opened = false;
+            Exception? dialogError = null;
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>()
+                    .FirstOrDefault(item => item.Text.StartsWith("Gán vai trò — "));
+                if (dialog == null) return;
+                timer.Stop();
+                try
+                {
+                    opened = true;
+                    Assert.Contains(Descendants(dialog).OfType<Label>(), item => item.Visible && item.Text == "Vai trò");
+                    var roles = Assert.Single(Descendants(dialog).OfType<ComboBox>());
+                    Assert.Equal("Vai trò", roles.AccessibleName);
+                    Assert.Equal("Hủy", Assert.IsType<Button>(dialog.CancelButton).Text);
+                    Assert.True(roles.Focus());
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                    Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
+                }
+                catch (Exception error) { dialogError = error; dialog.Close(); }
+            };
+            Assert.True(button.Focus());
+            timer.Start();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(opened, "Native Enter did not open the membership dialog.");
+            if (dialogError != null) throw dialogError;
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
+    public void Native_membership_dialog_enter_confirms_selected_role_once() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (control, scene) =>
+        {
+            control.UserDetail.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var button = Descendants(control.UserDetail).OfType<Button>().Single(item => item.Text == "Gán vai trò…");
+            var opened = false;
+            Exception? dialogError = null;
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>()
+                    .FirstOrDefault(item => item.Text.StartsWith("Gán vai trò — "));
+                if (dialog == null) return;
+                timer.Stop();
+                try
+                {
+                    opened = true;
+                    var roles = Assert.Single(Descendants(dialog).OfType<ComboBox>());
+                    roles.SelectedIndex = 1;
+                    Assert.True(roles.Focus());
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                    Assert.Equal(DialogResult.OK, dialog.DialogResult);
+                }
+                catch (Exception error) { dialogError = error; dialog.Close(); }
+            };
+            Assert.True(button.Focus());
+            timer.Start();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(opened, "Native Enter did not open the membership dialog.");
+            if (dialogError != null) throw dialogError;
+            var elapsed = Stopwatch.StartNew();
+            while (!control.LastOperation.IsCompleted && elapsed.Elapsed < TimeSpan.FromSeconds(5))
+            {
+                System.Windows.Forms.Application.DoEvents();
+                Thread.Yield();
+            }
+            Assert.True(control.LastOperation.IsCompleted);
+            Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate" &&
+                entry.Request is SecurityMutationJournalEntry mutation &&
+                mutation.Target == SecurityAdministrationTargetDto.User &&
+                mutation.Operation == SecurityAdministrationOperationDto.SetMembership);
+        });
+
+    [Fact]
     public void Native_enter_starts_and_discards_role_grant_draft_without_dispatch() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
         {
