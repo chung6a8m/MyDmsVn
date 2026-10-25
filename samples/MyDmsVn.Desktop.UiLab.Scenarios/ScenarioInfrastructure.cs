@@ -53,6 +53,7 @@ public sealed class ScenarioGate<T>
     private readonly TaskCompletionSource<T> _completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public bool IgnoreCancellation { get; set; }
+    public bool IgnoreOwnerRelease { get; set; }
     public bool IsCompleted => _completion.Task.IsCompleted;
 
     public Task<T> WaitAsync(CancellationToken cancellationToken)
@@ -74,7 +75,7 @@ public sealed class ScenarioGate<T>
     }
 
     public bool Complete(T result) => _completion.TrySetResult(result);
-    public bool Cancel() => _completion.TrySetCanceled();
+    public bool Cancel() => !IgnoreOwnerRelease && _completion.TrySetCanceled();
 }
 
 internal sealed class ScenarioTaskTracker

@@ -109,6 +109,38 @@ public sealed class SecurityNativeAndResetTests
             Until(() => form.CurrentSecurityControl == null);
         });
 
+    [Fact]
+    public void Security_reset_timeout_poisons_host_until_old_response_is_released() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
+        {
+            using var form = new UiLabForm();
+            form.Show();
+            Until(() => form.CurrentSalesControl != null && !form.IsResetting);
+            form.ModuleSelector.SelectedIndex = 1;
+            Until(() => form.CurrentSecurityControl != null && !form.IsResetting);
+            var old = form.CurrentSecurityControl!;
+            var data = form.CurrentSecurityScenarioData!;
+            var gate = new ScenarioGate<ApiResponse<System.Collections.Generic.IReadOnlyList<SecurityUserDto>>> { IgnoreCancellation = true, IgnoreOwnerRelease = true };
+            data.Administration.UsersGate = gate;
+            var reload = old.ActivateAsync(default);
+            Until(() => data.Administration.OutstandingOperations.Any(t => !t.IsCompleted));
+            var reset = form.ResetForTestAsync();
+            Until(() => reset.IsCompleted);
+            reset.GetAwaiter().GetResult();
+            Assert.True(form.IsPoisoned);
+            Assert.Contains("did not drain", form.StatusText);
+            Assert.Same(old, form.CurrentSecurityControl);
+            Assert.Same(data, form.CurrentSecurityScenarioData);
+            Assert.False(form.ModuleSelector.Enabled);
+            Assert.False(form.ScenarioSelector.Enabled);
+            form.ResetForTestAsync().GetAwaiter().GetResult();
+            Assert.Same(old, form.CurrentSecurityControl);
+            Assert.True(gate.Complete(ApiResponse<System.Collections.Generic.IReadOnlyList<SecurityUserDto>>.Success(data.Data.Users)));
+            Until(() => reload.IsCompleted);
+            form.Close();
+            Until(() => form.IsDisposed);
+        });
+
     static void Until(Func<bool> condition)
     {
         var timer = Stopwatch.StartNew();
