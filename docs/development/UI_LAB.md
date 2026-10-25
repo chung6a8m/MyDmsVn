@@ -1,6 +1,6 @@
 # Sales UI Lab — developer runbook
 
-The Sales UI Lab is a separate net48 WinForms development host for the existing `SalesReceiptControl`. It is intended for inspecting list/editor input, session and response races without a SQL instance or real Login. The Lab does not run the production Local adapter or prove Server authorization, SQL valuation, posting atomicity or a release package. The [current plan](../plans/20261024-001-a0-a1-sales-ui-lab.md) owns implementation state and candidate evidence; this page owns repeatable use and commands.
+The Sales UI Lab is a separate net48 WinForms development host for the existing `SalesReceiptControl`. It is intended for inspecting list/editor input, session and response races without a SQL instance or real Login. The Lab does not run the production Local adapter or prove Server authorization, SQL valuation, posting atomicity or a release package. The [archived A0/A1 record](../archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md) retains historical implementation state and candidate evidence; this page owns repeatable use and commands.
 
 ## Prerequisites and source boundaries
 

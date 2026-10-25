@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Assessment baseline:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43 and migrated assessment), 2026-10-23. The inspected net48 project/source layout is represented below; A0 changes documentation routing only. Current scheduling follows the [execution index](plans/README.md), while [UI-NEXT](ui-next/README.md) retains later implementation evidence. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and unfinished acceptance.
+**Audited source baseline:** `v1a-pro-ui-next@6ee6951c58f6e4ad92f991521ff5c553d2d22526` (merged PR #48), 2026-10-25. The net48 project/source orientation is represented below; this refresh supplies no new runtime acceptance. The [execution index](plans/README.md) records that no execution plan is active, while [UI-NEXT](ui-next/README.md) retains historical implementation evidence. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and unfinished acceptance.
 
 ## Source projects
 
@@ -14,7 +14,7 @@
 | `MyDmsVn.Server.DbMigrator` | `net48` | Controlled DbUp schema deployment and separate maintenance commands. |
 | `MyDmsVn.Desktop.Application` | `net48` | Contracts-based client interfaces and ViewModels. |
 | `MyDmsVn.Desktop.Infrastructure.Local` | `net48` | In-process Application dispatch, current-account checks and desktop session integration. |
-| `MyDmsVn.Desktop.WinForms` | `net48` | Shared views and pinned BootstrapSourceGrid presentation dependency. |
+| `MyDmsVn.Desktop.WinForms` | `net48` | Shared views and the BootstrapSourceGrid adapter from the pinned WinFormsKit checkout. |
 | `MyDmsVn.Desktop.App` | `net48` | Current WinForms host and Local composition root. |
 | `MyDmsVn.Desktop.AppCore` | `net8.0-windows`, parked | Retained source outside active solution/release; not current executable coverage. |
 
@@ -42,7 +42,7 @@ There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual o
 
 Sales uses the existing projects and test owners. Current source includes `Contracts/SalesContracts.cs`, Domain/Application/Infrastructure `Sales/` folders, inventory valuation math/coordinator, `LocalSalesReceiptApiClient.cs`, Sales ViewModels and `SalesReceiptControl.cs` with its app-owned grid/adapter. Schema `010_DirectSalesAndValuation.sql`, preflight/grants and fixture metadata are implemented. The [business](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [archived plan](archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md) retain their source rationale and historical checkpoints.
 
-UI-NEXT's [historical implementation plan](ui-next/20261023-implementation-plan.md) records proposed presentation files, affected owners and subsequent candidate evidence. Proposed paths/types do not exist merely because documentation names them; inspect source before choosing test selectors or using an API. The old SAL native125/attended/Owner gaps do not redefine the implemented project graph.
+UI-NEXT's [historical implementation plan](archive/20261025-pre-next-roadmap/ui-next/20261023-implementation-plan.md) records proposed presentation files, affected owners and subsequent candidate evidence. Proposed paths/types do not exist merely because documentation names them; inspect source before choosing test selectors or using an API. The old SAL native125/attended/Owner gaps do not redefine the implemented project graph.
 
 ## Actual feature directories
 
@@ -53,8 +53,8 @@ UI-NEXT's [historical implementation plan](ui-next/20261023-implementation-plan.
 | Application persistence contract | `src/MyDmsVn.Server.Application/Persistence/{IUnitOfWork,IUnitOfWorkFactory,UnitOfWorkState}.cs`. |
 | Infrastructure persistence | `src/MyDmsVn.Server.Infrastructure/Persistence/{SqlUnitOfWorkFactory,ISqlExecutionContext,SqlConnectionFactory,SqlPersistenceBuilder,LinqToDbSessionFactory,LinqToDbMappingSchemaProvider}.cs`. |
 | Schema | `src/MyDmsVn.Server.DbMigrator/Scripts/001_PersistenceFoundation.sql` through `010_DirectSalesAndValuation.sql`; exact names in [PERSISTENCE](PERSISTENCE.md). |
-| Implemented WinForms presentation seams | `BusinessCompactAppearance.cs`, `BusinessCompactNavigation.cs`, `GoodsReceiptLinesGrid.cs`, `GoodsReceiptLinesGridAdapter.cs`, `ReceiptNumericInput.cs` and `ReceiptNumberEditor.cs` in `src/MyDmsVn.Desktop.WinForms/`; `SalesReceiptControl.cs` and its grid/adapter own the Sales workspace; `CatalogControl.cs` remains shared by four catalogs. |
-| UI dependency | `vendor/MyDmsVn.WinFormsKit/`, pinned as checked in; contains UI core, grid adapter and the pinned SourceGrid engine. |
+| Implemented WinForms presentation seams | `BusinessCompactAppearance.cs`, `BusinessCompactNavigation.cs`, `GoodsReceiptLinesGrid.cs`, `GoodsReceiptLinesGridAdapter.cs`, `ReceiptNumericInput.cs` and `ReceiptDecimalInputProfiles.cs` in `src/MyDmsVn.Desktop.WinForms/`; `SalesReceiptControl.cs` and its grid/adapter own the Sales workspace; `CatalogControl.cs` remains shared by four catalogs. |
+| UI dependency | `vendor/MyDmsVn.WinFormsKit/` at `c232a4c09dc0386a5bd8bb484a5c991acae827d5`; contains UI core, grid adapter and SourceGrid at `f4e457b43582bf01892f50bdc74aa480531e5944`. Existing Bootstrap5WinFormUI/BootstrapSourceGrid assembly names remain valid. |
 
 `Application/Features/...`, `Application/Abstractions/Persistence` and Infrastructure `Persistence/Repositories`/`EntityMaps` were earlier blueprint examples. They are not the current file layout; use source-owned paths when changing code.
 
@@ -66,13 +66,14 @@ UI-NEXT's [historical implementation plan](ui-next/20261023-implementation-plan.
 | `MyDmsVn.UiLab.sln`, `samples/MyDmsVn.Desktop.UiLab*` | Separate A1 WinForms Lab and fixture graph; [runbook](development/UI_LAB.md). |
 | `Directory.Build.props`, `Directory.Packages.props`, project lock files | Shared build settings, exact centrally managed packages and project dependency graphs. |
 | `AGENTS.md`, `AI_CONTEXT.md`, `README.md` | Current development instructions and orientation. |
-| `docs/plans/README.md` | Stable current-work index; points to the sole execution-status owner. |
-| `docs/plans/20261024-001-a0-a1-sales-ui-lab.md` | Selected plan: A0 history, A1 authorization, tasks and candidate verification; no duplicated status here. |
-| `docs/ui-next/20261023-active-roadmap.md` | Historical UI-NEXT selection, task records and exact-candidate acceptance. |
-| `docs/archive/20261023-pre-ui-next/README.md` | Archive boundary; previous queues and unfinished work are excluded without acceptance or waiver. |
+| `docs/plans/README.md` | Stable current-work index; records no active plan and requires explicit activation of any successor. |
+| `docs/archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md` | Archived A0/A1 authorization, tasks and candidate verification; no current execution authority. |
+| `docs/archive/20261025-pre-next-roadmap/ui-next/20261023-active-roadmap.md` | Historical UI-NEXT selection, task records and exact-candidate acceptance. |
+| `docs/archive/README.md` | Dated archive boundaries, including the 2026-10-25 reset and retained acceptance limits. |
+| `docs/archive/20261023-pre-ui-next/README.md` | Earlier archive boundary; previous queues and unfinished work are excluded without acceptance or waiver. |
 | `docs/TEST_POLICY.md` | Authoritative test scope and evidence policy. |
 | `docs/TEST_STRATEGY.md` | Behavior coverage reference. |
-| `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Current roadmap pointer, unscheduled release constraints/out-of-scope directions and historical evidence. |
+| `docs/DEVELOPMENT_PLAN.md`, `docs/DEFERRED_WORK.md`, `docs/HISTORY.md` | Execution-index alias, unscheduled release constraints/out-of-scope directions and historical evidence. |
 | `tests/README.md`, SQL project-local/linked helpers | Direct `dotnet test`/Test Explorer commands, explicit SQL configuration and positively owned database lifecycle. |
 | `deployment/sql/Provision-MyDmsVnPrincipals.sql` | Explicit runtime/maintenance SQL authority separation. |
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |

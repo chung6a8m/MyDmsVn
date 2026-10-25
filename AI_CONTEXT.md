@@ -1,16 +1,18 @@
 # MyDmsVn — Current context for Codex
 
-**Active base:** `v1a-pro-ui-next` · **Updated:** 2026-10-24 · **Inspected product baseline:** `03acacdaea6a750aa88b33d61ea139379edcb326` (merged PR #45). The original UI-NEXT activation at `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` and correction inspection at `codex/uin-t13@6ff4b9829a4b69f992d75fb52047e991c1843b96` remain historical provenance. This context distinguishes source facts, candidate evidence and proposed work.
+**Active base:** `v1a-pro-ui-next` · **Updated:** 2026-10-25 · **Archive/source baseline:** `6ee6951c58f6e4ad92f991521ff5c553d2d22526` (merged PR #48, WinFormsKit consumer). The earlier UI-NEXT activation, DateInput correction and A0/A1 candidates remain historical provenance in the [archive boundary](docs/archive/20261025-pre-next-roadmap/README.md) and their original evidence. Source facts, candidate evidence and proposed work remain distinct.
 
 ## Owner decision and next work
 
-Read the [current execution index](docs/plans/README.md). Its selected plan is the only owner of authorized scope, task state and verification. Cross-repository organization decisions belong to [MyDmsVn.Docs](https://github.com/chung6a8m/MyDmsVn.Docs/blob/main/proposals/2026-10-24-adoption.md); proposals and future phase names do not activate implementation.
+Read the [current execution index](docs/plans/README.md). It currently records **no active execution plan; the next roadmap has not been selected**. Follow explicit Owner authorization; a future selected plan will own its own scope, task state and verification. Cross-repository organization decisions belong to [MyDmsVn.Docs](https://github.com/chung6a8m/MyDmsVn.Docs/blob/main/proposals/2026-10-24-adoption.md); proposals and future phase names do not activate implementation.
 
-[UI-NEXT](docs/ui-next/README.md) is now a historical reference. Its [roadmap](docs/ui-next/20261023-active-roadmap.md), [design/control policy](docs/ui-next/20261023-design-and-control-policy.md), [implementation](docs/ui-next/20261023-implementation-plan.md) and [acceptance](docs/ui-next/20261023-validation-and-handoff.md) retain their candidate-specific results. The [T13 ledger](docs/ui-next/evidence/20261024-uin-t13-integration.md) retains the attended zero-document FAIL after Owner Save, passing no-interaction control and dated bounded acceptance. [First-review](docs/ui-next/evidence/20261024-pr45-review-corrections.md) and [round-2](docs/ui-next/evidence/20261024-pr45-review-round2.md) corrections have separate evidence.
+[UI-NEXT](docs/ui-next/README.md) is now a historical reference. Its [roadmap](docs/archive/20261025-pre-next-roadmap/ui-next/20261023-active-roadmap.md), [design/control policy](docs/archive/20261025-pre-next-roadmap/ui-next/20261023-design-and-control-policy.md), [implementation](docs/archive/20261025-pre-next-roadmap/ui-next/20261023-implementation-plan.md) and [acceptance](docs/archive/20261025-pre-next-roadmap/ui-next/20261023-validation-and-handoff.md) retain their candidate-specific results. The [T13 ledger](docs/ui-next/evidence/20261024-uin-t13-integration.md) retains the attended zero-document FAIL after Owner Save, passing no-interaction control and dated bounded acceptance. [First-review](docs/ui-next/evidence/20261024-pr45-review-corrections.md) and [round-2](docs/ui-next/evidence/20261024-pr45-review-round2.md) corrections have separate evidence.
 
 The [DateInput evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md) records the first candidate's calendar-highlight failure, repaired candidate checks at physical native100/native125 and dated bounded Owner visual acceptance at 125%. The net48 app window reports 96 DPI even on the 120-DPI physical monitor. These records supersede the original NOT STARTED/pending handoff; they do not establish results for another candidate or production release.
 
 The [pre-UI-NEXT archive](docs/archive/20261023-pre-ui-next/README.md) retains the six earlier plans and their frozen index. Unfinished SAL acceptance, full integration repeats and production-release work remain excluded unless separately scheduled; no routing change completes or waives them.
+
+The Sales UI Lab is implemented through merged PR #47, and WinFormsKit consumer cutover through merged PR #48. The [archive boundary](docs/archive/20261025-pre-next-roadmap/README.md#source-and-merge-facts-at-this-boundary) distinguishes those merge facts from the old A1 review-pending text and the still-open separate Docs PR. The [UI Lab runbook](docs/development/UI_LAB.md) remains current for repeatable developer use. A1 fake/native checks and A3 focused passes do not establish full product acceptance; the earlier full Desktop failure and later NOT RUN scopes remain in the [retained limits](docs/archive/20261025-pre-next-roadmap/README.md#retained-acceptance-limits).
 
 ## Archived acceptance and implemented source
 
@@ -30,15 +32,14 @@ SAL T00–T06 checkpoints and the T07 Sales workspace are implemented in the mer
 
 ## UI baseline and ownership
 
-| Dependency | Historical correction-inspection pin |
+| Consumed component at the archive/source baseline | Exact pin |
 |---|---|
-| MyDmsVn.BootstrapSourceGrid | `02888dec75878a081f2caac9b22829ae3a2f7d72` |
-| Bootstrap5WinFormUI nested dependency | `c91993f4f44a60210f4c6c4106e82ebc69931a0a` |
-| SourceGrid nested dependency | `f4e457b43582bf01892f50bdc74aa480531e5944` |
+| `vendor/MyDmsVn.WinFormsKit` | `c232a4c09dc0386a5bd8bb484a5c991acae827d5` |
+| SourceGrid engine within WinFormsKit | `f4e457b43582bf01892f50bdc74aa480531e5944` |
 
-These are the consumed pins at the historical `6ff4b98` correction inspection, not the pins at the product baseline above and not assertions about upstream HEADs. The selected plan records its own inspected baseline; read gitlinks recursively before a future change and preserve intervening work.
+The toolkit checkout supplies the compatible `MyDmsVn.Bootstrap5WinFormUI` and `MyDmsVn.BootstrapSourceGrid` project/assembly identities. Earlier nested dependency layouts and correction-inspection pins remain in the archived records. Read current gitlinks recursively before a future change; these pins are not assertions about upstream HEADs or blanket verification results.
 
-The pinned shared UI includes `BootstrapToastContainer`, `BootstrapAlert`, input `ValidationState`, `BootstrapSpinner`, typed decimal/date input, the request-only tab close affordance, busy host and semantic panel/label controls. Their source and bounded verification belong to the corresponding [UI-NEXT task and acceptance rows](docs/ui-next/20261023-active-roadmap.md). `BootstrapToastService` still resolves a screen for its top-level host; passing a control does not create tab scope. The application supplies workspace-owned feedback and admission policy. DateInput Unified Compact and segment-preserving caret correction are implemented at the exact pins in the [candidate evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md); the repaired running visual received dated, bounded Owner acceptance at physical 125%.
+The pinned shared UI includes `BootstrapToastContainer`, `BootstrapAlert`, input `ValidationState`, `BootstrapSpinner`, typed decimal/date input, the request-only tab close affordance, busy host and semantic panel/label controls. Their source and bounded verification belong to the corresponding [UI-NEXT task and acceptance rows](docs/archive/20261025-pre-next-roadmap/ui-next/20261023-active-roadmap.md). `BootstrapToastService` still resolves a screen for its top-level host; passing a control does not create tab scope. The application supplies workspace-owned feedback and admission policy. DateInput Unified Compact and segment-preserving caret correction are implemented at the exact pins in the [candidate evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md); the repaired running visual received dated, bounded Owner acceptance at physical 125%.
 
 MyDmsVn owns workspace-instance identity and session/document generations, message/validation routing, command admission and dirty/recovery policy. Shared UI owns generic rendering, theme behavior and lifecycle. Keep controls out of Desktop.Application/public DTOs. Do not route late results by whichever tab happens to be selected, use a module key as a replacement for instance identity, or let a busy veil replace authorization/editability checks. Cancellation does not prove a mutation rolled back.
 
@@ -48,7 +49,7 @@ Keep Posted/busy/denied/`RequiresPostOutcomeReload` guards authoritative. Resolv
 
 ## Execution and evidence rules
 
-Read [AGENTS](AGENTS.md), the [execution index](docs/plans/README.md), selected task/references, [TEST_POLICY](docs/TEST_POLICY.md), [TEST_STRATEGY](docs/TEST_STRATEGY.md) and [tests/README](tests/README.md). Select focused source-owned checks for changed behavior. Historical UI-NEXT/SAL-T08/BCF matrices are not automatically active gates; no full six-owner fresh/reuse repeat or production-release task is inherited. Documentation-only changes require diff/link/status/encoding checks, not SQL/GUI execution.
+Read [AGENTS](AGENTS.md), the [execution index](docs/plans/README.md), explicitly authorized task/references (and a selected plan when present), [TEST_POLICY](docs/TEST_POLICY.md), [TEST_STRATEGY](docs/TEST_STRATEGY.md) and [tests/README](tests/README.md). Select focused source-owned checks for changed behavior. Historical UI-NEXT/SAL-T08/BCF matrices are not automatically active gates; no full six-owner fresh/reuse repeat or production-release task is inherited. Documentation-only changes require diff/link/status/encoding checks, not SQL/GUI execution.
 
 Interactive Windows/net48, serialized STA, WinFormsTestGuard, finite waits, bounded GUI-owned subprocesses and verified disposal remain required for GUI evidence. Keep hosted/native100/native125 and packaged/attended results distinct; test-session injection does not prove actual Login. Record actual client/work-area geometry and distinguish captures from physical-display observations.
 

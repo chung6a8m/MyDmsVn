@@ -1,6 +1,6 @@
 # Architecture — MyDmsVn
 
-**Inspected architecture baseline:** Local v1 at `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43), 2026-10-23. Current scheduling follows the [execution index](plans/README.md); [UI-NEXT](ui-next/README.md) retains later design/implementation evidence. The A0 routing update does not re-audit every technical statement below. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains source contracts and candidate acceptance limits.
+**Inspected architecture baseline:** Local v1 at `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43), 2026-10-23. The [execution index](plans/README.md) records that no execution plan is active; [UI-NEXT](ui-next/README.md) retains later design/implementation evidence. The A0 routing update does not re-audit every technical statement below. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains source contracts and candidate acceptance limits.
 
 ## Implemented Sales and active UI direction
 
@@ -8,7 +8,7 @@
 
 R3/R4 source fixes are reviewed/approved at `f5039cb`. [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`; candidate-specific core/SQL/package/native100 runnable automation passed. Native125, attended observations and dated Owner acceptance remain OPEN in the archive. Earlier BCF/BCI/GUI-P5/L2DB/RESP acceptance remains bounded by its original signed scope; [production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED.
 
-UI-NEXT's [design and control policy](ui-next/20261023-design-and-control-policy.md) assigns generic rendering, native control semantics, theme behavior and lifecycle to shared UI. MyDmsVn owns workspace/session/document identity, feedback and validation routing, dirty-close admission, operation cancellation and recovery policy. Historical proposal names require source verification before use; later UI-NEXT implementation/evidence remains linked from its reference index. No WinForms object enters Desktop.Application or public transport DTOs; no new provider/runtime/HTTP host or business workflow is implied.
+UI-NEXT's [design and control policy](archive/20261025-pre-next-roadmap/ui-next/20261023-design-and-control-policy.md) assigns generic rendering, native control semantics, theme behavior and lifecycle to shared UI. MyDmsVn owns workspace/session/document identity, feedback and validation routing, dirty-close admission, operation cancellation and recovery policy. Historical proposal names require source verification before use; later UI-NEXT implementation/evidence remains linked from its reference index. No WinForms object enters Desktop.Application or public transport DTOs; no new provider/runtime/HTTP host or business workflow is implied.
 
 ## 1. Current system and approved direction
 
@@ -86,7 +86,7 @@ Desktop.App configures Microsoft DI once. Local mode requires runtime database c
 
 ## 7. Validation and change control
 
-[Test policy](TEST_POLICY.md) owns execution scope. Use focused affected tests at task boundaries; broaden SQL coverage for shared fixture/UoW/migration changes and GUI coverage for changed UI behavior. BCI retains its [accepted historical evidence](BUSINESS_COMPACT_ACCEPTANCE.md); BCF retains its [completed bounded acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md), while current obligations follow the selected plan through the [execution index](plans/README.md) and TEST_POLICY. [UI-NEXT validation](ui-next/20261023-validation-and-handoff.md) retains historical acceptance references. [TEST_STRATEGY](TEST_STRATEGY.md) describes required behavior coverage, not another execution queue.
+[Test policy](TEST_POLICY.md) owns execution scope. Use focused affected tests at task boundaries; broaden SQL coverage for shared fixture/UoW/migration changes and GUI coverage for changed UI behavior. BCI retains its [accepted historical evidence](BUSINESS_COMPACT_ACCEPTANCE.md); BCF retains its [completed bounded acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md), while verification for separately authorized changes follows TEST_POLICY and any plan explicitly activated through the [execution index](plans/README.md). [UI-NEXT validation](archive/20261025-pre-next-roadmap/ui-next/20261023-validation-and-handoff.md) retains historical acceptance references. [TEST_STRATEGY](TEST_STRATEGY.md) describes required behavior coverage, not another execution queue.
 
 Keep explicit non-production SQL configuration, local allocation ownership/cleanup, finite waits and independent case evidence. SQL projects execute sequentially; interrupted allocations require manual review because no external lease/watchdog/orphan recovery service remains. RESP fixture reuse and the L2DB conversion are completed; preserve their accepted fixture boundaries, reset behavior and direct test commands. Historical acceptance is retained in [HISTORY](HISTORY.md), with unresolved [release prerequisites](DEFERRED_WORK.md#release-prerequisites) outside the active execution queue.
 

@@ -1,6 +1,6 @@
 # Test coverage — MyDmsVn
 
-**Updated:** 2026-10-24. This document owns behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) owns commands. Use the [execution index](plans/README.md) for the sole current plan. [UI-NEXT](ui-next/README.md) retains historical candidate evidence rather than a current task queue.
+**Updated:** 2026-10-25. This document owns behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) owns commands. The [execution index](plans/README.md) records no active plan; any successor requires explicit activation. [UI-NEXT](ui-next/README.md) retains historical candidate evidence rather than a current task queue.
 
 The [archive boundary](archive/20261023-pre-ui-next/README.md) retires old queues without completing their open acceptance. [SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`; candidate-specific runnable automation passed, while native125, attended observations and dated Owner acceptance remain OPEN. R3/R4 source fixes are reviewed/approved. BCF/BCI/GUI-P5/L2DB/RESP retain their exact historical signed scopes and exceptions.
 
@@ -8,7 +8,7 @@ The [archive boundary](archive/20261023-pre-ui-next/README.md) retires old queue
 
 ## Preserved UI behavior
 
-The [UI design/control policy](ui-next/20261023-design-and-control-policy.md) and [validation record](ui-next/20261023-validation-and-handoff.md) preserve UI-NEXT behavior and candidate-specific evidence. The current plan and TEST_POLICY select new verification only for changed behavior. Preserve the following coverage:
+The [UI design/control policy](archive/20261025-pre-next-roadmap/ui-next/20261023-design-and-control-policy.md) and [validation record](archive/20261025-pre-next-roadmap/ui-next/20261023-validation-and-handoff.md) preserve UI-NEXT behavior and candidate-specific evidence. TEST_POLICY selects verification for separately authorized changes; any future plan must be explicitly activated through the execution index. Preserve the following coverage:
 
 - Safe error field metadata survives mapping; field and stable-row cell messages align with invalid visual state and clear correctly without losing raw input. Fieldless errors remain visible; duplicate Product rows and reorder cannot misroute a line error.
 - Feedback belongs to the originating workspace instance/session/document generation. Tab switching, concurrent operations, hidden tabs, close/reopen and logout reject stale callbacks and do not leak protected data or steal focus.
@@ -93,6 +93,6 @@ Guarded STA/control tests, real-login packaged GUI Automation E2E with independe
 
 **Preserved lookup and inline behavior:** native per-character proof observes raw text, caret/range, focus and committed model effects across response rebinding, cancellation and shared notifications. Whole Text/WM_SETTEXT/UIA assignment is insufficient for a native typing claim. Preserve pending/committed identity, historical options, navigation admission, dirty/numeric/recovery guards, stable row identity, disposal and session replacement. Existing BCF tests are regression tools when affected, not a restarted T00–T06 queue.
 
-**Historical visual acceptance:** [BCF acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) retains its native contexts, matched references, exact package/test revisions and signed limitations. Select focused theme/layout/input/accessibility evidence through the current plan and TEST_POLICY; the historical UI-NEXT validation document is a reference and no former broad matrix is inherited automatically. Clean-machine installation, backup/recovery and signed release gates remain [UNACCEPTED / UNSCHEDULED prerequisites](DEFERRED_WORK.md#release-prerequisites).
+**Historical visual acceptance:** [BCF acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) retains its native contexts, matched references, exact package/test revisions and signed limitations. Select focused theme/layout/input/accessibility evidence for separately authorized changes under TEST_POLICY and any explicitly activated plan; the historical UI-NEXT validation document is a reference and no former broad matrix is inherited automatically. Clean-machine installation, backup/recovery and signed release gates remain [UNACCEPTED / UNSCHEDULED prerequisites](DEFERRED_WORK.md#release-prerequisites).
 
 P7 contract/HTTP parity, bearer authentication and modern-target reactivation remain [out of scope](DEFERRED_WORK.md#out-of-scope-directions). Any future activation needs its own approved scope and coverage decision. Do not create an API host to satisfy a test listed here.

@@ -2,13 +2,19 @@
 
 **Reset date:** 2026-10-18 · **Branch assessed:** `v1a` · **Baseline:** [c7ad32a4b0040f87417973eabd6c12757c54f7d5](https://github.com/chung6a8m/MyDmsVn/commit/c7ad32a4b0040f87417973eabd6c12757c54f7d5).
 
-This page is historical provenance, not an execution queue or test policy. Current scheduling follows the [execution index](plans/README.md). Historical activation checkpoints below retain their original dates/statuses; [the archive](archive/20261023-pre-ui-next/README.md) records the latest old-plan dispositions. Runtime behavior follows current source/specifications and execution follows [TEST_POLICY](TEST_POLICY.md).
+This page is historical provenance, not an execution queue or test policy. Current scheduling follows the [execution index](plans/README.md). Historical activation checkpoints below retain their original dates/statuses; [the archive index](archive/README.md) records the dated boundaries. Runtime behavior follows current source/specifications and execution follows [TEST_POLICY](TEST_POLICY.md).
+
+## 2026-10-25 — archive before the next roadmap
+
+The Owner requested documentation archival on `v1a-pro-ui-next` after merged PR #48. The inspected HEAD is `6ee6951c58f6e4ad92f991521ff5c553d2d22526`. The [archive boundary](archive/20261025-pre-next-roadmap/README.md) preserves ten UI-NEXT records, the A0/A1 plan and former selector, with old-path compatibility anchors. The [execution index](plans/README.md) selects no active plan; the next roadmap has not been chosen.
+
+Product PR #47 and consumer PR #48 are merged; the separate Docs PR #1 was still open at inspection. Their exact candidate results, earlier full Desktop failures and NOT RUN scopes remain separate from merge status. Existing evidence, earlier archives, current technical runbooks and source behavior are preserved. Unfinished acceptance and release prerequisites are not completed, waived or automatically queued. This Markdown-only change supplies no runtime acceptance.
 
 ## 2026-10-23 — UI Next selected; prior plans archived
 
 The Owner moved the UI assessment to `docs/ui-next` on `v1a-pro-ui-next` and requested analysis, an active roadmap, archival of old plans without carrying their unfinished work, and a PR into that branch. The inspected base is `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`, including merged PR #43 and the moved assessment.
 
-The [new roadmap](ui-next/20261023-active-roadmap.md), [design](ui-next/20261023-design-and-control-policy.md), [implementation tasks](ui-next/20261023-implementation-plan.md) and [validation](ui-next/20261023-validation-and-handoff.md) select contextual feedback, field/cell validation, shared edit mechanics, lossless numeric entry, typed dates, close/busy/theme primitives, DGV numeric parity and bounded paste/measurement. Every new implementation task is NOT STARTED; no runtime outcome is supplied by this documentation change.
+The [new roadmap](archive/20261025-pre-next-roadmap/ui-next/20261023-active-roadmap.md), [design](archive/20261025-pre-next-roadmap/ui-next/20261023-design-and-control-policy.md), [implementation tasks](archive/20261025-pre-next-roadmap/ui-next/20261023-implementation-plan.md) and [validation](archive/20261025-pre-next-roadmap/ui-next/20261023-validation-and-handoff.md) select contextual feedback, field/cell validation, shared edit mechanics, lossless numeric entry, typed dates, close/busy/theme primitives, DGV numeric parity and bounded paste/measurement. Every new implementation task is NOT STARTED; no runtime outcome is supplied by this documentation change.
 
 Six old plans plus their execution index moved to the [archive](archive/20261023-pre-ui-next/README.md). SAL-T07/T08 are archived incomplete: final product/package `f5039cb` and GUI tests `4697744` have bounded runnable automated evidence, while native125, attended and dated Owner acceptance remain OPEN. The archive preserves those results and earlier failures/exceptions. Unfinished old tasks and release prerequisites are excluded from the new queue, not completed or waived. Current business/security/recovery contracts and test-resource safeguards remain in force.
 

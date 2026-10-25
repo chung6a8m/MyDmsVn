@@ -1,6 +1,6 @@
 # Documentation index — v1a-pro-ui-next
 
-**Updated:** 2026-10-24. The [execution index](plans/README.md) selects the sole plan for current scope, task state and verification. This index routes readers by responsibility; historical results stay with their original candidates.
+**Updated:** 2026-10-25. The [execution index](plans/README.md) records **no active execution plan; the next roadmap has not been selected** after the [latest archive boundary](archive/20261025-pre-next-roadmap/README.md). This index routes readers by responsibility; historical results stay with their original candidates.
 
 ## Current work and Codex entry points
 
@@ -8,7 +8,7 @@
 |---|---|
 | [AGENTS.md](../AGENTS.md) | Stable repository instructions and invariants |
 | [AI_CONTEXT.md](../AI_CONTEXT.md) | Source context, historical boundaries and evidence distinctions |
-| [Execution index](plans/README.md) | Pointer to the sole current plan |
+| [Execution index](plans/README.md) | Current selection state; pointer to a plan only after new scope is selected |
 | [Development-plan alias](DEVELOPMENT_PLAN.md) | Compatibility entry point to the index; no progress copy |
 | [Test policy](TEST_POLICY.md) | Sole execution policy; focused scope and required safeguards |
 | [Test coverage](TEST_STRATEGY.md) | Required behavior and failure boundaries |
@@ -24,11 +24,13 @@ The implemented Sales rules remain in [business design](DIRECT_SALES.md), [costi
 
 ## Archived plans and evidence
 
+[Archive index](archive/README.md) · [2026-10-25 boundary and retained A1/A3 limits](archive/20261025-pre-next-roadmap/README.md) · [Archived A0/A1 record](archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md)
+
 [UI-NEXT historical index](ui-next/README.md) · [DateInput candidate evidence](ui-next/evidence/20261024-dateinput-unified-compact-correction.md) · [T13 retained failures and acceptance](ui-next/evidence/20261024-uin-t13-integration.md)
 
 [Archive boundary](archive/20261023-pre-ui-next/README.md) · [Frozen pre-UI-NEXT plan index](archive/20261023-pre-ui-next/plans/README.md) · [SAL plan](archive/20261023-pre-ui-next/plans/20261021-002-direct-sales-and-moving-average-costing.md) · [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) · [T08 integration evidence](evidence/sal/20261021-t08-integrated-acceptance.md)
 
-SAL source and reviewed R3/R4 fixes are present. T08 records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific core/SQL/package/native100 runnable automation PASS; native125, attended observations and dated Owner acceptance remain OPEN. Original failures and source/test/package distinctions remain authoritative. Old unfinished acceptance and full integration repeats are not inherited by the current plan.
+SAL source and reviewed R3/R4 fixes are present. T08 records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific core/SQL/package/native100 runnable automation PASS; native125, attended observations and dated Owner acceptance remain OPEN. Original failures and source/test/package distinctions remain authoritative. Old unfinished acceptance and full integration repeats are not automatically inherited by future work.
 
 [BCF final scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) · [BCF acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) · [BCI final acceptance](BUSINESS_COMPACT_ACCEPTANCE.md#final-t06-acceptance-and-handoff--2026-10-21) · [RESP verification](RESPAWN_VERIFICATION.md) · [L2DB verification](L2DB_VERIFICATION.md) · [GUI-P5 final verification](GUI_P5_VERIFICATION.md#final-t06-acceptance--2026-10-20)
 

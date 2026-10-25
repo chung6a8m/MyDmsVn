@@ -1,6 +1,6 @@
 # Technical stack and compatibility baseline
 
-**Inspected stack baseline:** `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43 and migrated assessment), 2026-10-23. Current scheduling follows the [execution index](plans/README.md); [UI-NEXT](ui-next/README.md) retains later UI implementation evidence. A0 changes routing, not runtime or package choices. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains prior evidence and unfinished acceptance. Production release prerequisites remain [UNACCEPTED / UNSCHEDULED](DEFERRED_WORK.md#release-prerequisites).
+**Audited source baseline:** `v1a-pro-ui-next@6ee6951c58f6e4ad92f991521ff5c553d2d22526` (merged PR #48), 2026-10-25. The [execution index](plans/README.md) records that no execution plan is active; [UI-NEXT](ui-next/README.md) retains historical UI implementation evidence. This source orientation supplies no new runtime or package acceptance. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains prior evidence and unfinished acceptance. Production release prerequisites remain [UNACCEPTED / UNSCHEDULED](DEFERRED_WORK.md#release-prerequisites).
 
 Sales, schema10 and fixed-point valuation are implemented using the existing net48/provider graph; valuation uses `System.Numerics.BigInteger`, not a framework upgrade. [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md) remains the architecture decision. [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`, with candidate-specific runnable automation PASS and native125/attended/Owner acceptance OPEN. The historical UI-NEXT records describe its UI infrastructure changes; documentation alone does not upgrade runtime, SQL provider or dependencies.
 
@@ -38,6 +38,8 @@ The user retains the repository's current net48 profile. Neither [RESP](archive/
 
 Current application persistence uses LINQ to DB and typed native SqlClient behind existing interfaces. DbUp owns controlled schema deployment. Microsoft DI composes the Local WinForms host; MediatR, FluentValidation and ErrorOr remain inside their defined Application/adapter boundaries. Cross-process DTOs and JSON are independent of SQL/UI providers. See [ARCHITECTURE](ARCHITECTURE.md), [PERSISTENCE](PERSISTENCE.md) and [CONTRACTS](CONTRACTS.md).
 
+The shared UI source is pinned at `vendor/MyDmsVn.WinFormsKit/` revision `c232a4c09dc0386a5bd8bb484a5c991acae827d5`, with SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. Existing Bootstrap5WinFormUI and BootstrapSourceGrid assembly names remain valid; use the checked-in WinFormsKit project paths. These are source pins at the audited baseline, not new verification results.
+
 ## Delivered dependency cutover
 
 RESP pins Respawn 4.0.0 in test owners. L2DB pins linq2db 6.3.0 in Infrastructure with Microsoft.Data.SqlClient 7.0.2; mappings/provider objects stay behind existing interfaces. T06 removes all active RepoDb/Dapper references, central pins, initializer hooks and temporary adapters. Native test-only SQL oracles do not invoke product mappings or repositories. DbUp remains the schema owner.
@@ -49,13 +51,13 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 - Reference a package only from projects that consume it. Review transitive assets, target compatibility, native SqlClient packaging and net48 binding redirects when changing dependencies.
 - Generate affected lock changes deliberately, review them and verify locked restore on the actual active matrix. Do not refresh unrelated packages or infer modern-product coverage from the SDK used to build net48.
 - Keep the existing central package-management settings. Resolve source-mapping problems explicitly; do not add blanket `NoWarn=NU1507` merely to hide them.
-- Keep LINQ to DB mappings/provider types in Infrastructure. Do not introduce EF Core, another auth framework, T4/scaffolding bundles or a runtime provider-selection flag as part of these plans.
+- Keep LINQ to DB mappings/provider types in Infrastructure. Do not introduce EF Core, another auth framework, T4/scaffolding bundles or a runtime provider-selection flag without separately authorized scope.
 - Keep shared JSON conventions in `ApiJson`. Additional import/export/updater packages require an actual approved consumer; an unused central MiniExcel/Onova pin is not a feature implementation.
-- Check the pinned BootstrapSourceGrid/WinForms source dependencies before changing UI APIs or targets. Modern C# syntax does not guarantee that a runtime API exists on net48.
+- Check the UI/BootstrapSourceGrid projects in the pinned WinFormsKit checkout before changing UI APIs or targets. Modern C# syntax does not guarantee that a runtime API exists on net48.
 
 ## Test configuration and verification
 
-[Test policy](TEST_POLICY.md) and the plan selected by the [execution index](plans/README.md) define focused task scope and dependency-based broadening; archived integration gates are not inherited. Run test projects directly and preserve the local allocation/cleanup guards. Mandatory SQL acceptance with missing configuration, Windows or targeting resources is `BLOCKED / NOT RUN`, not PASS; a skipped optional/local diagnostic is not mandatory coverage.
+[Test policy](TEST_POLICY.md) defines focused verification and dependency-based broadening for separately authorized changes. No plan is active in the [execution index](plans/README.md); any future plan must be explicitly activated, and archived integration gates are not inherited. Run test projects directly and preserve the local allocation/cleanup guards. Mandatory SQL acceptance with missing configuration, Windows or targeting resources is `BLOCKED / NOT RUN`, not PASS; a skipped optional/local diagnostic is not mandatory coverage.
 
 `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` explicitly identifies the designated non-production SQL instance and `master` catalog. The local IntegrationTests helper validates the live allocation before drop. There is no approval-file or external runner requirement. The product migrator instead requires an explicit application database and rejects system databases. Never confuse these configurations, print credentials or silently fall back to a developer/production database.
 
