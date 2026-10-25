@@ -276,6 +276,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T08 evidence — 2026-10-26:** Final test-source `a0a906c50ad4795295ea9b4689b50e7d4727a2c9` includes a mounted candidate shell close/reopen/sign-out test, **2/2 PASS**. The [post-gate evidence](../evidence/security/20261025-security-local-sql.md) links the SEC-T06/SEC-T07 results and the [review record](../evidence/security/20261025-security-ui-lab.md) traces SEC-UI-01–08 and SEC-L01–SEC-L12. The complete attended matrix and SEC-T04 review/keyboard gaps remain open; High Contrast is OWNER-WAIVED for SEC-T04 only. Real Login, package and release acceptance remain outside this scope.
 
+**PR #51 review round 6 correction — 2026-10-26:** Source/test `75fd28e9b9ea1781718c06bf94261ae0ff67ecb8` fixes R6-F01 committed Save followed by Forbidden required refresh and R6-F02 server rejection hidden behind Create/Edit/Password modals. The [post-gate evidence](../evidence/security/20261025-security-local-sql.md) records red/green cases, final focused **7/7 PASS**, full Ui.Tests **201/201 PASS** at physical100 and the Release build. Physical125 on this revised modal source remains NOT RUN pending a real scale change. The Security spec's retired baseline links were reconciled without changing the approved requirements.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
