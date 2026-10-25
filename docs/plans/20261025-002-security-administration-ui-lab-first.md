@@ -284,6 +284,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L09 attended continuation — 2026-10-26:** The Owner selected UI Lab-only post-Preview fault controls. Source/test `48eb09f42c6de500edc13997250603b8165fef12` adds revision and catalog-digest drift buttons to the Lab import confirmation, with sanitized journal events. The [evidence](../evidence/security/20261025-security-ui-lab.md) records **205/205 PASS** at measured physical100 and bounded live stale-revision/catalog Conflict observations. This closes those two formerly blocked attended branches only; full SEC-L01–SEC-L12 PASS, later-candidate physical125 review and remaining SEC-T04 keyboard traversal remain **OPEN**. No new Owner approval is inferred for this later revision.
 
+**SEC-L09 target-switch continuation — 2026-10-26:** Source/test `78d1d5bbfdaa4f75ccb825edd0aa37fca8a06e33` extends the Lab confirmation with a selected-target switch. The [evidence](../evidence/security/20261025-security-ui-lab.md) records a live Dark Preview → switch → confirm walkthrough with no Apply, plus **206/206 PASS** at measured physical100. The late-preview branch, complete attended matrix, later-candidate physical125 review and remaining SEC-T04 keyboard traversal remain **OPEN**.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
