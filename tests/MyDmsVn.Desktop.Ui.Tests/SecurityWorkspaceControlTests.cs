@@ -474,6 +474,23 @@ public sealed class SecurityWorkspaceControlTests
         Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
     [Fact]
+    public void Membership_forbidden_response_disables_actions_with_permission_context() => Run(SecurityScenarioId.SEC_L04, (control, scene) =>
+    {
+        control.UserDetail.Tabs.SelectedIndex = 1;
+        var buttons = Descendants(control.UserDetail.Tabs.TabPages[1], typeof(Button)).Cast<Button>().ToArray();
+        var assign = Assert.Single(buttons, button => button.Text == "Gán vai trò…");
+        var remove = Assert.Single(buttons, button => button.Text == "Gỡ vai trò");
+        control.UserDetail.Memberships.SelectedIndex = 0;
+        scene.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Forbidden", "Review response."));
+
+        Wait(control.ViewModel.SetMembershipAsync(203, false, default));
+        Assert.Equal(SecurityDatasetState.Forbidden, control.ViewModel.Users.State);
+        Assert.False(assign.Enabled);
+        Assert.False(remove.Enabled);
+        Assert.Contains("Không đủ quyền", assign.AccessibleDescription);
+        Assert.Contains("Không đủ quyền", control.ViewModel.EditingStatus);
+    });
+    [Fact]
     public void Role_filter_retains_hidden_draft_and_read_only_orphan() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
     {
         control.Tabs.SelectedIndex = 1;

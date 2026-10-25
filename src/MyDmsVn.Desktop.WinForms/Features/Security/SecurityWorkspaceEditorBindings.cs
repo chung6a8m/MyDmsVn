@@ -267,7 +267,8 @@ internal sealed class SecurityWorkspaceEditorBindings
     void RenderMembershipActions()
     {
         var user = Vm.SelectedUser;
-        var hint = !Vm.IsCurrent || !Vm.Users.IsCurrent(Vm.OwnerVersion) ? "Người dùng chưa khả dụng." :
+        var hint = Vm.Users.State == SecurityDatasetState.Forbidden ? "Không đủ quyền quản lý người dùng." :
+            !Vm.IsCurrent || !Vm.Users.IsCurrent(Vm.OwnerVersion) ? "Người dùng chưa khả dụng." :
             user == null ? "Chọn người dùng để quản lý vai trò." :
             user.IsProtectedAccount ? "Tài khoản được bảo vệ — bảo trì bên ngoài màn này." :
             !Vm.Roles.IsCurrent(Vm.OwnerVersion) ? "Vai trò chưa khả dụng — tải lại dữ liệu trước khi thay đổi." :

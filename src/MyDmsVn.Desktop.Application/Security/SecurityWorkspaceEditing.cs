@@ -119,7 +119,8 @@ public sealed partial class SecurityWorkspaceViewModel
                     RevokeTargetData(request.Target);
                 else if (response.Error?.Status == ApiStatusCode.Conflict)
                     MarkRecovery(request.Target, request.Operation == SecurityAdministrationOperationDto.SetMembership);
-                EditingStatus = response.Error?.Status == ApiStatusCode.Conflict ? "Xung đột" : "Không lưu được thay đổi";
+                EditingStatus = response.Error?.Status == ApiStatusCode.Conflict ? "Xung đột" :
+                    response.Error?.Status == ApiStatusCode.Forbidden ? "Không đủ quyền" : "Không lưu được thay đổi";
                 Notify();
                 return false;
             }
