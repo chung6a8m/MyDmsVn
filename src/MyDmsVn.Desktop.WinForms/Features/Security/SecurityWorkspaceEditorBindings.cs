@@ -137,7 +137,7 @@ internal sealed class SecurityWorkspaceEditorBindings
                 Vm.ReviewRecoveryAndRebase();
             return Task.CompletedTask;
         });
-        control.UserDetail.Tabs.TabPages[0].Controls.Add(_recovery);
+        control.UserDetail.Controls.Add(_recovery);
         GuardTabs(control.Tabs);
         GuardTabs(control.UserDetail.Tabs);
         GuardTabs(control.RoleDetail.Tabs);
@@ -164,8 +164,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         {
             _status.Text = Vm.EditingStatus;
             var recoveryOwner = Vm.RecoveryTarget == SecurityAdministrationTargetDto.Role
-                ? (Control)_control.RoleDetail.GrantArea
-                : Vm.DirectPermissionKey != null ? _control.UserDetail.Tabs.TabPages[3] : _control.UserDetail.Tabs.TabPages[0];
+                ? (Control)_control.RoleDetail : _control.UserDetail;
             if (_recovery.Parent != recoveryOwner)
             {
                 recoveryOwner.Controls.Add(_recovery);

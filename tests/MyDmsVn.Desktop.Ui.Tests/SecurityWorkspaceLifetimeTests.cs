@@ -149,8 +149,9 @@ public sealed class SecurityWorkspaceLifetimeTests
             control.RecoveryConfirmationOverride = () => true;
 
             var review = Find(control).Single(button => button.Text == "Đã đối chiếu — lập diff mới");
-            Assert.Same(control.UserDetail.Tabs.TabPages[3], review.Parent!.Parent);
+            Assert.Same(control.UserDetail, review.Parent!.Parent);
             Assert.True(review.Parent.Visible);
+            Assert.InRange(review.Parent.Bottom, 1, control.UserDetail.ClientSize.Height);
             review.PerformClick();
             Pump(control.LastOperation);
             Assert.True(control.ViewModel.RequiresRecovery);
@@ -164,6 +165,25 @@ public sealed class SecurityWorkspaceLifetimeTests
             Assert.False(review.Parent!.Visible);
             Assert.True(control.ViewModel.HasDirtyEditor);
             Assert.Equal(3, control.UserDetail.Tabs.SelectedIndex);
+        });
+
+    [Fact]
+    public void Role_recovery_is_reachable_from_members_tab() => SecurityWorkspaceControlTests.Run(
+        SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 1;
+            var role = control.ViewModel.SelectedRole!;
+            scene.Administration.RolesError = new ApiError(ApiStatusCode.InternalServerError, "Failed", "Roles unavailable.");
+            Pump(control.ViewModel.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(
+                SecurityAdministrationTargetDto.Role, SecurityAdministrationOperationDto.SetActive,
+                role.RoleId, isActive: false, expectedRevision: role.AssignmentRevision), default));
+            Assert.True(control.ViewModel.RequiresRecovery);
+            var reload = Find(control).Single(button => button.Text == "Tải lại để đối chiếu");
+            Assert.Same(control.RoleDetail, reload.Parent!.Parent);
+            Assert.True(reload.Visible);
+            Assert.InRange(reload.Parent.Bottom, 1, control.RoleDetail.ClientSize.Height);
+            Assert.Equal(1, control.RoleDetail.Tabs.SelectedIndex);
         });
 
     static void Pump(Task task)
