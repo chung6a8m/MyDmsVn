@@ -130,6 +130,8 @@ treating missing data as an empty state. Partial completion and stop reason rema
 2. Start import from an authorized selected user or role context; inspect preview, additions, target revision and catalog digest; cancel confirmation, then repeat and confirm.
 3. Inject malformed/unknown/Deprecated keys, inactive/protected or unauthorized target, stale preview, target switch and catalog change before Apply.
 
+For stale-preview review in the SQL-free Lab, choose a valid contextual import, then use **Đổi revision đối tượng** or **Đổi catalog digest** in the Lab confirmation dialog before **Áp dụng**. Reset between cases. Inspect the dialog's original preview revision/digest, the journal's Preview → review fault → Apply order, the reported Conflict and the unchanged assignment. These controls change only the Lab fixture.
+
 Expected: catalog navigation never dispatches an assignment mutation. Import is contextual and additive, retains the existing preview/confirmation contract and cannot act as replace-all role Save. Cancel
 dispatches no Apply. Apply uses the exact preview target/revision/digest and revalidation result. Stale/invalid/unauthorized/inactive/protected cases remain rejected without automatic retry; a late preview cannot
 confirm another target.
