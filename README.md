@@ -4,9 +4,11 @@ Windows desktop-first SME business software for Sales and Inventory. Local v1 in
 
 ## Current development status — v1a-pro-ui-next
 
-**Updated:** 2026-10-25. The [current execution index](docs/plans/README.md) selects the Owner-requested Sidebar horizontal-scrollbar follow-up and routes to its sole plan; that plan owns task state and verification. The [archive boundary](docs/archive/20261025-pre-next-roadmap/README.md) preserves prior work and exact-candidate limits after merged PR #48. Read [AGENTS](AGENTS.md), [AI_CONTEXT](AI_CONTEXT.md) and the sole [TEST_POLICY](docs/TEST_POLICY.md) before acting on that scope.
+**Updated:** 2026-10-25. The [current execution index](docs/plans/README.md) routes the Owner-requested Sidebar horizontal-scrollbar follow-up and the planned Security workspace; each plan owns task state and verification for its scope. The [archive boundary](docs/archive/20261025-pre-next-roadmap/README.md) preserves prior work and exact-candidate limits after merged PR #48. Read [AGENTS](AGENTS.md), [AI_CONTEXT](AI_CONTEXT.md) and the sole [TEST_POLICY](docs/TEST_POLICY.md) before acting on that scope.
 
 [Documentation index](docs/README.md) · [Development-plan alias](docs/DEVELOPMENT_PLAN.md) · [Architecture decisions](docs/adr/README.md)
+
+The current [UI Lab](docs/development/UI_LAB.md) remains Sales-only. The planned [Security workstream](docs/plans/20261025-002-security-administration-ui-lab-first.md) has a [UI/behavior specification](docs/design/SECURITY_ADMINISTRATION_UI.md) and [review guide](docs/development/SECURITY_UI_LAB_REVIEW.md). SQL-free review of the actual candidate and dated explicit Owner approval at SEC-T05 must precede SEC-T06 Local cutover or SEC-T07 SQL integration. Documentation and mockups do not approve that gate.
 
 [UI-NEXT](docs/ui-next/README.md) is retained as a historical design and acceptance reference. Its [DateInput candidate evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md) and [T13 ledger](docs/ui-next/evidence/20261024-uin-t13-integration.md) retain exact revisions, original failures and bounded acceptance; their former prompts do not schedule new work.
 

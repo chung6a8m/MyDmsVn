@@ -2,6 +2,12 @@
 
 The Sales UI Lab is a separate net48 WinForms development host for the existing `SalesReceiptControl`. It is intended for inspecting list/editor input, session and response races without a SQL instance or real Login. The Lab does not run the production Local adapter or prove Server authorization, SQL valuation, posting atomicity or a release package. The [archived A0/A1 record](../archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md) retains historical implementation state and candidate evidence; this page owns repeatable use and commands.
 
+## Planned Security extension
+
+The current host and scenarios described below remain Sales-only. The [Security UI specification](../design/SECURITY_ADMINISTRATION_UI.md) and [Security UI Labs review guide](SECURITY_UI_LAB_REVIEW.md) describe a planned extension using the actual candidate production components with fake ports. The [Security implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) alone owns its task state and gate decision; the review guide does not describe an already available Security scene picker.
+
+The extension must stay SQL-free through UI Labs review and dated explicit Owner approval at SEC-T05. SEC-T06 Local cutover and SEC-T07 SQL integration depend on that approval. This documentation PR, mockups and historical Sales Lab passes do not approve Security or prove its implementation. Preserve the Sales scenarios and commands below while implementing the separately authorized extension.
+
 ## Prerequisites and source boundaries
 
 Use an interactive Windows desktop with .NET Framework 4.8 targeting/runtime support, the SDK pinned by [`global.json`](../../global.json), and the repository's pinned submodules. Do not update submodules to remote HEAD. The source projects are:

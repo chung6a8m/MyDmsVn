@@ -10,7 +10,7 @@
 
 **Spec:** The reported behavior and acceptance contract in sections 1 and 3, with the [two reviewed Owner screenshots](../design-references/sidebar-horizontal-scrollbar/README.md).
 
-**Status:** PLANNED / NOT STARTED. The Owner requested this plan on `v1a-pro-ui-next`; this commit changes documentation and reference images only. Implementation and runtime verification have not been performed. This is the sole selected follow-up scope in the [execution index](README.md), not a replacement product roadmap.
+**Status:** PLANNED / NOT STARTED. The Owner requested this plan on `v1a-pro-ui-next`; this commit changes documentation and reference images only. Implementation and runtime verification have not been performed. This is the selected Sidebar follow-up scope in the [execution index](README.md), alongside the separately planned Security workstream; it is not a replacement product roadmap.
 
 **Inspected baseline:** `chung6a8m/MyDmsVn@b9fe4756b8ec68fabca74b1fd9a8fb1899a10c3d` on `v1a-pro-ui-next`. The consumer gitlink is `vendor/MyDmsVn.WinFormsKit@c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Re-read the branch and gitlink before implementation; record any relevant drift.
 
