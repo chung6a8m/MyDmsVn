@@ -12,7 +12,7 @@ namespace MyDmsVn.Desktop.WinForms.Features.Security;
 internal sealed class SecurityWorkspaceEditorBindings
 {
     readonly SecurityWorkspaceControl _control;
-    readonly CheckedListBox _grants = new() { Dock = DockStyle.Fill, CheckOnClick = true, AccessibleName = "Cấp quyền cho vai trò" };
+    readonly RoleGrantList _grants = new() { Dock = DockStyle.Fill, CheckOnClick = true, AccessibleName = "Cấp quyền cho vai trò" };
     readonly ComboBox _directKey = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Quyền riêng" };
     readonly RadioButton _inherit = new() { Text = "Theo vai trò", AutoSize = true };
     readonly RadioButton _allow = new() { Text = "Cho phép", AutoSize = true };
@@ -34,6 +34,11 @@ internal sealed class SecurityWorkspaceEditorBindings
         control.RoleDetail.Tabs.TabPages[0].Controls.Add(_grants);
         _grants.BringToFront();
         control.RoleDetail.Tabs.TabPages[0].Controls.Add(roleCommands);
+        _grants.SpacePressed += () =>
+        {
+            if (Vm.RoleDraft != null && _grants.SelectedItem is string key)
+                Vm.SetRoleGranted(key, !Vm.RoleDraft.DesiredKeys.Contains(key));
+        };
         _grants.ItemCheck += (_, e) =>
         {
             if (_rendering) return;
@@ -43,8 +48,9 @@ internal sealed class SecurityWorkspaceEditorBindings
                 return;
             }
             if (_grants.Items[e.Index] is not string key) return;
+            var granted = e.NewValue == CheckState.Checked;
             // ItemCheck precedes the native list update; render only after that update.
-            _control.BeginInvoke(new Action(() => Vm.SetRoleGranted(key, e.NewValue == CheckState.Checked)));
+            _control.BeginInvoke(new Action(() => Vm.SetRoleGranted(key, granted)));
         };
         var direct = Commands();
         direct.Height = 115;
@@ -126,10 +132,21 @@ internal sealed class SecurityWorkspaceEditorBindings
         try
         {
             _status.Text = Vm.EditingStatus + (Vm.HasDirtyEditor ? " · Có thay đổi chưa lưu" : "") + (Vm.RoleDraft != null ? " · " + Vm.RoleDraft.Changes.Count + " thay đổi" : "");
-            _grants.Items.Clear();
+            var selectedGrant = _grants.SelectedItem as string;
             var role = Vm.SelectedRole;
-            foreach (var key in Vm.Catalog.Items.Where(k => k.Status == "Active")) _grants.Items.Add(key.Key,
-                Vm.RoleDraft != null && Vm.RoleDraft.RoleId == role?.RoleId ? Vm.RoleDraft.DesiredKeys.Contains(key.Key) : role?.PermissionKeys.Contains(key.Key) == true);
+            var activeKeys = Vm.Catalog.Items.Where(k => k.Status == "Active").Select(k => k.Key).ToArray();
+            if (_grants.Items.Count != activeKeys.Length || activeKeys.Where((key, index) => !string.Equals(_grants.Items[index] as string, key, StringComparison.Ordinal)).Any())
+            {
+                _grants.Items.Clear();
+                foreach (var key in activeKeys) _grants.Items.Add(key);
+                if (selectedGrant != null) _grants.SelectedIndex = _grants.Items.IndexOf(selectedGrant);
+            }
+            for (var index = 0; index < activeKeys.Length; index++)
+            {
+                var key = activeKeys[index];
+                var granted = Vm.RoleDraft != null && Vm.RoleDraft.RoleId == role?.RoleId ? Vm.RoleDraft.DesiredKeys.Contains(key) : role?.PermissionKeys.Contains(key) == true;
+                if (_grants.GetItemChecked(index) != granted) _grants.SetItemChecked(index, granted);
+            }
             _grants.Enabled = role != null && Vm.Catalog.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
             _grants.AccessibleDescription = Vm.RoleDraft == null ? "Chỉ xem. Chọn Sửa quyền để thay đổi." : "Đang sửa quyền của vai trò.";
             var selected = Vm.DirectPermissionKey;
@@ -267,5 +284,21 @@ internal sealed class SecurityWorkspaceEditorBindings
         var button = new Button { Text = text, AutoSize = true };
         panel.Controls.Add(button);
         button.Click += async (_, _) => await _control.TrackOperation(action());
+    }
+}
+
+internal sealed class RoleGrantList : CheckedListBox
+{
+    internal event Action? SpacePressed;
+
+    protected override void WndProc(ref Message message)
+    {
+        if ((message.Msg == 0x0100 || message.Msg == 0x0101 || message.Msg == 0x0102) && message.WParam.ToInt32() == (int)Keys.Space)
+        {
+            if (message.Msg == 0x0100 && (message.LParam.ToInt64() & (1L << 30)) == 0)
+                SpacePressed?.Invoke();
+            return;
+        }
+        base.WndProc(ref message);
     }
 }

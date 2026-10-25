@@ -29,6 +29,10 @@ public sealed class SecurityPaneStateTests
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
             Assert.Equal(4, control.PermissionCatalog.Keys.Rows.Count);
             Assert.False(control.ViewModel.BeginDirectPermission("Sales.Receipts.Read"));
+            scene.Administration.UsersError = null;
+            Wait(control.ActivateAsync(default));
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
+            Assert.Equal(3, control.Users.Items.Count);
         });
 
     [Theory]
@@ -46,6 +50,10 @@ public sealed class SecurityPaneStateTests
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
             Assert.Equal(3, control.Users.Items.Count);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
+            scene.Administration.RolesError = null;
+            Wait(control.ActivateAsync(default));
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
+            Assert.Equal(3, control.Roles.Items.Count);
         });
 
     [Theory]
@@ -63,6 +71,10 @@ public sealed class SecurityPaneStateTests
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
             Assert.Equal(3, control.Users.Items.Count);
             Assert.Equal(3, control.Roles.Items.Count);
+            scene.Catalog.Error = null;
+            Wait(control.ActivateAsync(default));
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
+            Assert.Equal(4, control.PermissionCatalog.Keys.Rows.Count);
         });
 
     [Fact]
@@ -81,6 +93,45 @@ public sealed class SecurityPaneStateTests
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
             Assert.Empty(control.Users.Items);
             Assert.Null(control.ViewModel.SelectedUser);
+            Assert.Equal(3, control.Roles.Items.Count);
+        });
+
+    [Fact]
+    public void Held_role_read_exposes_loading_then_successful_empty_independently() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            var gate = new ScenarioGate<ApiResponse<System.Collections.Generic.IReadOnlyList<SecurityRoleDto>>> { IgnoreCancellation = true };
+            scene.Administration.RolesGate = gate;
+            var loading = control.ActivateAsync(default);
+            Assert.False(loading.IsCompleted);
+            Assert.Equal(SecurityDatasetState.Loading, control.ViewModel.Roles.State);
+            Assert.Empty(control.Roles.Items);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
+            gate.Complete(ApiResponse<System.Collections.Generic.IReadOnlyList<SecurityRoleDto>>.Success(Array.Empty<SecurityRoleDto>()));
+            Wait(loading);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
+            Assert.Empty(control.Roles.Items);
+            Assert.Null(control.ViewModel.SelectedRole);
+            Assert.Equal(3, control.Users.Items.Count);
+        });
+
+    [Fact]
+    public void Held_catalog_read_exposes_loading_then_successful_empty_independently() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            var gate = new ScenarioGate<ApiResponse<PermissionCatalogDto>> { IgnoreCancellation = true };
+            scene.Catalog.Gate = gate;
+            var loading = control.ActivateAsync(default);
+            Assert.False(loading.IsCompleted);
+            Assert.Equal(SecurityDatasetState.Loading, control.ViewModel.Catalog.State);
+            Assert.Empty(control.PermissionCatalog.Keys.Rows);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
+            gate.Complete(ApiResponse<PermissionCatalogDto>.Success(new PermissionCatalogDto("test", "empty-catalog", Array.Empty<PermissionCatalogItemDto>())));
+            Wait(loading);
+            Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
+            Assert.Empty(control.PermissionCatalog.Keys.Rows);
+            Assert.Equal(3, control.Users.Items.Count);
             Assert.Equal(3, control.Roles.Items.Count);
         });
 

@@ -79,6 +79,44 @@ public sealed class SecurityNativeAndResetTests
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
+    [Fact]
+    public void Native_enter_starts_and_discards_role_grant_draft_without_dispatch() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 0;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var buttons = Descendants(control.RoleDetail).OfType<Button>().ToArray();
+            var edit = Assert.Single(buttons, item => item.Text == "Sửa quyền");
+            var cancel = Assert.Single(buttons, item => item.Text == "Hủy thay đổi");
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
+            grants.SelectedIndex = 0;
+            var before = grants.GetItemChecked(0);
+            Assert.True(grants.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.Equal(before, grants.GetItemChecked(0));
+            Assert.Null(control.ViewModel.RoleDraft);
+            Assert.True(edit.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.NotNull(control.ViewModel.RoleDraft);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            grants.SelectedIndex = 0;
+            Assert.True(grants.Focus());
+            var item = grants.GetItemRectangle(0);
+            NativeLookupTypingDriver.Click(grants, new Point(item.Left + 20, item.Top + item.Height / 2));
+            Assert.Equal(!before, grants.GetItemChecked(0));
+            Assert.Equal(0, grants.SelectedIndex);
+            Assert.True(grants.ContainsFocus);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.Equal(before, grants.GetItemChecked(0));
+            Assert.False(control.ViewModel.HasDirtyEditor);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            Assert.True(cancel.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.Null(control.ViewModel.RoleDraft);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
     static System.Collections.Generic.IEnumerable<Control> Descendants(Control root)
     {
         foreach (Control child in root.Controls)
