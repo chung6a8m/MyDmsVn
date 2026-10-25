@@ -53,12 +53,43 @@ internal static class SecurityPresentation
 
 internal sealed class SecurityMasterListBox : ListBox
 {
+    readonly ToolTip _itemTip = new();
+    int _tipIndex = -1;
+
     internal SecurityMasterListBox()
     {
         DrawMode = DrawMode.OwnerDrawFixed;
-        ItemHeight = 58;
+        ItemHeight = 74;
         IntegralHeight = false;
     }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        var index = IndexFromPoint(e.Location);
+        if (index == _tipIndex) return;
+        _tipIndex = index;
+        _itemTip.SetToolTip(this, index < 0 || index >= Items.Count ? "" : FullText(Items[index]));
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        _tipIndex = -1;
+        _itemTip.SetToolTip(this, "");
+        base.OnMouseLeave(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) _itemTip.Dispose();
+        base.Dispose(disposing);
+    }
+
+    internal static string FullText(object item) => item is SecurityUserDto user
+        ? user.DisplayName + " · @" + user.Username + " · " + (user.IsActive ? "Hoạt động" : "Ngừng hoạt động")
+        : item is SecurityRoleDto role
+            ? role.Name + " · " + role.MemberUserIds.Count + " thành viên · " + (role.IsActive ? "Hoạt động" : "Ngừng hoạt động")
+            : item.ToString() ?? "";
 
     protected override void OnDrawItem(DrawItemEventArgs e)
     {
@@ -72,9 +103,11 @@ internal sealed class SecurityMasterListBox : ListBox
         var sub = item is SecurityUserDto u ? u.Username : item is SecurityRoleDto r ? r.MemberUserIds.Count + " thành viên" : "";
         var active = item is SecurityUserDto uu ? uu.IsActive : item is SecurityRoleDto rr && rr.IsActive;
         var status = active ? "Hoạt động" : "Ngừng hoạt động";
-        var titleRect = new Rectangle(e.Bounds.Left + 10, e.Bounds.Top + 6, Math.Max(0, e.Bounds.Width - 20), 21);
-        var subRect = new Rectangle(e.Bounds.Left + 10, e.Bounds.Top + 30, Math.Max(0, e.Bounds.Width - 145), 19);
-        var badgeRect = new Rectangle(Math.Max(e.Bounds.Left + 10, e.Bounds.Right - 138), e.Bounds.Top + 30, 128, 19);
+        var textWidth = Math.Max(0, e.Bounds.Width - 20);
+        var titleRect = new Rectangle(e.Bounds.Left + 10, e.Bounds.Top + 4, textWidth, 20);
+        var subRect = new Rectangle(e.Bounds.Left + 10, e.Bounds.Top + 27, textWidth, 19);
+        var badgeWidth = Math.Min(128, textWidth);
+        var badgeRect = new Rectangle(e.Bounds.Left + 10, e.Bounds.Top + 50, badgeWidth, 19);
         using var badgeBackground = new SolidBrush(theme.SurfaceSecondary);
         using var badgeBorder = new Pen(theme.MutedText);
         e.Graphics.FillRectangle(badgeBackground, badgeRect);

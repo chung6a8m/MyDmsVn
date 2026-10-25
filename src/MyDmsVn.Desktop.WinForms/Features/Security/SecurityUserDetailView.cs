@@ -24,6 +24,7 @@ public sealed class SecurityUserDetailView : UserControl
     public event Action<string>? DirectPermissionRequested;
     readonly Label _profile = new() { Dock = DockStyle.Fill, Padding = new Padding(12), AutoEllipsis = true };
     SecurityWorkspaceViewModel? _viewModel;
+    int? _renderedDirectUserId;
     bool _rendering;
 
     public SecurityUserDetailView()
@@ -95,17 +96,32 @@ public sealed class SecurityUserDetailView : UserControl
         Module.SelectedIndex = selectedModule != null && Module.Items.Contains(selectedModule) ? Module.Items.IndexOf(selectedModule) : 0;
         _rendering = false;
         Filter();
+        var selectedDirectKey = _renderedDirectUserId == user?.UserId
+            ? (DirectDecisions.SelectedItem as DirectDecisionItem)?.Key : null;
+        var firstVisibleDirect = _renderedDirectUserId == user?.UserId ? DirectDecisions.TopIndex : 0;
         _rendering = true;
-        DirectDecisions.Items.Clear();
-        if (user != null)
-            foreach (var decision in user.DirectDecisions)
+        try
+        {
+            DirectDecisions.Items.Clear();
+            if (user != null)
+                foreach (var decision in user.DirectDecisions)
+                {
+                    var key = viewModel.Catalog.Items.FirstOrDefault(item => item.Key == decision.PermissionKey);
+                    var label = key == null ? decision.PermissionKey : SecurityPresentation.Name(key) + " · " + decision.PermissionKey;
+                    var history = !viewModel.Catalog.IsCurrent(viewModel.OwnerVersion) ? " · Danh mục chưa khả dụng" : key == null ? " · Không còn trong danh mục" : key.Status == "Active" ? "" : " · Ngừng dùng";
+                    DirectDecisions.Items.Add(new DirectDecisionItem(decision.PermissionKey, label + " · " + (decision.Decision == true ? "Cho phép" : decision.Decision == false ? "Từ chối" : "Theo vai trò") + history, key?.Status == "Active"));
+                }
+            if (selectedDirectKey != null)
             {
-                var key = viewModel.Catalog.Items.FirstOrDefault(item => item.Key == decision.PermissionKey);
-                var label = key == null ? decision.PermissionKey : SecurityPresentation.Name(key) + " · " + decision.PermissionKey;
-                var history = !viewModel.Catalog.IsCurrent(viewModel.OwnerVersion) ? " · Danh mục chưa khả dụng" : key == null ? " · Không còn trong danh mục" : key.Status == "Active" ? "" : " · Ngừng dùng";
-                DirectDecisions.Items.Add(new DirectDecisionItem(decision.PermissionKey, label + " · " + (decision.Decision == true ? "Cho phép" : decision.Decision == false ? "Từ chối" : "Theo vai trò") + history, key?.Status == "Active"));
+                var selectedIndex = DirectDecisions.Items.Cast<DirectDecisionItem>().ToList()
+                    .FindIndex(item => item.Key == selectedDirectKey);
+                if (selectedIndex >= 0) DirectDecisions.SelectedIndex = selectedIndex;
             }
-        _rendering = false;
+            if (DirectDecisions.Items.Count > 0)
+                DirectDecisions.TopIndex = Math.Min(firstVisibleDirect, DirectDecisions.Items.Count - 1);
+            _renderedDirectUserId = user?.UserId;
+        }
+        finally { _rendering = false; }
     }
 
     void Filter()

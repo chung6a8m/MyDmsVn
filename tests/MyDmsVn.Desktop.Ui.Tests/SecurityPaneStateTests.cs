@@ -82,9 +82,13 @@ public sealed class SecurityPaneStateTests
             Assert.Equal(3, control.Users.Items.Count);
             Assert.Equal(3, control.Roles.Items.Count);
             scene.Catalog.Error = null;
-            Wait(control.ActivateAsync(default));
+            control.Tabs.SelectedIndex = 2;
+            control.PermissionCatalog.RefreshButton.PerformClick();
+            Wait(control.LastOperation);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
             Assert.Equal(4, control.PermissionCatalog.Keys.Rows.Count);
+            Assert.Equal(3, control.Users.Items.Count);
+            Assert.Equal(3, control.Roles.Items.Count);
         });
 
     [Fact]
@@ -102,6 +106,8 @@ public sealed class SecurityPaneStateTests
             Wait(loading);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
             Assert.Empty(control.Users.Items);
+            Assert.True(control.UserPaneStatus.Visible);
+            Assert.Equal("Chưa có người dùng", control.UserPaneStatus.Text);
             Assert.Null(control.ViewModel.SelectedUser);
             Assert.Equal(3, control.Roles.Items.Count);
         });
@@ -121,6 +127,9 @@ public sealed class SecurityPaneStateTests
             Wait(loading);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
             Assert.Empty(control.Roles.Items);
+            control.Tabs.SelectedIndex = 1;
+            Assert.True(control.RolePaneStatus.Visible);
+            Assert.Equal("Chưa có vai trò", control.RolePaneStatus.Text);
             Assert.Null(control.ViewModel.SelectedRole);
             Assert.Equal(3, control.Users.Items.Count);
         });

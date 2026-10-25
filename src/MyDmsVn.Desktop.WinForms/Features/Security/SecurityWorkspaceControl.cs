@@ -98,6 +98,7 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         UserActivity.SelectedIndexChanged += (_, _) => FilterMasters();
         RoleActivity.SelectedIndexChanged += (_, _) => FilterMasters();
         UserDetail.RefreshButton.Click += async (_, _) => { if (await AdmitNavigationAsync()) await ActivateAsync(CancellationToken.None); };
+        PermissionCatalog.RefreshButton.Click += async (_, _) => { if (await AdmitNavigationAsync()) await ActivateAsync(CancellationToken.None); };
         BusinessCompactAppearance.Apply(this);
         BootstrapThemeManager.ThemeChanged += ThemeChanged;
         ApplyTheme(this);
@@ -199,10 +200,14 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         try
         {
             FilterMasters();
-            UserPaneStatus.Text = ViewModel.Users.State == SecurityDatasetState.Ready ? "" : "Người dùng: " + SecurityPresentation.Dataset(ViewModel.Users.State);
-            RolePaneStatus.Text = ViewModel.Roles.State == SecurityDatasetState.Ready ? "" : "Vai trò: " + SecurityPresentation.Dataset(ViewModel.Roles.State);
-            UserPaneStatus.Visible = ViewModel.Users.State != SecurityDatasetState.Ready;
-            RolePaneStatus.Visible = ViewModel.Roles.State != SecurityDatasetState.Ready;
+            UserPaneStatus.Text = ViewModel.Users.State == SecurityDatasetState.Ready
+                ? ViewModel.Users.Items.Count == 0 ? "Chưa có người dùng" : ""
+                : "Người dùng: " + SecurityPresentation.Dataset(ViewModel.Users.State);
+            RolePaneStatus.Text = ViewModel.Roles.State == SecurityDatasetState.Ready
+                ? ViewModel.Roles.Items.Count == 0 ? "Chưa có vai trò" : ""
+                : "Vai trò: " + SecurityPresentation.Dataset(ViewModel.Roles.State);
+            UserPaneStatus.Visible = UserPaneStatus.Text.Length > 0;
+            RolePaneStatus.Visible = RolePaneStatus.Text.Length > 0;
             DatasetStatus.Text = "Người dùng: " + SecurityPresentation.Dataset(ViewModel.Users.State) + " · Vai trò: " + SecurityPresentation.Dataset(ViewModel.Roles.State) + " · Danh mục: " + SecurityPresentation.Dataset(ViewModel.Catalog.State);
             DatasetStatus.Visible = ViewModel.Users.State != SecurityDatasetState.Ready || ViewModel.Roles.State != SecurityDatasetState.Ready || ViewModel.Catalog.State != SecurityDatasetState.Ready;
             UserDetail.Render(ViewModel);

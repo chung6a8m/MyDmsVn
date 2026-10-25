@@ -9,6 +9,7 @@ using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.Application.Security;
 using MyDmsVn.Desktop.UiLab.Scenarios;
+using MyDmsVn.Desktop.WinForms;
 using MyDmsVn.Desktop.WinForms.Features.Security;
 using Xunit;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -73,6 +74,33 @@ public sealed class SecurityWorkspaceControlTests
         }
         finally { BootstrapThemeManager.CurrentTheme = theme; }
     });
+    [Theory]
+    [InlineData(900, 600)]
+    [InlineData(1200, 760)]
+    public void Expanded_shell_keeps_master_metadata_and_actions_reachable(int width, int height) => Run(SecurityScenarioId.SEC_L01, (control, data) =>
+    {
+        using var shellViewModel = new FoundationViewModel(new UnusedFoundationApi());
+        using var shell = new FoundationShellForm(shellViewModel, data.Session, new DesktopNotificationCenter())
+        {
+            Size = new System.Drawing.Size(width, height)
+        };
+        shell.Show();
+        Assert.True(shell.Navigation.Expanded);
+        Assert.NotNull(shell.OpenWorkspace("security-ui-lab-geometry", "Security", control, data.Session.Version));
+        shell.PerformLayout();
+        System.Windows.Forms.Application.DoEvents();
+        control.Tabs.SelectedIndex = 0;
+        System.Windows.Forms.Application.DoEvents();
+        Assert.True(control.Users.ClientSize.Width - 20 >= 100, "Master secondary text needs a visible line in the expanded shell.");
+        Assert.True(control.Users.ItemHeight >= 69);
+        Assert.Contains("lan", control.Users.GetItemText(control.Users.Items[0]));
+        AssertActionReachable(control.UserDetail.HeaderActions);
+        control.Tabs.SelectedIndex = 1;
+        System.Windows.Forms.Application.DoEvents();
+        Assert.True(control.Roles.ClientSize.Width - 20 >= 100);
+        Assert.Contains("thành viên", control.Roles.GetItemText(control.Roles.Items[0]));
+        AssertActionReachable(control.RoleDetail.HeaderActions);
+    });
     [Fact]
     public void Filters_preserve_selected_owner_and_show_catalog_lifecycle() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
     {
@@ -119,7 +147,10 @@ public sealed class SecurityWorkspaceControlTests
     {
         control.Tabs.SelectedIndex = 2;
         Assert.Equal(data.Data.Catalog.Items.Count, control.PermissionCatalog.Keys.Rows.Count);
-        Assert.Single(Descendants(control.PermissionCatalog, typeof(Button)));
+        var actions = Descendants(control.PermissionCatalog, typeof(Button)).Cast<Button>().Select(button => button.Text).ToArray();
+        Assert.Equal(2, actions.Length);
+        Assert.Contains("Sao chép mã quyền", actions);
+        Assert.Contains("Làm mới", actions);
         Assert.Equal(data.Data.Catalog.Items.Select(item => item.Module).Distinct().Count() + 1, control.PermissionCatalog.ModuleGroups.Items.Count);
         Assert.Contains("Tất cả", control.PermissionCatalog.ModuleGroups.Items[0]!.ToString());
         control.PermissionCatalog.ModuleGroups.SelectedIndex = 1;
@@ -128,6 +159,17 @@ public sealed class SecurityWorkspaceControlTests
         control.PermissionCatalog.Keys.CurrentCell = control.PermissionCatalog.Keys.Rows[0].Cells[0];
         Assert.Contains("Sales.Receipts.Read", control.PermissionCatalog.Details.Text);
         Assert.Contains("CHI TIẾT QUYỀN", control.PermissionCatalog.Details.Text);
+    });
+    [Fact]
+    public void Catalog_search_matches_the_displayed_friendly_name() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        scene.Data.Catalog = new PermissionCatalogDto("UI Lab", "different-description",
+            scene.Data.Catalog.Items.Select(item => item.Key == "Sales.Receipts.Read"
+                ? new PermissionCatalogItemDto(item.Key, item.Module, "Other description", item.Status) : item).ToArray());
+        Wait(control.ActivateAsync(default));
+        control.PermissionCatalog.Search.Text = "Xem phiếu bán hàng";
+        Assert.Single(control.PermissionCatalog.Keys.Rows);
+        Assert.Equal("Sales.Receipts.Read", control.PermissionCatalog.Keys.Rows[0].Cells[1].Value);
     });
     [Fact]
     public void Master_and_identity_views_show_separate_hierarchy() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
@@ -161,6 +203,34 @@ public sealed class SecurityWorkspaceControlTests
         Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
     });
     [Fact]
+    public void Direct_decision_render_preserves_selected_key_and_scroll_position() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var original = scene.Data.Users[0];
+        var decisions = Enumerable.Range(0, 6).Select(index => new SecurityDecisionDto("Legacy.Key" + index, false))
+            .Concat(new[] { new SecurityDecisionDto("Sales.Receipts.Post", false) })
+            .Concat(Enumerable.Range(6, 6).Select(index => new SecurityDecisionDto("Legacy.Key" + index, false))).ToArray();
+        scene.Data.Users[0] = new SecurityUserDto(original.UserId, original.Username, original.DisplayName,
+            original.Email, original.IsActive, original.AssignmentRevision, original.RoleIds, decisions, original.IsProtectedAccount);
+        Wait(control.ActivateAsync(default));
+        control.UserDetail.Tabs.SelectedIndex = 3;
+        var list = control.UserDetail.DirectDecisions;
+        list.Height = 66;
+        list.TopIndex = 4;
+        list.SelectedIndex = 6;
+        Until(() => control.ViewModel.DirectPermissionKey == "Sales.Receipts.Post");
+        var top = list.TopIndex;
+        control.ViewModel.SelectUser(101);
+        Assert.Equal(6, list.SelectedIndex);
+        Assert.Contains("Sales.Receipts.Post", list.SelectedItem!.ToString());
+        Assert.Equal(top, list.TopIndex);
+        Assert.True(list.Focus());
+        NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+        Assert.Equal(7, list.SelectedIndex);
+        NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Up);
+        Assert.Equal(6, list.SelectedIndex);
+        Assert.Equal(101, control.ViewModel.SelectedUserId);
+    });
+    [Fact]
     public void Role_editor_has_filters_history_and_contextual_recovery() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
         control.Tabs.SelectedIndex = 1;
@@ -192,6 +262,36 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Single(control.ViewModel.RoleDraft!.Changes);
         Assert.Contains("1 thay đổi", control.RoleDetail.GrantArea.Controls.Cast<Control>().OfType<Label>().Single().Text);
         Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
+    });
+    [Fact]
+    public void Deferred_role_check_cannot_edit_a_replacement_draft() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(CheckedListBox)).Cast<CheckedListBox>());
+        var index = grants.Items.IndexOf("Sales.Receipts.Post");
+        Assert.True(index >= 0);
+        grants.SetItemChecked(index, true);
+        control.ViewModel.SelectRole(202);
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        var replacement = control.ViewModel.RoleDraft;
+        System.Windows.Forms.Application.DoEvents();
+        Assert.Same(replacement, control.ViewModel.RoleDraft);
+        Assert.Empty(replacement!.Changes);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Fact]
+    public void Role_member_labels_include_username_and_activity() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.ViewModel.SelectRole(201);
+        Assert.Contains("@lan", control.RoleDetail.Members.Items[0]!.ToString());
+        Assert.Contains("Đang hoạt động", control.RoleDetail.Members.Items[0]!.ToString());
+        var original = scene.Data.Users[0];
+        scene.Data.Users[0] = new SecurityUserDto(original.UserId, original.Username, original.DisplayName,
+            original.Email, false, original.AssignmentRevision, original.RoleIds, original.DirectDecisions, original.IsProtectedAccount);
+        Wait(control.ActivateAsync(default));
+        Assert.Contains("Ngừng hoạt động", control.RoleDetail.Members.Items[0]!.ToString());
     });
     [Fact]
     public void Unmapped_catalog_key_with_no_description_keeps_its_canonical_name() => Run(SecurityScenarioId.SEC_L01, (control, data) =>
@@ -548,5 +648,22 @@ public sealed class SecurityWorkspaceControlTests
         var timer = Stopwatch.StartNew();
         while (!condition() && timer.Elapsed < TimeSpan.FromSeconds(6)) { System.Windows.Forms.Application.DoEvents(); Thread.Yield(); }
         Assert.True(condition());
+    }
+
+    static void AssertActionReachable(FlowLayoutPanel actions)
+    {
+        Assert.True(actions.AutoScroll);
+        var last = actions.Controls.Cast<Control>().OfType<Button>().Last();
+        actions.ScrollControlIntoView(last);
+        System.Windows.Forms.Application.DoEvents();
+        Assert.InRange(last.Left, 0, actions.ClientSize.Width);
+        Assert.InRange(last.Right, 1, actions.ClientSize.Width);
+    }
+
+    sealed class UnusedFoundationApi : IFoundationApiClient
+    {
+        public Task<MyDmsVn.Contracts.ApiResponse<MyDmsVn.Contracts.FoundationStatus>> GetStatusAsync(
+            MyDmsVn.Contracts.FoundationStatusRequest request, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Shell geometry must not request foundation data.");
     }
 }

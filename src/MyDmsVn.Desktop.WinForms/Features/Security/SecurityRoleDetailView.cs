@@ -79,7 +79,8 @@ public sealed class SecurityRoleDetailView : UserControl
             foreach (var id in role.MemberUserIds)
             {
                 var user = vm.Users.Items.FirstOrDefault(u => u.UserId == id);
-                Members.Items.Add(new SecurityMemberItem(id, user == null ? "#" + id + " — Chi tiết không khả dụng" : user.DisplayName));
+                Members.Items.Add(new SecurityMemberItem(id, user == null ? "#" + id + " — Chi tiết không khả dụng" :
+                    user.DisplayName + " · @" + user.Username + " · " + (user.IsActive ? "Đang hoạt động" : "Ngừng hoạt động")));
             }
         }
 
@@ -97,5 +98,6 @@ public sealed class SecurityRoleDetailView : UserControl
 
         public int Id { get; }
         public string Text { get; }
+        public override string ToString() => Text;
     }
 }

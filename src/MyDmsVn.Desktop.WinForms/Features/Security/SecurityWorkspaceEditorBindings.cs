@@ -67,7 +67,8 @@ internal sealed class SecurityWorkspaceEditorBindings
         _grants.ItemCheck += (_, e) =>
         {
             if (_rendering) return;
-            if (Vm.RoleDraft == null)
+            var draft = Vm.RoleDraft;
+            if (draft == null)
             {
                 e.NewValue = e.CurrentValue;
                 return;
@@ -75,7 +76,12 @@ internal sealed class SecurityWorkspaceEditorBindings
             if (_grants.Items[e.Index] is not string key) return;
             var granted = e.NewValue == CheckState.Checked;
             // ItemCheck precedes the native list update; render only after that update.
-            _control.BeginInvoke(new Action(() => Vm.SetRoleGranted(key, granted)));
+            _control.BeginInvoke(new Action(() =>
+            {
+                if (!_control.IsDisposed && Vm.IsCurrent && ReferenceEquals(Vm.RoleDraft, draft) &&
+                    Vm.SelectedRoleId == draft.RoleId && Vm.OwnerVersion == draft.SessionVersion)
+                    Vm.SetRoleGranted(key, granted);
+            }));
         };
         var direct = Commands();
         direct.Height = 115;

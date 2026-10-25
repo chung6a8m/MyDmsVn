@@ -10,6 +10,7 @@ public sealed class SecurityPermissionCatalogView : UserControl
 {
     public DataGridView Keys { get; } = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoGenerateColumns = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false };
     public Button CopyKey { get; } = new() { Text = "Sao chép mã quyền", Dock = DockStyle.Bottom, Height = 32 };
+    public Button RefreshButton { get; } = new() { Text = "Làm mới", AutoSize = true };
     public Label Count { get; } = new() { Dock = DockStyle.Bottom, Height = 24 };
     public TextBox Details { get; } = new() { Dock = DockStyle.Bottom, Multiline = true, ReadOnly = true, Height = 116, ScrollBars = ScrollBars.Vertical };
     public TextBox Search { get; } = new() { Width = 210, AccessibleName = "Tìm khóa quyền" };
@@ -27,7 +28,7 @@ public sealed class SecurityPermissionCatalogView : UserControl
     {
         Dock = DockStyle.Fill;
         var filters = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 62, WrapContents = true, AutoScroll = true };
-        filters.Controls.AddRange(new Control[] { Search, Lifecycle });
+        filters.Controls.AddRange(new Control[] { Search, Lifecycle, RefreshButton });
         Module.Items.Add("Tất cả phân hệ");
         Lifecycle.Items.AddRange(new object[] { "Tất cả vòng đời", "Đang dùng", "Ngừng dùng" });
         Module.SelectedIndex = Lifecycle.SelectedIndex = 0;
@@ -105,7 +106,7 @@ public sealed class SecurityPermissionCatalogView : UserControl
             if (Module.SelectedIndex > 0 && key.Module != Module.Text) continue;
             if (Lifecycle.SelectedIndex == 1 && key.Status != "Active") continue;
             if (Lifecycle.SelectedIndex == 2 && key.Status != "Deprecated") continue;
-            if (Search.Text.Length > 0 && (key.Key + " " + key.Description).IndexOf(Search.Text, StringComparison.CurrentCultureIgnoreCase) < 0) continue;
+            if (Search.Text.Length > 0 && (key.Key + " " + SecurityPresentation.Name(key) + " " + key.Description).IndexOf(Search.Text, StringComparison.CurrentCultureIgnoreCase) < 0) continue;
             var index = Keys.Rows.Add(SecurityPresentation.Name(key), key.Key, key.Module, key.Status == "Active" ? "Đang dùng" : "Ngừng dùng");
             Keys.Rows[index].Tag = key;
             if (key.Key == selectedKey) Keys.CurrentCell = Keys.Rows[index].Cells[0];
