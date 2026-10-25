@@ -96,10 +96,18 @@ namespace MyDmsVn.Desktop.Tests
             Pump();
             Assert.Contains("Selected", host.Controls.OfType<Button>()
                 .Single(row => ReferenceEquals(row.Tag, child)).AccessibleDescription);
+            host.ScrollControlIntoView(host.Controls.OfType<Button>().Last());
+            Pump();
+            Assert.True(host.AutoScrollPosition.Y < 0);
             Assert.True(workspaceInput.Focus());
+            var scrolledPosition = host.AutoScrollPosition.Y;
             navigation.SelectedItem = first;
             Pump();
             Assert.True(workspaceInput.Focused);
+            Assert.Equal(scrolledPosition, host.AutoScrollPosition.Y);
+            navigation.SelectedItem = null;
+            Pump();
+            Assert.Equal(scrolledPosition, host.AutoScrollPosition.Y);
             Assert.Empty(guard.Exceptions);
         }, TimeSpan.FromSeconds(15));
 
