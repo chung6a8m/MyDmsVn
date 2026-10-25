@@ -17,6 +17,52 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 public sealed class SecurityReviewScenarioTests
 {
     [Fact]
+    public void Import_review_dialog_can_change_fixture_after_preview_before_confirm()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L09, (_, scene) =>
+        {
+            const string json = "{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}";
+            var preview = scene.Administration.PreviewPermissionImportAsync(
+                PermissionImportTargetTypeDto.Role, 202, json, default).GetAwaiter().GetResult();
+            Assert.True(preview.IsSuccess);
+
+            using var dialog = new SecurityImportReviewDialog("Preview #202",
+                () => scene.AdvanceImportTargetRevision(PermissionImportTargetTypeDto.Role, 202),
+                () => scene.RotateCatalogDigest());
+            dialog.Show();
+            dialog.AdvanceTargetRevisionButton.PerformClick();
+            dialog.ConfirmButton.PerformClick();
+
+            Assert.Equal(DialogResult.OK, dialog.DialogResult);
+            var apply = scene.Administration.ApplyPermissionImportAsync(PermissionImportTargetTypeDto.Role, 202,
+                new PermissionAssignmentImportRequest(json, preview.Data!.TargetRevision, preview.Data.CatalogDigest), default).GetAwaiter().GetResult();
+            Assert.Equal(ApiStatusCode.Conflict, apply.Error!.Status);
+            Assert.DoesNotContain("Sales.Receipts.Read", scene.Data.Roles.Single(role => role.RoleId == 202).PermissionKeys);
+        });
+
+    [Fact]
+    public void Import_review_dialog_catalog_change_rejects_apply_without_assignment()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L09, (_, scene) =>
+        {
+            const string json = "{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}";
+            var preview = scene.Administration.PreviewPermissionImportAsync(
+                PermissionImportTargetTypeDto.Role, 202, json, default).GetAwaiter().GetResult();
+            Assert.True(preview.IsSuccess);
+
+            using var dialog = new SecurityImportReviewDialog("Preview #202",
+                () => scene.AdvanceImportTargetRevision(PermissionImportTargetTypeDto.Role, 202),
+                scene.RotateCatalogDigest);
+            dialog.Show();
+            dialog.RotateCatalogDigestButton.PerformClick();
+            dialog.ConfirmButton.PerformClick();
+
+            Assert.Equal(DialogResult.OK, dialog.DialogResult);
+            var apply = scene.Administration.ApplyPermissionImportAsync(PermissionImportTargetTypeDto.Role, 202,
+                new PermissionAssignmentImportRequest(json, preview.Data!.TargetRevision, preview.Data.CatalogDigest), default).GetAwaiter().GetResult();
+            Assert.Equal("Security.ImportCatalogChanged", apply.Error!.Code);
+            Assert.DoesNotContain("Sales.Receipts.Read", scene.Data.Roles.Single(role => role.RoleId == 202).PermissionKeys);
+        });
+
+    [Fact]
     public void Explicit_review_mutation_replaces_scenario_preset()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {

@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
+using MyDmsVn.Contracts.Security;
 
 namespace MyDmsVn.Desktop.UiLab.Scenarios;
 public enum SecurityScenarioId
@@ -37,6 +38,32 @@ public sealed class SecurityScenario : IDisposable
     public ScenarioPermissionCatalogApiClient Catalog { get; }
     public ScenarioSecurityAdministrationApiClient AdministrationApi => Administration;
     public ScenarioPermissionCatalogApiClient CatalogApi => Catalog;
+
+    public void AdvanceImportTargetRevision(PermissionImportTargetTypeDto type, int id)
+    {
+        if (type == PermissionImportTargetTypeDto.User)
+        {
+            var user = Data.Users.Single(item => item.UserId == id);
+            Data.Users[Data.Users.IndexOf(user)] = new SecurityUserDto(user.UserId, user.Username,
+                user.DisplayName, user.Email, user.IsActive, checked(user.AssignmentRevision + 1),
+                user.RoleIds, user.DirectDecisions, user.IsProtectedAccount);
+        }
+        else
+        {
+            var role = Data.Roles.Single(item => item.RoleId == id);
+            Data.Roles[Data.Roles.IndexOf(role)] = new SecurityRoleDto(role.RoleId, role.Name,
+                role.IsActive, checked(role.AssignmentRevision + 1), role.MemberUserIds, role.PermissionKeys);
+        }
+        Journal.Record("Security.ReviewTargetRevision", new { Target = type, TargetId = id });
+    }
+
+    public void RotateCatalogDigest()
+    {
+        var current = Data.Catalog;
+        Data.Catalog = new PermissionCatalogDto(current.ApplicationVersion,
+            current.CatalogDigest + "-review", current.Items);
+        Journal.Record("Security.ReviewCatalogDigest", new { });
+    }
 
     public void CancelPending()
     {

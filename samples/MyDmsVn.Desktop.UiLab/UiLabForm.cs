@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Drawing;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -179,6 +181,7 @@ internal sealed class UiLabForm : Form
             {
                 _securityData = SecurityScenarioCatalog.Create((SecurityScenarioId)_scenario.SelectedItem!);
                 _securityControl = new SecurityWorkspaceControl(new SecurityWorkspaceViewModel(_securityData.Administration, _securityData.Catalog, _securityData.Session, new SynchronizationContextUiDispatcher(context), _securityData.Session.Version));
+                _securityControl.SetImportDialogs(SelectSecurityImportJson, ConfirmSecurityImport);
                 _workspace.Controls.Add(_securityControl);
                 await _securityControl.ActivateAsync(_lifetime.Token);
                 _status.Text = _scenario.SelectedItem + " — ready (SQL-free Security)";
@@ -363,6 +366,29 @@ internal sealed class UiLabForm : Form
         if (_securityData == null) return;
         _securityReviewPanel.Visible = !_securityReviewPanel.Visible;
         _toolbarHost.Height = _securityReviewPanel.Visible ? 144 : 68;
+    }
+
+    private static string? SelectSecurityImportJson()
+    {
+        using var dialog = new OpenFileDialog { Title = "Nhập quyền từ JSON", Filter = "JSON (*.json)|*.json|All files (*.*)|*.*" };
+        if (dialog.ShowDialog() != DialogResult.OK) return null;
+        if (new FileInfo(dialog.FileName).Length > PermissionAssignmentImportLimits.MaximumUtf8Bytes)
+            throw new InvalidDataException("JSON exceeds the supported limit.");
+        return File.ReadAllText(dialog.FileName, new UTF8Encoding(false, true));
+    }
+
+    private bool ConfirmSecurityImport(string summary)
+    {
+        var scene = _securityData;
+        var preview = _securityControl?.ViewModel.ImportPreview;
+        if (scene == null || preview == null) return false;
+        var reviewSummary = summary + Environment.NewLine +
+            "Preview revision: " + preview.TargetRevision + Environment.NewLine +
+            "Preview catalog digest: " + preview.CatalogDigest;
+        using var dialog = new SecurityImportReviewDialog(reviewSummary,
+            () => scene.AdvanceImportTargetRevision(preview.Import.TargetType, preview.Import.TargetId),
+            scene.RotateCatalogDigest);
+        return dialog.ShowDialog(this) == DialogResult.OK;
     }
 
     private static ApiError ReviewError(ApiStatusCode status) => new ApiError(status,
