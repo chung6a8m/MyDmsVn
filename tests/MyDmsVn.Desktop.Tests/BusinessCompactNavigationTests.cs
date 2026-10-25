@@ -52,6 +52,8 @@ namespace MyDmsVn.Desktop.Tests
             using var form = new Form { ClientSize = new Size(900, 600) };
             using var navigation = new BusinessCompactNavigation { Dock = DockStyle.Left };
             form.Controls.Add(navigation);
+            using var workspaceInput = new TextBox { Dock = DockStyle.Fill };
+            form.Controls.Add(workspaceInput);
             var first = new BusinessCompactNavigationItem { Text = "First" };
             var section = new BusinessCompactNavigationItem { Text = "Section", Expanded = true };
             var child = new BusinessCompactNavigationItem { Text = "Child" };
@@ -85,6 +87,19 @@ namespace MyDmsVn.Desktop.Tests
             navigation.SelectedItem = null;
             Assert.DoesNotContain("Selected", childButton.AccessibleDescription);
             Assert.Equal(3, events);
+            section.Expanded = false;
+            Pump();
+            navigation.SelectedItem = child;
+            Assert.True(child.Selected);
+            Assert.DoesNotContain(host.Controls.OfType<Button>(), row => ReferenceEquals(row.Tag, child));
+            section.Expanded = true;
+            Pump();
+            Assert.Contains("Selected", host.Controls.OfType<Button>()
+                .Single(row => ReferenceEquals(row.Tag, child)).AccessibleDescription);
+            Assert.True(workspaceInput.Focus());
+            navigation.SelectedItem = first;
+            Pump();
+            Assert.True(workspaceInput.Focused);
             Assert.Empty(guard.Exceptions);
         }, TimeSpan.FromSeconds(15));
 
