@@ -45,7 +45,15 @@ internal sealed class SecurityWorkspaceEditorBindings
         Add(roleCommands, "Tạo vai trò…", () => IdentityDialogAsync(false, true));
         Add(roleCommands, "Sửa tên…", () => IdentityDialogAsync(false, false));
         Add(roleCommands, "Đổi trạng thái…", () => ActivationAsync(false));
-        _editRolePermissions = Add(roleCommands, "Sửa quyền", () => { Vm.BeginRolePermissions(); return Task.CompletedTask; });
+        _editRolePermissions = Add(roleCommands, "Sửa quyền", () =>
+        {
+            if (Vm.BeginRolePermissions())
+            {
+                control.RoleDetail.Tabs.SelectedIndex = 0;
+                _grantSearch.Focus();
+            }
+            return Task.CompletedTask;
+        });
         var grantFilters = Commands();
         grantFilters.Height = 38;
         grantFilters.Controls.AddRange(new Control[] { _grantSearch, _grantModule, _grantedOnly });

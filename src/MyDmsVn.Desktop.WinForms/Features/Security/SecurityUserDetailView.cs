@@ -25,6 +25,8 @@ public sealed class SecurityUserDetailView : UserControl
     readonly Label _profile = new() { Dock = DockStyle.Fill, Padding = new Padding(12), AutoEllipsis = true };
     SecurityWorkspaceViewModel? _viewModel;
     int? _renderedDirectUserId;
+    int? _renderedMembershipUserId;
+    int[] _renderedMembershipRoleIds = Array.Empty<int>();
     bool _rendering;
 
     public SecurityUserDetailView()
@@ -80,6 +82,12 @@ public sealed class SecurityUserDetailView : UserControl
         _profile.Text = user == null ? "Chưa chọn người dùng" : "THÔNG TIN TÀI KHOẢN" + Environment.NewLine + Environment.NewLine + "Tên hiển thị   " + user.DisplayName + Environment.NewLine + "Tên đăng nhập   " + user.Username + Environment.NewLine + "Email   " + (string.IsNullOrWhiteSpace(user.Email) ? "—" : user.Email) + Environment.NewLine + "Trạng thái   " + (user.IsActive ? "Đang hoạt động" : "Ngừng hoạt động");
         Tabs.TabPages[1].Text = "Vai trò (" + (user?.RoleIds.Count.ToString() ?? "—") + ")";
         Tabs.TabPages[3].Text = "Quyền riêng (" + (user?.DirectDecisions.Count.ToString() ?? "—") + ")";
+        var retainMembership = _renderedMembershipUserId == user?.UserId &&
+            viewModel.Users.IsCurrent(viewModel.OwnerVersion) && viewModel.Roles.IsCurrent(viewModel.OwnerVersion);
+        var selectedMembershipIndex = Memberships.SelectedIndex;
+        var selectedRoleId = retainMembership && selectedMembershipIndex >= 0 && selectedMembershipIndex < _renderedMembershipRoleIds.Length
+            ? _renderedMembershipRoleIds[selectedMembershipIndex] : (int?)null;
+        var firstVisibleMembership = retainMembership ? Memberships.TopIndex : 0;
         Memberships.Items.Clear();
         if (user != null)
         {
@@ -89,6 +97,15 @@ public sealed class SecurityUserDetailView : UserControl
                 Memberships.Items.Add(role == null ? "#" + id + " — Chi tiết không khả dụng" : role.Name + (role.IsActive ? "" : " — Vai trò ngừng hoạt động — không cấp quyền"));
             }
         }
+        if (selectedRoleId.HasValue && user != null)
+        {
+            var index = user.RoleIds.ToList().IndexOf(selectedRoleId.Value);
+            if (index >= 0) Memberships.SelectedIndex = index;
+        }
+        if (Memberships.Items.Count > 0)
+            Memberships.TopIndex = Math.Min(firstVisibleMembership, Memberships.Items.Count - 1);
+        _renderedMembershipUserId = user?.UserId;
+        _renderedMembershipRoleIds = user?.RoleIds.ToArray() ?? Array.Empty<int>();
         _rendering = true;
         var selectedModule = Module.SelectedItem as string;
         Module.Items.Clear();

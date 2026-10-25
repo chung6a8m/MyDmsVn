@@ -512,6 +512,66 @@ public sealed class SecurityWorkspaceControlTests
         Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
     });
     [Fact]
+    public void Edit_role_permissions_from_members_opens_grants_only_after_editor_admission() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Members.SelectedIndex = 1;
+        var edit = Assert.Single(control.RoleDetail.HeaderActions.Controls.Cast<Control>().OfType<Button>(), button => button.Text == "Sửa quyền");
+        var search = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(TextBox)).Cast<TextBox>());
+
+        edit.PerformClick();
+        Assert.Equal(0, control.RoleDetail.Tabs.SelectedIndex);
+        Assert.Equal(201, control.ViewModel.RoleDraft?.RoleId);
+        Assert.True(search.Focused);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+
+        control.ViewModel.DiscardEditor();
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        Assert.True(control.ViewModel.BeginDirectPermission("Sales.Receipts.Post"));
+        control.ViewModel.SetDirectDecision(true);
+        edit.PerformClick();
+        Assert.Equal(1, control.RoleDetail.Tabs.SelectedIndex);
+        Assert.Null(control.ViewModel.RoleDraft);
+        Assert.True(control.ViewModel.HasDirtyEditor);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+    [Fact]
+    public void Role_member_selection_survives_unrelated_render_and_opens_the_same_user() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        var members = control.RoleDetail.Members;
+        members.Height = 22;
+        members.SelectedIndex = 1;
+        members.TopIndex = 1;
+        var top = members.TopIndex;
+
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        Assert.Equal(1, members.SelectedIndex);
+        Assert.Contains("@inactive", members.SelectedItem!.ToString());
+        Assert.Equal(top, members.TopIndex);
+        Assert.True(control.RoleDetail.OpenUser.Enabled);
+        control.RoleDetail.OpenUser.PerformClick();
+        Assert.Equal(102, control.ViewModel.SelectedUserId);
+    });
+    [Fact]
+    public void User_membership_selection_survives_same_owner_render_and_clears_on_owner_change() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        var memberships = control.UserDetail.Memberships;
+        memberships.Height = 22;
+        memberships.SelectedIndex = 1;
+        memberships.TopIndex = 1;
+        var top = memberships.TopIndex;
+
+        control.ViewModel.SelectUser(101);
+        Assert.Equal(1, memberships.SelectedIndex);
+        Assert.Contains("Vai trò ngừng hoạt động", memberships.SelectedItem!.ToString());
+        Assert.Equal(top, memberships.TopIndex);
+        control.ViewModel.SelectUser(102);
+        Assert.Equal(-1, memberships.SelectedIndex);
+    });
+    [Fact]
     public void Deferred_role_check_cannot_edit_a_replacement_draft() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
     {
         control.Tabs.SelectedIndex = 1;

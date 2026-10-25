@@ -39,6 +39,7 @@ public sealed class SecurityRoleDetailView : UserControl
     };
 
     public event Action<int>? OpenUserRequested;
+    int? _renderedRoleId;
     public SecurityRoleDetailView()
     {
         Dock = DockStyle.Fill;
@@ -68,6 +69,10 @@ public sealed class SecurityRoleDetailView : UserControl
     public void Render(SecurityWorkspaceViewModel vm)
     {
         var role = vm.SelectedRole;
+        var retainMember = _renderedRoleId == role?.RoleId &&
+            vm.Roles.IsCurrent(vm.OwnerVersion) && vm.Users.IsCurrent(vm.OwnerVersion);
+        var selectedMemberId = retainMember ? (Members.SelectedItem as SecurityMemberItem)?.Id : null;
+        var firstVisibleMember = retainMember ? Members.TopIndex : 0;
         Header.Text = role == null ? "Chọn vai trò" : role.Name;
         HeaderState.Text = role == null ? "" : role.IsActive ? "● Đang hoạt động" : "● Ngừng hoạt động";
         Tabs.TabPages[1].Text = "Thành viên (" + (role?.MemberUserIds.Count.ToString() ?? "—") + ")";
@@ -87,6 +92,16 @@ public sealed class SecurityRoleDetailView : UserControl
                     user != null && vm.Users.IsCurrent(vm.OwnerVersion)));
             }
         }
+
+        if (selectedMemberId.HasValue)
+        {
+            var selectedIndex = Members.Items.Cast<SecurityMemberItem>().ToList()
+                .FindIndex(item => item.Id == selectedMemberId.Value && item.CanOpen);
+            if (selectedIndex >= 0) Members.SelectedIndex = selectedIndex;
+        }
+        if (Members.Items.Count > 0)
+            Members.TopIndex = Math.Min(firstVisibleMember, Members.Items.Count - 1);
+        _renderedRoleId = role?.RoleId;
 
         OpenUser.Enabled = Members.SelectedItem is SecurityMemberItem { CanOpen: true };
         Permissions.Visible = HistoryTitle.Visible = Permissions.Items.Count > 0;
