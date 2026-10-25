@@ -151,7 +151,7 @@ namespace MyDmsVn.Desktop.Tests
                     BusinessCompactNavigationTests.Pump();
                     _output.WriteLine(UiNextNativeScaleObservation.Observe(shell, token));
                     var host = shell.Navigation.Controls.OfType<FlowLayoutPanel>().Single();
-                    _output.WriteLine($"normal outer={shell.Size}; client={shell.ClientSize}; navigation={shell.Navigation.Bounds}; host={host.ClientSize}; footer={shell.Navigation.SessionArea.Bounds}");
+                    _output.WriteLine($"normal outer={shell.Size}; client={shell.ClientSize}; navigation={shell.Navigation.Bounds}; controlDpi={shell.Navigation.DeviceDpi}; host={host.ClientSize}; footer={shell.Navigation.SessionArea.Bounds}");
                     BusinessCompactNavigationTests.AssertHorizontalFit(host);
                     shell.Size = new System.Drawing.Size(900, 600);
                     BusinessCompactNavigationTests.Pump();
