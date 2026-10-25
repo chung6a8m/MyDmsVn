@@ -54,7 +54,7 @@ UI-NEXT's [historical implementation plan](ui-next/20261023-implementation-plan.
 | Infrastructure persistence | `src/MyDmsVn.Server.Infrastructure/Persistence/{SqlUnitOfWorkFactory,ISqlExecutionContext,SqlConnectionFactory,SqlPersistenceBuilder,LinqToDbSessionFactory,LinqToDbMappingSchemaProvider}.cs`. |
 | Schema | `src/MyDmsVn.Server.DbMigrator/Scripts/001_PersistenceFoundation.sql` through `010_DirectSalesAndValuation.sql`; exact names in [PERSISTENCE](PERSISTENCE.md). |
 | Implemented WinForms presentation seams | `BusinessCompactAppearance.cs`, `BusinessCompactNavigation.cs`, `GoodsReceiptLinesGrid.cs`, `GoodsReceiptLinesGridAdapter.cs`, `ReceiptNumericInput.cs` and `ReceiptNumberEditor.cs` in `src/MyDmsVn.Desktop.WinForms/`; `SalesReceiptControl.cs` and its grid/adapter own the Sales workspace; `CatalogControl.cs` remains shared by four catalogs. |
-| UI dependency | `vendor/MyDmsVn.BootstrapSourceGrid/`, pinned as checked in. |
+| UI dependency | `vendor/MyDmsVn.WinFormsKit/`, pinned as checked in; contains UI core, grid adapter and the pinned SourceGrid engine. |
 
 `Application/Features/...`, `Application/Abstractions/Persistence` and Infrastructure `Persistence/Repositories`/`EntityMaps` were earlier blueprint examples. They are not the current file layout; use source-owned paths when changing code.
 
