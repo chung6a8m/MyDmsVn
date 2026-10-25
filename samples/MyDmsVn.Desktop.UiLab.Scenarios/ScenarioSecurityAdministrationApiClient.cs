@@ -298,10 +298,11 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
 
         if (r.Operation == SecurityAdministrationOperationDto.SetActive)
             changed = (user ? u!.IsActive : role!.IsActive) != r.IsActive;
+        var targetActive = r.Operation == SecurityAdministrationOperationDto.SetActive ? r.IsActive : null;
         if (user)
-            data.Users[data.Users.IndexOf(u!)] = new SecurityUserDto(u!.UserId, r.Name ?? u.Username, r.DisplayName ?? u.DisplayName, r.Email ?? u.Email, r.IsActive ?? u.IsActive, revision + (changed ? 1 : 0), roles, decisions, u.IsProtectedAccount);
+            data.Users[data.Users.IndexOf(u!)] = new SecurityUserDto(u!.UserId, r.Name ?? u.Username, r.DisplayName ?? u.DisplayName, r.Email ?? u.Email, targetActive ?? u.IsActive, revision + (changed ? 1 : 0), roles, decisions, u.IsProtectedAccount);
         else
-            data.Roles[data.Roles.IndexOf(role!)] = new SecurityRoleDto(role!.RoleId, r.Name ?? role.Name, r.IsActive ?? role.IsActive, revision + (changed ? 1 : 0), role.MemberUserIds, keys);
+            data.Roles[data.Roles.IndexOf(role!)] = new SecurityRoleDto(role!.RoleId, r.Name ?? role.Name, targetActive ?? role.IsActive, revision + (changed ? 1 : 0), role.MemberUserIds, keys);
         return ApiResponse<SecurityAdministrationResultDto>.Success(new SecurityAdministrationResultDto(revision + (changed ? 1 : 0), changed, related));
     }
 

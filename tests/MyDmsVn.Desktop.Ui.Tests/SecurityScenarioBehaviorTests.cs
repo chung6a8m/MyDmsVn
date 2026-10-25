@@ -64,6 +64,26 @@ public sealed class SecurityScenarioBehaviorTests
     }
 
     [Fact]
+    public async Task Removing_membership_preserves_user_activity()
+    {
+        using var s = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L04);
+        var r = await s.Administration.MutateAsync(new SecurityAdministrationMutationRequest(
+            SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetMembership,
+            101, 203, isActive: false, expectedRevision: 11, expectedRelatedRevision: 23), default);
+
+        Assert.True(r.IsSuccess);
+        Assert.True(Assert.Single(s.Data.Users, user => user.UserId == 101).IsActive);
+        Assert.DoesNotContain(203, Assert.Single(s.Data.Users, user => user.UserId == 101).RoleIds);
+
+        var assignInactive = await s.Administration.MutateAsync(new SecurityAdministrationMutationRequest(
+            SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetMembership,
+            102, 202, isActive: true, expectedRevision: 12, expectedRelatedRevision: 22), default);
+        Assert.True(assignInactive.IsSuccess);
+        Assert.False(Assert.Single(s.Data.Users, user => user.UserId == 102).IsActive);
+        Assert.Contains(202, Assert.Single(s.Data.Users, user => user.UserId == 102).RoleIds);
+    }
+
+    [Fact]
     public async Task Held_mutations_can_complete_after_cancellation_without_retargeting()
     {
         using var s = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);
