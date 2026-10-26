@@ -20,9 +20,9 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly CheckBox _grantedOnly = new() { Text = "Chỉ quyền đã cấp", AutoSize = true };
     readonly Label _grantSummary = new() { Dock = DockStyle.Bottom, Height = 20 };
     readonly ComboBox _directKey = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Quyền riêng" };
-    readonly RadioButton _inherit = new() { Text = "Theo vai trò", AutoSize = true };
-    readonly RadioButton _allow = new() { Text = "Cho phép", AutoSize = true };
-    readonly RadioButton _deny = new() { Text = "Từ chối", AutoSize = true };
+    readonly RadioButton _inherit = new BootstrapRadioButton { Text = "Theo vai trò", AutoSize = true };
+    readonly RadioButton _allow = new BootstrapRadioButton { Text = "Cho phép", AutoSize = true };
+    readonly RadioButton _deny = new BootstrapRadioButton { Text = "Từ chối", AutoSize = true };
     readonly Label _status = new() { AutoSize = true };
     readonly Label _directPreview = new() { Dock = DockStyle.Bottom, Height = 58, AutoEllipsis = true };
     readonly FlowLayoutPanel _recovery = Commands();
