@@ -187,12 +187,23 @@ internal sealed class SecurityWorkspaceEditorBindings
     void Changed(object? sender, EventArgs e) => Render();
     void GuardTabs(TabControl tabs)
     {
+        var navigationVersion = 0;
         tabs.Selecting += async (_, e) =>
         {
+            var requestVersion = ++navigationVersion;
             if (Vm.CanNavigate) return;
             e.Cancel = true;
             var destination = e.TabPage;
-            if (await AdmitAsync() && destination != null && !tabs.IsDisposed) tabs.SelectedTab = destination;
+            var ownerVersion = Vm.OwnerVersion;
+            if (!await AdmitAsync() || destination == null || tabs.IsDisposed || !tabs.IsHandleCreated) return;
+            // A synchronous Discard can finish inside Selecting. Resume selection after WinForms finishes canceling it.
+            tabs.BeginInvoke(new Action(() =>
+            {
+                if (!_control.IsDisposed && !tabs.IsDisposed && Vm.IsCurrent && Vm.OwnerVersion == ownerVersion &&
+                    requestVersion == navigationVersion &&
+                    Vm.CanNavigate && tabs.TabPages.Contains(destination))
+                    tabs.SelectedTab = destination;
+            }));
         };
     }
     void Render()

@@ -961,6 +961,57 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Equal(1, control.UserDetail.Tabs.SelectedIndex);
         Assert.Equal(101, control.ViewModel.SelectedUserId);
     });
+    [Fact]
+    public void Discarding_dirty_direct_decision_completes_requested_subtab_navigation() => Run(SecurityScenarioId.SEC_L10, (control, data) =>
+    {
+        control.UserDetail.Tabs.SelectedIndex = 3;
+        Assert.True(control.ViewModel.BeginDirectPermission("Sales.Receipts.Post"));
+        control.ViewModel.SetDirectDecision(true);
+        Assert.True(control.ViewModel.HasDirtyEditor);
+        Assert.True(control.UserDetail.Tabs.IsHandleCreated);
+        control.NavigationResolutionOverride = () => SecurityDraftResolution.Discard;
+
+        control.UserDetail.Tabs.SelectedIndex = 2;
+        Until(() => control.UserDetail.Tabs.SelectedIndex == 2 || !control.UserDetail.Tabs.IsHandleCreated);
+
+        Assert.Equal(2, control.UserDetail.Tabs.SelectedIndex);
+        Assert.Null(control.ViewModel.DirectPermissionKey);
+        Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+    [Fact]
+    public void Newer_subtab_choice_supersedes_discarded_navigation() => Run(SecurityScenarioId.SEC_L10, (control, data) =>
+    {
+        control.UserDetail.Tabs.SelectedIndex = 3;
+        Assert.True(control.ViewModel.BeginDirectPermission("Sales.Receipts.Post"));
+        control.ViewModel.SetDirectDecision(true);
+        control.NavigationResolutionOverride = () => SecurityDraftResolution.Discard;
+
+        control.UserDetail.Tabs.SelectedIndex = 2;
+        control.UserDetail.Tabs.SelectedIndex = 1;
+        System.Windows.Forms.Application.DoEvents();
+
+        Assert.Equal(1, control.UserDetail.Tabs.SelectedIndex);
+        Assert.False(control.ViewModel.HasDirtyEditor);
+        Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Discarding_dirty_role_grant_completes_requested_tab_navigation(bool topLevel) => Run(SecurityScenarioId.SEC_L10, (control, data) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+        Assert.True(control.ViewModel.HasDirtyEditor);
+        control.NavigationResolutionOverride = () => SecurityDraftResolution.Discard;
+
+        if (topLevel) control.Tabs.SelectedIndex = 2;
+        else control.RoleDetail.Tabs.SelectedIndex = 1;
+        Until(() => topLevel ? control.Tabs.SelectedIndex == 2 : control.RoleDetail.Tabs.SelectedIndex == 1);
+
+        Assert.Null(control.ViewModel.RoleDraft);
+        Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
     [Theory]
     [InlineData(SecurityDraftResolution.Save)]
     [InlineData(SecurityDraftResolution.Discard)]
