@@ -488,6 +488,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L06 direct-Save Validation at physical100 — 2026-10-26:** On the same unchanged product/test and Release Lab, a fresh `SEC_L06` fixture staged U101 Post Deny→Allow and armed one-shot Validation. One `User/SetPermission` at revision 11 returned `BadRequest`; saved Deny and prospective Allow remained separate under a rejected-save recovery banner. Explicit three-source comparison reload succeeded, diff confirmation retained the intent without replay, and Hủy cleared it. The [journal and visual limits](../evidence/security/20261025-security-ui-lab.md) record the bounded path. Other SEC-L06 variants, SEC-T04 review and the full matrix remain OPEN.
 
+**SEC-L06 direct-Save Conflict at physical100 — 2026-10-26:** A separate fresh Dark `SEC_L06` fixture on the same source/test sent one U101 Post `decision=true` request at revision 11 and received Conflict. Explicit comparison reload returned Users/Roles/Catalog Success; native Enter confirmed the diff dialog, retained the unsaved Allow against saved Deny and sent no replay. Hủy cleared the draft. The [journal and bounded keyboard observation](../evidence/security/20261025-security-ui-lab.md) are recorded; other SEC-T04/SEC-L06 paths and full attended PASS remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
