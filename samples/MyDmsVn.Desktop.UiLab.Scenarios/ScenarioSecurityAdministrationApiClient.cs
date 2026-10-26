@@ -107,6 +107,7 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
     }
 
     public Queue<ApiError?> MutationErrors { get; } = new Queue<ApiError?>();
+    public bool DenyMembershipMutations { get; set; }
     public bool NoOpNextRolePermission { get; set; }
     public IReadOnlyList<Task> OutstandingOperations => tasks.Outstanding;
 
@@ -234,6 +235,8 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
     {
         if (!Enum.IsDefined(typeof(SecurityAdministrationTargetDto), r.Target) || !Enum.IsDefined(typeof(SecurityAdministrationOperationDto), r.Operation) || (r.Target == SecurityAdministrationTargetDto.Role && (r.Operation == SecurityAdministrationOperationDto.SetPassword || r.Operation == SecurityAdministrationOperationDto.SetMembership)) || ((r.Operation == SecurityAdministrationOperationDto.Create || r.Operation == SecurityAdministrationOperationDto.Update) && (string.IsNullOrWhiteSpace(r.Name) || r.Name!.Length > 100 || (r.Target == SecurityAdministrationTargetDto.User && (string.IsNullOrWhiteSpace(r.DisplayName) || r.DisplayName!.Length > 100)))) || (r.Target == SecurityAdministrationTargetDto.User && (r.Operation == SecurityAdministrationOperationDto.Create || r.Operation == SecurityAdministrationOperationDto.SetPassword) && (string.IsNullOrEmpty(r.Password) || Encoding.UTF8.GetByteCount(r.Password!) > 72)) || ((r.Operation == SecurityAdministrationOperationDto.SetActive || r.Operation == SecurityAdministrationOperationDto.SetMembership) && !r.IsActive.HasValue) || (r.Target == SecurityAdministrationTargetDto.Role && r.Operation == SecurityAdministrationOperationDto.SetPermission && !r.Decision.HasValue))
             return Fail(ApiStatusCode.BadRequest, "ValidationError");
+        if (DenyMembershipMutations && r.Target == SecurityAdministrationTargetDto.User && r.Operation == SecurityAdministrationOperationDto.SetMembership)
+            return Fail(ApiStatusCode.Forbidden, "Security.Forbidden");
         if (MutationErrors.Count > 0)
         {
             var error = MutationErrors.Dequeue();

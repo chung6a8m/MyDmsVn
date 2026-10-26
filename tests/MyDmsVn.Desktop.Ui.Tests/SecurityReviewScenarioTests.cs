@@ -120,6 +120,41 @@ public sealed class SecurityReviewScenarioTests
         });
 
     [Fact]
+    public void Host_persistent_membership_denial_keeps_role_management_independent()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (_, _) =>
+        {
+            using var host = new UiLabForm();
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L04;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L04 && !host.IsResetting);
+            host.SecurityReviewToggleButton.PerformClick();
+            host.SecurityDenyMembershipCheckBox.Checked = true;
+
+            var scene = host.CurrentSecurityScenarioData!;
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                var response = scene.Administration.MutateAsync(new SecurityAdministrationMutationRequest(
+                    SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetMembership,
+                    101, relatedId: 202, isActive: true, expectedRevision: 11, expectedRelatedRevision: 22), default).GetAwaiter().GetResult();
+                Assert.Equal(ApiStatusCode.Forbidden, response.Error!.Status);
+            }
+            Assert.DoesNotContain(202, scene.Data.Users.Single(user => user.UserId == 101).RoleIds);
+            Assert.DoesNotContain(101, scene.Data.Roles.Single(role => role.RoleId == 202).MemberUserIds);
+
+            var grant = scene.Administration.MutateAsync(new SecurityAdministrationMutationRequest(
+                SecurityAdministrationTargetDto.Role, SecurityAdministrationOperationDto.SetPermission,
+                201, permissionKey: "Sales.Receipts.Post", decision: true, expectedRevision: 21), default).GetAwaiter().GetResult();
+            Assert.True(grant.IsSuccess);
+            Assert.Equal(22, grant.Data!.AssignmentRevision);
+            Assert.Contains("Sales.Receipts.Post", scene.Data.Roles.Single(role => role.RoleId == 201).PermissionKeys);
+            Assert.Equal(2, scene.Journal.Entries.Count(entry => entry.Operation == "Security.Mutate.Result" &&
+                Assert.IsType<SecurityResponseJournalEntry>(entry.Request).Outcome == "Forbidden"));
+        });
+
+    [Fact]
     public void Import_review_dialog_can_change_fixture_after_preview_before_confirm()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L09, (_, scene) =>
         {

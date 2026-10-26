@@ -53,6 +53,7 @@ internal sealed class UiLabForm : Form
     private readonly Button _securityReleaseMutation = new Button { Text = "Release mutation", AutoSize = true };
     private readonly Button _securityAdvanceMembershipUserRevision = new Button { Text = "Advance U101 revision", AutoSize = true };
     private readonly Button _securityAdvanceMembershipRoleRevision = new Button { Text = "Advance R202 revision", AutoSize = true };
+    private readonly CheckBox _securityDenyMembership = new CheckBox { Text = "Deny membership writes", AutoSize = true };
     private readonly Button _securityHoldImportPreview = new Button { Text = "Hold next Preview", AutoSize = true };
     private readonly Button _securityReleaseImportPreview = new Button { Text = "Release Preview", AutoSize = true };
     private readonly Label _status = new Label { AutoSize = true, Text = "Starting...", Padding = new Padding(8) };
@@ -104,6 +105,7 @@ internal sealed class UiLabForm : Form
     internal Button SecurityReleaseMutationButton => _securityReleaseMutation;
     internal Button SecurityAdvanceMembershipUserRevisionButton => _securityAdvanceMembershipUserRevision;
     internal Button SecurityAdvanceMembershipRoleRevisionButton => _securityAdvanceMembershipRoleRevision;
+    internal CheckBox SecurityDenyMembershipCheckBox => _securityDenyMembership;
     internal Button SecurityHoldImportPreviewButton => _securityHoldImportPreview;
     internal Button SecurityReleaseImportPreviewButton => _securityReleaseImportPreview;
     internal Button SecurityReviewToggleButton => _securityReviewToggle;
@@ -126,7 +128,7 @@ internal sealed class UiLabForm : Form
             _securityHoldRead, _securityIgnoreCancellation, _securityIgnoreOwnerRelease,
             _securityArmRead, _securityReload, _securityReleaseRead, _securityMutationOutcome,
             _securityArmMutation, _securityReleaseMutation, _securityHoldImportPreview, _securityReleaseImportPreview,
-            _securityAdvanceMembershipUserRevision, _securityAdvanceMembershipRoleRevision });
+            _securityAdvanceMembershipUserRevision, _securityAdvanceMembershipRoleRevision, _securityDenyMembership });
         _toolbarHost.Controls.Add(_securityReviewPanel);
         _toolbarHost.Controls.Add(toolbar);
         Controls.Add(_workspace);
@@ -165,6 +167,7 @@ internal sealed class UiLabForm : Form
         _securityReleaseMutation.Click += (_, __) => ReleaseSecurityMutation();
         _securityAdvanceMembershipUserRevision.Click += (_, __) => AdvanceSecurityMembershipRevision(PermissionImportTargetTypeDto.User, 101);
         _securityAdvanceMembershipRoleRevision.Click += (_, __) => AdvanceSecurityMembershipRevision(PermissionImportTargetTypeDto.Role, 202);
+        _securityDenyMembership.CheckedChanged += (_, __) => { if (_securityData?.Id == SecurityScenarioId.SEC_L04) _securityData.Administration.DenyMembershipMutations = _securityDenyMembership.Checked; };
         _securityHoldImportPreview.Click += (_, __) => ArmSecurityImportPreview();
         _securityReleaseImportPreview.Click += (_, __) => ReleaseSecurityImportPreview();
         _diagnostics.Tick += (_, __) =>
@@ -188,6 +191,7 @@ internal sealed class UiLabForm : Form
             _releaseSecurityRead = null;
             _releaseSecurityMutation = null;
             _securityImportPreviewGate = null;
+            _securityDenyMembership.Checked = false;
             var context = SynchronizationContext.Current as WindowsFormsSynchronizationContext
                 ?? throw new InvalidOperationException("UI Lab requires a running Windows Forms synchronization context.");
             _lifetime = new CancellationTokenSource();
@@ -607,8 +611,10 @@ internal sealed class UiLabForm : Form
         var membershipRevisionReview = _securityData?.Id == SecurityScenarioId.SEC_L04;
         _securityAdvanceMembershipUserRevision.Visible = membershipRevisionReview;
         _securityAdvanceMembershipRoleRevision.Visible = membershipRevisionReview;
+        _securityDenyMembership.Visible = membershipRevisionReview;
         _securityAdvanceMembershipUserRevision.Enabled = enabled && membershipRevisionReview && _securityControl?.ViewModel.IsBusy != true;
         _securityAdvanceMembershipRoleRevision.Enabled = enabled && membershipRevisionReview && _securityControl?.ViewModel.IsBusy != true;
+        _securityDenyMembership.Enabled = enabled && membershipRevisionReview && _securityControl?.ViewModel.IsBusy != true;
         _securityHoldImportPreview.Enabled = enabled && _securityControl != null && _securityImportPreviewGate == null;
         _securityReleaseImportPreview.Enabled = _securityImportPreviewGate != null && !_securityImportPreviewGate.IsCompleted;
     }
