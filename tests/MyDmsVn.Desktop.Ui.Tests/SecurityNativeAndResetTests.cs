@@ -161,6 +161,60 @@ public sealed class SecurityNativeAndResetTests
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Native_enter_confirms_status_change_once_for_selected_owner(bool roles) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var detail = roles ? (Control)control.RoleDetail : control.UserDetail;
+            var button = Assert.Single(Descendants(detail).OfType<Button>(), item => item.Text == "Đổi trạng thái…");
+            var opened = false;
+            Exception? dialogError = null;
+            var elapsed = Stopwatch.StartNew();
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var title = new StringBuilder(80);
+                GetWindowText(GetForegroundWindow(), title, title.Capacity);
+                if (title.ToString() != "Đổi trạng thái")
+                {
+                    if (elapsed.Elapsed < TimeSpan.FromSeconds(4)) return;
+                    timer.Stop();
+                    dialogError = new TimeoutException("Native Enter did not open the status confirmation.");
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                    return;
+                }
+                timer.Stop();
+                try
+                {
+                    opened = true;
+                    Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                }
+                catch (Exception error) { dialogError = error; NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape); }
+            };
+            Assert.True(button.Focus());
+            timer.Start();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(opened, "Native Enter did not activate the focused status action.");
+            if (dialogError != null) throw dialogError;
+            Until(() => scene.Journal.Entries.Count(entry => entry.Operation == "Security.Catalog.Result") == 2);
+            var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate").Request);
+            Assert.Equal(roles ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User, request.Target);
+            Assert.Equal(SecurityAdministrationOperationDto.SetActive, request.Operation);
+            Assert.Equal(roles ? 201 : 101, request.TargetId);
+            Assert.Equal(roles ? 21 : 11, request.ExpectedRevision);
+            var result = Assert.IsType<SecurityResponseJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate.Result").Request);
+            Assert.Equal("Success", result.Outcome);
+            Assert.Equal(roles ? 22 : 12, result.AssignmentRevision);
+            Assert.False(roles ? control.ViewModel.SelectedRole!.IsActive : control.ViewModel.SelectedUser!.IsActive);
+        });
+
     [Fact]
     public void Native_membership_dialog_names_role_and_escape_cancels_without_dispatch() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (control, scene) =>
