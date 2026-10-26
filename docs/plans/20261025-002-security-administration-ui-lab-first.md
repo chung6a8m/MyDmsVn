@@ -342,6 +342,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L02 physical100 successful-empty continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records held Users Empty after an initially Forbidden Users read, with Roles/Catalog still successful. Releasing the held result showed an explicit empty Users pane while R201 retained its known two-member count but only ID-level unavailable details; a later authorized Users Success reload restored member names without mutation. Other source/outcome permutations and the full attended matrix remain OPEN.
 
+**SEC-T04 physical100 role-grant keyboard continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records search focus after **Sửa quyền**, a Post checkbox draft reverted with native Space while the list retained focus, and explicit Cancel without mutation. Escape did not close the inline editor. The complete command-focus traversal and native125 repeat remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
