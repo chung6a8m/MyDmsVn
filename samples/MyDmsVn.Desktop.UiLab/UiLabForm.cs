@@ -56,6 +56,7 @@ internal sealed class UiLabForm : Form
     private readonly CheckBox _securityDenyMembership = new CheckBox { Text = "Deny membership writes", AutoSize = true };
     private readonly Button _securityHoldImportPreview = new Button { Text = "Hold next Preview", AutoSize = true };
     private readonly Button _securityReleaseImportPreview = new Button { Text = "Release Preview", AutoSize = true };
+    private readonly Button _securityDenyImportPreview = new Button { Text = "Deny next Preview", AutoSize = true };
     private readonly Label _status = new Label { AutoSize = true, Text = "Starting...", Padding = new Padding(8) };
     private readonly TextBox _journal = new TextBox { ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Bottom, Height = 110 };
     private readonly Panel _workspace = new Panel { Dock = DockStyle.Fill };
@@ -108,6 +109,7 @@ internal sealed class UiLabForm : Form
     internal CheckBox SecurityDenyMembershipCheckBox => _securityDenyMembership;
     internal Button SecurityHoldImportPreviewButton => _securityHoldImportPreview;
     internal Button SecurityReleaseImportPreviewButton => _securityReleaseImportPreview;
+    internal Button SecurityDenyImportPreviewButton => _securityDenyImportPreview;
     internal Button SecurityReviewToggleButton => _securityReviewToggle;
     internal string JournalText => _journal.Text;
 
@@ -128,6 +130,7 @@ internal sealed class UiLabForm : Form
             _securityHoldRead, _securityIgnoreCancellation, _securityIgnoreOwnerRelease,
             _securityArmRead, _securityReload, _securityReleaseRead, _securityMutationOutcome,
             _securityArmMutation, _securityReleaseMutation, _securityHoldImportPreview, _securityReleaseImportPreview,
+            _securityDenyImportPreview,
             _securityAdvanceMembershipUserRevision, _securityAdvanceMembershipRoleRevision, _securityDenyMembership });
         _toolbarHost.Controls.Add(_securityReviewPanel);
         _toolbarHost.Controls.Add(toolbar);
@@ -170,6 +173,7 @@ internal sealed class UiLabForm : Form
         _securityDenyMembership.CheckedChanged += (_, __) => { if (_securityData?.Id == SecurityScenarioId.SEC_L04) _securityData.Administration.DenyMembershipMutations = _securityDenyMembership.Checked; };
         _securityHoldImportPreview.Click += (_, __) => ArmSecurityImportPreview();
         _securityReleaseImportPreview.Click += (_, __) => ReleaseSecurityImportPreview();
+        _securityDenyImportPreview.Click += (_, __) => ArmSecurityImportPreviewForbidden();
         _diagnostics.Tick += (_, __) =>
         {
             RefreshDiagnostics();
@@ -568,9 +572,21 @@ internal sealed class UiLabForm : Form
 
     private void ArmSecurityImportPreview()
     {
-        if (_securityData == null || _securityImportPreviewGate != null) return;
+        if (_securityData == null || _securityImportPreviewGate != null ||
+            _securityData.Administration.DenyNextImportPreview) return;
         _securityImportPreviewGate = _securityData.Administration.HoldNextImportPreview();
         _status.Text = "Next Security import Preview is held. Release it after replacing the session.";
+        SetCommands(!_poisoned);
+    }
+
+    private void ArmSecurityImportPreviewForbidden()
+    {
+        if (_securityData?.Id != SecurityScenarioId.SEC_L09 || _securityControl == null ||
+            _securityImportPreviewGate != null || _securityData.Administration.DenyNextImportPreview ||
+            _resetting || _poisoned) return;
+        _securityData.Administration.DenyNextImportPreview = true;
+        _securityData.Journal.Record("Security.ReviewImportPreviewFault", new { Outcome = "Forbidden" });
+        _status.Text = "Next Security import Preview: Forbidden.";
         SetCommands(!_poisoned);
     }
 
@@ -624,8 +640,13 @@ internal sealed class UiLabForm : Form
         _securityAdvanceMembershipUserRevision.Enabled = enabled && membershipRevisionReview && _securityControl?.ViewModel.IsBusy != true;
         _securityAdvanceMembershipRoleRevision.Enabled = enabled && membershipRevisionReview && _securityControl?.ViewModel.IsBusy != true;
         _securityDenyMembership.Enabled = enabled && membershipRevisionReview && _securityControl?.ViewModel.IsBusy != true;
-        _securityHoldImportPreview.Enabled = enabled && _securityControl != null && _securityImportPreviewGate == null;
+        _securityHoldImportPreview.Enabled = enabled && _securityControl != null && _securityImportPreviewGate == null &&
+            _securityData?.Administration.DenyNextImportPreview != true;
         _securityReleaseImportPreview.Enabled = _securityImportPreviewGate != null && !_securityImportPreviewGate.IsCompleted;
+        var importPreviewDenialReview = _securityData?.Id == SecurityScenarioId.SEC_L09;
+        _securityDenyImportPreview.Visible = importPreviewDenialReview;
+        _securityDenyImportPreview.Enabled = enabled && importPreviewDenialReview &&
+            _securityImportPreviewGate == null && _securityData?.Administration.DenyNextImportPreview != true;
     }
 
     private async void OnFormClosing(object? sender, FormClosingEventArgs args)

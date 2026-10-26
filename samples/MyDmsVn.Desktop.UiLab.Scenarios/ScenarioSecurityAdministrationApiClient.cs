@@ -107,6 +107,7 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
     }
 
     public Queue<ApiError?> MutationErrors { get; } = new Queue<ApiError?>();
+    public bool DenyNextImportPreview { get; set; }
     public bool DenyMembershipMutations { get; set; }
     public bool NoOpNextRolePermission { get; set; }
     public IReadOnlyList<Task> OutstandingOperations => tasks.Outstanding;
@@ -342,7 +343,12 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
             return Task.FromResult(ScenarioErrors.SessionChanged<PermissionAssignmentImportPreviewDto>());
         token.ThrowIfCancellationRequested();
         journal.Record("Security.ImportPreview", new { Target = type, TargetId = id });
-        var response = Preview(type, id, json);
+        var deny = DenyNextImportPreview;
+        DenyNextImportPreview = false;
+        var response = deny
+            ? ApiResponse<PermissionAssignmentImportPreviewDto>.Failure(new ApiError(ApiStatusCode.Forbidden,
+                "Security.Forbidden", "UI Lab import Preview denied."))
+            : Preview(type, id, json);
         var gate = nextImportPreview;
         nextImportPreview = null;
         return gate == null ? Task.FromResult(response) : tasks.Track(ReleaseImportPreviewAsync(gate, response, token));

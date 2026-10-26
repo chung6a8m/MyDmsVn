@@ -266,6 +266,41 @@ public sealed class SecurityReviewScenarioTests
         });
 
     [Fact]
+    public void Host_denied_import_preview_cannot_open_confirmation_or_apply_and_fault_is_one_shot()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L09, (_, _) =>
+        {
+            using var host = new UiLabForm();
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L09;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L09 && !host.IsResetting);
+
+            var scene = host.CurrentSecurityScenarioData!;
+            var viewModel = host.CurrentSecurityControl!.ViewModel;
+            viewModel.SelectRole(202);
+            host.SecurityReviewToggleButton.PerformClick();
+            Assert.True(host.SecurityDenyImportPreviewButton.Enabled);
+            host.SecurityDenyImportPreviewButton.PerformClick();
+            Assert.True(scene.Administration.DenyNextImportPreview);
+            const string json = "{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}";
+
+            Assert.False(viewModel.PreviewImportAsync(PermissionImportTargetTypeDto.Role, json, default).GetAwaiter().GetResult());
+            Assert.Null(viewModel.ImportPreview);
+            Assert.Contains("Forbidden", viewModel.ImportStatus);
+            Assert.Equal(SecurityDatasetState.Forbidden, viewModel.Roles.State);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.ImportApply");
+
+            host.SecurityReloadButton.PerformClick();
+            Until(() => viewModel.Roles.State == SecurityDatasetState.Ready && !viewModel.IsBusy);
+            viewModel.SelectRole(202);
+            Assert.True(viewModel.PreviewImportAsync(PermissionImportTargetTypeDto.Role, json, default).GetAwaiter().GetResult());
+            Assert.NotNull(viewModel.ImportPreview);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.ImportApply");
+        });
+
+    [Fact]
     public void Host_review_can_release_a_late_import_preview_without_republishing_it()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {
