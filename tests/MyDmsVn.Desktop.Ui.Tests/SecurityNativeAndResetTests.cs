@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -114,6 +115,49 @@ public sealed class SecurityNativeAndResetTests
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
             Assert.True(opened, "Native Enter did not activate the focused identity edit action.");
             if (dialogError != null) throw dialogError;
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Native_enter_opens_status_confirmation_and_escape_cancels_without_dispatch(bool roles) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var detail = roles ? (Control)control.RoleDetail : control.UserDetail;
+            var button = Assert.Single(Descendants(detail).OfType<Button>(), item => item.Text == "Đổi trạng thái…");
+            var opened = false;
+            Exception? dialogError = null;
+            var elapsed = Stopwatch.StartNew();
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var title = new StringBuilder(80);
+                GetWindowText(GetForegroundWindow(), title, title.Capacity);
+                if (title.ToString() != "Đổi trạng thái")
+                {
+                    if (elapsed.Elapsed < TimeSpan.FromSeconds(4)) return;
+                    timer.Stop();
+                    dialogError = new TimeoutException("Native Enter did not open the status confirmation.");
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                    return;
+                }
+                timer.Stop();
+                try
+                {
+                    opened = true;
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                }
+                catch (Exception error) { dialogError = error; }
+            };
+            Assert.True(button.Focus());
+            timer.Start();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(opened, "Native Enter did not activate the focused status action.");
+            if (dialogError != null) throw dialogError;
+            Assert.True(button.ContainsFocus);
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
@@ -520,6 +564,8 @@ public sealed class SecurityNativeAndResetTests
     }
 
     [DllImport("user32.dll")] static extern IntPtr GetFocus();
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
     [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr window);
