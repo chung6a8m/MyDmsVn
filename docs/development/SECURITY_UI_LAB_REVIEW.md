@@ -132,6 +132,8 @@ treating missing data as an empty state. Partial completion and stop reason rema
 
 For stale-preview review in the SQL-free Lab, choose a valid contextual import, then use **Đổi revision đối tượng** or **Đổi catalog digest** in the Lab confirmation dialog before **Áp dụng**. Reset between cases. Inspect the dialog's original preview revision/digest, the journal's Preview → review fault → Apply order, the reported Conflict and the unchanged assignment. For target-switch review, use **Đổi đối tượng** before confirmation; the selected user/role changes, the old preview is invalidated, and the journal must contain no Apply. These controls change only the Lab fixture or its current selection.
 
+For late-preview review, open **Security review tools** and press **Hold next Preview** before selecting a valid contextual JSON import. Once the journal records `Security.ImportPreview` and the workspace shows that JSON is being checked, press **Replace session**, then **Release Preview**. The old response must not open confirmation or Apply, and the replacement session must not regain the old role, catalog or assignment presentation. Reset before another case.
+
 Expected: catalog navigation never dispatches an assignment mutation. Import is contextual and additive, retains the existing preview/confirmation contract and cannot act as replace-all role Save. Cancel
 dispatches no Apply. Apply uses the exact preview target/revision/digest and revalidation result. Stale/invalid/unauthorized/inactive/protected cases remain rejected without automatic retry; a late preview cannot
 confirm another target.

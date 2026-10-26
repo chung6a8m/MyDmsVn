@@ -286,6 +286,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L09 target-switch continuation — 2026-10-26:** Source/test `78d1d5bbfdaa4f75ccb825edd0aa37fca8a06e33` extends the Lab confirmation with a selected-target switch. The [evidence](../evidence/security/20261025-security-ui-lab.md) records a live Dark Preview → switch → confirm walkthrough with no Apply, plus **206/206 PASS** at measured physical100. The late-preview branch, complete attended matrix, later-candidate physical125 review and remaining SEC-T04 keyboard traversal remain **OPEN**.
 
+**SEC-L09 late-preview continuation — 2026-10-26:** Source/test `595c8693ca4bf6b4de8afec9b32376ff28fac781` adds Lab-only controls to hold an import Preview across session replacement and release its old response. The [evidence](../evidence/security/20261025-security-ui-lab.md) records red/green focused checks, **208/208 PASS** at measured physical125 and a live Dark walkthrough with no confirmation or Apply after the old response. The full attended SEC-L01–SEC-L12 matrix, remaining SEC-T04 keyboard traversal and physical100 run on this revision remain **OPEN**. The prior Owner gate decision remains tied to its recorded candidate; this later review control does not change that decision.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
