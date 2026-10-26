@@ -502,6 +502,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L06 held read/write target admission at physical100 — 2026-10-26:** On the same Release Lab, a held Roles Success reload left Users available; choosing U102 while Roles loaded remained selected after release. A separate held `User/SetPermission` for U102/Post blocked a click on U101 until its Success response and three-source reload completed. The saved direct Allow and U102 selection remained, with one mutation. The [ordered journal and limitations](../evidence/security/20261025-security-ui-lab.md) are recorded. Other held-source and rejected-write variants, the SEC-T04 exit and full attended matrix remain OPEN.
 
+**SEC-T04 status-confirmation native Enter at physical100 — 2026-10-26:** Test-only revision `516d9d0d9e7c8f9f94c70b158c020906cc4b99f4` adds User and Role native Enter confirmation rows, each verifying a selected-owner `SetActive` request, one Success, expected revision and inactive confirmed state after the three-source reload. Focused **2/2** and full SQL-free Debug/net48 Ui.Tests **238/238** passed at measured physical100; [TRX, hash and row details](../evidence/security/20261025-security-ui-lab.md) are recorded. Physical125 on this revision, remaining SEC-T04 keyboard/review paths and the full attended matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
