@@ -189,6 +189,30 @@ public sealed class SecurityWorkspaceLifetimeTests
         });
 
     [Fact]
+    public void Role_recovery_review_requires_a_successful_comparison_reload() => SecurityWorkspaceControlTests.Run(
+        SecurityScenarioId.SEC_L08, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            Assert.True(control.ViewModel.BeginRolePermissions());
+            control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+            control.ViewModel.SetRoleGranted("Inventory.Stock.Read", true);
+            control.ViewModel.SetRoleGranted("Inventory.Stock.Audit", true);
+            Pump(control.ViewModel.SaveEditorAsync(default));
+            Assert.True(control.ViewModel.RequiresRecovery);
+            var review = Find(control).Single(button => button.Text == "Đã đối chiếu — lập diff mới");
+            Assert.False(review.Enabled);
+
+            scene.Administration.RolesError = new ApiError(ApiStatusCode.InternalServerError, "Failed", "Roles unavailable.");
+            Pump(control.ViewModel.ReloadForComparisonAsync(default));
+            Assert.True(control.ViewModel.RequiresRecovery);
+            Assert.False(review.Enabled);
+
+            scene.Administration.RolesError = null;
+            Pump(control.ViewModel.ReloadForComparisonAsync(default));
+            Assert.True(review.Enabled);
+        });
+
+    [Fact]
     public void Role_recovery_is_reachable_from_members_tab() => SecurityWorkspaceControlTests.Run(
         SecurityScenarioId.SEC_L01, (control, scene) =>
         {

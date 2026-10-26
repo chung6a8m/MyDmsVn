@@ -26,6 +26,7 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly Label _status = new() { AutoSize = true };
     readonly Label _directPreview = new() { Dock = DockStyle.Bottom, Height = 58, AutoEllipsis = true };
     readonly FlowLayoutPanel _recovery = Commands();
+    readonly Button _recoveryReview;
     readonly ToolTip _maintenanceTip = new();
     readonly Button _createUser;
     readonly Button _editUser;
@@ -169,7 +170,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         _recovery.Height = 54;
         _recovery.Controls.Add(_status);
         Add(_recovery, "Tải lại để đối chiếu", async () => { await Vm.ReloadForComparisonAsync(default); }, themed: false);
-        Add(_recovery, "Đã đối chiếu — lập diff mới", () =>
+        _recoveryReview = Add(_recovery, "Đã đối chiếu — lập diff mới", () =>
         {
             if (control.RecoveryConfirmationOverride?.Invoke() ??
                 MessageBox.Show(control, "Giữ ý định và tính lại thay đổi từ dữ liệu vừa tải? Không xác nhận kết quả lệnh chưa rõ.",
@@ -240,6 +241,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             }
             _recovery.Visible = Vm.RequiresRecovery || partialForbidden;
             foreach (var button in _recovery.Controls.OfType<Button>()) button.Visible = Vm.RequiresRecovery;
+            _recoveryReview.Enabled = Vm.CanReviewRecovery;
             _grantSummary.Text = Vm.RoleDraft == null ? "Chọn Sửa quyền để bắt đầu bản nháp" : Vm.RoleDraft.Changes.Count + " thay đổi chưa lưu trong toàn bộ danh mục";
             var roleEditorAvailable = Vm.IsCurrent && Vm.Roles.IsCurrent(Vm.OwnerVersion) && Vm.Catalog.IsCurrent(Vm.OwnerVersion) &&
                 Vm.SelectedRole != null && !Vm.IsBusy && !Vm.RequiresRecovery;

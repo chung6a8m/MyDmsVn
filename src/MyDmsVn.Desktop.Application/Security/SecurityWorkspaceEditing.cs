@@ -69,6 +69,15 @@ public sealed partial class SecurityWorkspaceViewModel
     public bool IsBusy { get; private set; }
     public bool RequiresRecovery { get; private set; }
     public SecurityAdministrationTargetDto? RecoveryTarget => _recoveryTarget;
+    public bool CanReviewRecovery => IsCurrent && !IsBusy && RequiresRecovery &&
+        _generation > _recoveryMarkedGeneration && Catalog.IsCurrent(OwnerVersion) &&
+        _recoveryTarget != null &&
+        (_recoveryTarget != SecurityAdministrationTargetDto.User || Users.IsCurrent(OwnerVersion)) &&
+        (_recoveryTarget != SecurityAdministrationTargetDto.Role || Roles.IsCurrent(OwnerVersion)) &&
+        (!_recoveryNeedsRelatedRoles || Roles.IsCurrent(OwnerVersion)) &&
+        (RoleDraft == null || (Roles.IsCurrent(OwnerVersion) && Roles.Items.Any(role => role.RoleId == RoleDraft.RoleId))) &&
+        (DirectPermissionKey == null || (Users.IsCurrent(OwnerVersion) &&
+            Users.Items.Any(user => user.UserId == _directUserId && !user.IsProtectedAccount)));
     public bool HasDirtyEditor => RoleDraft?.IsDirty == true || (DirectPermissionKey != null && DirectDecision != _originalDirectDecision);
     public bool CanNavigate => !IsBusy && !HasDirtyEditor && !RequiresRecovery;
     public SecuritySaveOutcome? LastSaveOutcome { get; private set; }
@@ -220,12 +229,7 @@ public sealed partial class SecurityWorkspaceViewModel
 
     public bool ReviewRecoveryAndRebase()
     {
-        if (!IsCurrent || IsBusy || !RequiresRecovery || _generation <= _recoveryMarkedGeneration ||
-            !Catalog.IsCurrent(OwnerVersion) ||
-            _recoveryTarget == null ||
-            (_recoveryTarget == SecurityAdministrationTargetDto.User && !Users.IsCurrent(OwnerVersion)) ||
-            (_recoveryTarget == SecurityAdministrationTargetDto.Role && !Roles.IsCurrent(OwnerVersion)) ||
-            (_recoveryNeedsRelatedRoles && !Roles.IsCurrent(OwnerVersion))) return false;
+        if (!CanReviewRecovery) return false;
         if (RoleDraft != null)
         {
             var role = Roles.Items.FirstOrDefault(r => r.RoleId == RoleDraft.RoleId);
