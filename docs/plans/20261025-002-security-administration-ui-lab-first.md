@@ -412,6 +412,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L05 inactive/protected continuation at physical125 — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records a fresh Dark `SEC_L05` Lab on unchanged source/test `5f86409`. U102's effective Active-key rows showed Deny with an inactive-account reason despite retained membership. U103's six Active-key rows showed **Chưa xác định** with an unverified protected-account reason; its edit actions and direct-edit shortcut were disabled, while Deprecated retained lifecycle Deny. The journal remained initial reads only. These are bounded fixture observations, not full SEC-L05/SEC-T04 attended PASS.
 
+**SEC-L07 same-revision physical100 continuation — 2026-10-26:** After `GetScaleFactorForMonitor` measured Windows at 100%, the [evidence](../evidence/security/20261025-security-ui-lab.md) records a fresh Light `SEC_L07` Release Lab on unchanged source/test `5f86409`. Native Tab after the first staged Post grant retained the two-key unsaved draft without a pre-Save write. A one-shot No-op grant returned unchanged assignment revision 21 for Inventory Read; the following Post request used 21 and returned 22. The UI then reloaded all three sources, showed both grants saved and cleared the draft. This repeats only the bounded no-op chain at physical100; other SEC-T04 keyboard paths and the complete SEC-L01–SEC-L12 matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
