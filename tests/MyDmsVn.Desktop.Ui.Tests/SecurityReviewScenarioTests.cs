@@ -18,6 +18,73 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 public sealed class SecurityReviewScenarioTests
 {
     [Theory]
+    [InlineData("Hold success", "Success")]
+    [InlineData("Hold failure", "Conflict")]
+    public void Close_save_waits_for_held_result_and_preserves_failed_editor(string fixtureOutcome, string expectedOutcome)
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
+        {
+            using var host = new UiLabForm((_, _) => Task.FromResult(WorkspaceCloseChoice.Save));
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L10;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L10 && !host.IsResetting);
+
+            var scene = host.CurrentSecurityScenarioData!;
+            var control = host.CurrentSecurityControl!;
+            host.SecurityReviewToggleButton.PerformClick();
+            host.SecurityMutationOutcomeSelector.SelectedItem = fixtureOutcome;
+            host.SecurityArmMutationButton.PerformClick();
+            Assert.True(control.ViewModel.BeginRolePermissions());
+            control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+            var before = control.CaptureCloseState();
+            Assert.True(before.IsDirty);
+
+            host.CloseWorkspaceButton.PerformClick();
+            Until(() => scene.Journal.Entries.Any(entry => entry.Operation == "Security.Mutate"));
+            Assert.Same(control, host.CurrentSecurityControl);
+            Assert.False(host.CloseWorkspaceButton.Enabled);
+            Assert.True(control.CaptureCloseState().IsDirty);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate.Result");
+            var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate").Request);
+            Assert.Equal(SecurityAdministrationTargetDto.Role, request.Target);
+            Assert.Equal(SecurityAdministrationOperationDto.SetPermission, request.Operation);
+            Assert.Equal(201, request.TargetId);
+            Assert.Equal("Sales.Receipts.Post", request.PermissionKey);
+            Assert.True(request.Decision);
+            Assert.Equal(21, request.ExpectedRevision);
+
+            Assert.True(host.SecurityReleaseMutationButton.Enabled);
+            host.SecurityReleaseMutationButton.PerformClick();
+            Until(() => scene.Journal.Entries.Any(entry => entry.Operation == "Security.Mutate.Result"));
+            var result = Assert.IsType<SecurityResponseJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate.Result").Request);
+            Assert.Equal(expectedOutcome, result.Outcome);
+            Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            if (expectedOutcome == "Success")
+            {
+                Assert.Equal(22, result.AssignmentRevision);
+                Until(() => host.CurrentSecurityControl == null && !host.IsResetting);
+                Assert.Null(host.CurrentSecurityScenarioData);
+                Assert.Contains("Workspace closed", host.StatusText);
+                Until(() => string.IsNullOrEmpty(host.JournalText));
+            }
+            else
+            {
+                Until(() => host.CloseWorkspaceButton.Enabled);
+                Assert.Null(result.AssignmentRevision);
+                Assert.Same(control, host.CurrentSecurityControl);
+                var after = control.CaptureCloseState();
+                Assert.True(after.IsDirty);
+                Assert.Equal(before.EditorIdentity, after.EditorIdentity);
+                Assert.Equal(before.Revision, after.Revision);
+                Assert.Contains("Close rejected; edits retained", host.StatusText);
+            }
+        });
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Close_save_dispatches_one_owned_write_and_clears_lab_presentation(bool directUser)
