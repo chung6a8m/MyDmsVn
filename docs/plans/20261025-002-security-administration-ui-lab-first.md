@@ -308,6 +308,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **Same-candidate physical125 continuation — 2026-10-26:** After the Owner switched Windows scale, unchanged source/test `759c22eeb097c077bbfb210e0d03c9f38a58a646` passed full Debug/net48 Ui.Tests **209/209** with all four native-search Light/Dark × minimum/review rows printing physical125. The reopened Dark Release Lab showed the corrected known-rejection banner for one U101 direct-permission `BadRequest`, with saved/unsaved state and recovery actions retained. The [evidence](../evidence/security/20261025-security-ui-lab.md) holds the exact TRX path and observations. This closes physical125 verification for the later correction, while SEC-L01–SEC-L12 and SEC-T04 review/keyboard work remain OPEN.
 
+**SEC-L03 Owner-operated Validation and SEC-T04 keyboard continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records the Owner-reported masked password, error and clearing; a sanitized U101 `SetPassword` BadRequest followed by a second Success at revision 11→12; an empty field on reviewer reopening; and a bounded native125 Users Tab/Down/Right/Shift+Tab sequence without mutation. The second password submission origin awaits Owner clarification. Neither the full SEC-L03 variants nor SEC-T04 keyboard/review exit is marked PASS.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
