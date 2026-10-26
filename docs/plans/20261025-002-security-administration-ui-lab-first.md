@@ -310,6 +310,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L03 Owner-operated Validation and SEC-T04 keyboard continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records the Owner-reported masked password, error and clearing; a sanitized U101 `SetPassword` BadRequest followed by a second Success at revision 11→12; an empty field on reviewer reopening; and a bounded native125 Users Tab/Down/Right/Shift+Tab sequence without mutation. The second password submission origin awaits Owner clarification. Neither the full SEC-L03 variants nor SEC-T04 keyboard/review exit is marked PASS.
 
+**SEC-T04 Roles keyboard continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) adds physical125 Dark Roles search → filter → list Tab order, Up/Down selected-role changes, Right into R201 **Thành viên (2)** and Shift+Tab return, all without mutation. Remaining native commands and full geometry/review are still OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
