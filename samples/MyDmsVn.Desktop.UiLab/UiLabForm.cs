@@ -490,6 +490,11 @@ internal sealed class UiLabForm : Form
         var origin = _securityControl;
         try
         {
+            if (!origin.ViewModel.CanNavigate)
+            {
+                if (!_poisoned && ReferenceEquals(origin, _securityControl)) _status.Text = "Security reload blocked; current state retained.";
+                return;
+            }
             await origin.ActivateAsync(_lifetime.Token);
             if (!_poisoned && ReferenceEquals(origin, _securityControl)) _status.Text = "Security reload completed.";
         }

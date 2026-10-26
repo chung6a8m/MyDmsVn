@@ -16,6 +16,33 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 
 public sealed class SecurityReviewScenarioTests
 {
+    [Fact]
+    public void Review_reload_reports_dirty_editor_block_without_new_reads()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
+        {
+            using var host = new UiLabForm();
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L10;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L10 && !host.IsResetting);
+            var scene = host.CurrentSecurityScenarioData!;
+            var vm = host.CurrentSecurityControl!.ViewModel;
+            Assert.True(vm.BeginDirectPermission("Sales.Receipts.Post"));
+            vm.SetDirectDecision(true);
+            Assert.True(vm.HasDirtyEditor);
+            var reads = scene.Journal.Entries.Count;
+
+            host.SecurityReviewToggleButton.PerformClick();
+            host.SecurityReloadButton.PerformClick();
+            Until(() => host.StatusText.IndexOf("blocked", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            Assert.Equal(reads, scene.Journal.Entries.Count);
+            Assert.True(vm.HasDirtyEditor);
+            Assert.Equal(true, vm.DirectDecision);
+        });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
