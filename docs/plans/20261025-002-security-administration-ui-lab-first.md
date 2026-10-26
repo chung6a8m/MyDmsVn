@@ -516,6 +516,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L06 direct tri-state repeat at physical100 — 2026-10-26:** On source/test `d3d3a97` and the rebuilt Release/net48 Lab, a fresh Dark `SEC_L06` fixture sent U101/Post `decision=true`, `false`, then `null` at revisions 11→12→13→14. Each write returned Success and was followed by Users/Roles/Catalog Success. Inherit removed Post from the direct-permission list and the effective row showed **Chưa được cấp** from no direct or role grant. [Ordered journal and bounded review](../evidence/security/20261025-security-ui-lab.md) are recorded. The earlier physical125 tri-state path belongs to its stated candidate; the other SEC-L06 branches, physical125 on this source and the complete matrix remain OPEN.
 
+**SEC-L06 denied direct Save repeat at physical100 — 2026-10-26:** On the same source/test and Release Lab, a fresh Dark `SEC_L06` fixture staged U101/Post Allow against saved Deny. A one-shot Forbidden Save sent exactly one `User/SetPermission` request at revision 11; the Users view cleared while Roles/catalog remained loaded. A separate successful three-source reload restored U101 with Post still Deny and no replay. [Ordered journal and bounded review](../evidence/security/20261025-security-ui-lab.md) are recorded. Other SEC-L06 branches, physical125 on this source and complete SEC-T04/SEC-L01–SEC-L12 acceptance remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
