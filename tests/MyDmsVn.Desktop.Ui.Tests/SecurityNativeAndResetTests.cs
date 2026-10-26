@@ -79,6 +79,44 @@ public sealed class SecurityNativeAndResetTests
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Native_escape_cancels_identity_edit_without_mutation(bool roles) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (control, scene) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var detail = roles ? (Control)control.RoleDetail : control.UserDetail;
+            var button = Descendants(detail).OfType<Button>()
+                .Single(item => item.Text == (roles ? "Sửa tên…" : "Sửa thông tin…"));
+            var opened = false;
+            Exception? dialogError = null;
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>()
+                    .FirstOrDefault(item => item.Text.StartsWith("Sửa — "));
+                if (dialog == null) return;
+                timer.Stop();
+                try
+                {
+                    opened = true;
+                    Assert.Equal("Hủy", Assert.IsType<Button>(dialog.CancelButton).Text);
+                    Assert.True(dialog.Controls.Cast<Control>().SelectMany(Descendants).OfType<TextBox>().First().Focus());
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                    Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
+                }
+                catch (Exception error) { dialogError = error; dialog.Close(); }
+            };
+            Assert.True(button.Focus());
+            timer.Start();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(opened, "Native Enter did not activate the focused identity edit action.");
+            if (dialogError != null) throw dialogError;
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
     [Fact]
     public void Native_membership_dialog_names_role_and_escape_cancels_without_dispatch() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (control, scene) =>
