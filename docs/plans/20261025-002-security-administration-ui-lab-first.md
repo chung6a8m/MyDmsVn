@@ -340,6 +340,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L12 physical100 repeated read-gate/Reset continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records a held Catalog read followed by Reset, then a held Users read followed by explicit Release and a second Reset in the same Release Lab. Both resets produced fresh populated graphs with only three initial reads; no mutation or stale old-graph journal event appeared. This covers a cooperative repeated-control path, not disposal internals or permanent noncooperative-worker termination. The complete attended matrix remains OPEN.
 
+**SEC-L02 physical100 successful-empty continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records held Users Empty after an initially Forbidden Users read, with Roles/Catalog still successful. Releasing the held result showed an explicit empty Users pane while R201 retained its known two-member count but only ID-level unavailable details; a later authorized Users Success reload restored member names without mutation. Other source/outcome permutations and the full attended matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
