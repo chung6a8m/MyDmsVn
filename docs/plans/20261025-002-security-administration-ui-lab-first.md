@@ -344,6 +344,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T04 physical100 role-grant keyboard continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records search focus after **Sửa quyền**, a Post checkbox draft reverted with native Space while the list retained focus, and explicit Cancel without mutation. Escape did not close the inline editor. The complete command-focus traversal and native125 repeat remain OPEN.
 
+**SEC-L10 physical100 same-user admission continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records U101's unsaved direct Allow draft blocking **Đổi trạng thái…** behind the ordinary Save/Discard/Cancel prompt. Cancel kept the same selected user/key and saved Deny versus unsaved Allow without mutation. Other same-entity actions, ordinary Refresh and the full attended matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
