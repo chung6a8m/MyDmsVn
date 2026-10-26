@@ -151,6 +151,8 @@ confirm another target.
 3. Verify the same editor identity/revision and draft before and after rejected navigation; inspect the actual close-coordinator path.
 4. While a draft is dirty, invoke activation/password/rename or another same-entity mutation and ordinary Refresh; exercise Save/Discard/Stay before any baseline replacement. Separately use explicit recovery reload after partial/uncertain Save.
 
+In the current workspace, the product **Làm mới** button is on **Quyền hiệu lực** and the read-only catalog, not the direct-decision editor. From a dirty direct draft, first record the subtab/top-tab Save/Discard/Stay admission needed to reach that button, then test Refresh. The UI Lab toolbar's **Reload Security** helper is a separate path.
+
 Expected: the specification's draft ownership/admission rules are consistent at every boundary. Cancel/rejected Save keeps the draft and relevant focus; Discard is explicit. Confirmed Save admits Close
 only for the same editor/revision and required successful refresh. Other same-entity mutations and ordinary baseline-replacing refresh resolve the draft first; they cannot silently erase it or invalidate it through a competing revision. Recovery reload loads current state for comparison with retained intent, without replay. Busy/uncertain state cannot be dismissed through an ordinary navigation shortcut. Reset is not a substitute for this scenario.
 
