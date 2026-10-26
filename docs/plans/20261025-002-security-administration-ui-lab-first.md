@@ -484,6 +484,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **Exact direct-Enter test revision native100 — 2026-10-26:** The same test-only source revision `9c43f38` passed the complete SQL-free Debug/net48 Ui.Tests suite **232/232** at measured physical100, including four scale-reporting native-search rows. The [TRX, hash and environment](../evidence/security/20261025-security-ui-lab.md) are recorded. This establishes both physical scales for the test revision; the remaining SEC-T04 review/keyboard paths and the attended matrix remain OPEN.
 
+**SEC-L01 compact-window visual continuation at physical100 — 2026-10-26:** On unchanged product/test and Release Lab, a fresh `SEC_L01` fixture was reviewed in an approximately `906 × 622` pixel outer window at measured physical100. Dark User information, role membership, effective/direct permissions, Role grants/members and read-only catalog remained visually reachable with local scrolling; Light catalog, User direct permissions and inactive-role members were also inspected. The six initial Users/Roles/Catalog Success reads were the only journal entries. The [bounded observations](../evidence/security/20261025-security-ui-lab.md) do not establish the exact client rectangle, all labels/scroll extents, complete keyboard traversal or full SEC-L01/SEC-T04 exit; the attended matrix remains OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
