@@ -326,6 +326,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T04 Roles keyboard continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) adds physical125 Dark Roles search → filter → list Tab order, Up/Down selected-role changes, Right into R201 **Thành viên (2)** and Shift+Tab return, all without mutation. Remaining native commands and full geometry/review are still OPEN.
 
+**Further physical125 attended continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) now records SEC-L05 inactive/protected effective explanations, SEC-L09 read-only catalog keyboard/double-click and lifecycle filtering, and SEC-L10 held failing role Save with rejected Close/target switch and one returned Conflict. These are bounded observations on the `e70b138` source/test candidate. The full SEC-L01–SEC-L12 attended matrix, remaining SEC-T04 command keyboard/geometry review and this revision's physical100 full-project run remain OPEN. High Contrast remains Owner-waived for SEC-T04 only.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
