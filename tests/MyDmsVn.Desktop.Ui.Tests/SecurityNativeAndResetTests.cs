@@ -534,6 +534,41 @@ public sealed class SecurityNativeAndResetTests
         });
 
     [Fact]
+    public void Native_enter_during_held_role_save_does_not_dispatch_a_second_mutation() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 0;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var edit = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Sửa quyền");
+            Assert.True(edit.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
+            var index = grants.Items.IndexOf("Sales.Receipts.Post");
+            Assert.True(index >= 0);
+            grants.SelectedIndex = index;
+            Assert.True(grants.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.True(grants.GetItemChecked(index));
+            var save = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Lưu quyền vai trò");
+            var gate = scene.Administration.HoldNextMutation(true);
+            Assert.True(save.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(control.ViewModel.IsBusy);
+            Assert.False(save.Enabled);
+            Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            gate.Complete(MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Success(new SecurityAdministrationResultDto(22, true)));
+            Until(() => scene.Journal.Entries.Count(entry => entry.Operation == "Security.Catalog.Result") == 2);
+            Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate.Result");
+            Assert.True(grants.GetItemChecked(index));
+            Assert.False(control.ViewModel.HasDirtyEditor);
+        });
+
+    [Fact]
     public void Native_tab_leaves_role_grant_list_and_save_has_real_focus() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
         {
