@@ -336,6 +336,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L05 physical100 unavailable-source continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records U101 effective-row changes after one Roles Forbidden read, explicit Roles Success recovery, one Catalog Forbidden read and explicit Catalog Success recovery on the same `e70b138` Release Lab. Role-dependent conclusions became Unknown while direct/Deprecated explanations remained; missing catalog removed the effective-key rows and blocked contextual editing until authorized reload. Four three-source refresh cycles added no mutation. Combined missing sources, all identity variants and the full matrix remain OPEN.
 
+**SEC-L06 physical100 invalid/protected continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records a fresh U101 direct-key chooser with only six Active keys, excluding `Legacy.Deprecated`, and a protected U103 whose maintenance/import/decision controls stayed locked. A visible Save attempt added no mutation. Arbitrary injected unknown keys and remaining protected paths are still OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
