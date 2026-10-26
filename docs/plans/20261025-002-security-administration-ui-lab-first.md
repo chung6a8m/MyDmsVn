@@ -302,6 +302,10 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L08 failed-refresh continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records Dark/physical100 R201 Post-grant Success revision 21→22 followed by a one-shot Catalog Failure during required refresh. The UI retained recovery and the one-key draft until authorized Success reload and explicit diff review reduced it to zero; no second mutation was dispatched. This closes the named successful-write/failed-refresh branch only; full SEC-L08 remains OPEN.
 
+**SEC-L10 same-entity admission continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records Dark/physical100 R201 dirty grant → **Sửa tên…**: Cancel preserved the selected owner and one-key draft without a mutation; Discard removed it before the rename modal opened, and canceling that modal sent no mutation. Remaining Save, status/refresh and held/failure paths remain OPEN.
+
+**SEC-L04 denied membership continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records a Dark/physical100 U101 → R202 membership request with expected user/role revisions 11/22, one Forbidden response, Users access scrubbed independently of Roles/catalog and an authorized Users Success reload that retained the original two memberships without replay. Separate stale-user and stale-role revision faults remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
