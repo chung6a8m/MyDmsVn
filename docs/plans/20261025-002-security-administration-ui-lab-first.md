@@ -520,6 +520,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L09 contextual Preview cancel and Apply at physical100 — 2026-10-26:** On the same source/test and Release Lab, a fresh Light `SEC_L09` fixture previewed an additive R202 `Sales.Receipts.Read` import. The first confirmation showed target #202, revision 22, catalog digest and one addition; Hủy produced no Apply. A second preview of the same JSON followed by explicit Áp dụng produced one Apply and a successful three-source reload; the confirmed R202 Read checkbox changed from unchecked to checked. [Ordered journal, fixture and limits](../evidence/security/20261025-security-ui-lab.md) are recorded. Stale/unauthorized variants on this source, physical125 and complete SEC-L09/SEC-T04/SEC-L01–SEC-L12 acceptance remain OPEN.
 
+**SEC-L09 invalid Preview inputs at physical100 — 2026-10-26:** On a fresh Light `SEC_L09` fixture with the same product/test/Release Lab, unknown-key, Deprecated-key and malformed JSON files were each rejected at Preview with `ValidationError`; the journal contained three Preview entries and no Apply. R202's confirmed grant list remained unchanged. [Input shapes, journal and limits](../evidence/security/20261025-security-ui-lab.md) are recorded. Other malformed variants, physical125 on this source and complete SEC-L09/SEC-T04/SEC-L01–SEC-L12 acceptance remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
