@@ -55,6 +55,9 @@ public sealed partial class SecurityWorkspaceViewModel
     public SecurityRolePermissionDraft? RoleDraft { get; private set; }
     public string? DirectPermissionKey { get; private set; }
     public bool? DirectDecision { get; private set; }
+    SecurityRolePermissionDraft? _suspendedRoleDraft;
+    string? _suspendedDirectPermissionKey;
+    bool? _suspendedDirectDecision;
     bool? _originalDirectDecision;
     int _directUserId;
     long _directRevision;
@@ -75,6 +78,8 @@ public sealed partial class SecurityWorkspaceViewModel
         (_recoveryTarget != SecurityAdministrationTargetDto.User || Users.IsCurrent(OwnerVersion)) &&
         (_recoveryTarget != SecurityAdministrationTargetDto.Role || Roles.IsCurrent(OwnerVersion)) &&
         (!_recoveryNeedsRelatedRoles || Roles.IsCurrent(OwnerVersion)) &&
+        (_suspendedRoleDraft == null || (Roles.IsCurrent(OwnerVersion) && Roles.Items.Any(role => role.RoleId == _suspendedRoleDraft.RoleId))) &&
+        (_suspendedDirectPermissionKey == null || (Users.IsCurrent(OwnerVersion) && Users.Items.Any(user => user.UserId == _directUserId))) &&
         (RoleDraft == null || (Roles.IsCurrent(OwnerVersion) && Roles.Items.Any(role => role.RoleId == RoleDraft.RoleId))) &&
         (DirectPermissionKey == null || (Users.IsCurrent(OwnerVersion) &&
             Users.Items.Any(user => user.UserId == _directUserId && !user.IsProtectedAccount)));
@@ -230,21 +235,30 @@ public sealed partial class SecurityWorkspaceViewModel
     public bool ReviewRecoveryAndRebase()
     {
         if (!CanReviewRecovery) return false;
-        if (RoleDraft != null)
+        var roleDraft = RoleDraft ?? _suspendedRoleDraft;
+        if (roleDraft != null)
         {
-            var role = Roles.Items.FirstOrDefault(r => r.RoleId == RoleDraft.RoleId);
+            var role = Roles.Items.FirstOrDefault(r => r.RoleId == roleDraft.RoleId);
             if (!Roles.IsCurrent(OwnerVersion) || role == null) return false;
-            var remainingIntent = RoleDraft.Changes;
+            var remainingIntent = roleDraft.Changes;
             var active = Catalog.Items.Where(k => k.Status == "Active").Select(k => k.Key).ToArray();
-            var rebased = new SecurityRolePermissionDraft(role.RoleId, role.AssignmentRevision, role.PermissionKeys, active, OwnerVersion, RoleDraft.EditorId);
+            var rebased = new SecurityRolePermissionDraft(role.RoleId, role.AssignmentRevision, role.PermissionKeys, active, OwnerVersion, roleDraft.EditorId);
             foreach (var change in remainingIntent.Where(change => active.Contains(change.PermissionKey)))
                 rebased.SetGranted(change.PermissionKey, change.Granted);
             RoleDraft = rebased;
+            _suspendedRoleDraft = null;
+            SelectedRoleId = role.RoleId;
         }
-        else if (DirectPermissionKey != null)
+        else if (DirectPermissionKey != null || _suspendedDirectPermissionKey != null)
         {
             var user = Users.Items.FirstOrDefault(u => u.UserId == _directUserId);
             if (!Users.IsCurrent(OwnerVersion) || user == null || user.IsProtectedAccount) return false;
+            DirectPermissionKey ??= _suspendedDirectPermissionKey;
+            if (_suspendedDirectPermissionKey != null)
+                DirectDecision = _suspendedDirectDecision;
+            _suspendedDirectPermissionKey = null;
+            _suspendedDirectDecision = null;
+            SelectedUserId = user.UserId;
             _originalDirectDecision = user.DirectDecisions.FirstOrDefault(d => d.PermissionKey == DirectPermissionKey)?.Decision;
             _directRevision = user.AssignmentRevision;
         }
@@ -371,6 +385,9 @@ public sealed partial class SecurityWorkspaceViewModel
         RoleDraft = null;
         DirectPermissionKey = null;
         DirectDecision = _originalDirectDecision = null;
+        _suspendedRoleDraft = null;
+        _suspendedDirectPermissionKey = null;
+        _suspendedDirectDecision = null;
         _editorId = Guid.NewGuid();
         RequiresRecovery = false;
         _recoveryTarget = null;
@@ -397,6 +414,14 @@ public sealed partial class SecurityWorkspaceViewModel
             {
                 // The target is forbidden, but the committed/unknown outcome still needs
                 // an authoritative refresh before ordinary close can be admitted.
+                // Keep the intent private until the target becomes readable again.
+                if (target == SecurityAdministrationTargetDto.Role && RoleDraft != null)
+                    _suspendedRoleDraft = RoleDraft;
+                if (target == SecurityAdministrationTargetDto.User && DirectPermissionKey != null)
+                {
+                    _suspendedDirectPermissionKey = DirectPermissionKey;
+                    _suspendedDirectDecision = DirectDecision;
+                }
                 RoleDraft = null;
                 DirectPermissionKey = null;
                 DirectDecision = _originalDirectDecision = null;

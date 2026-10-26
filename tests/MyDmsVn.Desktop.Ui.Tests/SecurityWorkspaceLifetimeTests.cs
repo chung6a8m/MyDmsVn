@@ -567,6 +567,64 @@ public sealed class SecurityWorkspaceLifetimeTests
         Assert.True(vm.HasDirtyEditor);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Denied_comparison_read_hides_uncertain_intent_until_authorized_rebase(bool roleTarget)
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);
+        using var vm = Model(scene);
+        await vm.LoadAsync(default);
+        if (roleTarget)
+        {
+            Assert.True(vm.BeginRolePermissions());
+            vm.SetRoleGranted("Sales.Receipts.Post", true);
+        }
+        else
+        {
+            Assert.True(vm.BeginDirectPermission("Sales.Receipts.Post"));
+            vm.SetDirectDecision(true);
+        }
+        var gate = scene.Administration.HoldNextMutation(true);
+        var saving = vm.SaveEditorAsync(default);
+        gate.Cancel();
+        await saving;
+        Assert.True(vm.RequiresRecovery);
+        Assert.True(vm.HasDirtyEditor);
+        var mutationCount = scene.Journal.Entries.Count(entry => entry.Operation == "Security.Mutate");
+
+        var denied = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Access changed.");
+        if (roleTarget) scene.Administration.RolesError = denied;
+        else scene.Administration.UsersError = denied;
+        await vm.ReloadForComparisonAsync(default);
+        Assert.Equal(SecurityDatasetState.Forbidden, roleTarget ? vm.Roles.State : vm.Users.State);
+        Assert.True(vm.RequiresRecovery);
+        Assert.False(vm.CanReviewRecovery);
+        Assert.Null(vm.RoleDraft);
+        Assert.Null(vm.DirectPermissionKey);
+
+        scene.Administration.RolesError = null;
+        scene.Administration.UsersError = null;
+        await vm.ReloadForComparisonAsync(default);
+        Assert.True(vm.CanReviewRecovery);
+        Assert.True(vm.ReviewRecoveryAndRebase());
+        if (roleTarget)
+        {
+            Assert.Equal(201, vm.SelectedRoleId);
+            Assert.Contains(vm.RoleDraft!.Changes, change => change.PermissionKey == "Sales.Receipts.Post" && change.Granted);
+            Assert.DoesNotContain("Sales.Receipts.Post", vm.SelectedRole!.PermissionKeys);
+        }
+        else
+        {
+            Assert.Equal(101, vm.SelectedUserId);
+            Assert.Equal("Sales.Receipts.Post", vm.DirectPermissionKey);
+            Assert.True(vm.DirectDecision);
+            Assert.False(vm.SelectedUser!.DirectDecisions.Single(decision => decision.PermissionKey == "Sales.Receipts.Post").Decision);
+        }
+        Assert.True(vm.HasDirtyEditor);
+        Assert.Equal(mutationCount, scene.Journal.Entries.Count(entry => entry.Operation == "Security.Mutate"));
+    }
+
     [Fact]
     public void Editor_button_tracks_held_mutation_until_refresh_finishes() => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
     {
