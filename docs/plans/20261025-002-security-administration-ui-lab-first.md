@@ -334,6 +334,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L01 physical100 layout continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records same-source Release Lab observations of U101's four subtabs, keyboard Right navigation, R201 grants/members, the inactive long-label role, and read-only catalog in maximized and narrower Light/Dark windows at measured physical100. The narrow outer screenshot measured about 773×843 pixels; it is not the guide's measured 900×600 workspace client. The journal stayed at three reads with no mutation. Full minimum-client and command-keyboard traversal, and the complete attended matrix, remain OPEN.
 
+**SEC-L05 physical100 unavailable-source continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records U101 effective-row changes after one Roles Forbidden read, explicit Roles Success recovery, one Catalog Forbidden read and explicit Catalog Success recovery on the same `e70b138` Release Lab. Role-dependent conclusions became Unknown while direct/Deprecated explanations remained; missing catalog removed the effective-key rows and blocked contextual editing until authorized reload. Four three-source refresh cycles added no mutation. Combined missing sources, all identity variants and the full matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
