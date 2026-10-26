@@ -261,6 +261,45 @@ public sealed class SecurityNativeAndResetTests
         });
 
     [Fact]
+    public void Native_enter_saves_one_role_grant_and_refreshes_confirmed_state() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 0;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var edit = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Sửa quyền");
+            Assert.True(edit.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
+            var index = grants.Items.IndexOf("Sales.Receipts.Post");
+            Assert.True(index >= 0);
+            Assert.False(grants.GetItemChecked(index));
+            grants.SelectedIndex = index;
+            Assert.True(grants.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.True(grants.GetItemChecked(index));
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            var save = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Lưu quyền vai trò");
+            Assert.True(save.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Until(() => scene.Journal.Entries.Count(entry => entry.Operation == "Security.Catalog.Result") == 2);
+            var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate").Request);
+            Assert.Equal(SecurityAdministrationTargetDto.Role, request.Target);
+            Assert.Equal(SecurityAdministrationOperationDto.SetPermission, request.Operation);
+            Assert.Equal(201, request.TargetId);
+            Assert.Equal("Sales.Receipts.Post", request.PermissionKey);
+            Assert.True(request.Decision);
+            Assert.Equal(21, request.ExpectedRevision);
+            var result = Assert.IsType<SecurityResponseJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate.Result").Request);
+            Assert.Equal("Success", result.Outcome);
+            Assert.Equal(22, result.AssignmentRevision);
+            Assert.True(grants.GetItemChecked(index));
+            Assert.False(control.ViewModel.HasDirtyEditor);
+        });
+
+    [Fact]
     public void Native_keyboard_selects_direct_key_and_tri_state_without_implicit_write() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
         {
