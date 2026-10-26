@@ -482,6 +482,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L06 Forbidden Save at physical125 — 2026-10-26:** On the unchanged Release Lab, a fresh `SEC_L06` fixture armed one-shot Forbidden for U101 direct Post Deny→Allow. Save sent one `User/SetPermission` at revision 11, then Forbidden scrubbed Users and disabled User commands while Roles/catalog remained loaded. Explicit Lab reload restored Users Success and saved Post Deny, with no replay or second mutation. The [journal and limits](../evidence/security/20261025-security-ui-lab.md) are recorded. This repeats a previously bounded Forbidden path on the current test revision; physical100 and remaining SEC-L06/SEC-T04 attended paths remain OPEN.
 
+**Exact direct-Enter test revision native100 — 2026-10-26:** The same test-only source revision `9c43f38` passed the complete SQL-free Debug/net48 Ui.Tests suite **232/232** at measured physical100, including four scale-reporting native-search rows. The [TRX, hash and environment](../evidence/security/20261025-security-ui-lab.md) are recorded. This establishes both physical scales for the test revision; the remaining SEC-T04 review/keyboard paths and the attended matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
