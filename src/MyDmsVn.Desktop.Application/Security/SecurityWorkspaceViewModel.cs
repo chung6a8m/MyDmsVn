@@ -49,6 +49,7 @@ public sealed partial class SecurityWorkspaceViewModel : IDisposable
             {
                 InvalidateImportPreview();
                 ClearEditorForLifetime();
+                LastMutationFeedback = null;
             }
             SelectedUserId = id;
             Notify();
@@ -64,6 +65,7 @@ public sealed partial class SecurityWorkspaceViewModel : IDisposable
             {
                 InvalidateImportPreview();
                 ClearEditorForLifetime();
+                LastMutationFeedback = null;
             }
             SelectedRoleId = id;
             Notify();

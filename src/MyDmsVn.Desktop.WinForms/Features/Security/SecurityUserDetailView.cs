@@ -11,6 +11,8 @@ public sealed class SecurityUserDetailView : UserControl
     public Label HeaderMetadata { get; } = new() { Dock = DockStyle.Top, Height = 23, AutoEllipsis = true };
     public Label HeaderState { get; } = new() { Dock = DockStyle.Top, Height = 24, AutoEllipsis = true };
     public FlowLayoutPanel HeaderActions { get; } = new() { Dock = DockStyle.Top, Height = 32, AutoScroll = false, WrapContents = true };
+    public Label ActionFeedback { get; } = new() { Dock = DockStyle.Top, Height = 26, Visible = false, AutoEllipsis = true,
+        Padding = new Padding(8, 4, 8, 0), AccessibleName = "Thông báo đổi trạng thái" };
     public TabControl Tabs { get; } = new BusinessCompactWorkspaceTabs { Dock = DockStyle.Fill };
     public ListBox Memberships { get; } = new() { Dock = DockStyle.Fill };
     public DataGridView Effective { get; } = new() { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoGenerateColumns = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false };
@@ -50,6 +52,7 @@ public sealed class SecurityUserDetailView : UserControl
         Tabs.TabPages[2].Controls.Add(filters);
         Tabs.TabPages[3].Controls.Add(DirectDecisions);
         Controls.Add(Tabs);
+        Controls.Add(ActionFeedback);
         var identity = new Panel { Dock = DockStyle.Top, Height = 115, Padding = new Padding(10, 5, 10, 4) };
         identity.Controls.Add(HeaderActions);
         identity.Controls.Add(HeaderState);

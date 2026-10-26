@@ -89,6 +89,9 @@ public sealed partial class SecurityWorkspaceViewModel
     public SecurityAdministrationTargetDto? LastSaveTarget { get; private set; }
     public string EditingStatus { get; private set; } = "";
     public SecurityMutationFeedback? LastMutationFeedback { get; private set; }
+    public SecurityAdministrationTargetDto? LastMutationTarget { get; private set; }
+    public SecurityAdministrationOperationDto? LastMutationOperation { get; private set; }
+    public int? LastMutationTargetId { get; private set; }
 
     public bool BeginRolePermissions()
     {
@@ -162,6 +165,9 @@ public sealed partial class SecurityWorkspaceViewModel
         if (request.Target == SecurityAdministrationTargetDto.User && Users.Items.Any(u => u.UserId == request.TargetId && u.IsProtectedAccount)) return false;
         IsBusy = true;
         LastMutationFeedback = null;
+        LastMutationTarget = request.Target;
+        LastMutationOperation = request.Operation;
+        LastMutationTargetId = request.TargetId;
         var editor = _editorId;
         var submittedRevision = EditorRevision;
         EditingStatus = "Đang lưu";
@@ -328,6 +334,8 @@ public sealed partial class SecurityWorkspaceViewModel
             LastSaveTarget = saveTarget;
             if (outcome.StopReason == SecuritySaveStopReason.Forbidden)
             {
+                if (outcome.Completion == SecuritySaveCompletion.Partial)
+                    MarkRecovery(saveTarget);
                 RevokeTargetData(saveTarget);
                 EditingStatus = RecoveryStatus(outcome);
             }

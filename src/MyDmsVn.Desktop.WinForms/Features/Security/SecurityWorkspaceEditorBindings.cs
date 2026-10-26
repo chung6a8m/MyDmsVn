@@ -37,7 +37,7 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly Button _grantSave;
     readonly Button _assignRole;
     readonly Button _removeRole;
-    readonly Label _membershipHint = new() { AutoSize = true };
+    readonly Label _membershipHint = new() { AutoSize = true, AccessibleName = "Thông báo gán vai trò" };
     bool _rendering;
     SecurityWorkspaceViewModel Vm => _control.ViewModel;
 
@@ -215,6 +215,14 @@ internal sealed class SecurityWorkspaceEditorBindings
         try
         {
             _status.Text = Vm.EditingStatus;
+            var actionFeedback = Vm.LastMutationOperation == SecurityAdministrationOperationDto.SetActive
+                ? Vm.LastMutationFeedback?.Message : null;
+            _control.UserDetail.ActionFeedback.Text = Vm.LastMutationTarget == SecurityAdministrationTargetDto.User &&
+                Vm.LastMutationTargetId == Vm.SelectedUserId ? actionFeedback ?? "" : "";
+            _control.UserDetail.ActionFeedback.Visible = _control.UserDetail.ActionFeedback.Text.Length > 0;
+            _control.RoleDetail.ActionFeedback.Text = Vm.LastMutationTarget == SecurityAdministrationTargetDto.Role &&
+                Vm.LastMutationTargetId == Vm.SelectedRoleId ? actionFeedback ?? "" : "";
+            _control.RoleDetail.ActionFeedback.Visible = _control.RoleDetail.ActionFeedback.Text.Length > 0;
             var user = Vm.SelectedUser;
             var usersAvailable = Vm.IsCurrent && Vm.Users.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
             _createUser.Enabled = usersAvailable;
@@ -303,6 +311,9 @@ internal sealed class SecurityWorkspaceEditorBindings
             !Vm.Roles.IsCurrent(Vm.OwnerVersion) ? "Vai trò chưa khả dụng — tải lại dữ liệu trước khi thay đổi." :
             Vm.IsBusy ? "Đang xử lý thay đổi." :
             Vm.RequiresRecovery ? "Cần đối chiếu kết quả trước khi thay đổi." : "";
+        if (hint.Length == 0 && Vm.LastMutationOperation == SecurityAdministrationOperationDto.SetMembership &&
+            Vm.LastMutationTarget == SecurityAdministrationTargetDto.User && Vm.LastMutationTargetId == user?.UserId)
+            hint = Vm.LastMutationFeedback?.Message ?? "";
         var canManage = CanManageMembership();
         _assignRole.Enabled = canManage;
         var index = _control.UserDetail.Memberships.SelectedIndex;
@@ -484,7 +495,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         reload.Enabled = false;
         try
         {
-            if (await Vm.ReloadForComparisonAsync(default) && Vm.ReviewRecoveryAndRebase())
+            if (await Vm.ReloadForComparisonAsync(default) && Vm.CanReviewRecovery)
                 dialog.Close();
             else if (!dialog.IsDisposed)
                 validation.Text = "Chưa tải lại được dữ liệu có quyền truy cập. Hãy thử lại hoặc hủy.";

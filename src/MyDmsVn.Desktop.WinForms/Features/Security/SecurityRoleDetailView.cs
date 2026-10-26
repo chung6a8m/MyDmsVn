@@ -14,6 +14,8 @@ public sealed class SecurityRoleDetailView : UserControl
     };
     public Label HeaderState { get; } = new() { Dock = DockStyle.Top, Height = 25, AutoEllipsis = true };
     public FlowLayoutPanel HeaderActions { get; } = new() { Dock = DockStyle.Top, Height = 32, AutoScroll = false, WrapContents = true };
+    public Label ActionFeedback { get; } = new() { Dock = DockStyle.Top, Height = 26, Visible = false, AutoEllipsis = true,
+        Padding = new Padding(8, 4, 8, 0), AccessibleName = "Thông báo đổi trạng thái" };
     public Panel GrantArea { get; } = new() { Dock = DockStyle.Fill };
     public Label HistoryTitle { get; } = new() { Dock = DockStyle.Bottom, Height = 22, Text = "Quyền cũ / không còn trong danh mục — chỉ xem" };
     public TabControl Tabs { get; } = new BusinessCompactWorkspaceTabs
@@ -51,6 +53,7 @@ public sealed class SecurityRoleDetailView : UserControl
         Tabs.TabPages[1].Controls.Add(Members);
         Tabs.TabPages[1].Controls.Add(OpenUser);
         Controls.Add(Tabs);
+        Controls.Add(ActionFeedback);
         var identity = new Panel { Dock = DockStyle.Top, Height = 95, Padding = new Padding(10, 5, 10, 4) };
         identity.Controls.Add(HeaderActions);
         identity.Controls.Add(HeaderState);

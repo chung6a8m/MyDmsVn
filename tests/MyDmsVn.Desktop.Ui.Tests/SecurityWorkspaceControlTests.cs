@@ -195,13 +195,89 @@ public sealed class SecurityWorkspaceControlTests
 
         Assert.Equal(SecurityDatasetState.Forbidden, control.ViewModel.Roles.State);
         Assert.Equal(SecuritySaveCompletion.Partial, control.ViewModel.LastSaveOutcome!.Completion);
+        Assert.Single(control.ViewModel.LastSaveOutcome.ConfirmedKeys);
+        Assert.Single(control.ViewModel.LastSaveOutcome.RejectedKeys);
+        Assert.Single(control.ViewModel.LastSaveOutcome.UnattemptedKeys);
+        Assert.Empty(control.ViewModel.Roles.Items);
+        Assert.Null(control.ViewModel.SelectedRole);
+        Assert.True(control.ViewModel.RequiresRecovery);
+        Assert.False(control.ViewModel.CanNavigate);
+        Assert.True(control.CaptureCloseState().RequiresOutcomeReview);
+        var admission = control.AdmitNavigationAsync();
+        Wait(admission);
+        Assert.False(admission.Result);
         var notice = Descendants(control.RoleDetail, typeof(Label)).Cast<Label>()
             .Single(label => label.Text.Contains("Đã lưu 1") && label.Text.Contains("Không đủ quyền"));
         Assert.True(notice.Visible);
-        Assert.All(notice.Parent!.Controls.OfType<Button>(), button => Assert.False(button.Visible));
+        Assert.Contains(notice.Parent!.Controls.OfType<Button>(), button => button.Visible && button.Text == "Tải lại để đối chiếu");
         Wait(control.ViewModel.LoadAsync(default));
         System.Windows.Forms.Application.DoEvents();
-        Assert.False(notice.Parent.Visible);
+        Assert.True(notice.Parent.Visible);
+        Assert.Equal(SecurityDatasetState.Forbidden, control.ViewModel.Roles.State);
+        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate.Result" &&
+            entry.Request is SecurityResponseJournalEntry result && result.Outcome == "Forbidden");
+        var reload = control.ViewModel.ReloadForComparisonAsync(default);
+        Wait(reload);
+        Assert.True(reload.Result);
+        Assert.True(control.ViewModel.CanReviewRecovery);
+        Assert.True(control.ViewModel.ReviewRecoveryAndRebase());
+        Assert.False(control.ViewModel.RequiresRecovery);
+        Assert.Contains(control.ViewModel.RoleDraft!.Changes, change => change.PermissionKey == "Sales.Receipts.Read");
+        Assert.Contains(control.ViewModel.RoleDraft.Changes, change => change.PermissionKey == "Sales.Receipts.Write");
+        Assert.DoesNotContain(control.ViewModel.RoleDraft.Changes, change => change.PermissionKey == "Sales.Receipts.Post");
+        Assert.False(control.ViewModel.CanNavigate);
+        Assert.Collection(scene.Journal.Entries.Where(entry => entry.Operation == "Security.Mutate"), _ => { }, _ => { });
+    });
+    [Fact]
+    public void Rejected_membership_shows_scoped_sanitized_feedback_without_changing_membership() => Run(SecurityScenarioId.SEC_L04, (control, scene) =>
+    {
+        control.UserDetail.Tabs.SelectedIndex = 1;
+        var originalRoles = control.ViewModel.SelectedUser!.RoleIds.ToArray();
+        scene.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(
+            MyDmsVn.Contracts.ApiStatusCode.BadRequest, "ValidationError", "raw server secret"));
+
+        var mutation = control.ViewModel.SetMembershipAsync(202, true, default);
+        Wait(mutation);
+        Assert.False(mutation.Result);
+        Assert.Equal(originalRoles, control.ViewModel.SelectedUser!.RoleIds);
+        Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Users.State);
+        Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Roles.State);
+        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        var feedback = Assert.Single(Descendants(control.UserDetail, typeof(Label)).Cast<Label>(),
+            label => label.AccessibleName == "Thông báo gán vai trò");
+        Assert.True(feedback.Visible);
+        Assert.NotEmpty(feedback.Text);
+        Assert.DoesNotContain("raw", feedback.Text);
+        control.ViewModel.SelectUser(102);
+        Assert.False(feedback.Visible);
+    });
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Rejected_status_change_shows_scoped_sanitized_feedback(bool roleTarget) => Run(SecurityScenarioId.SEC_L03, (control, scene) =>
+    {
+        if (roleTarget) control.Tabs.SelectedIndex = 1;
+        var target = roleTarget ? SecurityAdministrationTargetDto.Role : SecurityAdministrationTargetDto.User;
+        var targetId = roleTarget ? 201 : 101;
+        var revision = roleTarget ? control.ViewModel.SelectedRole!.AssignmentRevision : control.ViewModel.SelectedUser!.AssignmentRevision;
+        scene.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(
+            MyDmsVn.Contracts.ApiStatusCode.BadRequest, "ValidationError", "raw server secret"));
+
+        var mutation = control.ViewModel.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(
+            target, SecurityAdministrationOperationDto.SetActive, targetId, isActive: false, expectedRevision: revision), default);
+        Wait(mutation);
+        Assert.False(mutation.Result);
+        Assert.True(roleTarget ? control.ViewModel.SelectedRole!.IsActive : control.ViewModel.SelectedUser!.IsActive);
+        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        var pane = roleTarget ? (Control)control.RoleDetail : control.UserDetail;
+        var feedback = Assert.Single(Descendants(pane, typeof(Label)).Cast<Label>(),
+            label => label.AccessibleName == "Thông báo đổi trạng thái");
+        Assert.True(feedback.Visible);
+        Assert.NotEmpty(feedback.Text);
+        Assert.DoesNotContain("raw", feedback.Text);
+        if (roleTarget) control.ViewModel.SelectRole(202);
+        else control.ViewModel.SelectUser(102);
+        Assert.False(feedback.Visible);
     });
     [Theory]
     [InlineData(900, 600)]
@@ -807,6 +883,18 @@ public sealed class SecurityWorkspaceControlTests
         dialogError?.Throw();
         Assert.DoesNotContain(data.Data.Users, user => user.Username == "rejected-user");
         Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        if (status == MyDmsVn.Contracts.ApiStatusCode.Conflict)
+        {
+            Assert.True(control.ViewModel.RequiresRecovery);
+            Assert.True(control.ViewModel.CanReviewRecovery);
+            Assert.False(control.ViewModel.CanNavigate);
+            var review = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(),
+                button => button.Text == "Đã đối chiếu — lập diff mới");
+            Assert.True(review.Visible);
+            control.RecoveryConfirmationOverride = () => true;
+            review.PerformClick();
+            Assert.False(control.ViewModel.RequiresRecovery);
+        }
     });
     [Fact]
     public void User_create_held_save_rejects_duplicate_submission() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
@@ -977,6 +1065,123 @@ public sealed class SecurityWorkspaceControlTests
         if (phase == 2 && !System.Windows.Forms.Application.OpenForms.Cast<Form>().Any(form => form.Text.StartsWith("Đặt lại mật khẩu — "))) timer.Stop();
         Assert.False(timer.Enabled, "The rejected password dialog did not finish within the pumped test window.");
         dialogError?.Throw();
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        if (status == MyDmsVn.Contracts.ApiStatusCode.Conflict)
+        {
+            Assert.True(control.ViewModel.RequiresRecovery);
+            Assert.True(control.ViewModel.CanReviewRecovery);
+            Assert.False(control.ViewModel.CanNavigate);
+            var review = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(),
+                button => button.Text == "Đã đối chiếu — lập diff mới");
+            Assert.True(review.Visible);
+            control.RecoveryConfirmationOverride = () => true;
+            review.PerformClick();
+            Assert.False(control.ViewModel.RequiresRecovery);
+        }
+    });
+    [Fact]
+    public void Unknown_password_result_requires_explicit_review_after_failed_then_successful_reload() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var gate = data.Administration.HoldNextMutation();
+        var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đặt lại mật khẩu…");
+        ExceptionDispatchInfo? dialogError = null;
+        var phase = 0;
+        var ticks = 0;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) { if (phase == 4) timer.Stop(); return; }
+            try
+            {
+                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                var reload = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Tải lại để đối chiếu");
+                if (phase == 0)
+                {
+                    password.Text = "fixture-only-password";
+                    Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận").PerformClick();
+                    phase = 1;
+                }
+                else if (phase == 1 && data.Journal.Entries.Any(entry => entry.Operation == "Security.Mutate"))
+                {
+                    Assert.True(gate.Cancel());
+                    phase = 2;
+                }
+                else if (phase == 2 && control.ViewModel.RequiresRecovery && reload.Visible)
+                {
+                    Assert.Empty(password.Text);
+                    data.Catalog.Error = new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Forbidden", "raw secret");
+                    reload.PerformClick();
+                    phase = 3;
+                }
+                else if (phase == 3 && control.ViewModel.Catalog.State == SecurityDatasetState.Forbidden && !control.ViewModel.IsBusy)
+                {
+                    Assert.True(dialog.Visible);
+                    Assert.True(control.ViewModel.RequiresRecovery);
+                    Assert.False(control.ViewModel.CanReviewRecovery);
+                    data.Catalog.Error = null;
+                    reload.PerformClick();
+                    phase = 4;
+                }
+                else if (++ticks > 100) throw new Xunit.Sdk.XunitException("Unknown password recovery did not finish its reloads.");
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); timer.Stop(); dialog.Close(); gate.Cancel(); }
+        };
+        timer.Start();
+        reset.PerformClick();
+        if (phase == 4 && !System.Windows.Forms.Application.OpenForms.Cast<Form>().Any(form => form.Text.StartsWith("Đặt lại mật khẩu — ")))
+            timer.Stop();
+        dialogError?.Throw();
+        Assert.False(timer.Enabled, "Unknown password dialog did not close after the successful reload. Phase: " + phase);
+        Assert.True(control.ViewModel.RequiresRecovery);
+        Assert.True(control.ViewModel.CanReviewRecovery);
+        Assert.False(control.ViewModel.CanNavigate);
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate.Result" &&
+            entry.Request is SecurityResponseJournalEntry result && result.Outcome == "OutcomeUnknown");
+        var review = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đã đối chiếu — lập diff mới");
+        Assert.True(review.Visible);
+        control.RecoveryConfirmationOverride = () => true;
+        review.PerformClick();
+        Assert.False(control.ViewModel.RequiresRecovery);
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+    [Fact]
+    public void Canceling_conflicted_password_dialog_keeps_recovery_guard() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        data.Administration.MutationErrors.Enqueue(new MyDmsVn.Contracts.ApiError(
+            MyDmsVn.Contracts.ApiStatusCode.Conflict, "Security.RevisionConflict", "raw server secret"));
+        var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đặt lại mật khẩu…");
+        ExceptionDispatchInfo? dialogError = null;
+        var phase = 0;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) return;
+            try
+            {
+                if (phase == 0)
+                {
+                    Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới").Text = "fixture-only-password";
+                    Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận").PerformClick();
+                    phase = 1;
+                }
+                else if (control.ViewModel.RequiresRecovery)
+                {
+                    Assert.Empty(Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới").Text);
+                    Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Hủy").PerformClick();
+                    timer.Stop();
+                }
+            }
+            catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); timer.Stop(); dialog.Close(); }
+        };
+        timer.Start();
+        reset.PerformClick();
+        dialogError?.Throw();
+        Assert.False(timer.Enabled);
+        Assert.True(control.ViewModel.RequiresRecovery);
+        Assert.False(control.ViewModel.CanNavigate);
         Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
     [Fact]
