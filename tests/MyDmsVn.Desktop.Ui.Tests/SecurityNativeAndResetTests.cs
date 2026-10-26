@@ -291,6 +291,41 @@ public sealed class SecurityNativeAndResetTests
         });
 
     [Fact]
+    public void Native_enter_saves_one_direct_decision_and_refreshes_confirmed_state() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L06, (control, scene) =>
+        {
+            control.UserDetail.Tabs.SelectedIndex = 3;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            control.UserDetail.DirectDecisions.SelectedIndex = 0;
+            Until(() => control.ViewModel.DirectPermissionKey == "Sales.Receipts.Post");
+            var buttons = Descendants(control.UserDetail).OfType<Button>().ToArray();
+            var save = Assert.Single(buttons, item => item.Text == "Lưu quyền này");
+            var allow = Assert.Single(Descendants(control.UserDetail).OfType<RadioButton>(), item => item.Text == "Cho phép");
+            Assert.True(allow.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.Equal(true, control.ViewModel.DirectDecision);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            Assert.True(save.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Until(() => scene.Journal.Entries.Count(entry => entry.Operation == "Security.Catalog.Result") == 2);
+            var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate").Request);
+            Assert.Equal(SecurityAdministrationTargetDto.User, request.Target);
+            Assert.Equal(SecurityAdministrationOperationDto.SetPermission, request.Operation);
+            Assert.Equal(101, request.TargetId);
+            Assert.Equal("Sales.Receipts.Post", request.PermissionKey);
+            Assert.True(request.Decision);
+            Assert.Equal(11, request.ExpectedRevision);
+            var result = Assert.IsType<SecurityResponseJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate.Result").Request);
+            Assert.Equal("Success", result.Outcome);
+            Assert.Equal(12, result.AssignmentRevision);
+            Assert.Contains(control.UserDetail.DirectDecisions.Items.Cast<object>(), item =>
+                item.ToString()!.Contains("Sales.Receipts.Post") && item.ToString()!.Contains("Cho phép"));
+            Assert.False(control.ViewModel.HasDirtyEditor);
+        });
+
+    [Fact]
     public void Native_catalog_navigation_never_dispatches_an_assignment() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
         {
