@@ -492,6 +492,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T04 role-Save native Enter at physical100 — 2026-10-26:** Test-only revision `3c9c7d392ae58db6974f66b0586edc85fe8cd940` verifies keyboard Enter begins an R201 grant draft and later saves one Post grant at revision 21→22, with no pre-Save mutation, a completed three-source refresh and no dirty editor. Focused **1/1** and full SQL-free Debug/net48 Ui.Tests **233/233** passed at measured physical100; the [TRX, hash and actual rows](../evidence/security/20261025-security-ui-lab.md) are recorded. Native125 on this test revision and remaining SEC-T04 review/attended scenarios remain OPEN.
 
+**SEC-T04 status-confirmation keyboard cancellation at physical100 — 2026-10-26:** A fresh Dark `SEC_L01` Release Lab accepted native Tab → Enter on the U101 and R201 **Đổi trạng thái…** buttons, showed the target-specific confirmation text, and accepted Escape back to each button without a mutation. The [bounded focus path and journal](../evidence/security/20261025-security-ui-lab.md) are recorded. Confirmed state changes, other command paths and complete SEC-T04/attended exit remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
