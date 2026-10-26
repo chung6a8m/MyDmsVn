@@ -298,6 +298,10 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L06 rejected-write correction — 2026-10-26:** A live Validation response exposed a misleading `cần đối chiếu kết quả` banner for a known `BadRequest` assignment rejection. Source/test `759c22eeb097c077bbfb210e0d03c9f38a58a646` gives rejected writes a distinct `Không lưu` status while preserving the draft and recovery comparison. The [evidence](../evidence/security/20261025-security-ui-lab.md) records red/green focused testing, **209/209 PASS** Debug/net48 Ui.Tests at expected physical100, a zero-warning Release Lab build and a live Dark/physical100 confirmation. Same-revision physical125 and remaining SEC-L06 variants remain OPEN; the full SEC-L01–SEC-L12 matrix and SEC-T04 keyboard traversal also remain OPEN.
 
+**SEC-L06 denied-write continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) additionally records a Dark/physical100 U101 direct-Deny draft rejected once as Forbidden on source/test `759c22eeb097c077bbfb210e0d03c9f38a58a646`. Users access and sensitive selection cleared while Roles/catalog stayed loaded; a separate authorized Success reload restored the saved state without replay. This closes only the named denied-mutation/reload branch; full SEC-L06 remains OPEN.
+
+**SEC-L08 failed-refresh continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records Dark/physical100 R201 Post-grant Success revision 21→22 followed by a one-shot Catalog Failure during required refresh. The UI retained recovery and the one-key draft until authorized Success reload and explicit diff review reduced it to zero; no second mutation was dispatched. This closes the named successful-write/failed-refresh branch only; full SEC-L08 remains OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
