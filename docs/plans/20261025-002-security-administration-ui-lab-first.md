@@ -508,6 +508,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L07 duplicate Save while busy at physical100 — 2026-10-26:** A fresh Dark `SEC_L07` Release Lab staged one R201/Post grant without dispatch, then held the first Save response. The Save button became disabled; clicking its position again left the journal at one `Role/SetPermission` request. Releasing Success revision 22 completed the three-source reload, confirmed Post and cleared the draft. The [ordered Lab evidence](../evidence/security/20261025-security-ui-lab.md) covers this bounded duplicate-click branch; other SEC-L07 and full matrix checks remain OPEN.
 
+**SEC-L08 successful write followed by failed refresh at physical100 — 2026-10-26:** A fresh Dark `SEC_L08` Release Lab saved one R201/Post grant at revision 21→22, then a one-shot Roles read failed while Users/Catalog returned Success. The UI showed **Đã lưu, chưa tải lại được** and required explicit comparison reload. After all three sources succeeded, native Enter confirmed the diff, Post remained granted and no mutation replay occurred. The [ordered journal and recovery limit](../evidence/security/20261025-security-ui-lab.md) are recorded. Multi-key partial failure, uncertain completion and the full SEC-L08/attended matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
