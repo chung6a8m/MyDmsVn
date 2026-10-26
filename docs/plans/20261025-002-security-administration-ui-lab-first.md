@@ -420,6 +420,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L03 / SEC-T04 create-dialog keyboard continuation at physical100 — 2026-10-26:** On the unchanged `5f86409` source/test Release Lab, the [evidence](../evidence/security/20261025-security-ui-lab.md) records blank and missing-password Create User validation, a Create Role Tab → Save → Cancel → Shift+Tab path, empty-role validation through native Enter and Escape cancellation. The journal stayed at six initial reads and no mutation. Password entry and the full command/geometry matrix are not established by this bounded pass; SEC-T04 and the attended SEC-L01–SEC-L12 matrix remain OPEN.
 
+**SEC-T04 role-command keyboard continuation at physical100 — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records one Light `SEC_L03` SQL-free fixture Create Role submitted with native Tab/Enter, followed by a native Shift+Tab/Enter role Rename. The sanitized journal shows one Create Success revision 1 and one Update Success revision 2, each followed by authorized three-source reload; the selected role stayed visible with zero members/grants. This covers only the named role-command path, not the complete SEC-T04 keyboard/geometry review or attended SEC-L01–SEC-L12 matrix.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
