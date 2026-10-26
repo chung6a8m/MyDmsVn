@@ -314,6 +314,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L03 local validation, inactive/protected continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) adds physical125 blank Create User validation without a mutation, one successful nonsecret U102 inactive-account Update with returned revision 13, and disabled U103 protected-account maintenance/assignment controls. Valid Create User and remaining password/protection variants remain OPEN.
 
+**SEC-L10 dirty Close continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records one physical125 R201 grant draft surviving Close → Cancel without mutation, then Close → Yes admitted with the workspace removed. A separate one-key draft admitted Close → No/Discard; in both admitted paths the journal was disposed with the workspace, preventing an attended post-choice request count. Ordinary Refresh and failure/hold paths remain OPEN.
+
 **SEC-T04 Roles keyboard continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) adds physical125 Dark Roles search → filter → list Tab order, Up/Down selected-role changes, Right into R201 **Thành viên (2)** and Shift+Tab return, all without mutation. Remaining native commands and full geometry/review are still OPEN.
 
 ## 3. Mandatory Owner gate record
