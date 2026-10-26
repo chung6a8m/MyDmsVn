@@ -332,6 +332,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **Same-source physical100 verification — 2026-10-26:** The unchanged `e70b138` source/test passed the complete SQL-free Debug/net48 Ui.Tests project **211/211** at measured physical100, zero failed/skipped/not-executed; all four native-search rows printed `PHYSICAL_SCALE=100`. The ignored local TRX and scope are recorded in the [evidence](../evidence/security/20261025-security-ui-lab.md). The same code passed 211/211 at physical125. These automation runs do not mark the remaining attended matrix PASS or close SEC-T04 keyboard/review gaps.
 
+**SEC-L01 physical100 layout continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records same-source Release Lab observations of U101's four subtabs, keyboard Right navigation, R201 grants/members, the inactive long-label role, and read-only catalog in maximized and narrower Light/Dark windows at measured physical100. The narrow outer screenshot measured about 773×843 pixels; it is not the guide's measured 900×600 workspace client. The journal stayed at three reads with no mutation. Full minimum-client and command-keyboard traversal, and the complete attended matrix, remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
