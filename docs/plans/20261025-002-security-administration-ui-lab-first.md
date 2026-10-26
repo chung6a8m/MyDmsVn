@@ -418,6 +418,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L10 ordinary Refresh admission at physical100 — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records a fresh Dark `SEC_L10` fixture on the same source/test. U101's saved Post Deny was shown separately from an unsaved Allow preview. Switching to **Quyền hiệu lực** asked Save/Discard/Stay; Stay retained the selected direct editor and draft with no write, while explicit Discard admitted the tab change. Product **Làm mới** then reloaded Users/Roles/Catalog successfully, kept Post Deny and sent no mutation. This covers that one ordinary Refresh route, not all dirty-navigation or Close outcomes; SEC-T04 and the full attended matrix remain OPEN.
 
+**SEC-L03 / SEC-T04 create-dialog keyboard continuation at physical100 — 2026-10-26:** On the unchanged `5f86409` source/test Release Lab, the [evidence](../evidence/security/20261025-security-ui-lab.md) records blank and missing-password Create User validation, a Create Role Tab → Save → Cancel → Shift+Tab path, empty-role validation through native Enter and Escape cancellation. The journal stayed at six initial reads and no mutation. Password entry and the full command/geometry matrix are not established by this bounded pass; SEC-T04 and the attended SEC-L01–SEC-L12 matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
