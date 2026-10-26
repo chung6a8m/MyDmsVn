@@ -298,6 +298,56 @@ public sealed class SecurityNativeAndResetTests
         });
 
     [Fact]
+    public void Native_enter_opens_remove_role_confirmation_and_escape_keeps_membership() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (control, scene) =>
+        {
+            control.UserDetail.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var memberships = control.UserDetail.Memberships;
+            var remove = Assert.Single(Descendants(control.UserDetail.Tabs.TabPages[1]).OfType<Button>(),
+                item => item.Text == "Gỡ vai trò");
+            Assert.False(remove.Enabled);
+            Assert.True(memberships.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Equal(0, memberships.SelectedIndex);
+            Assert.True(remove.Enabled);
+            for (var i = 0; i < 3 && !remove.ContainsFocus; i++)
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.True(remove.ContainsFocus, "Native Tab should reach Gỡ vai trò from the selected role.");
+            var opened = false;
+            Exception? dialogError = null;
+            var elapsed = Stopwatch.StartNew();
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var title = new StringBuilder(80);
+                GetWindowText(GetForegroundWindow(), title, title.Capacity);
+                if (title.ToString() != "Gỡ vai trò")
+                {
+                    if (elapsed.Elapsed < TimeSpan.FromSeconds(4)) return;
+                    timer.Stop();
+                    dialogError = new TimeoutException("Native Enter did not open remove-role confirmation.");
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                    return;
+                }
+                timer.Stop();
+                try
+                {
+                    opened = true;
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                }
+                catch (Exception error) { dialogError = error; }
+            };
+            timer.Start();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(opened, "Native Enter did not activate Gỡ vai trò.");
+            if (dialogError != null) throw dialogError;
+            Assert.True(remove.ContainsFocus, "Escape should return focus to Gỡ vai trò.");
+            Assert.Equal(2, control.ViewModel.SelectedUser!.RoleIds.Count);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
     public void Native_tab_enter_opens_selected_role_member_without_mutation() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (control, scene) =>
         {
