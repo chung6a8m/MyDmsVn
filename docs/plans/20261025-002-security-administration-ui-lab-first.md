@@ -496,6 +496,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T04 repeatable native status-dialog cancellation — 2026-10-26:** Test-only revision `37c5575c18796a1dee802c669b6e466cec4d52f0` adds real focused-window Enter/Escape Theory rows for the U101 and R201 status confirmations, verifying the native dialog title, restored button focus and zero mutations. Focused **2/2** and full SQL-free Debug/net48 Ui.Tests **235/235** passed at measured physical100. The [actual TRX rows and hash](../evidence/security/20261025-security-ui-lab.md) are recorded. Native125 on this test revision, confirmed-status keyboard action and the broader SEC-T04/attended matrix remain OPEN.
 
+**SEC-L06 key/target boundary regression — 2026-10-26:** Test-only revision `6024bf8c6871baa23b7286358b5ce68e5059b481` verifies that an unknown key, Deprecated key and protected U103 cannot open a direct-permission editor or dispatch a mutation, while inactive ordinary U102 may submit one Active Post Allow. Focused **1/1** and full SQL-free Debug/net48 Ui.Tests **236/236** passed at measured physical100. The [TRX, returned state and exact limits](../evidence/security/20261025-security-ui-lab.md) are recorded; native125 for this revision and the uncompleted attended matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
