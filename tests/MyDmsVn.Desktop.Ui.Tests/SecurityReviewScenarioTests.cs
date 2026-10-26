@@ -316,6 +316,37 @@ public sealed class SecurityReviewScenarioTests
         });
 
     [Fact]
+    public void Host_can_arm_distinct_unheld_read_failures_for_one_reload()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L05, (_, _) =>
+        {
+            using var host = new UiLabForm();
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L05;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L05 && !host.IsResetting);
+            host.SecurityReviewToggleButton.PerformClick();
+
+            host.SecurityReadSourceSelector.SelectedItem = "Roles";
+            host.SecurityReadOutcomeSelector.SelectedItem = "Failure";
+            host.SecurityArmReadButton.PerformClick();
+            host.SecurityReadSourceSelector.SelectedItem = "Catalog";
+            host.SecurityReadOutcomeSelector.SelectedItem = "Forbidden";
+            host.SecurityArmReadButton.PerformClick();
+            host.SecurityReloadButton.PerformClick();
+
+            var vm = host.CurrentSecurityControl!.ViewModel;
+            Until(() => vm.Roles.State == SecurityDatasetState.Failed && vm.Catalog.State == SecurityDatasetState.Forbidden);
+            Assert.Equal(SecurityDatasetState.Ready, vm.Users.State);
+            Assert.Equal(101, vm.SelectedUserId);
+            Assert.Contains("Security.Roles.Result outcome=InternalServerError", host.JournalText);
+            Assert.Contains("Security.Catalog.Result outcome=Forbidden", host.JournalText);
+            Assert.DoesNotContain(host.CurrentSecurityScenarioData!.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
     public async Task Held_read_response_is_consumed_once_so_the_next_review_reload_uses_the_fixture()
     {
         using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);

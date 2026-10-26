@@ -442,9 +442,16 @@ internal sealed class UiLabForm : Form
     {
         var scene = _securityData;
         if (scene == null || _releaseSecurityRead != null) return;
-        if (scene.Administration.UsersGate != null || scene.Administration.RolesGate != null || scene.Catalog.Gate != null)
+        var sourceAlreadyArmed = _securityReadSource.Text switch
         {
-            _status.Text = "A Security read is already armed. Reload or Reset before arming another.";
+            "Users" => scene.Administration.UsersGate != null,
+            "Roles" => scene.Administration.RolesGate != null,
+            "Catalog" => scene.Catalog.Gate != null,
+            _ => false,
+        };
+        if (sourceAlreadyArmed)
+        {
+            _status.Text = "This Security source is already armed. Reload or Reset before arming it again.";
             return;
         }
         bool hold = _securityHoldRead.Checked;
