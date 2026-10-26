@@ -318,6 +318,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L03 Owner-operated valid Create User — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) adds one physical125 valid fixture Create with Owner-reported masked temporary-password input, one sanitized `User/Create` Success revision 1 and four users after authorized reload. Other SEC-L03 branches remain OPEN.
 
+**SEC-L04 role members with Users Forbidden — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records physical125 Users Forbidden with Roles/catalog Success, R201 known member count 2, ID-only unavailable member details and disabled **Mở người dùng** with no fallback read or mutation. A following Users Failure returned `InternalServerError` while Roles/catalog remained loaded; member details stayed ID-only with navigation disabled. An authorized Users Success reload restored member names and selectable navigation without mutation. Stale-user/stale-role revision faults remain OPEN.
+
 **SEC-T04 Roles keyboard continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) adds physical125 Dark Roles search → filter → list Tab order, Up/Down selected-role changes, Right into R201 **Thành viên (2)** and Shift+Tab return, all without mutation. Remaining native commands and full geometry/review are still OPEN.
 
 ## 3. Mandatory Owner gate record
