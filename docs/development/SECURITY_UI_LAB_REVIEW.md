@@ -140,6 +140,8 @@ For stale-preview review in the SQL-free Lab, choose a valid contextual import, 
 
 For late-preview review, open **Security review tools** and press **Hold next Preview** before selecting a valid contextual JSON import. Once the journal records `Security.ImportPreview` and the workspace shows that JSON is being checked, press **Replace session**, then **Release Preview**. The old response must not open confirmation or Apply, and the replacement session must not regain the old role, catalog or assignment presentation. Reset before another case.
 
+For a Forbidden Preview response, select an active user or role in `SEC_L09`, open **Security review tools**, press **Deny next Preview**, then choose a valid contextual JSON file. Verify `Security.Forbidden`, the affected source's denied state, no confirmation and no `Security.ImportApply`. Explicitly reload, select the target again and repeat Preview without re-arming; the fault is one-shot. Cancel its confirmation. Separately select inactive and protected fixture targets and verify that contextual import is disabled before a file can be chosen. These Lab observations do not prove server authorization.
+
 Expected: catalog navigation never dispatches an assignment mutation. Import is contextual and additive, retains the existing preview/confirmation contract and cannot act as replace-all role Save. Cancel
 dispatches no Apply. Apply uses the exact preview target/revision/digest and revalidation result. Stale/invalid/unauthorized/inactive/protected cases remain rejected without automatic retry; a late preview cannot
 confirm another target.
