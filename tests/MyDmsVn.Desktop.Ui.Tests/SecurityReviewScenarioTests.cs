@@ -16,6 +16,45 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 
 public sealed class SecurityReviewScenarioTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Host_membership_revision_fault_controls_reject_the_stale_loaded_revision(bool relatedRole)
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (_, _) =>
+        {
+            using var host = new UiLabForm();
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L04;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L04 && !host.IsResetting);
+            host.SecurityReviewToggleButton.PerformClick();
+
+            var scene = host.CurrentSecurityScenarioData!;
+            var vm = host.CurrentSecurityControl!.ViewModel;
+            Assert.Equal(101, vm.SelectedUserId);
+            if (relatedRole) host.SecurityAdvanceMembershipRoleRevisionButton.PerformClick();
+            else host.SecurityAdvanceMembershipUserRevisionButton.PerformClick();
+
+            Assert.Equal(relatedRole ? 11 : 12, scene.Data.Users.Single(user => user.UserId == 101).AssignmentRevision);
+            Assert.Equal(relatedRole ? 23 : 22, scene.Data.Roles.Single(role => role.RoleId == 202).AssignmentRevision);
+            var pending = vm.SetMembershipAsync(202, true, default);
+            Until(() => pending.IsCompleted);
+            Assert.False(pending.GetAwaiter().GetResult());
+            var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate").Request);
+            Assert.Equal(SecurityAdministrationOperationDto.SetMembership, request.Operation);
+            Assert.Equal(101, request.TargetId);
+            Assert.Equal(202, request.RelatedId);
+            Assert.Equal(11, request.ExpectedRevision);
+            Assert.Equal(22, request.ExpectedRelatedRevision);
+            Assert.Contains(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate.Result" &&
+                Assert.IsType<SecurityResponseJournalEntry>(entry.Request).Outcome == "Conflict");
+            Assert.DoesNotContain(202, scene.Data.Users.Single(user => user.UserId == 101).RoleIds);
+            Assert.DoesNotContain(101, scene.Data.Roles.Single(role => role.RoleId == 202).MemberUserIds);
+        });
+
     [Fact]
     public void Import_review_dialog_can_change_fixture_after_preview_before_confirm()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L09, (_, scene) =>

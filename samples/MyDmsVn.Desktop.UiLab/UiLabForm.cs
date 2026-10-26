@@ -51,6 +51,8 @@ internal sealed class UiLabForm : Form
     private readonly ComboBox _securityMutationOutcome = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 115 };
     private readonly Button _securityArmMutation = new Button { Text = "Arm mutation", AutoSize = true };
     private readonly Button _securityReleaseMutation = new Button { Text = "Release mutation", AutoSize = true };
+    private readonly Button _securityAdvanceMembershipUserRevision = new Button { Text = "Advance U101 revision", AutoSize = true };
+    private readonly Button _securityAdvanceMembershipRoleRevision = new Button { Text = "Advance R202 revision", AutoSize = true };
     private readonly Button _securityHoldImportPreview = new Button { Text = "Hold next Preview", AutoSize = true };
     private readonly Button _securityReleaseImportPreview = new Button { Text = "Release Preview", AutoSize = true };
     private readonly Label _status = new Label { AutoSize = true, Text = "Starting...", Padding = new Padding(8) };
@@ -100,6 +102,8 @@ internal sealed class UiLabForm : Form
     internal Button SecurityReleaseReadButton => _securityReleaseRead;
     internal Button SecurityArmMutationButton => _securityArmMutation;
     internal Button SecurityReleaseMutationButton => _securityReleaseMutation;
+    internal Button SecurityAdvanceMembershipUserRevisionButton => _securityAdvanceMembershipUserRevision;
+    internal Button SecurityAdvanceMembershipRoleRevisionButton => _securityAdvanceMembershipRoleRevision;
     internal Button SecurityHoldImportPreviewButton => _securityHoldImportPreview;
     internal Button SecurityReleaseImportPreviewButton => _securityReleaseImportPreview;
     internal Button SecurityReviewToggleButton => _securityReviewToggle;
@@ -121,7 +125,8 @@ internal sealed class UiLabForm : Form
         _securityReviewPanel.Controls.AddRange(new Control[] { _securityReadSource, _securityReadOutcome,
             _securityHoldRead, _securityIgnoreCancellation, _securityIgnoreOwnerRelease,
             _securityArmRead, _securityReload, _securityReleaseRead, _securityMutationOutcome,
-            _securityArmMutation, _securityReleaseMutation, _securityHoldImportPreview, _securityReleaseImportPreview });
+            _securityArmMutation, _securityReleaseMutation, _securityHoldImportPreview, _securityReleaseImportPreview,
+            _securityAdvanceMembershipUserRevision, _securityAdvanceMembershipRoleRevision });
         _toolbarHost.Controls.Add(_securityReviewPanel);
         _toolbarHost.Controls.Add(toolbar);
         Controls.Add(_workspace);
@@ -158,6 +163,8 @@ internal sealed class UiLabForm : Form
         _securityReleaseRead.Click += (_, __) => ReleaseSecurityRead();
         _securityArmMutation.Click += (_, __) => ArmSecurityMutation();
         _securityReleaseMutation.Click += (_, __) => ReleaseSecurityMutation();
+        _securityAdvanceMembershipUserRevision.Click += (_, __) => AdvanceSecurityMembershipRevision(PermissionImportTargetTypeDto.User, 101);
+        _securityAdvanceMembershipRoleRevision.Click += (_, __) => AdvanceSecurityMembershipRevision(PermissionImportTargetTypeDto.Role, 202);
         _securityHoldImportPreview.Click += (_, __) => ArmSecurityImportPreview();
         _securityReleaseImportPreview.Click += (_, __) => ReleaseSecurityImportPreview();
         _diagnostics.Tick += (_, __) =>
@@ -560,6 +567,15 @@ internal sealed class UiLabForm : Form
         SetCommands(!_poisoned);
     }
 
+    private void AdvanceSecurityMembershipRevision(PermissionImportTargetTypeDto type, int id)
+    {
+        if (_securityData?.Id != SecurityScenarioId.SEC_L04 || _securityControl == null ||
+            _securityControl.ViewModel.IsBusy || _resetting || _poisoned) return;
+        _securityData.AdvanceImportTargetRevision(type, id);
+        _status.Text = $"Security {type} #{id}: fixture revision advanced.";
+        RefreshDiagnostics();
+    }
+
     private void SetCommands(bool enabled)
     {
         _module.Enabled = enabled;
@@ -582,6 +598,11 @@ internal sealed class UiLabForm : Form
         _securityReleaseRead.Enabled = _releaseSecurityRead != null;
         _securityArmMutation.Enabled = enabled && _securityControl != null && _releaseSecurityMutation == null;
         _securityReleaseMutation.Enabled = _releaseSecurityMutation != null;
+        var membershipRevisionReview = _securityData?.Id == SecurityScenarioId.SEC_L04;
+        _securityAdvanceMembershipUserRevision.Visible = membershipRevisionReview;
+        _securityAdvanceMembershipRoleRevision.Visible = membershipRevisionReview;
+        _securityAdvanceMembershipUserRevision.Enabled = enabled && membershipRevisionReview && _securityControl?.ViewModel.IsBusy != true;
+        _securityAdvanceMembershipRoleRevision.Enabled = enabled && membershipRevisionReview && _securityControl?.ViewModel.IsBusy != true;
         _securityHoldImportPreview.Enabled = enabled && _securityControl != null && _securityImportPreviewGate == null;
         _securityReleaseImportPreview.Enabled = _securityImportPreviewGate != null && !_securityImportPreviewGate.IsCompleted;
     }
