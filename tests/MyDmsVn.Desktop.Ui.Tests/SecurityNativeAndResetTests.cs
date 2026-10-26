@@ -398,6 +398,40 @@ public sealed class SecurityNativeAndResetTests
         });
 
     [Fact]
+    public void Native_tab_leaves_role_grant_list_and_save_has_real_focus() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 0;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var edit = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Sửa quyền");
+            Assert.True(edit.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
+            var index = grants.Items.IndexOf("Sales.Receipts.Post");
+            Assert.True(index >= 0);
+            grants.SelectedIndex = index;
+            Assert.True(grants.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.True(grants.GetItemChecked(index));
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.False(grants.ContainsFocus, "Native Tab must leave the grant list while retaining its selected key.");
+            Assert.Equal(index, grants.SelectedIndex);
+            var search = Assert.Single(Descendants(control.RoleDetail).OfType<TextBox>(), item => item.AccessibleName == "Tìm quyền vai trò");
+            Assert.True(search.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Shift | Keys.Tab);
+            var save = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Lưu quyền vai trò");
+            Assert.Equal(save.Handle, GetFocus());
+            Assert.True(save.ContainsFocus);
+            Assert.True((save.AccessibilityObject.State & AccessibleStates.Focused) != 0,
+                "The focused Save button must also expose focus through accessibility.");
+            Assert.True((grants.AccessibilityObject.State & AccessibleStates.Focused) == 0,
+                "The selected grant row must not claim focus after the keyboard moves to Save.");
+            Assert.True(control.ViewModel.HasDirtyEditor);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
     public void Native_keyboard_selects_direct_key_and_tri_state_without_implicit_write() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
         {
