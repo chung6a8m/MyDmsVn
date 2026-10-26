@@ -17,6 +17,56 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 
 public sealed class SecurityReviewScenarioTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Close_save_dispatches_one_owned_write_and_clears_lab_presentation(bool directUser)
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
+        {
+            using var host = new UiLabForm((_, _) => Task.FromResult(WorkspaceCloseChoice.Save));
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L10;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L10 && !host.IsResetting);
+
+            var scene = host.CurrentSecurityScenarioData!;
+            var control = host.CurrentSecurityControl!;
+            if (directUser)
+            {
+                Assert.True(control.ViewModel.BeginDirectPermission("Sales.Receipts.Post"));
+                control.ViewModel.SetDirectDecision(true);
+            }
+            else
+            {
+                control.Tabs.SelectedIndex = 1;
+                Assert.True(control.ViewModel.BeginRolePermissions());
+                control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+            }
+            Assert.True(control.CaptureCloseState().IsDirty);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+
+            host.CloseWorkspaceButton.PerformClick();
+            Until(() => host.CurrentSecurityControl == null && !host.IsResetting);
+
+            var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate").Request);
+            Assert.Equal(directUser ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role, request.Target);
+            Assert.Equal(SecurityAdministrationOperationDto.SetPermission, request.Operation);
+            Assert.Equal(directUser ? 101 : 201, request.TargetId);
+            Assert.Equal("Sales.Receipts.Post", request.PermissionKey);
+            Assert.True(request.Decision);
+            Assert.Equal(directUser ? 11 : 21, request.ExpectedRevision);
+            var result = Assert.IsType<SecurityResponseJournalEntry>(Assert.Single(scene.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate.Result").Request);
+            Assert.Equal("Success", result.Outcome);
+            Assert.Equal(directUser ? 12 : 22, result.AssignmentRevision);
+            Assert.Null(host.CurrentSecurityScenarioData);
+            Assert.Contains("Workspace closed", host.StatusText);
+            Until(() => string.IsNullOrEmpty(host.JournalText));
+        });
+
     [Fact]
     public void Review_release_can_be_opened_while_close_admission_waits()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
