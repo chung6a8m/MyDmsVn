@@ -55,6 +55,41 @@ public sealed class SecurityWorkspaceLifetimeTests
         Assert.DoesNotContain("cần đối chiếu kết quả", vm.EditingStatus);
         Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     }
+
+    [Fact]
+    public async Task Direct_permission_rejects_unknown_deprecated_and_protected_targets_but_allows_inactive_ordinary_user()
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L06);
+        using var vm = Model(scene);
+        await vm.LoadAsync(default);
+
+        Assert.False(vm.BeginDirectPermission("Not.Registered"));
+        Assert.False(vm.BeginDirectPermission("Legacy.Deprecated"));
+        Assert.Null(vm.DirectPermissionKey);
+        vm.SelectUser(103);
+        Assert.True(vm.SelectedUser!.IsProtectedAccount);
+        Assert.False(vm.BeginDirectPermission("Sales.Receipts.Post"));
+        Assert.Null(vm.DirectPermissionKey);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+
+        vm.SelectUser(102);
+        Assert.False(vm.SelectedUser!.IsActive);
+        Assert.False(vm.SelectedUser.IsProtectedAccount);
+        Assert.True(vm.BeginDirectPermission("Sales.Receipts.Post"));
+        vm.SetDirectDecision(true);
+        await vm.SaveEditorAsync(default);
+
+        var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(scene.Journal.Entries,
+            entry => entry.Operation == "Security.Mutate").Request);
+        Assert.Equal(SecurityAdministrationTargetDto.User, request.Target);
+        Assert.Equal(SecurityAdministrationOperationDto.SetPermission, request.Operation);
+        Assert.Equal(102, request.TargetId);
+        Assert.Equal("Sales.Receipts.Post", request.PermissionKey);
+        Assert.True(request.Decision);
+        Assert.Contains(vm.SelectedUser!.DirectDecisions,
+            decision => decision.PermissionKey == "Sales.Receipts.Post" && decision.Decision == true);
+        Assert.False(vm.HasDirtyEditor);
+    }
     [Fact]
     public async Task Recovery_cannot_be_discarded_before_comparison()
     {
