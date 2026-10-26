@@ -346,6 +346,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L10 physical100 same-user admission continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records U101's unsaved direct Allow draft blocking **Đổi trạng thái…** behind the ordinary Save/Discard/Cancel prompt. Cancel kept the same selected user/key and saved Deny versus unsaved Allow without mutation. Other same-entity actions, ordinary Refresh and the full attended matrix remain OPEN.
 
+**SEC-L12 physical100 held-mutation Reset continuation — 2026-10-26:** The [evidence](../evidence/security/20261025-security-ui-lab.md) records one held R201 `SetPermission` request followed by Reset. The old graph was removed after teardown and the new graph had only three initial reads, with no enabled old Release control or stale completion. This is a bounded cooperative fixture observation; outcome outside the fixture and disposal internals remain unproven. The full attended matrix remains OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
