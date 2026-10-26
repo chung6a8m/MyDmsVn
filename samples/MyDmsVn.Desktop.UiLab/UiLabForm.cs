@@ -608,7 +608,9 @@ internal sealed class UiLabForm : Form
         _applyPermission.Enabled = enabled && _control?.CanRefreshPermissions == true;
         _holdReload.Enabled = enabled && _control != null && _reloadGate == null;
         _releaseReload.Enabled = enabled && _reloadGate != null && !_reloadGate.IsCompleted;
-        _securityReviewToggle.Enabled = (enabled || _poisoned) && _securityData != null;
+        var pendingSecurityRelease = _releaseSecurityRead != null || _releaseSecurityMutation != null ||
+            _securityImportPreviewGate != null && !_securityImportPreviewGate.IsCompleted;
+        _securityReviewToggle.Enabled = (enabled || _poisoned || _closingWorkspace && pendingSecurityRelease) && _securityData != null;
         _securityReviewPanel.Enabled = _securityData != null && (!_resetting || _poisoned);
         _securityArmRead.Enabled = enabled && _securityControl != null && _releaseSecurityRead == null;
         _securityReload.Enabled = enabled && _securityControl != null;

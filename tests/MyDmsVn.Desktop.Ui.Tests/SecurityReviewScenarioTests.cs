@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using MyDmsVn.Contracts;
 using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application.Security;
+using MyDmsVn.Desktop.WinForms;
 using MyDmsVn.Desktop.UiLab;
 using MyDmsVn.Desktop.UiLab.Scenarios;
 using MyDmsVn.Desktop.Tests;
@@ -16,6 +17,47 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 
 public sealed class SecurityReviewScenarioTests
 {
+    [Fact]
+    public void Review_release_can_be_opened_while_close_admission_waits()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
+        {
+            var prompt = new TaskCompletionSource<WorkspaceCloseChoice>();
+            using var host = new UiLabForm((_, _) => prompt.Task);
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L10;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L10 && !host.IsResetting);
+
+            host.SecurityReviewToggleButton.PerformClick();
+            host.SecurityMutationOutcomeSelector.SelectedItem = "Hold success";
+            host.SecurityArmMutationButton.PerformClick();
+            host.SecurityReviewToggleButton.PerformClick();
+            var vm = host.CurrentSecurityControl!.ViewModel;
+            Assert.True(vm.BeginRolePermissions());
+            vm.SetRoleGranted("Sales.Receipts.Post", true);
+
+            host.CloseWorkspaceButton.PerformClick();
+            Assert.False(host.CloseWorkspaceButton.Enabled);
+            try
+            {
+                Assert.True(host.SecurityReviewToggleButton.Enabled);
+                host.SecurityReviewToggleButton.PerformClick();
+                Assert.True(host.SecurityReleaseMutationButton.Enabled);
+                host.SecurityReleaseMutationButton.PerformClick();
+                Assert.False(host.SecurityReleaseMutationButton.Enabled);
+            }
+            finally
+            {
+                prompt.TrySetResult(WorkspaceCloseChoice.Cancel);
+                Until(() => host.CloseWorkspaceButton.Enabled);
+            }
+
+            Assert.DoesNotContain(host.CurrentSecurityScenarioData!.Journal.Entries,
+                entry => entry.Operation == "Security.Mutate");
+        });
+
     [Fact]
     public void Host_noop_grant_response_chains_unchanged_revision_to_next_key()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (_, _) =>
