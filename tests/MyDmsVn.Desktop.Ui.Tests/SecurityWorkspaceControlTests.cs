@@ -117,6 +117,34 @@ public sealed class SecurityWorkspaceControlTests
     });
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Minimum_user_view_shows_direct_permission_rows(bool dark) => Run(SecurityScenarioId.SEC_L01, (_, _) =>
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            using var lab = new MyDmsVn.Desktop.UiLab.UiLabForm { ClientSize = new System.Drawing.Size(900, 600) };
+            lab.ModuleSelector.SelectedIndex = 1;
+            lab.Show();
+            Until(() => lab.CurrentSecurityControl is { IsDisposed: false } && !lab.IsResetting && lab.StatusText.Contains("ready"));
+            var workspace = lab.CurrentSecurityControl!;
+            workspace.Tabs.SelectedIndex = 0;
+            workspace.UserDetail.Tabs.SelectedIndex = 3;
+            lab.PerformLayout();
+            System.Windows.Forms.Application.DoEvents();
+            var direct = workspace.UserDetail.DirectDecisions;
+            Assert.Equal(2, direct.Items.Count);
+            Assert.True(direct.Visible);
+            Assert.True(direct.ClientSize.Height >= direct.ItemHeight * 2,
+                $"Direct list client height {direct.ClientSize.Height}; item height {direct.ItemHeight}; tab height {workspace.UserDetail.Tabs.Height}");
+            lab.CloseWorkspaceButton.PerformClick();
+        }
+        finally { BootstrapThemeManager.CurrentTheme = theme; }
+    });
+
+    [Theory]
     [InlineData(900, 600, false)]
     [InlineData(900, 600, true)]
     [InlineData(1200, 760, false)]

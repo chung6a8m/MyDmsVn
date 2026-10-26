@@ -49,6 +49,7 @@ public sealed partial class SecurityWorkspaceControl
         var status = ViewModel.ImportStatus;
         _userImportStatus.Text = status;
         _roleImportStatus.Text = status;
+        _userImportStatus.Visible = !string.IsNullOrWhiteSpace(status);
         _roleImportStatus.Visible = !string.IsNullOrWhiteSpace(status);
         UserImportButton.Enabled = !ViewModel.IsBusy && !ViewModel.RequiresRecovery &&
             ViewModel.SelectedUser is { IsActive: true, IsProtectedAccount: false } &&

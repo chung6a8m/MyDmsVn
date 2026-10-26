@@ -104,7 +104,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             }));
         };
         var direct = Commands();
-        direct.Height = 115;
+        direct.Height = 70;
         direct.Controls.AddRange(new Control[] { _directKey, _inherit, _allow, _deny });
         control.UserDetail.Tabs.TabPages[3].Controls.Add(direct);
         var directActions = Commands();
