@@ -205,6 +205,9 @@ public sealed class SecurityScenarioBehaviorTests
     [InlineData("{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\",\"extra\":0}]}")]
     [InlineData("{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"},{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}")]
     [InlineData("/* comment */{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[]}")]
+    [InlineData("{\"schemaVersion\":1,")]
+    [InlineData("{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Future.Unknown\",\"decision\":\"Allow\"}]}")]
+    [InlineData("{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Legacy.Deprecated\",\"decision\":\"Allow\"}]}")]
     public async Task Import_rejects_noncanonical_schema_v1_documents(string json)
     {
         using var s = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L09);
