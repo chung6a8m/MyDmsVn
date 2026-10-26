@@ -360,7 +360,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         var user = Vm.SelectedUser;
         var role = Vm.SelectedRole;
         if (!create && (userTarget ? user == null || user.IsProtectedAccount : role == null)) return;
-        using var dialog = new Form { Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name), Width = 440, Height = userTarget ? (create ? 430 : 380) : 240, StartPosition = FormStartPosition.CenterParent };
+        using var dialog = new MutationDialog { Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name), Width = 440, Height = userTarget ? (create ? 430 : 380) : 240, StartPosition = FormStartPosition.CenterParent };
         var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
         var name = new TextBox { Width = 380, AccessibleName = userTarget ? "Tên đăng nhập" : "Tên vai trò", Text = create ? "" : userTarget ? user!.Username : role!.Name };
         var display = new TextBox { Width = 380, AccessibleName = "Tên hiển thị", Text = create ? "" : user?.DisplayName ?? "" };
@@ -387,6 +387,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         fields.Controls.Add(save); fields.Controls.Add(cancel); dialog.Controls.Add(fields);
         dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
+        var closeGuard = new MutationDialogCloseGuard(dialog, cancel, validation, _control, Vm);
         reload.Click += async (_, _) => await ReloadDialogAsync(dialog, validation, reload);
         save.Click += async (_, _) =>
         {
@@ -419,11 +420,16 @@ internal sealed class SecurityWorkspaceEditorBindings
                     invalid.Focus();
                     return;
                 }
-                validation.Text = "";
-                var saved = await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(userTarget ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role,
-                    create ? SecurityAdministrationOperationDto.Create : SecurityAdministrationOperationDto.Update,
-                    create ? 0 : userTarget ? user!.UserId : role!.RoleId, name: name.Text, displayName: userTarget ? display.Text : null, email: userTarget ? email.Text : null,
-                    password: create && userTarget ? password.Text : null, expectedRevision: create ? null : userTarget ? user!.AssignmentRevision : role!.AssignmentRevision), default);
+                closeGuard.Begin();
+                bool saved;
+                try
+                {
+                    saved = await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(userTarget ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role,
+                        create ? SecurityAdministrationOperationDto.Create : SecurityAdministrationOperationDto.Update,
+                        create ? 0 : userTarget ? user!.UserId : role!.RoleId, name: name.Text, displayName: userTarget ? display.Text : null, email: userTarget ? email.Text : null,
+                        password: create && userTarget ? password.Text : null, expectedRevision: create ? null : userTarget ? user!.AssignmentRevision : role!.AssignmentRevision), default);
+                }
+                finally { closeGuard.End(); }
                 if (saved) dialog.Close();
                 else if (!dialog.IsDisposed)
                 {
@@ -450,7 +456,7 @@ internal sealed class SecurityWorkspaceEditorBindings
     async Task PasswordAsync()
     {
         if (!await AdmitAsync() || Vm.SelectedUser is not { IsProtectedAccount: false } user) return;
-        using var dialog = new Form { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 230, StartPosition = FormStartPosition.CenterParent };
+        using var dialog = new MutationDialog { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 230, StartPosition = FormStartPosition.CenterParent };
         var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
         var password = new TextBox { Width = 360, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới" };
         var validation = new Label { AutoSize = true, AccessibleName = "Lỗi mật khẩu" };
@@ -462,6 +468,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         dialog.Controls.Add(fields);
         dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
+        var closeGuard = new MutationDialogCloseGuard(dialog, cancel, validation, _control, Vm);
         reload.Click += async (_, _) => await ReloadDialogAsync(dialog, validation, reload);
         save.Click += async (_, _) =>
         {
@@ -474,9 +481,14 @@ internal sealed class SecurityWorkspaceEditorBindings
                     password.Focus();
                     return;
                 }
-                validation.Text = "";
-                if (await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, user.UserId, password: password.Text, expectedRevision: user.AssignmentRevision), default))
-                    dialog.Close();
+                closeGuard.Begin();
+                bool saved;
+                try
+                {
+                    saved = await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, user.UserId, password: password.Text, expectedRevision: user.AssignmentRevision), default);
+                }
+                finally { closeGuard.End(); }
+                if (saved) dialog.Close();
                 else if (!dialog.IsDisposed)
                 {
                     validation.Text = Vm.LastMutationFeedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
@@ -488,6 +500,65 @@ internal sealed class SecurityWorkspaceEditorBindings
         };
         try { dialog.ShowDialog(_control); }
         finally { password.Clear(); }
+    }
+
+    sealed class MutationDialog : Form
+    {
+        internal Func<bool>? ShouldBlockClose { get; set; }
+
+        protected override void WndProc(ref Message message)
+        {
+            // Block native X / Alt+F4 before WinForms can set a modal Cancel result.
+            if (ShouldBlockClose?.Invoke() == true && (message.Msg == 0x0010 ||
+                message.Msg == 0x0112 && (message.WParam.ToInt64() & 0xFFF0) == 0xF060)) return;
+            base.WndProc(ref message);
+        }
+    }
+
+    sealed class MutationDialogCloseGuard
+    {
+        readonly MutationDialog _dialog;
+        readonly Button _cancel;
+        readonly Label _status;
+        readonly SecurityWorkspaceControl _owner;
+        readonly SecurityWorkspaceViewModel _viewModel;
+        bool _pending;
+
+        internal MutationDialogCloseGuard(MutationDialog dialog, Button cancel, Label status, SecurityWorkspaceControl owner, SecurityWorkspaceViewModel viewModel)
+        {
+            _dialog = dialog;
+            _cancel = cancel;
+            _status = status;
+            _owner = owner;
+            _viewModel = viewModel;
+            dialog.ShouldBlockClose = () => _pending && !_owner.IsDisposed && _viewModel.IsCurrent;
+            dialog.FormClosing += (_, args) =>
+            {
+                if (_pending && !_owner.IsDisposed && _viewModel.IsCurrent)
+                {
+                    args.Cancel = true;
+                    _dialog.DialogResult = DialogResult.None;
+                }
+            };
+        }
+
+        internal void Begin()
+        {
+            _pending = true;
+            _dialog.ControlBox = false;
+            _status.Text = "Đang lưu…";
+            _cancel.Enabled = false;
+            _dialog.CancelButton = null;
+        }
+
+        internal void End()
+        {
+            _pending = false;
+            if (_dialog.IsDisposed) return;
+            _dialog.ControlBox = true;
+            _cancel.Enabled = true;
+            _dialog.CancelButton = _cancel;
+        }
     }
 
     async Task ReloadDialogAsync(Form dialog, Label validation, Button reload)

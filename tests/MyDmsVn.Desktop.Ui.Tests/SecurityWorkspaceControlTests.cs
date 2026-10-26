@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -941,6 +942,130 @@ public sealed class SecurityWorkspaceControlTests
         dialogError?.Throw();
         Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
+    [Theory]
+    [InlineData("create-user", "success")]
+    [InlineData("edit-user", "success")]
+    [InlineData("create-role", "success")]
+    [InlineData("edit-role", "success")]
+    [InlineData("password", "success")]
+    [InlineData("create-user", "conflict")]
+    [InlineData("edit-user", "conflict")]
+    [InlineData("create-role", "conflict")]
+    [InlineData("edit-role", "conflict")]
+    [InlineData("password", "conflict")]
+    [InlineData("create-user", "unknown")]
+    [InlineData("edit-user", "unknown")]
+    [InlineData("create-role", "unknown")]
+    [InlineData("edit-role", "unknown")]
+    [InlineData("password", "unknown")]
+    public void Identity_and_password_dialogs_cannot_cancel_a_dispatched_mutation(string kind, string outcome) => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var gate = data.Administration.HoldNextMutation(true);
+        if (kind == "edit-role" || kind == "create-role") control.Tabs.SelectedIndex = 1;
+        var host = kind == "edit-role" || kind == "create-role" ? (Control)control.RoleDetail : control.UserDetail;
+        var caption = kind switch
+        {
+            "create-user" => "Tạo người dùng…",
+            "edit-user" => "Sửa thông tin…",
+            "edit-role" => "Sửa tên…",
+            "create-role" => "Tạo vai trò…",
+            _ => "Đặt lại mật khẩu…"
+        };
+        var command = Assert.Single(Descendants(host, typeof(Button)).Cast<Button>(), button => button.Text == caption);
+        ExceptionDispatchInfo? dialogError = null;
+        var phase = 0;
+        var ticks = 0;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form =>
+                form.Text == "Tạo người dùng" || form.Text == "Tạo vai trò" || form.Text.StartsWith("Sửa — ") || form.Text.StartsWith("Đặt lại mật khẩu — "));
+            try
+            {
+                if (dialog == null)
+                {
+                    if (phase == 2 && outcome == "success") { phase = 3; timer.Stop(); }
+                    else if (++ticks > 50) throw new Xunit.Sdk.XunitException("Modal closed before outcome or did not open.");
+                    return;
+                }
+                var save = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == (kind == "password" ? "Xác nhận" : "Lưu thông tin"));
+                var cancel = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Hủy");
+                var secret = Descendants(dialog, typeof(TextBox)).Cast<TextBox>().FirstOrDefault(field => field.UseSystemPasswordChar);
+                if (phase == 0)
+                {
+                    if (kind == "create-user")
+                    {
+                        Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên đăng nhập").Text = "held-review-user";
+                        Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên hiển thị").Text = "Held Review";
+                    }
+                    else if (kind == "create-role" || kind == "edit-role")
+                        Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên vai trò").Text = "Held Review Role";
+                    else if (kind == "edit-user")
+                        Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Tên hiển thị").Text = "Held Review User";
+                    if (secret != null) secret.Text = "fixture-only-password";
+                    save.PerformClick();
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                    phase = 1;
+                }
+                else if (phase == 1)
+                {
+                    Assert.True(dialog.Visible);
+                    Assert.False(save.Enabled);
+                    Assert.False(cancel.Enabled);
+                    Assert.False(dialog.ControlBox);
+                    Assert.Contains(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.Text == "Đang lưu…");
+                    cancel.PerformClick();
+                    Assert.True(dialog.Visible);
+                    var focusTarget = (Control?)secret ?? Descendants(dialog, typeof(TextBox)).Cast<TextBox>().First();
+                    Assert.True(focusTarget.Focus());
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                    Assert.True(dialog.Visible);
+                    SendMessage(dialog.Handle, 0x0010, IntPtr.Zero, IntPtr.Zero); // Native window close (X/Alt+F4).
+                    Assert.True(dialog.Visible);
+                    Assert.Equal(DialogResult.None, dialog.DialogResult);
+                    save.PerformClick();
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                    phase = 2;
+                    if (outcome == "success") gate.Complete(MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Success(new SecurityAdministrationResultDto(22, true)));
+                    else if (outcome == "conflict") gate.Complete(MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Failure(new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Conflict, "Security.RevisionConflict", "Conflict.")));
+                    else Assert.True(gate.Cancel());
+                }
+                else if (phase == 2 && outcome != "success" && !control.ViewModel.IsBusy)
+                {
+                    Assert.True(dialog.Visible);
+                    Assert.True(cancel.Enabled);
+                    Assert.True(dialog.ControlBox);
+                    Assert.True(control.ViewModel.RequiresRecovery);
+                    if (secret != null) Assert.Empty(secret.Text);
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                    phase = 3;
+                    timer.Stop();
+                    cancel.PerformClick();
+                }
+                else if (++ticks > 50) throw new Xunit.Sdk.XunitException("Held mutation did not settle.");
+            }
+            catch (Exception error)
+            {
+                dialogError = ExceptionDispatchInfo.Capture(error);
+                gate.Cancel();
+                Until(() => !control.ViewModel.IsBusy);
+                dialog?.Close();
+                timer.Stop();
+            }
+        };
+        timer.Start();
+        command.PerformClick();
+        if (phase == 2 && outcome == "success" && !System.Windows.Forms.Application.OpenForms.Cast<Form>().Any(form =>
+            form.Text == "Tạo người dùng" || form.Text == "Tạo vai trò" || form.Text.StartsWith("Sửa — ") || form.Text.StartsWith("Đặt lại mật khẩu — ")))
+        {
+            phase = 3;
+            timer.Stop();
+        }
+        Assert.False(timer.Enabled, "The modal scenario did not finish within the pumped test window.");
+        dialogError?.Throw();
+        Assert.Equal(3, phase);
+        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
     [Fact]
     public void Password_reset_dialog_rejects_invalid_input_before_dispatch() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
     {
@@ -1406,6 +1531,9 @@ public sealed class SecurityWorkspaceControlTests
             error?.Throw();
         }, TimeSpan.FromSeconds(25));
     }
+
+    [DllImport("user32.dll")]
+    static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
     static void Wait(Task task)
     {
