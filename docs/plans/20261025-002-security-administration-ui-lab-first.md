@@ -448,6 +448,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T04 role-grant keyboard Save at physical125 — 2026-10-26:** A fresh Dark `SEC_L01` fixture on the same `6b3bf71` binary reached **Lưu quyền vai trò** by two native Tabs from staged R201 Post. Enter sent one revision **21→22** grant write and completed the three-source reload; the grant remained checked with no draft. The [evidence](../evidence/security/20261025-security-ui-lab.md) records the bounded journal. Other outcomes, physical100 and the full attended matrix remain OPEN.
 
+**SEC-L09 catalog keyboard continuation at physical125 — 2026-10-26:** The same Dark Release Lab selected a catalog definition by double-click, kept Space read-only and moved selection/detail with native Enter; these actions added no write. The [evidence](../evidence/security/20261025-security-ui-lab.md) records the bounded journal. Import and the remaining SEC-L09 cases stay OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
