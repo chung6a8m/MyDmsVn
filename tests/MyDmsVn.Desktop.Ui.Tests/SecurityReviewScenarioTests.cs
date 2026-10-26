@@ -17,6 +17,43 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 public sealed class SecurityReviewScenarioTests
 {
     [Fact]
+    public void Host_noop_grant_response_chains_unchanged_revision_to_next_key()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (_, _) =>
+        {
+            using var host = new UiLabForm();
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L07;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L07 && !host.IsResetting);
+
+            var scene = host.CurrentSecurityScenarioData!;
+            var vm = host.CurrentSecurityControl!.ViewModel;
+            Assert.True(vm.BeginRolePermissions());
+            vm.SetRoleGranted("Inventory.Stock.Read", true);
+            vm.SetRoleGranted("Sales.Receipts.Post", true);
+            host.SecurityReviewToggleButton.PerformClick();
+            host.SecurityMutationOutcomeSelector.SelectedItem = "No-op grant";
+            host.SecurityArmMutationButton.PerformClick();
+
+            var save = vm.SaveEditorAsync(default);
+            Until(() => save.IsCompleted);
+            save.GetAwaiter().GetResult();
+
+            var requests = scene.Journal.Entries.Where(entry => entry.Operation == "Security.Mutate")
+                .Select(entry => Assert.IsType<SecurityMutationJournalEntry>(entry.Request)).ToArray();
+            Assert.Equal(new[] { "Inventory.Stock.Read", "Sales.Receipts.Post" }, requests.Select(request => request.PermissionKey));
+            Assert.Equal(new long?[] { 21, 21 }, requests.Select(request => request.ExpectedRevision));
+            var responses = scene.Journal.Entries.Where(entry => entry.Operation == "Security.Mutate.Result")
+                .Select(entry => Assert.IsType<SecurityResponseJournalEntry>(entry.Request)).ToArray();
+            Assert.Equal(new long?[] { 21, 22 }, responses.Select(response => response.AssignmentRevision));
+            Assert.False(vm.HasDirtyEditor);
+            Assert.All(new[] { "Inventory.Stock.Read", "Sales.Receipts.Post" },
+                key => Assert.Contains(key, scene.Data.Roles.Single(role => role.RoleId == 201).PermissionKeys));
+        });
+
+    [Fact]
     public void Review_reload_reports_dirty_editor_block_without_new_reads()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
         {

@@ -142,7 +142,7 @@ internal sealed class UiLabForm : Form
         _securityReadSource.SelectedIndex = 0;
         _securityReadOutcome.Items.AddRange(new object[] { "Success", "Empty", "Forbidden", "Failure" });
         _securityReadOutcome.SelectedIndex = 0;
-        _securityMutationOutcome.Items.AddRange(new object[] { "Success", "Validation", "Forbidden", "Conflict", "Hold success", "Hold failure", "Uncertain" });
+        _securityMutationOutcome.Items.AddRange(new object[] { "Success", "No-op grant", "Validation", "Forbidden", "Conflict", "Hold success", "Hold failure", "Uncertain" });
         _securityMutationOutcome.SelectedIndex = 0;
         _module.SelectedIndexChanged += async (_, __) => { if (_resetting) return; _scenario.Items.Clear(); _scenario.Items.AddRange(Enum.GetValues(_module.SelectedIndex == 1 ? typeof(SecurityScenarioId) : typeof(SalesScenarioId)).Cast<object>().ToArray()); _scenario.SelectedIndex = 0; if (IsHandleCreated) await ResetSafelyAsync(); };
         _theme.Click += (_, __) => BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
@@ -519,6 +519,7 @@ internal sealed class UiLabForm : Form
         if (scene == null || _releaseSecurityMutation != null) return;
         // An explicit reviewer choice replaces the scenario's pending preset response.
         scene.Administration.MutationErrors.Clear();
+        scene.Administration.NoOpNextRolePermission = _securityMutationOutcome.Text == "No-op grant";
         switch (_securityMutationOutcome.Text)
         {
             case "Validation": scene.Administration.MutationErrors.Enqueue(ReviewError(ApiStatusCode.BadRequest)); break;

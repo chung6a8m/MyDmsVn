@@ -107,6 +107,7 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
     }
 
     public Queue<ApiError?> MutationErrors { get; } = new Queue<ApiError?>();
+    public bool NoOpNextRolePermission { get; set; }
     public IReadOnlyList<Task> OutstandingOperations => tasks.Outstanding;
 
     public ScenarioGate<bool> HoldNextImportPreview()
@@ -305,6 +306,15 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
             }
             else
             {
+                if (NoOpNextRolePermission)
+                {
+                    NoOpNextRolePermission = false;
+                    // Lab-only race: the requested grant already matches the fixture when this call arrives.
+                    if (r.Decision == true && !keys.Contains(r.PermissionKey!))
+                        keys.Add(r.PermissionKey!);
+                    else if (r.Decision != true)
+                        keys.Remove(r.PermissionKey!);
+                }
                 changed = keys.Contains(r.PermissionKey!) != (r.Decision == true);
                 if (r.Decision == true && !keys.Contains(r.PermissionKey!))
                     keys.Add(r.PermissionKey!);
