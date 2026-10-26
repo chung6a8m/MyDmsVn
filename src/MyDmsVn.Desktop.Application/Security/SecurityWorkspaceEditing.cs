@@ -339,6 +339,7 @@ public sealed partial class SecurityWorkspaceViewModel
             SecuritySaveStopReason.Forbidden => "Không đủ quyền",
             SecuritySaveStopReason.Conflict => "xung đột",
             SecuritySaveStopReason.OutcomeUnknown => "cần đối chiếu kết quả",
+            SecuritySaveStopReason.Rejected => "Không lưu — yêu cầu bị từ chối; tải lại để đối chiếu",
             _ => "cần đối chiếu kết quả"
         };
         if (outcome.Completion != SecuritySaveCompletion.Partial)

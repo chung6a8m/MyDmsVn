@@ -35,6 +35,27 @@ public sealed class SecurityWorkspaceLifetimeTests
     }
 
     [Fact]
+    public async Task Rejected_direct_permission_save_reports_known_rejection()
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L06);
+        using var vm = Model(scene);
+        await vm.LoadAsync(default);
+        Assert.True(vm.BeginDirectPermission("Sales.Receipts.Read"));
+        vm.SetDirectDecision(false);
+        scene.Administration.MutationErrors.Enqueue(new ApiError(ApiStatusCode.BadRequest,
+            "ValidationError", "Rejected by validation."));
+
+        await vm.SaveEditorAsync(default);
+
+        Assert.Equal(SecuritySaveStopReason.Rejected, vm.LastSaveOutcome!.StopReason);
+        Assert.True(vm.RequiresRecovery);
+        Assert.Equal("Sales.Receipts.Read", vm.DirectPermissionKey);
+        Assert.Equal(false, vm.DirectDecision);
+        Assert.Contains("Không lưu", vm.EditingStatus);
+        Assert.DoesNotContain("cần đối chiếu kết quả", vm.EditingStatus);
+        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    }
+    [Fact]
     public async Task Recovery_cannot_be_discarded_before_comparison()
     {
         using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);
