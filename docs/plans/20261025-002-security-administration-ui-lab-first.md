@@ -444,6 +444,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T04 workspace-command disabled contrast at physical125 — 2026-10-26:** The next Dark Lab review found almost black text on disabled role-grant commands. Source commit `6b3bf71fac60749d9380165dc03c4c41853e3735` uses the existing pinned small themed button for workspace commands; the two long recovery commands retain their previous button because the first themed trial failed both minimum-size recovery rows. The corrected focused selector passed **16/16** and the full SQL-free Debug/net48 Ui.Tests project passed **228/228** at measured physical125. The rebuilt Release Lab showed the disabled role-grant commands legible in Dark and Light. The [evidence](../evidence/security/20261025-security-ui-lab.md) records exact hashes, TRX and bounded observation. Physical100 for this source, other SEC-T04 paths and the complete attended matrix remain OPEN.
 
+**SEC-T04 role-grant command keyboard continuation at physical125 — 2026-10-26:** On the same `6b3bf71` Dark Release Lab, native Tab from a staged R201 Post grant visibly focused **Hủy thay đổi**; Enter restored the saved grant and sent no mutation. The [evidence](../evidence/security/20261025-security-ui-lab.md) records the exact bounded path. Remaining commands, physical100 and the complete attended matrix stay OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
