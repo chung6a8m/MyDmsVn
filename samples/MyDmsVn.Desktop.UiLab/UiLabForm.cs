@@ -178,6 +178,7 @@ internal sealed class UiLabForm : Form
         {
             RefreshDiagnostics();
             SetCommands(!_resetting && !_closingWorkspace && !_poisoned);
+            UpdateModalMutationRelease();
         };
         Shown += async (_, __) => { _diagnostics.Start(); await ResetSafelyAsync(); };
         FormClosing += OnFormClosing;
@@ -568,6 +569,30 @@ internal sealed class UiLabForm : Form
         release();
         if (!_poisoned) _status.Text = "Held Security mutation released.";
         SetCommands(!_poisoned);
+    }
+
+    private void UpdateModalMutationRelease()
+    {
+        if (_releaseSecurityMutation == null && _securityData == null) return;
+        var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form =>
+            form.Modal && form.Text.StartsWith("Đặt lại mật khẩu — ", StringComparison.Ordinal));
+        var fields = dialog?.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+        if (fields == null) return;
+        var release = fields.Controls.OfType<Button>().FirstOrDefault(button => button.Name == "SecurityLabReleaseMutation");
+        if (release == null && _releaseSecurityMutation != null)
+        {
+            release = new Button
+            {
+                Name = "SecurityLabReleaseMutation",
+                Text = "Release mutation (Lab)",
+                AccessibleName = "Release held Security mutation (Lab)",
+                AutoSize = true,
+                CausesValidation = false
+            };
+            release.Click += (_, _) => ReleaseSecurityMutation();
+            fields.Controls.Add(release);
+        }
+        if (release != null) release.Enabled = _releaseSecurityMutation != null && _securityControl?.ViewModel.IsBusy == true;
     }
 
     private void ArmSecurityImportPreview()

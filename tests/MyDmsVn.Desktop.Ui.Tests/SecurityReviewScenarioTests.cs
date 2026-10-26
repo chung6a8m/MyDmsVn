@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -17,6 +18,87 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 
 public sealed class SecurityReviewScenarioTests
 {
+    [Fact]
+    public void Held_password_conflict_can_be_released_from_its_modal_without_repeating_the_secret()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L03, (_, _) =>
+        {
+            using var host = new UiLabForm();
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L03;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L03 && !host.IsResetting);
+            var scene = host.CurrentSecurityScenarioData!;
+            host.SecurityReviewToggleButton.PerformClick();
+            host.SecurityMutationOutcomeSelector.SelectedItem = "Hold failure";
+            host.SecurityArmMutationButton.PerformClick();
+
+            ExceptionDispatchInfo? failure = null;
+            var phase = 0;
+            var ticks = 0;
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+                if (dialog == null) return;
+                try
+                {
+                    var fields = Assert.Single(dialog.Controls.OfType<FlowLayoutPanel>());
+                    var password = Assert.Single(fields.Controls.OfType<TextBox>());
+                    var save = Assert.Single(fields.Controls.OfType<Button>(), button => button.Text == "Xác nhận");
+                    var release = fields.Controls.OfType<Button>().FirstOrDefault(button => button.AccessibleName == "Release held Security mutation (Lab)");
+                    if (phase == 0)
+                    {
+                        if (release == null)
+                        {
+                            if (++ticks > 30) throw new Xunit.Sdk.XunitException("Lab release action is absent from the password modal.");
+                            return;
+                        }
+                        Assert.False(release.Enabled);
+                        password.Text = "lab-fixture-only";
+                        save.PerformClick();
+                        phase = 1;
+                    }
+                    else if (phase == 1 && scene.Journal.Entries.Count(entry => entry.Operation == "Security.Mutate") == 1 && release?.Enabled == true)
+                    {
+                        Assert.False(save.Enabled);
+                        save.PerformClick();
+                        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                        Assert.NotNull(release);
+                        release.PerformClick();
+                        phase = 2;
+                    }
+                    else if (phase == 2 && scene.Journal.Entries.Any(entry => entry.Operation == "Security.Mutate.Result"))
+                    {
+                        var validation = Assert.Single(fields.Controls.OfType<Label>(), label => label.AccessibleName == "Lỗi mật khẩu");
+                        if (!validation.Text.Contains("Xung đột")) return;
+                        Assert.Empty(password.Text);
+                        Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                        Assert.Contains(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate.Result" &&
+                            entry.Request is SecurityResponseJournalEntry result && result.Outcome == "Conflict");
+                        Assert.DoesNotContain("lab-fixture-only", host.JournalText);
+                        timer.Stop();
+                        dialog.Close();
+                    }
+                    else if (++ticks > 100) throw new Xunit.Sdk.XunitException("Held password Conflict did not finish in the modal.");
+                }
+                catch (Exception error)
+                {
+                    failure = ExceptionDispatchInfo.Capture(error);
+                    timer.Stop();
+                    dialog.Close();
+                    if (host.SecurityReleaseMutationButton.Enabled) host.SecurityReleaseMutationButton.PerformClick();
+                }
+            };
+            timer.Start();
+            var reset = Assert.Single(host.CurrentSecurityControl!.UserDetail.HeaderActions.Controls.OfType<Button>(),
+                button => button.Text == "Đặt lại mật khẩu…");
+            reset.PerformClick();
+            Assert.False(timer.Enabled, "Password dialog did not finish within the pumped test window.");
+            failure?.Throw();
+        });
+
     [Theory]
     [InlineData("Hold success", "Success")]
     [InlineData("Hold failure", "Conflict")]
