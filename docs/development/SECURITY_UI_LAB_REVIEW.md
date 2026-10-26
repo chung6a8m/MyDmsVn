@@ -80,6 +80,8 @@ all permissions are allowed. Inactive ordinary accounts remain editable through 
 2. Only there, explicitly add/remove a role. Inspect User-target requests and confirmed counts from both perspectives; inject a stale user revision, then a stale role revision.
 3. Deny `Security.Users.Manage` while allowing role management; separately make Users data unavailable while role data remains available. Try the member-navigation action and membership commands.
 
+For the two stale-revision cases in the SQL-free Lab, Reset `SEC_L04` between cases and open **Security review tools** before opening the membership dialog. Click **Advance U101 revision** or **Advance R202 revision**, then use U101 → **Vai trò (2)** → **Gán vai trò…** to select R202 **Kiểm soát** and confirm. The fixture journal must show the corresponding `Security.ReviewTargetRevision` before exactly one User-target `SetMembership target=101 related=202 revision=11 relatedRevision=22` and a Conflict result. The visible membership remains unchanged and the recovery action requires explicit reload/diff review. These controls affect only the Lab fixture.
+
 Expected: `Thành viên (n)` has no add/remove-members editor and sends no membership writes. **Mở người dùng** routes to the selected user's `Vai trò (n)` only when authorized and navigation is admitted.
 All membership writes originate in that user tab and use User-target `SetMembership` with primary user and related role revisions from the latest successful authorized loads. They require `Security.Users.Manage`; role-management
 access alone cannot authorize them. Respect both returned revisions and reload both affected entities. Conflict is visible with no automatic retry. Missing Users access prevents member-name disclosure
