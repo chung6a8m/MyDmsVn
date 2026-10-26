@@ -86,6 +86,36 @@ public sealed class SecurityReviewScenarioTests
         });
 
     [Fact]
+    public void Host_review_can_release_a_late_import_preview_without_republishing_it()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
+        {
+            using var host = new UiLabForm();
+            host.Show();
+            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
+            host.ModuleSelector.SelectedIndex = 1;
+            Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
+            host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L09;
+            Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L09 && !host.IsResetting);
+            host.SecurityReviewToggleButton.PerformClick();
+            host.SecurityHoldImportPreviewButton.PerformClick();
+
+            var scene = host.CurrentSecurityScenarioData!;
+            var viewModel = host.CurrentSecurityControl!.ViewModel;
+            viewModel.SelectRole(202);
+            const string json = "{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}";
+            var pending = viewModel.PreviewImportAsync(PermissionImportTargetTypeDto.Role, json, default);
+            Assert.False(pending.IsCompleted);
+            scene.Session.Replace();
+            host.SecurityReleaseImportPreviewButton.PerformClick();
+            Until(() => pending.IsCompleted);
+
+            Assert.False(pending.GetAwaiter().GetResult());
+            Assert.Null(viewModel.ImportPreview);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.ImportApply");
+            host.Close();
+        });
+
+    [Fact]
     public void Explicit_review_mutation_replaces_scenario_preset()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {

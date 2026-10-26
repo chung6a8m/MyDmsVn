@@ -3,12 +3,36 @@ using System.Linq;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
 using MyDmsVn.Contracts.Security;
+using MyDmsVn.Desktop.Application;
+using MyDmsVn.Desktop.Application.Security;
 using MyDmsVn.Desktop.UiLab.Scenarios;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 public sealed class SecurityScenarioBehaviorTests
 {
+    [Fact]
+    public async Task Held_import_preview_cannot_publish_after_session_replacement()
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L09);
+        using var viewModel = new SecurityWorkspaceViewModel(scene.Administration, scene.Catalog,
+            scene.Session, new ImmediateUiDispatcher(), scene.Session.Version);
+        await viewModel.LoadAsync(default);
+        viewModel.SelectRole(202);
+        const string json = "{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}";
+        var gate = scene.Administration.HoldNextImportPreview();
+
+        var pending = viewModel.PreviewImportAsync(PermissionImportTargetTypeDto.Role, json, default);
+        Assert.False(pending.IsCompleted);
+        scene.Session.Replace();
+        gate.Complete(true);
+
+        Assert.False(await pending);
+        Assert.Null(viewModel.ImportPreview);
+        Assert.Null(viewModel.SelectedRoleId);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.ImportApply");
+    }
+
     [Fact]
     public void Review_fixture_aliases_have_required_assignments_and_catalog_states()
     {

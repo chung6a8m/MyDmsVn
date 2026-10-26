@@ -51,6 +51,8 @@ internal sealed class UiLabForm : Form
     private readonly ComboBox _securityMutationOutcome = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 115 };
     private readonly Button _securityArmMutation = new Button { Text = "Arm mutation", AutoSize = true };
     private readonly Button _securityReleaseMutation = new Button { Text = "Release mutation", AutoSize = true };
+    private readonly Button _securityHoldImportPreview = new Button { Text = "Hold next Preview", AutoSize = true };
+    private readonly Button _securityReleaseImportPreview = new Button { Text = "Release Preview", AutoSize = true };
     private readonly Label _status = new Label { AutoSize = true, Text = "Starting...", Padding = new Padding(8) };
     private readonly TextBox _journal = new TextBox { ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Bottom, Height = 110 };
     private readonly Panel _workspace = new Panel { Dock = DockStyle.Fill };
@@ -67,6 +69,7 @@ internal sealed class UiLabForm : Form
     private ScenarioGate<ApiResponse<SalesReceiptDto>>? _reloadGate;
     private Action? _releaseSecurityRead;
     private Action? _releaseSecurityMutation;
+    private ScenarioGate<bool>? _securityImportPreviewGate;
 
     internal ComboBox ModuleSelector => _module;
     internal SecurityScenario? CurrentSecurityScenarioData => _securityData;
@@ -97,6 +100,8 @@ internal sealed class UiLabForm : Form
     internal Button SecurityReleaseReadButton => _securityReleaseRead;
     internal Button SecurityArmMutationButton => _securityArmMutation;
     internal Button SecurityReleaseMutationButton => _securityReleaseMutation;
+    internal Button SecurityHoldImportPreviewButton => _securityHoldImportPreview;
+    internal Button SecurityReleaseImportPreviewButton => _securityReleaseImportPreview;
     internal Button SecurityReviewToggleButton => _securityReviewToggle;
     internal string JournalText => _journal.Text;
 
@@ -116,7 +121,7 @@ internal sealed class UiLabForm : Form
         _securityReviewPanel.Controls.AddRange(new Control[] { _securityReadSource, _securityReadOutcome,
             _securityHoldRead, _securityIgnoreCancellation, _securityIgnoreOwnerRelease,
             _securityArmRead, _securityReload, _securityReleaseRead, _securityMutationOutcome,
-            _securityArmMutation, _securityReleaseMutation });
+            _securityArmMutation, _securityReleaseMutation, _securityHoldImportPreview, _securityReleaseImportPreview });
         _toolbarHost.Controls.Add(_securityReviewPanel);
         _toolbarHost.Controls.Add(toolbar);
         Controls.Add(_workspace);
@@ -153,6 +158,8 @@ internal sealed class UiLabForm : Form
         _securityReleaseRead.Click += (_, __) => ReleaseSecurityRead();
         _securityArmMutation.Click += (_, __) => ArmSecurityMutation();
         _securityReleaseMutation.Click += (_, __) => ReleaseSecurityMutation();
+        _securityHoldImportPreview.Click += (_, __) => ArmSecurityImportPreview();
+        _securityReleaseImportPreview.Click += (_, __) => ReleaseSecurityImportPreview();
         _diagnostics.Tick += (_, __) =>
         {
             RefreshDiagnostics();
@@ -173,6 +180,7 @@ internal sealed class UiLabForm : Form
             _journal.Height = _module.SelectedIndex == 1 ? 70 : 110;
             _releaseSecurityRead = null;
             _releaseSecurityMutation = null;
+            _securityImportPreviewGate = null;
             var context = SynchronizationContext.Current as WindowsFormsSynchronizationContext
                 ?? throw new InvalidOperationException("UI Lab requires a running Windows Forms synchronization context.");
             _lifetime = new CancellationTokenSource();
@@ -365,7 +373,7 @@ internal sealed class UiLabForm : Form
     {
         if (_securityData == null) return;
         _securityReviewPanel.Visible = !_securityReviewPanel.Visible;
-        _toolbarHost.Height = _securityReviewPanel.Visible ? 144 : 68;
+        _toolbarHost.Height = _securityReviewPanel.Visible ? 168 : 68;
     }
 
     private static string? SelectSecurityImportJson()
@@ -534,6 +542,24 @@ internal sealed class UiLabForm : Form
         SetCommands(!_poisoned);
     }
 
+    private void ArmSecurityImportPreview()
+    {
+        if (_securityData == null || _securityImportPreviewGate != null) return;
+        _securityImportPreviewGate = _securityData.Administration.HoldNextImportPreview();
+        _status.Text = "Next Security import Preview is held. Release it after replacing the session.";
+        SetCommands(!_poisoned);
+    }
+
+    private void ReleaseSecurityImportPreview()
+    {
+        var gate = _securityImportPreviewGate;
+        if (gate == null) return;
+        _securityImportPreviewGate = null;
+        gate.Complete(true);
+        if (!_poisoned) _status.Text = "Held Security import Preview released.";
+        SetCommands(!_poisoned);
+    }
+
     private void SetCommands(bool enabled)
     {
         _module.Enabled = enabled;
@@ -556,6 +582,8 @@ internal sealed class UiLabForm : Form
         _securityReleaseRead.Enabled = _releaseSecurityRead != null;
         _securityArmMutation.Enabled = enabled && _securityControl != null && _releaseSecurityMutation == null;
         _securityReleaseMutation.Enabled = _releaseSecurityMutation != null;
+        _securityHoldImportPreview.Enabled = enabled && _securityControl != null && _securityImportPreviewGate == null;
+        _securityReleaseImportPreview.Enabled = _securityImportPreviewGate != null && !_securityImportPreviewGate.IsCompleted;
     }
 
     private async void OnFormClosing(object? sender, FormClosingEventArgs args)

@@ -63,6 +63,8 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
     readonly ScenarioJournal journal;
     readonly ScenarioTaskTracker tasks = new ScenarioTaskTracker();
     readonly List<ScenarioGate<ApiResponse<SecurityAdministrationResultDto>>> gates = new List<ScenarioGate<ApiResponse<SecurityAdministrationResultDto>>>();
+    readonly List<ScenarioGate<bool>> importPreviewGates = new List<ScenarioGate<bool>>();
+    ScenarioGate<bool>? nextImportPreview;
     public ScenarioSecurityAdministrationApiClient(SecurityScenarioData data, ScenarioDesktopSession session, long owner, ScenarioJournal journal)
     {
         this.data = data;
@@ -107,6 +109,16 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
     public Queue<ApiError?> MutationErrors { get; } = new Queue<ApiError?>();
     public IReadOnlyList<Task> OutstandingOperations => tasks.Outstanding;
 
+    public ScenarioGate<bool> HoldNextImportPreview()
+    {
+        if (nextImportPreview is { IsCompleted: false })
+            throw new InvalidOperationException("An import preview is already armed.");
+        var gate = new ScenarioGate<bool> { IgnoreCancellation = true };
+        nextImportPreview = gate;
+        importPreviewGates.Add(gate);
+        return gate;
+    }
+
     ScenarioGate<ApiResponse<SecurityAdministrationResultDto>>? nextMutation;
     public ScenarioGate<ApiResponse<SecurityAdministrationResultDto>> HoldNextMutation(bool ignoreCancellation = false)
     {
@@ -126,6 +138,8 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
         foreach (var g in roleGates)
             g.Cancel();
         foreach (var g in gates)
+            g.Cancel();
+        foreach (var g in importPreviewGates)
             g.Cancel();
     }
 
@@ -315,7 +329,18 @@ public sealed class ScenarioSecurityAdministrationApiClient : ISecurityAdministr
             return Task.FromResult(ScenarioErrors.SessionChanged<PermissionAssignmentImportPreviewDto>());
         token.ThrowIfCancellationRequested();
         journal.Record("Security.ImportPreview", new { Target = type, TargetId = id });
-        return Task.FromResult(Preview(type, id, json));
+        var response = Preview(type, id, json);
+        var gate = nextImportPreview;
+        nextImportPreview = null;
+        return gate == null ? Task.FromResult(response) : tasks.Track(ReleaseImportPreviewAsync(gate, response, token));
+    }
+
+    private static async Task<ApiResponse<PermissionAssignmentImportPreviewDto>> ReleaseImportPreviewAsync(
+        ScenarioGate<bool> gate, ApiResponse<PermissionAssignmentImportPreviewDto> response, CancellationToken token)
+    {
+        await gate.WaitAsync(token);
+        // Deliberately return the old snapshot to exercise the workspace owner fence.
+        return response;
     }
 
     // Keep the deliberately narrow schema-v1 admission aligned with the application parser.
