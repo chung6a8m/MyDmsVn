@@ -162,6 +162,29 @@ public sealed class SecurityNativeAndResetTests
         });
 
     [Fact]
+    public void Native_tab_preserves_staged_role_grant_after_mouse_toggle() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 0;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var edit = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Sửa quyền");
+            edit.PerformClick();
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
+            var index = grants.Items.IndexOf("Sales.Receipts.Post");
+            Assert.True(index >= 0);
+            var item = grants.GetItemRectangle(index);
+            NativeLookupTypingDriver.Click(grants, new Point(item.Left + 20, item.Top + item.Height / 2));
+            Assert.True(grants.GetItemChecked(index));
+            Assert.Contains("Sales.Receipts.Post", control.ViewModel.RoleDraft!.DesiredKeys);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.False(grants.ContainsFocus);
+            Assert.Contains("Sales.Receipts.Post", control.ViewModel.RoleDraft.DesiredKeys);
+            Assert.True(grants.GetItemChecked(index));
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
     public void Native_enter_starts_and_discards_role_grant_draft_without_dispatch() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
         {
