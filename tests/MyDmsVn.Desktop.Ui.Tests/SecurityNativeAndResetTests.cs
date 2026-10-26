@@ -298,6 +298,30 @@ public sealed class SecurityNativeAndResetTests
         });
 
     [Fact]
+    public void Native_tab_enter_opens_selected_role_member_without_mutation() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var members = control.RoleDetail.Members;
+            var open = control.RoleDetail.OpenUser;
+            Assert.Equal(-1, members.SelectedIndex);
+            Assert.False(open.Enabled);
+            Assert.True(members.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Equal(0, members.SelectedIndex);
+            Assert.True(open.Enabled);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.True(open.ContainsFocus, "Tab from the selected member should focus Mở người dùng.");
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Until(() => control.ViewModel.SelectedUserId == 101 && control.Tabs.SelectedIndex == 0 &&
+                control.UserDetail.Tabs.SelectedIndex == 1);
+            Assert.Equal(6, scene.Journal.Entries.Count);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
     public void Native_tab_preserves_staged_role_grant_after_mouse_toggle() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
         {
