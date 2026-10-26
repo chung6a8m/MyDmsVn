@@ -504,6 +504,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T04 status-confirmation native Enter at physical100 — 2026-10-26:** Test-only revision `516d9d0d9e7c8f9f94c70b158c020906cc4b99f4` adds User and Role native Enter confirmation rows, each verifying a selected-owner `SetActive` request, one Success, expected revision and inactive confirmed state after the three-source reload. Focused **2/2** and full SQL-free Debug/net48 Ui.Tests **238/238** passed at measured physical100; [TRX, hash and row details](../evidence/security/20261025-security-ui-lab.md) are recorded. Physical125 on this revision, remaining SEC-T04 keyboard/review paths and the full attended matrix remain OPEN.
 
+**SEC-T04 / SEC-L03 confirmed status in the running Lab at physical100 — 2026-10-26:** A fresh `SEC_L01` Release Lab separately confirmed U101 and R201 deactivation. The journal showed exactly one `SetActive` per target at revisions 11→12 and 21→22, with a three-source Success reload after each. U101 and R201 displayed inactive; R201 still showed two members. The [bounded dialog and journal observation](../evidence/security/20261025-security-ui-lab.md) does not establish all status variants, the physical125 counterpart or the complete attended matrix.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
