@@ -312,6 +312,7 @@ public sealed class SecurityWorkspaceControlTests
         control.PermissionCatalog.Search.Text = "no-match";
         Assert.Empty(control.PermissionCatalog.Keys.Rows);
         Assert.Contains("0 /", control.PermissionCatalog.Count.Text);
+        Assert.Contains("Không có quyền phù hợp bộ lọc", control.PermissionCatalog.Details.Text);
         Assert.False(control.PermissionCatalog.CopyKey.Enabled);
     });
 

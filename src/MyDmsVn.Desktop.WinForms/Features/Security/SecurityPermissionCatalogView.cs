@@ -113,7 +113,9 @@ public sealed class SecurityPermissionCatalogView : UserControl
         }
         Count.Text = Keys.Rows.Count + " / " + _viewModel.Catalog.Items.Count + " quyền · Chỉ xem";
         CopyKey.Enabled = Keys.Rows.Count > 0;
-        if (Keys.CurrentRow?.Tag is PermissionCatalogItemDto current)
+        if (Keys.Rows.Count == 0)
+            Details.Text = _viewModel.Catalog.Items.Count == 0 ? "Danh mục quyền chưa có mục nào." : "Không có quyền phù hợp bộ lọc.";
+        else if (Keys.CurrentRow?.Tag is PermissionCatalogItemDto current)
             Details.Text = DetailText(current);
     }
 

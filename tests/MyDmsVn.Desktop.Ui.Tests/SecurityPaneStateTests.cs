@@ -150,6 +150,7 @@ public sealed class SecurityPaneStateTests
             Wait(loading);
             Assert.Equal(SecurityDatasetState.Ready, control.ViewModel.Catalog.State);
             Assert.Empty(control.PermissionCatalog.Keys.Rows);
+            Assert.Contains("Danh mục quyền chưa có mục nào", control.PermissionCatalog.Details.Text);
             Assert.Equal(3, control.Users.Items.Count);
             Assert.Equal(3, control.Roles.Items.Count);
         });
