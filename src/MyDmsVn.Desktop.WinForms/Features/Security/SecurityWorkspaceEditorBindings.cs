@@ -44,9 +44,9 @@ internal sealed class SecurityWorkspaceEditorBindings
     {
         _control = control;
         var roleCommands = control.RoleDetail.HeaderActions;
-        Add(roleCommands, "Tạo vai trò…", () => IdentityDialogAsync(false, true), themed: true);
-        Add(roleCommands, "Sửa tên…", () => IdentityDialogAsync(false, false), themed: true);
-        Add(roleCommands, "Đổi trạng thái…", () => ActivationAsync(false), themed: true);
+        Add(roleCommands, "Tạo vai trò…", () => IdentityDialogAsync(false, true));
+        Add(roleCommands, "Sửa tên…", () => IdentityDialogAsync(false, false));
+        Add(roleCommands, "Đổi trạng thái…", () => ActivationAsync(false));
         _editRolePermissions = Add(roleCommands, "Sửa quyền", () =>
         {
             if (Vm.BeginRolePermissions())
@@ -55,7 +55,7 @@ internal sealed class SecurityWorkspaceEditorBindings
                 _grantSearch.Focus();
             }
             return Task.CompletedTask;
-        }, themed: true);
+        });
         var grantFilters = Commands();
         grantFilters.Height = 38;
         grantFilters.Controls.AddRange(new Control[] { _grantSearch, _grantModule, _grantedOnly });
@@ -161,14 +161,14 @@ internal sealed class SecurityWorkspaceEditorBindings
         control.UserDetail.Tabs.TabPages[1].Controls.Add(membership);
         control.UserDetail.Memberships.SelectedIndexChanged += (_, _) => RenderMembershipActions();
         var profile = control.UserDetail.HeaderActions;
-        _createUser = Add(profile, "Tạo người dùng…", () => IdentityDialogAsync(true, true), themed: true);
-        _editUser = Add(profile, "Sửa thông tin…", () => IdentityDialogAsync(true, false), themed: true);
-        _resetPassword = Add(profile, "Đặt lại mật khẩu…", () => PasswordAsync(), themed: true);
-        _changeUserState = Add(profile, "Đổi trạng thái…", () => ActivationAsync(true), themed: true);
+        _createUser = Add(profile, "Tạo người dùng…", () => IdentityDialogAsync(true, true));
+        _editUser = Add(profile, "Sửa thông tin…", () => IdentityDialogAsync(true, false));
+        _resetPassword = Add(profile, "Đặt lại mật khẩu…", () => PasswordAsync());
+        _changeUserState = Add(profile, "Đổi trạng thái…", () => ActivationAsync(true));
         _recovery.Dock = DockStyle.Bottom;
         _recovery.Height = 54;
         _recovery.Controls.Add(_status);
-        Add(_recovery, "Tải lại để đối chiếu", async () => { await Vm.ReloadForComparisonAsync(default); });
+        Add(_recovery, "Tải lại để đối chiếu", async () => { await Vm.ReloadForComparisonAsync(default); }, themed: false);
         Add(_recovery, "Đã đối chiếu — lập diff mới", () =>
         {
             if (control.RecoveryConfirmationOverride?.Invoke() ??
@@ -176,7 +176,7 @@ internal sealed class SecurityWorkspaceEditorBindings
                     "Đối chiếu", MessageBoxButtons.OKCancel) == DialogResult.OK)
                 Vm.ReviewRecoveryAndRebase();
             return Task.CompletedTask;
-        });
+        }, themed: false);
         control.UserDetail.Controls.Add(_recovery);
         GuardTabs(control.Tabs);
         GuardTabs(control.UserDetail.Tabs);
@@ -504,7 +504,7 @@ internal sealed class SecurityWorkspaceEditorBindings
     }
 
     static FlowLayoutPanel Commands() => new() { Dock = DockStyle.Top, Height = 70, AutoScroll = true, WrapContents = true };
-    Button Add(FlowLayoutPanel panel, string text, Func<Task> action, bool themed = false)
+    Button Add(FlowLayoutPanel panel, string text, Func<Task> action, bool themed = true)
     {
         Button button = themed
             ? new BootstrapButton { Text = text, AutoSize = true, Variant = BootstrapVariant.Primary, Outline = true, ButtonSize = BootstrapButtonSize.Small }
