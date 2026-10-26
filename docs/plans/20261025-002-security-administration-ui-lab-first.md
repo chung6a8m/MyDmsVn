@@ -398,6 +398,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-L07 same-revision click-then-Tab at physical125 — 2026-10-26:** On the same source/test `b412c90`, the [evidence](../evidence/security/20261025-security-ui-lab.md) records a fresh Release `SEC_L07` Lab in Dark and Light. R201 Post began unchecked; **Sửa quyền**, click Post and immediate native Tab retained one checked **Chưa lưu** change after the UI settled. The first Light accessibility read lagged the screenshot; a second read agreed. Explicit **Hủy thay đổi** restored unchecked in both themes, and the journal stayed at the initial six reads without mutation. This closes the requested same-revision, physical125 replay only; complete SEC-L07/SEC-T04 command traversal remains OPEN.
 
+**SEC-L09 Dark native-search attempt at physical125 — 2026-10-26:** On unchanged source/test `b412c90`, the [evidence](../evidence/security/20261025-security-ui-lab.md) records a native per-key search attempt in Dark. Windows composed `e` then `x` into `ẽ`, so that sequence did not establish ASCII `Export` filtering. A concurrent-input guard interrupted the next sequence; its later one-result state cannot be attributed to the reviewer. No mutation was observed. Dark canonical-key per-key review remains OPEN and needs an uncontended repeat.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
