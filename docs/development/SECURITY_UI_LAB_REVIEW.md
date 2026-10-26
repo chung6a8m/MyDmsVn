@@ -95,6 +95,8 @@ and user navigation; known member IDs/counts remain distinct from unavailable pr
 2. Inspect a Deprecated key, `U-INACTIVE` and `U-PROTECTED`. Open source details without entering an edit flow.
 3. Independently withhold Users, Roles or catalog information, then restore it by explicit authorized reload.
 
+For one combined-source review in `SEC_L05`, open **Security review tools** with U101's **Quyền hiệu lực** selected. Leave **Hold read** unchecked; arm **Roles / Failure**, then **Catalog / Forbidden**, and use **Reload Security** once. Distinct armed sources are consumed by that reload; arming the same source twice is refused. Use a second explicit Reload to restore the fixture's successful responses. The Lab permits only one held read at a time.
+
 Expected: effective permissions and source details are read-only. Direct Deny wins over ordinary role grants; inactive roles do not contribute effective grants; only confirmed applicable data supports a
 conclusion. Unknown/Deprecated keys are never offered as new grants. Missing required source data produces `Chưa xác định`, not a claimed runtime denial. Protected status explains the edit lock without
 inventing a verified server binding or bypass.
