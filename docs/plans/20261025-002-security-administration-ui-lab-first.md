@@ -494,6 +494,8 @@ All new type, file and test names below are **proposed** until implemented and d
 
 **SEC-T04 status-confirmation keyboard cancellation at physical100 — 2026-10-26:** A fresh Dark `SEC_L01` Release Lab accepted native Tab → Enter on the U101 and R201 **Đổi trạng thái…** buttons, showed the target-specific confirmation text, and accepted Escape back to each button without a mutation. The [bounded focus path and journal](../evidence/security/20261025-security-ui-lab.md) are recorded. Confirmed state changes, other command paths and complete SEC-T04/attended exit remain OPEN.
 
+**SEC-T04 repeatable native status-dialog cancellation — 2026-10-26:** Test-only revision `37c5575c18796a1dee802c669b6e466cec4d52f0` adds real focused-window Enter/Escape Theory rows for the U101 and R201 status confirmations, verifying the native dialog title, restored button focus and zero mutations. Focused **2/2** and full SQL-free Debug/net48 Ui.Tests **235/235** passed at measured physical100. The [actual TRX rows and hash](../evidence/security/20261025-security-ui-lab.md) are recorded. Native125 on this test revision, confirmed-status keyboard action and the broader SEC-T04/attended matrix remain OPEN.
+
 ## 3. Mandatory Owner gate record
 
 **Current decision: APPROVED for the reviewed SQL-free UI Lab candidate on 2026-10-26.** The Owner explicitly approved SEC-T05 in this conversation and authorized SEC-T06–SEC-T08. This does not mark incomplete attended checks PASS or establish SQL/product acceptance.
