@@ -21,7 +21,8 @@ internal abstract class UiLabHostForm : Form
     protected readonly ReceiptCommandButton _closeWorkspace = new ReceiptCommandButton { Text = "Close workspace", AutoSize = true, CausesValidation = false };
     private readonly Button _replaceSession = new Button { Text = "Replace session", AutoSize = true };
     protected readonly Panel _toolbarHost = new Panel { Dock = DockStyle.Top, Height = 68 };
-    protected readonly FlowLayoutPanel _toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 68, WrapContents = true, Padding = new Padding(6) };
+    private readonly Panel _toolbarScroll = new Panel { Dock = DockStyle.Top, Height = 68, AutoScroll = true };
+    protected readonly FlowLayoutPanel _toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Padding = new Padding(6) };
     protected readonly Label _status = new Label { AutoSize = true, Text = "Starting...", Padding = new Padding(8) };
     protected readonly TextBox _journal = new TextBox { ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Bottom, Height = 110 };
     protected readonly Panel _workspace = new Panel { Dock = DockStyle.Fill };
@@ -60,7 +61,8 @@ internal abstract class UiLabHostForm : Form
         _closeCoordinator = new WorkspaceCloseCoordinator(closePrompt);
         _closeWorkspace.RetainEditorFocus = () => Participant?.CaptureCloseState().IsDirty == true;
         _toolbar.Controls.AddRange(new Control[] { _scenario, _theme, _reset, _closeWorkspace, _replaceSession, _status });
-        _toolbarHost.Controls.Add(_toolbar);
+        _toolbarScroll.Controls.Add(_toolbar);
+        _toolbarHost.Controls.Add(_toolbarScroll);
         _viewportControls.Controls.AddRange(new Control[] { new Label { Text = "Shell content W × H (measure):", AutoSize = true, Padding = new Padding(0, 5, 0, 0) }, _viewportWidth, _viewportHeight, _viewportApply, _viewportFree, _reviewMode });
         _viewportHost.Controls.Add(_workspace);
         Controls.Add(_viewportHost);
