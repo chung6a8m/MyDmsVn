@@ -1,6 +1,6 @@
-# Test projects and commands — v1a-pro-ui-next
+# Test projects and commands — MyDmsVn
 
-**Updated:** 2026-10-25. [TEST_POLICY](../docs/TEST_POLICY.md) alone owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. The [execution index](../docs/plans/README.md) selects the authorized follow-up; successor work requires explicit activation, and this page owns runnable commands, not task progress. [UI-NEXT](../docs/ui-next/README.md) retains historical candidate evidence. No external SQL test framework is restored.
+**Updated:** 2026-10-25. [TEST_POLICY](../docs/TEST_POLICY.md) alone owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. The [execution index](../docs/plans/README.md) currently has no active selected follow-up; successor work requires explicit activation, and this page owns runnable commands, not task progress. [UI-NEXT](../docs/ui-next/README.md) retains historical candidate evidence. No external SQL test framework is restored.
 
 <a id="active-ui-next-commands-and-evidence"></a>
 

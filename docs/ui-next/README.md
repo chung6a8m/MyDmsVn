@@ -2,7 +2,7 @@
 
 **Routing updated:** 2026-10-25. The ten dated planning/design/assessment documents now live in the [2026-10-25 archive](../archive/20261025-pre-next-roadmap/README.md). Their old paths retain compatibility anchors only; `evidence/` remains unchanged. The [current execution index](../plans/README.md) selects current Owner-authorized follow-up work; this historical index supplies no task queue.
 
-The original roadmap was activated from `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. Subsequent task and DateInput results belong to the candidates in their evidence. Original activation phrases such as NOT STARTED/NOT RUN are historical, not instructions to replay tasks or continue former PR branches.
+The original roadmap was activated from commit `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. Subsequent task and DateInput results belong to the candidates in their evidence. Original activation phrases such as NOT STARTED/NOT RUN are historical, not instructions to replay tasks or continue former PR branches.
 
 ## Read for current work
 

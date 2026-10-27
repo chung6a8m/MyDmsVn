@@ -1,8 +1,8 @@
 # Security administration — UI and behavior specification
 
-**Design basis:** Owner-reviewed conversation and mockups, 2026-10-25. **Original inspected baseline:** `0216701835cc3326124a94760186989c1ac4f729` on `v1a-pro-ui-next`. **Implementation state:** the reviewed candidate and bounded Local/SQL handoff are implemented; the [plan](../plans/20261025-002-security-administration-ui-lab-first.md) and [evidence](../evidence/security/20261025-security-local-sql.md) own exact acceptance and remaining limits.
+**Design basis:** Owner-reviewed conversation and mockups, 2026-10-25. **Original inspected baseline:** commit `0216701835cc3326124a94760186989c1ac4f729` (historical). **Implementation state:** the reviewed candidate and bounded Local/SQL handoff are implemented; the [archived plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) and [evidence](../evidence/security/20261025-security-local-sql.md) retain exact acceptance and remaining limits.
 
-The [implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) owns task state and verification. The [visual references](../design-references/security-administration/README.md) illustrate composition; this specification and the Owner's explicit corrections take precedence over illustrative values in the wireframes and original conversation mockups. The [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) defines the repeatable review exercises.
+The [archived implementation plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) retains historical task state and verification; no active roadmap is selected. The [visual references](../design-references/security-administration/README.md) illustrate composition; this specification and the Owner's explicit corrections take precedence over illustrative values in the wireframes and original conversation mockups. The [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) defines the repeatable review exercises.
 
 ## 1. Intent, scope and decisions
 
