@@ -58,6 +58,60 @@ public sealed class SecurityWorkspaceControlTests
     });
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Minimum_user_direct_editor_keeps_commands_and_feedback_reachable(bool dark) => Run(SecurityScenarioId.SEC_L01, (_, _) =>
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            using var lab = new MyDmsVn.Desktop.UiLab.SecurityLabForm { ClientSize = new System.Drawing.Size(900, 600) };
+            lab.Show();
+            Until(() => lab.CurrentSecurityControl is { IsDisposed: false } && !lab.IsResetting && lab.StatusText.Contains("ready"));
+            var workspace = lab.CurrentSecurityControl!;
+            workspace.UserDetail.Tabs.SelectedIndex = 3;
+            Assert.True(workspace.ViewModel.BeginDirectPermission("Sales.Receipts.Post"));
+            Wait(workspace.ViewModel.PreviewImportAsync(PermissionImportTargetTypeDto.User, "invalid JSON", default));
+            Assert.False(string.IsNullOrWhiteSpace(workspace.ViewModel.ImportStatus));
+            var tab = workspace.UserDetail.Tabs.TabPages[3];
+            var selector = Assert.Single(Descendants(tab, typeof(ComboBox)).Cast<ComboBox>());
+            var buttons = Descendants(tab, typeof(Button)).Cast<Button>().ToArray();
+            var save = Assert.Single(buttons, button => button.Text == "Lưu quyền này");
+            var cancel = Assert.Single(buttons, button => button.Text == "Hủy");
+            var labels = Descendants(tab, typeof(Label)).Cast<Label>().ToArray();
+            var preview = Assert.Single(labels, label => label.Text.Contains("Kết quả dự kiến"));
+            var status = Assert.Single(labels, label => label.Text == workspace.ViewModel.ImportStatus);
+            // Regression: fixed docked regions can clip commands/feedback even if the list has a minimum height.
+            foreach (var item in new Control[] { status, selector }.Concat(Descendants(tab, typeof(RadioButton)))
+                .Concat(new Control[] { workspace.UserImportButton, preview, save, cancel }))
+            {
+                tab.ScrollControlIntoView(item);
+                if (item.CanSelect) Assert.True(item.Focus());
+                System.Windows.Forms.Application.DoEvents();
+                var viewport = tab.RectangleToScreen(tab.ClientRectangle);
+                var bounds = item.RectangleToScreen(item.ClientRectangle);
+                Assert.True(item.Visible && viewport.Contains(bounds), $"{item.AccessibleName ?? item.Text}: {bounds}; Direct viewport {viewport}");
+                var region = item;
+                while (region.Parent != tab) region = region.Parent!;
+                var center = tab.PointToClient(new System.Drawing.Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2));
+                Assert.Same(region, tab.GetChildAtPoint(center));
+            }
+            Assert.False(tab.HorizontalScroll.Visible);
+            Assert.False(workspace.HorizontalScroll.Visible);
+            workspace.ViewModel.SetDirectDecision(true);
+            selector.Focus();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(workspace.ViewModel.HasDirtyEditor);
+            cancel.PerformClick();
+            Assert.False(workspace.ViewModel.HasDirtyEditor);
+            Assert.False(Assert.Single(workspace.ViewModel.SelectedUser!.DirectDecisions, decision => decision.PermissionKey == "Sales.Receipts.Post").Decision);
+            lab.CloseWorkspaceButton.PerformClick();
+        }
+        finally { BootstrapThemeManager.CurrentTheme = theme; }
+    });
+
+    [Theory]
     [InlineData(900, 600, false)]
     [InlineData(900, 600, true)]
     [InlineData(1200, 760, false)]

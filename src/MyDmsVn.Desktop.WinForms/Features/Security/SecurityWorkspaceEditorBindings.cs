@@ -148,16 +148,23 @@ internal sealed class SecurityWorkspaceEditorBindings
             ToggleGrant(_grants.CurrentCell.RowIndex);
         };
         var direct = Commands();
-        direct.Height = 70;
+        direct.AutoScroll = false;
+        direct.AutoSize = true;
+        direct.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         direct.Controls.AddRange(new Control[] { _directKey, _inherit, _allow, _deny });
-        control.UserDetail.Tabs.TabPages[3].Controls.Add(direct);
+        var directArea = control.UserDetail.Tabs.TabPages[3];
+        directArea.AutoScroll = true;
+        directArea.Layout += (_, _) => LayoutDirectArea();
+        directArea.Controls.Add(direct);
         var directActions = Commands();
         directActions.Dock = DockStyle.Bottom;
-        directActions.Height = 42;
-        Add(directActions, "Hủy", () => { Vm.DiscardEditor(); return Task.CompletedTask; });
-        Add(directActions, "Lưu quyền này", () => Vm.SaveEditorAsync(default));
-        control.UserDetail.Tabs.TabPages[3].Controls.Add(_directPreview);
-        control.UserDetail.Tabs.TabPages[3].Controls.Add(directActions);
+        directActions.AutoScroll = false;
+        directActions.AutoSize = true;
+        directActions.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        ((BootstrapButton)Add(directActions, "Hủy", () => { Vm.DiscardEditor(); return Task.CompletedTask; })).Variant = BootstrapVariant.Secondary;
+        ((BootstrapButton)Add(directActions, "Lưu quyền này", () => Vm.SaveEditorAsync(default))).Outline = false;
+        directArea.Controls.Add(_directPreview);
+        directArea.Controls.Add(directActions);
         control.UserDetail.DirectPermissionRequested += key => _ = control.TrackOperation(OpenDirectAsync(key));
         _directKey.SelectedIndexChanged += async (_, _) =>
         {
@@ -418,6 +425,17 @@ internal sealed class SecurityWorkspaceEditorBindings
         var minimum = _grants.ColumnHeadersHeight + rowHeight + 4 +
             _grantContent.Controls.Cast<Control>().Where(child => child != _grants && child.Visible).Sum(child => child.Height);
         _grantContent.Height = Math.Max(_control.RoleDetail.GrantArea.ClientSize.Height, minimum);
+    }
+
+    void LayoutDirectArea()
+    {
+        // Dock against a local minimum display area, including contextual import/status controls
+        // added by their own binding. Optional feedback must not consume the native list's rows.
+        var area = _control.UserDetail.Tabs.TabPages[3];
+        var list = _control.UserDetail.DirectDecisions;
+        var minimum = list.ItemHeight * 2 + list.Height - list.ClientSize.Height +
+            area.Controls.Cast<Control>().Where(child => child != list && child.Visible).Sum(child => child.Height);
+        area.AutoScrollMinSize = new System.Drawing.Size(0, minimum);
     }
 
     void ToggleGrant(int index)
