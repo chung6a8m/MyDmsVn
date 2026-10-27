@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Contracts.Security;
 
 namespace MyDmsVn.Desktop.WinForms.Features.Security;
@@ -13,10 +14,10 @@ public sealed partial class SecurityWorkspaceControl
 {
     private Func<string?> _selectImportJson = SelectImportJson;
     private Func<string, bool> _confirmImport = ConfirmImport;
-    private readonly Label _userImportStatus = new() { Dock = DockStyle.Bottom, Height = 28 };
+    private readonly Label _userImportStatus = new BootstrapLabel { Dock = DockStyle.Bottom, Height = 28, AccessibleName = "Trạng thái nhập quyền riêng", TextRole = BootstrapTextRole.Muted };
     private readonly Label _roleImportStatus = new() { Dock = DockStyle.Bottom, Height = 28 };
 
-    public Button UserImportButton { get; } = new() { Text = "Nhập quyền từ JSON…", AutoSize = true };
+    public Button UserImportButton { get; } = new BootstrapButton { Text = "Nhập quyền từ JSON…", AutoSize = true, Outline = true, Variant = BootstrapVariant.Secondary, ButtonSize = BootstrapButtonSize.Small };
     public Button RoleImportButton { get; } = new() { Text = "Nhập quyền từ JSON…", AutoSize = true };
 
     public void SetImportDialogs(Func<string?> selectImportJson, Func<string, bool> confirmImport)

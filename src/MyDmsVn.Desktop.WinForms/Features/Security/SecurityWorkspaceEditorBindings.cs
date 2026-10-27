@@ -27,12 +27,12 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly BootstrapComboBox _grantModule = new() { Width = 115, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Nhóm quyền vai trò" };
     readonly BootstrapCheckBox _grantedOnly = new() { Text = "Chỉ quyền đã cấp", AutoSize = true };
     readonly Label _grantSummary = new() { Dock = DockStyle.Bottom, Height = 20 };
-    readonly ComboBox _directKey = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Quyền riêng" };
+    readonly ComboBox _directKey = new BootstrapComboBox { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Quyền riêng" };
     readonly RadioButton _inherit = new BootstrapRadioButton { Text = "Theo vai trò", AutoSize = true };
     readonly RadioButton _allow = new BootstrapRadioButton { Text = "Cho phép", AutoSize = true };
     readonly RadioButton _deny = new BootstrapRadioButton { Text = "Từ chối", AutoSize = true };
     readonly Label _status = new() { AutoSize = true };
-    readonly Label _directPreview = new() { Dock = DockStyle.Bottom, Height = 58, AutoEllipsis = true };
+    readonly Label _directPreview = new BootstrapLabel { Dock = DockStyle.Bottom, Height = 58, AutoEllipsis = true, AccessibleName = "Kết quả dự kiến và quyết định đã lưu" };
     readonly FlowLayoutPanel _recovery = Commands();
     readonly Button _recoveryReview;
     readonly ToolTip _maintenanceTip = new();
@@ -47,7 +47,7 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly Panel _grantContent = new() { Dock = DockStyle.Top };
     readonly Button _assignRole;
     readonly Button _removeRole;
-    readonly Label _membershipHint = new() { AutoSize = true, AccessibleName = "Thông báo gán vai trò" };
+    readonly Label _membershipHint = new BootstrapLabel { AutoSize = true, AccessibleName = "Thông báo gán vai trò", TextRole = BootstrapTextRole.Muted };
     SecurityDataset<PermissionCatalogItemDto>? _grantCatalogSnapshot;
     GrantCatalogEntry[] _activeGrantEntries = Array.Empty<GrantCatalogEntry>();
     Dictionary<string, GrantCatalogEntry> _activeGrantByKey = new(StringComparer.Ordinal);
@@ -177,6 +177,9 @@ internal sealed class SecurityWorkspaceEditorBindings
             if (!_rendering && radio.Checked) Vm.SetDirectDecision(_inherit.Checked ? null : _allow.Checked);
         };
         var membership = Commands();
+        membership.AutoScroll = false;
+        membership.AutoSize = true;
+        membership.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         _assignRole = Add(membership, "Gán vai trò…", async () =>
         {
             var userId = Vm.SelectedUserId;
@@ -207,6 +210,8 @@ internal sealed class SecurityWorkspaceEditorBindings
             var name = role.Name;
             if (MessageBox.Show(control, "Gỡ " + name + " khỏi " + user.DisplayName + "?", "Gỡ vai trò", MessageBoxButtons.OKCancel) == DialogResult.OK) await Vm.SetMembershipAsync(roleId, false, default);
         });
+        ((BootstrapButton)_assignRole).Outline = false;
+        ((BootstrapButton)_removeRole).Variant = BootstrapVariant.Danger;
         membership.Controls.Add(_membershipHint);
         control.UserDetail.Tabs.TabPages[1].Controls.Add(membership);
         control.UserDetail.Memberships.SelectedIndexChanged += (_, _) => RenderMembershipActions();

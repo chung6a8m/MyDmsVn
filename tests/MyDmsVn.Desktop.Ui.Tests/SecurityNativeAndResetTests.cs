@@ -29,6 +29,48 @@ public sealed class SecurityNativeAndResetTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void User_detail_effective_native_filter_retains_caret_key_and_owner_without_write(bool dark) =>
+        Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            var prior = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = MyDmsVn.Desktop.WinForms.BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+                control.UserDetail.Tabs.SelectedIndex = 2;
+                NativeLookupTypingDriver.Activate(control.FindForm()!);
+                var detail = control.UserDetail;
+                var row = Assert.Single(detail.Effective.Rows.Cast<DataGridViewRow>(), item => Equals(item.Tag, "Sales.Receipts.Post"));
+                detail.Effective.CurrentCell = row.Cells[0];
+                var search = Assert.IsType<BootstrapTextBox>((object)detail.Search);
+                search.Focus();
+                Assert.True(search.ContainsFocus);
+                var editor = GetFocus();
+                var text = "";
+                foreach (var character in "Sales.")
+                {
+                    SendMessage(editor, 0x0102, new IntPtr(character), IntPtr.Zero);
+                    text += character;
+                    System.Windows.Forms.Application.DoEvents();
+                    Assert.Equal(text, search.Text);
+                    AssertNativeSelection(editor, text.Length, 0);
+                    Assert.Equal(editor, GetFocus());
+                    Assert.Equal("Sales.Receipts.Post", detail.Effective.CurrentRow!.Tag);
+                    Assert.Equal(101, control.ViewModel.SelectedUserId);
+                }
+                SendMessage(editor, 0x00B1, new IntPtr(0), new IntPtr(5));
+                control.ViewModel.SelectUser(101);
+                AssertNativeSelection(editor, 0, 5);
+                Assert.Equal(editor, GetFocus());
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                Assert.Contains("Quyền riêng: Từ chối", detail.Explanation.Text);
+                Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            }
+            finally { BootstrapThemeManager.CurrentTheme = prior; }
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Native_tab_moves_from_search_through_filter_to_master_list(bool roles) =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, _) =>
         {
@@ -379,7 +421,8 @@ public sealed class SecurityNativeAndResetTests
                 item => item.Text == "Gỡ vai trò");
             Assert.False(remove.Enabled);
             Assert.True(memberships.Focus());
-            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            // Details ListView may select its first item on focus; Home names this fixture's intended role.
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Home);
             Assert.Equal(0, memberships.SelectedIndex);
             Assert.True(remove.Enabled);
             for (var i = 0; i < 3 && !remove.ContainsFocus; i++)
@@ -428,7 +471,7 @@ public sealed class SecurityNativeAndResetTests
             var remove = Assert.Single(Descendants(control.UserDetail.Tabs.TabPages[1]).OfType<Button>(),
                 item => item.Text == "Gỡ vai trò");
             Assert.True(memberships.Focus());
-            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Home);
             Assert.Equal(0, memberships.SelectedIndex);
             for (var i = 0; i < 3 && !remove.ContainsFocus; i++)
                 NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);

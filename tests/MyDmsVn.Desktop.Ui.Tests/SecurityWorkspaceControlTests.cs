@@ -23,6 +23,95 @@ public sealed class SecurityWorkspaceControlTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void User_detail_toolkit_surfaces_preserve_identity_read_only_explanation_and_theme(bool dark) => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var prior = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            var detail = control.UserDetail;
+            Assert.IsType<BootstrapLabel>(detail.Header);
+            Assert.IsType<BootstrapLabel>(detail.HeaderMetadata);
+            Assert.IsType<BootstrapLabel>(detail.HeaderState);
+            Assert.IsType<BootstrapPanel>(detail.Header.Parent);
+            Assert.Contains(Descendants(detail.Tabs.TabPages[0], typeof(BootstrapLabel)).Cast<BootstrapLabel>(),
+                label => label.Text == control.ViewModel.SelectedUser!.DisplayName);
+            Assert.IsAssignableFrom<BootstrapListView>((object)detail.Memberships);
+            Assert.IsAssignableFrom<BootstrapListView>((object)detail.DirectDecisions);
+            Assert.IsType<BootstrapDataGridView>(detail.Effective);
+            Assert.IsType<BootstrapTextBox>((object)detail.Search);
+            Assert.IsType<BootstrapComboBox>(detail.Module);
+            Assert.IsType<BootstrapComboBox>(detail.Result);
+            Assert.IsType<BootstrapButton>(detail.RefreshButton);
+            Assert.IsType<BootstrapButton>(detail.OpenDirectPermission);
+            Assert.IsType<BootstrapButton>(control.UserImportButton);
+            detail.Tabs.SelectedIndex = 2;
+            var row = Assert.Single(detail.Effective.Rows.Cast<DataGridViewRow>(), item => Equals(item.Tag, "Sales.Receipts.Post"));
+            detail.Effective.CurrentCell = row.Cells[0];
+            Assert.Contains(Environment.NewLine + "Sales.Receipts.Post", row.Cells[0].Value.ToString());
+            Assert.True(row.Height >= TextRenderer.MeasureText("A" + Environment.NewLine + "A", detail.Effective.Font).Height);
+            Assert.True(detail.Explanation.Multiline && detail.Explanation.ReadOnly);
+            Assert.Equal("Giải thích quyền hiệu lực đã tải", detail.Explanation.AccessibleName);
+            Assert.Contains("Quyền riêng: Từ chối", detail.Explanation.Text);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, detail.Explanation.BackColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, detail.Explanation.ForeColor);
+            Assert.True(detail.Explanation.Focus());
+            Assert.True(detail.Explanation.ContainsFocus);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        }
+        finally { BootstrapThemeManager.CurrentTheme = prior; }
+    });
+
+    [Fact]
+    public void User_detail_membership_actions_keep_native_selection_and_contextual_hierarchy() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var detail = control.UserDetail;
+        detail.Tabs.SelectedIndex = 1;
+        Assert.IsAssignableFrom<BootstrapListView>((object)detail.Memberships);
+        detail.Memberships.SelectedIndex = 1;
+        Assert.True(detail.Memberships.Focus());
+        control.ViewModel.SelectUser(101);
+        Assert.Equal(1, detail.Memberships.SelectedIndex);
+        Assert.Contains("không cấp quyền", detail.Memberships.SelectedItem!.ToString());
+        NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Up);
+        Assert.Equal(0, detail.Memberships.SelectedIndex);
+        var actions = Descendants(detail.Tabs.TabPages[1], typeof(BootstrapButton)).Cast<BootstrapButton>().ToArray();
+        Assert.False(Assert.Single(actions, button => button.Text == "Gán vai trò…").Outline);
+        var remove = Assert.Single(actions, button => button.Text == "Gỡ vai trò");
+        Assert.True(remove.Outline);
+        Assert.Equal(BootstrapVariant.Danger, remove.Variant);
+        foreach (var action in actions)
+        {
+            detail.Tabs.TabPages[1].ScrollControlIntoView(action);
+            Assert.True(action.Focus());
+            Assert.True(detail.Tabs.TabPages[1].RectangleToScreen(detail.Tabs.TabPages[1].ClientRectangle)
+                .Contains(action.RectangleToScreen(action.ClientRectangle)));
+        }
+        Assert.Equal(101, control.ViewModel.SelectedUserId);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Fact]
+    public void User_detail_direct_selector_uses_toolkit_without_changing_nullable_draft_or_committed_projection() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var detail = control.UserDetail;
+        detail.Tabs.SelectedIndex = 3;
+        var selector = Assert.IsType<BootstrapComboBox>(Assert.Single(Descendants(detail.Tabs.TabPages[3], typeof(ComboBox))));
+        selector.SelectedItem = "Sales.Receipts.Post";
+        var committed = Assert.Single(detail.Effective.Rows.Cast<DataGridViewRow>(), row => Equals(row.Tag, "Sales.Receipts.Post")).Cells[1].Value;
+        foreach (var choice in new[] { "Theo vai trò", "Cho phép", "Từ chối" })
+        {
+            Assert.Single(Descendants(detail, typeof(RadioButton)).Cast<RadioButton>(), radio => radio.Text == choice).Checked = true;
+            Assert.Equal(choice == "Theo vai trò" ? (bool?)null : choice == "Cho phép", control.ViewModel.DirectDecision);
+            Assert.Equal("Sales.Receipts.Post", control.ViewModel.DirectPermissionKey);
+            Assert.Equal(committed, Assert.Single(detail.Effective.Rows.Cast<DataGridViewRow>(), row => Equals(row.Tag, "Sales.Receipts.Post")).Cells[1].Value);
+        }
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Toolkit_master_tiles_preserve_owner_native_selection_and_theme(bool roles) => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
         if (roles) control.Tabs.SelectedIndex = 1;
