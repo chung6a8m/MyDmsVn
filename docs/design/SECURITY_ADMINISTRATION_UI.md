@@ -215,4 +215,3 @@ The [UI Labs guide](../development/SECURITY_UI_LAB_REVIEW.md) covers successful,
 The plan's **SEC-T05** gate requires nonempty discovered/executed selected tests, reviewed screenshots/observations, exact source/test/toolkit revisions, resolved blocking findings and dated explicit Owner approval of the running candidate. This document and the conversation mockups define the target; neither establishes that gate as passed.
 
 Only then may **SEC-T06–SEC-T08** connect the reviewed candidate to Local, perform focused real-SQL verification and reconcile the bounded handoff. Any subsequent visible behavior or shared-contract change reopens affected Lab review before relying on its earlier approval. Historical Sales/Sidebar/SQL/release evidence stays with its own candidate and scope.
-

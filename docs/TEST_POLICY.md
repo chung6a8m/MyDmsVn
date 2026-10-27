@@ -114,4 +114,3 @@ Keep raw TRX, Theory values, SQL identifiers, connection data and detailed diagn
 ## L2DB-T06 cutover note
 
 T06 removes active RepoDb/Dapper dependencies and mechanically replaces test/fixture SQL calls with independent native SqlClient oracles. The accepted reset/seed/ownership/drain contract above remains fixed. [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) records separate review, case/row reconciliation and affected boundary reruns; it does not replace RESP history or broaden the subsequently completed T07 package/limited Local smoke to full P5 GUI or P6 acceptance.
-

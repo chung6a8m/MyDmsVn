@@ -75,4 +75,3 @@ Originating workspace instance and session/document lifetime govern async presen
 Follow `.editorconfig` and `.gitattributes`: Markdown UTF-8 without BOM and CRLF in the working tree, normalized LF in Git blobs; C# retains its declared BOM/CRLF. Preserve Vietnamese diacritics, pinned submodules and historical evidence. Do not commit local connections, raw proprietary TRX/SQL identifiers or unreviewed screenshots.
 
 Completion is assessed against the explicitly authorized scope and the plan owning that scope through the [execution index](docs/plans/README.md), with actual candidate evidence and explicit limitations. Selecting a new plan does not complete archived acceptance. Historical Security/Sidebar/UI-NEXT/SAL/BCF acceptance and operational release acceptance remain separate. Report the actual boundary reached; do not reactivate archived/deleted plans or turn a design document into product/production acceptance.
-

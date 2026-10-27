@@ -27,4 +27,3 @@ The images are design inputs, not screenshots of implemented MyDmsVn, runtime ve
 - `01-catalog-light.png`: MyDmsVn compact product catalog workspace-1.png.
 - `02-goods-receipt.png`: MyDmsVn inventory receipt workspace-3.png.
 - `03-catalog-graphite.png`: MyDmsVn graphite catalog workspace-2.png.
-

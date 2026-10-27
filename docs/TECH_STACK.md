@@ -66,4 +66,3 @@ Deliberate lock regeneration removes obsolete ORM subgraphs. Remaining requireme
 Follow `.editorconfig` and `.gitattributes`: Markdown is UTF-8 without BOM and CRLF in the working tree; Git normalizes text blobs. Preserve the existing C# BOM and vendor/submodule policies. The framework removal changes test infrastructure; RESP and L2DB-T00–T07 have scoped evidence; broader release acceptance remains deferred.
 
 Vendor/runtime support and dependency advisories need a fresh review when a future runtime or production-release decision is scheduled. Such review is deferred work, not permission to upgrade frameworks or unrelated pins within UI-NEXT.
-

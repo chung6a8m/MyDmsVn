@@ -56,4 +56,3 @@ Interactive Windows/net48, serialized STA, WinFormsTestGuard, finite waits, boun
 SQL, when genuinely affected, requires explicitly designated non-production `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` with effective master, sequential owners and positive identity/token checks before cleanup. Preserve reusable fixtures, dedicated fresh exceptions, worker drain and terminal quarantine. Do not restore the removed runner, gate manifest, approval-file or prefix-only drop flow.
 
 Report exact source/test/package revisions, actual discovery/execution, environment, sanitized evidence and unresolved resources. New API names and test selectors remain proposals until source exists and nonempty discovery is verified. Missing, skipped or blocked mandatory cases never establish PASS. Historical totals and acceptance do not transfer to another candidate or imply production readiness.
-

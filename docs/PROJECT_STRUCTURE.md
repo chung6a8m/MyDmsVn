@@ -79,4 +79,3 @@ UI-NEXT's [historical implementation plan](archive/20261025-pre-next-roadmap/ui-
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
 Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. UI-NEXT does not reactivate AppCore or upgrade the framework. Sales files are implemented source; consult actual source and the linked UI-NEXT records rather than treating historical proposal wording as current implementation status. Historical evidence remains tied to its exact revision and scope.
-

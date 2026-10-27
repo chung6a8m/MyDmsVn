@@ -47,4 +47,3 @@ The linked UI Labs review guide defines repeatable scenarios and evidence fields
 ### Permission catalog
 
 ![SVG wireframe of the read-only permission catalog with search, module and lifecycle filters, and selected-definition details](04-permission-catalog.svg)
-

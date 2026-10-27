@@ -19,4 +19,3 @@ Current decisions and explicit owner instructions supersede older examples. Impl
 Historical approvals and measurements are indexed in [History](../HISTORY.md). Do not describe a documentation decision as delivered code, restore an obsolete policy from Git, or reopen a completed plan from its old task ID.
 
 A new decision record should state date, owner decision/status, context, scope, consequences, verification and superseded documents. Record a real changed decision explicitly; routine implementation choices within an approved plan do not create a new approval gate.
-

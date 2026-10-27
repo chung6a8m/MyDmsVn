@@ -28,4 +28,3 @@ Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this ind
 | [Release prerequisites](../DEFERRED_WORK.md#release-prerequisites) | UNACCEPTED / UNSCHEDULED — never inferred from a source merge |
 
 Evidence must remain tied to its source/test/package hashes, environment and selected scope. Documentation-only archival or activation has no product acceptance or SQL/GUI pass of its own.
-

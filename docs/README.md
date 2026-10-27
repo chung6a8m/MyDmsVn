@@ -47,4 +47,3 @@ Historical evidence retains its original dates, revisions, failures and signed e
 [SQL configuration/security](CONFIGURATION_AND_SQL_SECURITY.md) · [Schema/migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) · [Security administration](SECURITY_ADMINISTRATION_RUNBOOK.md) · [Diagnostics](LOCAL_DIAGNOSTICS_AND_TROUBLESHOOTING.md) · [Release packaging](LOCAL_RELEASE_PACKAGING.md)
 
 Runbooks describe source behavior and safe procedures. [Release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED and excluded from the active queue. [Retired/out-of-scope directions](DEFERRED_WORK.md) contain no alternative task order; [History](HISTORY.md) records prior decisions without replacing their evidence.
-

@@ -250,4 +250,3 @@ Copy this template into the plan-linked candidate evidence record. Do not mainta
 
 Approval requires an explicit dated Owner statement tied to the reviewed candidate and declared exceptions. A PR merge, document approval, screenshot acknowledgement or green fake test suite does not
 substitute for that decision. If the reviewed UI changes before product-host verification or handoff, record the difference and obtain review of the affected behavior; do not substitute an unreviewed implementation under the approved candidate's evidence.
-

@@ -78,4 +78,3 @@ HTTP Server.Api/HttpApiClient, bearer authentication, Local/HTTP parity and prod
 Sales orders, POS, fiscal/e-invoicing, payments, debt, returns/reversal, automatic pricing/discounts, accounting/tax, FIFO/periodic/revaluation, transfers, reservations, lots/serials, multiple units, multi-currency, multi-tenancy, offline synchronization and distributed transactions remain excluded. Direct sales, their outbound stock and moving-average valuation are already implemented source contracts; Customers participate in that workflow. Their incomplete historical acceptance remains archived and excluded from UI-NEXT.
 
 The future SQL/Windows support topology, legacy-account support or exclusion, signing/distribution and runtime lifecycle decisions belong to release planning. Codex should use the implemented contracts now, rather than reopening resolved P0/P5 design questions.
-
