@@ -1168,7 +1168,16 @@ public sealed class SecurityWorkspaceControlTests
                         Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Tên hiển thị").Text = "Held Review User";
                     if (secret != null) secret.Text = "fixture-only-password";
                     save.PerformClick();
-                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                    var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate").Request);
+                    var expected = kind switch
+                    {
+                        "create-user" => (SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.Create, 0, (long?)null),
+                        "edit-user" => (SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.Update, 101, (long?)11),
+                        "create-role" => (SecurityAdministrationTargetDto.Role, SecurityAdministrationOperationDto.Create, 0, (long?)null),
+                        "edit-role" => (SecurityAdministrationTargetDto.Role, SecurityAdministrationOperationDto.Update, 201, (long?)21),
+                        _ => (SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, 101, (long?)11)
+                    };
+                    Assert.Equal(expected, (request.Target, request.Operation, request.TargetId, request.ExpectedRevision));
                     phase = 1;
                 }
                 else if (phase == 1)

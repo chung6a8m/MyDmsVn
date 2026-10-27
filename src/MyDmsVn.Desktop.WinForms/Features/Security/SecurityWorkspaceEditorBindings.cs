@@ -412,6 +412,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         var display = new TextBox { Width = 380, AccessibleName = "Tên hiển thị", Text = create ? "" : user?.DisplayName ?? "" };
         var email = new TextBox { Width = 380, AccessibleName = "Email", Text = create ? "" : user?.Email ?? "" };
         var password = new TextBox { Width = 380, AccessibleName = "Mật khẩu tạm", UseSystemPasswordChar = true };
+        var identityFields = (Name: (Control)name, Display: (Control)display, Email: (Control)email, Password: (Control)password);
         void AddField(string caption, TextBox field)
         {
             fields.Controls.Add(new Label { Text = caption, AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
@@ -440,57 +441,21 @@ internal sealed class SecurityWorkspaceEditorBindings
             save.Enabled = false;
             try
             {
-                TextBox? invalid = null;
-                if (string.IsNullOrWhiteSpace(name.Text) || name.Text.Length > 100)
+                var invalid = ValidateIdentityFields(userTarget, create, identityFields);
+                if (invalid.HasValue)
                 {
-                    invalid = name;
-                    validation.Text = "Tên phải có từ 1 đến 100 ký tự.";
-                }
-                else if (userTarget && (string.IsNullOrWhiteSpace(display.Text) || display.Text.Length > 100))
-                {
-                    invalid = display;
-                    validation.Text = "Tên hiển thị phải có từ 1 đến 100 ký tự.";
-                }
-                else if (userTarget && email.Text.Length > 254)
-                {
-                    invalid = email;
-                    validation.Text = "Email không được vượt quá 254 ký tự.";
-                }
-                else if (userTarget && create && (password.Text.Length == 0 || Encoding.UTF8.GetByteCount(password.Text) > 72))
-                {
-                    invalid = password;
-                    validation.Text = "Mật khẩu tạm phải có từ 1 đến 72 byte UTF-8.";
-                }
-                if (invalid != null)
-                {
-                    invalid.Focus();
+                    validation.Text = invalid.Value.Message;
+                    invalid.Value.Field.Focus();
                     return;
                 }
-                closeGuard.Begin();
-                bool saved;
-                try
-                {
-                    saved = await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(userTarget ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role,
-                        create ? SecurityAdministrationOperationDto.Create : SecurityAdministrationOperationDto.Update,
-                        create ? 0 : userTarget ? user!.UserId : role!.RoleId, name: name.Text, displayName: userTarget ? display.Text : null, email: userTarget ? email.Text : null,
-                        password: create && userTarget ? password.Text : null, expectedRevision: create ? null : userTarget ? user!.AssignmentRevision : role!.AssignmentRevision), default);
-                }
-                finally { closeGuard.End(); }
+                var saved = await ExecuteIdentityMutationAsync(userTarget, create,
+                    create ? 0 : userTarget ? user!.UserId : role!.RoleId,
+                    create ? null : userTarget ? user!.AssignmentRevision : role!.AssignmentRevision, identityFields, closeGuard);
                 if (saved) dialog.Close();
                 else if (!dialog.IsDisposed)
                 {
-                    var feedback = Vm.LastMutationFeedback;
-                    validation.Text = feedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
-                    reload.Visible = Vm.RequiresRecovery;
-                    var field = feedback?.Field switch
-                    {
-                        "name" => name,
-                        "displayName" => display,
-                        "email" => email,
-                        "password" => password,
-                        _ => null
-                    };
-                    ((Control?)field ?? (Vm.RequiresRecovery ? reload : name)).Focus();
+                    var field = PresentIdentityFeedback(validation, reload, identityFields);
+                    (field ?? (Vm.RequiresRecovery ? reload : name)).Focus();
                 }
             }
             finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
@@ -529,6 +494,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         var email = AddField("Email", 2);
         var password = AddField("Mật khẩu tạm", 3, true);
         var inputs = new[] { name, display, email, password };
+        var identityFields = (Name: (Control)name, Display: (Control)display, Email: (Control)email, Password: (Control)password);
         var validation = new BootstrapLabel
         {
             AutoSize = true, Dock = DockStyle.Top, MaximumSize = new System.Drawing.Size(400, 0),
@@ -554,42 +520,21 @@ internal sealed class SecurityWorkspaceEditorBindings
             try
             {
                 foreach (var input in inputs) input.ValidationState = BootstrapValidationState.None;
-                BootstrapTextBox? invalid = null;
-                if (string.IsNullOrWhiteSpace(name.Text) || name.Text.Length > 100)
-                { invalid = name; validation.Text = "Tên phải có từ 1 đến 100 ký tự."; }
-                else if (string.IsNullOrWhiteSpace(display.Text) || display.Text.Length > 100)
-                { invalid = display; validation.Text = "Tên hiển thị phải có từ 1 đến 100 ký tự."; }
-                else if (email.Text.Length > 254)
-                { invalid = email; validation.Text = "Email không được vượt quá 254 ký tự."; }
-                else if (password.Text.Length == 0 || Encoding.UTF8.GetByteCount(password.Text) > 72)
-                { invalid = password; validation.Text = "Mật khẩu tạm phải có từ 1 đến 72 byte UTF-8."; }
-                if (invalid != null)
+                var invalid = ValidateIdentityFields(true, true, identityFields);
+                if (invalid.HasValue)
                 {
-                    invalid.ValidationState = BootstrapValidationState.Invalid;
-                    invalid.Focus();
+                    validation.Text = invalid.Value.Message;
+                    ((BootstrapTextBox)invalid.Value.Field).ValidationState = BootstrapValidationState.Invalid;
+                    invalid.Value.Field.Focus();
                     return;
                 }
-                closeGuard.Begin();
-                bool saved;
-                try
-                {
-                    saved = await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(
-                        SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.Create, 0,
-                        name: name.Text, displayName: display.Text, email: email.Text, password: password.Text), default);
-                }
-                finally { closeGuard.End(); }
+                var saved = await ExecuteIdentityMutationAsync(true, true, 0, null, identityFields, closeGuard);
                 if (saved) dialog.Close();
                 else if (!dialog.IsDisposed)
                 {
-                    var feedback = Vm.LastMutationFeedback;
-                    validation.Text = feedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
-                    reload.Visible = Vm.RequiresRecovery;
-                    var field = feedback?.Field switch
-                    {
-                        "name" => name, "displayName" => display, "email" => email, "password" => password, _ => null
-                    };
-                    if (field != null) field.ValidationState = BootstrapValidationState.Invalid;
-                    ((Control?)field ?? (Vm.RequiresRecovery ? reload : name)).Focus();
+                    var field = PresentIdentityFeedback(validation, reload, identityFields);
+                    if (field is BootstrapTextBox input) input.ValidationState = BootstrapValidationState.Invalid;
+                    (field ?? (Vm.RequiresRecovery ? reload : name)).Focus();
                 }
             }
             finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
@@ -599,6 +544,49 @@ internal sealed class SecurityWorkspaceEditorBindings
         try { dialog.ShowDialog(_control); }
         finally { password.Clear(); }
         return Task.CompletedTask;
+    }
+
+    static (Control Field, string Message)? ValidateIdentityFields(bool userTarget, bool create,
+        (Control Name, Control Display, Control Email, Control Password) fields)
+    {
+        if (string.IsNullOrWhiteSpace(fields.Name.Text) || fields.Name.Text.Length > 100)
+            return (fields.Name, "Tên phải có từ 1 đến 100 ký tự.");
+        if (userTarget && (string.IsNullOrWhiteSpace(fields.Display.Text) || fields.Display.Text.Length > 100))
+            return (fields.Display, "Tên hiển thị phải có từ 1 đến 100 ký tự.");
+        if (userTarget && fields.Email.Text.Length > 254)
+            return (fields.Email, "Email không được vượt quá 254 ký tự.");
+        if (userTarget && create && (fields.Password.Text.Length == 0 || Encoding.UTF8.GetByteCount(fields.Password.Text) > 72))
+            return (fields.Password, "Mật khẩu tạm phải có từ 1 đến 72 byte UTF-8.");
+        return null;
+    }
+
+    async Task<bool> ExecuteIdentityMutationAsync(bool userTarget, bool create, int targetId, long? expectedRevision,
+        (Control Name, Control Display, Control Email, Control Password) fields, MutationDialogCloseGuard closeGuard)
+    {
+        closeGuard.Begin();
+        try
+        {
+            return await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(
+                userTarget ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role,
+                create ? SecurityAdministrationOperationDto.Create : SecurityAdministrationOperationDto.Update,
+                targetId, name: fields.Name.Text, displayName: userTarget ? fields.Display.Text : null,
+                email: userTarget ? fields.Email.Text : null, password: userTarget && create ? fields.Password.Text : null,
+                expectedRevision: expectedRevision), default);
+        }
+        finally { closeGuard.End(); }
+    }
+
+    Control? PresentIdentityFeedback(Label validation, Button reload,
+        (Control Name, Control Display, Control Email, Control Password) fields)
+    {
+        var feedback = Vm.LastMutationFeedback;
+        validation.Text = feedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
+        reload.Visible = Vm.RequiresRecovery;
+        return feedback?.Field switch
+        {
+            "name" => fields.Name, "displayName" => fields.Display, "email" => fields.Email,
+            "password" => fields.Password, _ => null
+        };
     }
 
     async Task PasswordAsync()
