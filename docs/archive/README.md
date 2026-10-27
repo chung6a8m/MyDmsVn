@@ -4,6 +4,7 @@ Archives preserve decisions, implementation history and candidate-specific evide
 
 | Boundary | Contents and status |
 |---|---|
+| [2026-10-27 — main roadmap reset](20261027-main-roadmap-reset/README.md) | Sidebar and Security bounded workstreams archived after PR #52; no successor plan selected; outstanding attended/release limits retained. |
 | [2026-10-25 — prepare the next roadmap](20261025-pre-next-roadmap/README.md) | UI-NEXT and A0/A1 records retired after merged PR #48; next roadmap not selected; A3 consumer verification limits retained. |
 | [2026-10-23 — before UI-NEXT](20261023-pre-ui-next/README.md) | Six earlier plans and their index; completed scopes and incomplete SAL acceptance retained. |
 

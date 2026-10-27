@@ -1,24 +1,22 @@
-# Documentation index — v1a-pro-ui-next
+# Documentation index — main
 
-**Updated:** 2026-10-25. The [execution index](plans/README.md) routes the Sidebar follow-up and planned Security workstream after the [latest archive boundary](archive/20261025-pre-next-roadmap/README.md); each plan owns status and verification for its scope. This index routes readers by responsibility; historical results stay with their original candidates.
+**Updated:** 2026-10-27. [Execution index](plans/README.md): **no active roadmap**. [2026-10-27 archive](archive/20261027-main-roadmap-reset/README.md) closes the previous Sidebar and Security execution queues after they reached main through PR #52. These are bounded source/evidence milestones; no archived tests or approvals are silently transferred to another candidate.
 
 ## Current work and Codex entry points
 
-| Document | Owns |
+| Document | Responsibility |
 |---|---|
-| [AGENTS.md](../AGENTS.md) | Stable repository instructions and invariants |
-| [AI_CONTEXT.md](../AI_CONTEXT.md) | Source context, historical boundaries and evidence distinctions |
-| [Execution index](plans/README.md) | Current workstream routing; one task-status and verification owner per scope |
-| [Development-plan alias](DEVELOPMENT_PLAN.md) | Compatibility entry point to the index; no progress copy |
-| [Test policy](TEST_POLICY.md) | Sole execution policy; focused scope and required safeguards |
-| [Test coverage](TEST_STRATEGY.md) | Required behavior and failure boundaries |
-| [Test commands](../tests/README.md) | Direct projects, SQL ownership and interactive GUI prerequisites |
-| [Sales UI Lab runbook](development/UI_LAB.md) | Current Sales-only developer host, scenarios, reset and focused Lab commands |
-| [Planned Security UI specification](design/SECURITY_ADMINISTRATION_UI.md) | Target UI and behavior; existing source versus proposed components |
-| [Planned Security UI Labs review](development/SECURITY_UI_LAB_REVIEW.md) | Repeatable scenarios and gate evidence procedure; no duplicate task ledger |
-| [Architecture](ARCHITECTURE.md) and [ADRs](adr/README.md) | Local architecture rationale and recorded decisions; each authorized scope stays with its plan in the execution index |
+| [AGENTS.md](../AGENTS.md) | Current repository rules, safety and scope-selection discipline |
+| [AI_CONTEXT.md](../AI_CONTEXT.md) | Current source context, candidate evidence distinctions and acceptance limits |
+| [Execution index](plans/README.md) | Single selector for newly authorized dated plans; currently empty |
+| [Development-plan alias](DEVELOPMENT_PLAN.md) | Stable compatibility entry point to that index |
+| [Test policy](TEST_POLICY.md) | Sole source-owned execution policy |
+| [Test strategy](TEST_STRATEGY.md) · [test commands](../tests/README.md) | Coverage and direct scoped test commands |
+| [UI Lab runbook](development/UI_LAB.md) | SQL-free Sales and Security scenario host, reset and usage |
+| [Security UI specification](design/SECURITY_ADMINISTRATION_UI.md) · [Security Lab review](development/SECURITY_UI_LAB_REVIEW.md) | Implemented UI contracts and repeatable review exercises, not active task checklists |
+| [Architecture](ARCHITECTURE.md) · [ADRs](adr/README.md) | Current principles, decisions and historical source distinctions |
 
-The [Security plan](plans/20261025-002-security-administration-ui-lab-first.md) requires review of the actual candidate in the SQL-free UI Lab and dated explicit Owner approval at SEC-T05 before SEC-T06 Local cutover or SEC-T07 SQL integration. The current Lab remains Sales-only; this documentation PR and mockups do not approve the planned extension.
+The Owner-approved Security SQL-free candidate gate SEC-T05 was followed by bounded SEC-T06–SEC-T08 Local/SQL work. [Plan in archive](archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md), [Lab evidence](evidence/security/20261025-security-ui-lab.md) and [Local/SQL evidence](evidence/security/20261025-security-local-sql.md) retain remaining incomplete attended/native and release limits. Sidebar's [bounded evidence](evidence/sidebar/20261025-sidebar-horizontal-scrollbar.md) does not imply production-package acceptance.
 
 ## Product and implementation references
 
@@ -27,6 +25,8 @@ The [Security plan](plans/20261025-002-security-administration-ui-lab-first.md) 
 The implemented Sales rules remain in [business design](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). BCF's [design](BUSINESS_COMPACT_REFINEMENT.md) and [unchanged reference images](design-references/business-compact/README.md) retain the existing composition and input boundaries. These references do not create an alternate execution queue.
 
 ## Archived plans and evidence
+
+[2026-10-27 main archive: Sidebar and Security](archive/20261027-main-roadmap-reset/README.md) · [Retired plan index](archive/20261027-main-roadmap-reset/plans/README.md)
 
 [Archive index](archive/README.md) · [2026-10-25 boundary and retained A1/A3 limits](archive/20261025-pre-next-roadmap/README.md) · [Archived A0/A1 record](archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md)
 
