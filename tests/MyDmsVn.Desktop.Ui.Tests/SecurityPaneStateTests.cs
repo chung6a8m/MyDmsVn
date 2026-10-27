@@ -73,7 +73,7 @@ public sealed class SecurityPaneStateTests
             Assert.Equal(expected, control.ViewModel.Catalog.State);
             Assert.Contains(expected == SecurityDatasetState.Forbidden ? "Không có quyền xem" : "Tải dữ liệu thất bại", control.PermissionCatalog.Details.Text);
             Assert.DoesNotContain(expected.ToString(), control.DatasetStatus.Text);
-            Assert.Equal("Nhóm quyền chưa khả dụng", control.PermissionCatalog.ModuleGroups.Items[0]);
+            Assert.Equal("Nhóm quyền chưa khả dụng", control.PermissionCatalog.ModuleGroups.Items[0].Text);
             Assert.Contains("Danh mục chưa khả dụng", control.RoleDetail.HistoryTitle.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(control.RoleDetail.Permissions.Items.Cast<object>(), item => item.ToString()!.Contains("Không còn trong danh mục"));
             Assert.Empty(control.PermissionCatalog.Keys.Rows);

@@ -20,6 +20,146 @@ namespace MyDmsVn.Desktop.Tests;
 [Trait("Module", "Security")]
 public sealed class SecurityWorkspaceControlTests
 {
+    [Fact]
+    public void Role_catalog_render_preserves_selected_definition_native_row_and_filter_identity() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 2;
+        var catalog = control.PermissionCatalog;
+        catalog.ModuleGroups.SelectedIndex = catalog.Module.Items.IndexOf("Sales");
+        var row = catalog.Keys.Rows.Cast<DataGridViewRow>().Single(item => (string)item.Cells[1].Value == "Sales.Receipts.Post");
+        catalog.Keys.CurrentCell = row.Cells[0];
+        catalog.Keys.Focus();
+        control.ViewModel.SelectRole(201);
+        Assert.Same(row, catalog.Keys.CurrentRow);
+        Assert.True(catalog.Keys.ContainsFocus);
+        Assert.Equal("Sales", catalog.Module.Text);
+        Assert.Equal(catalog.Module.SelectedIndex, catalog.ModuleGroups.SelectedIndex);
+        Assert.Contains("Sales.Receipts.Post", catalog.Details.Text);
+        catalog.Search.Text = "Sales.";
+        Assert.Same(row, catalog.Keys.CurrentRow);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Role_catalog_toolkit_surfaces_keep_read_only_theme_focus_and_copy(bool dark) => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var prior = BootstrapThemeManager.CurrentTheme;
+        var clipboard = Clipboard.ContainsText() ? Clipboard.GetText() : null;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 1;
+            Assert.IsAssignableFrom<BootstrapListView>((object)control.RoleDetail.Members);
+            Assert.IsAssignableFrom<BootstrapListView>((object)control.RoleDetail.Permissions);
+            Assert.IsType<BootstrapButton>(control.RoleDetail.OpenUser);
+            Assert.IsType<BootstrapLabel>(control.RoleDetail.HistoryTitle);
+            control.RoleDetail.Members.SelectedIndex = 1;
+            Assert.True(control.RoleDetail.Members.Focus());
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, control.RoleDetail.Members.BackColor);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Home);
+            Assert.Equal(0, control.RoleDetail.Members.SelectedIndex);
+            Assert.DoesNotContain(control.RoleDetail.HeaderState.Text, "thành viên", StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("Thành viên (2)", control.RoleDetail.Tabs.TabPages[1].Text);
+            var catalog = control.PermissionCatalog;
+            control.Tabs.SelectedIndex = 2;
+            Assert.IsType<BootstrapDataGridView>(catalog.Keys);
+            Assert.IsType<BootstrapTextBox>((object)catalog.Search);
+            Assert.IsType<BootstrapComboBox>(catalog.Module);
+            Assert.IsType<BootstrapComboBox>(catalog.Lifecycle);
+            Assert.IsAssignableFrom<BootstrapListView>((object)catalog.ModuleGroups);
+            Assert.IsType<BootstrapButton>(catalog.CopyKey);
+            Assert.IsType<BootstrapButton>(catalog.RefreshButton);
+            Assert.IsType<BootstrapLabel>(catalog.Heading);
+            Assert.IsType<BootstrapPanel>(catalog.Keys.Parent);
+            Assert.True(catalog.Keys.ReadOnly && !catalog.Keys.AllowUserToAddRows && !catalog.Keys.AllowUserToDeleteRows);
+            Assert.True(catalog.Details.Multiline && catalog.Details.ReadOnly);
+            Assert.Equal("Chi tiết định nghĩa quyền đã chọn", catalog.Details.AccessibleName);
+            var row = catalog.Keys.Rows.Cast<DataGridViewRow>().Single(item => (string)item.Cells[1].Value == "Sales.Receipts.Post");
+            catalog.Keys.CurrentCell = row.Cells[0];
+            Assert.Contains("Sales.Receipts.Post", catalog.Details.Text);
+            Assert.Equal("Sales.Receipts.Post", row.Cells[1].ToolTipText);
+            Assert.True(catalog.Details.Focus());
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, catalog.Details.BackColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, catalog.Details.ForeColor);
+            catalog.CopyKey.PerformClick();
+            Assert.Equal("Sales.Receipts.Post", Clipboard.GetText());
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        }
+        finally
+        {
+            if (clipboard != null) Clipboard.SetText(clipboard); else Clipboard.Clear();
+            BootstrapThemeManager.CurrentTheme = prior;
+        }
+    });
+
+    [Fact]
+    public void Role_catalog_same_owner_render_keeps_native_member_and_catalog_rows_scroll_and_identity() => Run(SecurityScenarioId.SEC_L01, scene =>
+    {
+        var user = scene.Data.Users[0];
+        var ids = Enumerable.Range(1000, 45).ToArray();
+        foreach (var id in ids)
+            scene.Data.Users.Add(new SecurityUserDto(id, "member-" + id, "Thành viên " + id, user.Email, true,
+                user.AssignmentRevision, user.RoleIds, user.DirectDecisions, false));
+        var role = scene.Data.Roles[0];
+        scene.Data.Roles[0] = new SecurityRoleDto(role.RoleId, role.Name, role.IsActive, role.AssignmentRevision, ids, role.PermissionKeys);
+        var catalog = scene.Data.Catalog;
+        scene.Data.Catalog = new PermissionCatalogDto(catalog.ApplicationVersion, catalog.CatalogDigest, catalog.Items.Concat(
+            ids.Select(id => new PermissionCatalogItemDto("Long.Canonical.Key." + id, "Long", "Tên quyền " + id, "Active"))).ToArray());
+    }, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        var members = Assert.IsAssignableFrom<BootstrapListView>((object)control.RoleDetail.Members);
+        control.RoleDetail.Members.SelectedIndex = 30;
+        members.Items[30].Focused = true;
+        members.Items[30].EnsureVisible();
+        members.Focus();
+        var selected = members.Items[30];
+        var top = members.TopItem;
+        control.ViewModel.SelectRole(201);
+        Assert.Same(selected, Assert.Single(members.SelectedItems.Cast<ListViewItem>()));
+        Assert.Same(selected, members.FocusedItem);
+        Assert.Same(top, members.TopItem);
+        Assert.True(members.ContainsFocus);
+        control.Tabs.SelectedIndex = 2;
+        var catalog = control.PermissionCatalog;
+        catalog.ModuleGroups.SelectedIndex = catalog.Module.Items.IndexOf("Long");
+        catalog.Keys.CurrentCell = catalog.Keys.Rows[30].Cells[0];
+        catalog.Keys.FirstDisplayedScrollingRowIndex = 26;
+        catalog.Keys.Focus();
+        var row = catalog.Keys.CurrentRow;
+        var scroll = catalog.Keys.FirstDisplayedScrollingRowIndex;
+        control.ViewModel.SelectRole(201);
+        Assert.Same(row, catalog.Keys.CurrentRow);
+        Assert.Equal(scroll, catalog.Keys.FirstDisplayedScrollingRowIndex);
+        Assert.True(catalog.Keys.ContainsFocus);
+        Assert.Equal("Long", catalog.Module.Text);
+        Assert.Equal(catalog.Module.SelectedIndex, catalog.ModuleGroups.SelectedIndex);
+        Assert.Contains("Long.Canonical.Key.1030", catalog.Details.Text);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Fact]
+    public void Role_catalog_unavailable_users_scrub_profile_text_and_prevent_member_navigation() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Members.SelectedIndex = 0;
+        scene.Administration.UsersError = new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Forbidden", "Unavailable");
+        Wait(control.ActivateAsync(default));
+        Assert.Equal(2, control.RoleDetail.Members.Items.Count);
+        control.RoleDetail.Members.SelectedIndex = 0;
+        Assert.Contains("Chi tiết không khả dụng", control.RoleDetail.Members.SelectedItem!.ToString());
+        Assert.DoesNotContain("@lan", control.RoleDetail.Members.SelectedItem!.ToString());
+        Assert.False(control.RoleDetail.OpenUser.Enabled);
+        control.RoleDetail.OpenUser.PerformClick();
+        Assert.Equal(1, control.Tabs.SelectedIndex);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -661,7 +801,9 @@ public sealed class SecurityWorkspaceControlTests
     {
         control.Tabs.SelectedIndex = 2;
         Assert.Equal(data.Data.Catalog.Items.Count, control.PermissionCatalog.Keys.Rows.Count);
-        var actions = Descendants(control.PermissionCatalog, typeof(Button)).Cast<Button>().Select(button => button.Text).ToArray();
+        // The toolkit search composite owns its native clear button; it is not a catalog command.
+        var actions = Descendants(control.PermissionCatalog, typeof(Button)).Cast<Button>()
+            .Where(button => !control.PermissionCatalog.Search.Contains(button)).Select(button => button.Text).ToArray();
         Assert.Equal(2, actions.Length);
         Assert.Contains("Sao chép mã quyền", actions);
         Assert.Contains("Làm mới", actions);
@@ -1967,7 +2109,7 @@ public sealed class SecurityWorkspaceControlTests
         control.RoleDetail.Tabs.SelectedIndex = 1;
         control.RoleDetail.Members.SelectedIndex = 0;
 
-        Assert.Contains("Chi tiết không khả dụng", control.RoleDetail.Members.GetItemText(control.RoleDetail.Members.SelectedItem));
+        Assert.Contains("Chi tiết không khả dụng", control.RoleDetail.Members.SelectedItem!.ToString());
         Assert.False(control.RoleDetail.OpenUser.Enabled);
         control.RoleDetail.OpenUser.PerformClick();
         Assert.Equal(1, control.Tabs.SelectedIndex);

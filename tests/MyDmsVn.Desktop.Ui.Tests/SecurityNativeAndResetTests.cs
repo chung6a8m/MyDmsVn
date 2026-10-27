@@ -29,6 +29,45 @@ public sealed class SecurityNativeAndResetTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Role_catalog_native_filter_retains_caret_range_key_and_enter_never_writes(bool dark) =>
+        Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            var prior = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = MyDmsVn.Desktop.WinForms.BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+                control.Tabs.SelectedIndex = 2;
+                NativeLookupTypingDriver.Activate(control.FindForm()!);
+                var catalog = control.PermissionCatalog;
+                catalog.Keys.CurrentCell = catalog.Keys.Rows.Cast<DataGridViewRow>().Single(row => (string)row.Cells[1].Value == "Sales.Receipts.Post").Cells[0];
+                var search = Assert.IsType<BootstrapTextBox>((object)catalog.Search);
+                search.Focus();
+                var editor = GetFocus();
+                var text = "";
+                foreach (var character in "Sales.")
+                {
+                    SendMessage(editor, 0x0102, new IntPtr(character), IntPtr.Zero);
+                    text += character;
+                    System.Windows.Forms.Application.DoEvents();
+                    Assert.Equal(text, search.Text);
+                    AssertNativeSelection(editor, text.Length, 0);
+                    Assert.Equal(editor, GetFocus());
+                    Assert.Equal("Sales.Receipts.Post", catalog.Keys.CurrentRow!.Cells[1].Value);
+                }
+                SendMessage(editor, 0x00B1, new IntPtr(0), new IntPtr(5));
+                control.ViewModel.SelectRole(201);
+                AssertNativeSelection(editor, 0, 5);
+                Assert.Equal(editor, GetFocus());
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                Assert.Equal("Sales.Receipts.Post", catalog.Keys.CurrentRow!.Cells[1].Value);
+                Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            }
+            finally { BootstrapThemeManager.CurrentTheme = prior; }
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void User_detail_effective_native_filter_retains_caret_key_and_owner_without_write(bool dark) =>
         Run(SecurityScenarioId.SEC_L01, (control, scene) =>
         {
@@ -535,7 +574,12 @@ public sealed class SecurityNativeAndResetTests
             Assert.Equal(-1, members.SelectedIndex);
             Assert.False(open.Enabled);
             Assert.True(members.Focus());
+            // Native Details ListView may select its first row on focus; name the target explicitly.
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Home);
+            Assert.Equal(0, members.SelectedIndex);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Equal(1, members.SelectedIndex);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Up);
             Assert.Equal(0, members.SelectedIndex);
             Assert.True(open.Enabled);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
