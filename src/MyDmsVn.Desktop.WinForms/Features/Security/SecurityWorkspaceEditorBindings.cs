@@ -14,10 +14,17 @@ namespace MyDmsVn.Desktop.WinForms.Features.Security;
 internal sealed class SecurityWorkspaceEditorBindings
 {
     readonly SecurityWorkspaceControl _control;
-    readonly RoleGrantList _grants = new() { Dock = DockStyle.Fill, CheckOnClick = true, AccessibleName = "Cấp quyền cho vai trò" };
-    readonly TextBox _grantSearch = new() { Width = 145, AccessibleName = "Tìm quyền vai trò" };
-    readonly ComboBox _grantModule = new() { Width = 115, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Nhóm quyền vai trò" };
-    readonly CheckBox _grantedOnly = new() { Text = "Chỉ quyền đã cấp", AutoSize = true };
+    readonly BootstrapDataGridView _grants = new()
+    {
+        Dock = DockStyle.Fill, AccessibleName = "Cấp quyền cho vai trò", ReadOnly = true,
+        AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false,
+        AutoGenerateColumns = false, RowHeadersVisible = false, MultiSelect = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect, StandardTab = true,
+        AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells, EmptyStateText = "Không có quyền phù hợp bộ lọc."
+    };
+    readonly BootstrapTextBox _grantSearch = new() { Width = 145, AccessibleName = "Tìm quyền vai trò", PlaceholderText = "Tìm quyền…" };
+    readonly BootstrapComboBox _grantModule = new() { Width = 115, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Nhóm quyền vai trò" };
+    readonly BootstrapCheckBox _grantedOnly = new() { Text = "Chỉ quyền đã cấp", AutoSize = true };
     readonly Label _grantSummary = new() { Dock = DockStyle.Bottom, Height = 20 };
     readonly ComboBox _directKey = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Quyền riêng" };
     readonly RadioButton _inherit = new BootstrapRadioButton { Text = "Theo vai trò", AutoSize = true };
@@ -35,6 +42,8 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly Button _editRolePermissions;
     readonly Button _grantDiscard;
     readonly Button _grantSave;
+    readonly FlowLayoutPanel _grantActions;
+    readonly Panel _grantContent = new() { Dock = DockStyle.Top };
     readonly Button _assignRole;
     readonly Button _removeRole;
     readonly Label _membershipHint = new() { AutoSize = true, AccessibleName = "Thông báo gán vai trò" };
@@ -58,53 +67,51 @@ internal sealed class SecurityWorkspaceEditorBindings
             return Task.CompletedTask;
         });
         var grantFilters = Commands();
-        grantFilters.Height = 38;
+        grantFilters.AutoScroll = false;
+        grantFilters.Layout += (_, _) =>
+        {
+            var height = grantFilters.Controls.Cast<Control>().Where(child => child.Visible)
+                .Select(child => child.Bottom + child.Margin.Bottom).DefaultIfEmpty(0).Max();
+            if (height > 0 && grantFilters.Height != height) grantFilters.Height = height;
+            LayoutGrantArea();
+        };
         grantFilters.Controls.AddRange(new Control[] { _grantSearch, _grantModule, _grantedOnly });
-        var grantActions = Commands();
+        var grantActions = _grantActions = Commands();
         grantActions.Dock = DockStyle.Bottom;
         grantActions.Height = 42;
         _grantDiscard = Add(grantActions, "Hủy thay đổi", () => { Vm.DiscardEditor(); return Task.CompletedTask; });
         _grantSave = Add(grantActions, "Lưu quyền vai trò", () => Vm.SaveEditorAsync(default));
-        control.RoleDetail.GrantArea.Controls.Add(_grants);
-        control.RoleDetail.GrantArea.Controls.Add(_grantSummary);
-        control.RoleDetail.GrantArea.Controls.Add(grantActions);
-        control.RoleDetail.GrantArea.Controls.Add(grantFilters);
+        ((BootstrapButton)_grantSave).Outline = false;
+        ((BootstrapButton)_grantDiscard).Variant = BootstrapVariant.Secondary;
+        control.RoleDetail.GrantArea.Controls.Add(_grantContent);
+        control.RoleDetail.GrantArea.SizeChanged += (_, _) => LayoutGrantArea();
+        _grantContent.Controls.Add(_grants);
+        _grantContent.Controls.Add(_grantSummary);
+        _grantContent.Controls.Add(grantActions);
+        _grantContent.Controls.Add(grantFilters);
         _grantModule.Items.Add("Tất cả nhóm");
         _grantModule.SelectedIndex = 0;
         _grantSearch.TextChanged += (_, _) => { if (!_rendering) Render(); };
         _grantModule.SelectedIndexChanged += (_, _) => { if (!_rendering) Render(); };
         _grantedOnly.CheckedChanged += (_, _) => { if (!_rendering) Render(); };
-        _grants.FormattingEnabled = true;
-        _grants.Format += (_, e) =>
+        _grants.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Cấp", Width = 52, SortMode = DataGridViewColumnSortMode.NotSortable });
+        _grants.Columns.Add(new DataGridViewTextBoxColumn
         {
-            if (e.ListItem is not string key) return;
-            var item = Vm.Catalog.Items.FirstOrDefault(k => k.Key == key);
-            var pending = Vm.RoleDraft?.Changes.Any(change => change.PermissionKey == key) == true ? "  ·  Chưa lưu" : "";
-            e.Value = item == null ? key : SecurityPresentation.Name(item) + "  ·  " + key + "  ·  " + item.Module + pending;
+            HeaderText = "Quyền", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 80,
+            DefaultCellStyle = new DataGridViewCellStyle { WrapMode = DataGridViewTriState.True, Padding = new Padding(8, 4, 8, 4) },
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        });
+        _grants.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Nhóm", Width = 100, SortMode = DataGridViewColumnSortMode.NotSortable });
+        _grants.CellContentClick += (_, e) =>
+        {
+            if (e.ColumnIndex == 0 && e.RowIndex >= 0) ToggleGrant(e.RowIndex);
         };
-        _grants.SpacePressed += () =>
+        _grants.KeyDown += (_, e) =>
         {
-            if (Vm.RoleDraft != null && _grants.SelectedItem is string key)
-                Vm.SetRoleGranted(key, !Vm.RoleDraft.DesiredKeys.Contains(key));
-        };
-        _grants.ItemCheck += (_, e) =>
-        {
-            if (_rendering) return;
-            var draft = Vm.RoleDraft;
-            if (draft == null)
-            {
-                e.NewValue = e.CurrentValue;
-                return;
-            }
-            if (_grants.Items[e.Index] is not string key) return;
-            var granted = e.NewValue == CheckState.Checked;
-            // ItemCheck precedes the native list update; render only after that update.
-            _control.BeginInvoke(new Action(() =>
-            {
-                if (!_control.IsDisposed && Vm.IsCurrent && ReferenceEquals(Vm.RoleDraft, draft) &&
-                    Vm.SelectedRoleId == draft.RoleId && Vm.OwnerVersion == draft.SessionVersion)
-                    Vm.SetRoleGranted(key, granted);
-            }));
+            // Checkbox cells already raise CellContentClick for native Space. Other cells act on their selected row.
+            if (e.KeyCode != Keys.Space || _grants.CurrentCell == null || _grants.CurrentCell.ColumnIndex == 0) return;
+            e.Handled = e.SuppressKeyPress = true;
+            ToggleGrant(_grants.CurrentCell.RowIndex);
         };
         var direct = Commands();
         direct.Height = 70;
@@ -257,7 +264,9 @@ internal sealed class SecurityWorkspaceEditorBindings
             _editRolePermissions.Enabled = roleEditorAvailable && Vm.RoleDraft == null;
             _grantDiscard.Enabled = roleEditorAvailable && Vm.RoleDraft != null;
             _grantSave.Enabled = roleEditorAvailable && Vm.RoleDraft?.IsDirty == true;
-            var selectedGrant = _grants.SelectedItem as string;
+            _grantActions.Visible = Vm.RoleDraft != null;
+            _grantSummary.Visible = Vm.RoleDraft != null;
+            var selectedGrant = _grants.CurrentRow?.Tag as string;
             var role = Vm.SelectedRole;
             var selectedModule = _grantModule.SelectedItem as string;
             var modules = Vm.Catalog.Items.Where(k => k.Status == "Active").Select(k => k.Module).Distinct().OrderBy(value => value).ToArray();
@@ -270,19 +279,31 @@ internal sealed class SecurityWorkspaceEditorBindings
                 .Where(k => _grantSearch.Text.Length == 0 || (k.Key + " " + SecurityPresentation.Name(k) + " " + k.Description).IndexOf(_grantSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0)
                 .Where(k => !_grantedOnly.Checked || (Vm.RoleDraft?.DesiredKeys.Contains(k.Key) ?? role?.PermissionKeys.Contains(k.Key) == true))
                 .Select(k => k.Key).ToArray();
-            if (_grants.Items.Count != activeKeys.Length || activeKeys.Where((key, index) => !string.Equals(_grants.Items[index] as string, key, StringComparison.Ordinal)).Any())
+            if (_grants.Rows.Count != activeKeys.Length || activeKeys.Where((key, index) => !string.Equals(_grants.Rows[index].Tag as string, key, StringComparison.Ordinal)).Any())
             {
-                _grants.Items.Clear();
-                foreach (var key in activeKeys) _grants.Items.Add(key);
-                if (selectedGrant != null) _grants.SelectedIndex = _grants.Items.IndexOf(selectedGrant);
+                _grants.Rows.Clear();
+                foreach (var key in activeKeys)
+                {
+                    var index = _grants.Rows.Add(false, "", "");
+                    _grants.Rows[index].Tag = key;
+                    if (key == selectedGrant) _grants.CurrentCell = _grants.Rows[index].Cells[0];
+                }
             }
             for (var index = 0; index < activeKeys.Length; index++)
             {
                 var key = activeKeys[index];
+                var item = Vm.Catalog.Items.First(k => k.Key == key);
                 var granted = Vm.RoleDraft != null && Vm.RoleDraft.RoleId == role?.RoleId ? Vm.RoleDraft.DesiredKeys.Contains(key) : role?.PermissionKeys.Contains(key) == true;
-                if (_grants.GetItemChecked(index) != granted) _grants.SetItemChecked(index, granted);
+                var pending = Vm.RoleDraft?.Changes.Any(change => change.PermissionKey == key) == true;
+                var row = _grants.Rows[index];
+                row.Cells[0].Value = granted;
+                row.Cells[1].Value = SecurityPresentation.Name(item) + Environment.NewLine + key + (pending ? " · Chưa lưu" : "");
+                row.Cells[2].Value = item.Module;
+                foreach (DataGridViewCell cell in row.Cells)
+                    cell.ToolTipText = SecurityPresentation.Name(item) + " · " + key + " · " + item.Module + (pending ? " · Chưa lưu" : "");
             }
             _grants.Enabled = role != null && Vm.Catalog.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
+            LayoutGrantArea();
             _grants.Refresh();
             _grants.AccessibleDescription = Vm.RoleDraft == null ? "Chỉ xem. Chọn Sửa quyền để thay đổi." : "Đang sửa quyền của vai trò.";
             var selected = Vm.DirectPermissionKey;
@@ -297,6 +318,29 @@ internal sealed class SecurityWorkspaceEditorBindings
             _directPreview.Text = DirectPreview();
         }
         finally { _rendering = false; }
+    }
+
+    void LayoutGrantArea()
+    {
+        // Keep at least a complete permission row under its header. At constrained product bounds,
+        // this local viewport scrolls the filters/footer instead of collapsing the native table.
+        var rowHeight = _grants.Rows.Cast<DataGridViewRow>().Select(row => row.Height).DefaultIfEmpty(_grants.RowTemplate.Height).Max();
+        var minimum = _grants.ColumnHeadersHeight + rowHeight + 4 +
+            _grantContent.Controls.Cast<Control>().Where(child => child != _grants && child.Visible).Sum(child => child.Height);
+        _grantContent.Height = Math.Max(_control.RoleDetail.GrantArea.ClientSize.Height, minimum);
+    }
+
+    void ToggleGrant(int index)
+    {
+        var draft = Vm.RoleDraft;
+        if (_rendering || draft == null || !_grants.Enabled || !Vm.IsCurrent || Vm.IsBusy || Vm.RequiresRecovery ||
+            !Vm.Roles.IsCurrent(Vm.OwnerVersion) || !Vm.Catalog.IsCurrent(Vm.OwnerVersion) ||
+            Vm.SelectedRoleId != draft.RoleId || Vm.OwnerVersion != draft.SessionVersion ||
+            index < 0 || index >= _grants.Rows.Count || _grants.Rows[index].Tag is not string key ||
+            !Vm.Catalog.Items.Any(item => item.Key == key && item.Status == "Active")) return;
+        // Native grid editing is read-only: one mouse/Space gesture changes only this canonical draft key.
+        // No deferred callback can carry the row index into a replacement role, draft or session.
+        Vm.SetRoleGranted(key, !draft.DesiredKeys.Contains(key));
     }
 
     bool CanManageMembership() => Vm.IsCurrent && Vm.Users.IsCurrent(Vm.OwnerVersion) && Vm.Roles.IsCurrent(Vm.OwnerVersion) &&
@@ -599,21 +643,5 @@ internal sealed class SecurityWorkspaceEditorBindings
         panel.Controls.Add(button);
         button.Click += async (_, _) => await _control.TrackOperation(action());
         return button;
-    }
-}
-
-internal sealed class RoleGrantList : CheckedListBox
-{
-    internal event Action? SpacePressed;
-
-    protected override void WndProc(ref Message message)
-    {
-        if ((message.Msg == 0x0100 || message.Msg == 0x0101 || message.Msg == 0x0102) && message.WParam.ToInt32() == (int)Keys.Space)
-        {
-            if (message.Msg == 0x0100 && (message.LParam.ToInt64() & (1L << 30)) == 0)
-                SpacePressed?.Invoke();
-            return;
-        }
-        base.WndProc(ref message);
     }
 }

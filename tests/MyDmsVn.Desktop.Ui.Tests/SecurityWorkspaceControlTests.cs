@@ -112,10 +112,26 @@ public sealed class SecurityWorkspaceControlTests
             workspace.RoleDetail.Tabs.SelectedIndex = 0;
             lab.PerformLayout();
             System.Windows.Forms.Application.DoEvents();
-            var grants = workspace.RoleDetail.GrantArea.Controls.OfType<CheckedListBox>().Single();
+            var grants = Descendants(workspace.RoleDetail.GrantArea, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>().Single();
             Assert.True(grants.Visible);
             Assert.True(grants.Height >= 60,
                 $"Grant list height {grants.Height}; area {workspace.RoleDetail.GrantArea.Height}; tab {workspace.RoleDetail.Tabs.Height}");
+            Assert.True(workspace.ViewModel.BeginRolePermissions());
+            workspace.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+            Assert.True(grants.Height >= grants.ColumnHeadersHeight + grants.Rows[0].Height,
+                $"Editing grant grid height {grants.Height}; header {grants.ColumnHeadersHeight}; row {grants.Rows[0].Height}");
+            var search = Assert.Single(Descendants(workspace.RoleDetail.GrantArea, typeof(BootstrapTextBox)).Cast<BootstrapTextBox>());
+            foreach (Control filter in search.Parent!.Controls)
+            {
+                Assert.True(filter.Bottom <= search.Parent.ClientSize.Height, $"Filter {filter.AccessibleName ?? filter.Text} bottom {filter.Bottom}; parent {search.Parent.ClientSize}");
+                Assert.True(filter.Right <= search.Parent.ClientSize.Width);
+            }
+            var save = Assert.Single(Descendants(workspace.RoleDetail.GrantArea, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu quyền vai trò");
+            Assert.True(save.Focus());
+            var viewport = workspace.RoleDetail.GrantArea.RectangleToScreen(workspace.RoleDetail.GrantArea.ClientRectangle);
+            var saveBounds = save.RectangleToScreen(save.ClientRectangle);
+            Assert.True(viewport.Contains(saveBounds), $"Save {saveBounds}; grant viewport {viewport}");
+            workspace.ViewModel.DiscardEditor();
             lab.CloseWorkspaceButton.PerformClick();
         }
         finally { BootstrapThemeManager.CurrentTheme = theme; }
@@ -507,15 +523,29 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Equal(101, control.ViewModel.SelectedUserId);
     });
     [Fact]
+    public void Role_grant_table_keeps_friendly_name_canonical_target_and_group_visible() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>());
+        Assert.Equal(new[] { "Cấp", "Quyền", "Nhóm" }, grants.Columns.Cast<DataGridViewColumn>().Select(column => column.HeaderText));
+        var index = GrantIndex(grants, "Sales.Receipts.Read");
+        Assert.True(index >= 0);
+        Assert.Contains("Xem phiếu bán hàng", grants.Rows[index].Cells[1].Value!.ToString());
+        Assert.Contains("Sales.Receipts.Read", grants.Rows[index].Cells[1].Value!.ToString());
+        Assert.Equal("Sales", grants.Rows[index].Cells[2].Value);
+        Assert.DoesNotContain(grants.Rows.Cast<DataGridViewRow>(), row => (string?)row.Tag == "Legacy.Orphan");
+    });
+
+    [Fact]
     public void Role_editor_has_filters_history_and_contextual_recovery() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
         control.Tabs.SelectedIndex = 1;
         Assert.Equal("", control.RolePaneStatus.Text);
         Assert.Contains("Sửa quyền", control.RoleDetail.HeaderActions.Controls.Cast<Control>().OfType<Button>().Select(button => button.Text));
-        Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(CheckedListBox)));
-        Assert.NotEmpty(Descendants(control.RoleDetail.GrantArea, typeof(TextBox)));
-        Assert.NotEmpty(Descendants(control.RoleDetail.GrantArea, typeof(ComboBox)));
-        Assert.NotEmpty(Descendants(control.RoleDetail.GrantArea, typeof(CheckBox)));
+        Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapDataGridView)));
+        Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapTextBox)));
+        Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapComboBox)));
+        Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapCheckBox)));
         Assert.DoesNotContain(Descendants(control, typeof(FlowLayoutPanel)).Cast<FlowLayoutPanel>(), panel => panel.Visible && panel.Controls.Cast<Control>().OfType<Button>().Any(button => button.Text == "Tải lại để đối chiếu"));
     });
     [Fact]
@@ -526,11 +556,15 @@ public sealed class SecurityWorkspaceControlTests
         var save = Assert.Single(buttons, button => button.Text == "Lưu quyền vai trò");
         var discard = Assert.Single(buttons, button => button.Text == "Hủy thay đổi");
         Assert.False(save.Enabled);
-        Assert.False(discard.Enabled);
+        Assert.False(save.Visible);
+        Assert.False(discard.Visible);
 
         Assert.True(control.ViewModel.BeginRolePermissions());
         Assert.False(save.Enabled);
         Assert.True(discard.Enabled);
+        Assert.True(save.Visible);
+        Assert.False(Assert.IsType<BootstrapButton>(save).Outline);
+        Assert.True(Assert.IsType<BootstrapButton>(discard).Outline);
         control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
         Assert.True(save.Enabled);
         var gate = scene.Administration.HoldNextMutation(true);
@@ -606,20 +640,47 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Contains("Legacy.Orphan", control.RoleDetail.Permissions.Items[0]!.ToString());
         var edit = Assert.Single(Descendants(control.RoleDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Sửa quyền");
         edit.PerformClick();
-        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(CheckedListBox)).Cast<CheckedListBox>());
-        Assert.Contains("Xem phiếu bán hàng", grants.GetItemText(grants.Items[0]));
-        var index = grants.Items.IndexOf("Sales.Receipts.Post");
-        grants.SetItemChecked(index, true);
+        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>());
+        Assert.Contains("Xem phiếu bán hàng", grants.Rows[0].Cells[1].Value!.ToString());
+        var index = GrantIndex(grants, "Sales.Receipts.Post");
+        ClickGrant(grants, index);
         Until(() => control.ViewModel.RoleDraft?.Changes.Count == 1);
-        Assert.Contains("Chưa lưu", grants.GetItemText(grants.Items[index]));
-        var search = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(TextBox)).Cast<TextBox>());
+        Assert.Contains("Chưa lưu", grants.Rows[index].Cells[1].Value!.ToString());
+        var search = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapTextBox)).Cast<BootstrapTextBox>());
         search.Text = "Receipts.Read";
-        Assert.Single(grants.Items);
-        Assert.Equal("Sales.Receipts.Read", grants.Items[0]);
+        Assert.Single(grants.Rows.Cast<DataGridViewRow>());
+        Assert.Equal("Sales.Receipts.Read", grants.Rows[0].Tag);
         Assert.Single(control.ViewModel.RoleDraft!.Changes);
-        Assert.Contains("1 thay đổi", control.RoleDetail.GrantArea.Controls.Cast<Control>().OfType<Label>().Single().Text);
+        Assert.Contains(Descendants(control.RoleDetail.GrantArea, typeof(Label)).Cast<Label>(), label => label.Text.StartsWith("1 thay đổi", StringComparison.Ordinal));
         Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
     });
+    [Fact]
+    public void Role_filters_preserve_selected_key_hidden_changes_and_full_draft_count() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>());
+        var modules = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapComboBox)).Cast<BootstrapComboBox>());
+        var grantedOnly = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapCheckBox)).Cast<BootstrapCheckBox>());
+        ClickGrant(grants, GrantIndex(grants, "Sales.Receipts.Post"));
+        Assert.Equal("Sales.Receipts.Post", grants.CurrentRow!.Tag);
+        modules.SelectedItem = "Sales";
+        Assert.Equal("Sales.Receipts.Post", grants.CurrentRow!.Tag);
+        grantedOnly.Checked = true;
+        Assert.Equal("Sales.Receipts.Post", grants.CurrentRow!.Tag);
+        ClickGrant(grants, GrantIndex(grants, "Sales.Receipts.Read"));
+        Assert.Equal(-1, GrantIndex(grants, "Sales.Receipts.Read"));
+        modules.SelectedItem = "Inventory";
+        Assert.Empty(grants.Rows.Cast<DataGridViewRow>());
+        Assert.Equal(2, control.ViewModel.RoleDraft!.Changes.Count);
+        Assert.Contains(Descendants(control.RoleDetail.GrantArea, typeof(Label)).Cast<Label>(), label => label.Text.StartsWith("2 thay đổi", StringComparison.Ordinal));
+        modules.SelectedIndex = 0;
+        grantedOnly.Checked = false;
+        Assert.False(Granted(grants, GrantIndex(grants, "Sales.Receipts.Read")));
+        Assert.True(Granted(grants, GrantIndex(grants, "Sales.Receipts.Post")));
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
     [Fact]
     public void Edit_role_permissions_from_members_opens_grants_only_after_editor_admission() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
     {
@@ -627,12 +688,12 @@ public sealed class SecurityWorkspaceControlTests
         control.RoleDetail.Tabs.SelectedIndex = 1;
         control.RoleDetail.Members.SelectedIndex = 1;
         var edit = Assert.Single(control.RoleDetail.HeaderActions.Controls.Cast<Control>().OfType<Button>(), button => button.Text == "Sửa quyền");
-        var search = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(TextBox)).Cast<TextBox>());
+        var search = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapTextBox)).Cast<BootstrapTextBox>());
 
         edit.PerformClick();
         Assert.Equal(0, control.RoleDetail.Tabs.SelectedIndex);
         Assert.Equal(201, control.ViewModel.RoleDraft?.RoleId);
-        Assert.True(search.Focused);
+        Assert.True(search.ContainsFocus);
         Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
 
         control.ViewModel.DiscardEditor();
@@ -681,15 +742,18 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Equal(-1, memberships.SelectedIndex);
     });
     [Fact]
-    public void Deferred_role_check_cannot_edit_a_replacement_draft() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    public void Role_checkbox_does_not_replay_into_replacement_draft() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
     {
         control.Tabs.SelectedIndex = 1;
         Assert.True(control.ViewModel.BeginRolePermissions());
-        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(CheckedListBox)).Cast<CheckedListBox>());
-        var index = grants.Items.IndexOf("Sales.Receipts.Post");
+        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>());
+        var index = GrantIndex(grants, "Sales.Receipts.Post");
         Assert.True(index >= 0);
-        grants.SetItemChecked(index, true);
+        ClickGrant(grants, index);
+        Assert.Single(control.ViewModel.RoleDraft!.Changes);
+        control.ViewModel.DiscardEditor();
         control.ViewModel.SelectRole(202);
+        Assert.Equal(202, control.ViewModel.SelectedRoleId);
         Assert.True(control.ViewModel.BeginRolePermissions());
         var replacement = control.ViewModel.RoleDraft;
         System.Windows.Forms.Application.DoEvents();
@@ -732,17 +796,17 @@ public sealed class SecurityWorkspaceControlTests
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
             control.Tabs.SelectedIndex = 1;
             Assert.True(control.RoleDetail.Header.Font.Bold);
-            var grants = Assert.Single(Descendants(control.RoleDetail, typeof(CheckedListBox)).Cast<CheckedListBox>());
+            var grants = Assert.Single(Descendants(control.RoleDetail, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>());
             Assert.True(grants.Enabled);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, grants.ForeColor);
-            var before = grants.GetItemChecked(0);
-            grants.SetItemChecked(0, !before);
-            Assert.Equal(before, grants.GetItemChecked(0));
+            var before = Granted(grants, 0);
+            ClickGrant(grants, 0);
+            Assert.Equal(before, Granted(grants, 0));
             Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation.Contains("Mutate"));
             var edit = Assert.Single(Descendants(control.RoleDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Sửa quyền");
             edit.PerformClick();
-            grants.SetItemChecked(0, !before);
-            Assert.Equal(!before, grants.GetItemChecked(0));
+            ClickGrant(grants, 0);
+            Assert.Equal(!before, Granted(grants, 0));
         }
         finally { BootstrapThemeManager.CurrentTheme = priorTheme; }
     });
@@ -1479,6 +1543,15 @@ public sealed class SecurityWorkspaceControlTests
             foreach (var nested in Descendants(child, type))
                 yield return nested;
         }
+    }
+
+    internal static int GrantIndex(DataGridView grid, string key) => grid.Rows.Cast<DataGridViewRow>().ToList().FindIndex(row => (string?)row.Tag == key);
+    internal static bool Granted(DataGridView grid, int index) => (bool)grid.Rows[index].Cells[0].Value;
+    internal static void ClickGrant(DataGridView grid, int index)
+    {
+        grid.CurrentCell = grid.Rows[index].Cells[0];
+        typeof(DataGridView).GetMethod("OnCellContentClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(grid, new object[] { new DataGridViewCellEventArgs(0, index) });
     }
 
     static void AssertHeaderUsesActionRows(FlowLayoutPanel actions)

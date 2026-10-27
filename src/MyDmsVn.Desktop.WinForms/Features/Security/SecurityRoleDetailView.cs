@@ -16,7 +16,7 @@ public sealed class SecurityRoleDetailView : UserControl
     public FlowLayoutPanel HeaderActions { get; } = new() { Dock = DockStyle.Top, Height = 32, AutoScroll = false, WrapContents = true };
     public Label ActionFeedback { get; } = new() { Dock = DockStyle.Top, Height = 26, Visible = false, AutoEllipsis = true,
         Padding = new Padding(8, 4, 8, 0), AccessibleName = "Thông báo đổi trạng thái" };
-    public Panel GrantArea { get; } = new() { Dock = DockStyle.Fill };
+    public Panel GrantArea { get; } = new() { Dock = DockStyle.Fill, AutoScroll = true };
     public Label HistoryTitle { get; } = new() { Dock = DockStyle.Bottom, Height = 22, Text = "Quyền cũ / không còn trong danh mục — chỉ xem" };
     public TabControl Tabs { get; } = new BusinessCompactWorkspaceTabs
     {
