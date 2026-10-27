@@ -460,6 +460,55 @@ public sealed class SecurityWorkspaceControlTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Minimum_security_lists_do_not_expose_native_horizontal_scroll(bool dark) => Run(SecurityScenarioId.SEC_L01, scene =>
+    {
+        var user = scene.Data.Users[0];
+        var role = scene.Data.Roles[0];
+        for (var index = 0; index < 40; index++)
+        {
+            scene.Data.Users.Add(new SecurityUserDto(1000 + index, "scroll-" + index, "Người dùng " + index,
+                user.Email, true, user.AssignmentRevision, user.RoleIds, user.DirectDecisions, false));
+            scene.Data.Roles.Add(new SecurityRoleDto(1000 + index, "Vai trò " + index, true,
+                role.AssignmentRevision, Array.Empty<int>(), Array.Empty<string>()));
+        }
+        var catalog = scene.Data.Catalog;
+        scene.Data.Catalog = new PermissionCatalogDto(catalog.ApplicationVersion, catalog.CatalogDigest,
+            catalog.Items.Concat(Enumerable.Range(0, 40).Select(index => new PermissionCatalogItemDto(
+                "Security.NativeScroll." + index, "Module " + index, "Quyền kiểm tra " + index, "Active"))).ToArray());
+    }, (control, _) =>
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            var form = control.FindForm()!;
+            var users = NativeHorizontalScrollAfterConstrain(form, control, 0, control.Users);
+            var roles = NativeHorizontalScrollAfterConstrain(form, control, 1, control.Roles);
+            var groups = NativeHorizontalScrollAfterConstrain(form, control, 2, control.PermissionCatalog.ModuleGroups);
+            Console.WriteLine("NATIVE_SCROLL=Users normal " + users.Normal.Description + ", minimum " + users.Minimum.Description +
+                "; Roles normal " + roles.Normal.Description + ", minimum " + roles.Minimum.Description +
+                "; Catalog groups normal " + groups.Normal.Description + ", minimum " + groups.Minimum.Description);
+
+            var offenders = new[]
+                {
+                    ("Users normal", users.Normal), ("Users minimum", users.Minimum),
+                    ("Roles normal", roles.Normal), ("Roles minimum", roles.Minimum),
+                    ("Catalog groups normal", groups.Normal), ("Catalog groups minimum", groups.Minimum)
+                }
+                .Where(item => item.Item2.Visible)
+                .Select(item => item.Item1 + " " + item.Item2.Description)
+                .ToArray();
+            Assert.True(offenders.Length == 0, "Unexpected native horizontal scroll: " + string.Join("; ", offenders));
+            Assert.True(control.Users.Scrollable);
+            Assert.True(control.Roles.Scrollable);
+            Assert.True(control.PermissionCatalog.ModuleGroups.Scrollable);
+        }
+        finally { BootstrapThemeManager.CurrentTheme = theme; }
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Minimum_role_view_keeps_grant_choices_visible(bool dark) => Run(SecurityScenarioId.SEC_L01, (_, _) =>
     {
         var theme = BootstrapThemeManager.CurrentTheme;
@@ -2412,6 +2461,88 @@ public sealed class SecurityWorkspaceControlTests
 
     [DllImport("user32.dll")]
     static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    static extern int GetWindowLong(IntPtr window, int index);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    static extern bool GetScrollInfo(IntPtr window, int bar, ref ScrollInfo scrollInfo);
+
+    const int GwlStyle = -16;
+    const int WsHscroll = 0x00100000;
+    const int WsVscroll = 0x00200000;
+    const int SbHorz = 0;
+    const uint SifAll = 0x17;
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct ScrollInfo
+    {
+        public uint Size;
+        public uint Mask;
+        public int Minimum;
+        public int Maximum;
+        public uint Page;
+        public int Position;
+        public int TrackPosition;
+    }
+
+    static (bool Visible, string Description) NativeHorizontalScroll(ListView list)
+    {
+        list.CreateControl();
+        list.PerformLayout();
+        System.Windows.Forms.Application.DoEvents();
+        var info = new ScrollInfo { Size = (uint)Marshal.SizeOf<ScrollInfo>(), Mask = SifAll };
+        var hasInfo = GetScrollInfo(list.Handle, SbHorz, ref info);
+        var visible = (GetWindowLong(list.Handle, GwlStyle) & WsHscroll) != 0;
+        return (visible, "client=" + list.ClientSize.Width + "x" + list.ClientSize.Height +
+            ", range=" + (hasInfo ? info.Minimum + ".." + info.Maximum : "unavailable") +
+            ", page=" + (hasInfo ? info.Page.ToString() : "unavailable") +
+            ", tile=" + list.TileSize.Width + "x" + list.TileSize.Height +
+            ", column=" + (list.Columns.Count == 0 ? "none" : list.Columns[0].Width.ToString()) +
+            ", item=" + (list.Items.Count == 0 ? "none" : list.Items[0].Bounds.ToString()));
+    }
+
+    static ((bool Visible, string Description) Normal, (bool Visible, string Description) Minimum) NativeHorizontalScrollAfterConstrain(Form form,
+        SecurityWorkspaceControl control, int tabIndex, ListView list)
+    {
+        form.ClientSize = new System.Drawing.Size(952, 657);
+        control.Tabs.SelectedIndex = tabIndex;
+        form.PerformLayout();
+        control.PerformLayout();
+        System.Windows.Forms.Application.DoEvents();
+        var selected = list.Items[Math.Min(35, list.Items.Count - 1)];
+        selected.Selected = true;
+        selected.Focused = true;
+        selected.EnsureVisible();
+        Assert.True(list.Focus());
+        System.Windows.Forms.Application.DoEvents();
+        var top = NativeTopItem(list);
+        Assert.NotNull(top);
+        Assert.NotSame(list.Items[0], top);
+        var accessibleIdentity = list.AccessibleDescription;
+        var normal = NativeHorizontalScroll(list);
+        Assert.True((GetWindowLong(list.Handle, GwlStyle) & WsVscroll) != 0,
+            "Expected native vertical scroll at normal geometry: " + normal.Description);
+        form.ClientSize = new System.Drawing.Size(652, 497);
+        form.PerformLayout();
+        control.PerformLayout();
+        System.Windows.Forms.Application.DoEvents();
+        var minimum = NativeHorizontalScroll(list);
+        Assert.True((GetWindowLong(list.Handle, GwlStyle) & WsVscroll) != 0,
+            "Expected native vertical scroll at minimum geometry: " + minimum.Description);
+        Assert.Same(selected, Assert.Single(list.SelectedItems.Cast<ListViewItem>()));
+        Assert.Same(selected, list.FocusedItem);
+        Assert.Same(top, NativeTopItem(list));
+        Assert.True(list.ContainsFocus);
+        Assert.Equal(accessibleIdentity, list.AccessibleDescription);
+        return (normal, minimum);
+    }
+
+    static ListViewItem? NativeTopItem(ListView list) => list.View == View.Details
+        ? list.TopItem
+        : list.Items.Cast<ListViewItem>().FirstOrDefault(item =>
+            item.Bounds.Bottom > 0 && item.Bounds.Top < list.ClientSize.Height);
 
     static void Wait(Task task)
     {

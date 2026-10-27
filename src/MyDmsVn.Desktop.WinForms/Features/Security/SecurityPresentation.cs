@@ -55,6 +55,8 @@ internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Contr
 {
     readonly ToolTip _itemTip = new();
     string _tipText = "";
+    bool _tileExtentRefreshPending;
+    ListViewItem? _resizeTopAnchor;
 
     internal SecurityMasterListView()
     {
@@ -71,8 +73,42 @@ internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Contr
         UpdateTileSize();
     }
 
-    void UpdateTileSize() => TileSize = new Size(Math.Max(1, ClientSize.Width - SystemInformation.VerticalScrollBarWidth),
-        BusinessCompactAppearance.Scale(this, 64));
+    protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
+    {
+        if (!_tileExtentRefreshPending && IsHandleCreated && Items.Count > 0 &&
+            (width != Width || height != Height))
+            _resizeTopAnchor = Items.Cast<ListViewItem>().FirstOrDefault(item =>
+                item.Bounds.Bottom > 0 && item.Bounds.Top < ClientSize.Height);
+        base.SetBoundsCore(x, y, width, height, specified);
+    }
+
+    void UpdateTileSize()
+    {
+        ApplyTileSize(false);
+        if (!IsHandleCreated || _tileExtentRefreshPending) return;
+        _tileExtentRefreshPending = true;
+        BeginInvoke(new Action(() =>
+        {
+            _tileExtentRefreshPending = false;
+            if (!IsDisposed && !Disposing)
+            {
+                ApplyTileSize(true);
+                if (_resizeTopAnchor?.ListView == this) _resizeTopAnchor.EnsureVisible();
+            }
+            _resizeTopAnchor = null;
+        }));
+    }
+
+    void ApplyTileSize(bool resetNativeExtent)
+    {
+        var target = new Size(Math.Max(1, ClientSize.Width - SystemInformation.VerticalScrollBarWidth),
+            BusinessCompactAppearance.Scale(this, 64));
+        // Native Tile view updates its scroll range after WM_SIZE completes. A deferred
+        // public-contract width pulse recomputes that extent without replacing scrolling.
+        if (resetNativeExtent)
+            TileSize = new Size(Math.Max(1, target.Width - 1), target.Height);
+        TileSize = target;
+    }
 
     internal void Rebind(System.Collections.Generic.IEnumerable<object> source, object? selected)
     {

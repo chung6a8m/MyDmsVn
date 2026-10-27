@@ -218,6 +218,9 @@ public sealed class SecurityUserDetailView : UserControl
 // App-owned Security row content only. Selection, scroll, focus and rendering remain native/toolkit-owned.
 public sealed class SecurityDetailListView : BootstrapListView
 {
+    bool _columnExtentRefreshPending;
+    ListViewItem? _resizeTopAnchor;
+
     public SecurityDetailListView()
     {
         Dock = DockStyle.Fill;
@@ -231,6 +234,14 @@ public sealed class SecurityDetailListView : BootstrapListView
         Columns.Add("Thông tin");
         SizeChanged += (_, _) => FitColumn();
         DpiChangedAfterParent += (_, _) => FitColumn();
+    }
+
+    protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
+    {
+        if (!_columnExtentRefreshPending && IsHandleCreated && Items.Count > 0 &&
+            (width != Width || height != Height))
+            _resizeTopAnchor = TopItem;
+        base.SetBoundsCore(x, y, width, height, specified);
     }
 
     internal void Rebind(object[] values, bool sameOwner)
@@ -255,7 +266,28 @@ public sealed class SecurityDetailListView : BootstrapListView
 
     void FitColumn()
     {
-        if (Columns.Count > 0) Columns[0].Width = Math.Max(1, ClientSize.Width - SystemInformation.VerticalScrollBarWidth);
+        if (Columns.Count == 0) return;
+        ApplyColumnWidth(false);
+        if (!IsHandleCreated || _columnExtentRefreshPending) return;
+        _columnExtentRefreshPending = true;
+        BeginInvoke(new Action(() =>
+        {
+            _columnExtentRefreshPending = false;
+            if (!IsDisposed && !Disposing && Columns.Count > 0)
+            {
+                ApplyColumnWidth(true);
+                if (_resizeTopAnchor?.ListView == this) TopItem = _resizeTopAnchor;
+            }
+            _resizeTopAnchor = null;
+        }));
+    }
+
+    void ApplyColumnWidth(bool resetNativeExtent)
+    {
+        var target = Math.Max(1, ClientSize.Width - SystemInformation.VerticalScrollBarWidth);
+        // Details view likewise updates its native extent only after the host resize settles.
+        if (resetNativeExtent) Columns[0].Width = Math.Max(1, target - 1);
+        Columns[0].Width = target;
     }
 
     public int SelectedIndex
