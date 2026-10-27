@@ -110,6 +110,26 @@ public sealed class SecuritySecondarySurfaceTests
             }
         });
 
+    [Fact]
+    public void Role_activation_confirmation_wraps_complete_message_within_body() =>
+        Run(SecurityScenarioId.SEC_L01, (control, _) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            WithDialog("Đổi trạng thái", () => Button(control.RoleDetail, "Đổi trạng thái…").PerformClick(), dialog =>
+            {
+                dialog.PerformLayout();
+                System.Windows.Forms.Application.DoEvents();
+                var message = Assert.Single(Children(dialog).OfType<Label>(), label => label.AccessibleName == "Nội dung xác nhận");
+                var body = Assert.IsAssignableFrom<Panel>(message.Parent);
+                var measured = TextRenderer.MeasureText(message.Text, message.Font,
+                    new System.Drawing.Size(message.ClientSize.Width, int.MaxValue), TextFormatFlags.WordBreak);
+                Assert.True(message.Right <= body.ClientSize.Width - body.Padding.Right,
+                    $"Confirmation message right {message.Right}; body width {body.ClientSize.Width}; padding {body.Padding}; maximum {message.MaximumSize}.");
+                Assert.True(message.ClientSize.Height >= measured.Height,
+                    $"Confirmation message needs {measured.Height}px but has {message.ClientSize.Height}px at width {message.ClientSize.Width}.");
+            });
+        });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

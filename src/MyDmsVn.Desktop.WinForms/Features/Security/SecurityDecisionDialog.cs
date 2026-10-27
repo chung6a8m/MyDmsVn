@@ -30,8 +30,10 @@ internal sealed class SecurityDecisionDialog : Form
         Controls.Add(Actions);
         AcceptButton = AddChoice(confirm, DialogResult.OK, BootstrapVariant.Primary);
         CancelButton = AddChoice("Hủy", DialogResult.Cancel, BootstrapVariant.Secondary);
-        Body.SizeChanged += (_, _) => Message.MaximumSize = new Size(Math.Max(1, Body.ClientSize.Width - Body.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth), 0);
+        void FitMessage() => Message.MaximumSize = new Size(Math.Max(1, Body.ClientSize.Width - Body.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth), 0);
+        Body.SizeChanged += (_, _) => FitMessage();
         BusinessCompactAppearance.Apply(this);
+        FitMessage();
     }
 
     internal BootstrapButton AddChoice(string text, DialogResult result, BootstrapVariant variant)
