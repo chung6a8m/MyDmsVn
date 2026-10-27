@@ -1,6 +1,6 @@
 # Development-plan entry point
 
-**Current state (2026-10-27): no active execution roadmap.** Select authorized new work through [the execution index](plans/README.md), based on current `main` source, actual tests and explicit Owner scope. This file is a compatibility entry point; it has no separate task list or progress table.
+**Current routing (2026-10-27):** Follow [the execution index](plans/README.md) for the selected Business Compact and independent UI Labs roadmap, its authorized scope and sole task-state owner. This file is a compatibility entry point; it has no separate task list or progress table.
 
 The former [Sidebar](archive/20261027-main-roadmap-reset/plans/20261025-001-sidebar-navigation-horizontal-scrollbar.md) and [Security UI-Lab-first](archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) plans are frozen in the [2026-10-27 main archive](archive/20261027-main-roadmap-reset/README.md). Merged source and bounded verification are preserved; incomplete attended, native, actual Login and release acceptance remain candidate-specific and unscheduled.
 

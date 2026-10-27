@@ -4,6 +4,8 @@
 
 [Historical BCF plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md)
 
+[Current Business Compact policy](../../design/BUSINESS_COMPACT.md) carries the durable visual/control contract. The image register and original BCF interpretation below retain their historical scope; they do not approve a later implementation candidate.
+
 ## Reference register
 
 | File | Target | Pixels | SHA-256 |

@@ -1,8 +1,16 @@
 # Security UI Labs — review guide
 
-This is the repeatable review guide for the **implemented** Security workspace (SQL-free Lab candidate and production Local composition). It is **not** a current execution ledger or a replacement for explicit acceptance. The historical [Security execution plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md), [SQL-free candidate evidence](../evidence/security/20261025-security-ui-lab.md) and [Local/SQL evidence](../evidence/security/20261025-security-local-sql.md) own dated gate decisions and remaining gaps. SEC-T05 was Owner-approved on 2026-10-26, followed by bounded SEC-T06–SEC-T08; incomplete SEC-T04/native/attended checks are still open. The [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) remains normative. The [execution index](../plans/README.md) currently has no active roadmap.
+This is the repeatable review guide for the **implemented** Security workspace (SQL-free Lab candidate and production Local composition). It is **not** a current execution ledger or a replacement for explicit acceptance. The historical [Security execution plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md), [SQL-free candidate evidence](../evidence/security/20261025-security-ui-lab.md) and [Local/SQL evidence](../evidence/security/20261025-security-local-sql.md) own dated gate decisions and remaining gaps. SEC-T05 was Owner-approved on 2026-10-26, followed by bounded SEC-T06–SEC-T08; incomplete SEC-T04/native/attended checks are still open. The [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) remains normative. The [execution index](../plans/README.md) selects the active [Business Compact and independent UI Labs roadmap](../plans/20261027-001-business-compact-and-independent-ui-labs.md).
 
 Read the [UI Lab runbook](UI_LAB.md), [test policy](../TEST_POLICY.md), [test commands](../../tests/README.md) and [repository instructions](../../AGENTS.md) before running a candidate. Reading or updating this guide does not run GUI/SQL checks or grant runtime acceptance.
+
+## Current Business Compact review scope
+
+Use the durable [Business Compact policy](../design/BUSINESS_COMPACT.md) and [independent Lab specification](../design/INDEPENDENT_UI_LABS.md). UIL-T03/T04 review **Quyền của vai trò** and one account create/edit dialog as a native pilot; only explicit pilot approval permits broad SEC conformance. UIL-T06 separately reviews the completed SEC candidate before the SQL-free product-host check in UIL-T07. Both new gates start NOT APPROVED; the active plan owns their state.
+
+Review the real production controls in the direct SEC Lab after UIL-T02 exists, using the product theme/bootstrap, typography and measured content-client bounds. Cover Dark/Light and physical 100%/125% at normal/minimum product geometry, changed dialogs, command hierarchy, long labels/keys, selected/disabled/focus states and preserved native editing. Record toolkit mappings and justified native/custom exceptions. The existing commands below still build the mixed host until UIL-T02 updates them; a new launcher or result is not implied by this documentation change.
+
+Select relevant scenarios below for changed presentation/bindings and preserve their behavioral expectations. Historical gaps remain recorded in original evidence; the new plan does not silently select the entire unfinished historical matrix or another SQL round. Reset is a developer fixture boundary; verify ordinary Close admission separately.
 
 ## Candidate boundary and prerequisites
 
@@ -198,8 +206,7 @@ Capture sanitized screenshots with scenario ID, theme, physical scale and measur
 
 ## Commands and evidence discipline
 
-Follow [UI_LAB.md](UI_LAB.md) for locked restore and host launch. For the implementation candidate, run the existing Ui.Tests project as a whole once; later use source-verified focused selectors with
-nonempty discovery. Run GUI commands sequentially.
+Follow [UI_LAB.md](UI_LAB.md) for locked restore and the currently implemented host launch. Select source-verified focused cases for the active task and confirm nonempty discovery. This example selects existing Security classes; inspect the discovered set before execution. Until UIL-T02 updates setup, some host tests still start Sales before switching to Security. Run GUI commands sequentially.
 
 ```powershell
 dotnet restore MyDmsVn.UiLab.sln --locked-mode
@@ -208,34 +215,38 @@ dotnet build samples/MyDmsVn.Desktop.UiLab/MyDmsVn.Desktop.UiLab.csproj -c Debug
 if ($LASTEXITCODE -ne 0) { throw 'UiLab build failed.' }
 $results = 'TestResults/security-ui-lab-' + [guid]::NewGuid().ToString('N')
 dotnet test tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj `
-  -c Debug -f net48 --no-restore --logger 'trx;LogFileName=security-ui-lab.trx' --results-directory $results
+  -c Debug -f net48 --no-restore --list-tests --filter 'FullyQualifiedName~Security'
+if ($LASTEXITCODE -ne 0) { throw 'Security UI discovery failed.' }
+# Inspect discovery: no missing mandatory cases and no empty selection.
+dotnet test tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj `
+  -c Debug -f net48 --no-restore --filter 'FullyQualifiedName~Security' `
+  --logger 'trx;LogFileName=security-ui-lab.trx' --results-directory $results
 if ($LASTEXITCODE -ne 0) { throw 'UiLab tests failed.' }
 ```
 
-Existing `UiLabResetTests` and `UiLabToolbarReviewTests` are valid preservation selectors. New Security case names/selectors must be verified against implemented source and discovered cases before use.
+Existing `UiLabResetTests` and `UiLabToolbarReviewTests` are Sales preservation selectors, alongside `SalesScenarioBehaviorTests`; `~Sales` alone misses the first two. Include affected Sales/common checks when host/theme/lifecycle is shared. New case names or module-trait selectors must be verified against implemented source and discovered cases before use.
 Record actual Facts/Theory rows, outcomes and skipped/missing cases; zero discovery or an unexplained skip cannot establish a pass. SEC-T06 retired the duplicate legacy control/view-model and mapped their tests to the candidate owners in the [post-gate evidence](../evidence/security/20261025-security-local-sql.md); `SecurityAdministrationFormTests` now exercises the candidate. Run only the affected scope under [TEST_POLICY](../TEST_POLICY.md).
 
-No Lab result alone proves Server authorization, SQL transaction behavior, real Login, production wiring or package acceptance. The Owner gate was approved on 2026-10-26; the later Local/SQL results are recorded separately in the plan and post-gate evidence.
+No Lab result alone proves Server authorization, SQL transaction behavior, real Login, production wiring or package acceptance. The historical SEC-T05 Owner gate was approved on 2026-10-26; later Local/SQL results remain in the archived plan and post-gate evidence. The new UIL pilot/final decisions require their own exact-candidate observations and explicit approval.
 
 ## Gate evidence template
 
-Copy this template into the plan-linked candidate evidence record. Do not maintain a second task-status ledger in this guide. Use `pending`/`not run` until actual evidence exists; record the Owner's
-decision in the sole [plan](../plans/20261025-002-security-administration-ui-lab-first.md).
+Copy this template into the plan-linked candidate evidence record. Do not maintain a second task-status ledger in this guide. Use `pending`/`not run` until actual evidence exists; record the Owner's decision in the sole [active plan](../plans/20261027-001-business-compact-and-independent-ui-labs.md).
 
 | Evidence field | Value to record |
 |---|---|
 | Candidate identity | `[pending: source SHA, test SHA, vendor gitlinks and build configuration]` |
-| Environment | `[pending: Windows/toolchain, bitness, physical scale, reported DPI and measured geometry]` |
-| Source/composition proof | `[pending: actual candidate types; legacy production factory; evaluated isolated Lab graph; release references]` |
-| Scope and scenarios | `[pending: SEC-L01 through SEC-L12, fixture map, exact actions and gate-release order]` |
+| Environment and presentation | `[pending: Windows/toolchain, bitness, physical scale, reported DPI, theme, typography, outer/client/content bounds and tool/journal arrangement]` |
+| Source/composition proof | `[pending: actual candidate types; direct SEC launcher and no transient SAL graph; evaluated SQL-free Lab graph; existing production factory and absence of sample dependencies]` |
+| Scope and scenarios | `[pending: active task, pilot or final surface inventory, selected SEC-L scenarios, fixture map, exact actions and gate-release order]` |
+| Component map | `[pending: pinned toolkit controls per surface, native/custom exception capability reasons, command hierarchy and reviewed density]` |
 | Automation | `[not run: commands, nonempty discovery, executed Facts/Theory rows, pass/fail/skip and sanitized TRX summary]` |
 | Native/attended evidence | `[pending: scenario/theme/native100/native125 observations, keyboard/focus and screenshot references]` |
 | Serial-save evidence | `[pending: sanitized requests, returned revision chain, partial/conflict/uncertain outcome and explicit reload/diff]` |
 | Isolation and lifecycle | `[pending: no-SQL composition, redaction, cancellation/drain/disposal and timeout outcome]` |
 | Findings and corrections | `[pending: original failures, fixes, affected reruns, remaining issues and explicit exceptions]` |
 | Owner review | `[pending: Owner identity, review date/time, exact candidate, explicit approve/reject decision and scope]` |
-| Next-work dependency (template for a future candidate) | `[requires fresh dated Owner gate for that candidate; original SEC-T05 approval and SEC-T06–T08 outcomes are frozen in the archive]` |
+| Next-work dependency | `[UIL-T04 approval before broad SEC changes; UIL-T06 approval before final product-host parity; original SEC-T05 and SEC-T06–T08 remain historical]` |
 
 Approval requires an explicit dated Owner statement tied to the reviewed candidate and declared exceptions. A PR merge, document approval, screenshot acknowledgement or green fake test suite does not
-substitute for that decision. If the reviewed UI changes before Local cutover, record the difference and obtain review of the affected behavior; do not substitute an unreviewed implementation under the
-approved candidate's evidence.
+substitute for that decision. If the reviewed UI changes before product-host verification or handoff, record the difference and obtain review of the affected behavior; do not substitute an unreviewed implementation under the approved candidate's evidence.

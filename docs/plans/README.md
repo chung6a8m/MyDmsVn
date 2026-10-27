@@ -1,12 +1,14 @@
 # Execution-plan index
 
-**Updated:** 2026-10-27 · **Source baseline:** [`main@6eee394263a2`](https://github.com/chung6a8m/MyDmsVn/commit/6eee394263a28c33360877fcf3feb6e0dcdab8ad) · **Status:** NO ACTIVE EXECUTION PLAN
+**Updated:** 2026-10-27 · **Source baseline:** [`main@8de4451573e8`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9) · **Status:** ACTIVE ROADMAP SELECTED
 
 ## Current plan
 
-**None selected.** Sidebar PR #50 and Security PR #51 have both merged into `main` in PR #52. Their bounded implementation/verification plans have been archived. This index is deliberately empty until the Owner explicitly authorizes the next workstream. Neither OPEN historical acceptance nor an archived handoff is an implicit new task.
+**Selected:** [Business Compact conformance and independent UI Labs](20261027-001-business-compact-and-independent-ui-labs.md). The Owner approved this direction and requested the documentation PR/activation. That plan is the sole task/status owner for UIL-T00–UIL-T08: control inventory and repository UI workflow, shared product/Lab presentation, independent Sales/Security launchers, SEC native pilot and approval, remaining SEC conformance, final approval, focused product-host/shared regression and handoff.
 
-Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → a newly authorized dated plan → [TEST_POLICY](../TEST_POLICY.md). Current [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md), [TEST_STRATEGY](../TEST_STRATEGY.md) and [tests/README](../../tests/README.md) remain valid references.
+Implementation is **NOT STARTED**; first eligible task is **UIL-T00** after roadmap adoption. Native gates UIL-T04 and UIL-T06 are **NOT APPROVED**. This documentation activation creates no runtime evidence or release approval. The durable [Business Compact policy](../design/BUSINESS_COMPACT.md) and [Lab specification](../design/INDEPENDENT_UI_LABS.md) own the selected contracts; they do not duplicate task status. Sidebar PR #50 and Security PR #51 remain archived with their original bounded evidence. Neither OPEN historical acceptance nor an archived handoff is an implicit additional task.
+
+Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the selected dated plan and its design references → [TEST_POLICY](../TEST_POLICY.md). Current [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md), [TEST_STRATEGY](../TEST_STRATEGY.md) and [tests/README](../../tests/README.md) remain valid references.
 
 ## New-roadmap activation policy
 
@@ -25,4 +27,4 @@ Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this ind
 | [2026-10-23 archive](../archive/20261023-pre-ui-next/README.md) | Earlier plans including uncompleted SAL native125/attended/Owner acceptance |
 | [Release prerequisites](../DEFERRED_WORK.md#release-prerequisites) | UNACCEPTED / UNSCHEDULED — never inferred from a source merge |
 
-Evidence must remain tied to its source/test/package hashes, environment and selected scope. Documentation-only archiving has no product acceptance or SQL/GUI pass of its own.
+Evidence must remain tied to its source/test/package hashes, environment and selected scope. Documentation-only archival or activation has no product acceptance or SQL/GUI pass of its own.

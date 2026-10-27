@@ -2,7 +2,7 @@
 
 These three SVG wireframes recreate the three approved conversation layouts using the current specification's labels and canonical permission keys. They are precise composition references for review, not byte copies of the original PNGs, screenshots of an executed application, or evidence of UI Lab acceptance. The deleted image and older variants are excluded.
 
-Read the [UI and behavior specification](../../design/SECURITY_ADMINISTRATION_UI.md), [implementation plan](../../plans/20261025-002-security-administration-ui-lab-first.md) and [UI Labs review guide](../../development/SECURITY_UI_LAB_REVIEW.md). The specification and the Owner's explicit corrections are normative.
+Read the [UI and behavior specification](../../design/SECURITY_ADMINISTRATION_UI.md), durable [Business Compact policy](../../design/BUSINESS_COMPACT.md), active [Business Compact and independent UI Labs roadmap](../../plans/20261027-001-business-compact-and-independent-ui-labs.md) and [UI Labs review guide](../../development/SECURITY_UI_LAB_REVIEW.md). The specification and the Owner's explicit corrections are normative. The original [Security plan](../../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) retains its historical decisions.
 
 ## Included views
 
@@ -24,6 +24,7 @@ The catalog retains the reference sequence label `04`. No separate direct-editor
 - All sample user, role, member, permission, module and pending-change counts are illustrative. Runtime counts derive from the appropriate successfully loaded data or complete draft scope, including changes hidden by filters. Missing data must not become a fabricated zero count.
 - The effective view is read-only and labelled **Theo dữ liệu phân quyền đã tải**. It explains decision sources and missing or stale data as specified. It does not promise a later server authorization result; protected-account status alone does not establish a runtime bypass.
 - Role grant checkboxes stage a local draft. **Hủy thay đổi** restores the baseline, while **Lưu quyền vai trò** dispatches ordered single-key commands with the specified partial-success recovery. An unchecked grant means removing that role's grant, not a role-level Deny.
+- The Role permissions pilot preserves the structured **Cấp | Quyền | Nhóm** composition, readable canonical-key hierarchy, pending indicators and save/cancel summary. A concatenated checklist containing the same strings is not automatically composition-equivalent. Review the actual table/list choice and keyboard behavior in the independent SEC Lab.
 - Direct decisions use **Theo vai trò / Cho phép / Từ chối** and one-key **Lưu quyền này**. The separate editor, draft preview and save/cancel behavior are defined in the specification and demonstrated in the Lab scenarios.
 - Reuse existing active/inactive and protected-account semantics, the current shell and pinned theme/control primitives. Provide one clear create action per applicable object context; keep the catalog read-only. Follow the specification's compact layout and explicit action labels.
 
@@ -31,7 +32,7 @@ The catalog retains the reference sequence label `04`. No separate direct-editor
 
 The SVGs document layout, control ownership and visible copy. Their drawing bounds do not prescribe a WinForms client size or physical monitor scale. The running candidate must fit the existing shell bounds and undergo the required Light/Dark, physical native100/native125, keyboard, focus and workflow review.
 
-The linked UI Labs review guide defines the executable scenarios and evidence requirements. These wireframes do not record test execution, accepted behavior or Owner approval of an implemented candidate.
+The linked UI Labs review guide defines repeatable scenarios and evidence fields. The selected roadmap requires native pilot approval before expanding the new presentation across SEC and final candidate approval before product-host parity/handoff. Both gates begin NOT APPROVED. These wireframes and historical executed screenshots do not establish those new decisions.
 
 ## Preview
 
