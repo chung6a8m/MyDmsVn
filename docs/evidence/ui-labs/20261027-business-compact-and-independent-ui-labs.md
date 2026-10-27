@@ -185,7 +185,7 @@ The five checked-in images below were visually inspected before inclusion and co
 
 The approval covers the Role permissions composition and representative create-user dialog baseline on runtime source `fa777156d3bc0cc37c1a32495672a8091e5e70b0`, the unchanged WinFormsKit/SourceGrid pins recorded above, and the physical 100%/125% Light/Dark normal/constrained evidence matrix. It accepts the Dark disabled-action contrast and native `Form` shell as bounded pilot exceptions, and accepts keeping the two out-of-pilot direct-permission failures open for UIL-T05 rather than treating them as T04 blockers. Material changes to the approved pilot surfaces reopen focused review.
 
-UIL-T05 is unblocked but remains **NOT STARTED**. This approval does not establish final UIL-T06 approval, product-host parity, SQL, actual Login, package, release or production acceptance.
+At this T04 decision point, UIL-T05 was unblocked but remained **NOT STARTED**. This approval did not establish final UIL-T06 approval, product-host parity, SQL, actual Login, package, release or production acceptance; the later current-candidate state is recorded below.
 
 ### PR #56 review correction
 
@@ -194,3 +194,64 @@ PR #56 review of head `aa3f9cd13eac4b5ee63d65c34503c6a4045c1402` identified two 
 The validation regression selection first executed three rows with two expected failures and then passed 3/3 after the correction. The large-catalog native-search regression first failed on presentation identity before the cache correction and then passed; duplicate-key boundary tests also failed before consistent first-definition admission and passed afterward. Final Debug/net48 verification on the committed source build passed with zero warnings/errors. The affected Security assignment, native/reset, review-scenario and workspace-control selection excluding the two named open constrained Direct rows executed **159/159 passed, zero failed/skipped**. A separate execution of `Minimum_user_view_shows_direct_permission_rows` reproduced the same two Light/Dark failures with `Direct list client height 0; item height 17; tab height 223`; they remain **OPEN for UIL-T05** and are not represented as passing.
 
 This correction changes validation clearing and render efficiency, not the approved visual composition, vendor pins or the two accepted pilot exceptions. No additional attended visual review or Owner re-approval is inferred for the corrected commit. No SQL, actual Login, package, release or production verification was performed.
+
+## UIL-T05 remaining Security conformance and T06 candidate package
+
+UIL-T05 is complete within its selected presentation scope on source candidate `94978c235202df8e3527689340be3c1af8fecf7a`, based on `6847d5793564fbcd2a145c4d4d287f671dc85e90`. WinFormsKit remains pinned at `c232a4c09dc0386a5bd8bb484a5c991acae827d5` and its nested SourceGrid remains `f4e457b43582bf01892f50bdc74aa480531e5944`; neither vendor checkout changed. The candidate applies the approved T04 baseline to the remaining Security presentation and preserves the existing application/session/permission contracts. It is ready for final native review, but that review and its Owner decision are not complete.
+
+The reviewed remaining-surface inventory is:
+
+| Surface | Candidate composition and preserved boundary |
+|---|---|
+| Workspace and Users/Roles masters | Pinned toolkit tabs, text input, combo, list and command controls; richer master identity/status rows retain selection, keyboard focus, accessibility identity and stable top item through filtering, rebind, theme and constrained resize. |
+| User information and memberships | Toolkit-backed profile, command and membership presentation; the user owns **Vai trò (n)** membership mutation and the role-side **Thành viên (n)** list remains read-only without a duplicate header count. |
+| Effective and direct permissions | Toolkit grid/list, filters, three-way decision choices and explicit edit/save/discard hierarchy; loaded effective data remains explanatory, direct drafts retain raw state and constrained access, and recovery/session ownership remains app-owned. |
+| Role grants, history and members | The approved T03 grant pilot remains the baseline; toolkit member/history composition preserves canonical-key access, hidden-draft counts, serial save/recovery, navigation admission and read-only member ownership. |
+| Permission catalog | Toolkit search, lifecycle/group filters, group list, read-only grid and contextual copy/refresh commands; no catalog mutation was introduced. |
+| Identity, role and password dialogs | Native `Form` shell with themed toolkit body, labels, inputs, validation and commands; initial focus, tab/Accept/Cancel behavior, raw buffers, limits, pending-close and recovery remain intact. |
+| Activation, membership, confirmation and import feedback | Themed toolkit decision/import surfaces keep originating-workspace and session ownership, contextual action hierarchy and bounded feedback; the OS file picker remains the file-selection boundary. |
+
+The implementation/correction chain is retained rather than folded into one unexplained pass:
+
+- `0ce87ab` made native key-up LPARAM construction safe on the required x86 testhost.
+- `b60f684` kept the constrained direct-permission editor reachable, closing the two failures explicitly left open at T04.
+- `f626e0f` composed Security masters with pinned toolkit controls; `f77d227` then restored focused identity after a rebind.
+- `235007e` conformed the user detail surfaces; `d78c2e` conformed role members and the read-only permission catalog.
+- `e3af38b` applied the approved identity/password dialog baseline; `cbdcbbd` conformed confirmations and import feedback.
+- `28af283` bound asynchronous import feedback to the originating owner instead of the currently selected pane.
+- `94978c2` removed unintended horizontal scrollbars from constrained Users/Roles/catalog lists while retaining native vertical scrolling, top item, selection, focus and accessibility identity.
+
+An independent review accepted the `94978c2` resize correction with no Critical/Important/Minor findings. A separate review of the import-owner correction accepted the production path and recorded one bounded Minor limitation: the direct ViewModel preview-failure test bypass, when invoked without target metadata, hides feedback rather than guessing a pane. That bypass is not the production import route and is not represented as a solved presentation state.
+
+### Current-candidate automated verification
+
+Verification ran on Windows `10.0.26300.0`, SDK `8.0.427`, VSTest `17.11.1`, Debug/net48 with x86/Prefer32Bit and the serialized GUI guard. Locked restore and `dotnet build MyDmsVn.UiLab.sln -c Debug --no-restore` passed with zero warnings and zero errors. The source-verified union `FullyQualifiedName~Security|FullyQualifiedName~UiLabCloseResetLifetimeTests|FullyQualifiedName~UiLabModalOwnershipTests|FullyQualifiedName~UiLabModuleIndependenceTests|FullyQualifiedName~UiLabPermissionRefreshLifetimeTests|FullyQualifiedName~UiLabReviewModeAdmissionTests|FullyQualifiedName~UiLabViewportTests` discovered 321 rows and executed 321: 321 passed, zero failed and zero skipped in 6m03s. The local TRX is `.local/test-results/uil-t05-t06-final/uil-t05-t06-final.trx`; its sanitized summary, not the raw file, is published here.
+
+| Artifact | SHA-256 |
+|---|---|
+| Final TRX | `DB6691E464D6A60218585BBAD7826F2C66BDCB9B33384A34B361376A8A30A4DF` |
+| Security Lab executable | `D0B8A6699A3C93C61D89F2C65329AE73803AF62B4BA740531508EBB075332E42` |
+| Desktop WinForms DLL | `E2ED15F0B1E1EE908D09A79A24204D74EC2548E61A9315B5DF0AA08D28182AB6` |
+| Ui.Tests DLL | `2FFBDBDE8443F577AB62B48476056DFC8E3C405874F4EF08DFF411BD53257997` |
+
+This candidate changes presentation, native control composition and test evidence only. It does not change or verify SQL, actual Login, authorization semantics, a package, product-host parity, production release or any archived acceptance scope.
+
+### UIL-T06 native review state
+
+UIL-T06 is **IN PROGRESS / NOT APPROVED**. An independent physical-display probe reported 100% scale, 96 × 96 monitor DPI and a 1920 × 1032 work area. The required product-content contexts are normal 952 × 657 and minimum 652 × 497 in Light and Dark. The Lab itself reports `DeviceDpi=96` and `Physical scale: unverified`; those Lab diagnostics are not used as independent physical-scale evidence.
+
+The normal 952 × 657 Light/Dark Users, Roles and Catalog surfaces and representative secondary surfaces were first attended on exact parent `28af283`. On exact candidate `94978c2`, Light/normal Users, Roles and Catalog plus Dark/normal Roles were rechecked; the remaining unchanged Dark/normal parent observations are supported by the candidate's 321-row native suite but are not promoted to exact-candidate attended evidence. Exact-candidate Light/Dark minimum 652 × 497 review confirmed that Users master, Roles master and Catalog group list no longer expose a horizontal scrollbar, preserve their local vertical scrollbar where content overflows, and keep selection/focus/accessibility identity. The exact candidate's create-role dialog was also inspected in Dark/minimum with initial field focus, accessible label/error semantics and usable cancel/save hierarchy. This is a **partial physical-100 review**, not a completed full-inventory candidate matrix; unchanged parent observations plus automation are not promoted to full attended final-candidate evidence.
+
+The physical-100 review first found unintended native horizontal scrollbars on the constrained Users/Roles masters and Catalog group list. That finding was reproduced by a two-row Light/Dark regression (0/2 before correction), corrected in `94978c2`, then passed 2/2; the affected Security workspace/native selection passed 160/160 with zero skips. The final 321-row run above includes the correction.
+
+The final exception/disposition inventory remains explicit:
+
+- Identity/password/decision dialogs and the Lab import-review surface retain a native `Form` shell because the pinned `BootstrapModalHeader` equal-Font disposal defect prevents safe open-dialog theme use; toolkit body and commands remain themed. T04 accepted this only as the pilot baseline, and T06 must record a final disposition for the candidate.
+- `OpenFileDialog` remains the OS file-selection surface.
+- The ordinary Close `MessageBox` is shared by Sales/Security and remains reserved for the shared/product-host work in T07; UIL-T05 did not broaden that boundary.
+- Effective-permission explanation and catalog details retain native multiline read-only selectable/scrollable text because the pinned `BootstrapTextBox` exposes no public multiline/scrollbar capability and labels do not provide copy/selection/scroll.
+- Native ComboBox popup/arrow, OS window chrome and layout primitives retain contract/OS ownership.
+- Dark disabled-action contrast remains visibly low and requires a fresh T06 Owner disposition; the T04 pilot acceptance is not silently reused as final approval.
+- Noninteractive native labels retained by the approved T03 role pilot are unchanged. They are not interactive native/custom exceptions under BC-08, but remain part of the final visual review.
+
+Physical 125% Light/Dark normal/minimum review on this candidate is **NOT RUN**. The full changed-surface attended inventory at physical 100% is also not yet complete, and no final Owner decision has been given. Therefore the UIL-T06 decision remains **NOT APPROVED**, and UIL-T07 product-host parity/shared regression remains blocked. No SQL, actual Login, package or release approval is implied.
