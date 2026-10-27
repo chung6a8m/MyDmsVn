@@ -197,7 +197,7 @@ This correction changes validation clearing and render efficiency, not the appro
 
 ## UIL-T05 remaining Security conformance and T06 candidate package
 
-UIL-T05 implementation was completed on source candidate `94978c235202df8e3527689340be3c1af8fecf7a`, based on `6847d5793564fbcd2a145c4d4d287f671dc85e90`. Physical-125 review then found one bounded decision-dialog wrapping defect; correction `6cdce2b3d712006efe40cc23ad8d0ed1e1e20563` is the current T06 review candidate. WinFormsKit remains pinned at `c232a4c09dc0386a5bd8bb484a5c991acae827d5` and its nested SourceGrid remains `f4e457b43582bf01892f50bdc74aa480531e5944`; neither vendor checkout changed. The candidate applies the approved T04 baseline to the remaining Security presentation and preserves the existing application/session/permission contracts. Final native evidence is complete on the bounded basis below; the explicit Owner decision remains pending.
+UIL-T05 implementation was completed on source candidate `94978c235202df8e3527689340be3c1af8fecf7a`, based on `6847d5793564fbcd2a145c4d4d287f671dc85e90`. Physical-125 review then found one bounded decision-dialog wrapping defect; correction `6cdce2b3d712006efe40cc23ad8d0ed1e1e20563` is the current T06 review candidate. WinFormsKit remains pinned at `c232a4c09dc0386a5bd8bb484a5c991acae827d5` and its nested SourceGrid remains `f4e457b43582bf01892f50bdc74aa480531e5944`; neither vendor checkout changed. The candidate applies the approved T04 baseline to the remaining Security presentation and preserves the existing application/session/permission contracts. Final native evidence and the explicit Owner decision are recorded below.
 
 The reviewed remaining-surface inventory is:
 
@@ -239,7 +239,7 @@ This candidate changes presentation, native control composition and test evidenc
 
 ### UIL-T06 native review state
 
-UIL-T06 is **AWAITING OWNER DECISION / NOT APPROVED**. At physical 100%, an independent GDI probe reported a 1920 × 1080 physical desktop, a 1920 × 1080 logical desktop, 96 × 96 monitor DPI and 100% scale; the Lab reported a 1920 × 1032 work area. The required product-content contexts are normal 952 × 657 and minimum 652 × 497 in Light and Dark. The Lab itself reports `DeviceDpi=96` and `Physical scale: unverified`; those Lab diagnostics are not used as independent physical-scale evidence.
+UIL-T06 is **COMPLETE / APPROVED** within the bounded candidate scope below. At physical 100%, an independent GDI probe reported a 1920 × 1080 physical desktop, a 1920 × 1080 logical desktop, 96 × 96 monitor DPI and 100% scale; the Lab reported a 1920 × 1032 work area. The required product-content contexts are normal 952 × 657 and minimum 652 × 497 in Light and Dark. The Lab itself reports `DeviceDpi=96` and `Physical scale: unverified`; those Lab diagnostics are not used as independent physical-scale evidence.
 
 Physical-100 review was completed on exact correction candidate `6cdce2b` on 2026-10-27. The Lab outer/client geometry was 1250 × 850 / 1234 × 811, with the required product-content bounds applied at 952 × 657 normal and 652 × 497 minimum. The Lab host reports `viewport clipped; scroll to inspect` at the normal bound because the developer chrome plus fixed content exceed its visible client height; the host's own vertical scrollbar kept the complete fixed content reachable and was used during the review. The minimum bound reported `viewport visible`. This is a recorded Lab-host geometry limitation, not a claim that the 952 × 657 content fit without host scrolling.
 
@@ -259,12 +259,18 @@ The current-candidate reuse basis is narrow and explicit: `6cdce2b` changes only
 
 The final exception/disposition inventory remains explicit:
 
-- Identity/password/decision dialogs and the Lab import-review surface retain a native `Form` shell because the pinned `BootstrapModalHeader` equal-Font disposal defect prevents safe open-dialog theme use; toolkit body and commands remain themed. T04 accepted this only as the pilot baseline, and T06 must record a final disposition for the candidate.
+- Identity/password/decision dialogs and the Lab import-review surface retain a native `Form` shell because the pinned `BootstrapModalHeader` equal-Font disposal defect prevents safe open-dialog theme use; toolkit body and commands remain themed. The Owner accepted this bounded final-candidate exception at T06; it is not a generic toolkit waiver.
 - `OpenFileDialog` remains the OS file-selection surface.
 - The ordinary Close `MessageBox` is shared by Sales/Security and remains reserved for the shared/product-host work in T07; UIL-T05 did not broaden that boundary.
 - Effective-permission explanation and catalog details retain native multiline read-only selectable/scrollable text because the pinned `BootstrapTextBox` exposes no public multiline/scrollbar capability and labels do not provide copy/selection/scroll.
 - Native ComboBox popup/arrow, OS window chrome and layout primitives retain contract/OS ownership.
-- Dark disabled-action contrast remains visibly low and requires a fresh T06 Owner disposition; the T04 pilot acceptance is not silently reused as final approval.
+- Dark disabled-action contrast remains visibly low and is an Owner-accepted bounded final-candidate exception at T06; this explicit decision, rather than the earlier T04 pilot acceptance, is the final disposition.
 - Noninteractive native labels retained by the approved T03 role pilot are unchanged. They are not interactive native/custom exceptions under BC-08, but remain part of the final visual review.
 
-Physical 100% and 125% review is **COMPLETE for the primary Light/Dark normal/minimum matrices and for the secondary surface-level inventory on the explicit fixed-modal correction/reuse basis above**; it is not represented as a four-way secondary permutation matrix. No final Owner decision has been given. Therefore UIL-T06 is **AWAITING OWNER DECISION / NOT APPROVED**, and UIL-T07 product-host parity/shared regression remains blocked. No SQL, actual Login, package or release approval is implied.
+Physical 100% and 125% review is **COMPLETE for the primary Light/Dark normal/minimum matrices and for the secondary surface-level inventory on the explicit fixed-modal correction/reuse basis above**; it is not represented as a four-way secondary permutation matrix.
+
+**UIL-T06 Owner decision — APPROVED at 2026-10-27 21:36:16 +07:00.** In direct response to the request to approve or reject the exact final candidate together with the listed bounded exceptions, the Owner stated: `Tôi approve các ngoại lệ trên`.
+
+The approval covers runtime source candidate `6cdce2b3d712006efe40cc23ad8d0ed1e1e20563`, the unchanged WinFormsKit/SourceGrid pins recorded above, the 322/322 correction-candidate verification, the physical 100%/125% Light/Dark normal/minimum primary matrices, and the secondary surface-level inventory on the recorded fixed-modal correction/reuse basis. It accepts the complete exception inventory above, including the Lab-host scroll limitation at the normal viewport, as bounded final-candidate exceptions. Material changes to the approved Security presentation reopen the affected review.
+
+UIL-T06 is therefore **COMPLETE / APPROVED** within that exact scope. UIL-T07 product-host parity/shared regression is unblocked but remains **NOT STARTED**. This decision does not approve SQL, actual Login, a package, release, production deployment, a four-way secondary Cartesian matrix or any archived acceptance scope.
