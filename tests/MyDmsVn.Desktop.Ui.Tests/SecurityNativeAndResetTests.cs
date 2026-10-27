@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
 using MyDmsVn.Contracts.Security;
@@ -14,6 +15,7 @@ using MyDmsVn.Desktop.UiLab.Scenarios;
 using MyDmsVn.Desktop.WinForms.Features.Security;
 using Xunit;
 using Xunit.Abstractions;
+using static MyDmsVn.Desktop.Tests.SecurityWorkspaceControlTests;
 
 namespace MyDmsVn.Desktop.Tests;
 
@@ -67,7 +69,9 @@ public sealed class SecurityNativeAndResetTests
                 try
                 {
                     opened = true;
-                    Assert.True(dialog.Controls.Cast<Control>().SelectMany(Descendants).OfType<TextBox>().First().Focus());
+                    var field = SecurityWorkspaceControlTests.DialogInputs(dialog).First();
+                    field.Focus();
+                    Assert.True(field.ContainsFocus);
                     NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
                     Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
                 }
@@ -434,6 +438,101 @@ public sealed class SecurityNativeAndResetTests
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Native_role_space_autorepeat_toggles_once_until_keyup(int column) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            Assert.True(control.ViewModel.BeginRolePermissions());
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapDataGridView>());
+            var index = GrantIndex(grants, "Sales.Receipts.Post");
+            grants.CurrentCell = grants.Rows[index].Cells[column];
+            Assert.True(grants.Focus());
+            Assert.Equal(grants.Handle, GetFocus());
+            var draft = control.ViewModel.RoleDraft!;
+
+            Assert.True(PostMessage(grants.Handle, 0x0100, new IntPtr((int)Keys.Space), new IntPtr(1)));
+            System.Windows.Forms.Application.DoEvents();
+            Assert.True(Granted(grants, index));
+            Assert.Equal(1, draft.LocalEditRevision);
+            for (var repeat = 0; repeat < 3; repeat++)
+            {
+                Assert.True(PostMessage(grants.Handle, 0x0100, new IntPtr((int)Keys.Space), new IntPtr((1L << 30) | 1)));
+                System.Windows.Forms.Application.DoEvents();
+                Assert.True(Granted(grants, index));
+                Assert.Equal(1, draft.LocalEditRevision);
+            }
+            Assert.True(PostMessage(grants.Handle, 0x0101, new IntPtr((int)Keys.Space), new IntPtr((1L << 31) | (1L << 30) | 1)));
+            System.Windows.Forms.Application.DoEvents();
+            Assert.Equal(1, draft.LocalEditRevision);
+            Assert.Collection(draft.Changes, change =>
+            {
+                Assert.Equal("Sales.Receipts.Post", change.PermissionKey);
+                Assert.True(change.Granted);
+            });
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.False(Granted(grants, index));
+            Assert.Equal(2, draft.LocalEditRevision);
+            Assert.Empty(draft.Changes);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
+    public void Native_space_on_permission_name_toggles_only_the_selected_canonical_key() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            Assert.True(control.ViewModel.BeginRolePermissions());
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapDataGridView>());
+            var index = GrantIndex(grants, "Sales.Receipts.Post");
+            grants.CurrentCell = grants.Rows[index].Cells[1];
+            Assert.True(grants.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.Collection(control.ViewModel.RoleDraft!.Changes, change =>
+            {
+                Assert.Equal("Sales.Receipts.Post", change.PermissionKey);
+                Assert.True(change.Granted);
+            });
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.Empty(control.ViewModel.RoleDraft.Changes);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
+    public void Native_role_search_keeps_native_text_caret_focus_and_enter_does_not_save() =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            Assert.True(control.ViewModel.BeginRolePermissions());
+            control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+            var search = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapTextBox>(), item => item.AccessibleName == "Tìm quyền vai trò");
+            search.Focus();
+            Assert.True(search.ContainsFocus);
+            var editor = GetFocus();
+            Assert.NotEqual(IntPtr.Zero, editor);
+            var text = "";
+            foreach (var character in "Read")
+            {
+                SendMessage(editor, 0x0102, new IntPtr(character), IntPtr.Zero);
+                System.Windows.Forms.Application.DoEvents();
+                text += character;
+                Assert.Equal(text, search.Text);
+                Assert.Equal(editor, GetFocus());
+                var selection = SendMessage(editor, 0x00B0, IntPtr.Zero, IntPtr.Zero).ToInt64();
+                Assert.Equal(text.Length, (int)(selection & 0xFFFF));
+                Assert.Equal(text.Length, (int)((selection >> 16) & 0xFFFF));
+            }
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(control.ViewModel.HasDirtyEditor);
+            Assert.Contains("Sales.Receipts.Post", control.ViewModel.RoleDraft!.DesiredKeys);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
     [Fact]
     public void Native_tab_preserves_staged_role_grant_after_mouse_toggle() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
@@ -443,17 +542,17 @@ public sealed class SecurityNativeAndResetTests
             NativeLookupTypingDriver.Activate(control.FindForm()!);
             var edit = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Sửa quyền");
             edit.PerformClick();
-            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
-            var index = grants.Items.IndexOf("Sales.Receipts.Post");
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapDataGridView>());
+            var index = GrantIndex(grants, "Sales.Receipts.Post");
             Assert.True(index >= 0);
-            var item = grants.GetItemRectangle(index);
+            var item = grants.GetCellDisplayRectangle(0, index, true);
             NativeLookupTypingDriver.Click(grants, new Point(item.Left + 20, item.Top + item.Height / 2));
-            Assert.True(grants.GetItemChecked(index));
+            Assert.True(Granted(grants, index));
             Assert.Contains("Sales.Receipts.Post", control.ViewModel.RoleDraft!.DesiredKeys);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
             Assert.False(grants.ContainsFocus);
             Assert.Contains("Sales.Receipts.Post", control.ViewModel.RoleDraft.DesiredKeys);
-            Assert.True(grants.GetItemChecked(index));
+            Assert.True(Granted(grants, index));
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
@@ -467,26 +566,26 @@ public sealed class SecurityNativeAndResetTests
             var buttons = Descendants(control.RoleDetail).OfType<Button>().ToArray();
             var edit = Assert.Single(buttons, item => item.Text == "Sửa quyền");
             var cancel = Assert.Single(buttons, item => item.Text == "Hủy thay đổi");
-            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
-            grants.SelectedIndex = 0;
-            var before = grants.GetItemChecked(0);
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapDataGridView>());
+            grants.CurrentCell = grants.Rows[0].Cells[0];
+            var before = Granted(grants, 0);
             Assert.True(grants.Focus());
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
-            Assert.Equal(before, grants.GetItemChecked(0));
+            Assert.Equal(before, Granted(grants, 0));
             Assert.Null(control.ViewModel.RoleDraft);
             Assert.True(edit.Focus());
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
             Assert.NotNull(control.ViewModel.RoleDraft);
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
-            grants.SelectedIndex = 0;
+            grants.CurrentCell = grants.Rows[0].Cells[0];
             Assert.True(grants.Focus());
-            var item = grants.GetItemRectangle(0);
+            var item = grants.GetCellDisplayRectangle(0, 0, true);
             NativeLookupTypingDriver.Click(grants, new Point(item.Left + 20, item.Top + item.Height / 2));
-            Assert.Equal(!before, grants.GetItemChecked(0));
-            Assert.Equal(0, grants.SelectedIndex);
+            Assert.Equal(!before, Granted(grants, 0));
+            Assert.Equal(0, grants.CurrentCell.RowIndex);
             Assert.True(grants.ContainsFocus);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
-            Assert.Equal(before, grants.GetItemChecked(0));
+            Assert.Equal(before, Granted(grants, 0));
             Assert.False(control.ViewModel.HasDirtyEditor);
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
             Assert.True(cancel.Focus());
@@ -505,14 +604,14 @@ public sealed class SecurityNativeAndResetTests
             var edit = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Sửa quyền");
             Assert.True(edit.Focus());
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
-            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
-            var index = grants.Items.IndexOf("Sales.Receipts.Post");
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapDataGridView>());
+            var index = GrantIndex(grants, "Sales.Receipts.Post");
             Assert.True(index >= 0);
-            Assert.False(grants.GetItemChecked(index));
-            grants.SelectedIndex = index;
+            Assert.False(Granted(grants, index));
+            grants.CurrentCell = grants.Rows[index].Cells[0];
             Assert.True(grants.Focus());
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
-            Assert.True(grants.GetItemChecked(index));
+            Assert.True(Granted(grants, index));
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
             var save = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Lưu quyền vai trò");
             Assert.True(save.Focus());
@@ -530,7 +629,7 @@ public sealed class SecurityNativeAndResetTests
                 entry => entry.Operation == "Security.Mutate.Result").Request);
             Assert.Equal("Success", result.Outcome);
             Assert.Equal(22, result.AssignmentRevision);
-            Assert.True(grants.GetItemChecked(index));
+            Assert.True(Granted(grants, index));
             Assert.False(control.ViewModel.HasDirtyEditor);
         });
 
@@ -544,13 +643,13 @@ public sealed class SecurityNativeAndResetTests
             var edit = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Sửa quyền");
             Assert.True(edit.Focus());
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
-            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
-            var index = grants.Items.IndexOf("Sales.Receipts.Post");
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapDataGridView>());
+            var index = GrantIndex(grants, "Sales.Receipts.Post");
             Assert.True(index >= 0);
-            grants.SelectedIndex = index;
+            grants.CurrentCell = grants.Rows[index].Cells[0];
             Assert.True(grants.Focus());
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
-            Assert.True(grants.GetItemChecked(index));
+            Assert.True(Granted(grants, index));
             var save = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Lưu quyền vai trò");
             var gate = scene.Administration.HoldNextMutation(true);
             Assert.True(save.Focus());
@@ -565,7 +664,7 @@ public sealed class SecurityNativeAndResetTests
             Until(() => scene.Journal.Entries.Count(entry => entry.Operation == "Security.Catalog.Result") == 2);
             Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
             Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate.Result");
-            Assert.True(grants.GetItemChecked(index));
+            Assert.True(Granted(grants, index));
             Assert.False(control.ViewModel.HasDirtyEditor);
         });
 
@@ -579,18 +678,19 @@ public sealed class SecurityNativeAndResetTests
             var edit = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Sửa quyền");
             Assert.True(edit.Focus());
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
-            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<CheckedListBox>());
-            var index = grants.Items.IndexOf("Sales.Receipts.Post");
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapDataGridView>());
+            var index = GrantIndex(grants, "Sales.Receipts.Post");
             Assert.True(index >= 0);
-            grants.SelectedIndex = index;
+            grants.CurrentCell = grants.Rows[index].Cells[0];
             Assert.True(grants.Focus());
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
-            Assert.True(grants.GetItemChecked(index));
+            Assert.True(Granted(grants, index));
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
             Assert.False(grants.ContainsFocus, "Native Tab must leave the grant list while retaining its selected key.");
-            Assert.Equal(index, grants.SelectedIndex);
-            var search = Assert.Single(Descendants(control.RoleDetail).OfType<TextBox>(), item => item.AccessibleName == "Tìm quyền vai trò");
-            Assert.True(search.Focus());
+            Assert.Equal(index, grants.CurrentCell.RowIndex);
+            var search = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapTextBox>(), item => item.AccessibleName == "Tìm quyền vai trò");
+            search.Focus();
+            Assert.True(search.ContainsFocus);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Shift | Keys.Tab);
             var save = Assert.Single(Descendants(control.RoleDetail).OfType<Button>(), item => item.Text == "Lưu quyền vai trò");
             Assert.Equal(save.Handle, GetFocus());
@@ -818,6 +918,7 @@ public sealed class SecurityNativeAndResetTests
         Assert.True(condition(), "Security native/Reset operation did not complete within its bounded pump.");
     }
 
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] static extern IntPtr GetFocus();
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);

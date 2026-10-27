@@ -116,3 +116,81 @@ The original test failed as intended: Apply access was at Y=80–104 below a 68-
 After the user changed Windows display scale to 125%, an independent per-monitor-aware probe returned 120×120 DPI (`SetProcessDpiAwareness(2)` and `GetDpiForMonitor` both succeeded). At full PR evidence HEAD `c097afa4e1a7f2ec58aa9723255620e925c610cc`, locked restore and Debug/net48 build again passed with zero warnings/errors. The focused narrow-toolbar regression discovered/executed one test and passed, with no failure or skip; its guarded host still reported `DeviceDpi=96`, so this result is not used as the physical-scale measurement. Local TRX: `%TEMP%\mydmsvn-pr55-review\toolbar-125.trx`. Test DLL SHA-256 `6b7c90083beeac84d7a8b6306ab28ea6601f64134e41d54a235117973e9523eb`; Sales launcher SHA-256 `ec48a67d9e5a150c24125f28486b377885b1bf793b8a48875e98398ff499cf45`; shared Lab DLL SHA-256 `3735d40d36833f88bb1411143153aa03cf776ed2fd36983c978a6a8c308ec59a`.
 
 The Sales launcher was also inspected directly on that physical 125% display. It started S01Draft and was narrowed to reported virtualized outer 911 x 850, client 895 x 811 and content 895 x 557, with `DeviceDpi=96`. The toolbar scrolled independently while the workspace content size remained unchanged. In Light, the second row was scrolled fully into view; Apply access was invoked and reported `Allow all applied.`. A held Reload was invoked, the long status remained visible, the toolbar was scrolled again and `Release Reload` was invoked, reporting `Held Reload released.` and restoring the workspace. In Dark, the workspace theme switched and the same lower toolbar actions remained reachable by scrolling; no separate Dark click outcome is claimed. The Lab was closed and no launcher process remained. No screenshot was retained, and this attended observation does not imply Owner visual approval, SQL, actual Login, package or release acceptance.
+
+## UIL-T03 native SEC pilot and T04 review package
+
+UIL-T03 is complete within the bounded pilot scope and this package is ready for the UIL-T04 Owner gate. The exact runtime source candidate is `fa777156d3bc0cc37c1a32495672a8091e5e70b0`, based on `e3839e614ddbcbc4597d54a2a0c39f2bac7d0a20`. WinFormsKit remains `c232a4c09dc0386a5bd8bb484a5c991acae827d5` with nested SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`; neither vendor checkout changed. The reviewed direct entry point is `samples/MyDmsVn.Desktop.UiLab.Security/bin/Debug/net48/MyDmsVn.Desktop.UiLab.Security.exe`. Windows `10.0.26300.0`, SDK `8.0.427`, VSTest `17.11.1` x64, Debug/net48 and the existing serialized STA/WinForms guard were used. There is no package candidate.
+
+Final rebuilt artifacts for the review package:
+
+| Artifact | SHA-256 |
+|---|---|
+| Security Lab executable | `A438CDF5F9C3F59752806CB3659EA520C4D923E42BEC1182472ED6931FB653D5` |
+| Desktop WinForms DLL | `2D26036F3063F44512C31B5426337C125E542D4D1966958404AC1E4A44488308` |
+| Ui.Tests DLL | `C1390AF1237FB8A5B2F42E90A1F4AD51F4DEBF2C4FE5B027C13FCABB9B2DB3CC` |
+
+### Pilot composition and bounded exception
+
+The **Quyền của vai trò** pilot uses the pinned `BootstrapDataGridView` with Cấp / Quyền / Nhóm columns, `BootstrapTextBox`, `BootstrapComboBox` and `BootstrapCheckBox` filters, and explicit toolkit Save/discard actions. Friendly text is primary; the canonical key remains visible on its second line and available through tooltip/accessibility values. The summary counts the complete draft, including filtered-out changes. The grid owns local scrolling so a complete row, filter controls, footer actions, summary and existing read-only legacy grants remain reachable at constrained bounds. Application-owned serial single-key mutation, revision/recovery and busy/session guards remain unchanged.
+
+The representative **Tạo người dùng** dialog uses `BootstrapTextBox`, `BootstrapLabel` and `BootstrapButton`, receives the product presentation contract as its own surface, and preserves initial focus, tab order, Accept/Cancel, pending-close protection, validation and recovery. Shared app-owned helpers now keep create/edit identity validation and guarded mutation consistent: name/display-name limits are 100 characters, email 254 characters and the temporary secret 72 UTF-8 bytes; the secret is cleared after submission and server feedback maps back to the appropriate public field.
+
+The dialog shell remains a native `Form` as a narrow candidate exception, pending the Owner's T04 disposition. At the pinned toolkit revision, using `BootstrapModalHeader.ApplyTypography` during an open-dialog theme change can assign an equal `Font` and then dispose the previous instance retained by the WinForms `Label`, producing `ArgumentException`. T03 did not add private toolkit-chrome workarounds or change the vendor pin. The cost is native OS chrome and no toolkit modal backdrop; the body, validation and commands remain toolkit-backed and themed. This exception, visual hierarchy and density are part of the T04 decision, not already approved.
+
+The SQL-free scenario adds exactly one unassigned Active review definition, `UiLab.ReviewOnly.LongCanonicalPermissionKeyForNativeRoleGridOverflowAndTooltipInspection`, with group `UiLab.ReviewOnly` and the visible description `Chỉ dùng để duyệt giao diện UI Lab: kiểm tra nhãn quyền tiếng Việt rất dài, xuống dòng và khả năng đọc đầy đủ trong bảng quyền của vai trò`. It preserves the six real Active definitions, Deprecated definition, orphan assignment and existing assignments. It has no product permission or authorization meaning and does not change the product registry.
+
+### Focused verification
+
+Fresh discovery and execution were run after the reviewed screenshots were saved. All three selections were nonempty and used ordinary `dotnet test`; raw TRX and discovery transcripts remain local.
+
+| Selection | Discovered | Executed | Passed | Failed | Skipped |
+|---|---:|---:|---:|---:|---:|
+| Role draft/save, filters and native mouse/Space/autorepeat/Tab/Enter | 23 | 23 | 23 | 0 | 0 |
+| Create-user/shared identity/password compatibility | 27 | 27 | 27 | 0 | 0 |
+| Scenario fixture, pane state and role/catalog grid behavior | 47 | 47 | 47 | 0 | 0 |
+
+`dotnet build MyDmsVn.UiLab.sln -c Debug --no-restore` passed with zero warnings and zero errors. The automated native cases exercise raw per-key text, caret/range and focus, mouse and initial/repeated Space, Tab, safe Enter, Escape, and theme change while a dialog is open. An earlier broader affected selection executed 148 rows: 146 passed and two pre-existing `Minimum_user_view_shows_direct_permission_rows` rows (Light/Dark) failed because the direct-permission list had client height zero. Those two rows are outside this pilot and remain **OPEN for UIL-T05**; they are neither waived nor represented as a passing T03 result.
+
+### Native physical review matrix
+
+The exact direct Security candidate was inspected interactively at both Windows display scales. Windows Settings and work-area changes are the independent physical-scale evidence. The Lab reported `DeviceDpi=96` and `Physical scale: unverified` at both scales, so those Lab values are recorded as a DPI-awareness discrepancy and are not used to infer physical scale.
+
+| Physical scale / independent work area | Product-content bounds | Themes and pilot surfaces | Observation |
+|---|---|---|---|
+| 100% / 1920 × 1032 | Normal 952 × 657 | Light/Dark; role and create-user dialog | Long Vietnamese description/key, selected/disabled/editing and dialog validation states reviewed. Search received native `u`, `i`, `l` one key at a time with visible text/caret; Enter caused no dispatch. Mouse grant toggle followed by Space restored the original state; Tab moved focus to discard. |
+| 100% / 1920 × 1032 | Constrained 652 × 497 | Light/Dark; role and create-user dialog | Local role scrolling kept headers, complete rows, footer/summary and legacy grants reachable; the dialog remained usable with its fixed footer. |
+| 125% / 1536 × 816 | Normal 952 × 657 | Light/Dark; role and create-user dialog | Both surfaces fit the work area; the dialog measured approximately 582 × 579 physical pixels. Long label/key, selected/disabled and validation states remained readable subject to the Dark disabled-text finding below. |
+| 125% / 1536 × 816 | Constrained 652 × 497 | Light/Dark; role and create-user dialog | The constrained role retained its header, complete rows, footer/summary and read-only legacy access; the dialog remained within the work area. |
+
+The attended driver occasionally returned stale accessibility focus after a role-grid rerender even though subsequent native characters continued into the search editor. It also could not target dialog typing while the owner window was disabled. Therefore the visible attended search/caret sequence and the focused HWND/`EM_GETSEL` automated assertions are recorded separately; automated HWND evidence is authoritative for dialog per-key, selected-range and focus behavior. No attended dialog text entry is claimed.
+
+### Reviewed screenshots
+
+The five checked-in images below were visually inspected before inclusion and contain only SQL-free sample data. They capture physical 100%; the physical 125% matrix was directly attended but has no checked-in screenshot, so no 125% file is claimed.
+
+- [Light role grid with long label/key](screenshots/20261027-uil-t03/physical100-light-role-long-label.png) — SHA-256 `B0D6E2CD91DC09D919800B2A497B1A88E4524D02930FF5C1D50380DDF72734CD`.
+- [Dark role grid with long label/key](screenshots/20261027-uil-t03/physical100-dark-role-long-label.png) — SHA-256 `147886D691F8235EABA2104DD7E3291EB0B570D22FB5E0208BCF87400D47DE9C`.
+- [Dark role edit state with explicit footer](screenshots/20261027-uil-t03/physical100-dark-role-editing.png) — SHA-256 `EFD9B0F5B1FFA9B0ED8E161025A53901427ACD4ACCB53007B37F6DE814EC79D1`.
+- [Light create-user validation](screenshots/20261027-uil-t03/physical100-light-create-dialog-validation.png) — SHA-256 `B002B44C0A31F99A205A50BA99C1C9BBB0A05BEF33ADE58B21B0DBB93DFE8A32`.
+- [Dark create-user validation](screenshots/20261027-uil-t03/physical100-dark-create-dialog-validation.png) — SHA-256 `A5C4713E8E827F77F0F508CEADAD11F207677771067744B5B3FB23F959C4BFC4`.
+
+### Findings and UIL-T04 decision
+
+- Disabled action text in Dark remains low contrast, as first recorded at UIL-T01. It is visible in the pilot evidence and is an Owner-accepted bounded exception for this exact pilot baseline; the approval does not assert improved contrast.
+- The native `Form` shell and its OS-chrome/no-backdrop cost are an Owner-accepted bounded exception for this exact pilot baseline. The accepted exception does not create a generic toolkit waiver or authorize a vendor workaround/pin change.
+- The Owner accepted exclusion of the two direct-permission constrained-layout failures from the T04 pilot decision. Both failures remain **OPEN for UIL-T05**; they are not waived or converted into passing results.
+- No SQL, actual Login, product-host parity, package or release verification was selected or performed.
+
+**UIL-T04 Owner decision — APPROVED at 2026-10-27 15:03:12 +07:00.** In direct response to the request to approve or reject this exact UIL-T04 candidate together with the listed exceptions, the Owner stated: `Tôi approve các ngoại lệ trên`.
+
+The approval covers the Role permissions composition and representative create-user dialog baseline on runtime source `fa777156d3bc0cc37c1a32495672a8091e5e70b0`, the unchanged WinFormsKit/SourceGrid pins recorded above, and the physical 100%/125% Light/Dark normal/constrained evidence matrix. It accepts the Dark disabled-action contrast and native `Form` shell as bounded pilot exceptions, and accepts keeping the two out-of-pilot direct-permission failures open for UIL-T05 rather than treating them as T04 blockers. Material changes to the approved pilot surfaces reopen focused review.
+
+UIL-T05 is unblocked but remains **NOT STARTED**. This approval does not establish final UIL-T06 approval, product-host parity, SQL, actual Login, package, release or production acceptance.
+
+### PR #56 review correction
+
+PR #56 review of head `aa3f9cd13eac4b5ee63d65c34503c6a4045c1402` identified two P2 behavior/performance defects and one P3 documentation defect. Source/test/spec correction `6c8edb660b576e74a508fdce6896e5e1a4a45733` makes create-user field feedback revalidate through the public `BootstrapTextBox.TextChanged` surface after both local and mapped server rejection, without dispatching another mutation or replacing the raw editor. Role-grant presentation now caches immutable catalog text/module/direct-key data by catalog object, caches draft membership by draft identity plus `LocalEditRevision`, reuses unchanged rows/cells/tooltips, and admits only the first Active definition for a duplicate canonical key. The Security UI specification no longer duplicates a stale task status and routes current status to the active roadmap.
+
+The validation regression selection first executed three rows with two expected failures and then passed 3/3 after the correction. The large-catalog native-search regression first failed on presentation identity before the cache correction and then passed; duplicate-key boundary tests also failed before consistent first-definition admission and passed afterward. Final Debug/net48 verification on the committed source build passed with zero warnings/errors. The affected Security assignment, native/reset, review-scenario and workspace-control selection excluding the two named open constrained Direct rows executed **159/159 passed, zero failed/skipped**. A separate execution of `Minimum_user_view_shows_direct_permission_rows` reproduced the same two Light/Dark failures with `Direct list client height 0; item height 17; tab height 223`; they remain **OPEN for UIL-T05** and are not represented as passing.
+
+This correction changes validation clearing and render efficiency, not the approved visual composition, vendor pins or the two accepted pilot exceptions. No additional attended visual review or Owner re-approval is inferred for the corrected commit. No SQL, actual Login, package, release or production verification was performed.

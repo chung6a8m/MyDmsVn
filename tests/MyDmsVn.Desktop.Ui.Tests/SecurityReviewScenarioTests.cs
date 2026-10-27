@@ -30,22 +30,25 @@ public sealed class SecurityReviewScenarioTests
             {
                 var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo người dùng");
                 if (dialog == null) return;
+                timer.Stop();
                 try
                 {
-                    var field = dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<TextBox>().First();
-                    field.Text = "review text";
-                    field.Select(2, 4);
+                    var field = Assert.IsType<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapTextBox>(SecurityWorkspaceControlTests.DialogInputs(dialog).First());
+                    var driver = new NativeLookupTypingDriver(field);
+                    foreach (var character in "review text") driver.TypeCharacter(character);
+                    driver.SelectRange(2, 4);
                     foreach (var mode in new[] { MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark, MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Light })
                     {
                         MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(mode);
-                        Assert.Same(field, dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<TextBox>().First());
+                        Assert.Same(field, SecurityWorkspaceControlTests.DialogInputs(dialog).First());
                         Assert.Equal(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Colors.Surface, field.BackColor);
                         Assert.Equal(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Colors.Text, field.ForeColor);
                         Assert.Equal("Segoe UI", field.Font.Name);
                         Assert.Equal(10f, field.Font.SizeInPoints);
                         Assert.Equal("review text", field.Text);
-                        Assert.Equal(2, field.SelectionStart);
-                        Assert.Equal(4, field.SelectionLength);
+                        Assert.Equal(2, driver.SelectionStart);
+                        Assert.Equal(4, driver.SelectionLength);
+                        driver.AssertFocused();
                     }
                 }
                 catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
