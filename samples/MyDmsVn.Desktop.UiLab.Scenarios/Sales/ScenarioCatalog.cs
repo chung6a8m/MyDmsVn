@@ -17,6 +17,10 @@ public sealed class ScenarioPermissionClient : IPermissionApiClient
         ["Sales.Receipts.Post"] = true,
     };
 
+    private readonly ScenarioTaskTracker _permissionTasks = new ScenarioTaskTracker();
+    public ScenarioGate<bool>? NextCheckGate { get; set; }
+    public IReadOnlyList<Task> OutstandingChecks => _permissionTasks.Outstanding;
+
     public void Set(string permissionKey, bool allowed)
     {
         if (!_decisions.ContainsKey(permissionKey)) throw new ArgumentException("Unknown UI Lab permission key.", nameof(permissionKey));
@@ -25,9 +29,17 @@ public sealed class ScenarioPermissionClient : IPermissionApiClient
 
     public Task<ApiResponse<PermissionDecisionDto>> CheckAsync(string permissionKey, CancellationToken cancellationToken)
     {
+        var gate = NextCheckGate;
+        NextCheckGate = null;
+        return _permissionTasks.Track(CheckCoreAsync(permissionKey, cancellationToken, gate));
+    }
+
+    private async Task<ApiResponse<PermissionDecisionDto>> CheckCoreAsync(string permissionKey, CancellationToken cancellationToken, ScenarioGate<bool>? gate)
+    {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(ApiResponse<PermissionDecisionDto>.Success(
-            new PermissionDecisionDto(permissionKey, _decisions.TryGetValue(permissionKey, out var allowed) && allowed)));
+        if (gate != null) await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return ApiResponse<PermissionDecisionDto>.Success(
+            new PermissionDecisionDto(permissionKey, _decisions.TryGetValue(permissionKey, out var allowed) && allowed));
     }
 }
 

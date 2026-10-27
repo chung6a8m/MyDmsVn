@@ -10,14 +10,14 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Ui.Tests;
 
+[Trait("Module", "Common")]
 public sealed class UiLabViewportTests
 {
     [Fact]
     public void Fixed_review_viewport_survives_review_tool_visibility_and_reports_actual_geometry()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, __) =>
         {
-            using var host = new UiLabForm();
-            host.ModuleSelector.SelectedIndex = 1;
+            using var host = new SecurityLabForm();
             host.Show();
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             var width = Assert.IsType<NumericUpDown>(Assert.Single(host.Controls.Find("ReviewViewportWidth", true)));
@@ -51,8 +51,7 @@ public sealed class UiLabViewportTests
     public void Review_mode_keeps_viewport_and_hides_developer_chrome_until_restored()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, __) =>
         {
-            using var host = new UiLabForm { ClientSize = new Size(1000, 700) };
-            host.ModuleSelector.SelectedIndex = 1;
+            using var host = new SecurityLabForm { ClientSize = new Size(1000, 700) };
             host.Show();
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             var width = Assert.IsType<NumericUpDown>(Assert.Single(host.Controls.Find("ReviewViewportWidth", true)));

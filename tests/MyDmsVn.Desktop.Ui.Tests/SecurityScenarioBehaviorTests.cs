@@ -9,6 +9,7 @@ using MyDmsVn.Desktop.UiLab.Scenarios;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
+[Trait("Module", "Security")]
 public sealed class SecurityScenarioBehaviorTests
 {
     [Fact]

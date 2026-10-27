@@ -1,17 +1,19 @@
 ﻿using System;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
+using MyDmsVn.Desktop.WinForms;
 
 namespace MyDmsVn.Desktop.UiLab;
 
-internal static class Program
+public static class UiLabEntry
 {
-    [STAThread]
-    private static void Main()
+    public static void RunSales() => Run(() => new SalesLabForm());
+    public static void RunSecurity() => Run(() => new SecurityLabForm());
+    private static void Run(Func<Form> create)
     {
         System.Windows.Forms.Application.EnableVisualStyles();
         System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
-        MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme =
-            MyDmsVn.Desktop.WinForms.BusinessCompactAppearance.CreateTheme(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Mode);
-        System.Windows.Forms.Application.Run(new UiLabForm());
+        BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(BootstrapThemeManager.CurrentTheme.Mode);
+        System.Windows.Forms.Application.Run(create());
     }
 }

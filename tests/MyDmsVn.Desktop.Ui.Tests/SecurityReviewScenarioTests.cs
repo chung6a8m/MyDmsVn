@@ -16,6 +16,7 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Ui.Tests;
 
+[Trait("Module", "Security")]
 public sealed class SecurityReviewScenarioTests
 {
     [Fact]
@@ -93,10 +94,8 @@ public sealed class SecurityReviewScenarioTests
     public void Held_password_conflict_can_be_released_from_its_modal_without_repeating_the_secret()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L03, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L03;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L03 && !host.IsResetting);
@@ -176,10 +175,8 @@ public sealed class SecurityReviewScenarioTests
     public void Close_save_waits_for_held_result_and_preserves_failed_editor(string fixtureOutcome, string expectedOutcome)
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
         {
-            using var host = new UiLabForm((_, _) => Task.FromResult(WorkspaceCloseChoice.Save));
+            using var host = new SecurityLabForm((_, _) => Task.FromResult(WorkspaceCloseChoice.Save));
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L10;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L10 && !host.IsResetting);
@@ -243,10 +240,8 @@ public sealed class SecurityReviewScenarioTests
     public void Close_save_dispatches_one_owned_write_and_clears_lab_presentation(bool directUser)
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
         {
-            using var host = new UiLabForm((_, _) => Task.FromResult(WorkspaceCloseChoice.Save));
+            using var host = new SecurityLabForm((_, _) => Task.FromResult(WorkspaceCloseChoice.Save));
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L10;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L10 && !host.IsResetting);
@@ -292,10 +287,8 @@ public sealed class SecurityReviewScenarioTests
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
         {
             var prompt = new TaskCompletionSource<WorkspaceCloseChoice>();
-            using var host = new UiLabForm((_, _) => prompt.Task);
+            using var host = new SecurityLabForm((_, _) => prompt.Task);
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L10;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L10 && !host.IsResetting);
@@ -332,10 +325,8 @@ public sealed class SecurityReviewScenarioTests
     public void Host_noop_grant_response_chains_unchanged_revision_to_next_key()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L07;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L07 && !host.IsResetting);
@@ -369,10 +360,8 @@ public sealed class SecurityReviewScenarioTests
     public void Review_reload_reports_dirty_editor_block_without_new_reads()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L10;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L10 && !host.IsResetting);
@@ -398,10 +387,8 @@ public sealed class SecurityReviewScenarioTests
     public void Host_membership_revision_fault_controls_reject_the_stale_loaded_revision(bool relatedRole)
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L04;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L04 && !host.IsResetting);
@@ -435,10 +422,8 @@ public sealed class SecurityReviewScenarioTests
     public void Host_persistent_membership_denial_keeps_role_management_independent()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L04, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L04;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L04 && !host.IsResetting);
@@ -539,10 +524,8 @@ public sealed class SecurityReviewScenarioTests
     public void Host_denied_import_preview_cannot_open_confirmation_or_apply_and_fault_is_one_shot()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L09, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L09;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L09 && !host.IsResetting);
@@ -574,10 +557,8 @@ public sealed class SecurityReviewScenarioTests
     public void Host_review_can_release_a_late_import_preview_without_republishing_it()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L09;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L09 && !host.IsResetting);
@@ -604,10 +585,8 @@ public sealed class SecurityReviewScenarioTests
     public void Explicit_review_mutation_replaces_scenario_preset()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L08;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L08 && !host.IsResetting);
@@ -630,10 +609,8 @@ public sealed class SecurityReviewScenarioTests
     public void Host_review_gate_can_restore_denied_users_then_hold_an_empty_users_read()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L02;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting &&
@@ -666,10 +643,8 @@ public sealed class SecurityReviewScenarioTests
     public void Host_can_arm_distinct_unheld_read_failures_for_one_reload()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L05, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.ScenarioSelector.SelectedItem = SecurityScenarioId.SEC_L05;
             Until(() => host.CurrentSecurityScenarioData?.Id == SecurityScenarioId.SEC_L05 && !host.IsResetting);
@@ -753,10 +728,8 @@ public sealed class SecurityReviewScenarioTests
     public void Host_uncertain_release_remains_available_when_ignore_owner_release_was_selected()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.SecurityReviewToggleButton.PerformClick();
             host.SecurityMutationOutcomeSelector.SelectedItem = "Uncertain";
@@ -781,10 +754,8 @@ public sealed class SecurityReviewScenarioTests
     public void Poisoned_reset_keeps_failure_visible_and_can_release_an_older_held_read()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {
-            using var host = new UiLabForm();
+            using var host = new SecurityLabForm();
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting);
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting);
             host.SecurityReviewToggleButton.PerformClick();
             host.SecurityHoldReadCheckBox.Checked = true;

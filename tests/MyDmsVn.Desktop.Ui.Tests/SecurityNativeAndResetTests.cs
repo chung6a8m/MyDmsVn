@@ -17,6 +17,7 @@ using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests;
 
+[Trait("Module", "Security")]
 public sealed class SecurityNativeAndResetTests
 {
     readonly ITestOutputHelper output;
@@ -749,10 +750,8 @@ public sealed class SecurityNativeAndResetTests
     public void Security_reset_drains_rearmed_held_reads_before_replacement(bool ignoresCancellation) =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {
-            using var form = new UiLabForm();
+            using var form = new SecurityLabForm();
             form.Show();
-            Until(() => form.CurrentSalesControl != null && !form.IsResetting);
-            form.ModuleSelector.SelectedIndex = 1;
             Until(() => form.CurrentSecurityControl != null && !form.IsResetting);
             for (var round = 0; round < 2; round++)
             {
@@ -783,10 +782,8 @@ public sealed class SecurityNativeAndResetTests
     public void Security_reset_timeout_poisons_host_until_old_response_is_released() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
         {
-            using var form = new UiLabForm();
+            using var form = new SecurityLabForm();
             form.Show();
-            Until(() => form.CurrentSalesControl != null && !form.IsResetting);
-            form.ModuleSelector.SelectedIndex = 1;
             Until(() => form.CurrentSecurityControl != null && !form.IsResetting);
             var old = form.CurrentSecurityControl!;
             var data = form.CurrentSecurityScenarioData!;
@@ -801,7 +798,6 @@ public sealed class SecurityNativeAndResetTests
             Assert.Contains("did not drain", form.StatusText);
             Assert.Same(old, form.CurrentSecurityControl);
             Assert.Same(data, form.CurrentSecurityScenarioData);
-            Assert.False(form.ModuleSelector.Enabled);
             Assert.False(form.ScenarioSelector.Enabled);
             form.ResetForTestAsync().GetAwaiter().GetResult();
             Assert.Same(old, form.CurrentSecurityControl);

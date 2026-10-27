@@ -16,6 +16,7 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 
+[Trait("Module", "Sales")]
 public sealed class UiLabToolbarReviewTests
 {
     [Fact]
@@ -193,7 +194,7 @@ public sealed class UiLabToolbarReviewTests
 
     private static void Run(SalesScenarioId id,
         Func<WorkspaceCloseState, CancellationToken, Task<WorkspaceCloseChoice>>? prompt,
-        Action<UiLabForm, WinFormsTestGuard, CancellationToken> action)
+        Action<SalesLabForm, WinFormsTestGuard, CancellationToken> action)
     {
         StaTest.Run(token =>
         {
@@ -204,10 +205,10 @@ public sealed class UiLabToolbarReviewTests
             startup.CreateControl();
             startup.BeginInvoke(new Action(() =>
             {
-                UiLabForm? form = null;
+                SalesLabForm? form = null;
                 try
                 {
-                    form = prompt == null ? new UiLabForm() : new UiLabForm(prompt);
+                    form = prompt == null ? new SalesLabForm() : new SalesLabForm(prompt);
                     form.Show();
                     Until(() => form.CurrentScenarioData != null && form.CurrentSalesControl != null &&
                         !form.IsResetting, token, "Initial UI Lab workspace did not activate.");

@@ -206,12 +206,12 @@ Capture sanitized screenshots with scenario ID, theme, physical scale and measur
 
 ## Commands and evidence discipline
 
-Follow [UI_LAB.md](UI_LAB.md) for locked restore and the currently implemented host launch. Select source-verified focused cases for the active task and confirm nonempty discovery. This example selects existing Security classes; inspect the discovered set before execution. Until UIL-T02 updates setup, some host tests still start Sales before switching to Security. Run GUI commands sequentially.
+Follow [UI_LAB.md](UI_LAB.md) for locked restore and the currently implemented host launch. Select source-verified focused cases for the active task and confirm nonempty discovery. This example selects existing Security classes; inspect the discovered set before execution. Security host tests start Security directly. Run GUI commands sequentially.
 
 ```powershell
 dotnet restore MyDmsVn.UiLab.sln --locked-mode
 if ($LASTEXITCODE -ne 0) { throw 'UiLab locked restore failed.' }
-dotnet build samples/MyDmsVn.Desktop.UiLab/MyDmsVn.Desktop.UiLab.csproj -c Debug -f net48 --no-restore
+dotnet build samples/MyDmsVn.Desktop.UiLab.Security/MyDmsVn.Desktop.UiLab.Security.csproj -c Debug -f net48 --no-restore
 if ($LASTEXITCODE -ne 0) { throw 'UiLab build failed.' }
 $results = 'TestResults/security-ui-lab-' + [guid]::NewGuid().ToString('N')
 dotnet test tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj `

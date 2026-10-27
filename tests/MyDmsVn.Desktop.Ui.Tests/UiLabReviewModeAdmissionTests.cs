@@ -9,16 +9,15 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Ui.Tests;
 
+[Trait("Module", "Common")]
 public sealed class UiLabReviewModeAdmissionTests
 {
     [Fact]
     public void Review_mode_from_fit_lab_preserves_current_viewport_until_it_is_restored()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, __) =>
         {
-            using var host = new UiLabForm { ClientSize = new Size(1000, 700) };
+            using var host = new SecurityLabForm { ClientSize = new Size(1000, 700) };
             host.Show();
-            Until(() => host.CurrentSalesControl != null && !host.IsResetting && host.StatusText.Contains("ready"));
-            host.ModuleSelector.SelectedIndex = 1;
             Until(() => host.CurrentSecurityControl != null && !host.IsResetting && host.StatusText.Contains("SQL-free Security"));
             var workspace = host.CurrentSecurityControl!;
             var size = workspace.ClientSize;
