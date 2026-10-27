@@ -25,3 +25,11 @@ These two full plans preserve task IDs, dated results, failures, commands, hashe
 Do not reactivate old plans, copy unresolved checkboxes into a future backlog or mark old failures PASS. New work requires an explicit Owner selection, a new dated plan and a current-source review. Remove former branch names from **live Codex context and current documentation**, but do not rewrite historical evidence to erase provenance. [Repository instructions](../../../AGENTS.md) and [context](../../../AI_CONTEXT.md) are the active entry points.
 
 Documentation-only verification: inspect the diff, local link targets/anchors, archive/status routing and Markdown encoding; SQL/GUI execution is neither required nor claimed.
+
+## Documentation verification (2026-10-27)
+
+- Comparing the archive branch with inspected `main`: **24 changed Markdown paths only**; no application source, tests, scripts, runtime configuration, Git submodules or dependency pins changed.
+- Both archived plan bodies match the original plan text after removing the archive notice and normalizing rebased relative links. **11 Sidebar and 21 Security original section headings** remain on their compatibility pages so existing anchors retain a target.
+- **704 relative Markdown link occurrences** across the 24 changed paths resolved to tracked files/directories in the archive branch tree; **zero missing targets**. This verifies local targets, not GitHub rendering or every external URL.
+- The prior branch name is absent from refreshed active entry/context pages, plan index, technical guidance and compatibility pages. Historic `docs/HISTORY.md` and archived plan/evidence provenance are preserved deliberately and are not active work instructions.
+- This change is documentation-only. **SQL, GUI, product/package and release tests: NOT RUN / NOT CLAIMED** for the archival commit.
