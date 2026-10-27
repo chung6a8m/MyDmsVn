@@ -390,7 +390,7 @@ public sealed class SecurityNativeAndResetTests
                     Assert.Contains(Descendants(dialog).OfType<Label>(), item => item.Visible && item.Text == "Vai trò");
                     var roles = Assert.Single(Descendants(dialog).OfType<ComboBox>());
                     Assert.Equal("Vai trò", roles.AccessibleName);
-                    Assert.Equal("Hủy", Assert.IsType<Button>(dialog.CancelButton).Text);
+                    Assert.Equal("Hủy", Assert.IsType<BootstrapButton>(dialog.CancelButton).Text);
                     Assert.True(roles.Focus());
                     NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
                     Assert.Equal(DialogResult.Cancel, dialog.DialogResult);

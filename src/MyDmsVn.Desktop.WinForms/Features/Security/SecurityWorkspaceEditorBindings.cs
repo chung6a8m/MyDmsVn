@@ -31,7 +31,7 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly RadioButton _inherit = new BootstrapRadioButton { Text = "Theo vai trò", AutoSize = true };
     readonly RadioButton _allow = new BootstrapRadioButton { Text = "Cho phép", AutoSize = true };
     readonly RadioButton _deny = new BootstrapRadioButton { Text = "Từ chối", AutoSize = true };
-    readonly Label _status = new() { AutoSize = true };
+    readonly Label _status = new BootstrapLabel { AutoSize = true, MaximumSize = new System.Drawing.Size(460, 0), AccessibleRole = AccessibleRole.Alert, TextRole = BootstrapTextRole.Warning };
     readonly Label _directPreview = new BootstrapLabel { Dock = DockStyle.Bottom, Height = 58, AutoEllipsis = true, AccessibleName = "Kết quả dự kiến và quyết định đã lưu" };
     readonly FlowLayoutPanel _recovery = Commands();
     readonly Button _recoveryReview;
@@ -61,6 +61,8 @@ internal sealed class SecurityWorkspaceEditorBindings
     SecurityRoleDto? _grantRoleSnapshot;
     HashSet<string> _roleGrantedKeys = new(StringComparer.Ordinal);
     bool _rendering;
+    SecurityMutationFeedback? _mutationFeedbackSnapshot;
+    string? _recoveryMutationMessage;
     SecurityWorkspaceViewModel Vm => _control.ViewModel;
 
     sealed class GrantCatalogEntry
@@ -184,31 +186,41 @@ internal sealed class SecurityWorkspaceEditorBindings
         {
             var userId = Vm.SelectedUserId;
             if (!CanManageMembership() || !await AdmitAsync() || Vm.SelectedUserId != userId || !CanManageMembership()) return;
-            using var dialog = new Form { Text = "Gán vai trò — " + Vm.SelectedUser!.DisplayName, Width = 450, Height = 210, StartPosition = FormStartPosition.CenterParent };
-            var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
-            var roles = new ComboBox { Width = 390, DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Name", AccessibleName = "Vai trò" };
+            var user = Vm.SelectedUser!;
+            using var dialog = new SecurityDecisionDialog("Gán vai trò — " + user.DisplayName, "Người dùng: " + user.DisplayName + " (#" + user.UserId + ")", "Xác nhận gán");
+            var roles = new BootstrapComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Name", AccessibleName = "Vai trò" };
             foreach (var role in Vm.Roles.Items) roles.Items.Add(role);
-            var ok = new Button { Text = "Xác nhận gán", AutoSize = true, DialogResult = DialogResult.OK };
-            var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
-            fields.Controls.Add(new Label { Text = "Vai trò", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
-            fields.Controls.Add(roles); fields.Controls.Add(ok); fields.Controls.Add(cancel);
-            dialog.Controls.Add(fields);
-            dialog.AcceptButton = ok;
-            dialog.CancelButton = cancel;
+            dialog.Body.Controls.Add(roles);
+            dialog.Body.Controls.Add(new BootstrapLabel { Text = "Vai trò", AutoSize = true, Dock = DockStyle.Top });
+            dialog.Message.BringToFront();
+            dialog.Shown += (_, _) => roles.Focus();
             BusinessCompactAppearance.Apply(dialog);
-            if (dialog.ShowDialog(control) == DialogResult.OK && roles.SelectedItem is SecurityRoleDto selected) await Vm.SetMembershipAsync(selected.RoleId, true, default);
+            if (dialog.ShowOwned(control) == DialogResult.OK && roles.SelectedItem is SecurityRoleDto selected &&
+                CanManageMembership() && Vm.SelectedUserId == user.UserId && Vm.SelectedUser?.AssignmentRevision == user.AssignmentRevision &&
+                Vm.Roles.Items.Any(role => role.RoleId == selected.RoleId && role.AssignmentRevision == selected.AssignmentRevision))
+                await Vm.SetMembershipAsync(selected.RoleId, true, default);
         });
         _removeRole = Add(membership, "Gỡ vai trò", async () =>
         {
             var user = Vm.SelectedUser;
             var index = control.UserDetail.Memberships.SelectedIndex;
-            if (!CanManageMembership() || user == null || index < 0 || index >= user.RoleIds.Count || !await AdmitAsync() ||
-                Vm.SelectedUserId != user.UserId || !CanManageMembership()) return;
+            if (!CanManageMembership() || user == null || index < 0 || index >= user.RoleIds.Count) return;
             var roleId = user.RoleIds[index];
+            if (!await AdmitAsync() ||
+                Vm.SelectedUserId != user.UserId || !CanManageMembership()) return;
+            // A same-user Save admission may reload both DTOs. Keep the originating
+            // role ID while taking revisions from the newly admitted authorized load.
+            user = Vm.SelectedUser!;
+            if (!user.RoleIds.Contains(roleId)) return;
             var role = Vm.Roles.Items.FirstOrDefault(r => r.RoleId == roleId);
             if (role == null) return;
             var name = role.Name;
-            if (MessageBox.Show(control, "Gỡ " + name + " khỏi " + user.DisplayName + "?", "Gỡ vai trò", MessageBoxButtons.OKCancel) == DialogResult.OK) await Vm.SetMembershipAsync(roleId, false, default);
+            using var dialog = new SecurityDecisionDialog("Gỡ vai trò", "Gỡ " + name + " (#" + roleId + ") khỏi " + user.DisplayName + " (#" + user.UserId + ")?", "Gỡ vai trò");
+            ((BootstrapButton)dialog.AcceptButton!).Variant = BootstrapVariant.Danger;
+            if (dialog.ShowOwned(control) == DialogResult.OK && CanManageMembership() && Vm.SelectedUserId == user.UserId &&
+                Vm.SelectedUser?.AssignmentRevision == user.AssignmentRevision &&
+                Vm.Roles.Items.Any(item => item.RoleId == roleId && item.AssignmentRevision == role.AssignmentRevision))
+                await Vm.SetMembershipAsync(roleId, false, default);
         });
         ((BootstrapButton)_assignRole).Outline = false;
         ((BootstrapButton)_removeRole).Variant = BootstrapVariant.Danger;
@@ -221,17 +233,19 @@ internal sealed class SecurityWorkspaceEditorBindings
         _resetPassword = Add(profile, "Đặt lại mật khẩu…", () => PasswordAsync());
         _changeUserState = Add(profile, "Đổi trạng thái…", () => ActivationAsync(true));
         _recovery.Dock = DockStyle.Bottom;
-        _recovery.Height = 54;
+        _recovery.AutoSize = true;
+        _recovery.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _recovery.AutoScroll = false;
         _recovery.Controls.Add(_status);
-        Add(_recovery, "Tải lại để đối chiếu", async () => { await Vm.ReloadForComparisonAsync(default); }, themed: false);
+        ((BootstrapButton)Add(_recovery, "Tải lại để đối chiếu", async () => { await Vm.ReloadForComparisonAsync(default); })).Variant = BootstrapVariant.Secondary;
         _recoveryReview = Add(_recovery, "Đã đối chiếu — lập diff mới", () =>
         {
-            if (control.RecoveryConfirmationOverride?.Invoke() ??
-                MessageBox.Show(control, "Giữ ý định và tính lại thay đổi từ dữ liệu vừa tải? Không xác nhận kết quả lệnh chưa rõ.",
-                    "Đối chiếu", MessageBoxButtons.OKCancel) == DialogResult.OK)
+            using var dialog = new SecurityDecisionDialog("Đối chiếu", "Giữ ý định và tính lại thay đổi từ dữ liệu vừa tải? Không xác nhận kết quả lệnh chưa rõ.", "Lập diff mới");
+            if (control.RecoveryConfirmationOverride?.Invoke() ?? dialog.ShowOwned(control) == DialogResult.OK)
                 Vm.ReviewRecoveryAndRebase();
             return Task.CompletedTask;
-        }, themed: false);
+        });
+        ((BootstrapButton)_recoveryReview).Variant = BootstrapVariant.Secondary;
         control.UserDetail.Controls.Add(_recovery);
         GuardTabs(control.Tabs);
         GuardTabs(control.UserDetail.Tabs);
@@ -309,8 +323,16 @@ internal sealed class SecurityWorkspaceEditorBindings
         _rendering = true;
         try
         {
-            _status.Text = Vm.EditingStatus;
-            var actionFeedback = Vm.LastMutationOperation == SecurityAdministrationOperationDto.SetActive
+            // Assignment saves have their own partial/unknown status. A previously
+            // reviewed maintenance failure must not replace that later operation's copy.
+            if (!ReferenceEquals(_mutationFeedbackSnapshot, Vm.LastMutationFeedback))
+            {
+                _mutationFeedbackSnapshot = Vm.LastMutationFeedback;
+                _recoveryMutationMessage = Vm.RequiresRecovery ? _mutationFeedbackSnapshot?.Message : null;
+            }
+            if (!Vm.RequiresRecovery) _recoveryMutationMessage = null;
+            _status.Text = _recoveryMutationMessage ?? Vm.EditingStatus;
+            var actionFeedback = !Vm.RequiresRecovery && Vm.LastMutationOperation == SecurityAdministrationOperationDto.SetActive
                 ? Vm.LastMutationFeedback?.Message : null;
             _control.UserDetail.ActionFeedback.Text = Vm.LastMutationTarget == SecurityAdministrationTargetDto.User &&
                 Vm.LastMutationTargetId == Vm.SelectedUserId ? actionFeedback ?? "" : "";
@@ -469,7 +491,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             !Vm.Roles.IsCurrent(Vm.OwnerVersion) ? "Vai trò chưa khả dụng — tải lại dữ liệu trước khi thay đổi." :
             Vm.IsBusy ? "Đang xử lý thay đổi." :
             Vm.RequiresRecovery ? "Cần đối chiếu kết quả trước khi thay đổi." : "";
-        if (hint.Length == 0 && Vm.LastMutationOperation == SecurityAdministrationOperationDto.SetMembership &&
+        if (hint.Length == 0 && !Vm.RequiresRecovery && Vm.LastMutationOperation == SecurityAdministrationOperationDto.SetMembership &&
             Vm.LastMutationTarget == SecurityAdministrationTargetDto.User && Vm.LastMutationTargetId == user?.UserId)
             hint = Vm.LastMutationFeedback?.Message ?? "";
         var canManage = CanManageMembership();
@@ -853,12 +875,18 @@ internal sealed class SecurityWorkspaceEditorBindings
 
     async Task ActivationAsync(bool userTarget)
     {
-        if (!await AdmitAsync()) return;
+        var targetId = userTarget ? Vm.SelectedUserId : Vm.SelectedRoleId;
+        if (!await AdmitAsync() || !Vm.IsCurrent || (userTarget ? Vm.SelectedUserId : Vm.SelectedRoleId) != targetId) return;
         var user = Vm.SelectedUser; var role = Vm.SelectedRole;
         if (userTarget ? user == null || user.IsProtectedAccount : role == null) return;
         var name = userTarget ? user!.DisplayName : role!.Name;
         var active = userTarget ? user!.IsActive : role!.IsActive;
-        if (MessageBox.Show(_control, (active ? "Ngừng hoạt động " : "Kích hoạt ") + name + (userTarget ? "?" : "? Các thành viên vẫn được giữ; quyền của vai trò chỉ có hiệu lực khi hoạt động."), "Đổi trạng thái", MessageBoxButtons.OKCancel) != DialogResult.OK) return;
+        var revision = userTarget ? user!.AssignmentRevision : role!.AssignmentRevision;
+        using var dialog = new SecurityDecisionDialog("Đổi trạng thái", (active ? "Ngừng hoạt động " : "Kích hoạt ") + name + " (#" + targetId + ")?" +
+            (userTarget ? "" : " Các thành viên và quyền đã cấp vẫn được lưu; quyền của vai trò chỉ có hiệu lực khi hoạt động."));
+        if (dialog.ShowOwned(_control) != DialogResult.OK || !Vm.IsCurrent || Vm.IsBusy || Vm.RequiresRecovery ||
+            (userTarget ? Vm.SelectedUserId : Vm.SelectedRoleId) != targetId ||
+            (userTarget ? Vm.SelectedUser?.AssignmentRevision : Vm.SelectedRole?.AssignmentRevision) != revision) return;
         await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(userTarget ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role,
             SecurityAdministrationOperationDto.SetActive, userTarget ? user!.UserId : role!.RoleId, isActive: !active,
             expectedRevision: userTarget ? user!.AssignmentRevision : role!.AssignmentRevision), default);
