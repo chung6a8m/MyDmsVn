@@ -1,14 +1,12 @@
 # Security UI Labs — review guide
 
-This guide defines repeatable review procedures for the planned Security workspace. It is not an execution ledger or an approval record. The sole task-state owner is the [Security implementation
-plan](../plans/20261025-002-security-administration-ui-lab-first.md); the [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) is normative.
+This is the repeatable review guide for the **implemented** Security workspace (SQL-free Lab candidate and production Local composition). It is **not** a current execution ledger or a replacement for explicit acceptance. The historical [Security execution plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md), [SQL-free candidate evidence](../evidence/security/20261025-security-ui-lab.md) and [Local/SQL evidence](../evidence/security/20261025-security-local-sql.md) own dated gate decisions and remaining gaps. SEC-T05 was Owner-approved on 2026-10-26, followed by bounded SEC-T06–SEC-T08; incomplete SEC-T04/native/attended checks are still open. The [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) remains normative. The [execution index](../plans/README.md) currently has no active roadmap.
 
-Read the [UI Lab runbook](UI_LAB.md), [test policy](../TEST_POLICY.md), [test commands](../../tests/README.md) and [repository instructions](../../AGENTS.md) before running a candidate. This documentation
-change runs no GUI or SQL checks and establishes no runtime acceptance.
+Read the [UI Lab runbook](UI_LAB.md), [test policy](../TEST_POLICY.md), [test commands](../../tests/README.md) and [repository instructions](../../AGENTS.md) before running a candidate. Reading or updating this guide does not run GUI/SQL checks or grant runtime acceptance.
 
 ## Candidate boundary and prerequisites
 
-- Baseline: `v1a-pro-ui-next` at `0216701835cc3326124a94760186989c1ac4f729`; baseline WinFormsKit gitlink: `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Record the actual candidate and gitlinks for every
+- Original historical baseline: commit `0216701835cc3326124a94760186989c1ac4f729`; baseline WinFormsKit gitlink: `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Record the actual candidate and gitlinks for every
   review; baseline facts are not candidate evidence.
 - `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` were proposed relative to that baseline and are now implemented in the production WinForms and Desktop.Application assemblies. The Lab constructs those actual types, not a sample-only imitation.
 - The production factory stayed on the legacy control until the Owner approved SEC-T05 on 2026-10-26. SEC-T06 then cut over to the reviewed candidate; SEC-T07 focused SQL integration and SEC-T08 handoff are recorded in the [plan](../plans/20261025-002-security-administration-ui-lab-first.md) and [post-gate evidence](../evidence/security/20261025-security-local-sql.md).
@@ -236,7 +234,7 @@ decision in the sole [plan](../plans/20261025-002-security-administration-ui-lab
 | Isolation and lifecycle | `[pending: no-SQL composition, redaction, cancellation/drain/disposal and timeout outcome]` |
 | Findings and corrections | `[pending: original failures, fixes, affected reruns, remaining issues and explicit exceptions]` |
 | Owner review | `[pending: Owner identity, review date/time, exact candidate, explicit approve/reject decision and scope]` |
-| Next-work dependency | `[pending: SEC-T05 decision recorded in the plan before SEC-T06, SEC-T07 or SEC-T08 proceeds]` |
+| Next-work dependency (template for a future candidate) | `[requires fresh dated Owner gate for that candidate; original SEC-T05 approval and SEC-T06–T08 outcomes are frozen in the archive]` |
 
 Approval requires an explicit dated Owner statement tied to the reviewed candidate and declared exceptions. A PR merge, document approval, screenshot acknowledgement or green fake test suite does not
 substitute for that decision. If the reviewed UI changes before Local cutover, record the difference and obtain review of the affected behavior; do not substitute an unreviewed implementation under the

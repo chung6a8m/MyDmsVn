@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. Use the [execution index](../plans/README.md) for current work; [UI-NEXT](../ui-next/README.md) retains historical candidate records. The [archive boundary](../archive/20261023-pre-ui-next/README.md) retires earlier queues without waiving unfinished acceptance. [TEST_POLICY](../TEST_POLICY.md) remains the sole test-execution policy.
+Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. Use the [execution index](../plans/README.md) for current work; [UI-NEXT](../ui-next/README.md) retains historical candidate records. The [latest archive](../archive/20261027-main-roadmap-reset/README.md) retires Sidebar and Security bounded execution plans; [older archives](../archive/README.md) and unfinished acceptance remain preserved. No successor roadmap is selected. [TEST_POLICY](../TEST_POLICY.md) remains the sole test-execution policy.
 
 | ADR | Decision | Current status |
 |---|---|---|

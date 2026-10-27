@@ -1,6 +1,6 @@
 # Architecture — MyDmsVn
 
-**Inspected architecture baseline:** Local v1 at `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43), 2026-10-23. The [execution index](plans/README.md) selects current authorized work; [UI-NEXT](ui-next/README.md) retains later design/implementation evidence. The A0 routing update does not re-audit every technical statement below. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains source contracts and candidate acceptance limits.
+**Inspected architecture baseline:** Local v1 at historical commit `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43), 2026-10-23. The [execution index](plans/README.md) currently has no selected roadmap after [the 2026-10-27 main archive](archive/20261027-main-roadmap-reset/README.md); [UI-NEXT](ui-next/README.md) retains later design/implementation evidence. The A0 routing update does not re-audit every technical statement below. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains source contracts and candidate acceptance limits.
 
 ## Implemented Sales and active UI direction
 

@@ -4,6 +4,10 @@
 
 This page is historical provenance, not an execution queue or test policy. Current scheduling follows the [execution index](plans/README.md). Historical activation checkpoints below retain their original dates/statuses; [the archive index](archive/README.md) records the dated boundaries. Runtime behavior follows current source/specifications and execution follows [TEST_POLICY](TEST_POLICY.md).
 
+## 2026-10-27 — main merged, roadmap reset
+
+[PR #52](https://github.com/chung6a8m/MyDmsVn/pull/52) merged the previous development line into `main` at `6eee394263a28c33360877fcf3feb6e0dcdab8ad`, including [Sidebar PR #50](https://github.com/chung6a8m/MyDmsVn/pull/50) and [Security PR #51](https://github.com/chung6a8m/MyDmsVn/pull/51). The [new archive](archive/20261027-main-roadmap-reset/README.md) freezes both bounded plans and links their original evidence. The [execution index](plans/README.md) is now empty; no successor workstream is selected. Active AGENTS/AI_CONTEXT and documentation entry points use `main`, while prior names, candidate findings, incomplete Security SEC-T04/attended checks, SAL limits and release obligations remain historical evidence rather than a new backlog. This documentation change does not run tests or grant acceptance.
+
 ## 2026-10-25 — local documentation authority
 
 After the archive, the Owner requested removal of directions tied to the separate documentation repository. Current reading, decision ownership and work selection now use local [AGENTS](../AGENTS.md), [Architecture](ARCHITECTURE.md), [ADRs](adr/README.md) and the [execution index](plans/README.md), under explicit Owner authorization. External links in historical records remain provenance only; they add no required reading, synchronization, approval or publication dependency. The next roadmap remains unselected.

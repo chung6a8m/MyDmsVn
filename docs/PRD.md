@@ -1,6 +1,6 @@
 # Product requirements — MyDmsVn
 
-**Scope reference:** Local v1 on net48, inspected 2026-10-23 at `v1a-pro-ui-next@7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43 and migrated assessment). Current scheduling follows the [execution index](plans/README.md). [UI-NEXT](ui-next/README.md) retains later UI design/implementation evidence; the A0 routing update adds no business or production-release scope.
+**Scope reference:** Local v1 on net48, inspected 2026-10-23 at historical commit `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43 and migrated assessment). No roadmap is selected after the [2026-10-27 main archive](archive/20261027-main-roadmap-reset/README.md); future scheduling follows the [execution index](plans/README.md). [UI-NEXT](ui-next/README.md) retains later UI design/implementation evidence; the A0 routing update adds no business or production-release scope.
 
 The [archive boundary](archive/20261023-pre-ui-next/README.md) retires previous plans and excludes unfinished acceptance without waiving it. Sales and schema10 are implemented in source. [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific runnable automation PASS; native125, attended observations and dated Owner acceptance remain OPEN. BCF/BCI/GUI-P5/L2DB/RESP retain their recorded signed scopes. [Production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED.
 
