@@ -378,7 +378,9 @@ public sealed class SecurityWorkspaceControlTests
             var workspace = lab.CurrentSecurityControl!;
             workspace.UserDetail.Tabs.SelectedIndex = 3;
             Assert.True(workspace.ViewModel.BeginDirectPermission("Sales.Receipts.Post"));
-            Wait(workspace.ViewModel.PreviewImportAsync(PermissionImportTargetTypeDto.User, "invalid JSON", default));
+            workspace.SetImportDialogs(() => "invalid JSON", _ => false);
+            workspace.UserImportButton.PerformClick();
+            Wait(workspace.LastOperation);
             Assert.False(string.IsNullOrWhiteSpace(workspace.ViewModel.ImportStatus));
             var tab = workspace.UserDetail.Tabs.TabPages[3];
             var selector = Assert.Single(Descendants(tab, typeof(ComboBox)).Cast<ComboBox>());
@@ -1711,6 +1713,65 @@ public sealed class SecurityWorkspaceControlTests
         dialogError?.Throw();
         Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
+
+    [Fact]
+    public void Held_password_mutation_closes_and_scrubs_its_modal_on_session_replacement_before_late_completion() =>
+        Run(SecurityScenarioId.SEC_L03, (control, data) =>
+        {
+            var gate = data.Administration.HoldNextMutation(true);
+            var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(),
+                button => button.Text == "Đặt lại mật khẩu…");
+            ExceptionDispatchInfo? dialogError = null;
+            BootstrapTextBox? secret = null;
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>()
+                    .FirstOrDefault(form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+                if (dialog == null) return;
+                timer.Stop();
+                try
+                {
+                    secret = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog),
+                        field => field.AccessibleName == "Mật khẩu mới"));
+                    secret.Text = "replacement-session-secret";
+                    Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(),
+                        button => button.Text == "Xác nhận").PerformClick();
+                    Assert.True(control.ViewModel.IsBusy);
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+
+                    data.Session.Replace();
+                    Assert.Empty(secret.Text);
+                    Assert.False(control.ViewModel.IsCurrent);
+                    gate.Complete(MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Failure(
+                        new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.BadRequest,
+                            "ValidationError", "Late fixture outcome.")));
+                }
+                catch (Exception error)
+                {
+                    dialogError = ExceptionDispatchInfo.Capture(error);
+                    gate.Cancel();
+                    if (!dialog.IsDisposed) dialog.Close();
+                }
+            };
+            timer.Start();
+            reset.PerformClick();
+            Assert.False(timer.Enabled, "The held password dialog did not reach session replacement.");
+            dialogError?.Throw();
+            Until(() => data.Administration.OutstandingOperations.All(operation => operation.IsCompleted));
+            System.Windows.Forms.Application.DoEvents();
+
+            Assert.NotNull(secret);
+            Assert.Empty(secret!.Text);
+            Assert.DoesNotContain(System.Windows.Forms.Application.OpenForms.Cast<Form>(),
+                form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+            Assert.Empty(control.Users.Items);
+            Assert.Empty(control.Roles.Items);
+            Assert.Null(control.ViewModel.LastMutationFeedback);
+            Assert.DoesNotContain("replacement-session-secret",
+                string.Join(" ", data.Journal.Entries.Select(entry => entry.ToString())));
+            Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
     [Theory]
     [InlineData("create-user", "success")]
     [InlineData("edit-user", "success")]

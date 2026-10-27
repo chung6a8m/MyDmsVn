@@ -16,6 +16,7 @@ public sealed partial class SecurityWorkspaceControl
     private Func<string, bool> _confirmImport = null!;
     private PermissionImportTargetTypeDto? _importTarget;
     private int? _importTargetId;
+    private bool _importPresentationOperationActive;
     private readonly Label _userImportStatus = new BootstrapLabel { Dock = DockStyle.Bottom, Height = 28, AccessibleName = "Trạng thái nhập quyền riêng", TextRole = BootstrapTextRole.Muted };
     private readonly Label _roleImportStatus = new BootstrapLabel { Dock = DockStyle.Bottom, Height = 28, AccessibleName = "Trạng thái nhập quyền vai trò", TextRole = BootstrapTextRole.Muted };
 
@@ -52,14 +53,25 @@ public sealed partial class SecurityWorkspaceControl
     private void ImportChanged(object? sender, EventArgs args)
     {
         var status = ViewModel.ImportStatus;
-        // Direct ViewModel-driven Lab/review calls have no picker context. Present
-        // their feedback in the visible object context, never in both detail panes.
-        var target = _importTarget ?? (Tabs.SelectedIndex == 1 ? PermissionImportTargetTypeDto.Role : PermissionImportTargetTypeDto.User);
+        var preview = ViewModel.ImportPreview;
+        if (ViewModel.IsBusy && !_importPresentationOperationActive && preview == null)
+        {
+            // A caller bypassed this presentation owner. Do not attach an unknown
+            // operation to a stale picker target or whichever tab happens to be visible.
+            _importTarget = null;
+            _importTargetId = null;
+        }
+        if (preview != null)
+        {
+            // A direct Lab/review preview carries its own stable target and revision.
+            _importTarget = preview.Import.TargetType;
+            _importTargetId = preview.Import.TargetId;
+        }
+        var target = _importTarget;
         _userImportStatus.Text = target == PermissionImportTargetTypeDto.User &&
-            (_importTarget == null ||
-            ViewModel.SelectedUserId == _importTargetId || ViewModel.SelectedUserId == null) ? status : "";
+            (ViewModel.SelectedUserId == _importTargetId || ViewModel.SelectedUserId == null) ? status : "";
         _roleImportStatus.Text = target == PermissionImportTargetTypeDto.Role &&
-            (_importTarget == null || ViewModel.SelectedRoleId == _importTargetId || ViewModel.SelectedRoleId == null) ? status : "";
+            (ViewModel.SelectedRoleId == _importTargetId || ViewModel.SelectedRoleId == null) ? status : "";
         _userImportStatus.Visible = !string.IsNullOrWhiteSpace(_userImportStatus.Text);
         _roleImportStatus.Visible = !string.IsNullOrWhiteSpace(_roleImportStatus.Text);
         UserImportButton.Enabled = !ViewModel.IsBusy && !ViewModel.RequiresRecovery &&
@@ -77,33 +89,38 @@ public sealed partial class SecurityWorkspaceControl
             (targetType == PermissionImportTargetTypeDto.User ? ViewModel.SelectedUserId : ViewModel.SelectedRoleId) != targetId) return;
         _importTarget = targetType;
         _importTargetId = targetId;
-        string? json;
-        try { json = _selectImportJson(); }
-        catch
+        _importPresentationOperationActive = true;
+        try
         {
-            var status = targetType == PermissionImportTargetTypeDto.User ? _userImportStatus : _roleImportStatus;
-            status.Text = "Không đọc được tệp JSON";
-            status.Visible = true;
-            return;
+            string? json;
+            try { json = _selectImportJson(); }
+            catch
+            {
+                var status = targetType == PermissionImportTargetTypeDto.User ? _userImportStatus : _roleImportStatus;
+                status.Text = "Không đọc được tệp JSON";
+                status.Visible = true;
+                return;
+            }
+            if (json == null) return;
+            if (!ViewModel.IsCurrent || IsDisposed ||
+                (targetType == PermissionImportTargetTypeDto.User ? ViewModel.SelectedUserId : ViewModel.SelectedRoleId) != targetId) return;
+            if (!await ViewModel.PreviewImportAsync(targetType, json, CancellationToken.None)) return;
+
+            var preview = ViewModel.ImportPreview;
+            if (preview == null) return;
+            var additions = preview.Additions.Take(10).Select(item => item.PermissionKey).ToArray();
+            var summary = "Đối tượng: " + preview.TargetName + " (#" + preview.Import.TargetId + ")" + Environment.NewLine +
+                "Quyền sẽ thêm: " + preview.Additions.Count + Environment.NewLine +
+                "Revision: " + preview.TargetRevision + Environment.NewLine +
+                "Catalog digest: " + preview.CatalogDigest + Environment.NewLine +
+                string.Join(Environment.NewLine, additions);
+            if (preview.Additions.Count > additions.Length)
+                summary += Environment.NewLine + "… và " + (preview.Additions.Count - additions.Length) + " quyền khác";
+
+            var confirmed = _confirmImport(summary);
+            await ViewModel.ApplyImportPreviewAsync(targetType, json, confirmed, CancellationToken.None);
         }
-        if (json == null) return;
-        if (!ViewModel.IsCurrent || IsDisposed ||
-            (targetType == PermissionImportTargetTypeDto.User ? ViewModel.SelectedUserId : ViewModel.SelectedRoleId) != targetId) return;
-        if (!await ViewModel.PreviewImportAsync(targetType, json, CancellationToken.None)) return;
-
-        var preview = ViewModel.ImportPreview;
-        if (preview == null) return;
-        var additions = preview.Additions.Take(10).Select(item => item.PermissionKey).ToArray();
-        var summary = "Đối tượng: " + preview.TargetName + " (#" + preview.Import.TargetId + ")" + Environment.NewLine +
-            "Quyền sẽ thêm: " + preview.Additions.Count + Environment.NewLine +
-            "Revision: " + preview.TargetRevision + Environment.NewLine +
-            "Catalog digest: " + preview.CatalogDigest + Environment.NewLine +
-            string.Join(Environment.NewLine, additions);
-        if (preview.Additions.Count > additions.Length)
-            summary += Environment.NewLine + "… và " + (preview.Additions.Count - additions.Length) + " quyền khác";
-
-        var confirmed = _confirmImport(summary);
-        await ViewModel.ApplyImportPreviewAsync(targetType, json, confirmed, CancellationToken.None);
+        finally { _importPresentationOperationActive = false; }
     }
 
     private string? SelectImportJson()

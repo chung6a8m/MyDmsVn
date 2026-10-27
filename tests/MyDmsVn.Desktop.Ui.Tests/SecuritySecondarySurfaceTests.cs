@@ -147,6 +147,31 @@ public sealed class SecuritySecondarySurfaceTests
         });
 
     [Fact]
+    public void Direct_role_import_feedback_uses_preview_owner_instead_of_visible_user_or_stale_picker_target() =>
+        Run(SecurityScenarioId.SEC_L01, (control, _) =>
+        {
+            var userJson = "{\"schemaVersion\":1,\"targetType\":\"User\",\"targetId\":101,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}";
+            control.SetImportDialogs(() => userJson, _ => false);
+            control.UserImportButton.PerformClick();
+            Pump(control.LastOperation);
+
+            control.Tabs.SelectedIndex = 0;
+            control.ViewModel.SelectRole(202);
+            var roleJson = "{\"schemaVersion\":1,\"targetType\":\"Role\",\"targetId\":202,\"entries\":[{\"permissionKey\":\"Sales.Receipts.Read\",\"decision\":\"Allow\"}]}";
+            Pump(control.ViewModel.PreviewImportAsync(PermissionImportTargetTypeDto.Role, roleJson, default));
+
+            var statuses = Children(control).OfType<Label>().ToArray();
+            var userStatus = Assert.Single(statuses, label => label.AccessibleName == "Trạng thái nhập quyền riêng");
+            var roleStatus = Assert.Single(statuses, label => label.AccessibleName == "Trạng thái nhập quyền vai trò");
+            Assert.Equal(control.ViewModel.ImportStatus, roleStatus.Text);
+            control.Tabs.SelectedIndex = 1;
+            System.Windows.Forms.Application.DoEvents();
+            Assert.True(roleStatus.Visible);
+            Assert.Empty(userStatus.Text);
+            Assert.False(userStatus.Visible);
+        });
+
+    [Fact]
     public void Lab_import_review_separates_developer_faults_from_confirmation()
     {
         Run(SecurityScenarioId.SEC_L01, (_, __) =>
