@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Server.Infrastructure.Persistence;
 using Microsoft.Data.SqlClient;
 
 namespace MyDmsVn.Server.Infrastructure.Operations;
@@ -51,15 +51,15 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
         "(objectPermission.permission_name = N'SELECT' AND candidate.name IN (" +
         "N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
-        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions', " +
+        "N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'StockValuationEntries', N'StockLedger', N'StockBalances', N'SchemaVersions', " +
         "N'SystemSecuritySettings')) OR " +
         "(objectPermission.permission_name = N'INSERT' AND candidate.name IN (" +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
-        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances')) OR " +
+        "N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'StockValuationEntries', N'StockLedger', N'StockBalances')) OR " +
         "(objectPermission.permission_name = N'UPDATE' AND candidate.name IN (" +
         "N'Users', N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
-        "N'GoodsReceiptLines', N'GoodsReceiptNumberSequence', N'StockBalances')) OR " +
-        "(objectPermission.permission_name = N'DELETE' AND candidate.name = N'GoodsReceiptLines')))) OR " +
+        "N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'SalesReceiptNumberSequence', N'GoodsReceiptNumberSequence', N'StockBalances')) OR " +
+        "(objectPermission.permission_name = N'DELETE' AND candidate.name IN (N'GoodsReceiptLines', N'SalesReceiptLines'))))) OR " +
         "EXISTS (SELECT 1 FROM sys.tables AS ownerTable " +
         "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = ownerTable.schema_id " +
         "INNER JOIN sys.columns AS candidate ON candidate.object_id = ownerTable.object_id " +
@@ -72,11 +72,11 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
         "(checkedPermission.permission_name = N'SELECT' AND ownerTable.name IN (" +
         "N'Users', N'Roles', N'UserRoles', N'RolePermissions', N'UserPermissions', " +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
-        "N'GoodsReceiptLines', N'StockLedger', N'StockBalances', N'SchemaVersions', " +
+        "N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'StockValuationEntries', N'StockLedger', N'StockBalances', N'SchemaVersions', " +
         "N'SystemSecuritySettings')) OR " +
         "(checkedPermission.permission_name = N'UPDATE' AND (ownerTable.name IN (" +
         "N'Products', N'Warehouses', N'Employees', N'Customers', N'GoodsReceipts', " +
-        "N'GoodsReceiptLines', N'StockBalances') OR (ownerTable.name = N'Users' AND candidate.name IN (" +
+        "N'GoodsReceiptLines', N'SalesReceipts', N'SalesReceiptLines', N'StockBalances') OR (ownerTable.name = N'Users' AND candidate.name IN (" +
         "N'PasswordHash', N'PasswordSalt', N'PasswordAlgorithm', N'UpdatedAtUtc', N'UpdatedByUserId'))))))) OR " +
         "EXISTS (SELECT 1 FROM sys.objects AS candidate " +
         "INNER JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id = candidate.schema_id " +
@@ -143,10 +143,8 @@ public sealed class SqlRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
             throw new ArgumentException("The SQL connection must be open.", nameof(connection));
         }
 
-        var hasElevatedPermissions = await connection.QuerySingleAsync<int>(
-            new CommandDefinition(
-                ElevatedPermissionSql,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        using var command = SqlRead.Command(connection, null, ElevatedPermissionSql);
+        var hasElevatedPermissions = await SqlRead.SingleAsync(command, reader => reader.GetInt32(0), cancellationToken).ConfigureAwait(false);
         if (hasElevatedPermissions == 1)
         {
             throw new DesktopStartupException(

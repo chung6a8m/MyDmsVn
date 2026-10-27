@@ -1,79 +1,73 @@
-# Identity, authentication and authorization
+# Identity, permissions and Local sessions
 
-## 1. Database baseline and backward compatibility
+> Current scheduling boundary — routing updated 2026-10-24: this specification preserves implemented Sales/security/persistence contracts. The former SAL execution plan is [archived](archive/20261023-pre-ui-next/README.md); current work follows the [execution index](plans/README.md), without inheriting unfinished old-plan work. [UI-NEXT](ui-next/README.md) remains a historical reference. Later [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) uses product/package `f5039cb` and GUI tests `4697744`; native125, attended observations and dated Owner acceptance remain OPEN. Dated checkpoints below retain their own evidence boundary.
 
-Preserve the conceptual tables from `project-idea.md`:
-`Users` (`UserId`, `Username`, `DisplayName`, `Email`, `Source`, **`PasswordHash` + `PasswordSalt`**, activity and audit fields), `Roles`, `UserRoles`, `RolePermissions`, `UserPermissions`.
+**Current implementation:** SEC-REBUILD accepted in PR #34; documentation refreshed 2026-10-18. RESP and L2DB preserve these semantics. [ADR 0007](adr/0007-code-defined-permissions-and-single-superuser.md) records the decision; [security administration runbook](SECURITY_ADMINISTRATION_RUNBOOK.md) owns operator commands.
 
-During migration, respect the legacy source schema and width where historical values must be imported. New schema may add safe optional columns for `PasswordAlgorithm`/version if justified by test fixtures. Do not rename/remove `PasswordSalt` or assume it can be dropped because BCrypt embeds a salt.
+T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. Native UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 was deferred at this checkpoint; the later final wave fixed/reviewed it at `f5039cb` (see the current scheduling boundary above).
 
-Add:
-- case/collation-aware unique index on normalized `Username` (and `RoleName`);
-- unique (`UserId`, `RoleId`), (`RoleId`, `PermissionKey`), (`UserId`, `PermissionKey`);
-- FK and appropriate indexes; optional `rowversion` for admin edits;
-- clear constraints for statuses/sources and audit UTC timestamps.
+`SalesReceiptPost` is an explicit audited action. Independent Post authorization binds the current actor; successful audit is emitted safely after business commit with `businessOperationCommitted:true`. Audit-sink failure preserves committed success and never authorizes replay.
 
-## 2. Authentication / migration
+T05 query checkpoint (2026-10-22, `f9149a6`): [reviewed evidence](evidence/sal/20261022-t05-sales-keyset-queries.md) records independently Read-authorized List, strict normalized-filter-bound cursors, typed LINQ Product membership and all-line slim totals, retained-endpoint two-way keyset paging, and page/aggregate/probe on one short owned SERIALIZABLE transaction. Navigation is live across requests; the cursor grants no authority. Native UI and frozen T08/package/Owner acceptance remain open.
 
-- Introduce `IPasswordHasher` / `ILegacyPasswordVerifier` with an explicit algorithm/version identification strategy.
-- Verify legacy credentials using **known real algorithm specifications and sanitized test vectors**, not a guess about `PasswordSalt` semantics.
-- New/rehash credentials should use a current one-way password hasher such as BCrypt; where legacy columns remain NOT NULL, store an explicitly documented harmless sentinel for an unused separate salt (e.g. empty value), not a security secret.
-- On successful legacy login, rehash/migrate atomically to the new format and update algorithm marker, with safe failure/rollback behavior. Never log supplied password, hash or salt.
-- Distinguish disabled user from wrong credentials internally without disclosing account enumeration through public messages.
-- Local Mode executes authentication in-process. Its SQL credentials are a security limitation; use least-privilege database principal and trusted installation controls.
-- Remote Mode adds HTTP auth (Bearer tokens), token expiry handling and transport security; cookies not required for desktop bearer scenario. Revocation/session model finalized in P7.
+T06 Local/VM checkpoint (2026-10-22, `5fbd6f5`): [reviewed evidence](evidence/sal/20261022-t06-local-session-viewmodels.md) records all five session-bound Sales API operations, atomic list snapshots and bounded recovery, guarded stable line/editor models, independent Post permission and shared exact preview. Original-owner binding rejects replacement-user service admission; it does not promise zero API method attempts or UI-thread serialization. Denied Post reload hides protected presentation while retaining private same-owner recovery identity. Native control/raw-buffer/UI, frozen T08/package/Owner and release acceptance remain open.
 
-## 2a. Configured superuser enrollment and Local desktop session
+T07 source (`879ab7b`) propagates actual List 401/403 to protected editor scrub and pending-query cancellation. Explicit restored Read requires the original current authenticated session and fresh authorized List/Get; private original-ID Post recovery stays locked. [Bounded native100 evidence](evidence/sal/20261022-t07-native-sales-workspace.md) does not establish actual Login or runtime SQL identity. At this checkpoint full T07 was OPEN with native125 RESOURCE BLOCKED and R4 deferred. R4 was later fixed/reviewed at `f5039cb`; T08 has frozen automated evidence, with native125/attended/Owner acceptance still OPEN in the archive.
 
-- The current SEC-REBUILD implementation replaces the historical first-Administrator/synchronization workflow. A single configured superuser is bound to one database user through the protected singleton `dbo.SystemSecuritySettings` row. The operator command `security bootstrap-superuser` is maintenance-only, accepts only an empty user store and unbound settings table, and creates no role or permission grants. There is no default password/hash, desktop-startup seed or automatic re-enrollment.
-- Runtime configuration `Security__SuperuserUsername` must match both the bound normalized username and the current database account name. Startup rejects a missing/mismatched binding. Each authorization check reads current account activity and the singleton binding from SQL; a disabled account is denied. The configured superuser bypasses application role/direct-user decisions only while that database identity is active and matches the binding. `Administrator` is an ordinary role name with no bypass.
-- Local desktop session belongs to the currently authenticated user in one host process. Login creates that state only after successful backend verification; logout/expiry clears it, cancels/invalidates old UI state and requires reauthentication. Local Mode does not issue or emulate P7 bearer tokens. Backend authorization must fail closed without an authenticated user and remains mandatory regardless of UI state.
-- P3.1 T01–T07 evidence describes the historical implementation; see `docs/P3_1_VERIFICATION.md`. **P4.1 is owner-accepted complete (2026-10-16)** using automated L3 and attended packaged UI, with an explicit incomplete idle-expiry/relogin observation accepted as an exception, not a passed manual test. See `docs/P4_1_VERIFICATION.md`. Current behavior: Local dispatch captures one immutable actor/generation per request, production Login validates current SQL account state before publishing the session, and protected dispatch revalidates active-account status. The default Local idle timeout is 30 minutes, measured with a monotonic clock; keyboard/mouse input resets it, while API/background polling does not. Other P5/P6 GUI/operational gates remain open in `docs/plans/20261016-004-remaining-p5-acceptance-and-p6-hardening.md`. The [SEC-REBUILD plan](plans/20261016-003-permission-system-rebuild.md) T00–T05 now implement this permission system. T06, the T04 manual walkthrough, and final unfiltered SQL/GUI L3 remain open in the active plan.
+## Sales key definitions and Draft/detail enforcement
 
-## 3. Authorization algorithm
+T00 [SAL](DIRECT_SALES.md) defines code-owned Active keys `Sales.Receipts.Read`, `Sales.Receipts.Write` and `Sales.Receipts.Post`. Read authorizes List/Get including posted cost/gross profit; Write authorizes Create/Update Draft; Post authorizes the atomic posting command. The UI requires Read to open and the relevant action key for mutation; each service independently validates its own key/current actor. Command result DTOs retain existing authorized-write semantics. No separate costing permission is introduced.
 
-1. User must be authenticated and active in the current session and current database account.
-2. The configured superuser is allowed only when the current database user id and normalized username match the protected singleton binding and the account is active.
-3. For every other user, if a `UserPermissions` row exists for (user, permission), `Granted=1` allows and `Granted=0` denies.
-4. Otherwise allow if any assigned active role contains `RolePermissions` for the exact permission key.
-5. Otherwise deny.
+Register definitions and audited Post actions explicitly and extend coverage tests. Do not sync permissions, seed grants, auto-authorize Administrator or alter unknown/deprecated/direct-deny/superuser rules. Reuse Local actor snapshots, session fencing, safe post-commit diagnostics and recovery locks. New schema10 object grants/application-lock use require the explicit [SQL security extension](CONFIGURATION_AND_SQL_SECURITY.md); business permissions do not confer SQL administration. T00 registry/authorization foundation and T01 restricted-principal grants/validator have [bounded evidence](evidence/sal/20261022-t01-schema-bootstrap.md). T02 has [bounded restricted-runtime receipt/application-lock evidence](evidence/sal/20261022-t02-valued-inventory.md). T03 has [reviewed Draft Write/Get Read enforcement](evidence/sal/20261022-t03-sales-draft.md) through the current actor/account/binding/direct-Deny pipeline; a Post-only grant gives neither operation. Successful Write returns its authorized command result without an extra Read grant; it does not authorize the separate Get query. T04 independently enforces Post and verifies sale writer application-lock use. T06 supplies bounded deterministic Local/session admission proof; native UI and frozen evidence remain open; no automatic assignments are added.
 
-Unknown or undeclared keys default deny. Permission names are stable, namespaced keys, not UI captions. Explicit user deny always wins over all role grants.
+## 1. Identity and password compatibility
 
-Proposed keys for P5:
-- `Catalog.Products.Read`, `Catalog.Products.Write`;
-- `Catalog.Warehouses.Read`, `Catalog.Warehouses.Write`;
-- `Catalog.Employees.Read`, `Catalog.Employees.Write`;
-- `Catalog.Customers.Read`, `Catalog.Customers.Write`;
-- `Inventory.GoodsReceipts.Read`, `Inventory.GoodsReceipts.Write`, `Inventory.GoodsReceipts.Post`;
-- `Inventory.Balances.Read`, `Inventory.StockCard.Read`;
-- `Security.Users.Manage`, `Security.Roles.Manage`.
+Current identity tables include Users, Roles, UserRoles, RolePermissions, UserPermissions, SystemSecuritySettings and SecurityAuditEvents. The checked-in migrations define their constraints/revisions. Preserve `Users.PasswordHash`, `PasswordSalt` and algorithm identity when importing legacy data; a separate salt column is not permission to guess the old algorithm.
 
-Check authorization at each command/query use case in Application. The UI may hide/disable actions for usability but must **not** be the enforcement point. HTTP endpoints also require authentication/authorization middleware as appropriate.
+New credentials use the configured one-way password hasher. Legacy verification/rehash must use approved specifications and sanitized test vectors, fail closed for unsupported algorithms and preserve valid state on failure. Never log the supplied password, stored hash/salt or raw authentication exceptions. Legacy release support or an owner-approved exclusion/reset procedure remains an explicit [unaccepted, unscheduled release prerequisite](DEFERRED_WORK.md#release-prerequisites).
 
-Authorization snapshots the authenticated user identifier before its first asynchronous permission lookup and evaluates permissions for that exact user. Mutating requests carry the authorized actor snapshot into their handlers for audit fields. A later Local desktop sign-out or sign-in does not cancel or reattribute an already-authorized in-flight operation; explicit request cancellation remains the cancellation mechanism.
+## 2. Authorization order
 
-## 3a. Code-defined permission registry and deliberate RBAC
+The current [PermissionAuthorizationService](../src/MyDmsVn.Server.Application/Security/PermissionAuthorizationService.cs) applies this order:
 
-- `IPermissionRegistry` is composed deterministically from module-owned key definitions. A definition contains key, module, description and Active/Deprecated lifecycle. It rejects malformed keys and collisions and verifies that every referenced use-case key is composed. There is no synchronized SQL permission catalog, release manifest, `PendingActivation` state or automatic grant policy.
-- Migration `002_Identity.sql` creates `dbo.SystemSecuritySettings` with a singleton key, a noncascading FK to `Users`, a normalized bound username and a unique user binding. Runtime may read this row but cannot modify it. The maintenance-only bootstrap command creates exactly one active user and this binding in one transaction after validating an empty store; it stores only a one-way password hash and no role/grant rows.
-- Every ordinary user receives permissions only from explicit user or active-role assignments. New permission keys do not grant access until an operator assigns them through a reviewed security-administration workflow. Direct user Deny still overrides all role grants; unknown, deprecated and unassigned keys deny.
-- P3.1 provisioning and permission-sync behavior is historical evidence in `docs/P3_1_VERIFICATION.md`; its commands and SQL objects are absent from the current baseline. Current operator steps are in [SECURITY_ADMINISTRATION_RUNBOOK.md](SECURITY_ADMINISTRATION_RUNBOOK.md).
+1. Require an authenticated, active current actor with the matching user ID and an **Active definition in the code registry**. Unknown or deprecated keys deny before any bypass.
+2. Read the current SQL account/binding snapshot and require an active account.
+3. Allow the configured superuser only when current user ID, normalized account name and singleton database binding match the configured identity policy.
+4. For other accounts, use an explicit UserPermissions Grant/Deny when present.
+5. Otherwise allow an exact-key grant through an active assigned role; otherwise deny.
 
-## 4. Permission cache
+Direct user Deny overrides ordinary role grants. The configured superuser's matching identity bypass is distinct from those assignments; the role name Administrator has no intrinsic bypass.
 
-P5 can read from SQL without premature complex caches. If caching is added: scope keys by user + permissions version; invalidate on direct-permission change, role assignment, role-permission change, deactivation and user deletion. Never copy every permission into huge authentication claims. Evaluate dynamic permissions server-side.
+Every Application use case enforces authorization; hiding a control does not enforce it. Mutating operations carry the admitted actor snapshot to their handlers and audit. Provider migration must not introduce stale positive permission caches, claims expansion or a query path that skips these checks.
 
-## 5. Local and remote risk model
+## 3. Code-owned catalog and deliberate administration
 
-- v1: Desktop SQL access cannot provide the same trust boundary as a separate server. Guard database account privileges, SQL network exposure, backups and deployment package integrity. Never embed sa/admin passwords.
-- v2: Only Server.Api knows SQL credentials; desktop uses bearer credentials; HTTPS, rate limits, authorization and structured audit operate at the host boundary.
-- No business logic or authorization bypass flag conditional on local mode.
+`PermissionRegistryComposition.CreateDefault()` composes module definitions for Catalog, Inventory, Sales and Security. Keys, module/description and Active/Deprecated lifecycle come from code. Malformed definitions, collisions or missing referenced keys are rejected. The code catalog is available through a read-only Application query and offline CLI export.
 
-## 6. Test matrix
+New keys do not create grants or mutate authorization tables. Operators deliberately assign ordinary user/role permissions. There is no persisted catalog synchronization, release activation state, automatic Administrator grants or startup seeding.
 
-Direct user grant / deny; deny-over-role; union of multiple roles; unknown key; disabled user; permission removal/role change; invalid credentials; legacy verification and rehash; weak/default passwords rejected; concurrent permission updates; no password material in logs; unauthorized posting cannot mutate inventory.
+Security administration/import uses the current target revision and catalog digest, protected-target rules and SQL procedures. Preview is revalidated on Apply; stale/conflicting decisions fail. Mutation and corresponding security audit are atomic. Preserve exact revision, result and error semantics during L2DB; the [Contracts](CONTRACTS.md) and current store/procedures are the source of truth.
 
-Legacy migration requires approved fixtures before implementation. If no representative legacy hash format is supplied, implement the abstraction and mark migration behavior blocked rather than inventing a verifier.
+## 4. Configured superuser and SQL principals
 
-Historical P3.1 verification recorded first-Administrator enrollment and permission synchronization; that evidence does not validate the SEC-REBUILD replacement. Current SEC-REBUILD automated gates and the remaining manual Login/catalog/assignment walkthrough are tracked in `docs/plans/20261016-003-permission-system-rebuild.md`.
+The separate administrator package's `security bootstrap-superuser` command requires an empty user store and unbound settings. It creates one active account and its singleton binding in a transaction, with an interactively confirmed target and masked password entry. It creates no role/permission grants and never runs during desktop startup.
+
+`Security__SuperuserUsername` must agree with the bound normalized username and current account. Startup fails closed on a missing/mismatched binding. Ordinary administration cannot modify the protected identity; rename/recovery uses explicit maintenance commands and the current bound user ID. Bootstrap is not a recovery command.
+
+Desktop uses the least-privilege runtime SQL principal. Migrations, bootstrap and protected maintenance use a separate privileged principal outside the desktop package. The runtime's reviewed execute permissions are restricted to named security procedures; it cannot change schema or the binding directly. See [SQL configuration/security](CONFIGURATION_AND_SQL_SECURITY.md).
+
+## 5. Local session behavior
+
+Login validates current backend account state before publishing the process-local session. Local dispatch captures one immutable actor/generation; protected dispatch revalidates account activity. Logout/expiry clears the session and invalidates old UI state. Already admitted operations retain their actor and follow explicit cancellation; logout is not an implicit rollback of a committed or admitted command.
+
+The default idle timeout is 30 minutes on a monotonic clock. Keyboard/mouse activity renews it; background polling/API traffic does not. Local Mode does not issue bearer tokens. A future trusted HTTP host owns its own authentication/session boundary.
+
+P4.1 was owner-accepted with a specific incomplete packaged idle-expiry observation; [History](HISTORY.md) records that qualification. SEC-REBUILD and [GUI-P5](archive/20261023-pre-ui-next/plans/20261019-001-full-winforms-gui-p5-acceptance.md) acceptance is complete in the documented scopes. BCI is implemented/accepted historical UI work. The completed [BCF roadmap](archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); it must preserve current authorization, session cleanup and late-result guards. [Production operational/release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**; neither historical acceptance nor UI planning waives them.
+
+## 6. Trust, audit and tests
+
+Local Mode runs Application code on a client with SQL connectivity. A person controlling that machine/process can act within the runtime credential's SQL privileges; least privilege limits access but does not create a trusted server. Do not claim an actor ID passed from that process is cryptographic proof. The deferred HTTP service is the separate trust boundary.
+
+Use current audit sinks, safe error mapping and redaction. Workstation log files are not immutable centralized audit. Preserve existing post-commit diagnostics semantics; a log failure does not retroactively roll back committed business data.
+
+[TEST_STRATEGY](TEST_STRATEGY.md) covers active-account/registry/binding checks, direct decisions and roles, protected targets, imports/revisions/audit, legacy boundaries, sessions and unauthorized no-mutation behavior. [TEST_POLICY](TEST_POLICY.md) selects execution scope. Respawn must clear/reseed security state in owned test databases without reintroducing the retired production provisioning workflow.

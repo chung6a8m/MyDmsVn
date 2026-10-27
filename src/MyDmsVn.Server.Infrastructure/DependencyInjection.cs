@@ -7,11 +7,13 @@ using MyDmsVn.Server.Application.Catalog;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Application.Persistence;
+using MyDmsVn.Server.Application.Sales;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.Infrastructure.Catalog;
 using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
+using MyDmsVn.Server.Infrastructure.Sales;
 using MyDmsVn.Server.Infrastructure.Security;
 
 namespace MyDmsVn.Server.Infrastructure
@@ -33,6 +35,10 @@ namespace MyDmsVn.Server.Infrastructure
             }
 
             services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
+            services.TryAddSingleton<LinqToDbMappingSchemaProvider>();
+            services.TryAddSingleton<ILinqToDbSessionFactory, LinqToDbSessionFactory>();
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<ILinqToDbMapping, CatalogLinqToDbMapping>());
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.TryAddScoped<SqlIdentityStore>();
@@ -46,12 +52,11 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddScoped<IEmployeeQueryService, SqlEmployeeQueryService>();
             services.TryAddScoped<ICustomerQueryService, SqlCustomerQueryService>();
             services.TryAddScoped<IGoodsReceiptQueryService, SqlGoodsReceiptQueryService>();
+            services.TryAddScoped<ISalesReceiptQueryService, SqlSalesReceiptQueryService>();
             services.TryAddScoped<IInventoryQueryService, SqlInventoryQueryService>();
             services.TryAddScoped<IStockReconciliationQueryService, SqlStockReconciliationQueryService>();
             services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IRepoDbMapping, CatalogRepoDbMapping>());
-            services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IRepoDbMapping, InventoryRepoDbMapping>());
+                ServiceDescriptor.Singleton<ILinqToDbMapping, InventoryLinqToDbMapping>());
             services.Replace(
                 ServiceDescriptor.Scoped<IUserStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
@@ -61,7 +66,6 @@ namespace MyDmsVn.Server.Infrastructure
             services.Replace(
                 ServiceDescriptor.Scoped<IPermissionStore>(
                     serviceProvider => serviceProvider.GetRequiredService<SqlIdentityStore>()));
-            services.AddSingleton<RepoDbMappingInitializer>();
             services.AddScoped<IUnitOfWorkFactory>(serviceProvider =>
             {
                 var registrations = serviceProvider
@@ -71,13 +75,13 @@ namespace MyDmsVn.Server.Infrastructure
                         registration => registration.Create);
                 return new SqlUnitOfWorkFactory(
                     serviceProvider.GetRequiredService<IDbConnectionFactory>(),
-                    serviceProvider.GetRequiredService<RepoDbMappingInitializer>(),
                     serviceProvider,
                     registrations);
             });
             return new SqlPersistenceBuilder(services)
                 .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>()
                 .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>()
+                .AddRepository<ISalesReceiptWriteRepository, SqlSalesReceiptWriteRepository>()
                 .AddRepository<ISecurityAdministrationRepository, SqlSecurityAdministrationRepository>()
                 .AddRepository<IPermissionAssignmentImportRepository, SqlSecurityAdministrationRepository>();
         }

@@ -1,42 +1,19 @@
-# ADR 0005 — Test resource isolation and bounded parallelism
+# ADR 0005 — Test resource isolation
 
-Status: **Accepted** · Date: 2026-10-15
+**Status:** Accepted resource-isolation principles; fixture strategy refined by [ADR 0010](0010-respawn-fixture-reuse-and-test-policy.md), 2026-10-18.
+**Original date:** 2026-10-15.
 
-## Context
+## Decision that remains binding
 
-At the MVP stage the SQL integration assembly uses `[assembly: CollectionBehavior(DisableTestParallelization = true)]` to avoid SQL overload and command timeouts when many disposable databases and migrations are started at once. `Desktop.Tests` separately disables assembly parallelization to protect WinForms/STA/UI tests from competing global interface state. SQLPERF-T04/T05/T06 were completed in PR #23 (merged on 2026-10-15). T04 evaluated migrated-fixture reuse and rejected it because no SQL-backed test class had a sufficiently safe reset boundary; guarded per-test disposable databases remain. T05 implemented independently verified SQL responsibility categories and a dual-TFM focused runner, but did not adopt its optional bounded-parallel experiment because adequate isolation/capacity evidence was unavailable. T06 completed sequential dual-TFM benchmarks (median full-suite gains: 11.23% on `net48` and 8.56% on `net8.0`), retaining SQL assembly-level serialization. See [T04 decision](../SQLPERF_T04_DECISION.md), [T05 verification](../SQLPERF_T05_VERIFICATION.md), and [T06 verification](../SQLPERF_T06_VERIFICATION.md). These completed work items do not establish that parallel SQL execution is safe.
+Resource ownership determines isolation. A project name, SQL category or STA thread does not prove that mutable database/UI state can be shared safely. Test collections coordinate only their own assembly/process; cross-process SQL and GUI execution must therefore be coordinated explicitly by the operator. Current policy runs SQL projects sequentially and one GUI command at a time.
 
-The user clarified that a preference for sequential tests refers specifically to Desktop tests involving real GUI state, including mouse/keyboard simulation, focus and STA controls. It is not a perpetual policy for every SQL integration test.
+SQL tests use positively owned disposable databases on the explicitly designated non-production instance, finite waits, drained workers and verified cleanup. The local helper verifies live instance/allocation identity before drop. The removed external framework supplies no watchdog, lease or orphan cleanup; interrupted allocations need manual operator review. GUI tests interacting with controls, focus, message loops or input retain serialized resources and deterministic STA disposal. Pure tests without shared mutable state can retain normal xUnit behavior.
 
-## Decision
+## Accepted fixture direction
 
-1. Determine parallel eligibility from **resource ownership, isolation and actual test behavior**, not from the project name, traits or test duration. Test category/classification and execution/isolation policy are independent dimensions.
-2. **SQL:** Treat assembly-level `DisableTestParallelization` as a transitional safety measure, not the target architecture. The future target is **bounded parallelism between independently isolated xUnit collections**, with fresh/dedicated databases or safe migrated-fixture boundaries as appropriate. Shared mutable fixtures are serialized within their ownership boundary; no unsafe parallel writes, shared ambient UoW or dirty-state reuse. Schema/migration, security provisioning and multi-session contention cases retain the isolation/exclusivity their behavior needs.
-3. **Desktop:** Keep GUI-interacting WinForms tests serialized, including tests that create controls, rely on message-loop/focus/window state or drive mouse and keyboard interactions. STA alone does not make global UI side effects parallel-safe. The current Desktop assembly guard remains until a proven partition is introduced. Pure non-UI ViewModel tests may be separated into parallel-compatible projects/collections after evidence.
-4. **Pure unit/architecture/contract tests:** Keep normal xUnit collection parallelism when no shared mutable resource is involved. Do not introduce a blanket serial policy for new test assemblies.
-5. Parallelism **within a single test** (for example, a SQL locking/concurrency assertion using independent connections) is distinct from **runner-level test parallelism**. xUnit collection coordination applies inside one test assembly/process; shared SQL, test database lifecycle and GUI resources across processes or frameworks require separate runner/CI control.
-6. Preserve existing SQLPERF safety gates. The accepted benchmark protocol runs `net48` and `net8.0` full suites sequentially for comparable A/B evidence. Do not enable SQL assembly parallelization as a quick performance optimization; require a bounded capacity experiment, adversarial cleanup/isolation evidence, dual-TFM verification and an operable serial fallback.
+The owner selected and accepted **Respawn fixture reuse** for eligible tests in the completed [RESP plan](../archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md). One migrated database belongs to one collection and is reset/seeded before every test. Schema/principal/lifecycle exceptions keep fresh allocations. Existing SQL assembly guards remain; Catalog's shared fixture uses its explicit serialized collection because Catalog has no assembly guard. RESP is not a parallelism rollout.
 
-## Alternatives considered
+The old rejection of reusable fixtures was based on the then-current reset evidence. It is superseded by the accepted reuse strategy; its original measurements remain historical facts in [History](../HISTORY.md). No old dual-TFM stress/benchmark requirement is silently reinstated by this ADR. Current verification and failure handling are defined by [TEST_POLICY](../TEST_POLICY.md) and the completed [RESP evidence](../RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
 
-- **Permanently serialize every test assembly:** rejected; imposes avoidable latency on isolated SQL and pure tests without improving their correctness.
-- **Remove SQL assembly guard immediately:** rejected; fixture ownership, SQL capacity and failure cleanup must be demonstrated before doing so.
-- **Turn off all Desktop serialization once STA exists:** rejected; simulated input, focus, dialogs and process-global UI behavior can interfere across STA threads.
+Any later SQL parallelism rollout needs its own ownership/capacity/cleanup evidence and scope decision. It is outside the accepted BCF scope; use the [current execution index](../plans/README.md) for completed evidence and current scheduling.
 
-## Consequences / tradeoffs
-
-Parallel SQL execution is a **future capability requiring separate proof**: it was **not implemented or validated** by the now-completed T04/T05/T06 work, and their completion is not permission to weaken release gates. Isolation per database can cost more resources; migrated fixtures reduce setup but make ownership/reset correctness more demanding. Conservative exclusive collections may still be required. The policy does not mandate a specific concurrency limit, new framework, CI topology or unimplemented feature flag.
-
-## Required tests / evidence for future implementation
-
-- Explicit per-test/collection mapping of database/fixture ownership, reset strategy and resources affected across testhosts; ensure any shared mutable fixture is not accessed concurrently.
-- Repeated overlapping execution under a documented bounded SQL load on both supported TFMs, including contention, failure injection, canceled/abandoned tasks, leaks, reset failure and teardown/recovery; record orphaned database/session checks.
-- Independently reconciled SQL test inventory (including theory rows), full unfiltered suites with zero skipped mandatory cases, approved non-production SQL instance/ownership evidence and a tested serial rollback path.
-- Repeatable baseline/candidate performance measurements, separating SQL test-level parallelism from the benchmark runner's sequential cross-TFM protocol.
-- GUI-focused Desktop isolation tests before extracting any serial test group, including window/input ownership, no unexpected modal dialogs, cleanup and repeat-run flake assessment.
-
-## Affected documents
-
-`AGENTS.md`, `docs/TEST_STRATEGY.md`, `tests/README.md`, `docs/plans/archive/20261014-001-sql-integration-test-performance-optimization.md`, and `docs/adr/README.md`.
-
-This ADR documents the architectural direction and does **not** change runtime/test code or assert that current SQL assembly parallelization is safe.

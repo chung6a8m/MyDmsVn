@@ -12,6 +12,7 @@ namespace MyDmsVn.Server.Application.Security
             definitions.AddRange(CatalogPermissionDefinitions.All);
             definitions.AddRange(InventoryPermissionDefinitions.All);
             definitions.AddRange(SecurityPermissionDefinitions.All);
+            definitions.AddRange(MyDmsVn.Server.Application.Sales.SalesPermissionDefinitions.All);
             return PermissionRegistry.Create(definitions);
         }
     }

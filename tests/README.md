@@ -1,139 +1,211 @@
-# Test harness
+# Test projects and commands — v1a-pro-ui-next
 
-**2026-10-16 accepted targets:** NET8-PAUSE PR #32 merged at `8e310778`. Current `main` declares active application/SQL/Desktop `net48`; product `net8.0`/`net8.0-windows` is historical `PARKED / NOT RUN`. The runner remains tool-only `net8.0`. Focused, strict PR and benchmark tools require explicit framework arrays, and the manifest preserves the historical SQL inventory. T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with reviewer fixes re-verified at `6b2ff49`. The owner waived the duration comparison at `09d00bfa`; it remains unmeasured and no speedup is claimed. See [verification](../docs/NET8_PAUSE_T05_VERIFICATION.md) and [the reviewed reactivation procedure](../docs/REACTIVATE_NET8.md).
+**Updated:** 2026-10-25. [TEST_POLICY](../docs/TEST_POLICY.md) alone owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. The [execution index](../docs/plans/README.md) selects the authorized follow-up; successor work requires explicit activation, and this page owns runnable commands, not task progress. [UI-NEXT](../docs/ui-next/README.md) retains historical candidate evidence. No external SQL test framework is restored.
 
-**TESTGATE scope:** L1/L2/L3 are executed locally during this rollout. Do not configure CI to duplicate the developer's full SQL suite; any future CI integration is a separate decision. Preserve local strict SQL approval, watchdog, inventory and cleanup gates.
+<a id="active-ui-next-commands-and-evidence"></a>
 
-**Codex note:** The whole-solution commands below are optional final/manual checks, **not** an inner-loop or per-task default. Run task-specific tests first; use the approved focused SQL category runner only for actually affected SQL behaviors. `Invoke-TestGate.ps1` now reads the checked-in v1 manifest: Task mode cannot accept project/TFM/filter overrides, while Final binds a clean revision to one strict unfiltered pass per SQL TFM. The multi-pass `baseline` remains a performance tool; T04/T05 split projects are implemented. The in-progress [stabilization plan](../docs/plans/20261017-001-testgate-stabilization.md) adds a source/discovery-only SQL manifest preflight.
+## Selecting commands and evidence
 
-P0 tests require Windows, the .NET 8 SDK selected by `global.json`, and the .NET Framework 4.8 targeting pack/runtime. Run from the repository root:
+Use the ten baseline net48 projects plus the A1 Sales UI Lab test owner with the changed-behavior scope selected by [TEST_POLICY](../docs/TEST_POLICY.md) for separately authorized work and any plan explicitly activated through the [execution index](../docs/plans/README.md). Safe field metadata/mapping belongs to Server.Application.Tests; workspace state/lifetime belongs to Desktop.Session.Tests where controls are unnecessary; native control composition, focus and disposal belong to Desktop.Tests. Shared controls also require their upstream owner's affected tests/targets. Select real source cases, verify nonempty discovery and inspect actual TRX; proposed class names in a plan are not runnable tests and a successful zero-test filter is not PASS.
 
-```powershell
-dotnet restore MyDmsVn.sln --locked-mode
-dotnet build MyDmsVn.sln -c Release --no-restore
-dotnet test MyDmsVn.sln -c Release --no-build --no-restore
-```
+When DateInput behavior changes, use source-verified fixture/method selectors; the [historical correction plan](../docs/archive/20261025-pre-next-roadmap/ui-next/20261024-dateinput-unified-compact-correction.md) records relevant anchors. `DesktopDateInputIntegrationTests.cs` contains both a partial `GoodsReceiptControlTests` class and the `DesktopDateInputIntegrationTests` class that owns the Sales date integration cases. Filtering only `FullyQualifiedName~DesktopDateInputIntegrationTests` omits the Goods cases in the same file. Select the required classes/methods explicitly and verify discovery against source before collecting runtime evidence; filenames do not define test ownership or complete coverage.
 
-## Codex test selection and PR acceptance
+The [archive boundary](../docs/archive/20261023-pre-ui-next/README.md) excludes prior unfinished acceptance and full SAL integration repeats. [T08 evidence](../docs/evidence/sal/20261021-t08-integrated-acceptance.md) records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific core/SQL/package/native100 runnable automation PASS. R3/R4 source fixes are approved; native125, attended observations and dated Owner acceptance remain OPEN. Original failed trials and old accepted BCF/BCI/GUI-P5/L2DB/RESP scopes remain historical, not new expected counts or active gates.
 
-Use [Codex Test Execution Policy](../docs/CODEX_TEST_EXECUTION_POLICY.md) to select tests in four stages: focused edit loop, affected-task check, final PR regression, and specialized release/performance verification. The generic `dotnet test MyDmsVn.sln` command above is a convenient local check **not an SQL acceptance certificate**: it does not itself prove SQL method/theory-row discovery-to-TRX reconciliation, zero required SQL skips, process-tree watchdog coverage or post-run database ownership reconciliation.
+For documentation-only changes, run diff/link/status/encoding checks only. No full six-owner fresh/reuse repeat, archived SAL-T08 completion or production-release work is inherited. If implementation actually changes SQL/fixture/schema contracts, choose its affected owners under TEST_POLICY and preserve the resource rules below. [Production release prerequisites](../docs/DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED.
 
-For SQL development iteration, use `Invoke-FocusedSqlIntegrationTests.ps1 -Frameworks @('net48')` with a reviewed category. After final gate-affecting changes freeze, this candidate needs manifest-owned `NET8-PAUSE-T05` Final: one unfiltered active-net48 SQL pass plus separate bounded GUI D2 and Release evidence. Lower-level strict and benchmark wrappers also require `-Frameworks`. Historical net8 is outside the active profile and recorded NOT RUN.
+## Current implementation
 
-Write a **reviewed, sanitized** Test Execution Report in the PR: changed surface, selected scope per stage, exact commands/TFMs, passed/failed/skipped counts, strict SQL inventory/ownership/watchdog **outcomes** when applicable, and `passed` / `failed` / `blocked` / `not run` for remaining mandatory gates. Keep raw TRX, timing JSONL, discovery files, approval/ownership journals and local ZIPs on the approved machine, not as PR attachments or public links. Review any export individually; even archives named `shareable` may contain ownership tokens, instance fingerprints, approval IDs, database identifiers, local paths or theory arguments. Never disclose raw SQL connection strings, host/instance identifiers, credentials, journals or unsanitized test artifacts. See the [evidence publication boundary](../docs/CODEX_TEST_EXECUTION_POLICY.md#evidence-publication-boundary-mandatory).
+Run test projects directly with `dotnet test` or Test Explorer. The standalone SQL framework, its projects/tests, gate and invocation manifests, and command wrappers have been removed. The local [SqlTestDatabase](MyDmsVn.Server.Infrastructure.IntegrationTests/SqlTestDatabase.cs) helper creates a fresh uniquely owned database per call. RESP-T01 pins Respawn 4.0.0 and verifies the test-only application reset profile on net48. RESP-T02 implements exclusive collection lifecycle and the fixture-mode setting; RESP-T03 adopts all five Catalog business methods in one collection with its adapter/contamination probes. RESP-T04 also adopts seven Inventory and eight Identity/Security data-only cases; reviewed lifecycle/schema/principal/trigger/contention exceptions remain fresh.
 
-WinForms tests create and dispose controls on an STA thread through `StaTest`. Each action receives a cancellation token; a timeout cancels the action and waits for cleanup before returning. Actions that cannot cooperate with cancellation, including fatal-process scenarios, must run in a bounded subprocess.
+The ten baseline test projects and the new Sales UI Lab test project target **net48**:
 
-`WinFormsTestGuard` captures `Application.ThreadException` and `DataGridView.DataError`, subscribes to `AppDomain.UnhandledException` as last-chance diagnostics, and enables the Windows thread error mode that suppresses critical-error and general-protection-fault dialogs. Unconsumed captured exceptions fail the test when the guard is disposed; a test that intentionally raises an expected exception must consume it with `DrainExceptions()` and assert it. An `AppDomain.UnhandledException` notification cannot prevent process termination, so tests must catch/await worker failures before they become unhandled and use subprocess isolation when intentionally testing fatal behavior.
+| Responsibility | Project under `tests/` |
+|---|---|
+| Application/contracts | `MyDmsVn.Server.Application.Tests` |
+| Architecture | `MyDmsVn.Architecture.Tests` |
+| Pure Desktop/session | `MyDmsVn.Desktop.Session.Tests` |
+| Desktop/WinForms | `MyDmsVn.Desktop.Tests` |
+| Sales UI Lab scenario/native | `MyDmsVn.Desktop.Ui.Tests` |
+| SQL foundation | `MyDmsVn.Server.Infrastructure.Foundation.Tests` |
+| SQL catalogs | `MyDmsVn.Server.Infrastructure.Catalog.Tests` |
+| SQL inventory | `MyDmsVn.Server.Infrastructure.Inventory.Tests` |
+| SQL security | `MyDmsVn.Server.Infrastructure.Security.Tests` |
+| SQL migrations/schema | `MyDmsVn.Server.Infrastructure.Migrations.Tests` |
+| Shared SQL helper and remaining Local scenarios | `MyDmsVn.Server.Infrastructure.IntegrationTests` |
 
-## Test parallelization and isolation (current behavior)
+Each directory contains the matching `.csproj`. The last six are separate SQL owners; the original IntegrationTests project no longer means the entire SQL suite. Some classes in those projects are pure code. Inspect source before selecting them; an assembly name alone does not classify a case.
 
-- `tests/MyDmsVn.Desktop.Tests/AssemblyInfo.cs` disables xUnit parallelization for this assembly. **Keep it enabled** while WinForms tests involve STA controls, global window/focus state, message loops or real/simulated mouse and keyboard input. STA does not isolate global GUI state. Non-GUI ViewModel tests may later move into independently verified parallel-compatible collections or projects.
-- `tests/MyDmsVn.Server.Infrastructure.IntegrationTests/AssemblyInfo.cs` also disables assembly parallelization to protect disposable database creation/migrations. Do not remove it until bounded isolation/cleanup/load evidence passes active `net48` and, after reactivation, restored `net8.0`.
-- The other test assemblies have no corresponding assembly-wide prohibition in current source. xUnit normally parallelizes across collections; tests within one collection are sequential. SQL category traits (`FastSQL`, `MigrationSchema`, `SecurityProvisioning`, `SqlConcurrency`) do **not** independently define a parallel-execution policy.
-- When using a shared migrated SQL fixture, coordinate every test that can mutate its database within an explicit owning collection (or another independently proven synchronization boundary). Separate collections can run concurrently only when their resources are independently isolated and a safe capacity cap is enforced. Cross-process and cross-TFM execution requires runner/CI coordination: xUnit collection controls do not span processes.
-- The SQLPERF benchmark runner executes each explicitly selected framework sequentially; the pause selection is `net48`. Preserve watchdog, approval, ownership, inventory and unfiltered checks. Dual selection returns only with product-target reactivation.
+Use Windows with the SDK selected by `global.json` and .NET Framework 4.8 targeting/runtime support. The SDK request is `8.0.400` with `rollForward: latestFeature`; it is a build tool, not a modern product/test target. AppCore and historical modern product targets are PARKED / NOT RUN. Run commands from the repository root. Stop on failed restore/build/test; restore/build the current revision before using `--no-restore` or `--no-build`.
 
-See `docs/TEST_STRATEGY.md` and `docs/adr/0005-test-isolation-and-bounded-parallelism.md` for the policy and evidence required before changing these guards.
+## Focused non-SQL example
 
-## P1 SQL integration tests
-
-P1 SQL tests require a reachable SQL Server instance and a test administrator login that can create and drop databases. The connection string must be supplied explicitly through `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` and must target the `master` database. There is no fallback connection string.
-
-The P5.3 SQL-concurrency gates also observe blocked requests and their lock resources through `sys.dm_exec_requests` and `sys.dm_tran_locks` from a separate SQL session. Their test login therefore requires the server-level `VIEW SERVER STATE` permission on SQL Server 2019 (15.x) and earlier, or `VIEW SERVER PERFORMANCE STATE` on SQL Server 2022 (16.x) and later. The tests preflight the version-specific permission and fail immediately with the required `GRANT` when it is absent. Grant this monitoring permission only on the disposable-test SQL Server instance.
-
-SQLPERF-T02 concurrency tests use a unique test-only `sp_getapplock` release gate instead of a fixed SQL delay. A controller session acquires the session-owned gate before the holder starts; the trigger waits transaction-owned while retaining its business locks. A separate observer must identify the holder's APP wait and expected granted business-table lock, then the contender's wait on the expected business resource, before releasing the controller. Cancellation or failure releases the gate and drains every started task before database disposal. Do not replace this sequence with `WAITFOR`, `Task.Delay` or an uncommitted signal-table read.
-
-SQL test database mutation now also requires a separately maintained approval file. The file is local/operator-managed and must never be committed. It binds an explicit non-production attestation to the exact live SQL instance fingerprint and expiration/configuration metadata. Both variables are required; missing or mismatched approval fails closed before `CREATE DATABASE`, including direct IDE/VSTest runs.
-
-For an approved local Windows-authenticated development instance:
+For a Catalog Application change, the current source contains `CatalogApplicationTests`:
 
 ```powershell
-$env:MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING = 'Server=localhost;Database=master;Integrated Security=true;Encrypt=false;TrustServerCertificate=true'
-$env:MYDMSVN_SQL_TEST_APPROVAL_FILE = 'C:\local-secrets\sql-test-approval.json'
-dotnet test tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release
+$project = 'tests/MyDmsVn.Server.Application.Tests/MyDmsVn.Server.Application.Tests.csproj'
+dotnet restore $project --locked-mode
+if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed.' }
+dotnet test $project -c Release -f net48 --no-restore `
+  --filter 'FullyQualifiedName~CatalogApplicationTests'
+if ($LASTEXITCODE -ne 0) { throw 'Application tests failed.' }
 ```
 
-Environment variables saved at Windows `User` scope are inherited only by processes started after the change. Restart the terminal/Codex host, or load the values into the current PowerShell process without printing them:
+Select a real source/discovered class or method, then review the executed cases; an empty selection is not a successful check. Pure ViewModel/session tests use their actual project. Controls/focus tests use the Desktop section below.
+
+## Sales UI Lab
+
+The [UI Lab runbook](../docs/development/UI_LAB.md) gives the small-solution locked restore, host build/open steps, six scenarios and the whole new test-project command. Run that project once for the candidate and review actual TRX rows, then use nonempty source-verified filters for affected later edits. It needs interactive Windows/STA for native cases and no SQL connection or actual Login. Historical Desktop.Tests and Session.Tests remain separate owners. In the initial A1 source delta, 0 cases are retired or moved; `NativeLookupTypingDriver` is linked after removing its call into the Goods Receipt fixture, and the new native independence case checks that adapter. Move any later case only with old → behavior → replacement evidence.
+
+## SQL configuration
+
+Set only `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` for an operator-designated **non-production** SQL Server, with explicit effective database `master`. The account needs database create/drop rights and any privileges required by the selected principal/maintenance/DMV scenarios. Do not use a production connection or the application's runtime/migration configuration.
+
+If the reviewed value is already stored at Windows User scope, load it without printing:
 
 ```powershell
 $env:MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING = [Environment]::GetEnvironmentVariable('MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING', 'User')
-$env:MYDMSVN_SQL_TEST_APPROVAL_FILE = [Environment]::GetEnvironmentVariable('MYDMSVN_SQL_TEST_APPROVAL_FILE', 'User')
-dotnet run --project tests\tools\MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj -c Release --no-build -- preflight
+if ([string]::IsNullOrWhiteSpace($env:MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING)) {
+  throw 'Configure the designated SQL test instance before running required SQL coverage.'
+}
 ```
 
-Preflight exit code `0` confirms that the effective `master` connection, approval identity, expiration and version-specific monitoring permission are valid. Exit code `2` is blocked configuration and must stop the run before DDL. Do not echo either environment variable or commit the approval file.
+The helper rejects blank instance/catalog input, non-master catalogs, `AttachDBFilename` and `UserInstance` before opening SQL. No approval JSON or external preflight command is used. `SqlServerFact` skips when the connection is absent; those cases remain NOT RUN for mandatory SQL evidence. Invalid configured input or failed live ownership checks fail the test. The helper never silently chooses an instance.
 
-The repeatable SQLPERF runner builds separately, then runs TFMs sequentially under a Windows Job Object and requires complete TRX output:
+## Focused SQL project/category
+
+The retained `SqlServerFact` trait uses `Category`: `FastSQL`, `MigrationSchema`, `SecurityProvisioning` and `SqlConcurrency`. Standard VSTest `--filter` syntax can select one category or a source-verified class/method. A case can carry several categories, so category totals are not necessarily disjoint.
 
 ```powershell
-dotnet build MyDmsVn.sln -c Release --no-restore
-tests\tools\Invoke-SqlIntegrationBenchmark.ps1 `
-  -RepositoryRoot (Get-Location) `
-  -TestProject tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
-  -ArtifactRoot .sqlperf\run-001 `
-  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
-  -Frameworks @('net48')
+$project = 'tests/MyDmsVn.Server.Infrastructure.Catalog.Tests/MyDmsVn.Server.Infrastructure.Catalog.Tests.csproj'
+$results = 'TestResults/cat-' + [guid]::NewGuid().ToString('N').Substring(0,8)
+dotnet restore $project --locked-mode
+if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed.' }
+dotnet test $project -c Release -f net48 --no-restore `
+  --filter 'Category=FastSQL' --logger 'trx;LogFileName=catalog.trx' `
+  --results-directory $results
+if ($LASTEXITCODE -ne 0) { throw 'Catalog SQL tests failed.' }
 ```
 
-For a lower-level strict probe, first freeze and commit all gate-affecting inputs, build the runner and active integration-test TFM, then invoke the one-pass wrapper from the clean repository. Candidate acceptance remains manifest-owned:
+Omit `--filter` for a complete project pass. Substitute the exact owner and category for another affected scope. A focused pass proves only the selected cases. `dotnet test <project> -c Release -f net48 --list-tests --filter <filter>` can inspect discovery after restore; it does not prove SQL execution or cleanup.
+
+## Complete SQL milestone
+
+Only use all six owners when required by TEST_POLICY or a plan milestone. Execute them sequentially, with one unfiltered pass per project and separate results:
 
 ```powershell
-dotnet build tests\tools\MyDmsVn.SqlTestRunner\MyDmsVn.SqlTestRunner.csproj -c Release
-dotnet build tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj -c Release -f net48
-tests\tools\Invoke-SqlPrAcceptance.ps1 `
-  -RepositoryRoot (Get-Location) `
-  -TestProject tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
-  -ArtifactRoot .sqlperf\pr-acceptance-001 `
-  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
-  -Frameworks @('net48')
+$owners = @('Foundation.Tests', 'Catalog.Tests', 'Inventory.Tests',
+  'Security.Tests', 'Migrations.Tests', 'IntegrationTests')
+$results = 'TestResults/sql-' + [guid]::NewGuid().ToString('N').Substring(0,8)
+foreach ($owner in $owners) {
+  $name = 'MyDmsVn.Server.Infrastructure.' + $owner
+  $project = 'tests/' + $name + '/' + $name + '.csproj'
+  dotnet restore $project --locked-mode
+  if ($LASTEXITCODE -ne 0) { throw ('Locked restore failed: ' + $name) }
+  dotnet test $project -c Release -f net48 --no-restore `
+    --logger ('trx;LogFileName=' + $owner + '.trx') `
+    --results-directory $results
+  if ($LASTEXITCODE -ne 0) { throw ('SQL project failed: ' + $name) }
+}
 ```
 
-The wrapper rejects a dirty tree, resolves the exact commit, and runs each reviewed selected TFM without a filter, warm-up or measured repetition. It reuses strict classification, discovery/theory-row, TRX, timing, watchdog, preflight and ownership gates.
+Review each TRX's required cases, Theory rows, pass/fail/skip counts and cleanup failures. A zero exit with SQL skipped is not SQL acceptance. Use the current source and plan case map to explain additions/replacements/omissions; there is no separate gate registry, fingerprint approval or automated case-reconciliation service.
 
-### SQL manifest preflight (no SQL test execution)
+This loop does not automatically run Application, Architecture, Desktop.Session or Desktop. Add those project commands only when their affected scope or milestone requires them. Use a new short local results directory for each run; raw artifacts are not committed evidence.
 
-After restoring dependencies, run this *before* an expensive strict Final to check the active SQL projects' compiled source identities, fingerprints, logical ownership and expanded discovery. The `-PreflightOnly` switch allows a dirty development tree and does not require SQL approval because it does not execute SQL tests or create/drop test databases:
+## SQL helper lifecycle and interruption
+
+The shared source stays inside the existing IntegrationTests project. Catalog references that assembly; Foundation, Inventory, Security and Migrations compile linked helper copies. Keep that project ownership explicit when editing helpers.
+
+The helper requires `master`, generates a `MyDmsVn_Test_` GUID name, and records the live instance, database ID/creation time and random `MyDmsVn.TestOwnership` marker. It verifies those values before destructive cleanup. Helper connections disable pooling; disposing them does not clear unrelated connection pools. A missing/changed marker or changed allocation identity refuses deletion. It never adopts an arbitrary existing database.
+
+The helper disables connection retry, caps connection timeout at 30 seconds, uses 30-second SQL command timeouts and applies a two-minute cancellation budget to each create/dispose lifecycle. These are local operation bounds, not an external test-process timeout. A cleanup failure remains visible and can be retried where ownership still matches. Failure before ownership is confirmed leaves the allocation for manual review rather than guessing from its name. After a killed process, an operator reviews any leftover database on the designated test instance: there is no automatic orphan cleanup or durable allocation journal. Never bulk-drop by name prefix.
+
+Keep existing SQL assembly serial guards, and run SQL projects sequentially. IntegrationTests, Foundation, Inventory, Security and Migrations have assembly guards; Catalog retains no assembly guard; all fixture consumers share its explicit serialized Catalog SQL collection. There is no cross-process lease. Concurrency scenarios retain independent SQL sessions and verified lock handshakes; their workers, transactions and readers must drain before database disposal or a future reset.
+
+## Desktop / WinForms
+
+Run Desktop cases directly from an interactive Windows session. Existing `StaTest`, `WinFormsTestGuard`, assembly serialization, bounded waits, dialog suppression and exception/DataError capture remain in the project. Execute one GUI command at a time; no external GUI launcher or global lease remains.
 
 ```powershell
-$artifactRoot = '.sqlperf/manifest-preflight-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
-& ./tests/tools/Invoke-TestGate.ps1 -Mode Final `
-  -PlanId '20261016-003-permission-system-rebuild' -TaskId 'SEC-REBUILD-T06' `
-  -ArtifactRoot $artifactRoot -PreflightOnly
+$project = 'tests/MyDmsVn.Desktop.Tests/MyDmsVn.Desktop.Tests.csproj'
+dotnet restore $project --locked-mode
+if ($LASTEXITCODE -ne 0) { throw 'Desktop restore failed.' }
+dotnet test $project -c Release -f net48 --no-restore `
+  --logger 'trx;LogFileName=desktop.trx' `
+  --results-directory ('TestResults/gui-' + [guid]::NewGuid().ToString('N').Substring(0,8))
+if ($LASTEXITCODE -ne 0) { throw 'Desktop tests failed.' }
 ```
 
-This checks the reviewed SEC-REBUILD Final SQL project matrix; future plans must bind their own exact Final gate identities. An exit code 0 proves **metadata preflight only**, not executed cases/TRX, SQL approval, owned cleanup or Final acceptance. The full Final command remains clean-revision, SQL-approved and unfiltered. During a filtered Task, only *selected* test fingerprints are required to match, but full physical test-method inventory, category and Fact/Theory shape are still checked. Do not bulk-refresh unrelated fingerprints after each edit; freeze, review the manifest delta, and run full final verification.
+Add a real `FullyQualifiedName` filter for affected focused work; the example is unfiltered and is required only for an applicable broader scope. Fatal/noncooperative probes and packaging tests now use the Desktop-owned `GuiOwnedProcess` helper: suspended launch, job assignment before resume, bounded execution/cancellation, concurrent bounded output capture and verified tree/pipe drain. Compiler startup for temporary probes uses the same helper. `StaTest` still cannot kill a noncooperative STA; uncertain cleanup poisons further GUI admission. Run ordinary project tests; this is not a suite watchdog or restored runner. See [T01 evidence](../docs/GUI_P5_VERIFICATION.md) for source/row reconciliation and failed/aborted development trials. Automated GUI results do not replace attended packaged workflows or real packaged-login E2E explicitly required by authorized scope under TEST_POLICY. The L2DB-T07 correctness gate intentionally left 139 Desktop GUI invocations NOT RUN; that is a historical, frozen-revision count, not a permanent case total or a current PASS. GUI-P5-T01 reliability and T02 deterministic control coverage are complete in scope; executable `3a0621c` has 282 Desktop and 108 Session passes on net48/x86, including 129 new control invocations. [T02 ledger](../docs/GUI_P5_COVERAGE_MATRIX.md#appendix-c--gui-p5-t02-deterministic-control-closure) maps named cases and limitations. That T02 checkpoint left T03–T06 OPEN; the [completed GUI-P5 plan](../docs/archive/20261023-pre-ui-next/plans/20261019-001-full-winforms-gui-p5-acceptance.md) now records the later approved scope and explicit T05 Down NOT TESTED exception. Those historical passes do not establish BCF behavior or current-candidate acceptance; BCI has its own completed candidate-specific evidence. For explicit x86 checks, set both `-p:PlatformTarget=x86` and `-- RunConfiguration.TargetPlatform=x86` on each project command. Rebuild the graph or use separate outputs when switching back to AnyCPU/x64 so stale x86 dependencies are not loaded by an x64 testhost.
 
-For the manifest-owned NET8-PAUSE-T05 Final contract, use a fresh ignored artifact root from a clean committed revision:
+The two `GuiOwnedProcessTests` foreground recovery/refusal Facts optionally retain their synthetic target and UIA probe source/executable bytes before those focus launches. Set `MYDMSVN_GUI_PROBE_ARCHIVE_DIRECTORY` to an absolute, dedicated local evidence directory to enable copies, SHA256 manifests and retained stdout hash markers; unset/blank performs no archive writes. This is test-only evidence retention, not an attended observation or a product setting. The 2026-10-23 T08 focused invocation resolved `.local/t08/focus-rendezvous-02/probe-beforelaunch` under its recorded worktree and supplied that absolute path; each later context records its own directory.
+
+### Existing Sales package probes and archived integration
+
+`PackagedSalesAcceptanceTests.cs` extends the existing `PackagedGuiAcceptanceTests` owner with 19 rows: package metadata 1, native page-size 2, duplicate/gift/manual-price and independent cost oracle 2, stale Save/Post 4, direct Read/Write/Post Deny 6, uncertain SQL Post 2 and packaged schema transition 2. The runtime rows authenticate an ordinary user through actual Login and execute Light/Dark independently; UIA value assignment is not native per-character evidence.
+
+Set `MYDMSVN_GUI_P5_PACKAGE` to an existing validated current schema10 package and `MYDMSVN_GUI_P5_TEST_REVISION` to the package manifest's 40-character `sourceCommit` (the variable has a legacy name). Record the test-driver source revision and raw source/test-DLL hashes separately; set `MYDMSVN_GUI_SAL_SCHEMA9_PACKAGE` to the verified genuine historical schema9 package for metadata/old-runtime/upgrade cases. The latter must retain source `95591071ea214be88813deb5227d216f1b0bca71` and its recorded manifest/file hashes. Never modify the historical package. `MYDMSVN_GUI_P5_EXPECTED_SCALE` declares actual 100 or 125; it does not change display scale. SQL uses the explicitly designated non-production master connection and the existing per-case owned allocation/drain/drop topology. The schema row allocates separate partial-refusal and pristine9-upgrade fixtures; do not heuristically repair partial DDL and call it pristine9.
+
+Use focused direct Desktop project/filter runs during development, with both x86 flags above and actual TRX. `MYDMSVN_GUI_P5_TRACE_LOOKUPS=1` optionally forwards bounded owned lookup-state diagnostics for the Sales audit/coordinated probes; never log credentials or SQL identities. A clean baseline development package can prove a driver/oracle change only on that recorded package. The [development checkpoint](../docs/evidence/sal/20261023-t08-packaged-development-checkpoint.md) records actual failed/focused attempts and provenance limits. The archived T08 contract required its separately reviewed frozen source/package, complete prescribed integration scopes, native contexts and explicit Owner disposition; its remaining native125/attended/Owner gaps stay OPEN. These existing probes may be selected for a concrete changed-behavior regression, but do not reactivate that integration queue.
+### Historical BCF focused work and final integration
+
+BCF-T00–T01 first add deterministic native-key proof and minimally repair binding in `WarehouseFilterLookup`, `WarehouseLookup` and `EmployeeLookup`. The driver must verify the actual native EDIT HWND/focus, type individual characters and observe caret/range across controllable responses and completion of a canceled preceding search. Whole `.Text`, `WM_SETTEXT` and UIA SetValue do not establish that behavior. Retain the intended failing baseline proof separately from later passing runs; compile/focus/driver failures and empty discovery are not the intended regression failure. Inline Product is a reference/regression target.
+
+`GoodsReceiptLookupTypingTests` retains the T00 baseline of 15 intended RED rows ([evidence](../docs/evidence/bcf/20261021-t00-native-typing.md)). T01 implements `GoodsReceiptLookupBindingTests`: 92 binding/boundary rows plus the original 15 typing rows pass within the 172-row focused affected scope ([exact selectors, revisions and evidence](../docs/evidence/bcf/20261021-t01-lookup-binding.md)). These are hosted Windows results, not the T02 native100/125 Light/Dark and attended gate. Add the combined lookup selector below to the Desktop command above with `--filter`, using the explicit x86 parameters described above:
 
 ```powershell
-$artifactRoot = '.sqlperf/net8-pause-t05-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
-tests/tools/Invoke-TestGate.ps1 -Mode Final `
-  -PlanId '20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8' `
-  -TaskId 'NET8-PAUSE-T05' -ArtifactRoot $artifactRoot `
-  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE
+$bcfFilter = 'FullyQualifiedName~GoodsReceiptLookupTypingTests|FullyQualifiedName~GoodsReceiptLookupBindingTests'
 ```
 
-Keep this short unique root so `net48` ownership-journal atomic-write paths retain Windows `MAX_PATH` headroom. The wrapper defaults to the current repository and `tests/test-gates.v1.json`. Exit codes are `0` complete, `2` approval/resource/preflight denial, `3` incomplete execution/reconciliation/report, and `64` invalid CLI usage. Raw TRX, timing, ownership journals and lease state stay local; publish only the reviewed sanitized aggregate JSON.
+T02's implemented `LookupGateEnvironment` uses `MYDMSVN_BCF_EXPECTED_SCALE=100|125` and `MYDMSVN_BCF_THEME=Light|Dark` together. The receipt fixture applies/restores the requested theme; an owned PerMonitorV2 observer measures each lookup case's actual monitor DPI and rejects a declared scale mismatch. The test does not change Windows Display Scale or infer it from registry/virtualized `DeviceDpi`. Run one context at a time and retain its own TRX. Ordinary runs without these two variables remain hosted regressions, not native gate evidence. See [T02 execution evidence](../docs/evidence/bcf/20261021-t02-lookup-gate.md) for actual context results and limitations.
 
-Raw TRX, journals and timing JSONL stay ignored/local. Timing is off by default; the runner sets `MYDMSVN_SQL_TEST_TIMINGS=1`, a unique run ID and a local output path. A timeout, missing/corrupt TRX, nonzero exit, failed/skipped mandatory case, inventory mismatch, ownership ambiguity or approval failure makes the run incomplete.
+The opt-in `Bcf_attended_lookup_package_session_keeps_human_input_separate_from_automation` case additionally requires a validated frozen `MYDMSVN_GUI_P5_PACKAGE`, designated test SQL configuration, `MYDMSVN_GUI_P5_EXPECTED_SCALE` and an explicitly created empty `MYDMSVN_BCF_ATTENDED_DIRECTORY` for local session coordination. It is skipped without attended opt-in and excluded from the automated matrix selector. Setup/login is automated; the human supplies query keystrokes, independently reports all three controls in Light/Dark, and requests read-only native snapshots. The owned 22-minute session verifies process/output drain and no receipt/inventory writes before verified SQL teardown. Session completion alone does not certify human input; record those reports separately. Never create coordination markers as a substitute for absent human observations.
 
-For bounded development iteration, run one explicit SQL responsibility category on active `net48`:
+T04 adds 12 focused Products/shared-catalog rows in `BusinessCompactRefinementTests.Catalog.cs`. [Frozen T04 evidence](../docs/evidence/bcf/20261021-t04-products-inspector.md) reconciles native100 240 affected rows, native125 234+2=236 runnable rows, extra Dark 122 each and 43 Session rows; all executed rows pass on source 29cd2a1. Four strict 1680-wide shell/Products native125 rows remain unselected/NOT TESTED, and one stale query-error Minor is retained. The corrected native125 selector deliberately includes the two legacy fitted layout rows; their PASS does not certify the unavailable full viewport. See the evidence for exact selectors, hashes and the 14 reviewed captures. No new full project, SQL, package, Login or attended acceptance is implied.
 
-```powershell
-tests\tools\Invoke-FocusedSqlIntegrationTests.ps1 `
-  -RepositoryRoot (Get-Location) `
-  -TestProject tests\MyDmsVn.Server.Infrastructure.IntegrationTests\MyDmsVn.Server.Infrastructure.IntegrationTests.csproj `
-  -ArtifactRoot .sqlperf\focused-fastsql `
-  -ApprovalFile $env:MYDMSVN_SQL_TEST_APPROVAL_FILE `
-  -Category FastSQL `
-  -Frameworks @('net48')
-```
+Run affected existing control/Session cases as required by inspected, separately authorized changes under TEST_POLICY and any explicitly activated plan. The historical BCF-T02 matrix preceded T03 visual work; BCF-T03–T05 covered shell/theme, Products and receipt presentation in their recorded scope. That old phase gate is not restarted. Do not run full Desktop or all SQL owners after each binding/layout edit.
 
-Valid categories are `FastSQL`, `MigrationSchema`, `SecurityProvisioning` and `SqlConcurrency`. `FastSQL` contains only tests that access SQL Server; pure tests remain in the reviewed method-level non-SQL exemption manifest. Each exemption fingerprint covers its declaring source, same-assembly methods reached through its compiled call graph (including async/iterator state machines), and the project/dependency boundary of reached cross-assembly helpers. Relevant changes therefore require review while unrelated source, generated output and commit metadata do not create drift. The helper runs discovery/execution under the owned-process-tree watchdog, preserves caller-owned harness environment variables, reports selected methods plus discovered/executed/skipped cases per TFM, reconciles theory rows and ownership after every launched execution, and fails closed on a mismatch or timeout. A focused green run never replaces the unfiltered benchmark/release gate.
+BCF-T02 is COMPLETE on frozen `67fff29`: 172/172 automated rows per native100/125 Light/Dark context (688 total), plus separate human all-three reports and two clean real-package sessions. See its evidence for source/hash reconciliation, input limits and the deferred Minor observer-budget issue. At the historical T03 checkpoint, shell/theme had [partial verification](../docs/evidence/bcf/20261021-t03-chrome-followup.md): native125 at 1680×900 Light/Dark remained OPEN because the available monitor clamped the requested client, and native chrome limits were recorded. Final BCF acceptance retains its separately signed bounded scope and exceptions. BusinessCompactRefinementTests uses actual hosted catalog data and guarded independent DPI/capture probes. The lookup gate is not visual/full BCF or release acceptance.
 
-The harness creates a unique database named `MyDmsVn_Test_<32 hex digits>`, disables pooling for its database connection, and only drops the exact generated name it owns. Name validation rejects production-like names and incomplete test prefixes. Teardown does not call global `SqlConnection.ClearAllPools()`: owned database and production migrator connections are non-pooled, and the one test that deliberately enables a migration pool clears that exact pool itself. `SINGLE_USER WITH ROLLBACK IMMEDIATE` remains the guarded cleanup boundary for positively owned databases; unrelated pools must remain intact. Never point the variable at production or grant the test principal access to production data.
+The historical BCF-T06 contract required one reconciled frozen integration round: complete Desktop.Session once, complete Desktop GUI at native100 and native125, both-theme actual cases, and the scoped existing bounded package/actual-Login and attended workflows. Preserve independent SQL checks/owned cleanup for package scenarios that require them; binding/visual work alone does not select the entire SQL suite. Record actual discovery/execution/outcomes, source/test/package hashes, native DPI/theme/client bounds and matched reference/app comparisons in the [BCF ledger](../docs/BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md). Future-candidate native results remain NOT RUN until executed; neither command examples nor earlier candidate counts establish their PASS.
 
-When either required variable is absent, SQL-dependent tests are reported as skipped with the missing-variable reason; guardrail tests still run. Skips are invalid for SQL acceptance. The candidate Final sets both variables and runs active `net48`; historical net8 remains NOT RUN.
+## Accepted reuse and evidence
 
-The deployment migrator is a separate executable and is not run by desktop startup. P6 replaced the original shared setting with the migration-only `MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING` or `MYDMSVN_MIGRATION_SQLSERVER_CONNECTION_STRING_FILE`; see `docs/CONFIGURATION_AND_SQL_SECURITY.md`. The target must be an already-created application database. The migrator does not create or drop databases and rejects missing catalogs, SQL Server system databases, unmanaged databases, future/forked history and partial schema. The `dbo.P1TestProbe` fixture is embedded only in this test project and is never loaded by the deployment migrator.
+RESP-T01 provides the compatible Respawn package and owned full-schema reset profile. RESP-T02 adds exclusive scopes, tracked workers/cleanup and xUnit collection adapter probes inside existing owners. Set `MYDMSVN_SQL_TEST_FIXTURE_MODE` to `fresh` or `reuse` for participating fixtures; absent/blank defaults to reuse, matching is case-insensitive with surrounding whitespace ignored, and any other value fails. T03–T04 adopt all 20 original eligible methods (Catalog 5, Inventory 7, Identity/Security 8); default reuse is now implemented. Dedicated exceptions continue using their own fresh helper in either mode. Keep the original behaviors/Theory rows and report ordinary TRX results plus lightweight allocation/migration/reset/seed/drop observations; do not recreate the removed framework.
+
+Report exact revision, commands, project/TFM/filter, actual counts/outcomes and unresolved cleanup. Missing Windows, targeting packs, SQL or GUI resources is BLOCKED / NOT RUN. Keep connection data, raw TRX, Theory values, SQL identifiers and detailed diagnostics local; publish sanitized summaries. No old test total or benchmark result proves a new candidate has passed.
+
+The RESP-T01 reset probes run directly in Foundation using `FullyQualifiedName~ReusableSqlFixtureIntegrationTests` (11 SQL Facts); the T01 snapshot had 27 Foundation cases; the T02 snapshot had 41 cases; the complete project after PR36 review has 44. They always allocate fresh owned databases to challenge reset/ownership/schema/failure boundaries. See [case map](../docs/RESPAWN_CASE_MAP.md#resp-t01-additions) and [verification](../docs/RESPAWN_VERIFICATION.md).
+
+RESP-T02 local scope/parser tests use IntegrationTests with `FullyQualifiedName~ReusableSqlFixtureTests` (19 cases after PR36 review; 14 at T04); combine with `FullyQualifiedName~SqlTestDatabase` for 41 selected cases. T04 renames the parser test to `Mode_parser_uses_reuse_default_and_accepts_explicit_modes` and adds a local regression that rejects a seed assertion masquerading as the expected scenario failure. Foundation lifecycle probes use `FullyQualifiedName~ReusableSqlFixtureLifecycleIntegrationTests` (17 cases after PR36 review, including one local probe-cleanup regression). Catalog adapter probes use `FullyQualifiedName~SqlFixtureCollectionAdapterTests` (one Fact and two Theory rows). After T03, the Catalog `Category=FastSQL` selection and complete project each contain ten cases: five original business cases, three adapter cases and two contamination Theory rows. Every Theory row resets and seeds independently.
+
+Participating fixtures migrate/prepare once per allocation, reset/seed/verify before every admitted body, then retain exclusive admission until tracked workers and resource cleanup drain. Register every background worker and owned resource before returning the scope. A cleanup/reset/seed/boundary failure poisons reuse; a body assertion failure allows the next reset only after successful drain and an unchanged final boundary. Fresh mode uses that same contract on a new database per case. Catalog initialization and all final-drop diagnostics use xUnit's fixture message sink; lazy Inventory/Security initialization is reported once in the first participating member's output. Per-case observations use test output. Do not count shared migration once per test or double-count runner summaries.
+
+`MYDMSVN_SQL_TEST_ADAPTER_PROBE` is an opt-in fault seam for the selected Catalog collection consumers: `initialize-failure`, `reset-failure`, `seed-failure`, `schema-failure`, `trigger-failure`, `cleanup-failure`. Leave it unset for normal execution. In explicit reuse initialization failure affects every selected test. For the original five business methods plus three adapter rows, other fault selections must report eight failed cases, no skips; cleanup-only failure permits exactly the first body before terminal poison. The deliberate scenario-failure challenge is excluded from those eight-member fault selections. These expected failing development runs are recorded separately from passing verification. Restore the caller's prior process environment after changing either setting. See [T03 evidence](../docs/RESPAWN_VERIFICATION.md#resp-t03-execution-record--catalog-adoption).
+
+The Catalog collection uses the complete APP reset profile, followed by an explicit empty catalog/User baseline; the three adapter cases additionally seed/assert one User. Employee linkage remains seeded inside the original CRUD scenario. All application-owned DI providers/scopes, UoWs and direct scenario connections register cleanup with the exclusive test scope; disposal failure poisons reuse. No business UoW or transaction is shared across cases.
+
+`FullyQualifiedName~CatalogFixtureReuseIntegrationTests` selects the two reordered contamination rows (`reverse: False` / `reverse: True`). Each row deliberately commits catalog/User sentinels, catches the expected assertion failure after successful cleanup, then calls all five original business bodies in a controlled order and verifies a final empty baseline. This is **two xUnit cases / fourteen scenario scopes**, not fourteen results. A complete Catalog pass is **ten cases / twenty-two scopes**: reuse allocates/migrates/drops once; explicit fresh does so twenty-two times with identical business assertions. Per-case reset/seed/verify/cleanup counts cover every nested scope. Use the existing Foundation `Outstanding_worker_blocks_reset_until_drained` and `Reset_cancellation_drains_before_rejecting_the_waiting_scope` methods for the dedicated multi-session/drain check; business contention cases remain fresh.
+
+RESP-T04 uses the linked `ApplicationSqlCollectionFixture` in Inventory and Security, with one independent APP allocation per participating owner/collection. Its xUnit initialization is lazy: selecting only a fresh exception in a mixed class does not evaluate the fixture mode/fault setting or allocate a reusable database. Existing assembly serialization remains. Query `SeedAsync` runs in the seed callback, followed by cached-boundary verification; other data scenarios start from an explicitly asserted empty 15-table APP baseline and retain their own deterministic arrangement. Returned IDs and actual rowversion reads remain the authority; database-wide counters do not rewind.
+
+`FullyQualifiedName~ApplicationDataFixtureReuseIntegrationTests` selects one new SQL Fact in each owner. Each Fact checks complete 15-table contamination (including receipts/ledger/balances, permissions/revisions/audit/binding and sequence advancement), then an exact expected assertion failure, all eligible business scenarios in forward/reverse order and final empty baselines. It is one xUnit result with 18 Inventory or 20 Security scopes. The complete eligible selections therefore have **Inventory 8 cases / 25 scopes**, **Security 9 cases / 28 scopes**. Other methods in mixed classes remain fresh; select exact eligible methods from the [case map](../docs/RESPAWN_CASE_MAP.md#resp-t04-adoption-and-frozen-candidate) when checking reuse alone.
+
+`MYDMSVN_SQL_TEST_APPLICATION_PROBE` is the opt-in Inventory/Security fault seam: `initialize-failure`, `reset-failure`, `seed-failure`, `schema-failure`, `trigger-failure`, `cleanup-failure`. Leave it unset for ordinary runs. Select the seven/eight original eligible methods (exclude contamination probes) for failure evidence; all selected members must fail, no skips. The seed fault fills all 15 mutable tables before throwing. Lazy setup means the first participating member exposes an initialization error and later members reject poison. Cleanup-only failure allows exactly one body. A focused fresh-exception selection must still pass with this fault set to initialize-failure, with no reusable allocation/observation.
+
+The accepted RESP-T05 candidate has **265 cases** across the six SQL owners: Foundation 44, Catalog 10, Inventory 36, Security 53, Migrations 65, IntegrationTests 57. One complete sequential explicit fresh pass and one explicit reuse pass each passed all 265 with zero failed/skipped cases and successful cleanup. Focused parser/default adapters also passed. See [matched acceptance and exact baseline](../docs/RESPAWN_VERIFICATION.md#pr-36-review-follow-up), including wall-time/phase observations and their limits. Keep both fault settings unset for ordinary runs. Preserve this test baseline during L2DB. See [T04 evidence](../docs/RESPAWN_VERIFICATION.md#resp-t04-execution-record--frozen-data-fixtures).
+
+
+PR36 review repairs add `verify-after` after tracked drain while admission is held, so final-case boundary drift fails that case. Scope stop/worker/resource cleanup shares a two-minute cooperative budget; timeout quarantines the allocation, rejects later admissions/teardown and requires manual review, with no automatic verify/reset/drop even after late completion. Stop/resource callbacks run off-thread; stop notification and actual worker drain are distinct. Current local parser/scope selection has19cases (combinedSqlTestDatabase selection41); Foundation lifecycle selection17cases and complete project44. See [review evidence](../docs/RESPAWN_VERIFICATION.md#pr-36-review-follow-up).
+
+## L2DB-T06 oracle and dependency cutover
+
+Active net48 product/test graphs now use LINQ to DB/native SqlClient only. `tests/SqlOracle` contains bounded raw-SQL test helpers, linked into the existing owners; Catalog uses the helper from its existing IntegrationTests reference. The per-command oracle has no product mappings, SQL generation, replacement-connection creation, retries or ambient transaction. NativeSql.Owned retains explicit scenario-level disposable database allocation/migration and guarded cleanup through the existing helper; it is not a fallback connection path. Foundation retains LINQ probes with independent native same-session/rollback observations. Historical pilot case names remain logical IDs but run the sole production implementation.
+
+T06 source/row reconciliation and sequential six-owner results are in [verification](../docs/L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) and the [case ledger](../docs/L2DB_CASE_MIGRATION.md#t06-dependency-cutover-and-complete-source-reconciliation). The 265-case paragraph above is accepted RESP history, not the current source total. [T07 frozen-revision correctness/package/Local smoke acceptance](../docs/L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) is complete:581/0/0 required invocations, verified package and guarded runtime smoke cleanup. W139 was conditionally NOT RUN in T07's frozen scope. Later GUI-P5 acceptance is complete within its approved scope; BCI has its own completed frozen UI acceptance evidence and BCF has completed its bounded acceptance and SAL retains its archived incomplete acceptance; current scheduling follows the [execution index](../docs/plans/README.md), while [production release prerequisites](../docs/DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED.
+
+
+### BCF-T05 receipt verification — 2026-10-21
+
+Source/test `991530f` implements guarded receipt List/Detail. [T05 evidence](../docs/evidence/bcf/20261021-t05-receipt-presentation.md) records native100 301/301 and native125 295/295 runnable affected passes, with 116/116 measured Dark lookup rows at each scale. Native100 has 69 additional default-theme control/inline passes within its 185-row supplementary invocation; those 69 are not Dark evidence. All four frozen invocations total 897 executed passes, with 464 clean measured lookup observer/drain records and 26 reviewed captures. Discovery301/295 excludes only six strict wide native125 capture rows from the latter selector; fitted legacy layout rows stay selected. No rebuild occurs between contexts. Existing T02 attended acceptance is preserved for its own candidate; no new package/Login, attended receipt or T06/Owner acceptance is claimed.

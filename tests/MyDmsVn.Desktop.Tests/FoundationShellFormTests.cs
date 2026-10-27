@@ -3,16 +3,23 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Linq;
+using System.Diagnostics;
+using System.IO;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests
 {
     public sealed class FoundationShellFormTests
     {
+        private readonly ITestOutputHelper _output;
+
+        public FoundationShellFormTests(ITestOutputHelper output) => _output = output;
+
         [Fact]
         public void Shell_exposes_navigation_workspace_and_session_status()
         {
@@ -54,11 +61,278 @@ namespace MyDmsVn.Desktop.Tests
 
                         Assert.Same(firstPage, secondPage);
                         Assert.Single(shell.Workspace.TabPages);
-                        Assert.Same(first, firstPage!.Controls[0]);
+                        Assert.Same(first, Assert.IsType<WorkspaceFeedbackHost>(firstPage!.Controls[0]).Content);
                         Assert.True(duplicate.IsDisposed);
                     }
                 },
                 TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Tab_close_request_removes_only_the_originating_page_and_disposes_it_once()
+        {
+            StaTest.Run(_ =>
+            {
+                using var shell = CreateShell();
+                var firstContent = new Panel();
+                var secondContent = new Panel();
+                var first = shell.OpenWorkspace("first", "First", firstContent, shell.WorkspaceSessionVersion)!;
+                var second = shell.OpenWorkspace("second", "Second", secondContent, shell.WorkspaceSessionVersion)!;
+                Assert.True(shell.Workspace.IsTabClosable(first));
+                Assert.True(shell.Workspace.RequestTabClose(first));
+
+                Assert.Single(shell.Workspace.TabPages);
+                Assert.Same(second, shell.Workspace.TabPages[0]);
+                Assert.True(first.IsDisposed);
+                Assert.True(firstContent.IsDisposed);
+                Assert.False(secondContent.IsDisposed);
+                Assert.Same(second, shell.OpenWorkspace("second", "Second", new Panel(), shell.WorkspaceSessionVersion));
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Clean_security_tab_uses_normal_workspace_close_lifecycle()
+        {
+            StaTest.Run(_ =>
+            {
+                using var shell = CreateShell();
+                var editor = new TextBox { Text = "read only detail" };
+                var page = shell.OpenWorkspace("security-administration", "Security", editor, shell.WorkspaceSessionVersion)!;
+                Assert.True(shell.Workspace.IsTabClosable(page));
+                Assert.True(shell.Workspace.RequestTabClose(page));
+                shell.RequestWorkspaceCloseAsync(page).GetAwaiter().GetResult();
+                Assert.True(editor.IsDisposed);
+                Assert.Empty(shell.Workspace.TabPages);
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Fact]
+        public void Closing_selected_workspace_allows_the_same_sidebar_item_to_open_it_again()
+        {
+            StaTest.Run(_ =>
+            {
+                var session = new TestDesktopSession();
+                session.SetCurrentUser(new CurrentUserDto(7, "operator", "Operator"));
+                var notifications = new DesktopNotificationCenter();
+                var factory = new RecordingGoodsReceiptControlFactory();
+                using var shell = new FoundationShellForm(new FoundationViewModel(new ReadyApiClient(), notifications),
+                    session, notifications, new EmptyCatalogControlFactory(), factory);
+                var item = shell.Navigation.Items.Cast<BusinessCompactNavigationItem>()
+                    .Single(candidate => string.Equals(candidate.Tag as string, "goods-receipts", StringComparison.Ordinal));
+                shell.Navigation.SelectedItem = item;
+                var first = Assert.Single(shell.Workspace.TabPages.Cast<TabPage>());
+                Assert.True(shell.Workspace.RequestTabClose(first));
+                Assert.Empty(shell.Workspace.TabPages);
+                Assert.Null(shell.Navigation.SelectedItem);
+
+                shell.Navigation.SelectedItem = item;
+                Assert.Single(shell.Workspace.TabPages);
+                Assert.Equal(2, factory.CreateCount);
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Products_navigation_keeps_sidebar_vertical_only_through_open_close_and_reopen(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using var guard = new WinFormsTestGuard();
+                    // Physical screenshots require an unoccluded foreground desktop; keep them in a separate capture run.
+                    using var probe = Environment.GetEnvironmentVariable("MYDMSVN_SIDEBAR_CAPTURE") == "1"
+                        ? new GuiProcessProbeFixture(package: false, inline: true) : null;
+                    var session = new TestDesktopSession();
+                    session.SetCurrentUser(new CurrentUserDto(7, "operator", "Operator"));
+                    var notifications = new DesktopNotificationCenter();
+                    var factory = new RecordingCatalogControlFactory();
+                    using var shell = new FoundationShellForm(new FoundationViewModel(new ReadyApiClient(), notifications),
+                        session, notifications, factory);
+                    shell.Show();
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.Equal(new System.Drawing.Size(1200, 760), shell.Size);
+                    _output.WriteLine(UiNextNativeScaleObservation.Observe(shell, token));
+                    var host = shell.Navigation.Controls.OfType<FlowLayoutPanel>().Single();
+                    _output.WriteLine($"normal outer={shell.Size}; client={shell.ClientSize}; navigation={shell.Navigation.Bounds}; controlDpi={shell.Navigation.DeviceDpi}; host={host.ClientSize}; footer={shell.Navigation.SessionArea.Bounds}");
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    shell.Size = new System.Drawing.Size(900, 600);
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.Equal(new System.Drawing.Size(900, 600), shell.Size);
+                    _output.WriteLine($"constrained outer={shell.Size}; client={shell.ClientSize}; navigation={shell.Navigation.Bounds}; host={host.ClientSize}; footer={shell.Navigation.SessionArea.Bounds}");
+                    var sidebarWidth = shell.Navigation.Width;
+                    var products = shell.Navigation.Items.Cast<BusinessCompactNavigationItem>()
+                        .Single(item => item.Tag is CatalogKind kind && kind == CatalogKind.Product);
+                    Assert.Empty(shell.Workspace.TabPages);
+                    Assert.True(host.VerticalScroll.Visible);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    if (probe != null) CaptureSidebar(shell, "zero-tabs", mode, token, probe);
+
+                    var productsButton = host.Controls.OfType<Button>().Single(button => ReferenceEquals(button.Tag, products));
+                    if (probe != null)
+                        InlineReceiptTestDriver.Click(productsButton,
+                            new System.Drawing.Point(productsButton.Width / 2, productsButton.Height / 2), shell);
+                    else
+                        shell.Navigation.SelectedItem = products;
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.Same(products, shell.Navigation.SelectedItem);
+                    var first = Assert.Single(shell.Workspace.TabPages.Cast<TabPage>());
+                    Assert.Equal("catalog-product", first.Name);
+                    Assert.Equal(1, factory.CreateCount);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    if (probe != null) CaptureSidebar(shell, "products", mode, token, probe);
+                    var duplicate = shell.OpenCatalog(CatalogKind.Product);
+                    Assert.Same(first, duplicate);
+                    Assert.Equal(1, factory.CreateCount);
+                    var second = shell.OpenWorkspace("second", "Second", new Panel(), shell.WorkspaceSessionVersion)!;
+                    BusinessCompactNavigationTests.Pump();
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    if (probe != null) CaptureSidebar(shell, "second-tab", mode, token, probe);
+                    Assert.True(shell.Workspace.RequestTabClose(first));
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.True(first.IsDisposed);
+                    Assert.Null(shell.Navigation.SelectedItem);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    shell.Navigation.SelectedItem = products;
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.Equal(2, factory.CreateCount);
+                    Assert.Equal("catalog-product", shell.Workspace.SelectedTab!.Name);
+                    Assert.Equal(sidebarWidth, shell.Navigation.Width);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    if (probe != null) CaptureSidebar(shell, "reopened-products", mode, token, probe);
+                    Assert.True(shell.Workspace.RequestTabClose(shell.Workspace.SelectedTab!));
+                    Assert.True(shell.Workspace.RequestTabClose(second));
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.Empty(shell.Workspace.TabPages);
+                    Assert.Null(shell.Navigation.SelectedItem);
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    if (probe != null) CaptureSidebar(shell, "zero-tabs-final", mode, token, probe);
+
+                    var securityButton = host.Controls.OfType<Button>()
+                        .Single(button => button.AccessibleName == "Security administration");
+                    host.ScrollControlIntoView(securityButton);
+                    BusinessCompactNavigationTests.Pump();
+                    Assert.InRange(securityButton.Top, 0, host.ClientSize.Height);
+                    Assert.True(securityButton.Bottom <= host.ClientSize.Height);
+                    Assert.True(productsButton.Focus());
+                    GoodsReceiptInlineEditorTests.Key(Keys.End);
+                    Assert.True(securityButton.Focused);
+                    GoodsReceiptInlineEditorTests.Key(Keys.Home);
+                    Assert.True(productsButton.Focused);
+                    shell.Navigation.Collapse();
+                    BusinessCompactNavigationTests.Pump();
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    shell.Navigation.Expand();
+                    shell.ToggleTheme();
+                    BusinessCompactNavigationTests.Pump();
+                    BusinessCompactNavigationTests.AssertHorizontalFit(host);
+                    shell.ToggleTheme();
+                    Assert.Equal(mode, BootstrapThemeManager.CurrentTheme.Mode);
+                    Assert.Equal(sidebarWidth, shell.Navigation.Width);
+                    foreach (Control footerControl in shell.Navigation.SessionArea.Controls)
+                        Assert.True(shell.Navigation.SessionArea.ClientRectangle.Contains(footerControl.Bounds));
+                    Assert.Empty(guard.Exceptions);
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
+            }, TimeSpan.FromSeconds(60));
+        }
+
+        private void CaptureSidebar(Form shell, string state, BootstrapThemeMode mode,
+            CancellationToken token, GuiProcessProbeFixture probe)
+        {
+            shell.Refresh();
+            BusinessCompactNavigationTests.Pump();
+            var scale = Environment.GetEnvironmentVariable("MYDMSVN_UIN_EXPECTED_SCALE") ?? "unmarked";
+            var directory = Path.Combine(GuiSqlEnvironment.RepositoryRoot(), "TestResults/sidebar-captures");
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, "hosted-" + state + "-native" + scale + "-" + mode + ".png");
+            var start = probe.Start(shell.Handle.ToInt64() + " capture-shell-screen " + Process.GetCurrentProcess().Id + " \"" + path + "\"");
+            if (scale != "unmarked") start.EnvironmentVariables["MYDMSVN_BCF_EXPECTED_SCALE"] = scale;
+            var operation = GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(15), token);
+            while (!operation.IsCompleted) { System.Windows.Forms.Application.DoEvents(); Thread.Yield(); }
+            var result = operation.GetAwaiter().GetResult();
+            Assert.True(result.CleanupVerified);
+            Assert.True(result.ExitCode == 0, result.StandardOutput + result.StandardError);
+            Assert.Contains("SCREEN_CLIENT_CAPTURE=", result.StandardOutput);
+            _output.WriteLine("HOSTED_CAPTURE=" + state + ";scale=" + scale + ";mode=" + mode + ";" +
+                result.StandardOutput.Split('\n').First(line => line.StartsWith("SCREEN_CLIENT_CAPTURE=", StringComparison.Ordinal)));
+        }
+
+        [Fact]
+        public void Disposing_shell_twice_after_workspace_cleanup_is_idempotent()
+        {
+            StaTest.Run(_ =>
+            {
+                var shell = CreateShell();
+                var content = new Panel();
+                shell.OpenWorkspace("first", "First", content, shell.WorkspaceSessionVersion);
+                shell.Dispose();
+                shell.Dispose();
+                Assert.True(content.IsDisposed);
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Native_close_request_keeps_other_tab_and_closes_last_tab_in_both_themes(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using var guard = new WinFormsTestGuard();
+                    using var shell = CreateShell();
+                    shell.Show();
+                    _output.WriteLine(UiNextNativeScaleObservation.Observe(shell, token));
+                    var firstContent = new TextBox();
+                    var secondContent = new TextBox();
+                    var first = shell.OpenWorkspace("first", "First", firstContent, shell.WorkspaceSessionVersion)!;
+                    var second = shell.OpenWorkspace("second", "Second", secondContent, shell.WorkspaceSessionVersion)!;
+                    Assert.True(shell.Workspace.RequestTabClose(first));
+                    Assert.Single(shell.Workspace.TabPages);
+                    Assert.Same(second, shell.Workspace.SelectedTab);
+                    Assert.True(firstContent.IsDisposed);
+                    Assert.True(shell.Workspace.RequestTabClose(second));
+                    Assert.Empty(shell.Workspace.TabPages);
+                    Assert.True(secondContent.IsDisposed);
+                    Assert.Empty(guard.Exceptions);
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
+            }, TimeSpan.FromSeconds(20));
+        }
+
+        [Fact]
+        public void Delayed_close_prompt_cannot_remove_reopened_page_after_session_change()
+        {
+            StaTest.Run(_ =>
+            {
+                var session = new TestDesktopSession();
+                session.SetCurrentUser(new CurrentUserDto(42, "operator", "Operator"));
+                var notifications = new DesktopNotificationCenter();
+                using var shell = new FoundationShellForm(new FoundationViewModel(new ReadyApiClient(), notifications), session, notifications);
+                var answer = new TaskCompletionSource<WorkspaceCloseChoice>();
+                shell.ClosePrompt = (_, _) => answer.Task;
+                var oldContent = new DirtyCloseContent();
+                var oldPage = shell.OpenWorkspace("same", "Old", oldContent, shell.WorkspaceSessionVersion)!;
+                Assert.True(shell.Workspace.RequestTabClose(oldPage));
+                session.SignOut();
+                Assert.True(oldPage.IsDisposed);
+                session.SetCurrentUser(new CurrentUserDto(43, "new-operator", "New Operator"));
+                var newContent = new Panel();
+                var newPage = shell.OpenWorkspace("same", "New", newContent, shell.WorkspaceSessionVersion)!;
+                answer.SetResult(WorkspaceCloseChoice.Discard);
+                System.Windows.Forms.Application.DoEvents();
+                Assert.Single(shell.Workspace.TabPages);
+                Assert.Same(newPage, shell.Workspace.TabPages[0]);
+                Assert.False(newContent.IsDisposed);
+                Assert.Equal(1, oldContent.DisposeCount);
+            }, TimeSpan.FromSeconds(10));
         }
 
         [Fact]
@@ -94,11 +368,11 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(1, inventory.CardCreateCount);
                         Assert.Contains(
                             shell.Navigation.Items.Cast<object>(),
-                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                            item => item is BusinessCompactNavigationItem sidebarItem &&
                                 string.Equals(sidebarItem.Tag as string, "stock-balances", StringComparison.Ordinal));
                         Assert.Contains(
                             shell.Navigation.Items.Cast<object>(),
-                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                            item => item is BusinessCompactNavigationItem sidebarItem &&
                                 string.Equals(sidebarItem.Tag as string, "stock-card", StringComparison.Ordinal));
                     }
                 },
@@ -118,11 +392,22 @@ namespace MyDmsVn.Desktop.Tests
                             BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
                         using (var shell = CreateShell())
                         {
+                            shell.Show();
+                            System.Windows.Forms.Application.DoEvents();
+                            var toggle = shell.Navigation.SessionArea.Controls.OfType<Button>()
+                                .Single(button => button.AccessibleName == "Theme toggle");
+                            Assert.True(toggle.IsHandleCreated);
+                            Assert.Equal(AccessibleRole.PushButton, toggle.AccessibleRole);
+                            Assert.Equal("Current theme: Light", toggle.AccessibleDescription);
                             shell.ToggleTheme();
 
                             Assert.Equal(
                                 BootstrapThemeMode.Dark,
                                 BootstrapThemeManager.CurrentTheme.Mode);
+                              Assert.Equal("Current theme: Dark", toggle.AccessibilityObject.Description);
+                              toggle.PerformClick();
+                              Assert.Equal(BootstrapThemeMode.Light, BootstrapThemeManager.CurrentTheme.Mode);
+                              Assert.Equal("Current theme: Light", toggle.AccessibilityObject.Description);
                         }
                     }
                     finally
@@ -533,7 +818,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(1, factory.CreateCount);
                         Assert.Contains(
                             shell.Navigation.Items.Cast<object>(),
-                            item => item is MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSidebarItem sidebarItem &&
+                            item => item is BusinessCompactNavigationItem sidebarItem &&
                                 sidebarItem.Text == "Goods Receipts");
 
                         shell.SignOut();
@@ -599,6 +884,31 @@ namespace MyDmsVn.Desktop.Tests
         private sealed class EmptyCatalogControlFactory : ICatalogControlFactory
         {
             public Control Create(CatalogKind kind) => new Panel();
+        }
+
+        private sealed class RecordingCatalogControlFactory : ICatalogControlFactory
+        {
+            public int CreateCount { get; private set; }
+            public Control Create(CatalogKind kind)
+            {
+                Assert.Equal(CatalogKind.Product, kind);
+                CreateCount++;
+                return new Panel();
+            }
+        }
+
+        private sealed class DirtyCloseContent : Panel, IWorkspaceCloseParticipant
+        {
+            private readonly Guid _identity = Guid.NewGuid();
+            public int DisposeCount { get; private set; }
+            public WorkspaceCloseState CaptureCloseState() => new WorkspaceCloseState(_identity, 1, true, false, false, true);
+            public Task<WorkspaceSaveOutcome> SaveForCloseAsync(CancellationToken token) =>
+                Task.FromResult(new WorkspaceSaveOutcome(WorkspaceSaveStatus.Rejected, _identity, 1));
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing && !IsDisposed) DisposeCount++;
+                base.Dispose(disposing);
+            }
         }
 
         private sealed class RecordingGoodsReceiptControlFactory : IGoodsReceiptControlFactory

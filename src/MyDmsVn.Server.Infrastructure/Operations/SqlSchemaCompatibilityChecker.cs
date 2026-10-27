@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Server.Infrastructure.Persistence;
 using Microsoft.Data.SqlClient;
 
 namespace MyDmsVn.Server.Infrastructure.Operations;
@@ -532,9 +532,17 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
         return await CheckConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<SchemaCompatibilityResult> CheckConnectionAsync(
-        SqlConnection connection,
+    public static Task<SchemaCompatibilityResult> CheckExactSchema9Async(SqlConnection connection,
         CancellationToken cancellationToken)
+        => new SqlSchemaCompatibilityChecker(connection.ConnectionString).CheckVersionAsync(connection, cancellationToken, true);
+
+    public Task<SchemaCompatibilityResult> CheckConnectionAsync(SqlConnection connection,
+        CancellationToken cancellationToken) => CheckVersionAsync(connection, cancellationToken, false);
+
+    private async Task<SchemaCompatibilityResult> CheckVersionAsync(
+        SqlConnection connection,
+        CancellationToken cancellationToken,
+        bool exactSchema9)
     {
         if (connection == null)
         {
@@ -546,44 +554,70 @@ public sealed class SqlSchemaCompatibilityChecker : ISchemaCompatibilityChecker
             throw new ArgumentException("The SQL connection must be open.", nameof(connection));
         }
 
-        var journalExists = await connection.QuerySingleAsync<int>(
-            new CommandDefinition(
-                "SELECT CASE WHEN OBJECT_ID(N'dbo.SchemaVersions', N'U') IS NULL THEN 0 ELSE 1 END;",
-                cancellationToken: cancellationToken)).ConfigureAwait(false) == 1;
+        using var journalCommand = SqlRead.Command(connection, null,
+            "SELECT CASE WHEN OBJECT_ID(N'dbo.SchemaVersions', N'U') IS NULL THEN 0 ELSE 1 END;");
+        var journalExists = await SqlRead.SingleAsync(journalCommand, reader => reader.GetInt32(0), cancellationToken).ConfigureAwait(false) == 1;
 
         IReadOnlyList<string> scripts;
         if (journalExists)
         {
-            var applied = await connection.QueryAsync<string>(
-                new CommandDefinition(
-                    "SELECT ScriptName FROM dbo.SchemaVersions ORDER BY Id;",
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
-            scripts = applied.ToList();
+            using var scriptsCommand = SqlRead.Command(connection, null, "SELECT ScriptName FROM dbo.SchemaVersions ORDER BY Id;");
+            scripts = await SqlRead.QueryAsync(scriptsCommand, reader => reader.GetString(0), cancellationToken).ConfigureAwait(false);
         }
         else
         {
             scripts = Array.Empty<string>();
         }
 
-        var artifactRows = await connection.QueryAsync<string>(
-            new CommandDefinition(
-                ArtifactSql,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var artifactSql = exactSchema9 ? ArtifactSql : ArtifactSql
+            .Replace("N'SystemSecuritySettings', N'SecurityAuditEvents'))", "N'SystemSecuritySettings', N'SecurityAuditEvents', N'SalesReceipts', N'SalesReceiptLines', N'StockValuationEntries'))")
+            .Replace("candidate.type = N'SO' AND candidate.name = N'GoodsReceiptNumberSequence'", "candidate.type = N'SO' AND candidate.name IN (N'GoodsReceiptNumberSequence', N'SalesReceiptNumberSequence')")
+            .Replace("candidate.name = N'TR_StockLedger_AppendOnly'", "candidate.name IN (N'TR_StockLedger_AppendOnly', N'TR_StockValuationEntries_AppendOnly')")
+            .Replace("candidate.parent_object_id = OBJECT_ID(N'dbo.StockLedger', N'U')", "candidate.parent_object_id = CASE candidate.name WHEN N'TR_StockLedger_AppendOnly' THEN OBJECT_ID(N'dbo.StockLedger', N'U') ELSE OBJECT_ID(N'dbo.StockValuationEntries', N'U') END");
+        using var artifactCommand = SqlRead.Command(connection, null, artifactSql);
+        var artifactRows = await SqlRead.QueryAsync(artifactCommand, reader => reader.GetString(0), cancellationToken).ConfigureAwait(false);
         var artifacts = new HashSet<string>(artifactRows, StringComparer.Ordinal);
 
         if (journalExists)
         {
-            var columnArtifactRows = await connection.QueryAsync<string>(
-                new CommandDefinition(
-                    ColumnArtifactSql,
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            var columnSql = exactSchema9 ? ColumnArtifactSql : ColumnArtifactSql.Replace(
+                "AND NOT (ownerTable.name IN (N'Users', N'Roles')", "AND NOT (ownerTable.name = N'StockBalances' AND candidate.name = N'InventoryValue') AND NOT (ownerTable.name IN (N'Users', N'Roles')");
+            using var columnCommand = SqlRead.Command(connection, null, columnSql);
+            var columnArtifactRows = await SqlRead.QueryAsync(columnCommand, reader => reader.GetString(0), cancellationToken).ConfigureAwait(false);
             artifacts.UnionWith(columnArtifactRows);
-
         }
 
-        return SchemaCompatibilityPolicy.Evaluate(
-            journalExists,
-            scripts,
-            artifacts);
+        if (!exactSchema9)
+        {
+            using var addedCommand = SqlRead.Command(connection, null,
+                "SELECT ArtifactKey FROM (VALUES " +
+                "(N'Column:StockBalances.InventoryValue', CASE WHEN COL_LENGTH(N'dbo.StockBalances', N'InventoryValue') IS NOT NULL THEN 1 END), " +
+                "(N'Table:SalesReceipts', OBJECT_ID(N'dbo.SalesReceipts', N'U')), " +
+                "(N'Table:SalesReceiptLines', OBJECT_ID(N'dbo.SalesReceiptLines', N'U')), " +
+                "(N'Table:StockValuationEntries', OBJECT_ID(N'dbo.StockValuationEntries', N'U')), " +
+                "(N'Sequence:SalesReceiptNumberSequence', OBJECT_ID(N'dbo.SalesReceiptNumberSequence', N'SO')), " +
+                "(N'Trigger:TR_StockValuationEntries_AppendOnly', OBJECT_ID(N'dbo.TR_StockValuationEntries_AppendOnly', N'TR'))) " +
+                "AS added(ArtifactKey, ObjectId) WHERE ObjectId IS NOT NULL;");
+            artifacts.UnionWith(await SqlRead.QueryAsync(addedCommand, reader => reader.GetString(0), cancellationToken).ConfigureAwait(false));
+        }
+        if (!exactSchema9 && journalExists && scripts.Count == 10 &&
+            string.Equals(await SqlSchemaDefinitionFingerprint.ReadAsync(connection, cancellationToken).ConfigureAwait(false),
+                SqlSchemaDefinitionFingerprint.Schema10, StringComparison.Ordinal))
+        {
+            // Exact definition inventory proves all original and added objects together.
+            artifacts.Remove("Unknown:UserObject");
+            artifacts.Add("Invariant:InventoryColumns");
+            artifacts.Add("Invariant:DirectSalesSchema");
+        }
+        var result = exactSchema9 ? SchemaCompatibilityPolicy.EvaluateSchema9(journalExists, scripts, artifacts) :
+            SchemaCompatibilityPolicy.Evaluate(journalExists, scripts, artifacts);
+        if (exactSchema9 && result.IsCompatible &&
+            !string.Equals(await SqlSchemaDefinitionFingerprint.ReadAsync(connection, cancellationToken).ConfigureAwait(false),
+                SqlSchemaDefinitionFingerprint.Schema9, StringComparison.Ordinal))
+        {
+            return new SchemaCompatibilityResult(SchemaCompatibilityStatus.Partial, "Schema.PartialMigration",
+                "Schema9 không khớp đầy đủ definition inventory đã đóng băng. Migration đã dừng trước khi thay đổi dữ liệu.");
+        }
+        return result;
     }
 }

@@ -159,7 +159,7 @@ namespace MyDmsVn.Server.Application.Tests
                         "P-007",
                         "Product 7",
                         false,
-                        12.3400m),
+                        12.3400m, 24.6800m, 2.00000000m),
                 },
                 1,
                 25,
@@ -169,7 +169,7 @@ namespace MyDmsVn.Server.Application.Tests
             var json = JsonConvert.SerializeObject(response, ApiJson.CreateSerializerSettings());
 
             Assert.Equal(
-                "{\"data\":{\"items\":[{\"warehouseId\":2,\"warehouseCode\":\"WH-02\",\"warehouseName\":\"Warehouse 2\",\"warehouseIsActive\":false,\"productId\":7,\"productCode\":\"P-007\",\"productName\":\"Product 7\",\"productIsActive\":false,\"quantity\":12.3400}],\"pageNumber\":1,\"pageSize\":25,\"totalCount\":1}}",
+                "{\"data\":{\"items\":[{\"warehouseId\":2,\"warehouseCode\":\"WH-02\",\"warehouseName\":\"Warehouse 2\",\"warehouseIsActive\":false,\"productId\":7,\"productCode\":\"P-007\",\"productName\":\"Product 7\",\"productIsActive\":false,\"quantity\":12.3400,\"inventoryValue\":24.6800,\"averageUnitCost\":2.00000000}],\"pageNumber\":1,\"pageSize\":25,\"totalCount\":1}}",
                 json);
         }
 
@@ -199,7 +199,7 @@ namespace MyDmsVn.Server.Application.Tests
                 "GoodsReceipt",
                 41,
                 "GR0000000041",
-                12.5000m);
+                12.5000m, 25.0000m);
 
             var balanceRoundTrip = JsonConvert.DeserializeObject<StockBalanceQuery>(
                 JsonConvert.SerializeObject(balanceQuery, settings),
@@ -215,6 +215,7 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Equal(25, balanceRoundTrip.PageSize);
             Assert.Equal(2, cardQuery.PageNumber);
             Assert.Equal(50, cardQuery.PageSize);
+            Assert.Equal(25.0000m, cardRoundTrip.ValueChange);
             Assert.Equal(41, cardRoundTrip.DocumentId);
             Assert.Equal("GR0000000041", cardRoundTrip.DocumentNumber);
             Assert.False(cardRoundTrip.WarehouseIsActive);

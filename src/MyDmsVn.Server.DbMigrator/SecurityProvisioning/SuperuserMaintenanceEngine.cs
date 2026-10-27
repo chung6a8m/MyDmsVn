@@ -1,8 +1,7 @@
-using System;
+﻿using System;
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Infrastructure.Identity;
@@ -54,19 +53,13 @@ public sealed class SuperuserMaintenanceEngine
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            var updated = await connection.ExecuteAsync(new CommandDefinition(
+            using var updatedCommand = MaintenanceSql.Command(connection, transaction,
                 "UPDATE dbo.Users SET PasswordHash = @passwordHash, PasswordSalt = N'', " +
                 "PasswordAlgorithm = @algorithm, IsActive = 1, UpdatedAtUtc = @utcNow, " +
                 "UpdatedByUserId = NULL WHERE UserId = @expectedUserId;",
-                new
-                {
-                    passwordHash,
-                    algorithm = _passwordHasher.Algorithm,
-                    utcNow,
-                    expectedUserId,
-                },
-                transaction,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
+                MaintenanceSql.Text("@passwordHash", passwordHash), MaintenanceSql.Text("@algorithm", _passwordHasher.Algorithm),
+                MaintenanceSql.P("@utcNow", SqlDbType.DateTime2, utcNow), MaintenanceSql.P("@expectedUserId", SqlDbType.Int, expectedUserId));
+            var updated = await updatedCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             if (updated != 1)
             {
                 throw new InvalidOperationException("The bound superuser could not be recovered.");
@@ -124,19 +117,19 @@ public sealed class SuperuserMaintenanceEngine
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            var updatedAccount = await connection.ExecuteAsync(new CommandDefinition(
+            using var updatedAccountCommand = MaintenanceSql.Command(connection, transaction,
                 "UPDATE dbo.Users SET Username = @username, NormalizedUsername = @normalizedNewUsername, " +
                 "UpdatedAtUtc = @utcNow, UpdatedByUserId = NULL WHERE UserId = @expectedUserId;",
-                new { username, normalizedNewUsername, utcNow, expectedUserId },
-                transaction,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
-            var updatedBinding = await connection.ExecuteAsync(new CommandDefinition(
+                MaintenanceSql.Text("@username", username), MaintenanceSql.Text("@normalizedNewUsername", normalizedNewUsername),
+                MaintenanceSql.P("@utcNow", SqlDbType.DateTime2, utcNow), MaintenanceSql.P("@expectedUserId", SqlDbType.Int, expectedUserId));
+            var updatedAccount = await updatedAccountCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            using var updatedBindingCommand = MaintenanceSql.Command(connection, transaction,
                 "UPDATE dbo.SystemSecuritySettings SET BoundNormalizedUsername = @normalizedNewUsername " +
                 "WHERE Id = 1 AND SuperuserUserId = @expectedUserId " +
                 "AND BoundNormalizedUsername = @configuredNormalizedUsername;",
-                new { normalizedNewUsername, expectedUserId, configuredNormalizedUsername },
-                transaction,
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
+                MaintenanceSql.Text("@normalizedNewUsername", normalizedNewUsername), MaintenanceSql.P("@expectedUserId", SqlDbType.Int, expectedUserId),
+                MaintenanceSql.Text("@configuredNormalizedUsername", configuredNormalizedUsername));
+            var updatedBinding = await updatedBindingCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             if (updatedAccount != 1 || updatedBinding != 1)
             {
                 throw new InvalidOperationException("The bound superuser identity could not be renamed.");
@@ -178,13 +171,12 @@ public sealed class SuperuserMaintenanceEngine
         SqlTransaction transaction,
         CancellationToken cancellationToken)
     {
-        var lockResult = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+        using var lockResultCommand = MaintenanceSql.Command(connection, transaction,
             "DECLARE @result int; EXEC @result = sys.sp_getapplock " +
             "@Resource = @resource, @LockMode = N'Exclusive', @LockOwner = N'Transaction', " +
             "@LockTimeout = 10000; SELECT @result;",
-            new { resource = LockResource },
-            transaction,
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
+            MaintenanceSql.Text("@resource", LockResource));
+        var lockResult = await MaintenanceSql.SingleAsync<int>(lockResultCommand, cancellationToken).ConfigureAwait(false);
         if (lockResult < 0)
         {
             throw new InvalidOperationException("The superuser maintenance lock could not be acquired.");
@@ -198,7 +190,7 @@ public sealed class SuperuserMaintenanceEngine
         int expectedUserId,
         CancellationToken cancellationToken)
     {
-        var matches = await connection.QuerySingleAsync<bool>(new CommandDefinition(
+        using var matchesCommand = MaintenanceSql.Command(connection, transaction,
             "SELECT CAST(CASE WHEN EXISTS (" +
             "SELECT 1 FROM dbo.SystemSecuritySettings AS settings WITH (UPDLOCK, HOLDLOCK) " +
             "INNER JOIN dbo.Users AS account WITH (UPDLOCK, HOLDLOCK) " +
@@ -207,9 +199,8 @@ public sealed class SuperuserMaintenanceEngine
             "AND settings.BoundNormalizedUsername = @configuredNormalizedUsername " +
             "AND account.NormalizedUsername = settings.BoundNormalizedUsername) " +
             "THEN 1 ELSE 0 END AS bit);",
-            new { expectedUserId, configuredNormalizedUsername },
-            transaction,
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
+            MaintenanceSql.P("@expectedUserId", SqlDbType.Int, expectedUserId), MaintenanceSql.Text("@configuredNormalizedUsername", configuredNormalizedUsername));
+        var matches = await MaintenanceSql.SingleAsync<bool>(matchesCommand, cancellationToken).ConfigureAwait(false);
         if (!matches)
         {
             throw new InvalidOperationException(

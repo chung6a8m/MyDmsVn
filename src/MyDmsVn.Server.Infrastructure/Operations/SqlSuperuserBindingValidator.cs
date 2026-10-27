@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Server.Infrastructure.Persistence;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Identity;
 
@@ -25,7 +25,7 @@ public sealed class SqlSuperuserBindingValidator : ISuperuserBindingValidator
         var configuredNormalizedUsername = UsernameNormalizer.Normalize(configuredUsername);
         using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        var matches = await connection.QuerySingleAsync<bool>(new CommandDefinition(
+        using var command = SqlRead.Command(connection, null,
             "SELECT CAST(CASE WHEN EXISTS (" +
             "SELECT 1 FROM dbo.SystemSecuritySettings AS settings " +
             "INNER JOIN dbo.Users AS account ON account.UserId = settings.SuperuserUserId " +
@@ -33,8 +33,8 @@ public sealed class SqlSuperuserBindingValidator : ISuperuserBindingValidator
             "AND settings.BoundNormalizedUsername = @configuredNormalizedUsername " +
             "AND account.NormalizedUsername = settings.BoundNormalizedUsername) " +
             "THEN 1 ELSE 0 END AS bit);",
-            new { configuredNormalizedUsername },
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
+            SqlRead.Text("@configuredNormalizedUsername", configuredNormalizedUsername));
+        var matches = await SqlRead.SingleAsync(command, reader => reader.GetBoolean(0), cancellationToken).ConfigureAwait(false);
         if (!matches)
         {
             throw new DesktopStartupException(

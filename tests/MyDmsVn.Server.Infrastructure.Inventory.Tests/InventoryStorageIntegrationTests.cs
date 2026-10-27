@@ -2,10 +2,9 @@
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,11 +12,22 @@ using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(ApplicationSqlCollectionFixture.CollectionName)]
 public sealed class InventoryStorageIntegrationTests
 {
+    private readonly ApplicationSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
+
+    public InventoryStorageIntegrationTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
+    {
+        _fixture = fixture;
+        _output = output;
+    }
+
     [SqlServerFact]
     public async Task Inventory_migration_enforces_ledger_and_balance_storage_invariants()
     {
@@ -82,13 +92,11 @@ public sealed class InventoryStorageIntegrationTests
     }
 
     [SqlServerFact]
-    public async Task Reconciliation_flags_missing_keys_on_either_side_and_quantity_mismatch()
-    {
-        var database = await CreateDatabaseAsync();
-        try
+    public Task Reconciliation_flags_missing_keys_on_either_side_and_quantity_mismatch() =>
+        _fixture.RunAsync(nameof(Reconciliation_flags_missing_keys_on_either_side_and_quantity_mismatch), _output, async test =>
         {
-            using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 await connection.OpenAsync();
                 var ids = await SeedReferencesAsync(connection);
                 await connection.ExecuteAsync(
@@ -96,10 +104,10 @@ public sealed class InventoryStorageIntegrationTests
                     "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) VALUES " +
                     "(@WarehouseId, @LedgerOnlyProductId, 'GoodsReceipt', 200, 2001, 5.0000, SYSUTCDATETIME(), @UserId), " +
                     "(@WarehouseId, @MismatchProductId, 'GoodsReceipt', 201, 2002, 7.0000, SYSUTCDATETIME(), @UserId); " +
-                    "INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity) VALUES " +
-                    "(@WarehouseId, @ZeroBalanceOnlyProductId, 0.0000), " +
-                    "(@WarehouseId, @NonzeroBalanceOnlyProductId, 3.0000), " +
-                    "(@WarehouseId, @MismatchProductId, 6.0000);",
+                    "INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity, InventoryValue) VALUES " +
+                    "(@WarehouseId, @ZeroBalanceOnlyProductId, 0.0000, 0), " +
+                    "(@WarehouseId, @NonzeroBalanceOnlyProductId, 3.0000, 0), " +
+                    "(@WarehouseId, @MismatchProductId, 6.0000, 0);",
                     new
                     {
                         ids.WarehouseId,
@@ -112,8 +120,8 @@ public sealed class InventoryStorageIntegrationTests
             }
 
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
             var differences = await provider
                 .GetRequiredService<IStockReconciliationQueryService>()
                 .FindDifferencesAsync(CancellationToken.None);
@@ -128,24 +136,17 @@ public sealed class InventoryStorageIntegrationTests
             Assert.Contains(differences, difference =>
                 difference.HasLedger && difference.HasBalance &&
                 difference.LedgerQuantity == 7.0000m && difference.BalanceQuantity == 6.0000m);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task Reconciliation_executes_in_a_serializable_transaction()
-    {
-        var database = await CreateDatabaseAsync();
-        try
+    public Task Reconciliation_executes_in_a_serializable_transaction() =>
+        _fixture.RunAsync(nameof(Reconciliation_executes_in_a_serializable_transaction), _output, async test =>
         {
-            var recordingFactory = new RecordingConnectionFactory(database.ConnectionString);
+            var recordingFactory = new RecordingConnectionFactory(test.ConnectionString);
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
+            services.AddSqlPersistence(test.ConnectionString);
             services.Replace(ServiceDescriptor.Singleton<IDbConnectionFactory>(recordingFactory));
-            using var provider = services.BuildServiceProvider();
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
 
             var differences = await provider
                 .GetRequiredService<IStockReconciliationQueryService>()
@@ -153,23 +154,34 @@ public sealed class InventoryStorageIntegrationTests
 
             Assert.Empty(differences);
             Assert.Equal(IsolationLevel.Serializable, recordingFactory.LastIsolationLevel);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
-        var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-        Assert.True(migration.Successful, migration.Error?.ToString());
-        return database;
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            return database;
+        }
+        catch (Exception setupError)
+        {
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupError)
+            {
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
+            }
+
+            throw;
+        }
     }
 
     private static async Task<ReferenceIds> SeedReferencesAsync(SqlConnection connection)

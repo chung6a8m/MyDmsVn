@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using DbUp;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Security;
@@ -24,10 +23,7 @@ public sealed class SchemaCompatibilityIntegrationTests
         try
         {
             var assembly = typeof(DatabaseMigrationRunner).Assembly;
-            var interrupted = MeasuredDatabaseMigrationRunner.Execute(
-                database.MeasurementContext,
-                "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.direct-prefix",
-                () => DeployChanges.To
+            var interrupted = DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScriptsEmbeddedInAssembly(
                     assembly,
@@ -35,19 +31,17 @@ public sealed class SchemaCompatibilityIntegrationTests
                         resourceName.Contains(".Scripts.") &&
                         !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal) &&
                         !resourceName.EndsWith("008_Security_Administration.sql", StringComparison.Ordinal) &&
-                        !resourceName.EndsWith("009_Security_Permission_Import.sql", StringComparison.Ordinal))
+                        !resourceName.EndsWith("009_Security_Permission_Import.sql", StringComparison.Ordinal) &&
+                        !resourceName.EndsWith("010_DirectSalesAndValuation.sql", StringComparison.Ordinal))
                 .JournalToSqlTable("dbo", "SchemaVersions")
                 .WithTransactionPerScript()
                 .LogToNowhere()
                 .Build()
-                .PerformUpgrade());
+                .PerformUpgrade();
             Assert.True(interrupted.Successful, interrupted.Error?.ToString());
             Assert.Equal(6, interrupted.Scripts.Count());
 
-            var injectedFailure = MeasuredDatabaseMigrationRunner.Execute(
-                database.MeasurementContext,
-                "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.direct-failure",
-                () => DeployChanges.To
+            var injectedFailure = DeployChanges.To
                 .SqlDatabase(database.ConnectionString)
                 .WithScript(
                     "007_FaultInjection.sql",
@@ -57,7 +51,7 @@ public sealed class SchemaCompatibilityIntegrationTests
                 .WithTransactionPerScript()
                 .LogToNowhere()
                 .Build()
-                .PerformUpgrade());
+                .PerformUpgrade();
             Assert.False(injectedFailure.Successful);
 
             using (var connection = new SqlConnection(database.ConnectionString))
@@ -75,7 +69,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             Assert.Equal(SchemaCompatibilityStatus.TooOld, blocked.Status);
 
             var rejected = Assert.Throws<DatabaseMigrationPreflightException>(
-                () => MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SchemaCompatibilityIntegrationTests.Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data.migration-01", database.ConnectionString));
+                () => new DatabaseMigrationRunner().Migrate(database.ConnectionString));
             Assert.Equal("Migration.UnsupportedExistingDatabase", rejected.Code);
             var stillBlocked = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
                 .CheckAsync(CancellationToken.None);
@@ -106,7 +100,7 @@ public sealed class SchemaCompatibilityIntegrationTests
             Assert.True(first.IsCompatible);
             Assert.True(second.IsCompatible);
             using var connection = new SqlConnection(database.ConnectionString);
-            Assert.Equal(9, await connection.QuerySingleAsync<int>(
+            Assert.Equal(10, await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.SchemaVersions;"));
         }
         finally
@@ -365,6 +359,10 @@ public sealed class SchemaCompatibilityIntegrationTests
         {
             using (var connection = new SqlConnection(database.ConnectionString))
             {
+                var saleNumberCheck = await connection.QuerySingleAsync<string>(
+                    "SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.SalesReceipts') AND name=N'CK_SalesReceipts_SaleNo_NoNul';");
+                var saleUnitCheck = await connection.QuerySingleAsync<string>(
+                    "SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.SalesReceiptLines') AND name=N'CK_SalesReceiptLines_Unit';");
                 await connection.ExecuteAsync(
                     "ALTER TABLE dbo.Products DROP CONSTRAINT CK_Products_Code_NoNul, " +
                     "CK_Products_Name_NoNul, CK_Products_Unit_NoNul; " +
@@ -375,6 +373,8 @@ public sealed class SchemaCompatibilityIntegrationTests
                     "ALTER TABLE dbo.Customers DROP CONSTRAINT CK_Customers_Code_NoNul, " +
                     "CK_Customers_Name_NoNul; " +
                     "ALTER TABLE dbo.GoodsReceipts DROP CONSTRAINT CK_GoodsReceipts_ReceiptNo_NoNul; " +
+                    "ALTER TABLE dbo.SalesReceipts DROP CONSTRAINT CK_SalesReceipts_SaleNo_NoNul; " +
+                    "ALTER TABLE dbo.SalesReceiptLines DROP CONSTRAINT CK_SalesReceiptLines_Unit; " +
                     "EXEC(N'ALTER FUNCTION dbo.CatalogTextContainsNul(@Value nvarchar(max)) RETURNS bit " +
                     "WITH SCHEMABINDING AS BEGIN RETURN 0; END;'); " +
                     "ALTER TABLE dbo.Products ADD " +
@@ -392,7 +392,13 @@ public sealed class SchemaCompatibilityIntegrationTests
                     "CONSTRAINT CK_Customers_Name_NoNul CHECK (dbo.CatalogTextContainsNul(Name) = 0); " +
                     "ALTER TABLE dbo.GoodsReceipts ADD " +
                     "CONSTRAINT CK_GoodsReceipts_ReceiptNo_NoNul " +
-                    "CHECK (dbo.CatalogTextContainsNul(ReceiptNo) = 0);");
+                    "CHECK (dbo.CatalogTextContainsNul(ReceiptNo) = 0); " +
+                    "ALTER TABLE dbo.SalesReceipts ADD CONSTRAINT CK_SalesReceipts_SaleNo_NoNul CHECK " + saleNumberCheck + "; " +
+                    "ALTER TABLE dbo.SalesReceiptLines ADD CONSTRAINT CK_SalesReceiptLines_Unit CHECK " + saleUnitCheck + ";");
+                Assert.Equal(saleNumberCheck, await connection.QuerySingleAsync<string>(
+                    "SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.SalesReceipts') AND name=N'CK_SalesReceipts_SaleNo_NoNul';"));
+                Assert.Equal(saleUnitCheck, await connection.QuerySingleAsync<string>(
+                    "SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.SalesReceiptLines') AND name=N'CK_SalesReceiptLines_Unit';"));
             }
 
             var result = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
@@ -624,9 +630,11 @@ public sealed class SchemaCompatibilityIntegrationTests
     [SqlServerFact(SqlTestCategory.MigrationSchema)]
     public async Task Clean_known_prefix_is_too_old()
     {
-        var database = await CreateMigratedDatabaseAsync();
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
+            DirectSalesSchemaCompatibilityTests.Install9(database.ConnectionString);
             using (var connection = new SqlConnection(database.ConnectionString))
             {
                 await connection.ExecuteAsync(
@@ -689,31 +697,28 @@ public sealed class SchemaCompatibilityIntegrationTests
         }
     }
 
-    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(
-                database.MeasurementContext,
-                "SchemaCompatibilityIntegrationTests.CreateMigratedDatabaseAsync.migration-01",
-                database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             return database;
         }
-        catch
+        catch (Exception setupError)
         {
             try
             {
                 await database.DisposeAsync();
             }
-            catch
+            catch (Exception cleanupError)
             {
-                // Preserve the migration failure; the ownership journal records any failed cleanup.
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
             }
 
             throw;

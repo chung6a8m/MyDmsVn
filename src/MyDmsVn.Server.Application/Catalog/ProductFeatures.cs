@@ -203,7 +203,7 @@ internal sealed class CreateProductCommandHandler
         catch (CatalogWriteConflictException exception)
             when (exception.Conflict == CatalogWriteConflict.DuplicateCode)
         {
-            return Error.Conflict("Product.DuplicateCode", "A product with this code already exists.");
+            return CatalogErrors.DuplicateCode("Product.DuplicateCode", "A product with this code already exists.");
         }
 
         return new ProductDto(product.Id, product.Code, product.Name, product.Unit, product.IsActive);
@@ -275,7 +275,7 @@ internal sealed class UpdateProductCommandHandler
         catch (CatalogWriteConflictException exception)
             when (exception.Conflict == CatalogWriteConflict.DuplicateCode)
         {
-            return Error.Conflict("Product.DuplicateCode", "A product with this code already exists.");
+            return CatalogErrors.DuplicateCode("Product.DuplicateCode", "A product with this code already exists.");
         }
 
     }

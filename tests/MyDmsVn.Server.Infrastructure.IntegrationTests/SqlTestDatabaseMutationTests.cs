@@ -1,255 +1,117 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Runtime.CompilerServices;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using MyDmsVn.SqlTestHarness.Approval;
-using MyDmsVn.SqlTestHarness.Ownership;
-using MyDmsVn.SqlTestHarness.Preflight;
+using MyDmsVn.Testing.Sql;
+using Microsoft.Data.SqlClient;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class SqlTestDatabaseMutationTests
 {
-    private const string MasterConnectionString =
-        "Server=sql-alias;Database=master;Integrated Security=true;Encrypt=false";
-
-    [Fact]
-    public async Task Direct_create_with_missing_approval_issues_no_destructive_sql()
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("Server=localhost;Integrated Security=true")]
+    [InlineData("Server=localhost;Database=MyDmsVn;Integrated Security=true")]
+    [InlineData("Server=localhost;Database=model;Integrated Security=true")]
+    [InlineData("Database=master;Integrated Security=true")]
+    [InlineData("Server=localhost;Database=master;AttachDbFilename=test.mdf;Integrated Security=true")]
+    [InlineData("Server=localhost;Database=master;User Instance=true;Integrated Security=true")]
+    public async Task Invalid_admin_configuration_is_rejected_before_opening_a_connection(
+        string connectionString)
     {
-        await WithJournalAsync(async (directory, journal) =>
-        {
-            var session = new RecordingSession();
-            var missingApproval = Path.Combine(directory, "missing-approval.json");
+        var connectionRequested = false;
 
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => SqlTestDatabase.CreateAsync(
-                    MasterConnectionString,
-                    missingApproval,
-                    journal,
-                    _ => session,
-                    CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => SqlTestDatabase.CreateAsync(
+                connectionString,
+                CancellationToken.None,
+                value =>
+                {
+                    connectionRequested = true;
+                    return new SqlConnection(value);
+                },
+                _ => { }));
 
-            Assert.Empty(session.Commands);
-            Assert.Empty(await journal.ReadAllAsync());
-        });
+        Assert.False(connectionRequested);
     }
 
     [Fact]
-    public async Task Direct_create_with_expired_approval_issues_no_destructive_sql()
+    public async Task Cancelled_create_does_not_open_a_connection()
     {
-        await WithJournalAsync(async (directory, journal) =>
-        {
-            var approvalPath = Path.Combine(directory, "approval.json");
-            File.WriteAllText(approvalPath, ExpiredApprovalJson());
-            var session = new RecordingSession();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var connectionRequested = false;
 
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => SqlTestDatabase.CreateAsync(
-                    MasterConnectionString,
-                    approvalPath,
-                    journal,
-                    _ => session,
-                    CancellationToken.None));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => SqlTestDatabase.CreateAsync(
+                "Server=localhost;Database=master;Integrated Security=true",
+                cancellation.Token,
+                value =>
+                {
+                    connectionRequested = true;
+                    return new SqlConnection(value);
+                },
+                _ => { }));
 
-            Assert.Empty(session.Commands);
-            Assert.Empty(await journal.ReadAllAsync());
-        });
+        Assert.False(connectionRequested);
     }
 
-    [Fact]
-    public async Task Direct_create_with_live_identity_mismatch_issues_no_destructive_sql()
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
+    public Task Teardown_refuses_a_database_with_a_changed_ownership_marker() =>
+        AssertMarkerRequiredForCleanupAsync(removeMarker: false);
+
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
+    public Task Teardown_refuses_a_database_with_a_missing_ownership_marker() =>
+        AssertMarkerRequiredForCleanupAsync(removeMarker: true);
+
+    private static async Task AssertMarkerRequiredForCleanupAsync(bool removeMarker)
     {
-        await WithJournalAsync(async (directory, journal) =>
+        var adminConnectionString = Environment.GetEnvironmentVariable(
+            SqlTestDatabase.ConnectionStringEnvironmentVariable)!;
+        var database = await SqlTestDatabase.CreateAsync(adminConnectionString);
+        string? originalMarker = null;
+        var markerChanged = false;
+        try
         {
-            var approvalPath = Path.Combine(directory, "approval.json");
-            File.WriteAllText(approvalPath, ValidApprovalJson());
-            var session = new RecordingSession
-            {
-                Identity = new SqlInstanceIdentity(
-                    "production-sql",
-                    "PROD",
-                    null,
-                    "tcp:10.0.0.200,1433"),
-            };
+            using var connection = new SqlConnection(database.ConnectionString);
+            originalMarker = await connection.QuerySingleAsync<string>(
+                "SELECT CONVERT(nvarchar(128), value) FROM sys.extended_properties " +
+                "WHERE class = 0 AND name = N'MyDmsVn.TestOwnership';");
+            await connection.ExecuteAsync(removeMarker
+                ? "EXEC sys.sp_dropextendedproperty @name = N'MyDmsVn.TestOwnership';"
+                : "EXEC sys.sp_updateextendedproperty @name = N'MyDmsVn.TestOwnership', " +
+                  "@value = N'changed-by-lifecycle-test';");
+            markerChanged = true;
 
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => SqlTestDatabase.CreateAsync(
-                    MasterConnectionString,
-                    approvalPath,
-                    journal,
-                    _ => session,
-                    CancellationToken.None));
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => database.DisposeAsync());
 
-            Assert.DoesNotContain(
-                session.Commands,
-                command => command.IndexOf("CREATE DATABASE", StringComparison.OrdinalIgnoreCase) >= 0);
-            Assert.Empty(await journal.ReadAllAsync());
-        });
-    }
-
-    [Fact]
-    public async Task Disposal_on_a_changed_server_issues_no_cleanup_ddl()
-    {
-        await WithJournalAsync(async (directory, journal) =>
+            Assert.Contains("ownership", exception.Message, StringComparison.OrdinalIgnoreCase);
+            using var adminConnection = new SqlConnection(adminConnectionString);
+            var access = await adminConnection.QuerySingleAsync<string>(
+                "SELECT user_access_desc FROM sys.databases WHERE name = @databaseName;",
+                new { databaseName = database.DatabaseName });
+            Assert.Equal("MULTI_USER", access);
+        }
+        finally
         {
-            var approvalPath = Path.Combine(directory, "approval.json");
-            File.WriteAllText(approvalPath, ValidApprovalJson());
-            var session = new RecordingSession();
-            var database = await SqlTestDatabase.CreateAsync(
-                MasterConnectionString,
-                approvalPath,
-                journal,
-                _ => session,
-                CancellationToken.None);
-            session.Identity = new SqlInstanceIdentity(
-                "production-sql",
-                "PROD",
-                null,
-                "tcp:10.0.0.200,1433");
-
-            await Assert.ThrowsAsync<InvalidOperationException>(() => database.DisposeAsync());
-
-            Assert.DoesNotContain(
-                session.Commands,
-                command =>
-                    command.IndexOf("ALTER DATABASE", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    command.IndexOf("DROP DATABASE", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    command.IndexOf("KILL", StringComparison.OrdinalIgnoreCase) >= 0);
-            Assert.Equal(
-                DatabaseOwnershipState.Created,
-                Assert.Single(await journal.ReadAllAsync()).State);
-        });
-    }
-
-    [Fact]
-    public async Task Database_helper_forwards_the_public_test_identity_to_measurement_context()
-    {
-        await WithJournalAsync(async (directory, journal) =>
-        {
-            var approvalPath = Path.Combine(directory, "approval.json");
-            File.WriteAllText(approvalPath, ValidApprovalJson());
-            var database = await CreateThroughHelperAsync(
-                approvalPath,
-                journal,
-                new RecordingSession());
             try
             {
-                Assert.Equal(
-                    nameof(Database_helper_forwards_the_public_test_identity_to_measurement_context),
-                    database.MeasurementContext.TestCaseId);
+                if (markerChanged)
+                {
+                    using var connection = new SqlConnection(database.ConnectionString);
+                    await connection.ExecuteAsync(
+                        "EXEC sys." + (removeMarker ? "sp_addextendedproperty" : "sp_updateextendedproperty") +
+                        " @name = N'MyDmsVn.TestOwnership', @value = @originalMarker;",
+                        new { originalMarker });
+                }
             }
             finally
             {
                 await database.DisposeAsync();
             }
-        });
-    }
-
-    private static Task<SqlTestDatabase> CreateThroughHelperAsync(
-        string approvalPath,
-        IDatabaseOwnershipJournal journal,
-        ISqlAdministrativeSession session,
-        [CallerMemberName] string testCaseId = "") =>
-        SqlTestDatabase.CreateAsync(
-            MasterConnectionString,
-            approvalPath,
-            journal,
-            _ => session,
-            CancellationToken.None,
-            testCaseId);
-
-    private static async Task WithJournalAsync(
-        Func<string, FileDatabaseOwnershipJournal, Task> assertion)
-    {
-        var directory = Path.Combine(Path.GetTempPath(), "MyDmsVn.SqlMutationTests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        try
-        {
-            await assertion(directory, new FileDatabaseOwnershipJournal(Path.Combine(directory, "journal")));
-        }
-        finally
-        {
-            Directory.Delete(directory, true);
-        }
-    }
-
-    private static string ExpiredApprovalJson() =>
-        ValidApprovalJson().Replace("2099-01-01T00:00:00Z", "2000-01-01T00:00:00Z");
-
-    private static string ValidApprovalJson() =>
-        "{" +
-        "\"schemaVersion\":1," +
-        "\"approvalId\":\"expired\"," +
-        "\"nonProductionAttestation\":true," +
-        "\"validUntilUtc\":\"2099-01-01T00:00:00Z\"," +
-        "\"identity\":{" +
-        "\"serverName\":\"vsql01\"," +
-        "\"machineName\":\"TESTBOX\"," +
-        "\"instanceName\":\"SQLEXPRESS\"," +
-        "\"endpoint\":\"tcp:10.0.0.5,1433\"}," +
-        "\"fingerprintSha256\":\"3e68cd38f51b859ba18373c96bf81945b44cbc94ebe8e83435dcc1720892f7e7\"}";
-
-    private sealed class RecordingSession : ISqlAdministrativeSession
-    {
-        public RecordingSession()
-        {
-            Identity = new SqlInstanceIdentity(
-                "vsql01",
-                "TESTBOX",
-                "SQLEXPRESS",
-                "tcp:10.0.0.5,1433");
-        }
-
-        public List<string> Commands { get; } = new List<string>();
-
-        public SqlInstanceIdentity Identity { get; set; }
-
-        public DatabaseOwnershipMarker? Marker { get; private set; }
-
-        public Task OpenAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-        public Task<string?> ReadEffectiveDatabaseAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<string?>("master");
-
-        public Task<SqlInstanceIdentity?> ReadIdentityAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<SqlInstanceIdentity?>(Identity);
-
-        public Task<int?> ReadMajorVersionAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<int?>(16);
-
-        public Task<bool?> HasServerPermissionAsync(string permissionName, CancellationToken cancellationToken) =>
-            Task.FromResult<bool?>(true);
-
-        public Task<LiveDatabaseOwnership?> ReadDatabaseOwnershipAsync(
-            string databaseName,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<LiveDatabaseOwnership?>(
-                Marker is null
-                    ? null
-                    : new LiveDatabaseOwnership(
-                        42,
-                        new DateTimeOffset(2026, 10, 14, 1, 2, 0, TimeSpan.Zero),
-                        Marker));
-
-        public Task ExecuteAsync(
-            string sql,
-            IReadOnlyDictionary<string, object?> parameters,
-            CancellationToken cancellationToken)
-        {
-            Commands.Add(sql);
-            if (parameters.TryGetValue("@markerValue", out var markerValue))
-            {
-                Marker = DatabaseOwnershipMarker.TryParse(Convert.ToString(markerValue));
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
         }
     }
 }

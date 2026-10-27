@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
@@ -19,7 +19,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_rejects_the_same_runtime_and_migration_identity.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -47,7 +47,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_rejects_an_existing_elevated_runtime_identity.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -83,7 +83,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_direct_object_alter_permission.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -132,10 +132,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(
-                database.MeasurementContext,
-                "SqlPrincipalProvisioningTests.Runtime_can_execute_only_the_allowlisted_administration_procedure.migration-01",
-                database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -227,7 +224,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_rejects_direct_user_impersonation_permission.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -261,7 +258,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Startup_rejects_direct_user_impersonation_permission.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -302,7 +299,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_direct_users_insert_permission.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -353,7 +350,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_disallowed_users_column_update.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -400,7 +397,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_and_startup_reject_schema_dml_permission.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();
@@ -449,7 +446,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Provisioning_script_grants_runtime_dml_but_not_schema_or_journal_mutation.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             using var connection = new SqlConnection(database.ConnectionString);
@@ -595,7 +592,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Runtime_preflight_rejects_unexpected_filtered_unique_index.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             using var connection = new SqlConnection(database.ConnectionString);
@@ -636,7 +633,7 @@ public sealed class SqlPrincipalProvisioningTests
             Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            var migration = MeasuredDatabaseMigrationRunner.Migrate(database.MeasurementContext, "SqlPrincipalProvisioningTests.Runtime_preflight_detects_unlisted_object_without_data_grants.migration-01", database.ConnectionString);
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
 
             using var connection = new SqlConnection(database.ConnectionString);
@@ -670,6 +667,169 @@ public sealed class SqlPrincipalProvisioningTests
             finally
             {
                 await connection.ExecuteAsync("REVERT;");
+            }
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Schema10_runtime_can_write_sales_and_valuation_but_cannot_mutate_append_only_history()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [SalRuntimeProbe] WITHOUT LOGIN; CREATE USER [SalMigrationProbe] WITHOUT LOGIN;");
+            var script = ReadProvisioningScript("SalRuntimeProbe", "SalMigrationProbe");
+            await connection.ExecuteAsync(script);
+            await connection.ExecuteAsync(script);
+            var actorId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Users (Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) " +
+                "OUTPUT INSERTED.UserId VALUES(N'SAL probe',N'SAL PROBE',N'SAL probe',N'Local',N'hash',N'',N'BCrypt');");
+            var productId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'SAL',N'SAL',N'unit');");
+            var warehouseId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Warehouses(Code,Name) OUTPUT INSERTED.WarehouseId VALUES(N'SAL',N'SAL');");
+            var employeeId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Employees(Code,Name) OUTPUT INSERTED.EmployeeId VALUES(N'SAL',N'SAL');");
+            var customerId = await connection.QuerySingleAsync<int>(
+                "INSERT dbo.Customers(Code,Name) OUTPUT INSERTED.CustomerId VALUES(N'SAL',N'SAL');");
+            var args = new { actorId, productId, warehouseId, employeeId, customerId };
+            await connection.ExecuteAsync("EXECUTE AS USER = N'SalRuntimeProbe';");
+            try
+            {
+                await new SqlRuntimePrincipalValidator().ValidateConnectionAsync(
+                    connection, System.Threading.CancellationToken.None);
+                Assert.Equal(0, await connection.QuerySingleAsync<int>(
+                    "SELECT HAS_PERMS_BY_NAME(N'dbo.SalesReceipts',N'OBJECT',N'DELETE') + " +
+                    "HAS_PERMS_BY_NAME(N'dbo.StockValuationEntries',N'OBJECT',N'UPDATE') + " +
+                    "HAS_PERMS_BY_NAME(N'dbo.StockValuationEntries',N'OBJECT',N'DELETE') + " +
+                    "HAS_PERMS_BY_NAME(N'dbo.StockLedger',N'OBJECT',N'UPDATE') + " +
+                    "HAS_PERMS_BY_NAME(N'dbo.StockLedger',N'OBJECT',N'DELETE') + " +
+                    "HAS_PERMS_BY_NAME(N'dbo.StockBalances',N'OBJECT',N'DELETE');"));
+                var sequence = await connection.QuerySingleAsync<long>(
+                    "SELECT NEXT VALUE FOR dbo.SalesReceiptNumberSequence;");
+                Assert.Equal(1, sequence);
+                var saleId = await connection.QuerySingleAsync<long>(
+                    "INSERT dbo.SalesReceipts(SaleNo,SaleDate,WarehouseId,EmployeeId,CustomerId,CreatedByUserId) " +
+                    "OUTPUT INSERTED.SaleId VALUES(N'SAL-1','20261022',@warehouseId,@employeeId,@customerId,@actorId);", args);
+                await connection.ExecuteAsync(
+                    "INSERT dbo.SalesReceiptLines(SaleId,[LineNo],ProductId,Qty,Unit,IsGift,LineAmount,UnitPrice,CreatedByUserId) " +
+                    "VALUES(@saleId,1,@productId,1,N'unit',0,3,3,@actorId),(@saleId,2,@productId,1,N'unit',1,0,3,@actorId); " +
+                    "UPDATE dbo.SalesReceiptLines SET UnitPrice=4 WHERE SaleId=@saleId AND [LineNo]=2; " +
+                    "DELETE dbo.SalesReceiptLines WHERE SaleId=@saleId AND [LineNo]=2; " +
+                    "UPDATE dbo.SalesReceipts SET Note=N'updated' WHERE SaleId=@saleId;",
+                    new { saleId, productId, actorId });
+                Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                    "SELECT COUNT(*) FROM dbo.SalesReceiptLines WHERE SaleId=@saleId;", new { saleId }));
+                var ledgerId = await connection.QuerySingleAsync<long>(
+                    "INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId) " +
+                    "OUTPUT INSERTED.LedgerId VALUES(@warehouseId,@productId,'GoodsReceipt',1,1,2,SYSUTCDATETIME(),@actorId);", args);
+                await connection.ExecuteAsync(
+                    "INSERT dbo.StockValuationEntries(LedgerId,ValueChange) VALUES(@ledgerId,6);",
+                    new { ledgerId });
+                await connection.ExecuteAsync(
+                    "INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@warehouseId,@productId,2,6); " +
+                    "UPDATE dbo.StockBalances SET Quantity=1,InventoryValue=3 WHERE WarehouseId=@warehouseId AND ProductId=@productId;", args);
+                Assert.Equal(6m, await connection.QuerySingleAsync<decimal>(
+                    "SELECT ValueChange FROM dbo.StockValuationEntries WHERE LedgerId=@ledgerId;", new { ledgerId }));
+                Assert.Equal(3m, await connection.QuerySingleAsync<decimal>(
+                    "SELECT InventoryValue FROM dbo.StockBalances WHERE WarehouseId=@warehouseId AND ProductId=@productId;", args));
+                foreach (var sql in new[]
+                {
+                    "DELETE dbo.SalesReceipts;",
+                    "UPDATE dbo.StockValuationEntries SET ValueChange=0;",
+                    "DELETE dbo.StockValuationEntries;",
+                    "UPDATE dbo.StockLedger SET QuantityChange=1;",
+                    "DELETE dbo.StockLedger;",
+                    "DELETE dbo.StockBalances;",
+                    "ALTER TABLE dbo.StockValuationEntries ADD Unauthorized int NULL;",
+                    "DISABLE TRIGGER dbo.TR_StockValuationEntries_AppendOnly ON dbo.StockValuationEntries;",
+                    "DISABLE TRIGGER dbo.TR_StockLedger_AppendOnly ON dbo.StockLedger;"
+                })
+                {
+                    var denied = await Assert.ThrowsAsync<SqlException>(() => connection.ExecuteAsync(sql));
+                    Assert.NotEqual(51000, denied.Number);
+                }
+            }
+            finally
+            {
+                await connection.ExecuteAsync("REVERT;");
+            }
+
+            // Even an administrator cannot silently rewrite either append-only history.
+            foreach (var sql in new[]
+            {
+                "UPDATE dbo.StockValuationEntries SET ValueChange=0;", "DELETE dbo.StockValuationEntries;",
+                "UPDATE dbo.StockLedger SET QuantityChange=1;", "DELETE dbo.StockLedger;"
+            })
+            {
+                var denied = await Assert.ThrowsAsync<SqlException>(() => connection.ExecuteAsync(sql));
+                Assert.Equal(51000, denied.Number);
+            }
+            Assert.Equal(1, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockValuationEntries WHERE ValueChange=6;"));
+            Assert.Equal(1, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger WHERE QuantityChange=2;"));
+        }
+        finally
+        {
+            await database.DisposeAsync();
+        }
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Schema10_provisioning_and_startup_reject_extra_object_and_column_rights()
+    {
+        var database = await SqlTestDatabase.CreateAsync(
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+        try
+        {
+            var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+            Assert.True(migration.Successful, migration.Error?.ToString());
+            using var connection = new SqlConnection(database.ConnectionString);
+            await connection.OpenAsync();
+            await connection.ExecuteAsync(
+                "CREATE USER [SalExtraRuntime] WITHOUT LOGIN; CREATE USER [SalExtraMigration] WITHOUT LOGIN;");
+            var script = ReadProvisioningScript("SalExtraRuntime", "SalExtraMigration");
+            await connection.ExecuteAsync(script);
+            foreach (var right in new[]
+            {
+                "UPDATE ON OBJECT::dbo.StockValuationEntries",
+                "UPDATE (ValueChange) ON OBJECT::dbo.StockValuationEntries",
+                "DELETE ON OBJECT::dbo.StockValuationEntries",
+                "DELETE ON OBJECT::dbo.SalesReceipts",
+                "SELECT ON OBJECT::dbo.SecurityAuditEvents"
+            })
+            {
+                await connection.ExecuteAsync("GRANT " + right + " TO [SalExtraRuntime];");
+                try
+                {
+                    await connection.ExecuteAsync("EXECUTE AS USER = N'SalExtraRuntime';");
+                    try
+                    {
+                        var denied = await Assert.ThrowsAsync<DesktopStartupException>(
+                            () => new SqlRuntimePrincipalValidator().ValidateConnectionAsync(
+                                connection, System.Threading.CancellationToken.None));
+                        Assert.Equal("Security.RuntimePrincipalOverprivileged", denied.Code);
+                    }
+                    finally
+                    {
+                        await connection.ExecuteAsync("REVERT;");
+                    }
+                    var provisioning = await Assert.ThrowsAsync<SqlException>(() => connection.ExecuteAsync(script));
+                    Assert.Equal(51004, provisioning.Number);
+                }
+                finally
+                {
+                    await connection.ExecuteAsync("REVOKE " + right + " FROM [SalExtraRuntime];");
+                }
             }
         }
         finally

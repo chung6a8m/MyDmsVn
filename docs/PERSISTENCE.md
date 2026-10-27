@@ -1,19 +1,43 @@
-﻿# Persistence design — SQL Server / RepoDb / Dapper / Explicit UoW
+# Persistence — LINQ to DB/native implementation
 
-## 1. Separation
+> Current scheduling boundary — routing updated 2026-10-24: this specification preserves implemented Sales/security/persistence contracts. The former SAL execution plan is [archived](archive/20261023-pre-ui-next/README.md); current work follows the [execution index](plans/README.md), without inheriting unfinished old-plan work. [UI-NEXT](ui-next/README.md) remains a historical reference. Later [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) uses product/package `f5039cb` and GUI tests `4697744`; native125, attended observations and dated Owner acceptance remain OPEN. Dated checkpoints below retain their own evidence boundary.
 
-- Command handlers interact with `IRepository` abstractions implemented using RepoDb.
-- Complex read models use `IProductQueryService`, `IInventoryQueryService` and related Application abstractions, implemented with Dapper; query services return **DTOs**, not mutable Domain entities.
-- All persistence implementations are in `Server.Infrastructure`. SQL mappings reflect real schema explicitly.
-- DbUp scripts are embedded in a dedicated migrator and versioned deterministically.
+**Current implementation:** Catalog uses LINQ to DB writes/typed reads and a native SqlClient count/page escape after [T03 verification](L2DB_VERIFICATION.md#l2db-t03--catalog-conversion). Inventory now uses LINQ writes/reference loads and typed native batch readers after [T04 verification](L2DB_VERIFICATION.md#l2db-t04--inventory-conversion). Identity/Security/operational consumers use typed native SqlClient after [T05 verification](L2DB_VERIFICATION.md#l2db-t05--identity-security-and-operations-conversion), with transitional hooks/packages/pilots removed in T06; explicit UoW and DbUp remain on active net48. The pre-migration baseline was assessed at `v1a` commit `c7ad32a4b0040f87417973eabd6c12757c54f7d5` on 2026-10-18.
 
-## 2. Unit of Work contract
+**Delivered direction and remaining acceptance:** [L2DB](archive/20261023-pre-ui-next/plans/20261018-001-linq2db-net48-persistence-migration.md) replaced active RepoDb/Dapper consumers with LINQ to DB plus a documented native SqlClient surface after [RESP](archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md) established the accepted pre-migration fixture baseline. RESP and L2DB-T00–T07 have scoped evidence, including [frozen-revision correctness/package/Local smoke acceptance](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke). [GUI-P5](archive/20261023-pre-ui-next/plans/20261019-001-full-winforms-gui-p5-acceptance.md) is complete in its approved scope. BCI is implemented/accepted historical UI work. The completed [BCF roadmap](archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) is COMPLETE / OWNER ACCEPTED in its [final bounded scope](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21); it preserves this persistence contract; [production release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain **UNACCEPTED / UNSCHEDULED**. [ADR 0009](adr/0009-linq2db-local-net48-persistence.md) owns the provider decision; the ownership and behavior rules below apply throughout.
 
-Preferred sketch (signature details may change after P0 compatibility checks):
+T04 source checkpoint (2026-10-22, `7eeafa4`): [reviewed evidence](evidence/sal/20261022-t04-atomic-sales-post.md) records atomic Post on one owned UoW, Shared-before-header and all sorted stock locks before writes, exact duplicate/gift allocation, immutable line cost, paired quantity/value movements and authoritative status/version materialized before commit. Receipt Post and Exclusive reconciliation use the same protocol. Native UI, frozen T08, package and Owner acceptance remain open; this checkpoint is not deployable. T01 R3 was deferred at this checkpoint; the later final wave fixed/reviewed it at `f5039cb` (see the current scheduling boundary above).
+
+The Sales repository revalidates supplied allocations against locked Q/V, conditionally transitions Draft using rowversion, updates explicit line cost/audit columns, appends each negative quantity movement immediately with its nonpositive value companion (including zero), and applies sorted Q/V deltas through the borrowed coordinator. No new raw lock escape or hidden connection is introduced.
+
+T05 query checkpoint (2026-10-22, `f9149a6`): [reviewed evidence](evidence/sal/20261022-t05-sales-keyset-queries.md) records independently Read-authorized List, strict normalized-filter-bound cursors, typed LINQ Product membership and all-line slim totals, retained-endpoint two-way keyset paging, and page/aggregate/probe on one short owned SERIALIZABLE transaction. Navigation is live across requests; the cursor grants no authority. Native UI and frozen T08/package/Owner acceptance remain open.
+
+## SAL schema and valued receipt/reconciliation checkpoints
+
+[SAL](DIRECT_SALES.md) retains the provider and UoW decisions while adding typed Sales mappings/repositories and value inventory. New sales list/detail/filter/aggregate/write operations prefer LINQ to DB; the [query specification](DIRECT_SALES_QUERY_AND_UI.md) requires Product Any/EXISTS and SaleId DESC keyset paging without OFFSET or compulsory counts. Existing native query surfaces are source facts, not a requirement to copy SQL strings into the new module.
+
+The [costing specification](DIRECT_SALES_COSTING.md) requires one quantity/value companion per Posted source line, exact fixed-point arithmetic, stock-key locks acquired before ledger insertion and a transaction-owned Shared writer / Exclusive reconciliation barrier. Receipt posting, sale posting and reconciliation change together. DbUp/metadata, sequences, application locks and narrowly proven locking seams may use parameterized native SQL on the same owned connection/transaction. No hidden query connection or parallel commands on that connection.
+
+T01 implements schema10/bootstrap, runtime grants/validator, explicit Sales/value mappings, exact10 compatibility, narrowly verified exact9 maintenance admission and the19-table/two-trigger/two-sequence owned reset boundary ([evidence](evidence/sal/20261022-t01-schema-bootstrap.md)). The historical baseline remains schema9. T02 implements valued receipt posting, an internal borrowed-transaction coordinator, Exclusive reconciliation and authoritative stock projections ([evidence](evidence/sal/20261022-t02-valued-inventory.md)). Typed LINQ6.3.0 point reads express UPDLOCK/HOLDLOCK/composite-PK range protection; no raw balance-lock escape was required. The T02 native seam is same-transaction sp_getapplock with Transaction/public ownership and15s/30s bounds. T04 completes both writer/reconciliation source participation; coherent deployment acceptance remains incomplete; the development checkpoint is not deployable.
+
+T03 adds [reviewed Sales Draft persistence/detail](evidence/sal/20261022-t03-sales-draft.md) through the existing repository/query/DI seams. Write repositories borrow the caller UoW connection/current transaction; explicit LINQ allowlists, header UPDLOCK/HOLDLOCK, rowversion, complete ownership checks and temporary resequencing preserve retained IDs/audits. NEXT VALUE FOR is a bounded SQL-specific sequence operation on that same transaction. Complete Write DTOs materialize before commit. GetById separately owns one short SERIALIZABLE LINQ read transaction, loads bounded references/detail and disposes before returning; T04 Post and T05 List are implemented; T06 separately implements Local/VM; T07 native controls have [bounded native100 evidence](evidence/sal/20261022-t07-native-sales-workspace.md); full native125/frozen/attended obligations remain open.
+
+## 1. Layer separation
+
+Command handlers depend on business repository interfaces in Server.Application. Dedicated query-service interfaces return materialized Contracts DTOs. SQL implementation, provider mapping, execution contexts and connection ownership adapters stay in Server.Infrastructure.
+
+Catalog now uses explicit LINQ allowlists/mappings and owned typed queries, with native COUNT_BIG/long-offset lists. Receipt/header/line/ledger storage and Warehouse/Employee reference loads now use registered LINQ mappings and explicit allowlists. Native readers replace Inventory Dapper projections while retaining the same SQL algorithms and per-call connection/transaction ownership. The obsolete Catalog/Inventory RepoDb mappings are removed; T06 removes generic legacy hooks and converts Foundation probes to registered LINQ mappings plus independent native test oracles. Identity/Security/operational consumers now use typed native readers/parameters for the existing procedure/diagnostic/maintenance SQL. Readers drain deferred errors before reporting success; credential/maintenance audit times bind as DateTime2 to match schema precision. Existing receipt header/conditional-state/draft and inventory count/page native seams remain. T02 balance locking/writes use typed LINQ; reconciliation materializes under one owned SERIALIZABLE transaction/Exclusive gate, indexes source lines once and cooperatively checks cancellation throughout analysis and before completion. Keep an accurate consumer inventory during L2DB; a library name is not evidence that every repository uses that library for every operation.
+
+No provider objects, `DataConnection`, `IQueryable`, SQL connections/transactions or provider mapping attributes may cross into Application, Domain, Contracts, Views or ViewModels. The delivered DAL keeps existing business interfaces and explicit registrations. DbUp remains the sole schema owner.
+
+## 2. Existing Unit of Work contract
+
+The current interfaces live in `src/MyDmsVn.Server.Application/Persistence/`:
 
 ```csharp
 public interface IUnitOfWork : IDisposable
 {
+    UnitOfWorkState State { get; }
     void BeginTransaction();
     TRepository Repository<TRepository>() where TRepository : class;
     void Commit();
@@ -23,106 +47,96 @@ public interface IUnitOfWork : IDisposable
 public interface IUnitOfWorkFactory
 {
     IUnitOfWork Create();
+    Task<IUnitOfWork> CreateAsync(CancellationToken cancellationToken);
 }
 ```
 
-Rules:
-1. Factory creates a **fresh opened IDbConnection** and transfers its ownership to the UoW.
-2. UoW owns one connection and at most one active IDbTransaction.
-3. Repositories are **scoped to the UoW** and use that connection; all RepoDb writes/reads get the current transaction explicitly (including async methods).
-   `IUnitOfWorkFactory` is resolved from the caller DI scope so repository constructors receive the same scoped request/user/tenant context. The UoW disposes repository instances it creates, but it does not own or dispose caller-scoped dependencies.
-4. Dapper query services that need to participate in a transaction get the same connection + transaction via a scoped, explicit execution context.
-5. BeginTransaction twice is an error unless a future ADR explicitly defines nested semantics; do **not** silently return or replace.
-6. Commit/Rollback allowed only in legal states, cleanup occurs exactly once; dispose of uncommitted transaction always attempts rollback.
-7. No global `static AsyncLocal<IDbTransaction>`, implicit thread-local state or ambient shared transaction.
-8. No concurrent commands on one connection/UoW; create separate scopes for parallel work. Cancellation must dispose safely.
-9. Sync methods are sufficient for initial ownership API, but async `CommitAsync/RollbackAsync/DisposeAsync` may be added where supported by target-specific implementations.
-10. Repositories are registered explicitly with DI; do not discover the first assignable type by arbitrary assembly scan.
+The existing state values are `Created`, `ActiveTransaction`, `Committed`, `RolledBack` and `Disposed`. `SqlUnitOfWorkFactory` owns the implementation/state machine; `ISqlExecutionContext` exposes the guarded current connection and optional current transaction only within Infrastructure.
 
+1. The factory creates a fresh opened connection and transfers its ownership to the UoW. One UoW has at most one active transaction.
+2. Repositories resolved from the UoW use that connection and its current explicit transaction for all participating operations, including asynchronous calls.
+3. The factory is resolved from the caller DI scope. Repositories receive the same scoped request/user context. The UoW disposes repository instances it creates, while caller-scoped dependencies remain caller-owned.
+4. Begin, commit and rollback obey the existing state machine. A second begin is an error; completion/disposal prevents further database operations through the scope. Dispose of an uncommitted transaction attempts rollback and cleanup occurs exactly once.
+5. A repository resolved before `BeginTransaction` must use a transaction begun later. Do not capture the constructor-time transaction as permanent state.
+6. Do not use ambient `TransactionScope`, static/AsyncLocal transaction state or hidden fallback connections for participating work.
+7. Do not run concurrent commands on one connection/UoW. Parallel work needs separately owned scopes; cancellation/failure must release owned resources safely.
+8. Register business repository interfaces explicitly with `SqlPersistenceBuilder.AddRepository<TRepository,TImplementation>()`. Unregistered or invalid repository types fail clearly; no arbitrary first-type assembly scanning or general `GetService<T>()` API belongs in the UoW.
 
-### 2.1. Repository resolution convention
-
-Application command handlers are permitted to obtain **repository interfaces** from their own explicit UoW:
+### Repository resolution and reads
 
 ```csharp
 using var uow = await _unitOfWorkFactory.CreateAsync(cancellationToken);
 uow.BeginTransaction();
-
 var repository = uow.Repository<IGoodsReceiptWriteRepository>();
-// Execute command-side operations through this repository.
-
+// Execute participating work and materialize the required result.
 uow.Commit();
-// Disposal rolls back an active uncommitted transaction.
 ```
 
-- `TRepository` must be a business repository **interface** defined in `Server.Application` (or an appropriate inner layer), never a concrete SQL repository class. Application and Domain must not depend on `Server.Infrastructure`, `ISqlExecutionContext`, `IDbConnection`, `IDbTransaction`, RepoDb, Dapper, or SQL implementation details.
-- `Repository<TRepository>()` is **only** a UoW-scoped repository resolver, not a generic service locator. Register each interface-to-implementation mapping explicitly (for example via `SqlPersistenceBuilder.AddRepository<TRepository, TImplementation>()`); unregistered interfaces must fail clearly. Do not add arbitrary `GetService<T>()` or `Resolve<T>()` APIs to the UoW.
-- Resolution must bind each repository to the current UoW's connection and transaction. Multiple repositories resolved from the same UoW share that scope; no repository can silently open its own connection or transaction for participating work. Pass the active transaction explicitly to RepoDb operations, including async calls.
-- Repositories belong to their UoW's lifetime. Do not use or expose them after the UoW is disposed, or share the UoW/repositories concurrently. The UoW is responsible for disposing repository instances it creates, not injected caller-scoped dependencies.
-- Standalone CQRS queries use Application query-service interfaces returning DTOs; they do **not** need a UoW by default. When a query participates in an active command transaction, Infrastructure uses an explicit shared execution context with the same connection and transaction.
-- The tradeoff is that repository dependencies are looked up within the handler rather than listed in its constructor. Preserve strong interface typing, explicit registrations, startup/composition validation where feasible, and SQL integration tests for multi-repository atomicity. Switching to direct repository injection would require a separately proven transaction/lifetime design, not just a syntax change.
+`Repository<TRepository>()` is a typed UoW-scoped resolver, not a general service locator. Application asks for a business interface, never `Sql*Repository` or an Infrastructure execution context. Repositories belong to the UoW lifetime and must not escape or be shared concurrently.
 
-This convention documents the existing `IUnitOfWork` contract and accepted [ADR 0002](adr/0002-explicit-unit-of-work.md); it is not a new Unit of Work strategy.
+Standalone CQRS reads do not require a UoW by default. Infrastructure owns their connection and fully materializes DTOs before disposal. A query that needs same-transaction visibility uses the command's explicit connection/transaction; it cannot silently open its own connection. Preserve explicit registration checks and multi-repository atomicity tests. Changing to direct repository injection would require a separately proven ownership design, beyond provider replacement.
 
-## 3. Example posting ownership
+### LINQ to DB session adapters (verified T01 seam)
 
-```text
-PostGoodsReceiptHandler
-  -> create UoW
-  -> begin transaction
-  -> lock receipt header
-  -> load lines and lock Warehouse, Employee, then Products by ProductId
-  -> receiptRepo.TryMarkPosted(receiptId, expected Draft + rowversion, ...)
-  -> receiptRepo.AppendStockLedger(documentLine IDs)
-  -> receiptRepo.ApplyBalanceDeltas by (WarehouseId, ProductId)
-  -> commit
-  -> dispose
+L2DB-T01 introduced the internal Infrastructure-only `ILinqToDbSessionFactory` seam; T03–T06 now use it for production LINQ operations:
+
+```csharp
+LinqToDB.Data.DataConnection Borrow(ISqlExecutionContext context, bool requireTransaction);
+Task<LinqToDB.Data.DataConnection> OpenOwnedAsync(CancellationToken cancellationToken);
 ```
 
-Any failure before commit must rollback. Never open another independent connection from a repository inside that handler. A status update is **conditional**; 0 affected rows means missing/already-posted/concurrent transition, resolved using a read as necessary. Enforce a unique index on movement source identity to guard against double ledger entries.
+These methods exist in the verified T01 seam; [verification](L2DB_VERIFICATION.md#l2db-t01--net48-package-and-resource-ownership) binds their net48/package/ownership evidence. T03/T04 now compose production repositories explicitly through this seam. The [initial T02 pilot](L2DB_VERIFICATION.md#l2db-t02--three-slice-pilot-no-go) found a baseline missing-target reader defect; the authorized repair below resolves it. Product list batching/long offsets and Security allowlisted procedures use explicit native escape paths; receipt writes interoperate with unchanged native locking/posting/balance SQL. [L2DB-PILOT-01 repair](L2DB_VERIFICATION.md#l2db-t02-blocker-repair--l2db-pilot-01) changes the baseline to ReadSingleOrDefaultAsync plus an invariant null guard, surfacing deferred SQL51031 through the existing mapper; strict User/Role NotFound parity now passes. The [final T02 GO](L2DB_VERIFICATION.md#l2db-t02-final-go--approved-runtime-startup) includes schema9/x86 package verification and successful real restricted-runtime startup, with approved temporary login/database cleanup. T03 registers the Catalog mapping and T04 registers Inventory mapping and borrowed writes/reference loads. Inventory native-only queries retain their existing factory-owned connection/transaction path. T05 converts Identity/Security/operational consumers to native SqlClient on their existing explicit factory/UoW/maintenance connection paths; T06 removes transitional hooks/packages/pilots and active old-ORM dependencies. [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) records the native test-oracle conversion and retained fixture boundaries. Each wrapper is operation-scoped and must be materialized/disposed before a UoW state transition; repositories borrow anew for each operation. A borrowed wrapper obtains the current connection/transaction for each operation and owns neither. Wrapper disposal, query failure and cancellation must not close, dispose, commit or roll back UoW resources. Invalid provider/state or a missing required transaction fails before SQL without opening a fallback connection.
 
-## 4. Concurrency and balance consistency
+An owned standalone wrapper opens through the existing connection factory, owns connection disposal and cleans up if wrapper construction fails. Mapping composition is published only after successful construction and is then reused read-only; a failed initialization cannot poison all later requests. The internal provider composes a private candidate under an instance lock and publishes after FluentMappingBuilder.Build; the package MappingSchema remains mutable, so Infrastructure consumers must not mutate the published schema. Explicit MicrosoftDataSqlClient provider selection and a conservative v2012 dialect avoid automatic server detection opening another connection; T02 reviews the generated SQL before rollout. UseConnection and UseTransaction are mutually exclusive option paths. Borrowed transactions stay UoW-owned; owned standalone wrappers use DisposeConnection=true. The wrapper default command timeout is 30 seconds and async operations receive caller cancellation.
 
-For P5:
-- ```text
-  StockBalances PRIMARY KEY (WarehouseId, ProductId)
-  StockLedger UNIQUE (DocumentType, DocumentLineId)
-  GoodsReceipt Status conditional update Draft -> Posted
-  ```
-- Posting multiple receipts to same warehouse/product must not lose increments.
-- Suggested SQL strategy: atomic `UPDATE Quantity = Quantity + @delta`; for missing rows use an explicit serializable/UPDLOCK/HOLDLOCK-safe upsert or controlled retry on unique-key violation. Upsert and ledger insert remain **inside one transaction**.
-- Avoid unguarded "read quantity, add in C#, overwrite" or naive concurrent `MERGE`.
-- Sort balance keys before applying multiple increments to reduce deadlock risk. Deadlocks/concurrency faults get bounded, explicitly tested retry only at an operation-safe boundary.
-- Posting uses the consistent lock order GoodsReceipt header → Warehouse → Employee → Products by ProductId → StockBalances by (WarehouseId,ProductId). Catalog SetActive operations use ordinary SQL updates and therefore wait on held master-data locks rather than invalidating an in-flight Post check.
-- Reconciliation reads grouped ledger totals and balances inside one explicit `SERIALIZABLE` transaction. It first acquires shared table locks in the same StockLedger → StockBalances order as Post, so it neither reports two different committed states nor creates a join-plan lock-order inversion while Post is in flight.
-- `rowversion` can protect UI edits and assist optimistic consistency, but **does not replace** atomic increment locking.
-- Ledger source identity, receipt status and balance update should be verified together in SQL integration tests.
+## 3. Posting, concurrency and query behavior
 
-## 5. RepoDb mapping
+Goods receipt Post owns one explicit transaction. It locks the receipt header, loads its lines and validates locked Warehouse, Employee and Products in stable ProductId order. It performs the conditional Draft/expected-rowversion transition, appends ledger entries, applies sorted balance deltas and commits. Any failure before commit rolls back status, ledger and balances together.
 
-- Map table/schema/PK/identity, column names and DB types explicitly; verify mapping APIs against pinned RepoDb 1.16.x.
-- Text in Vietnamese should use NVARCHAR/Unicode; only specify ANSI/VARCHAR when a documented legacy constraint requires it.
-- Initialize RepoDb mapping **once after successful setup**; do not set the initialized flag before mapping completes.
-- Do not map a business code as PK when SQL uses another actual PK without a documented key policy.
-- Enforce nullable reference handling for `GetById`; distinguish entity-not-found from SQL failures.
+- `StockBalances` has the `(WarehouseId, ProductId)` primary key; ledger source identity is unique on `(DocumentType, DocumentLineId)`.
+- Concurrent receipts affecting the same balance cannot lose increments. Preserve atomic `UPDATE Quantity = Quantity + @delta` and the existing lock-safe missing-row handling inside the transaction.
+- Preserve receipt header → Warehouse → Employee → sorted Products → sorted StockBalances lock order. Ordinary catalog SetActive updates wait on held master-data locks rather than invalidating a posting check mid-transaction.
+- Reconciliation reads ledger totals and balances in one explicit `SERIALIZABLE` transaction. It acquires shared table locks in StockLedger → StockBalances order, matching Post, to avoid mixed committed states and lock-order inversion.
+- Preserve conditional affected-row checks, receipt sequence numbering, returned IDs, byte-array rowversion, SQL decimal precision/scale, append-only ledger identity and stock-card chronological tie-breakers.
+- Do not replace this SQL with unrestricted entity updates, naive `MERGE` or C# read-modify-write balances. A rowversion does not replace atomic increment locking.
+- Any deadlock retry is bounded and tested at an operation-safe boundary. Deliberate multiple SQL sessions inside a concurrency test are distinct from concurrent test-project execution.
 
-## 6. Migrations and data safety
+Catalog queries preserve literal substring search, Unicode, blank/trim normalization, active-only lookups, deterministic code/ID ordering, `COUNT_BIG` and long offsets. Preserve write-field allowlists, audit fields, generated IDs, missing-row behavior and SQL-error mapping. Do not add catalog concurrency tokens absent from the schema or contracts. Native parameterized SqlClient remains acceptable for exact paging/multiple-result/procedure/locking semantics; every retained surface needs a file/method/reason in the L2DB verification record.
 
-- DbUp uses numbered, immutable scripts. The implemented chain is `001_PersistenceFoundation.sql`, `002_Identity.sql`, `003_Catalog.sql`, `004_Catalog_Nul_Constraints.sql`, `005_GoodsReceipt.sql`, `006_GoodsReceipt_Number_Sequence.sql` and `007_Inventory_Stock.sql`; later migrations remain additive.
-- History table under controlled schema; apply once, in order, with meaningful deployment logs.
-- Run migrator as a **separate controlled deployment command**, not per-desktop login. Client DB logins should not require DDL.
-- Require an explicit application database in the migration connection string and reject SQL Server system databases (`master`, `model`, `msdb`, `tempdb`) before opening a connection.
-- Provide a clean reset script only for clearly named disposable **test** databases, with an explicit safety check; do not auto-drop existing DBs.
-- Migration tests: new database, repeated no-op run, upgrade from last baseline, rollback **operational** procedure (DB backup/restore; DbUp does not automatically downgrade).
-- Schema, RepoDb mapping and DTO projection must evolve together.
+## 4. Mapping and security boundaries
 
-## 7. Tests required before P5
+The composed LINQ mapping schema is published only after successful setup and retries after failure; no legacy mapping hook remains. Mappings must describe real schema/table, primary keys, identities, column names, nullability, Unicode lengths, decimal precision/scale and SQL-generated fields explicitly. Never map a business code as a primary key merely for convenience. Distinguish entity-not-found from SQL failure.
 
-- UoW commit, rollback and dispose-without-commit;
-- two repositories in same transaction;
-- Dapper query seeing uncommitted same-transaction data when needed;
-- parallel UoWs without cross-contamination;
-- duplicate posting and concurrent balance increments;
-- no leaked connections on exception and cancellation.
+L2DB mappings stay in Infrastructure, including mappings of existing Domain POCOs. Operation-specific insert/update allowlists prevent generated/audit fields from being overwritten. Bulk copy is only in scope if an inventoried existing consumer needs it and shared-transaction, identity, constraints and cancellation semantics are proved.
 
-These must run against SQL Server in an isolated test environment; mocks alone do not prove ADO.NET transaction correctness.
+Security administration uses the existing allowlisted procedures and maintenance/runtime authority boundary. Preserve current-subject/account checks, registered Active keys, the protected singleton superuser, direct-user precedence, active-role grants and default deny. Preserve additive import with revision/digest revalidation, 1 MiB UTF-8/5,000-entry limits and atomic audit. No generic ORM DML on restricted RBAC/binding tables and no widened SQL grants are authorized by L2DB. Preserve legacy password columns. See [SECURITY](SECURITY.md) and [ADR 0007](adr/0007-code-defined-permissions-and-single-superuser.md).
+
+## 5. Migrations and data safety
+
+The current DbUp scripts under `src/MyDmsVn.Server.DbMigrator/Scripts/` are:
+
+| Script | Responsibility |
+|---|---|
+| `001_PersistenceFoundation.sql` | Persistence foundation. |
+| `002_Identity.sql` | Supported identity/RBAC schema and singleton superuser binding. |
+| `003_Catalog.sql` | Catalog schema. |
+| `004_Catalog_Nul_Constraints.sql` | Catalog NUL constraints. |
+| `005_GoodsReceipt.sql` | Receipt schema. |
+| `006_GoodsReceipt_Number_Sequence.sql` | Server-issued receipt sequence. |
+| `007_Inventory_Stock.sql` | Stock ledger/balance schema. |
+| `008_Security_Administration.sql` | Administration procedure, assignment revisions and security audit. |
+| `009_Security_Permission_Import.sql` | Assignment-import read/apply procedures using existing revisions and audit. |
+
+Preserve the current supported post-security-rebuild baseline, numbered scripts and DbUp history. The earlier unreleased security redesign is historical and does not authorize another schema rewrite or data reset. L2DB changes DAL implementation, not production schema, grants, assignments or migration history. Any necessary production schema change needs a separate reviewed scope decision.
+
+Run migrations as a controlled deployment command, not from desktop login. Require an explicit application database and reject SQL Server system databases before connecting. Runtime client accounts must not need DDL. The current migrator admits only Empty or Compatible databases; a valid older prefix is rejected as `Migration.UnsupportedExistingDatabase`, not automatically upgraded or resumed. Migration coverage includes clean creation, repeated no-op application and supported-baseline compatibility/refusal; operational rollback is compatible code redeployment or backup/restore, not an automatic DbUp downgrade.
+
+RESP may reset data only in explicitly owned, disposable test databases through its reviewed fixture design. Preserve only the verified migration journal and ownership metadata; clear/reseed mutable seed data. Identity and sequence behavior, independent sessions and exceptional fresh-database tests require explicit reset contracts. This is test lifecycle work, never a permission to reset an application database. Use the explicitly designated non-production instance and retain local live instance/allocation/marker validation before reset or teardown. Ambiguous or interrupted allocations need manual review; no ownership journal or automatic orphan cleanup remains.
+
+## 6. Validation and rollout
+
+[TEST_POLICY](TEST_POLICY.md) owns execution scope; [TEST_STRATEGY](TEST_STRATEGY.md) describes behavioral coverage. Keep focused tests for each changed feature and broaden across SQL owners when shared connection/UoW/mapping/fixture/migration behavior changes. RESP and L2DB final milestones require complete applicable active net48 SQL evidence through direct sequential project commands and the local owned-database lifecycle. There is no automatic full repository/GUI run after every task or code PR, and no mandatory multi-pass performance benchmark.
+
+Required invariants include commit/rollback/dispose-without-commit, two repositories sharing a transaction, same-transaction read visibility, independent UoWs, late transaction binding, resolver/lifetime failures, cancellation/exception cleanup, duplicate/concurrent posting, reconciliation and least-privileged security behavior. Mocks alone cannot prove SQL transaction/locking correctness.
+
+RESP was accepted against the pre-migration RepoDb/Dapper baseline first. L2DB-T00 records that accepted commit and freezes fixture boundaries, reset behavior and direct test commands during DAL conversion. Preserve independent native-SQL setup/assertions so a replacement DAL cannot validate itself. Retain necessary fresh-database exceptions; fixture reuse never relaxes observable isolation. Only verified code cutover allows current implementation documentation to describe LINQ to DB as delivered.

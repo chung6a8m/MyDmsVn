@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Messaging;
@@ -17,7 +18,11 @@ namespace MyDmsVn.Desktop.Application
         private bool _userIdInputInvalid;
 
         public EmployeeCatalogViewModel(IEmployeeApiClient client, IMessenger messenger, IUiDispatcher dispatcher, IDesktopNotificationService notifications, IAsyncDelay delay, TimeSpan? debounceInterval = null, IDesktopExceptionReporter? exceptionReporter = null)
-            : base(CatalogKind.Employee, messenger, dispatcher, notifications, delay, debounceInterval, exceptionReporter) => _client = client ?? throw new ArgumentNullException(nameof(client));
+            : base(CatalogKind.Employee, messenger, dispatcher, notifications, delay, debounceInterval, exceptionReporter)
+        {
+            _client = client ?? throw new ArgumentNullException(nameof(client));
+            InitializeAcceptedEditor();
+        }
         public string Code { get => _code; set => SetProperty(ref _code, value ?? string.Empty); }
         public string Name { get => _name; set => SetProperty(ref _name, value ?? string.Empty); }
         public string? Phone { get => _phone; set => SetProperty(ref _phone, value); }
@@ -55,8 +60,22 @@ namespace MyDmsVn.Desktop.Application
         protected override Task<ApiResponse<EmployeeDto>> UpdateAsync(int id, CancellationToken cancellationToken) => _userIdInputInvalid ? InvalidUserId() : _client.UpdateAsync(id, new SaveEmployeeRequest(Code, Name, Phone, UserId), cancellationToken);
         protected override Task<ApiResponse<UnitResponse>> SetActiveCoreAsync(int id, bool isActive, CancellationToken cancellationToken) => _client.SetActiveAsync(id, isActive, cancellationToken);
         protected override int GetId(EmployeeDto item) => item.Id;
+        protected override EmployeeDto WithActiveStatus(EmployeeDto item, bool isActive) => new EmployeeDto(item.Id, item.Code, item.Name, item.Phone, item.UserId, isActive);
         protected override void PopulateEditor(EmployeeDto item) { Code = item.Code; Name = item.Name; Phone = item.Phone; UserIdText = item.UserId?.ToString() ?? string.Empty; }
         protected override void ClearEditor() { Code = string.Empty; Name = string.Empty; Phone = null; UserIdText = string.Empty; }
+        protected override IReadOnlyDictionary<string, string> CaptureEditorFields() =>
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [nameof(Code)] = Code, [nameof(Name)] = Name, [nameof(Phone)] = Phone ?? string.Empty,
+                [nameof(UserIdText)] = UserIdText,
+            };
+        protected override IReadOnlyDictionary<string, string> CaptureAcceptedFields(EmployeeDto item) =>
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [nameof(Code)] = item.Code, [nameof(Name)] = item.Name,
+                [nameof(Phone)] = item.Phone ?? string.Empty,
+                [nameof(UserIdText)] = item.UserId?.ToString() ?? string.Empty,
+            };
 
         private static Task<ApiResponse<EmployeeDto>> InvalidUserId() =>
             Task.FromResult(

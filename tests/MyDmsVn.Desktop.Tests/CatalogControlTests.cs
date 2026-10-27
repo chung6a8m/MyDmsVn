@@ -5,16 +5,23 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using CommunityToolkit.Mvvm.Messaging;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests
 {
     public sealed class CatalogControlTests
     {
+        private readonly ITestOutputHelper _output;
+
+        public CatalogControlTests(ITestOutputHelper output) => _output = output;
+
         [Fact]
         public void Catalog_control_renders_active_state_and_keeps_compact_keyboard_layout()
         {
@@ -36,6 +43,9 @@ namespace MyDmsVn.Desktop.Tests
                         control.CreateControl();
                         control.PerformLayout();
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
+                        Assert.Equal(BootstrapSurfaceRole.Surface,
+                            Assert.IsType<BootstrapPanel>(Assert.Single(control.Controls.Find("CatalogInspector", true))).SurfaceRole);
+                        Assert.Equal(BootstrapTextRole.Muted, Assert.IsType<BootstrapLabel>(control.PageLabel).TextRole);
 
                         Assert.Equal(3, control.Grid.RowsCount);
                         Assert.Equal("Active", control.Grid[1, 3].Value);
@@ -142,6 +152,102 @@ namespace MyDmsVn.Desktop.Tests
         }
 
         [Fact]
+        public void Duplicate_code_retains_typed_text_and_offers_accessible_navigation()
+        {
+            StaTest.Run(_ =>
+            {
+                var client = new ProductClient
+                {
+                    CreateResponse = ApiResponse<ProductDto>.Failure(new ApiError(
+                        ApiStatusCode.Conflict, "Catalog.DuplicateCode", "Code already exists.",
+                        new[] { new ApiErrorDetail("Catalog.DuplicateCode", "Code already exists.", "code") })),
+                };
+                using (var viewModel = CreateViewModel(client))
+                using (var control = new CatalogControl(viewModel))
+                using (var host = new Form())
+                {
+                    host.Controls.Add(control);
+                    host.Show();
+                    control.NewButton.PerformClick();
+                    control.EditorControls["code"].Text = "DUPLICATE";
+                    control.EditorControls["name"].Text = "Product";
+                    control.EditorControls["unit"].Text = "pcs";
+                    control.SaveButton.PerformClick();
+                    PumpMessagesUntil(() => control.LastOperation.IsCompleted && control.GetFieldError("code").Length != 0, TimeSpan.FromSeconds(2));
+
+                    Assert.Equal("DUPLICATE", control.EditorControls["code"].Text);
+                    Assert.Equal(BootstrapValidationState.Invalid, control.EditorControls["code"].ValidationState);
+                    Assert.Contains("Code already exists.", control.ValidationSummaryText);
+                    Assert.False(control.EditorControls["code"].ContainsFocus);
+                    control.FocusFirstValidationError();
+                    Assert.True(control.EditorControls["code"].ContainsFocus);
+                }
+            }, TimeSpan.FromSeconds(10));
+        }
+
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Compact_product_validation_summary_keeps_bound_and_unknown_errors_visible_with_feedback_host(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var oldTheme = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    var client = new ProductClient
+                    {
+                        CreateResponse = ApiResponse<ProductDto>.Failure(new ApiError(
+                            ApiStatusCode.Conflict, "Catalog.DuplicateCode", "Correct the fields.",
+                            new[]
+                            {
+                                new ApiErrorDetail("Catalog.DuplicateCode", "Code already exists.", "code"),
+                                new ApiErrorDetail("Validation.Unknown", "Additional check required.", "legacy.path"),
+                            })),
+                    };
+                    using (var viewModel = CreateViewModel(client))
+                    using (var control = new CatalogControl(viewModel))
+                    using (var scope = new WorkspaceFeedbackScope())
+                    using (var workspace = new WorkspaceFeedbackHost(control, scope))
+                    using (var form = new Form { ClientSize = new System.Drawing.Size(940, 700) })
+                    {
+                        control.AttachFeedback(scope, new WorkspaceFeedbackNotificationService(scope));
+                        form.Controls.Add(workspace);
+                        form.Show();
+                        control.NewButton.PerformClick();
+                        control.EditorControls["code"].Text = "DUPLICATE";
+                        control.EditorControls["name"].Text = "Product";
+                        control.EditorControls["unit"].Text = "pcs";
+                        control.SaveButton.PerformClick();
+                        PumpMessagesUntil(() => control.LastOperation.IsCompleted && control.ValidationSummaryText.Contains("legacy.path"), TimeSpan.FromSeconds(2));
+                        scope.Capture(scope.BeginOperation("command", WorkspaceOperationKind.Write)).Publish(
+                            new DesktopNotification(DesktopNotificationKind.Error, "Correction needed."));
+                        System.Windows.Forms.Application.DoEvents();
+
+                        var summary = Assert.IsType<Label>(control.Controls.Find("CatalogValidationSummary", true).Single());
+                        var navigate = Assert.IsType<BootstrapButton>(control.Controls.Find("CatalogValidationNavigation", true).Single());
+                        Assert.True(summary.Visible);
+                        Assert.True(workspace.Alert.Visible);
+                        Assert.False(control.Controls.Find("CatalogError", true).Single().Visible);
+                        Assert.Contains("code: Code already exists.", summary.Text);
+                        Assert.Contains("legacy.path: Additional check required.", summary.Text);
+                        Assert.Equal(BootstrapValidationState.Invalid, control.EditorControls["code"].ValidationState);
+                        Assert.False(control.EditorControls["code"].ContainsFocus);
+                        Assert.True(navigate.CanSelect);
+                        navigate.Select();
+                        navigate.PerformClick();
+                        Assert.True(control.EditorControls["code"].ContainsFocus);
+                        Assert.Equal("DUPLICATE", control.EditorControls["code"].Text);
+                        _output.WriteLine($"Product validation theme={mode}; DeviceDpi={form.DeviceDpi}; client={form.ClientSize}; workspace={workspace.ClientSize}; inspector={control.EditorPanelWidth}");
+                        _output.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
+                    }
+                }
+                finally { BootstrapThemeManager.CurrentTheme = oldTheme; }
+            }, TimeSpan.FromSeconds(12));
+        }
+
+        [Fact]
         public void Editor_fields_are_disabled_while_a_save_is_in_flight()
         {
             StaTest.Run(
@@ -158,6 +264,9 @@ namespace MyDmsVn.Desktop.Tests
 
                         control.SaveButton.PerformClick();
 
+                        var busyHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>());
+                        Assert.NotNull(busyHost.Content);
+                        Assert.Contains(control.Grid, ((SplitContainer)busyHost.Content).Panel1.Controls.Cast<Control>());
                         Assert.All(control.EditorControls.Values, editor => Assert.False(editor.Enabled));
 
                         client.CompleteCreate(new ProductDto(1, "P1", "Product", "pcs", true));
@@ -170,6 +279,47 @@ namespace MyDmsVn.Desktop.Tests
                     }
                 },
                 TimeSpan.FromSeconds(10));
+        }
+
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Native_busy_overlay_stays_local_and_releases_after_save(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using var guard = new WinFormsTestGuard();
+                    var client = new ProductClient { ControlCreateResponse = true };
+                    using var viewModel = CreateViewModel(client);
+                    using var control = new CatalogControl(viewModel);
+                    using var form = new Form { ClientSize = new System.Drawing.Size(940, 700), TopMost = true };
+                    form.Controls.Add(control);
+                    form.Show();
+                    control.NewButton.PerformClick();
+                    control.EditorControls["code"].Text = "P1";
+                    control.EditorControls["name"].Text = "Product";
+                    control.EditorControls["unit"].Text = "pcs";
+                    control.SaveButton.PerformClick();
+                    var busyHost = Assert.Single(control.Controls.OfType<BootstrapBusyHost>());
+                    var overlay = Assert.Single(busyHost.Controls.OfType<Panel>());
+                    _output.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
+                    PumpMessagesUntil(() => overlay.Visible, TimeSpan.FromSeconds(2));
+                    Assert.True(overlay.Visible);
+                    Assert.False(Assert.Single(overlay.Controls.OfType<Button>()).Visible);
+                    Assert.False(control.SaveButton.Enabled);
+                    Assert.False(busyHost.Contains(control.RefreshButton));
+                    client.CompleteCreate(new ProductDto(1, "P1", "Product", "pcs", true));
+                    PumpMessagesUntil(() => control.LastOperation.IsCompleted && !overlay.Visible, TimeSpan.FromSeconds(2));
+                    control.LastOperation.GetAwaiter().GetResult();
+                    Assert.False(overlay.Visible);
+                    Assert.Empty(guard.Exceptions);
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
+            }, TimeSpan.FromSeconds(20));
         }
 
         [Fact]

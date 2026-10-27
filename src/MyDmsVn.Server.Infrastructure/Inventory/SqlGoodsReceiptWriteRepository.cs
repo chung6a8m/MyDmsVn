@@ -6,12 +6,14 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using LinqToDB;
+using LinqToDB.Async;
+using LinqToDB.Data;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.Domain.Catalog;
 using MyDmsVn.Server.Domain.Inventory;
 using MyDmsVn.Server.Infrastructure.Persistence;
-using RepoDb;
 
 namespace MyDmsVn.Server.Infrastructure.Inventory;
 
@@ -23,29 +25,16 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         "PostedByUserId, RowVersion " +
         "FROM dbo.GoodsReceipts WITH (UPDLOCK, HOLDLOCK) WHERE ReceiptId = @receiptId;";
 
-    private const string ApplyBalanceDeltaSql =
-        "UPDATE dbo.StockBalances WITH (UPDLOCK, HOLDLOCK) " +
-        "SET Quantity = Quantity + @delta " +
-        "WHERE WarehouseId = @warehouseId AND ProductId = @productId; " +
-        "IF @@ROWCOUNT = 0 " +
-        "BEGIN " +
-        "    BEGIN TRY " +
-        "        INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity) " +
-        "        VALUES (@warehouseId, @productId, @delta); " +
-        "    END TRY " +
-        "    BEGIN CATCH " +
-        "        IF ERROR_NUMBER() NOT IN (2601, 2627) THROW; " +
-        "        UPDATE dbo.StockBalances WITH (UPDLOCK, HOLDLOCK) " +
-        "        SET Quantity = Quantity + @delta " +
-        "        WHERE WarehouseId = @warehouseId AND ProductId = @productId; " +
-        "        IF @@ROWCOUNT <> 1 THROW 51001, 'Stock balance unique-key retry failed.', 1; " +
-        "    END CATCH " +
-        "END;";
-
     private readonly ISqlExecutionContext _context;
+    private readonly ILinqToDbSessionFactory _sessions;
+    private readonly InventoryValuationCoordinator _valuation;
 
-    public SqlGoodsReceiptWriteRepository(ISqlExecutionContext context) =>
+    public SqlGoodsReceiptWriteRepository(ISqlExecutionContext context, ILinqToDbSessionFactory sessions)
+    {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
+        _valuation = new InventoryValuationCoordinator(_context, _sessions);
+    }
 
     public async Task<GoodsReceiptReferenceSnapshot> GetReferenceSnapshotAsync(
         int warehouseId,
@@ -53,15 +42,11 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         IReadOnlyCollection<int> productIds,
         CancellationToken cancellationToken)
     {
-        var transaction = GetTransaction();
-        var warehouse = (await _context.Connection.QueryAsync<Warehouse>(
-            warehouseId,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false)).SingleOrDefault();
-        var employee = (await _context.Connection.QueryAsync<Employee>(
-            employeeId,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false)).SingleOrDefault();
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
+        var warehouse = await db.GetTable<Warehouse>().SingleOrDefaultAsync(
+            row => row.Id == warehouseId, cancellationToken).ConfigureAwait(false);
+        var employee = await db.GetTable<Employee>().SingleOrDefaultAsync(
+            row => row.Id == employeeId, cancellationToken).ConfigureAwait(false);
         var products = await GetProductReferenceStatesAsync(productIds, cancellationToken)
             .ConfigureAwait(false);
 
@@ -128,22 +113,23 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
             throw new ArgumentNullException(nameof(lines));
         }
 
-        var transaction = GetTransaction();
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
         var sequenceValue = await NextReceiptNumberValueAsync(cancellationToken).ConfigureAwait(false);
         header.ReceiptNumber = "GR" + sequenceValue.ToString("D10", CultureInfo.InvariantCulture);
-        header.Id = await _context.Connection.InsertAsync<GoodsReceipt, long>(
-            header,
-            fields: InventoryRepoDbWriteFields.GoodsReceiptCreate,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+        header.Id = await db.GetTable<GoodsReceipt>()
+            .Value(row => row.ReceiptNumber, header.ReceiptNumber)
+            .Value(row => row.ReceiptDate, header.ReceiptDate)
+            .Value(row => row.WarehouseId, header.WarehouseId)
+            .Value(row => row.EmployeeId, header.EmployeeId)
+            .Value(row => row.Status, header.Status)
+            .Value(row => row.Note, header.Note)
+            .Value(row => row.CreatedByUserId, header.CreatedByUserId)
+            .InsertWithInt64IdentityAsync(cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("The goods receipt insert returned no identity.");
         foreach (var line in lines)
         {
             line.ReceiptId = header.Id;
-            line.Id = await _context.Connection.InsertAsync<GoodsReceiptLine, long>(
-                line,
-                fields: InventoryRepoDbWriteFields.GoodsReceiptLineCreate,
-                transaction: transaction,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+            line.Id = await InsertLineAsync(db, line, cancellationToken).ConfigureAwait(false);
         }
 
         return await ReloadHeaderAsync(header.Id, cancellationToken).ConfigureAwait(false);
@@ -178,14 +164,13 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
 
         // Posting always takes locks in this order: receipt header, warehouse, employee,
         // products by ProductId, then balances by (WarehouseId, ProductId).
-        var warehouse = await LockCatalogStateAsync(
-            "SELECT IsActive FROM dbo.Warehouses WITH (UPDLOCK, HOLDLOCK) WHERE WarehouseId = @id;",
-            header.WarehouseId,
-            cancellationToken).ConfigureAwait(false);
-        var employee = await LockCatalogStateAsync(
-            "SELECT IsActive FROM dbo.Employees WITH (UPDLOCK, HOLDLOCK) WHERE EmployeeId = @id;",
-            header.EmployeeId,
-            cancellationToken).ConfigureAwait(false);
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
+        var warehouseRow = await db.GetTable<Warehouse>().TableHint("UPDLOCK").TableHint("HOLDLOCK")
+            .SingleOrDefaultAsync(row => row.Id == header.WarehouseId, cancellationToken).ConfigureAwait(false);
+        var employeeRow = await db.GetTable<Employee>().TableHint("UPDLOCK").TableHint("HOLDLOCK")
+            .SingleOrDefaultAsync(row => row.Id == header.EmployeeId, cancellationToken).ConfigureAwait(false);
+        var warehouse = ToReferenceState(warehouseRow?.IsActive);
+        var employee = ToReferenceState(employeeRow?.IsActive);
         var productIds = lines.Select(line => line.ProductId).Distinct().OrderBy(id => id).ToArray();
         var products = await LockProductStatesAsync(productIds, cancellationToken).ConfigureAwait(false);
 
@@ -215,55 +200,40 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1;
     }
 
-    public async Task AppendStockLedgerAsync(
-        long receiptId,
-        int warehouseId,
-        IReadOnlyList<GoodsReceiptLine> lines,
-        DateTime postedAtUtc,
-        int postedByUserId,
-        CancellationToken cancellationToken)
+    public Task AcquirePostingGateAsync(CancellationToken token) => _valuation.AcquirePostingGateAsync(token);
+
+    public Task<IReadOnlyDictionary<int, StockValuationState>> LockValuationBalancesAsync(
+        int warehouseId, IReadOnlyCollection<int> productIds, CancellationToken token) =>
+        _valuation.LockBalancesAsync(warehouseId, productIds, token);
+
+    public async Task ApplyPostedInventoryAsync(GoodsReceipt header, IReadOnlyList<GoodsReceiptLine> lines,
+        DateTime postedAtUtc, int postedByUserId, CancellationToken token)
     {
-        var transaction = GetTransaction();
+        // Recheck every key before the first append; callers cannot smuggle an unlocked later line.
+        var balances = _valuation.GetLockedBalances(header.WarehouseId, lines.Select(line => line.ProductId));
+        var values = lines.ToDictionary(line => line.Id,
+            line => InventoryValuationMath.CalculateReceiptValue(line.Quantity, line.UnitCost));
+        InventoryValuationMath.SumAmounts(values.Values);
+        foreach (var group in lines.GroupBy(line => line.ProductId))
+        {
+            var balance = balances[group.Key];
+            _ = new StockValuationState(
+                InventoryValuationMath.SumQuantities(group.Select(line => line.Quantity).Concat(new[] { balance.Quantity })),
+                InventoryValuationMath.SumAmounts(group.Select(line => values[line.Id]).Concat(new[] { balance.InventoryValue })));
+        }
         foreach (var line in lines.OrderBy(line => line.LineNumber).ThenBy(line => line.Id))
         {
-            var entry = new StockLedgerEntry
+            await _valuation.AppendMovementAsync(new StockLedgerEntry
             {
-                WarehouseId = warehouseId,
-                ProductId = line.ProductId,
-                DocumentType = "GoodsReceipt",
-                DocumentId = receiptId,
-                DocumentLineId = line.Id,
-                QuantityChange = line.Quantity,
-                PostedAtUtc = postedAtUtc,
-                PostedByUserId = postedByUserId,
-            };
-            entry.Id = await _context.Connection.InsertAsync<StockLedgerEntry, long>(
-                entry,
-                fields: InventoryRepoDbWriteFields.StockLedgerCreate,
-                transaction: transaction,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                WarehouseId = header.WarehouseId, ProductId = line.ProductId,
+                DocumentType = "GoodsReceipt", DocumentId = header.Id, DocumentLineId = line.Id,
+                QuantityChange = line.Quantity, PostedAtUtc = postedAtUtc, PostedByUserId = postedByUserId,
+            }, values[line.Id], token).ConfigureAwait(false);
         }
-    }
-
-    public async Task ApplyStockBalanceDeltasAsync(
-        int warehouseId,
-        IReadOnlyDictionary<int, decimal> deltasByProductId,
-        CancellationToken cancellationToken)
-    {
-        foreach (var delta in deltasByProductId.OrderBy(item => item.Key))
-        {
-            using var command = new SqlCommand(
-                ApplyBalanceDeltaSql,
-                GetSqlConnection(),
-                GetSqlTransaction());
-            command.Parameters.Add("@warehouseId", SqlDbType.Int).Value = warehouseId;
-            command.Parameters.Add("@productId", SqlDbType.Int).Value = delta.Key;
-            var quantity = command.Parameters.Add("@delta", SqlDbType.Decimal);
-            quantity.Precision = 18;
-            quantity.Scale = 4;
-            quantity.Value = delta.Value;
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
+        foreach (var group in lines.GroupBy(line => line.ProductId).OrderBy(group => group.Key))
+            await _valuation.ApplyBalanceAsync(header.WarehouseId, group.Key,
+                InventoryValuationMath.SumQuantities(group.Select(line => line.Quantity)),
+                InventoryValuationMath.SumAmounts(group.Select(line => values[line.Id])), token).ConfigureAwait(false);
     }
 
     public async Task<GoodsReceipt> ReplaceDraftAsync(
@@ -281,12 +251,15 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
             throw new ArgumentNullException(nameof(lines));
         }
 
-        var transaction = GetTransaction();
-        var affected = await _context.Connection.UpdateAsync(
-            header,
-            fields: InventoryRepoDbWriteFields.GoodsReceiptDraftUpdate,
-            transaction: transaction,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
+        var affected = await db.GetTable<GoodsReceipt>().Where(row => row.Id == header.Id)
+            .Set(row => row.ReceiptDate, header.ReceiptDate)
+            .Set(row => row.WarehouseId, header.WarehouseId)
+            .Set(row => row.EmployeeId, header.EmployeeId)
+            .Set(row => row.Note, header.Note)
+            .Set(row => row.UpdatedAtUtc, header.UpdatedAtUtc)
+            .Set(row => row.UpdatedByUserId, header.UpdatedByUserId)
+            .UpdateAsync(cancellationToken).ConfigureAwait(false);
         if (affected != 1)
         {
             throw new InvalidOperationException("The locked goods receipt header could not be updated.");
@@ -304,11 +277,7 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         foreach (var line in lines)
         {
             line.ReceiptId = header.Id;
-            line.Id = await _context.Connection.InsertAsync<GoodsReceiptLine, long>(
-                line,
-                fields: InventoryRepoDbWriteFields.GoodsReceiptLineCreate,
-                transaction: transaction,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+            line.Id = await InsertLineAsync(db, line, cancellationToken).ConfigureAwait(false);
         }
 
         return await ReloadHeaderAsync(header.Id, cancellationToken).ConfigureAwait(false);
@@ -358,69 +327,38 @@ internal sealed class SqlGoodsReceiptWriteRepository : IGoodsReceiptWriteReposit
         return lines;
     }
 
-    private async Task<CatalogReferenceState> LockCatalogStateAsync(
-        string sql,
-        int id,
-        CancellationToken cancellationToken)
-    {
-        using var command = new SqlCommand(sql, GetSqlConnection(), GetSqlTransaction());
-        command.Parameters.Add("@id", SqlDbType.Int).Value = id;
-        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-        return value == null || value == DBNull.Value
-            ? CatalogReferenceState.Missing
-            : ToReferenceState(Convert.ToBoolean(value, CultureInfo.InvariantCulture));
-    }
-
     private async Task<IReadOnlyDictionary<int, CatalogReferenceState>> LockProductStatesAsync(
-        IReadOnlyList<int> productIds,
-        CancellationToken cancellationToken)
+        IReadOnlyList<int> productIds, CancellationToken cancellationToken)
     {
-        var states = productIds.ToDictionary(id => id, _ => CatalogReferenceState.Missing);
-        if (productIds.Count == 0)
+        var states = new Dictionary<int, CatalogReferenceState>();
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
+        foreach (var id in productIds.Distinct().OrderBy(id => id))
         {
-            return states;
+            var product = await db.GetTable<Product>().TableHint("UPDLOCK").TableHint("HOLDLOCK")
+                .SingleOrDefaultAsync(row => row.Id == id, cancellationToken).ConfigureAwait(false);
+            states.Add(id, ToReferenceState(product?.IsActive));
         }
-
-        var sql = new StringBuilder(
-            "SELECT ProductId, IsActive FROM dbo.Products WITH (UPDLOCK, HOLDLOCK) WHERE ProductId IN (");
-        using var command = new SqlCommand
-        {
-            Connection = GetSqlConnection(),
-            Transaction = GetSqlTransaction(),
-        };
-        for (var index = 0; index < productIds.Count; index++)
-        {
-            if (index > 0)
-            {
-                sql.Append(',');
-            }
-
-            var parameterName = "@lockedProductId" + index.ToString(CultureInfo.InvariantCulture);
-            sql.Append(parameterName);
-            command.Parameters.Add(parameterName, SqlDbType.Int).Value = productIds[index];
-        }
-
-        sql.Append(") ORDER BY ProductId;");
-        command.CommandText = sql.ToString();
-        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            states[reader.GetInt32(0)] = reader.GetBoolean(1)
-                ? CatalogReferenceState.Active
-                : CatalogReferenceState.Inactive;
-        }
-
         return states;
     }
 
     private async Task<GoodsReceipt> ReloadHeaderAsync(long receiptId, CancellationToken cancellationToken)
     {
-        var rows = await _context.Connection.QueryAsync<GoodsReceipt>(
-            receiptId,
-            transaction: GetTransaction(),
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        return rows.Single();
+        using var db = _sessions.Borrow(_context, requireTransaction: true);
+        return await db.GetTable<GoodsReceipt>().SingleAsync(
+            row => row.Id == receiptId, cancellationToken).ConfigureAwait(false);
     }
+
+    // Explicit allowlist: SQL owns identity/default audit fields; callers cannot write rowversion.
+    private static async Task<long> InsertLineAsync(DataConnection db, GoodsReceiptLine line, CancellationToken token) =>
+        await db.GetTable<GoodsReceiptLine>()
+            .Value(row => row.ReceiptId, line.ReceiptId)
+            .Value(row => row.LineNumber, line.LineNumber)
+            .Value(row => row.ProductId, line.ProductId)
+            .Value(row => row.Quantity, line.Quantity)
+            .Value(row => row.UnitCost, line.UnitCost)
+            .Value(row => row.CreatedByUserId, line.CreatedByUserId)
+            .InsertWithInt64IdentityAsync(token).ConfigureAwait(false)
+        ?? throw new InvalidOperationException("The goods receipt line insert returned no identity.");
 
     private System.Data.IDbTransaction GetTransaction() =>
         _context.Transaction

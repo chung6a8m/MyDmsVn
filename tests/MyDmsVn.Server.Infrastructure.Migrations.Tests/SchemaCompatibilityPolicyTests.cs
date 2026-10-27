@@ -17,10 +17,15 @@ public sealed class SchemaCompatibilityPolicyTests
         "007_Inventory_Stock.sql",
         "008_Security_Administration.sql",
         "009_Security_Permission_Import.sql",
+        "010_DirectSalesAndValuation.sql",
     };
 
     private static readonly string[] CurrentArtifacts =
     {
+        "Invariant:DirectSalesSchema",
+        "Column:StockBalances.InventoryValue",
+        "Table:SalesReceipts", "Table:SalesReceiptLines", "Table:StockValuationEntries",
+        "Sequence:SalesReceiptNumberSequence", "Trigger:TR_StockValuationEntries_AppendOnly",
         "Invariant:PersistenceColumns",
         "Table:Users",
         "Table:Roles",

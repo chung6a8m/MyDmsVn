@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -213,7 +213,7 @@ public sealed class InventoryViewModelTests
             "P-" + productId,
             "Product " + productId,
             true,
-            quantity);
+            quantity, 0m, quantity == 0 ? (decimal?)null : 0m);
 
     private static StockCardRow Movement(long ledgerId, int warehouseId, int productId, decimal quantity) =>
         new StockCardRow(
@@ -230,7 +230,7 @@ public sealed class InventoryViewModelTests
             "GoodsReceipt",
             41,
             "GR0000000041",
-            quantity);
+            quantity, 0m);
 
     private sealed class ImmediateDelay : IAsyncDelay
     {

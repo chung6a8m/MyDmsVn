@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using MyDmsVn.Server.Infrastructure.Operations;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
@@ -25,8 +26,10 @@ namespace MyDmsVn.Desktop.Tests
                 var manifest = JObject.Parse(
                     File.ReadAllText(Path.Combine(fixture.Root, "release-manifest.json")));
                 Assert.Equal("1.2.3", manifest.Value<string>("productVersion"));
-                Assert.Equal(8, manifest["schemaSupport"]!.Value<int>("minimum"));
-                Assert.Equal(8, manifest["schemaSupport"]!.Value<int>("maximum"));
+                Assert.Equal(SchemaCompatibilityPolicy.CurrentScripts.Count, manifest["schemaSupport"]!.Value<int>("minimum"));
+                Assert.Equal(SchemaCompatibilityPolicy.CurrentScripts.Count, manifest["schemaSupport"]!.Value<int>("maximum"));
+                Assert.Equal(SchemaCompatibilityPolicy.CurrentScripts,
+                    manifest["schemaSupport"]!["requiredScripts"]!.Values<string>());
                 Assert.IsType<bool>(manifest["sourceTreeDirty"]!.Value<bool>());
                 Assert.Equal(2, manifest["packages"]!.Count());
                 Assert.All(manifest["packages"]!, package =>
@@ -39,7 +42,25 @@ namespace MyDmsVn.Desktop.Tests
             }
             finally
             {
-                Directory.Delete(fixture.Root, recursive: true);
+                if (!GuiTestSafety.IsPoisoned) Directory.Delete(fixture.Root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task Packages_without_runtime_schema_policy_are_rejected()
+        {
+            var fixture = CreateFixture();
+            try
+            {
+                File.Delete(Path.Combine(fixture.Root, "admin-migrator-net48-win-x86", "MyDmsVn.Server.Infrastructure.dll"));
+                var result = await RunPackagingScriptAsync(fixture.Root, "1.2.3");
+                Assert.NotEqual(0, result.ExitCode);
+                Assert.Contains("Release.SchemaPolicyMissing", result.StandardError);
+                Assert.False(File.Exists(Path.Combine(fixture.Root, "release-manifest.json")));
+            }
+            finally
+            {
+                if (!GuiTestSafety.IsPoisoned) Directory.Delete(fixture.Root, recursive: true);
             }
         }
 
@@ -63,7 +84,7 @@ namespace MyDmsVn.Desktop.Tests
             }
             finally
             {
-                Directory.Delete(fixture.Root, recursive: true);
+                if (!GuiTestSafety.IsPoisoned) Directory.Delete(fixture.Root, recursive: true);
             }
         }
 
@@ -79,10 +100,49 @@ namespace MyDmsVn.Desktop.Tests
             Directory.CreateDirectory(admin);
             File.WriteAllText(Path.Combine(net48, "MyDmsVn.Desktop.App.exe"), "net48-host");
             File.WriteAllText(Path.Combine(admin, "MyDmsVn.Server.DbMigrator.exe"), "admin-only");
+            File.Copy(typeof(SchemaCompatibilityPolicy).Assembly.Location,
+                Path.Combine(admin, "MyDmsVn.Server.Infrastructure.dll"));
+            Require32BitPolicy(Path.Combine(admin, "MyDmsVn.Server.Infrastructure.dll"));
             return new PackagingFixture(root, net48);
         }
 
-        private static async Task<ProcessResult> RunPackagingScriptAsync(
+        // Match publish -p:PlatformTarget=x86 even when test dependencies were built AnyCPU.
+        private static void Require32BitPolicy(string path)
+        {
+            var bytes = File.ReadAllBytes(path);
+            using (var reader = new BinaryReader(new MemoryStream(bytes)))
+            {
+                reader.BaseStream.Position = 0x3c;
+                var pe = reader.ReadInt32();
+                reader.BaseStream.Position = pe + 4;
+                Assert.Equal((ushort)0x14c, reader.ReadUInt16());
+                var sections = reader.ReadUInt16();
+                reader.BaseStream.Position = pe + 20;
+                var optionalSize = reader.ReadUInt16();
+                reader.BaseStream.Position = pe + 24;
+                Assert.Equal((ushort)0x10b, reader.ReadUInt16());
+                reader.BaseStream.Position = pe + 24 + 96 + 14 * 8;
+                var cliRva = reader.ReadUInt32();
+                for (var index = 0; index < sections; index++)
+                {
+                    reader.BaseStream.Position = pe + 24 + optionalSize + index * 40 + 8;
+                    var virtualSize = reader.ReadUInt32();
+                    var virtualAddress = reader.ReadUInt32();
+                    var rawSize = reader.ReadUInt32();
+                    var rawAddress = reader.ReadUInt32();
+                    if (cliRva < virtualAddress || cliRva >= virtualAddress + Math.Max(virtualSize, rawSize))
+                        continue;
+                    var flagsOffset = checked((int)(rawAddress + cliRva - virtualAddress + 16));
+                    var flags = BitConverter.GetBytes(BitConverter.ToUInt32(bytes, flagsOffset) | 2u);
+                    Array.Copy(flags, 0, bytes, flagsOffset, flags.Length);
+                    File.WriteAllBytes(path, bytes);
+                    return;
+                }
+            }
+            throw new InvalidOperationException("Fixture policy has no CLR header.");
+        }
+
+        private static async Task<GuiProcessResult> RunPackagingScriptAsync(
             string outputRoot,
             string version)
         {
@@ -90,7 +150,7 @@ namespace MyDmsVn.Desktop.Tests
             var script = Path.Combine(repositoryRoot, "deployment", "release", "Publish-LocalRelease.ps1");
             var startInfo = new ProcessStartInfo
             {
-                FileName = "powershell.exe",
+                FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
                 Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" +
                     script + "\" -Version \"" + version + "\" -OutputRoot \"" +
                     outputRoot + "\" -SkipPublish",
@@ -100,13 +160,7 @@ namespace MyDmsVn.Desktop.Tests
                 UseShellExecute = false,
                 WorkingDirectory = repositoryRoot,
             };
-            using (var process = Process.Start(startInfo)!)
-            {
-                var output = process.StandardOutput.ReadToEndAsync();
-                var error = process.StandardError.ReadToEndAsync();
-                await Task.Run(() => process.WaitForExit());
-                return new ProcessResult(process.ExitCode, await output, await error);
-            }
+            return await GuiOwnedProcess.RunAsync(startInfo, TimeSpan.FromSeconds(60));
         }
 
         private static string FindRepositoryRoot()
@@ -133,18 +187,5 @@ namespace MyDmsVn.Desktop.Tests
             public string DesktopDirectory { get; }
         }
 
-        private sealed class ProcessResult
-        {
-            public ProcessResult(int exitCode, string standardOutput, string standardError)
-            {
-                ExitCode = exitCode;
-                StandardOutput = standardOutput;
-                StandardError = standardError;
-            }
-
-            public int ExitCode { get; }
-            public string StandardOutput { get; }
-            public string StandardError { get; }
-        }
     }
 }

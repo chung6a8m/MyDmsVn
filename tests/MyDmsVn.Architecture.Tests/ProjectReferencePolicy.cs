@@ -37,12 +37,12 @@ namespace MyDmsVn.Architecture.Tests
         private static readonly IReadOnlyDictionary<string, string[]> ForbiddenPackageTokens =
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
-                ["MyDmsVn.Contracts"] = new[] { "ErrorOr", "MediatR", "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
-                ["MyDmsVn.SharedKernel"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
-                ["MyDmsVn.Server.Domain"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
-                ["MyDmsVn.Server.Application"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
-                ["MyDmsVn.Desktop.Application"] = new[] { "ErrorOr", "MediatR", "RepoDb", "Dapper", "SqlClient", "AspNetCore", "Windows.Forms" },
-                ["MyDmsVn.Desktop.WinForms"] = new[] { "RepoDb", "Dapper", "SqlClient", "AspNetCore" },
+                ["MyDmsVn.Contracts"] = new[] { "ErrorOr", "MediatR", "RepoDb", "Dapper", "linq2db", "SqlClient", "AspNetCore", "Windows.Forms" },
+                ["MyDmsVn.SharedKernel"] = new[] { "RepoDb", "Dapper", "linq2db", "SqlClient", "AspNetCore", "Windows.Forms" },
+                ["MyDmsVn.Server.Domain"] = new[] { "RepoDb", "Dapper", "linq2db", "SqlClient", "AspNetCore", "Windows.Forms" },
+                ["MyDmsVn.Server.Application"] = new[] { "RepoDb", "Dapper", "linq2db", "SqlClient", "AspNetCore", "Windows.Forms" },
+                ["MyDmsVn.Desktop.Application"] = new[] { "ErrorOr", "MediatR", "RepoDb", "Dapper", "linq2db", "SqlClient", "AspNetCore", "Windows.Forms" },
+                ["MyDmsVn.Desktop.WinForms"] = new[] { "RepoDb", "Dapper", "linq2db", "SqlClient", "AspNetCore" },
             };
 
         public static IReadOnlyCollection<string> FindViolations()

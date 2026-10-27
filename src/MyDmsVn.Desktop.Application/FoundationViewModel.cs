@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
@@ -6,11 +6,12 @@ using MyDmsVn.Contracts;
 
 namespace MyDmsVn.Desktop.Application
 {
-    public sealed class FoundationViewModel : DesktopViewModelBase
+    public sealed class FoundationViewModel : DesktopViewModelBase, IDisposable
     {
         private readonly IFoundationApiClient _apiClient;
         private bool _isReady;
         private string? _runtime;
+        private volatile bool _disposed;
 
         public FoundationViewModel(IFoundationApiClient apiClient)
             : this(apiClient, new DesktopNotificationCenter())
@@ -45,12 +46,15 @@ namespace MyDmsVn.Desktop.Application
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
+            if (_disposed) throw new ObjectDisposedException(nameof(FoundationViewModel));
             return ExecuteBusyAsync(
                 async operationCancellation =>
                 {
                     var response = await _apiClient.GetStatusAsync(
                         new FoundationStatusRequest("Desktop"),
                         operationCancellation);
+                    if (_disposed) return;
+                    operationCancellation.ThrowIfCancellationRequested();
                     if (response.IsSuccess)
                     {
                         IsReady = response.Data!.IsReady;
@@ -64,7 +68,15 @@ namespace MyDmsVn.Desktop.Application
                     IsEmpty = true;
                     ApplyApiError(response.Error!);
                 },
-                cancellationToken);
+                cancellationToken,
+                publishCancellation: () => !_disposed);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            CancelCurrentOperation();
         }
 
         private Task InitializeFromCommandAsync(CancellationToken cancellationToken)

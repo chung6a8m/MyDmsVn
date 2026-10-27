@@ -1,22 +1,33 @@
-# Active phase roadmap — Codex entry point
+# Execution-plan index
 
-**Date:** 2026-10-16. Execute the following items **in exactly this order**. The first plan remains active for context despite verified completion; it must not be reimplemented. No other plan in this directory is an active work item.
+**Updated:** 2026-10-26 · **Base branch:** `v1a-pro-ui-next`
 
-| Order | Active plan | State |
-|---:|---|---|
-| 1 | [20261016-001-task-gates-and-modular-tests.md](20261016-001-task-gates-and-modular-tests.md) | TESTGATE-T01–T03 **verified complete**, retained for reference |
-| 2 | [20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md](20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) | Accepted and merged as PR #32 at `8e310778`; duration comparison waived, not measured |
-| 3 | [20261016-002-modular-test-projects.md](20261016-002-modular-test-projects.md) | TESTGATE-T04/T05 complete at `973109f`; next: SEC-REBUILD |
-| 4 | [20261016-003-permission-system-rebuild.md](20261016-003-permission-system-rebuild.md) | SEC-REBUILD T00–T06 accepted; strict Final 775/775, packaged GUI D2 138/138 and owner walkthrough completed at `0303a911` (PR #34) |
-| 5 | [20261017-001-testgate-stabilization.md](20261017-001-testgate-stabilization.md) | TESTGATE stabilization implementation **under review**: lease lifecycle, SQL manifest preflight and focused Task fingerprints; P2 manifest-v2 migration separately planned; Windows/SQL evidence pending |
-| 6 | [20261016-004-remaining-p5-acceptance-and-p6-hardening.md](20261016-004-remaining-p5-acceptance-and-p6-hardening.md) | Outstanding P5.1/P5.4 interactive checks, P6 T01–T04 operational gaps, P6 T05–T08 and G1–G5 |
-| 6 | [20261008-008-phase-7-remote-api.md](20261008-008-phase-7-remote-api.md) | Future P7 API/HTTP parity; re-enable `net8.0` before implementing the net8 host |
+## Current plan
 
-## Acceptance, archiving and current TFM scope
+The Owner-requested Sidebar follow-up and the planned Security workspace are separate workstreams. Each linked plan is the sole owner of task state, dependencies and verification within its scope; this index contains no duplicate task ledger.
 
-- [Historical/superseded plans archive](archive/README.md) contains completed P0/P1/P2/P3/P3.1/P4, owner-accepted P4.1, completed SQLPERF, and the original P5/P6 plans **whose remaining tasks were explicitly transferred to item 6**. No unfinished P5/P6 check was falsely marked green by archiving.
-- P4.1 closed by the owner's **2026-10-16 explicit acceptance** of existing automated L3 plus partial packaged manual UI. The 30-minute idle-expiry/relogin observation was not completed, and its specific waiver does not close P5/P6. See [verification](../P4_1_VERIFICATION.md).
-- NET8-PAUSE T01–T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with reviewer gate fixes re-verified at `6b2ff49`; PR #32 merged at `8e310778`. The owner waived the duration comparison at `09d00bfa` because no matching baseline exists; it remains unmeasured and no speedup is claimed. Current `main` follows the accepted active matrix; branches created before the merge follow their checked-in declarations. Retired net8 tests are PARKED/NOT RUN, never PASS. Preserve explicit framework flags, SQL approval/inventory/ownership and the [full restoration procedure](../REACTIVATE_NET8.md).
-- Use [Development Plan](../DEVELOPMENT_PLAN.md), [Codex policy](../CODEX_TEST_EXECUTION_POLICY.md), [Test Gate Matrix](../TEST_GATE_MATRIX.md) and root [AGENTS.md](../../AGENTS.md). Task-scoped L1/L2 verification prevents per-edit full SQL reruns; a single final strict full gate still requires approved real SQL and an exact frozen revision.
+| Workstream | Scope and status owner | Design/review references |
+|---|---|---|
+| Sidebar navigation | [Sidebar Navigation Horizontal Scrollbar](20261025-001-sidebar-navigation-horizontal-scrollbar.md): complete within the Owner-selected SQL-free hosted-shell scope; the plan owns exact evidence and limitations. | [Reviewed zero-tab and Products-tab screenshots](../design-references/sidebar-horizontal-scrollbar/README.md) |
+| Security workspace | [Security Administration — UI Lab First](20261025-002-security-administration-ui-lab-first.md): Owner-approved SQL-free candidate, completed bounded SEC-T06–SEC-T08 cutover/integration/handoff, with attended and release limits retained. | [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) · [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) |
 
-When handing off a task, report completed scope, exact test commands/results, missing gates and next active task. Do not restart historical SQLPERF or P4.1 without a new approved change request.
+The UI Lab now hosts Sales and the SQL-free Security candidate. The Owner approved the reviewed Security candidate at **SEC-T05** on 2026-10-26; **SEC-T06 Local cutover**, **SEC-T07 focused SQL integration** and **SEC-T08 bounded handoff** are recorded in the Security plan and [post-gate evidence](../evidence/security/20261025-security-local-sql.md). Its incomplete attended matrix and other stated limits remain open. Record any future task execution and gate decision only in the plan that owns that scope.
+
+Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the plan for the authorized scope and [TEST_POLICY](../TEST_POLICY.md). [TEST_STRATEGY](../TEST_STRATEGY.md) owns coverage and [tests/README](../../tests/README.md) owns commands. Continue only work authorized by the Owner; archived tasks and prompts do not supply that authorization.
+
+## Selecting the next roadmap
+
+These are bounded, separately owned follow-ups after the [2026-10-25 archive boundary](../archive/20261025-pre-next-roadmap/README.md). The Sidebar plan retains its source-based diagnosis and focused Windows verification. The Security plan records the UI-Labs-first implementation and bounded handoff without replacing Sidebar tasks or activating a broader product/release roadmap.
+
+Do not carry forward unfinished UI-NEXT/SAL acceptance, old integration repeats, release prerequisites or other proposed phases automatically. Any additional selected follow-up must cite the original evidence and define its own scope; archival neither completes nor waives it.
+
+Future scope is selected explicitly by the Owner and recorded in a dated plan based on the then-current source. Point this index to one execution-status owner for each selected scope. Record decisions needed for this repository in its local [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md) and authorized plan. Historical external proposals or publication status do not add required reading, synchronization, approval or implementation work.
+
+## Historical plans and acceptance
+
+- [2026-10-25 archive](../archive/20261025-pre-next-roadmap/README.md): UI-NEXT assessments/design/plans/prompts, A0/A1 plan and the former execution index. Old-path files retain compatibility anchors only.
+- [UI-NEXT reference index](../ui-next/README.md): route to archived rationale and unchanged evidence, including DateInput and T13 bounded acceptance.
+- [2026-10-23 archive](../archive/20261023-pre-ui-next/README.md): six earlier plans and their frozen index; incomplete SAL acceptance remains open in its original evidence.
+- [Release prerequisites](../DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED. Deleted REL/P6/runtime plans stay retired.
+
+The archive and current source are not interchangeable: historical verification applies only to its exact candidate and scope. This documentation change supplies no new runtime or production acceptance.

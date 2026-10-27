@@ -1,161 +1,87 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.CompilerServices;
+﻿using System;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
-using MyDmsVn.SqlTestHarness;
-using MyDmsVn.SqlTestHarness.Approval;
-using MyDmsVn.SqlTestHarness.Ownership;
-using MyDmsVn.SqlTestHarness.Preflight;
-using MyDmsVn.SqlTestHarness.Timing;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 internal sealed class SqlTestDatabase : IDisposable
 {
     public const string ConnectionStringEnvironmentVariable =
-        SqlTestHarnessEnvironment.ConnectionStringVariable;
+        "MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING";
 
-    public const string ApprovalFileEnvironmentVariable =
-        SqlTestHarnessEnvironment.ApprovalFileVariable;
-
-    private static readonly string DirectRunId =
-        "direct-" + Process.GetCurrentProcess().Id + "-" + Guid.NewGuid().ToString("N");
+    private const int CommandTimeoutSeconds = 30;
+    private static readonly TimeSpan LifecycleTimeout = TimeSpan.FromMinutes(2);
 
     private readonly string _adminConnectionString;
-    private readonly string _approvalFilePath;
-    private readonly IDatabaseOwnershipJournal _journal;
-    private readonly Func<string, ISqlAdministrativeSession> _sessionFactory;
-    private DatabaseOwnershipRecord _record;
+    private readonly Func<string, SqlConnection> _connectionFactory;
+    private readonly string _serverName;
+    private readonly string _ownershipToken;
+    private readonly (int Id, DateTime CreateDate) _identity;
+    private readonly bool _guiAllocation;
     private int _disposeState;
 
     private SqlTestDatabase(
         string adminConnectionString,
-        string approvalFilePath,
-        IDatabaseOwnershipJournal journal,
-        Func<string, ISqlAdministrativeSession> sessionFactory,
-        DatabaseOwnershipRecord record,
-        SqlTestMeasurementContext measurementContext)
+        Func<string, SqlConnection> connectionFactory,
+        string databaseName,
+        string serverName,
+        string ownershipToken,
+        (int Id, DateTime CreateDate) identity,
+        bool guiAllocation)
     {
         _adminConnectionString = adminConnectionString;
-        _approvalFilePath = approvalFilePath;
-        _journal = journal;
-        _sessionFactory = sessionFactory;
-        _record = record;
-        MeasurementContext = measurementContext;
-        DatabaseName = record.DatabaseName;
-
-        var builder = new SqlConnectionStringBuilder(adminConnectionString)
+        _connectionFactory = connectionFactory;
+        _serverName = serverName;
+        _ownershipToken = ownershipToken;
+        _identity = identity;
+        _guiAllocation = guiAllocation;
+        DatabaseName = databaseName;
+        ConnectionString = new SqlConnectionStringBuilder(adminConnectionString)
         {
-            InitialCatalog = DatabaseName,
+            InitialCatalog = databaseName,
             Pooling = false,
-        };
-        ConnectionString = builder.ConnectionString;
+        }.ConnectionString;
     }
 
     public string ConnectionString { get; }
 
     public string DatabaseName { get; }
 
-    public SqlTestMeasurementContext MeasurementContext { get; }
-
     public static Task<SqlTestDatabase> CreateAsync(
         string adminConnectionString,
-        CancellationToken cancellationToken = default,
-        [CallerMemberName] string testCaseId = "")
-    {
-        return CreateAsync(
-            adminConnectionString,
-            CreateMeasurementContextForTest(testCaseId),
-            cancellationToken);
-    }
-
-    public static Task<SqlTestDatabase> CreateAsync(
-        string adminConnectionString,
-        SqlTestMeasurementContext? measurementContext,
-        CancellationToken cancellationToken = default,
-        [CallerMemberName] string testCaseId = "")
-    {
-        ValidateAdminConnectionString(adminConnectionString);
-        var approvalFilePath = Environment.GetEnvironmentVariable(ApprovalFileEnvironmentVariable);
-        if (string.IsNullOrWhiteSpace(approvalFilePath))
-        {
-            throw new InvalidOperationException(
-                $"Set {ApprovalFileEnvironmentVariable} to an operator-maintained non-production SQL approval file.");
-        }
-
-        return CreateAsync(
-            adminConnectionString,
-            approvalFilePath,
-            CreateDefaultJournal(),
-            connectionString => new SqlClientAdministrativeSession(connectionString),
-            cancellationToken,
-            measurementContext ?? CreateMeasurementContextForTest(testCaseId),
-            _ => { });
-    }
-
-    internal static Task<SqlTestDatabase> CreateAsync(
-        string adminConnectionString,
-        string approvalFilePath,
-        IDatabaseOwnershipJournal journal,
-        Func<string, ISqlAdministrativeSession> sessionFactory,
-        CancellationToken cancellationToken,
-        [CallerMemberName] string testCaseId = "") =>
+        CancellationToken cancellationToken = default) =>
         CreateAsync(
             adminConnectionString,
-            approvalFilePath,
-            journal,
-            sessionFactory,
             cancellationToken,
-            CreateMeasurementContextForTest(testCaseId),
+            value => new SqlConnection(value),
             _ => { });
+
+    public static Task<SqlTestDatabase> CreateGuiAsync(
+        string adminConnectionString,
+        CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(adminConnectionString, cancellationToken,
+            value => new SqlConnection(value), _ => { }, guiAllocation: true);
 
     internal static Task<SqlTestDatabase> CreateAsync(
         string adminConnectionString,
         CancellationToken cancellationToken,
-        Func<string, ISqlAdministrativeSession> sessionFactory,
-        Action<string> afterCreate,
-        [CallerMemberName] string testCaseId = "")
-    {
-        ValidateAdminConnectionString(adminConnectionString);
-        var approvalFilePath = Environment.GetEnvironmentVariable(ApprovalFileEnvironmentVariable);
-        if (string.IsNullOrWhiteSpace(approvalFilePath))
-        {
-            throw new InvalidOperationException(
-                $"Set {ApprovalFileEnvironmentVariable} to an operator-maintained non-production SQL approval file.");
-        }
+        Func<string, SqlConnection> connectionFactory,
+        Action<string> afterCreate) =>
+        CreateCoreAsync(adminConnectionString, cancellationToken, connectionFactory, afterCreate, guiAllocation: false);
 
-        return CreateAsync(
-            adminConnectionString,
-            approvalFilePath,
-            CreateDefaultJournal(),
-            sessionFactory,
-            cancellationToken,
-            CreateMeasurementContextForTest(testCaseId),
-            afterCreate);
-    }
-
-    private static async Task<SqlTestDatabase> CreateAsync(
+    private static async Task<SqlTestDatabase> CreateCoreAsync(
         string adminConnectionString,
-        string approvalFilePath,
-        IDatabaseOwnershipJournal journal,
-        Func<string, ISqlAdministrativeSession> sessionFactory,
         CancellationToken cancellationToken,
-        SqlTestMeasurementContext measurementContext,
-        Action<string> afterCreate)
+        Func<string, SqlConnection> connectionFactory,
+        Action<string> afterCreate,
+        bool guiAllocation)
     {
-        ValidateAdminConnectionString(adminConnectionString);
-        if (journal is null)
+        var normalizedConnectionString = NormalizeAdminConnectionString(adminConnectionString);
+        if (connectionFactory is null)
         {
-            throw new ArgumentNullException(nameof(journal));
-        }
-
-        if (sessionFactory is null)
-        {
-            throw new ArgumentNullException(nameof(sessionFactory));
+            throw new ArgumentNullException(nameof(connectionFactory));
         }
 
         if (afterCreate is null)
@@ -163,122 +89,59 @@ internal sealed class SqlTestDatabase : IDisposable
             throw new ArgumentNullException(nameof(afterCreate));
         }
 
-        var approval = SqlInstanceApprovalLoader.Load(approvalFilePath);
-        var databaseName = SqlTestDatabaseName.Create();
-        SqlTestDatabaseName.EnsureDisposable(databaseName);
-        var runId = GetRunId();
-        var record = new DatabaseOwnershipRecord(
-            runId,
-            Guid.NewGuid().ToString("N"),
-            databaseName,
-            Guid.NewGuid().ToString("N"),
-            approval.FingerprintSha256,
-            approval.ApprovalId,
-            DatabaseOwnershipState.CreateIntent,
-            DateTimeOffset.UtcNow,
-            databaseId: null,
-            databaseCreateDateUtc: null);
-        var database = new SqlTestDatabase(
-            adminConnectionString,
-            approvalFilePath,
-            journal,
-            sessionFactory,
-            record,
-            measurementContext);
-
-        var createIssued = false;
-        var ownershipConfirmed = false;
-        using var timing = measurementContext.StartOperation(
-            "create",
-            "database-create-" + record.OwnershipToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(LifecycleTimeout);
+        var token = timeout.Token;
+        var databaseName = guiAllocation ? SqlTestDatabaseName.CreateGui() : SqlTestDatabaseName.Create();
+        EnsureName(databaseName, guiAllocation);
+        var ownershipToken = Guid.NewGuid().ToString("N");
+        SqlTestDatabase? database = null;
+        var createAttempted = false;
         try
         {
-            using var session = sessionFactory(adminConnectionString);
-            var preflight = await new SqlPreflightValidator()
-                .ValidateOpenSessionAsync(
-                    adminConnectionString,
-                    approval,
-                    SqlPreflightRequirements.Mutation,
-                    session,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            EnsureAuthorized(preflight);
+            using var connection = connectionFactory(normalizedConnectionString);
+            await connection.OpenAsync(token).ConfigureAwait(false);
+            var serverName = await ReadInstanceAsync(connection, token).ConfigureAwait(false);
 
-            await journal.WriteCreateIntentAsync(record, cancellationToken).ConfigureAwait(false);
-            await session.ExecuteAsync(
-                    $"CREATE DATABASE [{databaseName}];",
-                    EmptyParameters,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            createIssued = true;
-
-            var marker = new DatabaseOwnershipMarker(runId, record.OwnershipToken);
-            await session.ExecuteAsync(
-                    $"EXEC [{databaseName}].sys.sp_addextendedproperty " +
-                    "@name = N'MyDmsVn.TestOwnership', @value = @markerValue;",
-                    new Dictionary<string, object?>
-                    {
-                        ["@markerValue"] = marker.Serialize(),
-                    },
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            var live = await session.ReadDatabaseOwnershipAsync(databaseName, cancellationToken)
-                .ConfigureAwait(false);
-            if (live is null || live.Marker is null ||
-                !string.Equals(live.Marker.RunId, runId, StringComparison.Ordinal) ||
-                !string.Equals(live.Marker.OwnershipToken, record.OwnershipToken, StringComparison.Ordinal))
+            createAttempted = true;
+            using (var create = CreateCommand(connection, $"CREATE DATABASE [{databaseName}];"))
             {
-                record = await journal.TransitionAsync(
-                        record,
-                        DatabaseOwnershipState.Quarantined,
-                        cancellationToken: cancellationToken)
-                    .ConfigureAwait(false);
-                database._record = record;
-                throw new InvalidOperationException(
-                    "The created SQL test database ownership marker could not be corroborated.");
+                await create.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             }
 
-            record = await journal.TransitionAsync(
-                    record,
-                    DatabaseOwnershipState.Created,
-                    live.DatabaseId,
-                    live.CreateDateUtc,
-                    cancellationToken)
+            using (var mark = CreateCommand(
+                connection,
+                $"EXEC [{databaseName}].sys.sp_addextendedproperty " +
+                "@name = N'MyDmsVn.TestOwnership', @value = @ownershipToken;"))
+            {
+                mark.Parameters.Add("@ownershipToken", SqlDbType.NVarChar, 32).Value = ownershipToken;
+                await mark.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            }
+
+            var identity = await ReadDatabaseIdentityAsync(connection, databaseName, token)
                 .ConfigureAwait(false);
-            database._record = record;
-            ownershipConfirmed = true;
+            var marker = await ReadOwnershipMarkerAsync(connection, databaseName, token)
+                .ConfigureAwait(false);
+            if (identity is null || !string.Equals(marker, ownershipToken, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The created database ownership could not be confirmed.");
+            }
+
+            database = new SqlTestDatabase(
+                normalizedConnectionString,
+                connectionFactory,
+                databaseName,
+                serverName,
+                ownershipToken,
+                identity.Value,
+                guiAllocation);
             afterCreate(databaseName);
             return database;
         }
         catch (Exception provisioningError)
         {
-            if (provisioningError is OperationCanceledException)
-            {
-                timing.Cancel();
-            }
-            else
-            {
-                timing.Fail();
-            }
-            if (createIssued && !ownershipConfirmed &&
-                database._record.State != DatabaseOwnershipState.Quarantined)
-            {
-                try
-                {
-                    database._record = await journal.TransitionAsync(
-                            database._record,
-                            DatabaseOwnershipState.Quarantined,
-                            cancellationToken: CancellationToken.None)
-                        .ConfigureAwait(false);
-                }
-                catch
-                {
-                    // Preserve the original failure. An incomplete journal remains ambiguous and is never auto-dropped.
-                }
-            }
-
-            if (ownershipConfirmed)
+            if (database is not null)
             {
                 try
                 {
@@ -287,20 +150,56 @@ internal sealed class SqlTestDatabase : IDisposable
                 catch (Exception cleanupError)
                 {
                     throw new AggregateException(
-                        "SQL test database provisioning failed and guarded cleanup also failed.",
+                        $"Provisioning and guarded cleanup both failed for SQL test database '{databaseName}'.",
                         provisioningError,
                         cleanupError);
                 }
+            }
+            else if (createAttempted)
+            {
+                throw new InvalidOperationException(
+                    $"Provisioning did not confirm ownership of SQL test database '{databaseName}'. " +
+                    "Inspect the allocation manually; no unverified database was dropped.",
+                    provisioningError);
             }
 
             throw;
         }
     }
 
-    public void Dispose()
+    // Validate the actual reset connection, not just a name or connection-string target.
+    internal async Task VerifyOwnershipAsync(SqlConnection connection, CancellationToken cancellationToken)
     {
-        DisposeAsync().GetAwaiter().GetResult();
+        if (Volatile.Read(ref _disposeState) != 0)
+        {
+            throw new InvalidOperationException("The SQL test allocation is disposing or disposed.");
+        }
+
+        EnsureName(DatabaseName, _guiAllocation);
+        if (connection.State != ConnectionState.Open)
+        {
+            throw new InvalidOperationException("Ownership verification requires an open connection.");
+        }
+
+        using var command = CreateCommand(connection,
+            "SELECT DB_NAME(), CONVERT(nvarchar(128), SERVERPROPERTY('ServerName')), " +
+            "database_id, create_date, " +
+            "(SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties " +
+            "WHERE class=0 AND name=N'MyDmsVn.TestOwnership') " +
+            "FROM sys.databases WHERE database_id=DB_ID();");
+        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ||
+            reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(4) ||
+            !string.Equals(reader.GetString(0), DatabaseName, StringComparison.Ordinal) ||
+            !string.Equals(reader.GetString(1), _serverName, StringComparison.OrdinalIgnoreCase) ||
+            reader.GetInt32(2) != _identity.Id || reader.GetDateTime(3) != _identity.CreateDate ||
+            !string.Equals(reader.GetString(4), _ownershipToken, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Refusing reset: the live SQL allocation ownership does not match.");
+        }
     }
+
+    public void Dispose() => DisposeAsync().GetAwaiter().GetResult();
 
     public async Task DisposeAsync()
     {
@@ -315,191 +214,138 @@ internal sealed class SqlTestDatabase : IDisposable
             throw new InvalidOperationException("SQL test database cleanup is already in progress.");
         }
 
-        using var timing = MeasurementContext.StartOperation(
-            "drop",
-            "database-drop-" + _record.OwnershipToken);
         try
         {
-            SqlTestDatabaseName.EnsureDisposable(DatabaseName);
-            var approval = SqlInstanceApprovalLoader.Load(_approvalFilePath);
-            using var session = _sessionFactory(_adminConnectionString);
-            var preflight = await new SqlPreflightValidator()
-                .ValidateOpenSessionAsync(
-                    _adminConnectionString,
-                    approval,
-                    SqlPreflightRequirements.Mutation,
-                    session,
-                    CancellationToken.None)
-                .ConfigureAwait(false);
-            EnsureAuthorized(preflight);
-
-            var live = await session.ReadDatabaseOwnershipAsync(DatabaseName, CancellationToken.None)
-                .ConfigureAwait(false);
-            if (live is null)
+            EnsureName(DatabaseName, _guiAllocation);
+            using var timeout = new CancellationTokenSource(LifecycleTimeout);
+            var token = timeout.Token;
+            using var connection = _connectionFactory(_adminConnectionString);
+            await connection.OpenAsync(token).ConfigureAwait(false);
+            var serverName = await ReadInstanceAsync(connection, token).ConfigureAwait(false);
+            if (!string.Equals(serverName, _serverName, StringComparison.OrdinalIgnoreCase))
             {
-                _record = await TransitionToDisposedWithoutDdlAsync().ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"Refusing cleanup of '{DatabaseName}' on a different SQL Server instance.");
+            }
+
+            var identity = await ReadDatabaseIdentityAsync(connection, DatabaseName, token)
+                .ConfigureAwait(false);
+            if (identity is null)
+            {
                 Volatile.Write(ref _disposeState, 2);
                 return;
             }
 
-            _record = await _journal.TransitionAsync(
-                    _record,
-                    DatabaseOwnershipState.DropIntent)
-                .ConfigureAwait(false);
-            var reconciliation = await DatabaseOwnershipReconciler.ClassifyAsync(
-                    _record,
-                    live,
-                    _record.RunId)
-                .ConfigureAwait(false);
-            if (!reconciliation.MayAutomaticallyClean)
+            if (identity.Value.Id != _identity.Id || identity.Value.CreateDate != _identity.CreateDate)
             {
-                _record = await _journal.TransitionAsync(
-                        _record,
-                        DatabaseOwnershipState.Quarantined)
-                    .ConfigureAwait(false);
                 throw new InvalidOperationException(
-                    "SQL test database cleanup was quarantined because ownership could not be corroborated.");
+                    $"Refusing cleanup of '{DatabaseName}': the database identity has changed.");
             }
 
-            await session.ExecuteAsync(
-                    $"ALTER DATABASE [{DatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; " +
-                    $"DROP DATABASE [{DatabaseName}];",
-                    EmptyParameters,
-                    CancellationToken.None)
+            var marker = await ReadOwnershipMarkerAsync(connection, DatabaseName, token)
                 .ConfigureAwait(false);
-            _record = await _journal.TransitionAsync(
-                    _record,
-                    DatabaseOwnershipState.Disposed)
-                .ConfigureAwait(false);
+            if (!string.Equals(marker, _ownershipToken, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Refusing cleanup of '{DatabaseName}': the database ownership marker has changed or is missing.");
+            }
+
+            using var drop = CreateCommand(
+                connection,
+                $"ALTER DATABASE [{DatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; " +
+                $"DROP DATABASE [{DatabaseName}];");
+            await drop.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             Volatile.Write(ref _disposeState, 2);
         }
-        catch (Exception cleanupError)
+        catch
         {
-            if (cleanupError is OperationCanceledException)
-            {
-                timing.Cancel();
-            }
-            else
-            {
-                timing.Fail();
-            }
-            if (_record.State == DatabaseOwnershipState.DropIntent)
-            {
-                try
-                {
-                    _record = await _journal.TransitionAsync(
-                            _record,
-                            DatabaseOwnershipState.CleanupFailed)
-                        .ConfigureAwait(false);
-                }
-                catch
-                {
-                    // Keep the original cleanup failure and the durable DropIntent for operator reconciliation.
-                }
-            }
-
             Volatile.Write(ref _disposeState, 0);
             throw;
         }
     }
 
-    private async Task<DatabaseOwnershipRecord> TransitionToDisposedWithoutDdlAsync()
+    private static void EnsureName(string name, bool guiAllocation)
     {
-        var record = _record;
-        if (record.State == DatabaseOwnershipState.Created ||
-            record.State == DatabaseOwnershipState.CleanupFailed)
-        {
-            record = await _journal.TransitionAsync(record, DatabaseOwnershipState.DropIntent)
-                .ConfigureAwait(false);
-        }
-
-        return await _journal.TransitionAsync(record, DatabaseOwnershipState.Disposed)
-            .ConfigureAwait(false);
+        if (guiAllocation) SqlTestDatabaseName.EnsureGuiDisposable(name);
+        else SqlTestDatabaseName.EnsureDisposable(name);
     }
 
-    private static void ValidateAdminConnectionString(string adminConnectionString)
+    private static string NormalizeAdminConnectionString(string connectionString)
     {
-        if (string.IsNullOrWhiteSpace(adminConnectionString))
+        if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new ArgumentException("A SQL Server connection string is required.", nameof(adminConnectionString));
+            throw new InvalidOperationException("A SQL Server connection string targeting master is required.");
         }
 
-        var builder = new SqlConnectionStringBuilder(adminConnectionString);
-        if (!string.Equals(builder.InitialCatalog, "master", StringComparison.OrdinalIgnoreCase))
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        if (string.IsNullOrWhiteSpace(builder.DataSource) ||
+            !string.Equals(builder.InitialCatalog, "master", StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrEmpty(builder.AttachDBFilename) ||
+            builder.UserInstance)
         {
             throw new InvalidOperationException(
-                "The SQL test connection must explicitly target the master database.");
+                "SQL test administration requires an explicit SQL Server instance and master database without attachment.");
         }
+
+        builder.InitialCatalog = "master";
+        builder.Pooling = false;
+        builder.ConnectRetryCount = 0;
+        builder.ConnectTimeout = builder.ConnectTimeout == 0
+            ? CommandTimeoutSeconds
+            : Math.Min(builder.ConnectTimeout, CommandTimeoutSeconds);
+        return builder.ConnectionString;
     }
 
-    private static void EnsureAuthorized(SqlPreflightResult result)
+    private static async Task<string> ReadInstanceAsync(
+        SqlConnection connection,
+        CancellationToken cancellationToken)
     {
-        if (!result.IsSuccess)
+        using var command = CreateCommand(
+            connection,
+            "SELECT DB_NAME(), CONVERT(nvarchar(128), SERVERPROPERTY('ServerName'));");
+        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ||
+            reader.IsDBNull(0) || reader.IsDBNull(1) ||
+            !string.Equals(reader.GetString(0), "master", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(reader.GetString(1)))
         {
             throw new InvalidOperationException(
-                $"SQL test mutation preflight failed ({result.Failure!.Kind}): {result.Failure.Message}");
+                "SQL test administration could not verify the live master database and server identity.");
         }
+
+        return reader.GetString(1);
     }
 
-    private static IDatabaseOwnershipJournal CreateDefaultJournal()
+    private static async Task<(int Id, DateTime CreateDate)?> ReadDatabaseIdentityAsync(
+        SqlConnection connection,
+        string databaseName,
+        CancellationToken cancellationToken)
     {
-        var configured = Environment.GetEnvironmentVariable(
-            SqlTestHarnessEnvironment.JournalDirectoryVariable);
-        var root = string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MyDmsVn",
-                "SqlTestHarness",
-                "journal")
-            : configured;
-        return new FileDatabaseOwnershipJournal(root);
-    }
-
-    private static string GetRunId()
-    {
-        var configured = Environment.GetEnvironmentVariable(SqlTestHarnessEnvironment.RunIdVariable);
-        return string.IsNullOrWhiteSpace(configured) ? DirectRunId : configured;
-    }
-
-    internal static SqlTestMeasurementContext CreateMeasurementContextForTest(string testCaseId)
-    {
-        var enabled = string.Equals(
-            Environment.GetEnvironmentVariable(SqlTestHarnessEnvironment.TimingEnabledVariable),
-            "1",
-            StringComparison.Ordinal);
-        var outputPath = Environment.GetEnvironmentVariable(
-            SqlTestHarnessEnvironment.TimingOutputVariable);
-        if (enabled && string.IsNullOrWhiteSpace(outputPath))
+        using var command = CreateCommand(
+            connection,
+            "SELECT database_id, create_date FROM sys.databases WHERE name = @databaseName;");
+        command.Parameters.Add("@databaseName", SqlDbType.NVarChar, 128).Value = databaseName;
+        using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            throw new InvalidOperationException(
-                $"Set {SqlTestHarnessEnvironment.TimingOutputVariable} when SQL timing is enabled.");
+            return null;
         }
 
-        ISqlTestTimingSink sink = enabled
-            ? new JsonLinesSqlTestTimingSink(outputPath!)
-            : NullTimingSink.Instance;
-        return SqlTestMeasurementContext.Create(
-            GetRunId(),
-            string.IsNullOrWhiteSpace(testCaseId) ? "unknown-test" : testCaseId,
-#if NET48
-            "net48",
-#else
-            "net8.0",
-#endif
-            Guid.NewGuid().ToString("N"),
-            sink,
-            enabled);
+        return (reader.GetInt32(0), reader.GetDateTime(1));
     }
 
-    private sealed class NullTimingSink : ISqlTestTimingSink
+    private static async Task<string?> ReadOwnershipMarkerAsync(
+        SqlConnection connection,
+        string databaseName,
+        CancellationToken cancellationToken)
     {
-        public static NullTimingSink Instance { get; } = new NullTimingSink();
-
-        public void Write(SqlTestTimingEvent timingEvent)
-        {
-        }
+        using var command = CreateCommand(
+            connection,
+            $"SELECT CONVERT(nvarchar(128), value) FROM [{databaseName}].sys.extended_properties " +
+            "WHERE class = 0 AND name = N'MyDmsVn.TestOwnership';");
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
     }
 
-    private static IReadOnlyDictionary<string, object?> EmptyParameters { get; } =
-        new Dictionary<string, object?>();
+    private static SqlCommand CreateCommand(SqlConnection connection, string commandText) =>
+        new SqlCommand(commandText, connection) { CommandTimeout = CommandTimeoutSeconds };
 }

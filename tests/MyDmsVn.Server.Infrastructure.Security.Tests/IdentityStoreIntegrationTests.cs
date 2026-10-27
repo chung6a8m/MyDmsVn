@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Data;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using MediatR;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,18 +12,27 @@ using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Identity;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests
 {
+    [Collection(ApplicationSqlCollectionFixture.CollectionName)]
     public sealed class IdentityStoreIntegrationTests
     {
-        [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-        public async Task User_and_permission_stores_read_current_sql_state_and_replace_hash_atomically()
+        private readonly ApplicationSqlCollectionFixture _fixture;
+        private readonly ITestOutputHelper _output;
+
+        public IdentityStoreIntegrationTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
         {
-            var database = await CreateMigratedDatabaseAsync();
-            try
+            _fixture = fixture;
+            _output = output;
+        }
+
+        [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+        public Task User_and_permission_stores_read_current_sql_state_and_replace_hash_atomically() =>
+            _fixture.RunAsync(nameof(User_and_permission_stores_read_current_sql_state_and_replace_hash_atomically), _output, async test =>
             {
-                using var connection = new SqlConnection(database.ConnectionString);
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 var userId = await InsertUserAsync(connection, "operator", "OPERATOR");
                 var roleId = await connection.QuerySingleAsync<int>(
                     "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
@@ -41,8 +49,8 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                     });
 
                 var services = new ServiceCollection();
-                services.AddSqlPersistence(database.ConnectionString);
-                using var provider = services.BuildServiceProvider();
+                services.AddSqlPersistence(test.ConnectionString);
+                var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
                 var userStore = provider.GetRequiredService<IUserStore>();
                 var permissionStore = provider.GetRequiredService<IPermissionStore>();
                 var accountValidator = provider.GetRequiredService<IUserAccountValidator>();
@@ -102,20 +110,13 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                     CancellationToken.None);
                 Assert.Null(inactivePermission.DirectDecision);
                 Assert.False(inactivePermission.HasRoleGrant);
-            }
-            finally
-            {
-                await database.DisposeAsync();
-            }
-        }
+            });
 
         [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-        public async Task Identity_unique_relationship_constraints_reject_duplicates()
-        {
-            var database = await CreateMigratedDatabaseAsync();
-            try
+        public Task Identity_unique_relationship_constraints_reject_duplicates() =>
+            _fixture.RunAsync(nameof(Identity_unique_relationship_constraints_reject_duplicates), _output, async test =>
             {
-                using var connection = new SqlConnection(database.ConnectionString);
+                var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 var userId = await InsertUserAsync(connection, "operator", "OPERATOR");
                 var roleId = await connection.QuerySingleAsync<int>(
                     "INSERT dbo.Roles (RoleName, NormalizedRoleName) " +
@@ -141,23 +142,16 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
                 await AssertDuplicateAsync(
                     connection.ExecuteAsync(
                         "INSERT dbo.Roles (RoleName, NormalizedRoleName) VALUES (N'warehouse', N'WAREHOUSE');"));
-            }
-            finally
-            {
-                await database.DisposeAsync();
-            }
-        }
+            });
 
         [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
-        public async Task Login_with_an_outdated_bcrypt_hash_rehashes_through_the_sql_store()
-        {
-            var database = await CreateMigratedDatabaseAsync();
-            try
+        public Task Login_with_an_outdated_bcrypt_hash_rehashes_through_the_sql_store() =>
+            _fixture.RunAsync(nameof(Login_with_an_outdated_bcrypt_hash_rehashes_through_the_sql_store), _output, async test =>
             {
                 const string password = "Maple-River-47-Cobalt!";
                 var oldHash = new BcryptPasswordHasher(10).Hash(password);
-                using (var connection = new SqlConnection(database.ConnectionString))
                 {
+                    var connection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                     await connection.ExecuteAsync(
                         "INSERT dbo.Users " +
                         "(Username, NormalizedUsername, DisplayName, Source, PasswordHash, PasswordSalt, PasswordAlgorithm) " +
@@ -167,25 +161,20 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
 
                 var services = new ServiceCollection();
                 services.AddServerApplication();
-                services.AddSqlPersistence(database.ConnectionString);
-                using var provider = services.BuildServiceProvider();
+                services.AddSqlPersistence(test.ConnectionString);
+                var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
 
                 var result = await provider.GetRequiredService<ISender>().Send(
                     new LoginCommand("operator", password),
                     CancellationToken.None);
 
                 Assert.False(result.IsError);
-                using var verificationConnection = new SqlConnection(database.ConnectionString);
+                var verificationConnection = ApplicationSqlCollectionFixture.Track(test, new SqlConnection(test.ConnectionString));
                 var newHash = await verificationConnection.QuerySingleAsync<string>(
                     "SELECT PasswordHash FROM dbo.Users WHERE NormalizedUsername = N'OPERATOR';");
                 Assert.NotEqual(oldHash, newHash);
                 Assert.True(new BcryptPasswordHasher().Verify(password, newHash));
-            }
-            finally
-            {
-                await database.DisposeAsync();
-            }
-        }
+            });
 
         [SqlServerFact(SqlTestCategory.SecurityProvisioning, SqlTestCategory.SqlConcurrency)]
         public async Task Permission_snapshot_never_exposes_role_grant_without_concurrent_direct_deny()
@@ -243,16 +232,32 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests
             }
         }
 
-        private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
-            [CallerMemberName] string testCaseId = "")
+        private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
         {
-            var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
             var database = await SqlTestDatabase.CreateAsync(
-                Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-                measurement);
-            var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-            Assert.True(result.Successful, result.Error?.ToString());
-            return database;
+                Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
+            try
+            {
+                var result = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
+                Assert.True(result.Successful, result.Error?.ToString());
+                return database;
+            }
+            catch (Exception setupError)
+            {
+                try
+                {
+                    await database.DisposeAsync();
+                }
+                catch (Exception cleanupError)
+                {
+                    throw new AggregateException(
+                        "Test database setup and cleanup both failed.",
+                        setupError,
+                        cleanupError);
+                }
+
+                throw;
+            }
         }
 
         private static Task<int> InsertUserAsync(

@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Data;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Infrastructure.Persistence;
-using RepoDb;
+using LinqToDB;
+using LinqToDB.Mapping;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -104,7 +104,7 @@ public sealed class PersistenceTransactionTests
     }
 
     [SqlServerFact]
-    public async Task Repository_and_Dapper_share_the_same_server_session()
+    public async Task Repository_and_native_oracle_share_the_same_server_session()
     {
         var database = await CreateMigratedDatabaseAsync();
         try
@@ -142,7 +142,7 @@ public sealed class PersistenceTransactionTests
 
             var cancellationException = await Record.ExceptionAsync(
                 () => context.Connection.ExecuteAsync(
-                    new CommandDefinition(
+                    new SqlTestCommand(
                         "WAITFOR DELAY '00:00:02';",
                         transaction: context.Transaction,
                         cancellationToken: cancellation.Token)));
@@ -168,28 +168,33 @@ public sealed class PersistenceTransactionTests
         services
             .AddSqlPersistence(connectionString)
             .AddRepository<IFirstProbeRepository, FirstProbeRepository>()
-            .AddRepository<ISecondProbeRepository, SecondProbeRepository>()
-            .AddRepoDbMapping<TransactionProbeMapping>();
+            .AddRepository<ISecondProbeRepository, SecondProbeRepository>();
+        services.AddSingleton<ILinqToDbMapping>(new TransactionProbeMapping());
         return services.BuildServiceProvider();
     }
 
-    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateMigratedDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
-            TestDatabaseMigrationRunner.Migrate(
-                database.MeasurementContext,
-                "PersistenceTransactionTests.CreateMigratedDatabaseAsync.migration-01",
-                database.ConnectionString);
+            TestDatabaseMigrationRunner.Migrate(database.ConnectionString);
         }
-        catch
+        catch (Exception setupError)
         {
-            await database.DisposeAsync();
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupError)
+            {
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
+            }
+
             throw;
         }
 
@@ -225,21 +230,23 @@ public sealed class PersistenceTransactionTests
     private sealed class FirstProbeRepository : IFirstProbeRepository
     {
         private readonly ISqlExecutionContext _context;
+        private readonly ILinqToDbSessionFactory _sessions;
 
-        public FirstProbeRepository(ISqlExecutionContext context)
+        public FirstProbeRepository(ISqlExecutionContext context, ILinqToDbSessionFactory sessions)
         {
             _context = context;
+            _sessions = sessions;
         }
 
         public Task<int> InsertAsync(string value, CancellationToken cancellationToken)
         {
-            return InsertProbeAsync(_context, value, cancellationToken);
+            return InsertProbeAsync(_context, _sessions, value, cancellationToken);
         }
 
         public Task<int> GetServerSessionIdAsync(CancellationToken cancellationToken)
         {
             return _context.Connection.QuerySingleAsync<int>(
-                new CommandDefinition(
+                new SqlTestCommand(
                     "SELECT @@SPID;",
                     transaction: RequireTransaction(_context),
                     cancellationToken: cancellationToken));
@@ -249,21 +256,23 @@ public sealed class PersistenceTransactionTests
     private sealed class SecondProbeRepository : ISecondProbeRepository
     {
         private readonly ISqlExecutionContext _context;
+        private readonly ILinqToDbSessionFactory _sessions;
 
-        public SecondProbeRepository(ISqlExecutionContext context)
+        public SecondProbeRepository(ISqlExecutionContext context, ILinqToDbSessionFactory sessions)
         {
             _context = context;
+            _sessions = sessions;
         }
 
         public Task<int> InsertAsync(string value, CancellationToken cancellationToken)
         {
-            return InsertProbeAsync(_context, value, cancellationToken);
+            return InsertProbeAsync(_context, _sessions, value, cancellationToken);
         }
 
         public Task FailAsync(CancellationToken cancellationToken)
         {
             return _context.Connection.ExecuteAsync(
-                new CommandDefinition(
+                new SqlTestCommand(
                     "THROW 51000, 'Expected second repository failure.', 1;",
                     transaction: RequireTransaction(_context),
                     cancellationToken: cancellationToken));
@@ -277,27 +286,25 @@ public sealed class PersistenceTransactionTests
         public string Value { get; set; } = string.Empty;
     }
 
-    private sealed class TransactionProbeMapping : IRepoDbMapping
+    private sealed class TransactionProbeMapping : ILinqToDbMapping
     {
-        public void Configure()
+        public void Configure(FluentMappingBuilder builder)
         {
-            ClassMapper.Add<TransactionProbe>("dbo.P1TestProbe");
-            PropertyMapper.Add<TransactionProbe>(entity => entity.Id, "ProbeId");
-            PropertyMapper.Add<TransactionProbe>(entity => entity.Value, "ProbeValue");
-            PrimaryMapper.Add<TransactionProbe>(entity => entity.Id);
-            IdentityMapper.Add<TransactionProbe>(entity => entity.Id);
+            var probe = builder.Entity<TransactionProbe>().HasSchemaName("dbo").HasTableName("P1TestProbe");
+            probe.Property(row => row.Id).HasColumnName("ProbeId").IsPrimaryKey().IsIdentity();
+            probe.Property(row => row.Value).HasColumnName("ProbeValue").HasDataType(DataType.NVarChar).HasLength(128);
         }
     }
 
-    private static Task<int> InsertProbeAsync(
+    private static async Task<int> InsertProbeAsync(
         ISqlExecutionContext context,
+        ILinqToDbSessionFactory sessions,
         string value,
         CancellationToken cancellationToken)
     {
-        return context.Connection.InsertAsync<TransactionProbe, int>(
-            new TransactionProbe { Value = value },
-            transaction: RequireTransaction(context),
-            cancellationToken: cancellationToken);
+        using var db = sessions.Borrow(context, true);
+        return await db.GetTable<TransactionProbe>().Value(row => row.Value, value).InsertWithInt32IdentityAsync(cancellationToken)
+            ?? throw new InvalidOperationException("Probe insert returned no identity.");
     }
 
     private static IDbTransaction RequireTransaction(ISqlExecutionContext context)

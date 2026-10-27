@@ -39,7 +39,7 @@ internal sealed class WarehouseFeatureHandlers :
             return response;
         }
         catch (CatalogWriteConflictException)
-        { return Error.Conflict("Warehouse.DuplicateCode", "A warehouse with this code already exists."); }
+        { return CatalogErrors.DuplicateCode("Warehouse.DuplicateCode", "A warehouse with this code already exists."); }
     }
 
     public async Task<ErrorOr<UnitResponse>> Handle(SetWarehouseActiveCommand command, CancellationToken cancellationToken)
@@ -127,7 +127,7 @@ internal sealed class EmployeeFeatureHandlers :
     {
         CatalogWriteConflict.EmployeeUserAlreadyLinked => Error.Conflict("Employee.UserAlreadyLinked", "This user is already linked to an employee."),
         CatalogWriteConflict.EmployeeUserNotFound => Error.Conflict("Employee.UserNotFound", "The selected user does not exist."),
-        _ => Error.Conflict("Employee.DuplicateCode", "An employee with this code already exists."),
+        _ => CatalogErrors.DuplicateCode("Employee.DuplicateCode", "An employee with this code already exists."),
     };
 }
 
@@ -160,7 +160,7 @@ internal sealed class CustomerFeatureHandlers :
             return response;
         }
         catch (CatalogWriteConflictException)
-        { return Error.Conflict("Customer.DuplicateCode", "A customer with this code already exists."); }
+        { return CatalogErrors.DuplicateCode("Customer.DuplicateCode", "A customer with this code already exists."); }
     }
 
     public async Task<ErrorOr<UnitResponse>> Handle(SetCustomerActiveCommand command, CancellationToken cancellationToken)

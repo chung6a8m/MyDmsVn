@@ -6,6 +6,18 @@ using MyDmsVn.Contracts.Security;
 
 namespace MyDmsVn.Desktop.Application
 {
+    public interface ISalesReceiptApiClient
+    {
+        // Bind once to the VM owner. Reject a different actual captured session
+        // before admitting any operation, independently of cancellation.
+        ISalesReceiptApiClient ForSession(long expectedSessionVersion);
+        Task<ApiResponse<SalesReceiptListPage>> ListAsync(SalesReceiptListRequest request, CancellationToken cancellationToken);
+        Task<ApiResponse<SalesReceiptDto>> GetAsync(long saleId, CancellationToken cancellationToken);
+        Task<ApiResponse<SalesReceiptDto>> CreateDraftAsync(SaveSalesReceiptRequest request, CancellationToken cancellationToken);
+        Task<ApiResponse<SalesReceiptDto>> UpdateDraftAsync(UpdateSalesReceiptDraftRequest request, CancellationToken cancellationToken);
+        Task<ApiResponse<PostSalesReceiptResponse>> PostAsync(PostSalesReceiptRequest request, CancellationToken cancellationToken);
+    }
+
     public interface IProductApiClient
     {
         Task<ApiResponse<PagedResult<ProductDto>>> ListAsync(CatalogListRequest request, CancellationToken cancellationToken);
@@ -76,11 +88,13 @@ namespace MyDmsVn.Desktop.Application
 
     public interface IPermissionCatalogApiClient
     {
+        IPermissionCatalogApiClient ForSession(long expectedSessionVersion);
         Task<ApiResponse<PermissionCatalogDto>> GetCatalogAsync(CancellationToken cancellationToken);
     }
 
     public interface ISecurityAdministrationApiClient
     {
+        ISecurityAdministrationApiClient ForSession(long expectedSessionVersion);
         Task<ApiResponse<IReadOnlyList<SecurityUserDto>>> ListUsersAsync(CancellationToken cancellationToken);
         Task<ApiResponse<IReadOnlyList<SecurityRoleDto>>> ListRolesAsync(CancellationToken cancellationToken);
         Task<ApiResponse<SecurityAdministrationResultDto>> MutateAsync(

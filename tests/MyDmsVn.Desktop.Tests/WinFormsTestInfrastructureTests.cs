@@ -4,14 +4,20 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Desktop.Tests
 {
     public sealed class WinFormsTestInfrastructureTests
     {
+        private readonly ITestOutputHelper _output;
+
+        public WinFormsTestInfrastructureTests(ITestOutputHelper output) => _output = output;
+
         [Fact]
         public void StaTest_runs_action_on_sta_thread()
         {
+            _output.WriteLine("Observed testhost bitness: " + (IntPtr.Size * 8));
             ApartmentState observedState = ApartmentState.Unknown;
 
             StaTest.Run(
@@ -53,6 +59,18 @@ namespace MyDmsVn.Desktop.Tests
                 () => StaTest.Run(_ => throw expected, TimeSpan.FromSeconds(1)));
 
             Assert.Same(expected, actual);
+        }
+
+        [Fact]
+        public void StaTest_timeout_preserves_failure_raised_during_cooperative_cleanup()
+        {
+            var cleanupFailure = new InvalidOperationException("Synthetic STA cleanup failure");
+            var timeout = Assert.Throws<TimeoutException>(() => StaTest.Run(token =>
+            {
+                token.WaitHandle.WaitOne();
+                throw cleanupFailure;
+            }, TimeSpan.FromMilliseconds(50)));
+            Assert.Same(cleanupFailure, timeout.InnerException);
         }
 
         [Fact]

@@ -1,31 +1,34 @@
 # MyDmsVn
 
-Windows desktop-first SME business management, beginning with **Sales & Inventory Foundation** and designed to evolve from a local Application/SQL adapter to a remotely hosted HTTP API without duplicating business handlers.
+Windows desktop-first SME business software for Sales and Inventory. Local v1 invokes Application handlers in process through the Local adapter.
 
-## Current status — 2026-10-16
+## Current development status — v1a-pro-ui-next
 
-P0/P1/P2/P3/P3.1/P4 implementation is complete. P4.1 Login/session is **closed by explicit product-owner manual-UI acceptance**, with a documented incomplete packaged idle-expiry observation; the owner exception does not close remaining P5/P6 release gates. P5 business features and automated tests exist, but P5.1/P5.4 interactive acceptance remains open. P6 operational/release acceptance remains open. TESTGATE T01–T03 are verified; modularization, permission-system replacement and P7 are future work.
+**Updated:** 2026-10-25. The [current execution index](docs/plans/README.md) routes the Owner-requested Sidebar horizontal-scrollbar follow-up and the planned Security workspace; each plan owns task state and verification for its scope. The [archive boundary](docs/archive/20261025-pre-next-roadmap/README.md) preserves prior work and exact-candidate limits after merged PR #48. Read [AGENTS](AGENTS.md), [AI_CONTEXT](AI_CONTEXT.md) and the sole [TEST_POLICY](docs/TEST_POLICY.md) before acting on that scope.
 
-**Current accepted matrix:** [NET8-PAUSE](docs/plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md) PR #32 merged at `8e310778`; T01–T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with reviewer fixes re-verified at `6b2ff49`. The owner waived the duration comparison at `09d00bfa` because no comparable baseline exists; it remains unmeasured and no speedup is claimed. Application, SQL and Desktop projects actively target `net48`; historical .NET 8 case metadata and the parked AppCore source remain for [reviewed reactivation](docs/REACTIVATE_NET8.md). The runner's tool-only `net8.0` target is not product coverage. Follow the [ordered active roadmap](docs/plans/README.md) and [Development Plan](docs/DEVELOPMENT_PLAN.md).
+[Documentation index](docs/README.md) · [Development-plan alias](docs/DEVELOPMENT_PLAN.md) · [Architecture decisions](docs/adr/README.md)
 
-## Approved technology and boundaries
+The current [UI Lab](docs/development/UI_LAB.md) remains Sales-only. The planned [Security workstream](docs/plans/20261025-002-security-administration-ui-lab-first.md) has a [UI/behavior specification](docs/design/SECURITY_ADMINISTRATION_UI.md) and [review guide](docs/development/SECURITY_UI_LAB_REVIEW.md). SQL-free review of the actual candidate and dated explicit Owner approval at SEC-T05 must precede SEC-T06 Local cutover or SEC-T07 SQL integration. Documentation and mockups do not approve that gate.
 
-- C#, active product/runtime target `.NET Framework 4.8`; `.NET 8` product targets are temporarily parked while the test runner remains tool-only `net8.0`. No unapproved move to .NET 10. See [Tech Stack](docs/TECH_STACK.md).
-- Clean Architecture/modular monolith, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork.
-- RepoDb for write-side storage, Dapper for read models, SQL Server and versioned DbUp migrations.
-- Shared WinForms/CommunityToolkit.Mvvm views, Bootstrap5WinFormUI and BootstrapSourceGrid; LocalApiClient for v1, HttpApiClient planned for v2.
-- Security enforcement is mandatory in Application, not just desktop UI. The current permission implementation follows [SEC-REBUILD](docs/plans/20261016-003-permission-system-rebuild.md): code-defined catalog, explicit assignments, and one configured superuser. T06 and final SQL/GUI acceptance remain open.
-- Historical legacy password columns remain for safe migration evaluation.
+[UI-NEXT](docs/ui-next/README.md) is retained as a historical design and acceptance reference. Its [DateInput candidate evidence](docs/ui-next/evidence/20261024-dateinput-unified-compact-correction.md) and [T13 ledger](docs/ui-next/evidence/20261024-uin-t13-integration.md) retain exact revisions, original failures and bounded acceptance; their former prompts do not schedule new work.
 
-## How to work in this repository
+The [pre-UI-NEXT archive](docs/archive/20261023-pre-ui-next/README.md) preserves earlier execution queues. SAL source is present in the merged baseline; [T08 evidence](docs/evidence/sal/20261021-t08-integrated-acceptance.md) records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific runnable automation PASS. Native125, attended observations and dated Owner acceptance remain OPEN. Routing cleanup neither completes nor waives those gaps. [Production release prerequisites](docs/DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED.
 
-1. Read [AGENTS.md](AGENTS.md), [PRD](docs/PRD.md), [Architecture](docs/ARCHITECTURE.md) and [Tech Stack](docs/TECH_STACK.md).
-2. Follow the **exact order** of the [six active roadmap entries](docs/plans/README.md). Completed TESTGATE-T01–T03 stays active as context only.
-3. Run focused **Task** tests during implementation; use the guarded manifest-owned strict **Final** acceptance only after gate-affecting inputs are frozen. Never substitute unapproved SQL/GUI tests or run the full SQL suite after every edit.
-4. Publish reviewed sanitized results; do not commit SQL credentials, instance approval files, TRX, ownership journals or other raw diagnostics. Missing external environment means BLOCKED/NOT RUN, not PASSED.
+## Current implementation
+
+- Product, WinForms and all eleven active test projects target `net48`. Desktop and separate admin migrator package as Windows x86 directories. AppCore/net8 remains PARKED / NOT SHIPPED.
+- Clean Architecture, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork, LINQ to DB plus typed native SqlClient, SQL Server and DbUp remain the current architecture.
+- Test-only Respawn reusable owned fixtures, deterministic reset/seed, dedicated fresh exceptions and direct `dotnet test`/Test Explorer are implemented. The old SQL harness, runner, gate manifest and approval-file flow remain removed.
+- WinForms uses CommunityToolkit.Mvvm and the pinned `vendor/MyDmsVn.WinFormsKit` checkout, which supplies the compatible Bootstrap5WinFormUI/BootstrapSourceGrid assemblies and pinned SourceGrid engine. Four catalogs, Goods Receipt and Sales Draft/Post, quantity/value ledger and stock inquiries, code-defined permissions and one configured superuser exist.
+- Sales preserves manual prices, independent duplicate Product rows, gifts and moving-average cost frozen at actual Post. Receipt/sale/reconciliation share the reviewed transaction-owned valuation protocol. Development source requires schema10; historical schema9 package evidence remains separate.
+- BCI/BCF compact layout, native inline editing and lookup repairs are implemented and accepted within their recorded bounded scopes. RESP, L2DB and GUI-P5 are completed baselines; preserve their exact evidence and exceptions. Historical acceptance does not establish acceptance for a later candidate or production release.
+
+## Working with Codex
+
+Read [AGENTS.md](AGENTS.md), [AI_CONTEXT.md](AI_CONTEXT.md), the [execution index](docs/plans/README.md), explicitly authorized scope and its relevant references, then the sole [TEST_POLICY.md](docs/TEST_POLICY.md). Verify changed behavior with focused source-owned tests. Archived tasks and prompts do not authorize new work; SAL integration and production-release tasks are not inherited. Documentation-only changes require diff/link/status/encoding checks, not SQL/GUI execution.
+
+Shared UI owns reusable controls and rendering; MyDmsVn owns workspace/session identity, operation admission, dirty-close and recovery policies. Runtime, security, SQL ownership, transaction and test execution safeguards remain binding. [Retired/out-of-scope directions](docs/DEFERRED_WORK.md) define constraints without another execution queue; [History](docs/HISTORY.md) and original evidence retain provenance.
 
 ## Documentation
 
-[Development Plan](docs/DEVELOPMENT_PLAN.md) · [Active plans](docs/plans/README.md) · [Archive](docs/plans/archive/README.md) · [Contracts](docs/CONTRACTS.md) · [Security](docs/SECURITY.md) · [Persistence](docs/PERSISTENCE.md) · [Test Strategy](docs/TEST_STRATEGY.md) · [Test Gate Matrix](docs/TEST_GATE_MATRIX.md) · [Codex policy](docs/CODEX_TEST_EXECUTION_POLICY.md) · [ADR index](docs/adr/README.md)
-
-Previous completed dual-framework build/test evidence is historical and is **not** proof that any future TFM reduction, restored net8 target or P7 API has already passed.
+Start with the [documentation index](docs/README.md), [Architecture](docs/ARCHITECTURE.md), [PRD](docs/PRD.md), [Contracts](docs/CONTRACTS.md), [Technical stack](docs/TECH_STACK.md) and [test commands](tests/README.md).

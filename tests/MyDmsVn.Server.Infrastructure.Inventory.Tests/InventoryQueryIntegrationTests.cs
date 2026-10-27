@@ -1,28 +1,35 @@
-using System;
+﻿using System;
 using System.Data;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.DbMigrator;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(ApplicationSqlCollectionFixture.CollectionName)]
 public sealed class InventoryQueryIntegrationTests
 {
-    [SqlServerFact]
-    public async Task Stock_card_query_preserves_datetime2_boundaries()
+    private readonly ApplicationSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
+
+    public InventoryQueryIntegrationTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
     {
-        var database = await CreateDatabaseAsync();
-        try
+        _fixture = fixture;
+        _output = output;
+    }
+
+    [SqlServerFact]
+    public Task Stock_card_query_preserves_datetime2_boundaries() =>
+        _fixture.RunAsync(nameof(Stock_card_query_preserves_datetime2_boundaries), _output, test => SeedAsync(test.ConnectionString), async (test, seed) =>
         {
-            var seed = await SeedAsync(database.ConnectionString);
             var lastTickOfSecond = new DateTime(
                 2026,
                 10,
@@ -32,16 +39,16 @@ public sealed class InventoryQueryIntegrationTests
                 0,
                 DateTimeKind.Utc).AddSeconds(1).AddTicks(-1);
             await InsertBoundaryMovementsAsync(
-                database.ConnectionString,
+                test.ConnectionString,
                 seed.ArchivedWarehouseId,
                 seed.ArchivedProductId,
                 seed.UserId,
                 lastTickOfSecond);
 
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
-            using var scope = provider.CreateScope();
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
+            var scope = ApplicationSqlCollectionFixture.Track(test, provider.CreateScope());
             var queries = scope.ServiceProvider.GetRequiredService<IInventoryQueryService>();
 
             var result = await queries.GetStockCardAsync(
@@ -57,24 +64,16 @@ public sealed class InventoryQueryIntegrationTests
             var movement = Assert.Single(result.Items);
             Assert.Equal(lastTickOfSecond, movement.PostedAtUtc);
             Assert.Equal(1.0000m, movement.QuantityChange);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history()
-    {
-        var database = await CreateDatabaseAsync();
-        try
+    public Task Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history() =>
+        _fixture.RunAsync(nameof(Balance_and_stock_card_queries_filter_page_sort_and_keep_inactive_history), _output, test => SeedAsync(test.ConnectionString), async (test, seed) =>
         {
-            var seed = await SeedAsync(database.ConnectionString);
             var services = new ServiceCollection();
-            services.AddSqlPersistence(database.ConnectionString);
-            using var provider = services.BuildServiceProvider();
-            using var scope = provider.CreateScope();
+            services.AddSqlPersistence(test.ConnectionString);
+            var provider = ApplicationSqlCollectionFixture.Track(test, services.BuildServiceProvider());
+            var scope = ApplicationSqlCollectionFixture.Track(test, provider.CreateScope());
             var queries = scope.ServiceProvider.GetRequiredService<IInventoryQueryService>();
 
             var firstBalancePage = await queries.GetStockBalancesAsync(
@@ -131,24 +130,7 @@ public sealed class InventoryQueryIntegrationTests
             Assert.False(firstMovement.ProductIsActive);
             Assert.Equal(new[] { 5.0000m, 7.5000m },
                 new[] { firstMovement.QuantityChange, secondMovement.QuantityChange });
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
-
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
-    {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
-        var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
-        var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
-        Assert.True(migration.Successful, migration.Error?.ToString());
-        return database;
-    }
+        });
 
     private static async Task<SeedData> SeedAsync(string connectionString)
     {
@@ -188,9 +170,10 @@ public sealed class InventoryQueryIntegrationTests
             "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) VALUES " +
             "(@warehouseId, @productId, 'GoodsReceipt', @firstReceiptId, @firstLineId, 5.0000, @firstPosted, @userId), " +
             "(@warehouseId, @productId, 'GoodsReceipt', @secondReceiptId, @secondLineId, 7.5000, @secondPosted, @userId); " +
-            "INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity) VALUES " +
-            "(@warehouseId, @productId, 12.5000), " +
-            "(@otherWarehouseId, @otherProductId, 3.0000); " +
+            "INSERT dbo.StockBalances (WarehouseId, ProductId, Quantity, InventoryValue) VALUES " +
+            "(@warehouseId, @productId, 12.5000, 12.5000), " +
+            "(@otherWarehouseId, @otherProductId, 3.0000, 0.0000); " +
+            "INSERT dbo.StockValuationEntries(LedgerId,ValueChange) SELECT LedgerId,QuantityChange FROM dbo.StockLedger; " +
             "UPDATE dbo.Warehouses SET IsActive = 0 WHERE WarehouseId = @warehouseId; " +
             "UPDATE dbo.Products SET IsActive = 0 WHERE ProductId = @productId;",
             new
@@ -252,17 +235,20 @@ public sealed class InventoryQueryIntegrationTests
         DateTime lastTickOfSecond)
     {
         using var connection = new SqlConnection(connectionString);
-        var parameters = new DynamicParameters();
-        parameters.Add("warehouseId", warehouseId);
-        parameters.Add("productId", productId);
-        parameters.Add("lastTickOfSecond", lastTickOfSecond, DbType.DateTime2);
-        parameters.Add("nextSecond", lastTickOfSecond.AddTicks(1), DbType.DateTime2);
-        parameters.Add("userId", userId);
+        var parameters = new[]
+        {
+            new SqlParameter("@warehouseId", SqlDbType.Int) { Value = warehouseId },
+            new SqlParameter("@productId", SqlDbType.Int) { Value = productId },
+            new SqlParameter("@lastTickOfSecond", SqlDbType.DateTime2) { Value = lastTickOfSecond },
+            new SqlParameter("@nextSecond", SqlDbType.DateTime2) { Value = lastTickOfSecond.AddTicks(1) },
+            new SqlParameter("@userId", SqlDbType.Int) { Value = userId },
+        };
         await connection.ExecuteAsync(
             "INSERT dbo.StockLedger " +
             "(WarehouseId, ProductId, DocumentType, DocumentId, DocumentLineId, QuantityChange, PostedAtUtc, PostedByUserId) VALUES " +
             "(@warehouseId, @productId, 'Boundary', 1, 9001, 1.0000, @lastTickOfSecond, @userId), " +
-            "(@warehouseId, @productId, 'Boundary', 2, 9002, 2.0000, @nextSecond, @userId);",
+            "(@warehouseId, @productId, 'Boundary', 2, 9002, 2.0000, @nextSecond, @userId); " +
+            "INSERT dbo.StockValuationEntries(LedgerId,ValueChange) SELECT LedgerId,QuantityChange FROM dbo.StockLedger WHERE DocumentType='Boundary';",
             parameters);
     }
 

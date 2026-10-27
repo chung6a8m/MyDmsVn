@@ -1,14 +1,14 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Infrastructure.Persistence;
-using RepoDb;
+using LinqToDB;
+using LinqToDB.Mapping;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -16,20 +16,17 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class RepositoryAndQueryIntegrationTests
 {
     [SqlServerFact]
-    public async Task Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write()
+    public async Task Explicit_repository_uses_Linq_and_native_oracle_sees_its_uncommitted_write()
     {
         var database = await CreateDatabaseAsync();
         try
         {
-            TestDatabaseMigrationRunner.Migrate(
-                database.MeasurementContext,
-                "RepositoryAndQueryIntegrationTests.Explicit_repository_uses_RepoDb_and_Dapper_sees_its_uncommitted_write.migration-01",
-                database.ConnectionString);
+            TestDatabaseMigrationRunner.Migrate(database.ConnectionString);
             var services = new ServiceCollection();
             services
                 .AddSqlPersistence(database.ConnectionString)
-                .AddRepository<ITestProbeRepository, TestProbeRepository>()
-                .AddRepoDbMapping<TestProbeMapping>();
+                .AddRepository<ITestProbeRepository, TestProbeRepository>();
+            services.AddSingleton<ILinqToDbMapping>(new TestProbeMapping());
             using var provider = services.BuildServiceProvider();
             var factory = provider.GetRequiredService<IUnitOfWorkFactory>();
             using var unitOfWork = await factory.CreateAsync(CancellationToken.None);
@@ -77,27 +74,24 @@ public sealed class RepositoryAndQueryIntegrationTests
     }
 
     [Fact]
-    public async Task RepoDb_mapping_initialization_is_thread_safe_and_retries_after_failure()
+    public async Task Linq_mapping_initialization_is_thread_safe_and_retries_after_failure()
     {
         var mapping = new FailOnceMapping();
-        var initializer = new RepoDbMappingInitializer(new IRepoDbMapping[] { mapping });
+        var initializer = new LinqToDbMappingSchemaProvider(new ILinqToDbMapping[] { mapping });
 
-        Assert.Throws<InvalidOperationException>(() => initializer.Initialize());
+        Assert.Throws<InvalidOperationException>(() => initializer.GetSchema());
 
         var attempts = Enumerable.Range(0, 16)
-            .Select(_ => Task.Run(() => initializer.Initialize()));
+            .Select(_ => Task.Run(() => initializer.GetSchema()));
         await Task.WhenAll(attempts);
 
         Assert.Equal(2, mapping.Attempts);
     }
 
-    private static Task<SqlTestDatabase> CreateDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static Task<SqlTestDatabase> CreateDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         return SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
     }
 
     private interface ITestProbeRepository
@@ -108,20 +102,19 @@ public sealed class RepositoryAndQueryIntegrationTests
     private sealed class TestProbeRepository : ITestProbeRepository
     {
         private readonly ISqlExecutionContext _context;
+        private readonly ILinqToDbSessionFactory _sessions;
 
-        public TestProbeRepository(ISqlExecutionContext context)
+        public TestProbeRepository(ISqlExecutionContext context, ILinqToDbSessionFactory sessions)
         {
             _context = context;
+            _sessions = sessions;
         }
 
-        public Task<int> InsertAsync(string value, CancellationToken cancellationToken)
+        public async Task<int> InsertAsync(string value, CancellationToken cancellationToken)
         {
-            var transaction = _context.Transaction
-                ?? throw new InvalidOperationException("This repository write requires an active transaction.");
-            return _context.Connection.InsertAsync<TestProbe, int>(
-                new TestProbe { Value = value },
-                transaction: transaction,
-                cancellationToken: cancellationToken);
+            using var db = _sessions.Borrow(_context, true);
+            return await db.GetTable<TestProbe>().Value(row => row.Value, value).InsertWithInt32IdentityAsync(cancellationToken)
+                ?? throw new InvalidOperationException("Probe insert returned no identity.");
         }
     }
 
@@ -132,25 +125,23 @@ public sealed class RepositoryAndQueryIntegrationTests
         public string Value { get; set; } = string.Empty;
     }
 
-    private sealed class TestProbeMapping : IRepoDbMapping
+    private sealed class TestProbeMapping : ILinqToDbMapping
     {
-        public void Configure()
+        public void Configure(FluentMappingBuilder builder)
         {
-            ClassMapper.Add<TestProbe>("dbo.P1TestProbe");
-            PropertyMapper.Add<TestProbe>(entity => entity.Id, "ProbeId");
-            PropertyMapper.Add<TestProbe>(entity => entity.Value, "ProbeValue");
-            PrimaryMapper.Add<TestProbe>(entity => entity.Id);
-            IdentityMapper.Add<TestProbe>(entity => entity.Id);
+            var probe = builder.Entity<TestProbe>().HasSchemaName("dbo").HasTableName("P1TestProbe");
+            probe.Property(row => row.Id).HasColumnName("ProbeId").IsPrimaryKey().IsIdentity();
+            probe.Property(row => row.Value).HasColumnName("ProbeValue").HasDataType(DataType.NVarChar).HasLength(128);
         }
     }
 
-    private sealed class FailOnceMapping : IRepoDbMapping
+    private sealed class FailOnceMapping : ILinqToDbMapping
     {
         private int _attempts;
 
         public int Attempts => _attempts;
 
-        public void Configure()
+        public void Configure(FluentMappingBuilder builder)
         {
             if (Interlocked.Increment(ref _attempts) == 1)
             {

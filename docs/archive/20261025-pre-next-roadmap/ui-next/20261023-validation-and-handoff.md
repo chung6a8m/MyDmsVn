@@ -1,0 +1,134 @@
+> **Archived on 2026-10-25.** Snapshot from `6ee6951c58f6e4ad92f991521ff5c553d2d22526`; original statuses, commands and candidate evidence below describe their recorded dates. Read the [archive boundary](../README.md) for later merge facts and retained limitations. This document does not schedule work; use the [current execution index](../../../plans/README.md). Local links were rebased for this location.
+
+# UI Next — validation and cross-session handoff
+
+> **Historical acceptance reference.** This file retains the original candidate rows, failures, commands and limits. It does not schedule a new run; use the [current execution index](../plans/README.md) and TEST_POLICY for authorized work. A0 changes routing only and creates no runtime result.
+
+**Date:** 2026-10-23
+**Status:** DateInput correction UIN-D01–D03 and UIN-DA01–DA04 are VERIFIED/accepted within the exact final candidate's bounded UI scope after physical native100/native125 checks and dated Owner visual acceptance at 125%. The first candidate's 2026-10-24 Owner calendar-highlight failure is retained. T00–T13 remain VERIFIED in their recorded historical bounded scopes; retain the original T13 attended-fixture FAIL, passing control and dated acceptance.
+**Authority:** [TEST_POLICY](../../../TEST_POLICY.md) remains the sole execution policy. This document records the behavior selected by the [historical UI-NEXT roadmap](20261023-active-roadmap.md), not an additional test framework or current execution queue.
+
+## DateInput correction acceptance
+
+**Added:** 2026-10-24. The Owner approved [option 01 — Unified Compact](20261024-dateinput-unified-compact-design.md). [UIN-D01–D03](20261024-dateinput-unified-compact-correction.md) now owns the affected DateInput contribution to UIN-A07/A12/A14. Historical rows below remain candidate-specific records; the correction established its separate candidate results in the linked evidence.
+
+| ID / owner | Required observable outcome | Required evidence | Current state |
+|---|---|---|---|
+| UIN-DA01 / D01 | Repeated Day/Month/Year Up/Down retains logical caret/selection, including short DMY normalization and cross-separator selection; rejected/readonly/disabled/IME input does not mutate; clock and pending/accepted rules preserved | Native key/selection assertions, actual behavioral RED where meaningful, affected UI tests on net48/x86 and net8.0-windows/x64 | VERIFIED in bounded [correction evidence](../../../ui-next/evidence/20261024-dateinput-unified-compact-correction.md) |
+| UIN-DA02 / D02 | One exterior border, date displayed once, icon-only trigger before/after open/preview/accept/cancel, coherent focus/validation and readable geometry; standalone picker compatible | Rendered outcome/layout plus native popup/focus/accessibility/lifecycle tests, Light/Dark and measured native100/native125, larger-font check; affected default TextBox cases if its rendering seam changes | First-candidate Owner FAIL retained; repaired candidate VERIFIED at physical native100/native125 with [rendered tests, package and Owner observation](../../../ui-next/evidence/20261024-dateinput-unified-compact-correction.md) |
+| UIN-DA03 / D03 | Exact UI → BSG → app pins; Sales From/To and Goods/Sales required dates preserve caret through host projection, admit changes only at the existing query/commit boundaries and retain guards | App Release net48/x86 build, focused native integration cases, new bounded actual-Login DateInput package smoke, source/test/package hashes and owned cleanup | Final candidate VERIFIED at physical native100/native125 with owned cleanup in [evidence](../../../ui-next/evidence/20261024-dateinput-unified-compact-correction.md) |
+| UIN-DA04 / D03 | Owner inspects the corrected running visual against option 01; remaining environment/scale/behavior limits are explicit | Dated disposition on an identified new build, separately recording which scale/theme was observed and the automated matrix | First-candidate Owner FAIL retained; repaired package accepted by Owner on 2026-10-24 at physical 125% in [evidence](../../../ui-next/evidence/20261024-dateinput-unified-compact-correction.md) |
+
+Use the scoped selectors and source-file ownership warning in the correction plan. Run GUI/SQL owners sequentially with existing protection. Record actual selected/discovered/executed rows and skip/failure reasons. Record monitor DPI separately from test-window DPI; a 120-DPI monitor or `native125` directory does not prove 120-DPI window awareness. Never rename a missing prerequisite or zero-test run into PASS.
+
+The original handoff required a sanitized evidence record under `docs/ui-next/evidence/` with the real execution date, exact app/UI/BSG/SourceGrid/test/package identity, original failures, successful repair runs, current limitations and cleanup. Keep previous [T13](../../../ui-next/evidence/20261024-uin-t13-integration.md), [first-review](../../../ui-next/evidence/20261024-pr45-review-corrections.md) and [second-review](../../../ui-next/evidence/20261024-pr45-review-round2.md) evidence intact. The original documentation-only activation ran no product/GUI/SQL tests and granted no runtime/production acceptance.
+
+## Evidence boundary
+
+The original documentation activation verified source references, plan/archive status, links, encoding and a docs-only diff. Subsequent [T00](../../../ui-next/evidence/20261023-t00-field-errors.md) and [T01](../../../ui-next/evidence/20261023-uin-t01-workspace-feedback.md) implementation evidence records focused product/session/host tests. Source test existence alone is not a PASS.
+
+The old SAL-T07/T08 open native125, attended and Owner obligations remain in the [archive](../../20261023-pre-ui-next/README.md). They are neither prerequisites nor acceptance rows here. New UI Next checks use UIN-A identifiers and exact current candidates; they cannot change historical SAL/BCF results. Production prerequisites remain unaccepted and unscheduled.
+
+## Acceptance matrix
+
+All rows began **NOT RUN** at activation. Current states below separate focused evidence from full row closure.
+
+| ID / task owner | Required observable behavior | Minimum meaningful evidence | Current evidence state |
+|---|---|---|---|
+| UIN-A01 / T00,T02 | Duplicate Code create/update retains attempted text, Conflict and `code` target; correct editor shows invalid/readable state; unrelated fields stay intact; general/authorization errors remain safe and visible | AT mapper/catalog + ST VM + focused Product native UI; delayed old response and relevant-field clearing | VERIFIED in task scope: [current-candidate AT/ST and Light/Dark native100/native125](../../../ui-next/evidence/20261023-uin-t00-t02-native-completion.md); package/Owner remains T13 |
+| UIN-A02 / T01 | Concurrent A/B outcomes remain in originating workspace; switch/close/reopen/document/session changes reject stale results; hidden success retention is bounded; persistent recovery survives status/Toast changes | Deterministic captured-scope tests and real host lifecycle tests including pre-handle publication/UI dispatch | VERIFIED in task scope: [current-candidate ST and Light/Dark native100/native125](../../../ui-next/evidence/20261023-uin-t00-t02-native-completion.md); package/Owner remains T13 |
+| UIN-A03 / T02 | Same current errors drive editor border, readable message, ErrorProvider, inactive cell/row and accessible summary; duplicate/zero-ID/reordered/removed rows cannot steal another line's error | Native Sales pilot + accessible keyboard navigation; submitted-index-to-stable-line mapping; R4 clearing regressions | VERIFIED in task scope: [current-candidate ST and Light/Dark native100/native125](../../../ui-next/evidence/20261023-uin-t00-t02-native-completion.md); package/Owner remains T13 |
+| UIN-A04 / T03,T05 | Commit applies once after host acceptance; stale validation proof or a different native accepted value cannot apply; invalid buffer is retained; cancel projects current model; Save/Post/navigation resolve all pending buffers; locked routes cannot mutate | Both receipt adapter session tests, controlled late callbacks, native Enter/Escape/Tab/Back and existing admission tests | T03 VERIFIED for its recorded adapters: [native100 x86, 117/117 selected](../../../ui-next/evidence/20261023-uin-t03-inline-sessions.md). T05 new-control integration VERIFIED in its bounded source/native scope: [UI/BSG and Sales/Goods Light/Dark native100/native125](../../../ui-next/evidence/20261023-uin-t05-decimal-entry.md); T13 package/Owner review remains open |
+| UIN-A05 / T04 | Decimal candidate is lossless; exact maxima/scale/sign/culture/null grammar match current app policy; meaningful far-tail digits reject before decimal rounding; generated grouping is distinguishable from pasted input | Pure parser/display vectors with fixed expected values, app-profile differential characterization and legacy formatter compatibility | VERIFIED in pure T04 scope: [two-target parser/projection, legacy formatter and app oracle evidence](../../../ui-next/evidence/20261023-uin-t04-decimal-core.md); native T05 verified separately under [UIN-A06](../../../ui-next/evidence/20261023-uin-t05-decimal-entry.md) |
+| UIN-A06 / T05 | Numeric format-as-you-type retains caret/range, first key, middle edits, group-boundary delete, paste, undo/redo, IME and model commit semantics | Real native per-character control + BSG + Sales/Goods tests; Copy/Cut retain invalid pending selection; identical-display external grouped paste rejects; reuse across frozen profiles/disposal and no duplicate dirty notifications | VERIFIED in bounded T05 scope: [two-target UI/BSG, app net48 x86, measured Light/Dark native100/native125](../../../ui-next/evidence/20261023-uin-t05-decimal-entry.md); physical IME-language typing remains unobserved |
+| UIN-A07 / T06,T11 | Day/day-month/full DMY completion uses captured local reference; valid leap/min/max/null handling; invalid dates/short years/compact forms do not normalize silently; popup/segment keys commit once; pending date survives projection | Pure clock-injected parser, native key/calendar tests, required headers and nullable Sales filter admission; Stock Card UTC regression | T06 required-header contribution VERIFIED in bounded source/native scope: [UI/BSG, Goods/Sales Light/Dark native100/native125 and Stock Card regression PASS](../../../ui-next/evidence/20261023-uin-t06-quick-dates.md). [T11 nullable Sales filters](../../../ui-next/evidence/20261024-uin-t11-workspace-adoption.md) VERIFIED on measured Light/Dark native100/native125 |
+| UIN-A08 / T07 | All close routes use one admission; four catalogs track accepted baseline/dirty revision; explicit write outcome governs Save-close, never Task/IsBusy/errors; rejection retains text, refresh failure stays distinguishable, stale prompt/result cannot close newer edits; busy/recovery refuses and logout scrubs | Pointer-before-focus, Ctrl+W/accessibility, dirty create/update and unchanged close, duplicate/canceled/failed Save, saved-plus-refresh-failure, newer revision/document/session/reopened instance during async admission; disposal once | VERIFIED in bounded T07 scope: [UI/BSG, Session/GUI and measured Light/Dark native100/native125 PASS](../../../ui-next/evidence/20261023-uin-t07-workspace-close.md) |
+| UIN-A09 / T08 | Busy presentation is local, delayed and token-owned; old completion cannot hide a new operation; Cancel means request only; keyboard/UIA guards remain; no stale focus/Enabled restoration | Overlap/out-of-order/fast/faulted/hidden/disposed scenarios, native focus and existing admission regressions | VERIFIED in bounded scope: [UI/BSG two-target, app Catalog/Sales/Goods Light/Dark and measured native100/native125 evidence](../../../ui-next/evidence/20261024-uin-t08-busy-host.md); package/Owner remains T13 |
+| UIN-A10 / T09 | Semantic Panel/Label preserve layout/accessibility and override ownership; public nested/dynamic children receive app appearance, private children remain excluded, roles survive generic appearance refresh; theme/DPI preserve input/error/focus and release resources | Both themes/native100/125 on affected composition, long text/mnemonic/readability, repeated open/close/theme lifetime tests | VERIFIED in bounded source/native scope: [UI/BSG two-target, app Light/Dark native100 153/153 and supported native125 145/145 evidence](../../../ui-next/evidence/20261024-uin-t09-semantic-surfaces.md); six archived BCF wide125 reference cases remain outside this gate; package/Owner remains T13 |
+| UIN-A11 / T10 | DGV decimal and BSG numeric hosts share value/error behavior while honoring independent lifecycle; existing lookup keeps keyboard, dirty and async semantics | DGV clone/recycled-editor/reset/new-row/null/readonly/DataError tests; BSG conversion rejection/registry disposal; common scenario vectors | VERIFIED in bounded scope: [UI/BSG two-target and app Light/Dark, measured native100/native125 evidence](../../../ui-next/evidence/20261024-uin-t10-decimal-dgv.md); package/Owner remains T13 |
+| UIN-A12 / T11 | Four catalogs and existing Sales/Goods/stock workspaces use shared feedback/theme/close/busy rules; native exceptions are explicit; nullable filter binding retains pending text | Focused affected screen tests + multi-tab/session scenarios + bounded host smoke; no business/pagination/column changes | VERIFIED in bounded scope: [affected GUI/Session, DI smoke and measured Light/Dark native100/native125 evidence](../../../ui-next/evidence/20261024-uin-t11-workspace-adoption.md) |
+| UIN-A13 / T12 | Full TSV plan validates before mutation; reject invalid/stale/readonly/unsupported targets with no observable partial patch; accepted patch affects local draft once; measurements use real workload | Pure planning + ordinary-edit revision-before-first-notification and reentrant-observer/identity/guard tests + native paste; 1/50/200-line Sales observations with named environment, distributions and resource counts | VERIFIED in bounded scope: [final-candidate atomic planner, Light/Dark native100/native125 and performance evidence](../../../ui-next/evidence/20261024-uin-t12-numeric-paste.md); package/Owner remains T13 |
+| UIN-A14 / T13 | One exact candidate reconciles affected UI behavior, public APIs/pins, bounded actual-Login smoke and separate Owner observations; remaining limits are explicit | Selected final UI Next cases, exact artifact hashes, cleanup and dated bounded review; no imported old-plan completion | VERIFIED in bounded UI Next scope: [repaired v3 candidate and dated Owner acceptance](../../../ui-next/evidence/20261024-uin-t13-integration.md); attended zero-document fixture remains 1/1 FAIL after Owner Save, separate no-interaction control 1/1 PASS; no separate Owner visual re-review at native125 |
+
+## Source-verified regression anchors
+
+These files exist at the recorded base. Extend them where they cover the changed behavior; do not create redundant tests just to match a planned filename. NEW files in the implementation plan remain proposals until added/discovered.
+
+| Area | Existing app paths relative to repository root |
+|---|---|
+| Error metadata | `tests/MyDmsVn.Server.Application.Tests/CatalogApplicationTests.cs`, `ApiResponseMapperTests.cs` in the same project |
+| VM/session errors | `tests/MyDmsVn.Desktop.Session.Tests/DesktopViewModelBaseTests.cs`, `CatalogViewModelTests.cs`, `FoundationViewModelTests.cs` in that project |
+| Catalog/shell | `tests/MyDmsVn.Desktop.Tests/CatalogControlTests.cs`, `FoundationShellFormTests.cs` |
+| Strict numeric grammar | `tests/MyDmsVn.Desktop.Tests/ReceiptNumericInputTests.cs` |
+| Both inline sessions | `tests/MyDmsVn.Desktop.Tests/GoodsReceiptInlineEditorTests.Sessions.cs`, `SalesReceiptGridTests.cs` |
+| Current R4 and admission | `tests/MyDmsVn.Desktop.Tests/SalesReceiptControlTests.cs`, `SalesReceiptLookupNativeInputTests.cs`, `SalesReceiptControlAdmissionTests.cs` |
+| Accessibility/layout | `tests/MyDmsVn.Desktop.Tests/GoodsReceiptInlineAccessibilityTests.cs`, `SalesReceiptAccessibilityTests.cs`, `BusinessCompactLayoutTests.cs`, `BusinessCompactRefinementTests.Catalog.cs`, `BusinessCompactRefinementTests.Receipt.cs` |
+| Bounded packaged host | `tests/MyDmsVn.Desktop.Tests/PackagedGuiAcceptanceTests.cs`, `PackagedSalesAcceptanceTests.cs`, `GuiOwnedProcessTests.cs` |
+
+Preserve current Sales cases `Resolved_numeric_validation_clears_footer_and_provider_without_clearing_operation_feedback`, `Save_commits_real_numeric_buffer_before_snapshot`, `Post_commits_raw_cell_then_rejects_new_dirty_state_without_post` and `Back_rejects_invalid_raw_edit_without_native_focus_validation_or_loss`. They establish useful regression intent; their existence alone does not establish a run on a future UI Next candidate.
+
+For upstream control/editor work, use the exact test projects and existing anchors named by each task. UI and BSG retain both supported TFMs. Read their current test policies, API baseline and public seam docs; do not copy app-only test commands into an upstream repository or silently drop its compatibility obligations.
+
+## Verification scope by slice
+
+| Change | Select first | Broaden only for |
+|---|---|---|
+| Field metadata/pure scope logic | Focused Application/Session tests and affected build | A changed shared error/session contract affecting other callers |
+| Native binder/host/tab/busy/theme | Focused guarded STA tests and both themes; native DPI cases for changed geometry/input | Shared shell lifecycle or actual package composition affected |
+| New numeric/date parser | Deterministic pure grammar/value/display vectors and legacy compatibility | Changed shared formatter/history seams |
+| Native input and grid adapter | Real per-key native controls, host lifecycle and affected receipt regression | Shared keyboard/popup/clone/editor ownership changes |
+| Staged paste | Pure planner, guarded atomic application and native entry | A demonstrated shared draft-notification/totals risk |
+| Documentation activation | Diff, source/path/link/status/encoding and archive preservation | Executable source/configuration also changes |
+
+A field metadata or theme edit does not select the old SAL six-SQL-owner fresh/reuse programme. No database schema/valuation change is planned. If implementation discovers that it needs such a change, stop that expansion and record a separate scope decision; do not hide it inside a UI task.
+
+### Native interaction and accessibility
+
+Use interactive Windows with serialized guarded STA, finite waits and existing exception/DataError capture. For changed numeric/date/lookup interaction, type actual characters and observe native edit focus, raw candidate, caret/range and committed effects; `.Text = ...`, `WM_SETTEXT` or UIA SetValue alone is not typing proof. Include pending IME composition where the control participates in text entry.
+
+New controls and their affected app composition require Light/Dark at measured native100 and native125. Record actual monitor DPI, client geometry and test kind. Use supported compact content sizes sufficient to expose clipping/focus/errors; do not import the archived wide125 1680-logical visual-reference gate. A missing native context is BLOCKED/NOT RUN for the **new affected cases**, not an excuse to label them passed or to resume the old SAL task.
+
+Keep hosted control tests, actual native-scale observations, actual-Login packaged automation and human observations distinct. Errors need readable text, accessible names/descriptions and keyboard summary navigation; color/ErrorProvider alone is insufficient. Observe focus order, Enter/Escape/Tab once-only behavior and cancel without data loss.
+
+### Commands and discovery
+
+Use source-verified existing projects and actual implemented test names. Restore locked dependencies before `--no-restore`, and rebuild the selected current source before `--no-build`. Examples below are templates, not claimed executions or permanent acceptance counts:
+
+```powershell
+$project = 'tests/MyDmsVn.Desktop.Session.Tests/MyDmsVn.Desktop.Session.Tests.csproj'
+dotnet restore $project --locked-mode
+if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed.' }
+dotnet test $project -c Release -f net48 --no-restore `
+  --filter 'FullyQualifiedName~DesktopViewModelBaseTests|FullyQualifiedName~CatalogViewModelTests' `
+  --logger 'trx;LogFileName=ui-next-session.trx' `
+  --results-directory ('TestResults/ui-next-' + [guid]::NewGuid().ToString('N').Substring(0,8))
+if ($LASTEXITCODE -ne 0) { throw 'Focused session tests failed.' }
+```
+
+Select newly implemented scope/parser cases only after source inspection and nonempty discovery. Follow [tests/README](../../../../tests/README.md) for actual app x86/native execution parameters and resource prerequisites; follow upstream policies for hang protection and dual-target verification. A successful empty filter, skipped mandatory case or compile failure is not PASS or an intended RED.
+
+### Final UIN-T13 scope
+
+Freeze app/vendor/test/package identity. Reconcile A01–A13, then run affected App/Session cases and the changed native UI scenario set on that candidate. Use one complete Desktop.Session run if shared scope/admission changed broadly; select the affected Desktop GUI cases and explicitly justify additional breadth. This does not require an automatic all-ten-project, all-SQL or full historical GUI matrix.
+
+Use bounded actual-Login package smoke for changed composition: Product duplicate Code, Sales/Goods numeric/date admission, tab routing, busy/close and unresolved-outcome presentation. Existing business fixtures may be reused as regressions. SQL-backed smoke keeps the designated non-production connection, positive allocation/token ownership, sequential owners and verified worker/process drain; never substitute production data or automatic prefix cleanup.
+
+Record short attended observations for the new input/feedback/close experience separately from automation and obtain dated bounded Owner disposition. Old SAL attended/native125/frozen acceptance remains open independently. UI Next verification is not release acceptance.
+
+## Evidence record and task-state protocol
+
+Create sanitized records under `docs/ui-next/evidence/YYYYMMDD-uin-tNN-description.md` as work executes. No placeholder file implies a test was run. Each record must contain:
+
+1. Task/acceptance IDs, changed behavior and exact app/UI/BSG/SourceGrid/test/package revisions or hashes.
+2. Environment, target, native DPI/theme/client bounds where relevant, actual commands and selected/discovered/executed cases.
+3. Expected versus observed behavior, PASS/FAIL/BLOCKED/NOT RUN, skips/omissions, original failures and scope of repair runs.
+4. Owned resource/process/SQL cleanup, unresolved resources and sanitized artifacts; no secrets/raw proprietary identifiers.
+5. Compatibility/API/pin changes, remaining limits, review disposition and the next ready task.
+
+Keep implementation state (NOT STARTED / IN PROGRESS / VERIFIED), evidence state and Owner acceptance separate. A partial native100 pass does not close a row with required native125 behavior. A later relevant change invalidates only affected evidence, not every historical run. For pure refactoring, existing characterization can pass before extraction; RED is required for new failure behavior where meaningful, not manufactured by weakening a test.
+
+## Activation handoff
+
+At the original planning boundary all T00–T13 implementation states were NOT STARTED and all A01–A14 runtime states were NOT RUN. T00–T02 and A01–A03 are VERIFIED in their bounded task-owned scope, with [current-candidate evidence](../../../ui-next/evidence/20261023-uin-t00-t02-native-completion.md). T03/A04 are [VERIFIED for current Goods/Sales adapters](../../../ui-next/evidence/20261023-uin-t03-inline-sessions.md) at native100. T04/A05 are [VERIFIED for pure parser/projection and application policy](../../../ui-next/evidence/20261023-uin-t04-decimal-core.md); T05 native control/adapter and receipt pilots are [VERIFIED in their bounded source/native scope](../../../ui-next/evidence/20261023-uin-t05-decimal-entry.md). T13's earlier package automation missed an attended date-field layout defect; the repaired package, passing native100/native125 automation, dated native100 Owner acceptance, retained attended-fixture FAIL after Owner Save and passing no-interaction control are recorded in [T13 evidence](../../../ui-next/evidence/20261024-uin-t13-integration.md). T13/A14 are VERIFIED within this bounded UI Next scope. T06 is [VERIFIED for its bounded source/native scope](../../../ui-next/evidence/20261023-uin-t06-quick-dates.md); T11 still owns nullable Sales filters. T07/A08 are [VERIFIED in bounded source and measured Light/Dark native100/native125 scope](../../../ui-next/evidence/20261023-uin-t07-workspace-close.md). T08/A09 are [VERIFIED in bounded source and measured Light/Dark native100/native125 scope](../../../ui-next/evidence/20261024-uin-t08-busy-host.md). T09/A10 are [VERIFIED in bounded source and measured Light/Dark native100/native125 scope](../../../ui-next/evidence/20261024-uin-t09-semantic-surfaces.md) at supported compact sizes; the archived wide125 BCF reference gate remains separate. T10/A11 are [VERIFIED in bounded source/demo and measured Light/Dark native100/native125 scope](../../../ui-next/evidence/20261024-uin-t10-decimal-dgv.md). The original activation PR contained the source refresh, selected contracts, bounded implementation plan, archive and authority/link updates only.
+
+Before publishing the docs PR, verify exact base/target branch, documentation-only changed paths, six archived plans plus frozen old index, preservation of historical bodies/results except archive notices/link relocation, local links/anchors, proposed API labels, UTF-8 without BOM/CRLF working tree and normalized LF Git blobs. Record actual publication/verification outcomes in the PR; never claim a push or PR before its remote result is confirmed.

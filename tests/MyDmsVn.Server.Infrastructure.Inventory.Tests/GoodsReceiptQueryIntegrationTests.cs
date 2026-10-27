@@ -1,29 +1,37 @@
-using System;
+﻿using System;
+using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dapper;
+using MyDmsVn.Testing.Sql;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application.Inventory;
 using MyDmsVn.Server.DbMigrator;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+[Collection(ApplicationSqlCollectionFixture.CollectionName)]
 public sealed class GoodsReceiptQueryIntegrationTests
 {
-    [SqlServerFact]
-    public async Task Get_returns_complete_aggregate_version_and_inactive_historical_labels()
+    private readonly ApplicationSqlCollectionFixture _fixture;
+    private readonly ITestOutputHelper _output;
+
+    public GoodsReceiptQueryIntegrationTests(ApplicationSqlCollectionFixture fixture, ITestOutputHelper output)
     {
-        var database = await CreateDatabaseAsync();
-        try
+        _fixture = fixture;
+        _output = output;
+    }
+
+    [SqlServerFact]
+    public Task Get_returns_complete_aggregate_version_and_inactive_historical_labels() =>
+        _fixture.RunAsync(nameof(Get_returns_complete_aggregate_version_and_inactive_historical_labels), _output, test => SeedAsync(test.ConnectionString), async (test, seed) =>
         {
-            var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString);
-            using var scope = provider.CreateScope();
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString));
+            var scope = ApplicationSqlCollectionFixture.Track(test, provider.CreateScope());
             var queries = scope.ServiceProvider.GetRequiredService<IGoodsReceiptQueryService>();
 
             var receipt = await queries.GetByIdAsync(seed.Receipt1Id, CancellationToken.None);
@@ -40,22 +48,14 @@ public sealed class GoodsReceiptQueryIntegrationTests
             Assert.Equal("P-QUERY-1 - Query product 1", receipt.Lines[0].ProductDisplayName);
             Assert.False(receipt.Lines[0].ProductIsActive);
             Assert.Null(missing);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
-    public async Task List_is_deterministic_set_based_and_applies_each_filter()
-    {
-        var database = await CreateDatabaseAsync();
-        try
+    public Task List_is_deterministic_set_based_and_applies_each_filter() =>
+        _fixture.RunAsync(nameof(List_is_deterministic_set_based_and_applies_each_filter), _output, test => SeedAsync(test.ConnectionString), async (test, seed) =>
         {
-            var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString);
-            using var scope = provider.CreateScope();
+            var provider = ApplicationSqlCollectionFixture.Track(test, CreateProvider(test.ConnectionString));
+            var scope = ApplicationSqlCollectionFixture.Track(test, provider.CreateScope());
             var queries = scope.ServiceProvider.GetRequiredService<IGoodsReceiptQueryService>();
 
             var firstPage = await queries.ListAsync(
@@ -91,41 +91,45 @@ public sealed class GoodsReceiptQueryIntegrationTests
             Assert.Equal(new[] { seed.Receipt2Id, seed.Receipt1Id }, productSearch.Items.Select(item => item.Id));
             Assert.Equal(3, empty.TotalCount);
             Assert.Empty(empty.Items);
-        }
-        finally
-        {
-            await database.DisposeAsync();
-        }
-    }
+        });
 
     [SqlServerFact]
     public async Task Get_holds_one_revision_while_header_and_lines_are_read()
     {
         var database = await CreateDatabaseAsync();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        ServiceProvider? provider = null;
+        IServiceScope? scope = null;
+        SqlConnection? lineBlocker = null;
+        SqlTransaction? lineBlockerTransaction = null;
+        SqlConnection? observer = null;
+        Task<GoodsReceiptDto?>? read = null;
+        Exception? original = null;
         try
         {
             var seed = await SeedAsync(database.ConnectionString);
-            using var provider = CreateProvider(database.ConnectionString);
-            using var scope = provider.CreateScope();
+            provider = CreateProvider(database.ConnectionString);
+            scope = provider.CreateScope();
             var queries = scope.ServiceProvider.GetRequiredService<IGoodsReceiptQueryService>();
-            using var lineBlocker = new SqlConnection(database.ConnectionString);
-            await lineBlocker.OpenAsync();
-            using var lineBlockerTransaction = lineBlocker.BeginTransaction();
+            lineBlocker = new SqlConnection(database.ConnectionString);
+            await lineBlocker.OpenAsync(cancellation.Token);
+            lineBlockerTransaction = lineBlocker.BeginTransaction();
+            var blockerSession = await NativeSql.Scalar<int>(lineBlocker, lineBlockerTransaction, "SELECT CONVERT(int,@@SPID)");
             await lineBlocker.ExecuteAsync(
                 "UPDATE dbo.GoodsReceiptLines SET Quantity = Quantity + 1 " +
                 "WHERE ReceiptId = @receiptId;",
                 new { receiptId = seed.Receipt1Id },
                 lineBlockerTransaction);
 
-            var read = queries.GetByIdAsync(seed.Receipt1Id, CancellationToken.None);
-            await Task.Delay(150);
-            Assert.False(read.IsCompleted);
+            observer = new SqlConnection(database.ConnectionString);
+            await observer.OpenAsync(cancellation.Token);
+            read = queries.GetByIdAsync(seed.Receipt1Id, cancellation.Token);
+            await WaitForBlockedLineReadAsync(observer, blockerSession, read, cancellation.Token);
+            _output.WriteLine("Native reader blocked on GoodsReceiptLines while holding GoodsReceipts shared lock.");
 
-            using var concurrentUpdate = new SqlConnection(database.ConnectionString);
-            await concurrentUpdate.OpenAsync();
-            await concurrentUpdate.ExecuteAsync("SET LOCK_TIMEOUT 250;");
+            await observer.ExecuteAsync("SET LOCK_TIMEOUT 250;");
             var updateError = await Record.ExceptionAsync(
-                () => concurrentUpdate.ExecuteAsync(
+                () => observer.ExecuteAsync(
                     "UPDATE dbo.GoodsReceipts SET Note = N'concurrent update' " +
                     "WHERE ReceiptId = @receiptId;",
                     new { receiptId = seed.Receipt1Id }));
@@ -141,10 +145,47 @@ public sealed class GoodsReceiptQueryIntegrationTests
             Assert.Equal(seed.Version1, receipt!.Version);
             Assert.Equal(new[] { 2m, 3m }, receipt.Lines.Select(line => line.Quantity));
         }
+        catch (Exception error) { original = error; throw; }
         finally
         {
-            await database.DisposeAsync();
+            try
+            {
+                await SqlConcurrencyCleanup.CompleteAsync(
+                    () => { if (lineBlockerTransaction?.Connection != null) lineBlockerTransaction.Rollback(); return Task.CompletedTask; },
+                    () => { lineBlockerTransaction?.Dispose(); lineBlocker?.Dispose(); },
+                    cancellation,
+                    async () => { scope?.Dispose(); provider?.Dispose(); observer?.Dispose(); await database.DisposeAsync(); },
+                    TimeSpan.FromSeconds(20), read);
+            }
+            catch (Exception cleanup) when (original != null) { throw new AggregateException(original, cleanup); }
         }
+    }
+
+    private static async Task WaitForBlockedLineReadAsync(SqlConnection observer, int blocker, Task read, CancellationToken token)
+    {
+        var watch = Stopwatch.StartNew();
+        while (watch.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            if (read.IsCompleted)
+            {
+                await read;
+                throw new InvalidOperationException("Receipt read finished before the expected line-lock boundary.");
+            }
+            var blocked = await observer.QuerySingleAsync<int>(@"
+SELECT COUNT(*) FROM sys.dm_exec_requests r
+CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+WHERE r.database_id=DB_ID() AND r.blocking_session_id=@blocker AND r.wait_type LIKE 'LCK%'
+AND t.text LIKE '%FROM dbo.GoodsReceiptLines line%' AND t.text LIKE '%FROM dbo.GoodsReceipts gr%'
+AND EXISTS (SELECT 1 FROM sys.dm_tran_locks l JOIN sys.partitions p ON p.hobt_id=l.resource_associated_entity_id
+ WHERE l.request_session_id=r.session_id AND l.request_status IN ('WAIT','CONVERT')
+ AND p.object_id=OBJECT_ID('dbo.GoodsReceiptLines'))
+AND EXISTS (SELECT 1 FROM sys.dm_tran_locks l JOIN sys.partitions p ON p.hobt_id=l.resource_associated_entity_id
+ WHERE l.request_session_id=r.session_id AND l.request_status='GRANT' AND l.request_mode IN ('S','RangeS-S')
+ AND p.object_id=OBJECT_ID('dbo.GoodsReceipts'))", new { blocker });
+            if (blocked == 1) return;
+            await Task.Delay(25, token);
+        }
+        throw new TimeoutException("Receipt reader did not reach the native line-lock boundary while holding its header lock.");
     }
 
     private static ServiceProvider CreateProvider(string connectionString)
@@ -154,22 +195,30 @@ public sealed class GoodsReceiptQueryIntegrationTests
         return services.BuildServiceProvider();
     }
 
-    private static async Task<SqlTestDatabase> CreateDatabaseAsync(
-        [CallerMemberName] string testCaseId = "")
+    private static async Task<SqlTestDatabase> CreateDatabaseAsync()
     {
-        var measurement = SqlTestDatabase.CreateMeasurementContextForTest(testCaseId);
         var database = await SqlTestDatabase.CreateAsync(
-            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!,
-            measurement);
+            Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         try
         {
             var migration = new DatabaseMigrationRunner().Migrate(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.ToString());
             return database;
         }
-        catch
+        catch (Exception setupError)
         {
-            await database.DisposeAsync();
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupError)
+            {
+                throw new AggregateException(
+                    "Test database setup and cleanup both failed.",
+                    setupError,
+                    cleanupError);
+            }
+
             throw;
         }
     }

@@ -1,48 +1,23 @@
-# ADR 0008 — Temporary .NET 8 application and test target pause
+# ADR 0008 — Temporary .NET 8 product target pause
 
-**Status:** Accepted and merged as PR #32 (`8e310778`)
-**Date:** 2026-10-16  
-**Implementation:** [NET8-PAUSE](../plans/20261016-001-task-gates-and-modular-tests-post-with-temporary-remove-net8.md)
-
-## Context
-
-The application and SQL test graph currently repeats compatible work on `net48` and `net8.0`, while shared WinForms code and tests repeat on `net48` and `net8.0-windows`. The strict SQL acceptance path correctly runs each active SQL TFM sequentially, but that makes ordinary Codex feedback expensive. The owner approved the named NET8-PAUSE plan and its candidate-only Stage B transition on 2026-10-16. T01–T05 acceptance passed and PR #32 merged into `main` at `8e310778`; its active `net48` matrix is now the normal matrix on current `main`. Branches created before that merge retain their checked-in target declarations.
-
-The baseline is commit `62a92cf66cc94c71cd0506ad454bb4c8140b49c5`. The detailed project, logical-case and discovery inventory is recorded in [the T01 baseline](../NET8_PAUSE_T01_BASELINE.md).
+**Status:** Accepted and implemented, PR #32 (`8e310778`); current-state clarification 2026-10-18.
+**Original date:** 2026-10-16.
 
 ## Decision
 
-Temporarily make `net48` the only active application, SQL-test and WinForms target. Preserve all modern source and framework-specific branches for restoration.
+The active first-party product, SQL-test and WinForms target is **net48**. Keep Desktop.App as the shipped desktop and DbMigrator as a separate net48 administrator package. AppCore source remains parked outside solution/release; historical product net8/net8-windows cases are PARKED / NOT RUN.
 
-- Change the genuine dual-target application libraries and tests to `net48` only.
-- Keep `MyDmsVn.Desktop.App` as the active desktop host.
-- Park `MyDmsVn.Desktop.AppCore` by removing it from the active solution and release/package matrix without deleting its project or source.
-- Retarget `MyDmsVn.Architecture.Tests` to `net48`, because it directly references application libraries that become `net48` only and uses no required .NET 8-only runtime API.
-- Keep `MyDmsVn.SqlTestRunner` and `MyDmsVn.SqlTestRunner.Tests` on tool-only `net8.0`. Their product dependency is the retained `netstandard2.0` SQL test harness; their fixture-build prerequisite must select active SQL TFMs explicitly and must not make tool-host `net8.0` count as application or SQL coverage.
-- Keep `MyDmsVn.SqlTestHarness` on `netstandard2.0`.
-- Do not modify vendored Bootstrap/SourceGrid projects. The active host consumes their declared `net48` target; their modern targets remain vendor-owned restoration capability.
-- Publish only the `net48` desktop and a `net48` admin migrator during the pause. A modern desktop package is `PARKED / NOT RUN`, never passed.
-- Store the reviewed active and historical framework profiles separately. Strict Task/Final validation compares requested execution frameworks to the active profile and preserves historical logical-case identities without executing or counting them as passed.
+All ten remaining test projects target net48 after the owner's complete removal of the former SQL framework on 2026-10-18. The .NET 8 SDK remains a build dependency; it does not establish modern product coverage. Preserve vendor source/targets and use the appropriate active host references; no vendor rewrite or SDK downgrade is implied.
 
-The Stage B exception was bound only to this plan and implementation candidate. After T01–T05 acceptance and merge, its `net48` matrix became the normal active matrix on current `main`. The owner waived the comparable-duration measurement in `09d00bfa` because no matching dual-TFM baseline exists; it remains unmeasured, and no speedup is claimed. The waiver does not authorize skipped functional, SQL, GUI, packaging or restoration gates, nor unrelated business, schema, security or concurrency changes.
+The owner reaffirmed active net48 when approving L2DB option 3A and the v1a roadmap. Neither Respawn compatibility nor LINQ to DB adoption authorizes modern-target reactivation or a .NET 10 upgrade.
 
-## Re-enable and rollback
+## Evidence and qualification
 
-Reactivation follows [the reviewed procedure](../REACTIVATE_NET8.md): restore recorded dual declarations (`net48;net8.0` and `net48;net8.0-windows`), return AppCore and the modern release package to the active graph, restore dual manifest/profile arrays and runner fixture builds, then execute fresh full dual-TFM SQL, GUI, architecture, build and package acceptance. Historical results are never relabeled as current proof.
+Runtime/build/package/GUI/restoration evidence is recorded in [History](../HISTORY.md). The original candidate-specific Stage B exception has ended. The owner waived the comparable-duration measurement at `09d00bfa` because no matched baseline existed; that is not a measured performance result or a waiver of future functional/ownership checks.
 
-Rollback is required if the tool/reference graph is incoherent, strict inventory guarantees weaken, watchdog or cleanup becomes ambiguous, active release coverage is unacceptable, or the reduced-TFM Final fails. Rollback restores the baseline declarations and gate profile before rerunning affected gates.
+## Reactivation
 
-P7 `Server.Api` and claimed modern WinForms parity remain blocked until .NET 8 is reactivated and freshly verified, unless a separate accepted architecture decision replaces that runtime plan.
+Modern-target reactivation remains an [out-of-scope direction](../DEFERRED_WORK.md#out-of-scope-directions), not an executable backlog or part of BCI. A later owner decision must define a new reviewed plan and its runtime evidence requirements. Preserve net48 unless the owner separately changes that requirement; removing the former reactivation procedure does not reactivate AppCore.
 
-## Alternatives considered
+Current new-work testing follows [TEST_POLICY](../TEST_POLICY.md). This accepted pause does not require rerunning its historical acceptance envelope for unrelated documentation or feature changes.
 
-- Keep dual targeting and rely only on L1/L2 selection: safe but does not deliver the approved target-scope reduction.
-- Retarget the SQL runner to `net48`: rejected because the existing process-tree, inventory and modern tool implementation is already verified on `net8.0`; changing it adds risk without reducing application/SQL execution scope.
-- Keep narrow `net8.0` compatibility builds in application libraries for Architecture tests: rejected because it weakens the requested removal and is unnecessary after retargeting Architecture tests to `net48`.
-- Modify vendor targets: rejected because the repository consumes a valid vendor `net48` target and the plan forbids automatic vendor rewrites.
-
-## Consequences and required tests
-
-The .NET 8 SDK remains required by `global.json` and tool projects. The pause is not a .NET SDK downgrade or permanent runtime deprecation. Active tests must prove the complete `net48` source/discovery/TRX bijection, zero mandatory SQL skips, approved SQL ownership/cleanup, bounded GUI process-tree execution and active Release packaging. Restoration must be drilled in an isolated worktree before acceptance.
-
-Affected documents include `AGENTS.md`, `README.md`, `docs/TECH_STACK.md`, `docs/PROJECT_STRUCTURE.md`, `docs/TEST_STRATEGY.md`, `docs/CODEX_TEST_EXECUTION_POLICY.md`, `docs/TEST_GATE_MATRIX.md`, `tests/README.md`, release guidance and downstream active plans.

@@ -1,124 +1,98 @@
-# Testing strategy and quality gates
+# Test coverage — MyDmsVn
 
-**Roadmap/TFM scope (2026-10-16):** NET8-PAUSE PR #32 merged at `8e310778`; current `main` declares active `net48` application, SQL and GUI targets. `net8.0`/`net8.0-windows` product entries are retained as `PARKED / NOT RUN`. The runner and runner tests remain tool-only `net8.0`. The versioned manifest preserves the historical SQL inventory and binds Final to the active SQL owner on `net48`. T05 runtime/build/package/GUI/restoration gates pass at `6b0ce337`, with reviewer fixes re-verified at `6b2ff49`. The owner waived the duration comparison at `09d00bfa` because no comparable baseline exists; it was not measured, and no speedup is claimed. Branches created before the merge follow their checked-in declarations; restoration follows [REACTIVATE_NET8](REACTIVATE_NET8.md) and requires full dual-target validation.
+**Updated:** 2026-10-25. This document owns behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) owns commands. The [execution index](plans/README.md) selects the authorized follow-up and its scoped verification; successor work requires explicit activation. [UI-NEXT](ui-next/README.md) retains historical candidate evidence rather than a current task queue.
 
-## 1. Test layers
+The [archive boundary](archive/20261023-pre-ui-next/README.md) retires old queues without completing their open acceptance. [SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`; candidate-specific runnable automation passed, while native125, attended observations and dated Owner acceptance remain OPEN. R3/R4 source fixes are reviewed/approved. BCF/BCI/GUI-P5/L2DB/RESP retain their exact historical signed scopes and exceptions.
 
-| Layer | Coverage | Preferred evidence |
+<a id="active-ui-next-coverage"></a>
+
+## Preserved UI behavior
+
+The [UI design/control policy](archive/20261025-pre-next-roadmap/ui-next/20261023-design-and-control-policy.md) and [validation record](archive/20261025-pre-next-roadmap/ui-next/20261023-validation-and-handoff.md) preserve UI-NEXT behavior and candidate-specific evidence. TEST_POLICY selects verification for separately authorized changes; any future plan must be explicitly activated through the execution index. Preserve the following coverage:
+
+- Safe error field metadata survives mapping; field and stable-row cell messages align with invalid visual state and clear correctly without losing raw input. Fieldless errors remain visible; duplicate Product rows and reorder cannot misroute a line error.
+- Feedback belongs to the originating workspace instance/session/document generation. Tab switching, concurrent operations, hidden tabs, close/reopen and logout reject stale callbacks and do not leak protected data or steal focus.
+- Persistent recovery/error state outlives a transient success toast where required. Hidden-host retention and pending-message bounds are explicit; dismissing a visual does not silently resolve a business lock.
+- Busy leases/lifecycle survive nested operations, cancellation and disposal without flicker, premature unlock or stale focus restoration. Query cancellation does not imply mutation rollback. Native keyboard and existing command admission continue to enforce Posted/busy/denied/recovery restrictions.
+- Normal tab close resolves pending edits and honors app-owned dirty/recovery admission before disposal; rejected close retains buffers. Forced session cleanup remains independent of ordinary close veto. Shared close affordances preserve native selection, overflow, keyboard and accessibility semantics.
+- Theme surfaces use semantic tokens while preserving font ownership, high contrast, Light/Dark behavior, DPI/layout and native accessible names/focus. New generic UI APIs preserve the shared library's supported targets and existing toast/input/spinner contracts.
+- DateInput correction preserves caret/selection in the same logical day/month/year segment through repeated Up/Down and short-input normalization; rejected steps preserve text and selection. Unified Compact provides one border and an icon-only calendar trigger before/after opening, selecting and canceling; retain popup/focus/validation behavior and standalone CalendarPicker compatibility. Cover affected hosts, Light/Dark and measured native100/native125 when a changed behavior requires those checks; the historical correction plan is a reference, and design approval remains separate from new-candidate runtime/Owner acceptance.
+
+Use existing Application/Session/WinForms/vendor test owners. Proposed cases/selectors are not runnable until implemented and discovered. Archived SAL-T08, the full six-owner fresh/reuse round and old unfinished acceptance are excluded; broaden only for the actual changed dependency under TEST_POLICY.
+
+## Preserved Sales and inventory behavior
+
+The current source implements exact scale/precision-safe valuation, schema10 and verified exact9 admission, authorized Draft/Post/Get/List, independent duplicate/gift rows, shared receipt/sale/reconciliation locking, immutable Posted costs and filter-bound keyset queries. Preserve transaction atomicity, one economic effect under retries, independent-session concurrency, quantity/value conservation, session generations and uncertain-outcome recovery. [Business](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [SAL acceptance](DIRECT_SALES_ACCEPTANCE.md) retain the source rules and historical evidence; they do not schedule a new SAL integration round.
+
+Inventory remains the existing SQL test owner for sales/value persistence. Do not create a new SQL harness/project or rerun all owners merely because a UI consumer changes.
+
+## Coverage owners
+
+| Area | Current project(s) | Behavior |
 |---|---|---|
-| Architecture | Dependency rules, dual-target compatibility, no HTTP/SQL in Domain or UI | architecture/reference tests + build |
-| Unit (Application) | Validator codes/field names, handler decisions, permission precedence | xUnit/NUnit tests with fakes |
-| Contracts | DTO/JSON golden snapshots, ApiResponse success/failure invariants | shared fixture tests |
-| SQL integration | DbUp scripts, RepoDb mapping, Dapper reads, Explicit UoW, concurrency | SQL Server disposable test DB |
-| Local adapter | same outputs/errors as Application conversion | adapter contract suite |
-| UI | ViewModel commands, binding, error mapping; STA control smoke | Windows STA tests with dialog suppression |
-| Remote HTTP (P7) | auth/status codes, JSON, same business behavior as Local | WebApplicationFactory + SQL test DB |
+| Boundaries/contracts | `MyDmsVn.Architecture.Tests`, `MyDmsVn.Server.Application.Tests` | Reference rules, typed result/JSON semantics, validation, authorization and actor snapshots |
+| Foundation | `MyDmsVn.Server.Infrastructure.Foundation.Tests` | Connection/UoW state, commit/rollback, ownership, provider behavior |
+| Catalog | `MyDmsVn.Server.Infrastructure.Catalog.Tests` | Mapping, CRUD, paging/filtering, constraints and lookups |
+| Inventory | `MyDmsVn.Server.Infrastructure.Inventory.Tests` | Receipt draft/post, optimistic concurrency, ledger/balance/card/reconciliation |
+| Security | `MyDmsVn.Server.Infrastructure.Security.Tests` | SQL identity/permissions, superuser, administration/import, audit |
+| Schema | `MyDmsVn.Server.Infrastructure.Migrations.Tests` | Clean/no-op migration, partial/unknown/future schema, maintenance principals |
+| SQL infrastructure | `MyDmsVn.Server.Infrastructure.IntegrationTests` | Local fresh-database ownership/cleanup, configuration rejection and concurrency probes; inspect source to distinguish real SQL from pure tests |
+| Desktop | `MyDmsVn.Desktop.Session.Tests`, `MyDmsVn.Desktop.Tests` | Pure session/ViewModel behavior and guarded WinForms interaction respectively |
+| Sales UI Lab | `MyDmsVn.Desktop.Ui.Tests` | Focused fake-contract/scenario and native Sales control checks; moved old coverage requires an explicit old → behavior → replacement mapping |
 
-## 2. Cross-target matrix
+Paths are under `tests/`. The A1 Lab adds an eleventh net48 test owner; the ten baseline projects and their historical evidence remain distinct. The former standalone SQL framework and its tests are removed. Historical product .NET 8 coverage is parked. [UI Lab runbook](development/UI_LAB.md) covers its source-bound scenarios and commands.
 
-- `net48` compile/run on Windows with installed Framework 4.8 targeting/runtime.
-- Historical `net8.0` Application, Infrastructure and integration coverage is parked during the pause.
-- Historical `net8.0-windows` WinForms/AppCore coverage is parked; the active GUI gate is bounded `net48` D2.
-- At least one clean Windows build of each host during P0/P6. Do not claim Linux CI proves WinForms parity.
-- Contract DTO tests run for both applicable targets.
+## Persistence and migrations
 
-## 2.1. Test parallelization and isolation policy
+- Clean database applies each reviewed production migration; second unchanged invocation is a no-op. Partial, unmanaged, unknown and future schema states fail according to the manifest.
+- An explicit UoW shares one connection/transaction across repositories and queries; uncommitted reads on that scope see its writes.
+- Two writes commit together; a failure after the first rolls them back; disposal without commit rolls back and releases resources.
+- Independently created UoWs do not exchange connections/transactions. Reject invalid state, nested transactions and use-after-disposal; cancellation has bounded cleanup.
+- Catalog uniqueness, FKs, nullable fields, Unicode/no-NUL rules, SQL error mapping, deterministic filters/paging and inactive historical references remain covered.
+- L2DB mapping/projection changes preserve precision/scale, DateTime handling, identity return values, rowversion bytes, parameterization and null semantics.
 
-The enduring architecture rule is **selective serialization by isolation boundary**, not an assembly-wide ban on parallel tests. SQL integration test execution may be parallelized in a bounded manner after ownership, cleanup and host capacity are proven. The current SQL integration assembly-level `DisableTestParallelization = true` is a temporary fail-safe; **do not remove it as part of an unvalidated optimization**. The separate `Desktop.Tests` guard remains appropriate for GUI-interacting tests until a safe split is demonstrated. See accepted [ADR 0005](adr/0005-test-isolation-and-bounded-parallelism.md).
+## Inventory
 
-| Workload / resource | Preferred policy | Required boundary |
-|---|---|---|
-| Pure Application, Architecture, contract and non-UI ViewModel logic | Preserve xUnit collection-level parallelism by default | No shared mutable process or external state |
-| SQL mapping/CRUD with independently owned disposable databases | Eligible for bounded collection-level parallelism | Each parallel collection owns isolated DB/state, verified disposal and approved instance; resource cap based on evidence |
-| SQL tests using one migrated fixture | Serialize access within the shared mutable fixture unless independently proven safe | Explicit collection ownership, complete reset of data/schema/security/identity/sequence state, drained operations and bounded fixture disposal |
-| SQL migration/history/schema drift, security bootstrap/permissions, locking and special multi-session cases | Use fresh/dedicated resources and selective exclusive execution as needed | Never rely on test-category names alone; prove absence of cross-test interference |
-| Desktop WinForms / focus / mouse / keyboard / message-loop interaction | Serialize GUI-interacting execution; retain current Desktop assembly guard | STA plus deterministic cleanup, dialog suppression and no competing global UI input |
+- Draft save/reload/update observes expected rowversion; stale updates do not replace accepted changes.
+- Posting atomically changes receipt status, adds one movement per line and updates balances.
+- Sequential and concurrent duplicate Post creates no duplicate ledger entries or balance increments.
+- Different receipts posting to the same warehouse/product retain the complete sum; missing-balance-row creation is race-safe.
+- Injected failure after ledger insertion rolls back receipt, ledger and balance together.
+- Unauthorized posting leaves business state unchanged. Posted receipts remain immutable; append-only trigger behavior remains enforced.
+- Balance/card filters, inactive historical references, UTC boundaries, stable ordering and document identity match the contract.
+- Ledger/balance reconciliation observes one consistent database state, detects missing/extra keys, and preserves lock ordering against concurrent Post.
+- Real concurrency tests coordinate independent SQL sessions; collection serialization must not replace those sessions with sequential calls.
 
-A test trait is a **responsibility label**, not permission to run concurrently. xUnit collections coordinate tests inside one assembly; they do not arbitrate SQL instances, GUI focus or fixtures used by separate testhost processes. Configure runner/CI orchestration separately to prevent conflicting cross-process/TFM workloads. Genuine concurrency assertions within one test must still launch the required independent SQL sessions.
+## Permissions, identity and sessions
 
-Before removing or narrowing a serial guard, document the isolation/ownership matrix, maximum active databases/connections, capacity evidence, cancellation and failed-test cleanup, repeatable stress runs on both supported TFMs, and a tested rollback to serial behavior. Treat a timeout, deadlock, contamination, leaked connection or orphaned database as a failed experiment. SQLPERF benchmarks continue to run `net48` and `net8.0` sequentially for comparable measurements; focused and category-filtered runs cannot replace unfiltered SQL release gates.
+- Authentication/active-account checks and code-registry Active status precede authorization, including superuser bypass. Unknown/deprecated keys deny.
+- Configured superuser identity must match the protected current SQL binding; disabled/mismatched accounts fail closed. Administrator is an ordinary role.
+- Ordinary direct Grant/Deny takes precedence over role grants; inactive roles and unassigned permissions deny.
+- New keys change the code catalog without seeding or granting assignments. Registry collisions and missing use-case definitions fail.
+- Administration/import preserves target revisions, catalog digest, protected targets, audit and atomic mutations. Stale preview/target changes are rejected.
+- Legacy hash verification uses approved algorithm vectors; rehash and its failure behavior preserve valid credentials without exposing secret material.
+- Local dispatch captures the admitted actor/generation. Logout/expiry and stale completions do not publish another user's state; already admitted operations retain their actor.
+- No permission-sync, startup seeding or retired bootstrap workflow is reintroduced by documentation cleanup; preserve the existing security boundaries.
 
-## 2.2. Task gates and final full regression
+## RESP reset/lifecycle coverage
 
-**TESTGATE rollout is local-only.** The required final full SQL acceptance is performed on an approved developer/Codex machine; do not introduce a new CI run of that full suite or CI gate enforcement as part of TESTGATE-T01–T05. Existing unrelated CI configuration is unchanged. Future CI participation requires explicit approval; local evidence must continue to satisfy all strict inventory, watchdog and cleanup gates.
+- Compatible package/provider loads in the real net48 test host. Reset works before the first business insert and after populated/failed tests.
+- Migration runs once per reusable fixture. `dbo.SchemaVersions` and allocation ownership proof survive unchanged.
+- Every mutable table is empty or deterministically seeded before the next test, including assignment/binding/security audit tables.
+- The owned reset profile restores/verifies the StockLedger trigger, constraints, sequence contract and baseline identity behavior. Rowversion is treated as opaque and not rewound.
+- Checkpoint belongs to one database/schema profile; metadata drift or unexpected tables/temporal objects reject reuse.
+- Reset/seed/cleanup failure prevents subsequent test bodies from running on a poisoned fixture. Timed-out workers cannot overlap the next test.
+- Independent testhosts allocate distinct owned databases; interrupted allocations require manual operator review. Run SQL projects sequentially and preserve existing assembly guards. Catalog has no assembly guard; its accepted explicit collection serializes every shared-fixture consumer. There is no external lease or automatic orphan recovery.
+- Every original logical test and Theory row remains accounted for. Dedicated migration/schema/principal/fault tests continue to use fresh databases.
 
+## Desktop and release
 
-Every new implementation plan must specify an executable L2 task-gate matrix: changed module/dependencies, test project and TFM, actual reviewed selectors, mandatory real-SQL category/adversarial checks, approval/cleanup constraints and evidence. Codex runs smallest correct focused L1 and affected L2 gates; do **not** default to `dotnet test MyDmsVn.sln` or unfiltered SQL after each task. See [Test Gate Matrix](TEST_GATE_MATRIX.md) and [Codex policy](CODEX_TEST_EXECUTION_POLICY.md).
+Pure ViewModel/session checks use deterministic data and clocks. Controls/message-loop/focus tests use STA and serialized GUI resources with bounded disposal and exception capture. No headless exception, DataError, printer, login or file dialog may stall the testhost.
 
-Plan one complete L3 acceptance envelope only at the final gate-affecting revision after L2 is green. Required **unfiltered SQL for every currently approved active TFM** (`net48` on current `main`; branches created before NET8-PAUSE merged follow their checked-in declarations), GUI watchdog, approval, independent inventory/discovery/TRX, zero mandatory skips and database ownership/cleanup remain intact. An L3 failure or relevant code/test/migration/harness/build/CI edit invalidates affected evidence; focused repair must precede rerunning the applicable full gate. The strict single-pass `pr-acceptance` path and manifest-owned `Invoke-TestGate.ps1` Task/Final orchestration are implemented. T04/T05 module project splits remain in progress. Benchmark repetition is specialized L4, not the default feature gate; ADR 0005 still governs isolation.
+Guarded STA/control tests, real-login packaged GUI Automation E2E with independent SQL assertions, and attended walkthroughs are separate evidence. The completed [GUI-P5 plan](archive/20261023-pre-ui-next/plans/20261019-001-full-winforms-gui-p5-acceptance.md) retains its inventory, bounded process work, sign-offs and T05 Down NOT TESTED exception. The [BCI design](BUSINESS_COMPACT_UI.md) and [acceptance record](BUSINESS_COMPACT_ACCEPTANCE.md) describe implemented inline editing, lookup, focus, accessibility, validation, dirty-state, read-only and session/permission behavior with candidate-specific completed evidence. Preserve that behavior; it is no longer merely proposed. Historical results cannot establish acceptance for another candidate.
 
-## 3. Mandatory SQL scenarios
+**Preserved lookup and inline behavior:** native per-character proof observes raw text, caret/range, focus and committed model effects across response rebinding, cancellation and shared notifications. Whole Text/WM_SETTEXT/UIA assignment is insufficient for a native typing claim. Preserve pending/committed identity, historical options, navigation admission, dirty/numeric/recovery guards, stable row identity, disposal and session replacement. Existing BCF tests are regression tools when affected, not a restarted T00–T06 queue.
 
-1. DbUp clean install and re-run unchanged.
-2. Commit persists two repository writes in the same UoW.
-3. Error on second operation rolls back first.
-4. Dispose without commit rolls back and releases connection.
-5. Dapper within same UoW reads correct uncommitted changes.
-6. Concurrent independent UoWs do not exchange transaction objects/connections.
-7. Posting same Draft twice (sequential and concurrent): only one ledger entry per line and one balance increment.
-8. Concurrent different receipts for same (WarehouseId,ProductId): final balance equals sum.
-9. Transaction failure after ledger insertion leaves both ledger/balance unchanged and receipt Draft.
-10. Stock reconciliation query: computed ledger sum equals materialized balance.
-11. Unique catalog codes and FKs enforced by SQL.
-12. Unauthorized Post leaves all business tables unchanged.
-13. Stock Balance filters/page order are deterministic and preserve readable inactive warehouse/product history.
-14. Stock Card filters by warehouse/product and UTC range, orders by `PostedAtUtc, LedgerId`, and returns stable document identity.
-15. Full P5 slice: create/post a receipt, read the resulting balance/card, reject duplicate Post, and allow a pre-deactivation Draft to post exactly once after all references are reactivated.
+**Historical visual acceptance:** [BCF acceptance](BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md) retains its native contexts, matched references, exact package/test revisions and signed limitations. Select focused theme/layout/input/accessibility evidence for separately authorized changes under TEST_POLICY and any explicitly activated plan; the historical UI-NEXT validation document is a reference and no former broad matrix is inherited automatically. Clean-machine installation, backup/recovery and signed release gates remain [UNACCEPTED / UNSCHEDULED prerequisites](DEFERRED_WORK.md#release-prerequisites).
 
-**Required:** use isolated test database provisioned by test infrastructure with a test-only connection string, not an arbitrary existing database. Do not silently drop an unknown database. If SQL Server unavailable, report SQL tests as **not run**.
-
-## 4. UI hangs / unattended test policy
-
-- WinForms controls must be created/disposed on an STA thread.
-- Register test exception handlers and DataError behavior so failures throw/assert/log instead of opening default modal dialogs.
-- All UI interactions and async operations have deterministic timeouts, cancellation and cleanup.
-- Headless CI should not open a printer dialog, login prompt, unhandled-exception dialog, SaveFileDialog or MessageBox.
-- Record screenshot/UI manual smoke evidence separately; never label it automated.
-
-## 5. Security and contract scenarios
-
-- User direct deny overrides role grant; direct grant overrides lack of role grant.
-- Unknown permission and inactive user fail closed.
-- Legacy migration verifier tested only with approved real/synthetic algorithm fixtures; no plaintext/hashes in logs.
-- ApiResponse JSON casing/nullable behavior, input invalid/mixed errors; for P7 cover HTTP 400/401/403/404/409/500.
-- Local/HTTP parity tests reuse same command/read data and semantic assertions.
-- Inventory Local adapter tests cover both read permissions, validation mapping and the absence of balance/ledger mutation APIs.
-
-## 6. CI / acceptance gate
-
-Before marking a roadmap task complete:
-1. `dotnet restore` (locked when lockfile exists).
-2. `dotnet build ... -c Release` across supported TFMs.
-3. `dotnet test ... -c Release` for eligible test projects.
-4. SQL integration / Windows UI tests in appropriately configured environment.
-5. Document tests executed, skipped and blocked with reasons.
-
-### Progressive Codex execution and evidence
-
-Use the mandatory [Codex Test Execution Policy](CODEX_TEST_EXECUTION_POLICY.md) when implementing subsequent plans. It distinguishes (1) focused inner-loop checks, (2) affected-task validation, (3) final PR acceptance, and (4) specialized release/performance/stress gates. The test scope must expand at the final gate-affecting revision; a focused green run cannot satisfy a required unfiltered full-suite gate. Tests should not be rerun merely to inflate evidence, but earlier regression results become stale after source, test/theory-row, SQL/migration, inventory/manifest, runner/harness, or build/CI changes that can affect discovery, execution, scope, or results. Rerun the applicable complete L3 gates against the final relevant revision.
-
-For code-bearing PRs, the final gate includes supported Release build/tests and full **unfiltered** SQL integration on every manifest-approved active TFM. This Stage B candidate uses only active SQL `net48`; historical net8 is NOT RUN. Supply `-Frameworks @('net48')` to the lower-level strict wrapper when a plan explicitly uses it; candidate acceptance itself remains manifest-owned. No accepted SQL result may rely on missing approval, skips, filters, partial TRX or unverified ownership. `Invoke-SqlIntegrationBenchmark.ps1` remains opt-in L4 and also requires an explicit framework array.
-
-A documentation-only PR with no runtime, test harness, build or CI behavior changes may substitute reviewable static/document checks, explicitly recording the SQL/GUI suites as not run and the reason. Every PR must carry the execution report described in the policy; a code-bearing PR with an environment-blocked required gate is **not verified / not ready for acceptance** and must not have its plan gate checked off. Keep WinForms GUI assembly serialization and resource-based SQL isolation from ADR 0005 unchanged.
-
-## SQL integration measurement safety
-
-SQL integration mutation requires both `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` targeting `master` and an operator-maintained `MYDMSVN_SQL_TEST_APPROVAL_FILE`. The harness verifies the live effective database, exact instance identity/fingerprint, approval lifetime and version-specific DMV permission before DDL. It repeats the live check before teardown. Database ownership is journaled and flushed before creation, corroborated with a database marker and live metadata, and quarantined rather than dropped when ownership is ambiguous.
-
-Use `tests/tools/Invoke-SqlIntegrationBenchmark.ps1 -Frameworks <reviewed-array>` only for plan-triggered SQLPERF measurements. It runs the selected supported TFMs sequentially beneath a Windows Job Object, with unique TRX/timing artifacts and fail-closed reconciliation. The pause profile is `@('net48')`; `@('net48','net8.0')` becomes valid again only after the product SQL target is restored and built.
-
-TRX duration is authoritative inclusive test time. Timing JSONL is opt-in and records explicit create/migration/drop scopes. Reports use interval unions, exclusive attribution, overlap and residual; nested stage durations are never added to TRX or wall-clock. Raw connection strings, hosts, approval data, theory values, journals and local paths must not enter shareable reports. Missing DMV permission/data is reported as unavailable, not zero.
-
-SQL concurrency probes that must pause inside a business transaction use a unique test-only application-lock gate. Acceptance requires independent DMV evidence that the holder waits on the controller's APP lock while retaining the expected business lock, and that the contender waits on the expected non-APP business resource before release. All started SQL operations have bounded cancellation and are drained before the disposable database is torn down; an uncommitted signal row is never the progress condition.
-
-Disposable database connections and production migration sessions are non-pooled. Teardown must not globally clear unrelated client pools; any test that deliberately opts into pooling owns and clears that exact pool. Guarded `SINGLE_USER WITH ROLLBACK IMMEDIATE` and positive ownership reconciliation remain mandatory, including failure/retry and interrupted-migration cases.
-
-Gate SQLPERF-T01 passed on 2026-10-15 at commit `cd3374ff295b86c2e38ea665c16cbbed5b356621`: one warm-up plus three accepted measured runs per TFM executed 213 / 213 cases with no mandatory skips, timing overhead stayed below 5%, and the post-baseline Release regression matrix passed. The sanitized baseline, invalid-run handling, cleanup evidence and limitations are recorded in `docs/SQLPERF_T01_VERIFICATION.md`. Re-establish a matched baseline if the inventory or environment changes materially before evaluating an optimization.
-
-For development iteration, use `tests/tools/Invoke-FocusedSqlIntegrationTests.ps1` with an explicit category and TFM list. The helper performs approval preflight, runs discovery/execution under the owned-process-tree watchdog, writes unique TRX/timing/journal artifacts, reports selected/discovered/executed/skipped counts and performs bounded ownership reconciliation after every launched execution, including timeout or result-gate failure. It restores the approval variable and leaves all other caller-owned harness environment variables unchanged. Valid categories are `FastSQL`, `MigrationSchema`, `SecurityProvisioning` and `SqlConcurrency`. Each non-SQL exemption fingerprint covers its declaring source, same-assembly methods reached through its compiled call graph (including async/iterator state machines), and the project/dependency boundary of reached cross-assembly helpers; relevant changes require review without unrelated source or commit metadata creating drift. The historical dual-target baseline validates both SQL TFM classifications; the current active profile is `net48` on `main`. Any target-selectable runner must validate **every declared and reviewed active SQL TFM** without erasing the historical inventory. Focused success is never a merge/release substitute: **Final requires an unfiltered, sequential pass on every approved active SQL TFM**, with independent source/discovery/expanded Theory-row/TRX reconciliation, zero mandatory skips, SQL approval, watchdog and owned-database cleanup. Branches created before NET8-PAUSE merged follow their checked-in target declarations. The accepted `main` profile uses the full reviewed active `net48` Final plus required GUI/Release gates. Parked `net8.0` results are **NOT RUN**, not PASS; restoration requires fresh dual-TFM acceptance.
-
-SQLPERF-T06 closed on 2026-10-15 at candidate `972674f` against unchanged baseline `2a139c258027f336cb1ded66a071a68c491ce08b`. One warm-up plus three accepted measured runs per TFM improved full-suite median wall-clock by 11.23% on `net48` and 8.56% on `net8.0`, while the candidate inventory increased from 213 to 222 executed cases. The 20–30% engineering target was not achieved; per-test database isolation and serial execution remain the reviewed policy because no safe fixture reset boundary or parallel-capacity evidence exists. Exact commands, matched-inventory analysis, migration-event and ownership reconciliation, rejected-run diagnosis and full Release results are in `docs/SQLPERF_T06_VERIFICATION.md`.
-
-P0 created `MyDmsVn.sln`; these commands are runnable on Windows with the .NET 8 SDK and .NET Framework 4.8 targeting pack. P1 provides guarded isolated test-database infrastructure; SQL scenarios still require the explicit approved non-production configuration above.
-
-Do not weaken a test, delete a failing assertion or skip a platform solely to pass CI. Fix cause or document a real environment dependency and preserve coverage.
+P7 contract/HTTP parity, bearer authentication and modern-target reactivation remain [out of scope](DEFERRED_WORK.md#out-of-scope-directions). Any future activation needs its own approved scope and coverage decision. Do not create an API host to satisfy a test listed here.

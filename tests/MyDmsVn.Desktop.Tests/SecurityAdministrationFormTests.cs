@@ -24,30 +24,28 @@ public sealed class SecurityAdministrationFormTests
             {
                 using var guard = new WinFormsTestGuard();
                 var session = new TestSession();
-                var viewModel = new SecurityAdministrationViewModel(
+                var viewModel = new SecurityWorkspaceViewModel(
                     new FakeAdministrationClient(),
                     new FakeCatalogClient(),
                     session,
-                    new DesktopNotificationCenter());
-                using (var control = new SecurityAdministrationControl(viewModel))
+                    new ImmediateUiDispatcher(),
+                    session.Version);
+                using (var control = new SecurityWorkspaceControl(viewModel))
                 {
                     control.ActivateAsync(CancellationToken.None).GetAwaiter().GetResult();
-                    Assert.NotNull(control.UsersGrid);
-                    Assert.NotNull(control.RolesGrid);
-                    Assert.NotNull(control.PermissionsGrid);
-                    Assert.Equal("Import JSON…", control.ImportPermissionButton.Text);
-                    Assert.True(control.IsPasswordMasked);
-                    Assert.True(control.ImportPermissionButton.Enabled);
+                    Assert.Single(control.Users.Items);
+                    Assert.Single(control.Roles.Items);
+                    Assert.Single(control.PermissionCatalog.Keys.Rows);
+                    Assert.True(control.PermissionCatalog.Keys.ReadOnly);
                     Assert.True(guard.FatalErrorDialogsSuppressed);
-                    guard.Attach(control.PermissionsGrid);
+                    guard.Attach(control.PermissionCatalog.Keys);
                     var expected = new InvalidOperationException("invalid permission row");
                     typeof(DataGridView).GetMethod("OnDataError", BindingFlags.Instance | BindingFlags.NonPublic)!
-                        .Invoke(control.PermissionsGrid, new object[]
+                        .Invoke(control.PermissionCatalog.Keys, new object[]
                         {
                             false,
                             new DataGridViewDataErrorEventArgs(expected, 0, 0, DataGridViewDataErrorContexts.Commit),
                         });
-                    Assert.Equal("The selected value is invalid.", control.StatusText);
                     Assert.Same(expected, Assert.Single(guard.DrainExceptions()));
                     Assert.Empty(guard.DrainExceptions());
                 }
@@ -77,9 +75,24 @@ public sealed class SecurityAdministrationFormTests
                     new EmptyInventoryFactory(),
                     securityFactory);
 
-                Assert.NotNull(shell.OpenSecurityAdministration());
+                var first = shell.OpenSecurityAdministration();
+                Assert.NotNull(first);
                 Assert.Single(shell.Workspace.TabPages);
+                var firstControl = Assert.IsType<SecurityWorkspaceControl>(
+                    Assert.IsType<WorkspaceFeedbackHost>(first!.Controls[0]).Content);
+                Assert.True(shell.Workspace.IsTabClosable(first));
+                shell.RequestWorkspaceCloseAsync(first).GetAwaiter().GetResult();
+                Assert.True(firstControl.IsDisposed);
+                Assert.Empty(shell.Workspace.TabPages);
+
+                var second = shell.OpenSecurityAdministration();
+                Assert.NotNull(second);
+                Assert.NotSame(first, second);
+                var secondControl = Assert.IsType<SecurityWorkspaceControl>(
+                    Assert.IsType<WorkspaceFeedbackHost>(second!.Controls[0]).Content);
+                Assert.NotSame(firstControl, secondControl);
                 shell.SignOut();
+                Assert.True(secondControl.IsDisposed);
                 Assert.Empty(shell.Workspace.TabPages);
                 Assert.Null(shell.OpenSecurityAdministration());
                 Assert.Empty(guard.DrainExceptions());
@@ -89,6 +102,7 @@ public sealed class SecurityAdministrationFormTests
 
     private sealed class FakeAdministrationClient : ISecurityAdministrationApiClient
     {
+        public ISecurityAdministrationApiClient ForSession(long expectedSessionVersion) => this;
         public Task<ApiResponse<IReadOnlyList<SecurityUserDto>>> ListUsersAsync(CancellationToken cancellationToken) =>
             Task.FromResult(ApiResponse<IReadOnlyList<SecurityUserDto>>.Success(new[]
             {
@@ -126,6 +140,7 @@ public sealed class SecurityAdministrationFormTests
 
     private sealed class FakeCatalogClient : IPermissionCatalogApiClient
     {
+        public IPermissionCatalogApiClient ForSession(long expectedSessionVersion) => this;
         public Task<ApiResponse<PermissionCatalogDto>> GetCatalogAsync(CancellationToken cancellationToken) =>
             Task.FromResult(ApiResponse<PermissionCatalogDto>.Success(new PermissionCatalogDto(
                 "1.0.0.0",
@@ -152,11 +167,12 @@ public sealed class SecurityAdministrationFormTests
             _notifications = notifications;
         }
 
-        public Control Create() => new SecurityAdministrationControl(new SecurityAdministrationViewModel(
-            new FakeAdministrationClient(),
-            new FakeCatalogClient(),
+        public Control Create() => new SecurityWorkspaceControl(new SecurityWorkspaceViewModel(
+            new FakeAdministrationClient().ForSession(_session.Version),
+            new FakeCatalogClient().ForSession(_session.Version),
             _session,
-            _notifications));
+            new ImmediateUiDispatcher(),
+            _session.Version));
     }
 
     private sealed class EmptyCatalogFactory : ICatalogControlFactory

@@ -17,6 +17,11 @@ public sealed class StockReconciliationDifference
     public decimal LedgerQuantity { get; set; }
 
     public decimal BalanceQuantity { get; set; }
+    public decimal LedgerValue { get; set; }
+    public decimal BalanceValue { get; set; }
+    private readonly List<string> _issues = new List<string>();
+    public IReadOnlyList<string> Issues => _issues.AsReadOnly();
+    public void AddIssue(string issue) { if (!_issues.Contains(issue)) _issues.Add(issue); }
 }
 
 public interface IStockReconciliationQueryService

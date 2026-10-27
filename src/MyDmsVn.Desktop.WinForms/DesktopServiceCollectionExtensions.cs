@@ -34,6 +34,7 @@ namespace MyDmsVn.Desktop.WinForms
             services.AddTransient<LoginForm>();
             services.AddTransient<ICatalogControlFactory, CatalogControlFactory>();
             services.AddTransient<IGoodsReceiptControlFactory, GoodsReceiptControlFactory>();
+            services.AddTransient<ISalesReceiptControlFactory, SalesReceiptControlFactory>();
             services.AddTransient<IInventoryControlFactory, InventoryControlFactory>();
             services.AddTransient<ISecurityAdministrationControlFactory, SecurityAdministrationControlFactory>();
             services.AddTransient<FoundationShellForm>();
@@ -46,34 +47,35 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ISecurityAdministrationApiClient _administration;
         private readonly IPermissionCatalogApiClient _catalog;
         private readonly IDesktopSession _session;
-        private readonly IDesktopNotificationService _notifications;
-        private readonly IDesktopExceptionReporter? _exceptionReporter;
+        private readonly IUiDispatcher _dispatcher;
 
         public SecurityAdministrationControlFactory(
             ISecurityAdministrationApiClient administration,
             IPermissionCatalogApiClient catalog,
             IDesktopSession session,
-            IDesktopNotificationService notifications,
-            IDesktopExceptionReporter? exceptionReporter = null)
+            IUiDispatcher dispatcher)
         {
             _administration = administration;
             _catalog = catalog;
             _session = session;
-            _notifications = notifications;
-            _exceptionReporter = exceptionReporter;
+            _dispatcher = dispatcher;
         }
 
-        public Control Create() => new SecurityAdministrationControl(
-            new SecurityAdministrationViewModel(
-                _administration,
-                _catalog,
+        public Control Create()
+        {
+            var ownerVersion = _session.Version;
+            return new SecurityWorkspaceControl(new SecurityWorkspaceViewModel(
+                _administration.ForSession(ownerVersion),
+                _catalog.ForSession(ownerVersion),
                 _session,
-                _notifications,
-                _exceptionReporter));
+                _dispatcher,
+                ownerVersion));
+        }
     }
 
     internal sealed class CatalogControlFactory : ICatalogControlFactory
     {
+        private readonly IDesktopSession _session;
         private readonly IProductApiClient _products;
         private readonly IWarehouseApiClient _warehouses;
         private readonly IEmployeeApiClient _employees;
@@ -85,6 +87,7 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly IAsyncDelay _delay;
 
         public CatalogControlFactory(
+            IDesktopSession session,
             IProductApiClient products,
             IWarehouseApiClient warehouses,
             IEmployeeApiClient employees,
@@ -95,6 +98,7 @@ namespace MyDmsVn.Desktop.WinForms
             IDesktopExceptionReporter exceptionReporter,
             IAsyncDelay delay)
         {
+            _session = session;
             _products = products;
             _warehouses = warehouses;
             _employees = employees;
@@ -108,44 +112,47 @@ namespace MyDmsVn.Desktop.WinForms
 
         public Control Create(CatalogKind kind)
         {
+            var scope = new WorkspaceFeedbackScope(_session.Version, () => _session.Version);
+            var notifications = new WorkspaceFeedbackNotificationService(scope);
+            CatalogControl Build(CatalogControl control) { control.AttachFeedback(scope, notifications); return control; }
             switch (kind)
             {
                 case CatalogKind.Product:
-                    return new CatalogControl(
+                    return Build(new CatalogControl(
                         new ProductCatalogViewModel(
                             _products,
                             _messenger,
                             _dispatcher,
-                            _notifications,
+                            notifications,
                             _delay,
-                            exceptionReporter: _exceptionReporter));
+                            exceptionReporter: _exceptionReporter)));
                 case CatalogKind.Warehouse:
-                    return new CatalogControl(
+                    return Build(new CatalogControl(
                         new WarehouseCatalogViewModel(
                             _warehouses,
                             _messenger,
                             _dispatcher,
-                            _notifications,
+                            notifications,
                             _delay,
-                            exceptionReporter: _exceptionReporter));
+                            exceptionReporter: _exceptionReporter)));
                 case CatalogKind.Employee:
-                    return new CatalogControl(
+                    return Build(new CatalogControl(
                         new EmployeeCatalogViewModel(
                             _employees,
                             _messenger,
                             _dispatcher,
-                            _notifications,
+                            notifications,
                             _delay,
-                            exceptionReporter: _exceptionReporter));
+                            exceptionReporter: _exceptionReporter)));
                 case CatalogKind.Customer:
-                    return new CatalogControl(
+                    return Build(new CatalogControl(
                         new CustomerCatalogViewModel(
                             _customers,
                             _messenger,
                             _dispatcher,
-                            _notifications,
+                            notifications,
                             _delay,
-                            exceptionReporter: _exceptionReporter));
+                            exceptionReporter: _exceptionReporter)));
                 default:
                     throw new ArgumentOutOfRangeException(nameof(kind));
             }

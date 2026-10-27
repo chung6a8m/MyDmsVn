@@ -24,10 +24,16 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ICatalogControlFactory? _catalogControlFactory;
         private readonly IGoodsReceiptControlFactory? _goodsReceiptControlFactory;
         private readonly IInventoryControlFactory? _inventoryControlFactory;
+        private readonly ISalesReceiptControlFactory? _salesReceiptControlFactory;
         private readonly ISecurityAdministrationControlFactory? _securityAdministrationControlFactory;
         private readonly int _uiThreadId;
+        private readonly WorkspaceCloseCoordinator _closeCoordinator;
+        private CancellationTokenSource _workspaceCloseLifetime = new CancellationTokenSource();
         private long? _workspaceSessionVersion;
         private bool _openingWorkspace;
+        private bool _disposedResources;
+        private Button? _themeButton;
+        private Label? _sessionUserLabel;
 
         public FoundationShellForm(FoundationViewModel viewModel)
             : this(viewModel, null, null, null, null, null, null, true)
@@ -124,6 +130,14 @@ namespace MyDmsVn.Desktop.WinForms
         {
         }
 
+        public FoundationShellForm(FoundationViewModel viewModel, IDesktopSession session,
+            IDesktopNotificationService notifications, ICatalogControlFactory catalogControlFactory,
+            IGoodsReceiptControlFactory goodsReceiptControlFactory, IInventoryControlFactory inventoryControlFactory,
+            ISecurityAdministrationControlFactory securityAdministrationControlFactory, ISalesReceiptControlFactory salesReceiptControlFactory)
+            : this(viewModel, session, notifications, catalogControlFactory, goodsReceiptControlFactory, inventoryControlFactory,
+                securityAdministrationControlFactory)
+        { _salesReceiptControlFactory = salesReceiptControlFactory ?? throw new ArgumentNullException(nameof(salesReceiptControlFactory)); }
+
         private FoundationShellForm(
             FoundationViewModel viewModel,
             IDesktopSession? session,
@@ -142,22 +156,33 @@ namespace MyDmsVn.Desktop.WinForms
             _inventoryControlFactory = inventoryControlFactory;
             _securityAdministrationControlFactory = securityAdministrationControlFactory;
             _uiThreadId = Thread.CurrentThread.ManagedThreadId;
+            _closeCoordinator = new WorkspaceCloseCoordinator((state, token) => ClosePrompt!(state, token));
+            ClosePrompt = (state, token) =>
+            {
+                if (token.IsCancellationRequested) return System.Threading.Tasks.Task.FromResult(WorkspaceCloseChoice.Cancel);
+                var answer = MessageBox.Show(this, "Save changes before closing this workspace?", "Close workspace",
+                    MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button3);
+                return System.Threading.Tasks.Task.FromResult(answer == DialogResult.Yes ? WorkspaceCloseChoice.Save :
+                    answer == DialogResult.No ? WorkspaceCloseChoice.Discard : WorkspaceCloseChoice.Cancel);
+            };
 
             Text = "MyDmsVn";
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(900, 600);
             Size = new Size(1200, 760);
             AutoScaleMode = AutoScaleMode.Dpi;
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(BootstrapThemeManager.CurrentTheme.Mode);
 
             Navigation = CreateNavigation();
             Navigation.SelectedItemChanged += OnNavigationSelectedItemChanged;
-            Workspace = new BootstrapTabControl
+            Workspace = new BusinessCompactWorkspaceTabs
             {
                 Dock = DockStyle.Fill,
             };
             Workspace.SelectedIndexChanged += OnWorkspaceSelectedIndexChanged;
+            Workspace.TabCloseRequested += OnTabCloseRequested;
 
-            var topBar = CreateTopBar();
+            CreateSessionArea();
             var statusBar = new BootstrapStatusStrip
             {
                 Dock = DockStyle.Bottom,
@@ -168,7 +193,7 @@ namespace MyDmsVn.Desktop.WinForms
                 Spring = true,
                 TextAlign = ContentAlignment.MiddleLeft,
             };
-            _currentUserLabel = new ToolStripStatusLabel("Not signed in");
+            _currentUserLabel = new ToolStripStatusLabel("Not signed in") { Visible = false };
             _busyIndicator = new ToolStripProgressBar
             {
                 Style = ProgressBarStyle.Marquee,
@@ -178,10 +203,10 @@ namespace MyDmsVn.Desktop.WinForms
             statusBar.Items.Add(_statusLabel);
             statusBar.Items.Add(_busyIndicator);
             statusBar.Items.Add(_currentUserLabel);
+            statusBar.Items.Add(new ToolStripStatusLabel("Local mode"));
 
             Controls.Add(Workspace);
             Controls.Add(Navigation);
-            Controls.Add(topBar);
             Controls.Add(statusBar);
 
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
@@ -197,11 +222,13 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 _notifications.NotificationPublished += OnNotificationPublished;
             }
+            BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+            BusinessCompactAppearance.Apply(this);
         }
 
         public FoundationViewModel ViewModel => _viewModel;
 
-        public BootstrapSidebar Navigation { get; }
+        public BusinessCompactNavigation Navigation { get; }
 
         public BootstrapTabControl Workspace { get; }
 
@@ -212,6 +239,8 @@ namespace MyDmsVn.Desktop.WinForms
         public bool BusyIndicatorVisible => _busyIndicator.Available;
 
         public long WorkspaceSessionVersion => _session?.Version ?? 0;
+
+        internal Func<WorkspaceCloseState, CancellationToken, System.Threading.Tasks.Task<WorkspaceCloseChoice>> ClosePrompt { get; set; }
 
         public TabPage? OpenCatalog(CatalogKind kind)
         {
@@ -244,6 +273,21 @@ namespace MyDmsVn.Desktop.WinForms
             {
                 _openingWorkspace = false;
             }
+        }
+
+        public TabPage? OpenSalesReceipts()
+        {
+            if (_salesReceiptControlFactory == null) return null;
+            const string key = "sales-receipts";
+            _openingWorkspace = true;
+            try
+            {
+                if (_documents.TryGetValue(key, out var existing))
+                { Workspace.SelectedTab = existing; ActivateWorkspace(existing); return existing; }
+                var page = OpenWorkspace(key, "Sales Receipts", _salesReceiptControlFactory.Create(), WorkspaceSessionVersion);
+                ActivateWorkspace(page); return page;
+            }
+            finally { _openingWorkspace = false; }
         }
 
         public TabPage? OpenGoodsReceipts()
@@ -360,9 +404,23 @@ namespace MyDmsVn.Desktop.WinForms
                 Name = key,
             };
             content.Dock = DockStyle.Fill;
-            page.Controls.Add(content);
+            var scope = content is CatalogControl catalogContent ? catalogContent.FeedbackScope :
+                content is SalesReceiptControl salesContent ? salesContent.FeedbackScope :
+                content is GoodsReceiptControl goodsContent ? goodsContent.FeedbackScope :
+                content is StockBalanceControl balanceContent ? balanceContent.FeedbackScope :
+                content is StockCardControl cardContent ? cardContent.FeedbackScope :
+                new WorkspaceFeedbackScope(sessionVersion);
+            var feedbackHost = new WorkspaceFeedbackHost(content, scope) { Dock = DockStyle.Fill };
+            feedbackHost.AttentionChanged += (_, __) =>
+            {
+                if (page.IsDisposed) return;
+                page.Text = title + (feedbackHost.HasAttention ? " !" : string.Empty);
+                page.AccessibleDescription = feedbackHost.HasAttention ? "Unread workspace error" : string.Empty;
+            };
+            page.Controls.Add(feedbackHost);
             _documents.Add(key, page);
             Workspace.TabPages.Add(page);
+            Workspace.SetTabClosable(page, true);
             Workspace.SelectedTab = page;
 
             if (!IsWorkspaceRequestCurrent(sessionVersion))
@@ -384,6 +442,12 @@ namespace MyDmsVn.Desktop.WinForms
             _currentUserLabel.Text = string.IsNullOrWhiteSpace(displayName)
                 ? "Not signed in"
                 : displayName;
+            if (_sessionUserLabel != null)
+            {
+                _sessionUserLabel.AccessibleName = _currentUserLabel.Text;
+                _sessionUserLabel.Text = Navigation.Expanded ? _currentUserLabel.Text : "●";
+                Navigation.SetToolTip(_sessionUserLabel, CurrentUserText);
+            }
         }
 
         public void ToggleTheme()
@@ -391,7 +455,7 @@ namespace MyDmsVn.Desktop.WinForms
             var nextMode = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light
                 ? BootstrapThemeMode.Dark
                 : BootstrapThemeMode.Light;
-            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(nextMode);
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(nextMode);
         }
 
         public void SignOut()
@@ -413,6 +477,7 @@ namespace MyDmsVn.Desktop.WinForms
         protected override void OnHandleCreated(EventArgs eventArgs)
         {
             base.OnHandleCreated(eventArgs);
+            UpdateThemeDescription();
             ApplyViewModelState();
             if (_session != null)
             {
@@ -428,11 +493,17 @@ namespace MyDmsVn.Desktop.WinForms
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
+            if (disposing && !_disposedResources)
             {
+                _disposedResources = true;
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+                BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
                 Navigation.SelectedItemChanged -= OnNavigationSelectedItemChanged;
                 Workspace.SelectedIndexChanged -= OnWorkspaceSelectedIndexChanged;
+                Workspace.TabCloseRequested -= OnTabCloseRequested;
+                CloseAllWorkspaces();
+                _workspaceCloseLifetime.Cancel();
+                _workspaceCloseLifetime.Dispose();
                 if (_session != null)
                 {
                     _session.SessionChanged -= OnSessionChanged;
@@ -442,6 +513,7 @@ namespace MyDmsVn.Desktop.WinForms
                 {
                     _notifications.NotificationPublished -= OnNotificationPublished;
                 }
+                _viewModel.Dispose();
             }
 
             base.Dispose(disposing);
@@ -457,12 +529,23 @@ namespace MyDmsVn.Desktop.WinForms
             DispatchToUi(() => SetStatus(notification.Message));
         }
 
+        private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs eventArgs) =>
+            DispatchToUi(UpdateThemeDescription);
+
+        private void UpdateThemeDescription()
+        {
+            if (_themeButton != null && !_themeButton.IsDisposed)
+                _themeButton.AccessibleDescription = "Current theme: " + BootstrapThemeManager.CurrentTheme.Mode;
+        }
+
         private void OnNavigationSelectedItemChanged(object? sender, EventArgs eventArgs)
         {
             if (Navigation.SelectedItem?.Tag is CatalogKind kind)
             {
                 OpenCatalog(kind);
             }
+            else if (string.Equals(Navigation.SelectedItem?.Tag as string, "sales-receipts", StringComparison.Ordinal))
+            { OpenSalesReceipts(); }
             else if (string.Equals(
                 Navigation.SelectedItem?.Tag as string,
                 "goods-receipts",
@@ -501,25 +584,83 @@ namespace MyDmsVn.Desktop.WinForms
             }
         }
 
+        private void OnTabCloseRequested(object? sender, TabCloseRequestedEventArgs request)
+        {
+            _ = RequestWorkspaceCloseAsync(request.Page);
+        }
+
+        internal async System.Threading.Tasks.Task RequestWorkspaceCloseAsync(TabPage page)
+        {
+            if (page == null || IsDisposed || Disposing) return;
+            var key = page.Name;
+            if (!_documents.TryGetValue(key, out var current) || !ReferenceEquals(current, page)) return;
+            var sessionVersion = WorkspaceSessionVersion;
+            var token = _workspaceCloseLifetime.Token;
+            var content = WorkspaceContent(page);
+            WorkspaceCloseDecision decision;
+            if (content is IWorkspaceCloseParticipant participant)
+                decision = await _closeCoordinator.RequestCloseAsync(participant, token);
+            else
+                decision = token.IsCancellationRequested ? WorkspaceCloseDecision.KeepOpen : WorkspaceCloseDecision.Admitted;
+            if (decision != WorkspaceCloseDecision.Admitted || token.IsCancellationRequested) return;
+            await InvokeOnUiAsync(() =>
+            {
+                if (IsDisposed || Disposing || token.IsCancellationRequested || !IsWorkspaceRequestCurrent(sessionVersion) ||
+                    !_documents.TryGetValue(key, out var stillOpen) || !ReferenceEquals(stillOpen, page)) return;
+                _documents.Remove(key);
+                Workspace.TabPages.Remove(page);
+                page.Dispose();
+                if (Navigation.SelectedItem?.Tag is CatalogKind selectedKind)
+                {
+                    if (string.Equals(key, "catalog-" + selectedKind.ToString().ToLowerInvariant(), StringComparison.Ordinal))
+                        Navigation.SelectedItem = null;
+                }
+                else if (string.Equals(Navigation.SelectedItem?.Tag as string, key, StringComparison.Ordinal))
+                    Navigation.SelectedItem = null;
+            }, token);
+        }
+
+        private async System.Threading.Tasks.Task InvokeOnUiAsync(Action action, CancellationToken token)
+        {
+            if (Thread.CurrentThread.ManagedThreadId == _uiThreadId) { action(); return; }
+            if (!IsHandleCreated || IsDisposed || Disposing) return;
+            var done = new System.Threading.Tasks.TaskCompletionSource<bool>(
+                System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+            using var registration = token.Register(() => done.TrySetResult(false));
+            try
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    try { if (!IsDisposed && !Disposing) action(); done.TrySetResult(true); }
+                    catch (Exception error) { done.TrySetException(error); }
+                }));
+            }
+            catch (InvalidOperationException) { done.TrySetResult(false); }
+            await done.Task.ConfigureAwait(false);
+        }
+
+        private static Control? WorkspaceContent(TabPage? page) => page?.Controls.Count > 0 ?
+            (page.Controls[0] is WorkspaceFeedbackHost host ? host.Content : page.Controls[0]) : null;
+
         private static void ActivateWorkspace(TabPage? page)
         {
             ActivateCatalog(page);
-            if (page?.Controls.Count > 0 && page.Controls[0] is GoodsReceiptControl goodsReceipts)
+            if (WorkspaceContent(page) is GoodsReceiptControl goodsReceipts)
             {
                 _ = goodsReceipts.ActivateAsync(CancellationToken.None);
             }
 
-            if (page?.Controls.Count > 0 && page.Controls[0] is StockBalanceControl balances)
+            if (WorkspaceContent(page) is StockBalanceControl balances)
             {
                 _ = balances.ActivateAsync(CancellationToken.None);
             }
 
-            if (page?.Controls.Count > 0 && page.Controls[0] is StockCardControl card)
+            if (WorkspaceContent(page) is StockCardControl card)
             {
                 _ = card.ActivateAsync(CancellationToken.None);
             }
 
-            if (page?.Controls.Count > 0 && page.Controls[0] is IActivatableDesktopControl activatable)
+            if (WorkspaceContent(page) is IActivatableDesktopControl activatable)
             {
                 _ = activatable.ActivateAsync(CancellationToken.None);
             }
@@ -527,7 +668,7 @@ namespace MyDmsVn.Desktop.WinForms
 
         private static void ActivateCatalog(TabPage? page)
         {
-            if (page?.Controls.Count > 0 && page.Controls[0] is CatalogControl catalog)
+            if (WorkspaceContent(page) is CatalogControl catalog)
             {
                 _ = catalog.ActivateAsync(CancellationToken.None);
             }
@@ -611,6 +752,10 @@ namespace MyDmsVn.Desktop.WinForms
 
         private void CloseAllWorkspaces()
         {
+            var previousLifetime = _workspaceCloseLifetime;
+            _workspaceCloseLifetime = new CancellationTokenSource();
+            previousLifetime.Cancel();
+            previousLifetime.Dispose();
             var pages = new TabPage[_documents.Count];
             _documents.Values.CopyTo(pages, 0);
             Workspace.TabPages.Clear();
@@ -638,48 +783,26 @@ namespace MyDmsVn.Desktop.WinForms
             _notifications.Publish(new DesktopNotification(kind, message));
         }
 
-        private static BootstrapSidebar CreateNavigation()
+        private static BusinessCompactNavigation CreateNavigation()
         {
-            var navigation = new BootstrapSidebar
+            var navigation = new BusinessCompactNavigation
             {
                 Dock = DockStyle.Left,
-                ExpandedWidth = 240,
+                ExpandedWidth = 224,
                 CollapsedWidth = 64,
             };
-            navigation.Items.Add(
-                new BootstrapSidebarItem
-                {
-                    Text = "Foundation",
-                    Tag = "foundation",
-                });
-            navigation.Items.Add(new BootstrapSidebarItem { Text = "Products", Tag = CatalogKind.Product });
-            navigation.Items.Add(new BootstrapSidebarItem { Text = "Warehouses", Tag = CatalogKind.Warehouse });
-            navigation.Items.Add(new BootstrapSidebarItem { Text = "Employees", Tag = CatalogKind.Employee });
-            navigation.Items.Add(new BootstrapSidebarItem { Text = "Customers", Tag = CatalogKind.Customer });
-            navigation.Items.Add(
-                new BootstrapSidebarItem
-                {
-                    Text = "Goods Receipts",
-                    Tag = "goods-receipts",
-                });
-            navigation.Items.Add(
-                new BootstrapSidebarItem
-                {
-                    Text = "Tồn kho",
-                    Tag = "stock-balances",
-                });
-            navigation.Items.Add(
-                new BootstrapSidebarItem
-                {
-                    Text = "Thẻ kho",
-                    Tag = "stock-card",
-                });
-            navigation.Items.Add(
-                new BootstrapSidebarItem
-                {
-                    Text = "Security administration",
-                    Tag = "security-administration",
-                });
+            void Add(string text, object tag, string group, string icon) => navigation.Items.Add(
+                new BusinessCompactNavigationItem { Text = text, Tag = tag, Group = group, Icon = BusinessCompactIcons.For(icon) });
+            Add("Products", CatalogKind.Product, "Catalog", "product");
+            Add("Warehouses", CatalogKind.Warehouse, "Catalog", "warehouse");
+            Add("Employees", CatalogKind.Employee, "Catalog", "employee");
+            Add("Customers", CatalogKind.Customer, "Catalog", "customer");
+            Add("Sales Receipts", "sales-receipts", "Sales", "receipt");
+            Add("Goods Receipts", "goods-receipts", "Inventory", "receipt");
+            Add("Tồn kho", "stock-balances", "Inventory", "balance");
+            Add("Thẻ kho", "stock-card", "Inventory", "card");
+            Add("Foundation", "foundation", "System", "foundation");
+            Add("Security administration", "security-administration", "System", "security");
             return navigation;
         }
 
@@ -734,28 +857,35 @@ namespace MyDmsVn.Desktop.WinForms
             }
         }
 
-        private BootstrapToolStrip CreateTopBar()
+        private void CreateSessionArea()
         {
-            var topBar = new BootstrapToolStrip
-            {
-                Dock = DockStyle.Top,
-                GripStyle = ToolStripGripStyle.Hidden,
-            };
-            var title = new ToolStripLabel("MyDmsVn");
-            var themeButton = new ToolStripButton("Light / Dark")
-            {
-                Alignment = ToolStripItemAlignment.Right,
-            };
+            _sessionUserLabel = new Label { Name = "CompactUser", AccessibleName = "Not signed in", AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
+            var themeButton = new BusinessCompactIconButton("theme") { Name = "ThemeToggle", AccessibleName = "Theme toggle", AccessibleRole = AccessibleRole.PushButton };
+            _themeButton = themeButton;
             themeButton.Click += (_, _) => ToggleTheme();
-            var signOutButton = new ToolStripButton("Sign out")
-            {
-                Alignment = ToolStripItemAlignment.Right,
-            };
+            var signOutButton = new BusinessCompactIconButton("signout") { AccessibleName = "Sign out" };
             signOutButton.Click += (_, _) => SignOut();
-            topBar.Items.Add(title);
-            topBar.Items.Add(signOutButton);
-            topBar.Items.Add(themeButton);
-            return topBar;
+            Navigation.SessionArea.Controls.Add(_sessionUserLabel);
+            Navigation.SessionArea.Controls.Add(themeButton);
+            Navigation.SessionArea.Controls.Add(signOutButton);
+            Navigation.SetToolTip(themeButton, "Switch Light / Graphite theme");
+            Navigation.SetToolTip(signOutButton, "Sign out");
+            void LayoutSession()
+            {
+                var expanded = Navigation.Expanded;
+                int S(int value) => BusinessCompactAppearance.Scale(Navigation, value);
+                Navigation.SessionArea.Height = S(expanded ? 88 : 128);
+                _sessionUserLabel.SetBounds(S(12), S(4), Navigation.Width - S(24), S(30));
+                _sessionUserLabel.Text = expanded ? _sessionUserLabel.AccessibleName : "●";
+                themeButton.SetBounds(S(8), S(40), S(expanded ? 96 : 44), S(32));
+                signOutButton.SetBounds(S(expanded ? 108 : 8), S(expanded ? 40 : 80), S(expanded ? 108 : 44), S(32));
+                themeButton.Text = expanded ? "Theme" : "";
+                signOutButton.Text = expanded ? "Sign out" : "";
+                themeButton.Padding = signOutButton.Padding = new Padding(S(expanded ? 36 : 0), 0, 0, 0);
+            }
+            Navigation.SizeChanged += (_, _) => LayoutSession();
+            LayoutSession();
+            UpdateThemeDescription();
         }
     }
 }

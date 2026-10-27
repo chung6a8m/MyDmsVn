@@ -20,6 +20,7 @@ namespace MyDmsVn.Desktop.Tests
 
         public WinFormsTestGuard()
         {
+            GuiTestSafety.ThrowIfPoisoned();
             var requestedErrorMode =
                 GetThreadErrorMode() | FailCriticalErrors | NoGeneralProtectionFaultErrorBox;
             if (!SetThreadErrorMode(requestedErrorMode, out _previousThreadErrorMode))

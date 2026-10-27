@@ -13,9 +13,9 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly IProductApiClient _products;
         private readonly IMessenger _messenger;
         private readonly IUiDispatcher _dispatcher;
-        private readonly IDesktopNotificationService _notifications;
         private readonly IDesktopExceptionReporter _exceptionReporter;
         private readonly IAsyncDelay _delay;
+        private readonly IDesktopSession? _session;
 
         public GoodsReceiptControlFactory(
             IGoodsReceiptApiClient receipts,
@@ -26,7 +26,8 @@ namespace MyDmsVn.Desktop.WinForms
             IUiDispatcher dispatcher,
             IDesktopNotificationService notifications,
             IDesktopExceptionReporter exceptionReporter,
-            IAsyncDelay delay)
+            IAsyncDelay delay,
+            IDesktopSession? session = null)
         {
             _receipts = receipts ?? throw new ArgumentNullException(nameof(receipts));
             _warehouses = warehouses ?? throw new ArgumentNullException(nameof(warehouses));
@@ -34,18 +35,21 @@ namespace MyDmsVn.Desktop.WinForms
             _products = products ?? throw new ArgumentNullException(nameof(products));
             _messenger = messenger ?? throw new ArgumentNullException(nameof(messenger));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
-            _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
+            if (notifications == null) throw new ArgumentNullException(nameof(notifications));
             _exceptionReporter = exceptionReporter ??
                 throw new ArgumentNullException(nameof(exceptionReporter));
             _delay = delay ?? throw new ArgumentNullException(nameof(delay));
+            _session = session;
         }
 
         public Control Create()
         {
+            var feedback = new WorkspaceFeedbackNotificationService(new WorkspaceFeedbackScope(
+                _session?.Version ?? 0, _session == null ? null : () => _session.Version));
             var list = new GoodsReceiptListViewModel(
                 _receipts,
                 _dispatcher,
-                _notifications,
+                feedback,
                 _delay,
                 exceptionReporter: _exceptionReporter);
             var editor = new GoodsReceiptEditorViewModel(
@@ -54,27 +58,27 @@ namespace MyDmsVn.Desktop.WinForms
                     new WarehouseCatalogLookupSource(_warehouses),
                     _messenger,
                     _dispatcher,
-                    _notifications,
+                    feedback,
                     _delay,
                     exceptionReporter: _exceptionReporter),
                 new CatalogLookupViewModel(
                     new EmployeeCatalogLookupSource(_employees),
                     _messenger,
                     _dispatcher,
-                    _notifications,
+                    feedback,
                     _delay,
                     exceptionReporter: _exceptionReporter),
                 new GoodsReceiptProductOptionsViewModel(
                     new ProductCatalogLookupSource(_products),
                     _messenger,
                     _dispatcher,
-                    _notifications,
+                    feedback,
                     _delay,
                     exceptionReporter: _exceptionReporter),
                 _dispatcher,
-                _notifications,
+                feedback,
                 _exceptionReporter);
-            return new GoodsReceiptControl(list, editor);
+            return new GoodsReceiptControl(list, editor, feedback);
         }
     }
 }

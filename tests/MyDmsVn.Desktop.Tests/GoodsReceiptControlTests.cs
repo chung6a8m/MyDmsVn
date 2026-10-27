@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -8,12 +8,206 @@ using CommunityToolkit.Mvvm.Messaging;
 using MyDmsVn.Contracts;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.WinForms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using Xunit;
 
 namespace MyDmsVn.Desktop.Tests
 {
-    public sealed class GoodsReceiptControlTests
+    public sealed partial class GoodsReceiptControlTests
     {
+        internal static string MeasureGoodsEditingPerformance()
+        {
+            using var fixture = new Fixture();
+            using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+            using var form = new Form { Width = 1000, Height = 650 };
+            form.Controls.Add(control); form.Show(); System.Windows.Forms.Application.DoEvents();
+            fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+            control.ActivateAsync(default).GetAwaiter().GetResult();
+            control.SelectReceiptAsync(41, default).GetAwaiter().GetResult();
+            while (fixture.Editor.Lines.Count < 25) fixture.Editor.AddLine();
+            var line = fixture.Editor.Lines[12];
+            var grid = (GoodsReceiptLinesGrid)control.LineGrid;
+            var adapter = (GoodsReceiptLinesGridAdapter)typeof(GoodsReceiptControl)
+                .GetField("_inline", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(control)!;
+            var refresh = adapter.GetType().GetMethod("RefreshProjection", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var events = 0; var invalidations = 0;
+            fixture.Editor.PropertyChanged += (_, __) => events++;
+            grid.Invalidated += (_, __) => invalidations++;
+            var edits = new List<double>(); var editBytes = new List<double>();
+            var projections = new List<double>(); var projectionBytes = new List<double>();
+            for (var repetition = 0; repetition < 14; ++repetition)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                adapter.SetAccessibleValue(adapter.AccessibleGeneration, line, 2, repetition % 2 == 0 ? "2.5" : "3.5");
+                watch.Stop();
+                if (repetition >= 2) { edits.Add(watch.Elapsed.TotalMilliseconds); editBytes.Add(GC.GetAllocatedBytesForCurrentThread() - before); }
+                before = GC.GetAllocatedBytesForCurrentThread(); watch.Restart();
+                refresh.Invoke(adapter, null);
+                watch.Stop();
+                if (repetition >= 2) { projections.Add(watch.Elapsed.TotalMilliseconds); projectionBytes.Add(GC.GetAllocatedBytesForCurrentThread() - before); }
+            }
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            string Distribution(List<double> values)
+            {
+                var sorted = values.OrderBy(value => value).ToArray();
+                return "p50=" + sorted[(int)Math.Ceiling(sorted.Length * .5) - 1].ToString("F2") +
+                    ",p95=" + sorted[(int)Math.Ceiling(sorted.Length * .95) - 1].ToString("F2");
+            }
+            int CountControls(Control parent) => 1 + parent.Controls.Cast<Control>().Sum(CountControls);
+            return "Goods lines=25; edit/commit=" + Distribution(edits) + "; bytes=" + Distribution(editBytes) +
+                "; projection=" + Distribution(projections) + "; projectionBytes=" + Distribution(projectionBytes) +
+                "; editorEvents=" + events + "; gridInvalidations=" + invalidations + "; retainedControls=" + CountControls(form);
+        }
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void Numeric_paste_command_applies_goods_quantity_and_cost_without_write_api_call(BootstrapThemeMode mode)
+        {
+            StaTest.Run(token =>
+            {
+                var original = BootstrapThemeManager.CurrentTheme;
+                try
+                {
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                    using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                    using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                    using var form = new Form { Width = 1000, Height = 650 };
+                    form.Controls.Add(control); form.Show(); System.Windows.Forms.Application.DoEvents();
+                    fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                    control.ActivateAsync(token).GetAwaiter().GetResult();
+                    control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();
+                    var grid = (GoodsReceiptLinesGrid)control.LineGrid;
+                    var adapter = (GoodsReceiptLinesGridAdapter)typeof(GoodsReceiptControl)
+                        .GetField("_inline", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(control)!;
+                    grid.Selection.ResetSelection(false);
+                    grid.Selection.SelectRange(new SourceGrid.Range(new SourceGrid.Position(1, 2), new SourceGrid.Position(1, 3)), true);
+                    Assert.True(adapter.TryPasteNumeric("2\t7"), adapter.EditError);
+                    Assert.Equal(2m, fixture.Editor.Lines[0].Quantity);
+                    Assert.Equal(7m, fixture.Editor.Lines[0].UnitCost);
+                    Assert.Equal(0, fixture.Api.CreateCalls);
+                    Assert.Null(fixture.Api.LastUpdate);
+                    Assert.Null(fixture.Api.LastPost);
+                    var revision = fixture.Editor.EditRevision;
+                    grid.Selection.ResetSelection(false);
+                    grid.Selection.SelectCell(new SourceGrid.Position(1, 4), true); // Read-only total.
+                    Assert.False(adapter.TryPasteNumeric("9"));
+                    Assert.Equal(revision, fixture.Editor.EditRevision);
+                    Assert.Equal(7m, fixture.Editor.Lines[0].UnitCost);
+                    Console.WriteLine(UiNextNativeScaleObservation.Observe(form, token));
+                    Assert.Empty(guard.Exceptions);
+                }
+                finally { BootstrapThemeManager.CurrentTheme = original; }
+            }, TimeSpan.FromSeconds(15));
+        }
+        [Fact]
+        public void Factory_goods_query_failure_is_visible_in_its_own_workspace()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                var globalNotices = 0;
+                fixture.Notifications.NotificationPublished += (_, __) => globalNotices++;
+                var factory = new GoodsReceiptControlFactory(fixture.Api,
+                    new WarehouseCatalogClient(fixture.WarehouseSource),
+                    new EmployeeCatalogClient(fixture.EmployeeSource),
+                    new ProductCatalogClient(fixture.ProductSource), fixture.Messenger,
+                    new ImmediateUiDispatcher(), fixture.Notifications,
+                    new InventoryControlTests.SilentReporter(), new ImmediateDelay());
+                var control = Assert.IsType<GoodsReceiptControl>(factory.Create());
+                using var host = new WorkspaceFeedbackHost(control, control.FeedbackScope);
+                using var form = new Form { Width = 900, Height = 600 };
+                form.Controls.Add(host); form.Show(); System.Windows.Forms.Application.DoEvents();
+                fixture.Api.ListError = new ApiError(ApiStatusCode.Forbidden, "Auth.Forbidden", "Goods denied.");
+
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                System.Windows.Forms.Application.DoEvents();
+
+                Assert.True(host.Alert.Visible);
+                Assert.Contains("Support ID:", host.Alert.Text);
+                Assert.Equal(BootstrapTextRole.Danger, Assert.IsType<BootstrapLabel>(control.OperationStatusLabel).TextRole);
+                Assert.Equal(0, globalNotices);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(20));
+        }
+
+        [Fact]
+        public void Close_state_detects_dirty_draft_and_clean_posted_receipt()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                Assert.Equal(BootstrapSurfaceRole.Surface,
+                    Assert.IsType<BootstrapPanel>(Assert.Single(control.Controls.Find("GoodsDetailSurface", true))).SurfaceRole);
+                Assert.Equal(BootstrapTextRole.Muted, Assert.IsType<BootstrapLabel>(control.PageLabel).TextRole);
+                fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();
+                Assert.False(control.CaptureCloseState().IsDirty);
+                fixture.Editor.Note = "unsaved";
+                Assert.True(control.CaptureCloseState().IsDirty);
+                Assert.True(control.CaptureCloseState().CanSave);
+                fixture.Editor.Load(ReceiptApiClient.Receipt(status: "Posted"));
+                Assert.False(control.CaptureCloseState().IsDirty);
+                Assert.False(control.CaptureCloseState().CanSave);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(15));
+        }
+
+        [Fact]
+        public void Save_for_close_returns_goods_write_and_current_revision()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.SelectReceiptAsync(41, token).GetAwaiter().GetResult();
+                fixture.Editor.Note = "unsaved";
+                var outcome = control.SaveForCloseAsync(token).GetAwaiter().GetResult();
+                Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+                Assert.Equal(control.CaptureCloseState().Revision, outcome.SubmittedRevision);
+                Assert.False(control.CaptureCloseState().IsDirty);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(15));
+        }
+
+        [Fact]
+        public void Newer_goods_edit_during_close_save_keeps_receipt_dirty_and_revision_mismatched()
+        {
+            StaTest.Run(token =>
+            {
+                using var guard = new WinFormsTestGuard(); using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.NewButton.PerformClick();
+                fixture.Editor.SetWarehouse(3, "W3 - Main", true);
+                fixture.Editor.SetEmployee(5, "E5 - Operator", true);
+                var line = fixture.Editor.AddLine();
+                line.SetProduct(7, "P7 - Product 7", true);
+                line.Quantity = 1m; line.UnitCost = 2m;
+                fixture.Editor.Note = "submitted";
+                fixture.Api.ControlCreateResponse = true;
+
+                var pending = control.SaveForCloseAsync(token);
+                Assert.Equal(1, fixture.Api.CreateCalls);
+                fixture.Editor.Note = "newer edit";
+                fixture.Api.CompleteCreate();
+                PumpMessagesUntil(() => pending.IsCompleted, TimeSpan.FromSeconds(2));
+                var outcome = pending.GetAwaiter().GetResult();
+
+                Assert.Equal(WorkspaceSaveStatus.Saved, outcome.Status);
+                Assert.True(outcome.RefreshFailed);
+                Assert.NotEqual(control.CaptureCloseState().Revision, outcome.SubmittedRevision);
+                Assert.True(control.CaptureCloseState().IsDirty);
+                Assert.Equal("newer edit", fixture.Editor.Note);
+                Assert.Empty(guard.Exceptions);
+            }, TimeSpan.FromSeconds(15));
+        }
+
         [Fact]
         public void Activation_and_selection_render_master_detail_lookups_total_and_read_only_state()
         {
@@ -30,7 +224,8 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(2, control.ReceiptGrid.RowsCount);
                         Assert.Equal("GR0000000041", control.ReceiptGrid[1, 1].Value);
                         Assert.Equal(2, control.LineGrid.RowsCount);
-                        Assert.Equal("P7 - Product 7", control.LineGrid[1, 1].Value);
+                        Assert.Equal(7, control.LineGrid[1, 1].Value);
+                        Assert.Equal("P7 - Product 7", fixture.Editor.Lines[0].ProductDisplayName);
                         Assert.Equal("10.00", control.TotalLabel.Text);
                         Assert.Equal("Posted", control.StatusLabel.Text);
                         Assert.Equal("AQIDBAUGBwg=", control.VersionLabel.Text);
@@ -129,12 +324,8 @@ namespace MyDmsVn.Desktop.Tests
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
                         control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
 
-                        Assert.Equal(4, control.QuantityEditor.DecimalPlaces);
-                        Assert.Equal(GoodsReceiptContractLimits.MaximumQuantity, control.QuantityEditor.Maximum);
-                        Assert.Equal(1.2345m, control.QuantityEditor.Value);
-                        Assert.Equal(4, control.UnitCostEditor.DecimalPlaces);
-                        Assert.Equal(GoodsReceiptContractLimits.MaximumUnitCost, control.UnitCostEditor.Maximum);
-                        Assert.Equal(0.1234m, control.UnitCostEditor.Value);
+                        Assert.Equal(1.2345m, InlineReceiptTestDriver.Value(control, 2));
+                        Assert.Equal(0.1234m, InlineReceiptTestDriver.Value(control, 3));
 
                         control.SaveButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
@@ -147,28 +338,49 @@ namespace MyDmsVn.Desktop.Tests
                 TimeSpan.FromSeconds(10));
         }
 
-        [Fact]
-        public void In_flight_activation_disables_commands_until_the_list_finishes()
+        [Theory]
+        [InlineData(BootstrapThemeMode.Light)]
+        [InlineData(BootstrapThemeMode.Dark)]
+        public void In_flight_activation_disables_commands_until_the_list_finishes(BootstrapThemeMode mode)
         {
             StaTest.Run(
                 cancellationToken =>
                 {
-                    using (var fixture = new Fixture())
-                    using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                    var original = BootstrapThemeManager.CurrentTheme;
+                    try
                     {
-                        fixture.Api.ControlListResponse = true;
+                        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                        using (var fixture = new Fixture())
+                        using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
+                        using (var form = new Form { ClientSize = new System.Drawing.Size(1000, 700) })
+                        {
+                            form.Controls.Add(control);
+                            form.Show();
+                            fixture.Api.ControlListResponse = true;
 
-                        var activation = control.ActivateAsync(cancellationToken);
+                            var activation = control.ActivateAsync(cancellationToken);
 
-                        Assert.False(control.RefreshButton.Enabled);
-                        Assert.False(control.ReceiptGrid.Enabled);
-                        Assert.True(control.BusyIndicator.Visible);
-                        fixture.Api.CompleteList();
-                        PumpMessagesUntil(() => activation.IsCompleted, TimeSpan.FromSeconds(2));
-                        activation.GetAwaiter().GetResult();
-                        Assert.True(control.RefreshButton.Enabled);
-                        Assert.False(control.BusyIndicator.Visible);
+                            var split = Assert.Single(control.Controls.OfType<SplitContainer>());
+                            var busyHost = Assert.Single(split.Panel1.Controls.OfType<BootstrapBusyHost>());
+                            Assert.Contains(control.ReceiptGrid, busyHost.Content.Controls.Cast<Control>());
+                            var overlay = Assert.Single(busyHost.Controls.OfType<Panel>(),
+                                item => !ReferenceEquals(item, busyHost.Content));
+                            Console.WriteLine(UiNextNativeScaleObservation.Observe(form, cancellationToken));
+                            PumpMessagesUntil(() => overlay.Visible, TimeSpan.FromSeconds(2));
+                            Assert.True(overlay.Visible);
+                            Assert.False(busyHost.Contains(control.RefreshButton));
+                            Assert.False(control.RefreshButton.Enabled);
+                            Assert.False(control.ReceiptGrid.Enabled);
+                            Assert.True(control.BusyIndicator.Visible);
+                            fixture.Api.CompleteList();
+                            PumpMessagesUntil(() => activation.IsCompleted, TimeSpan.FromSeconds(2));
+                            activation.GetAwaiter().GetResult();
+                            Assert.True(control.RefreshButton.Enabled);
+                            Assert.False(overlay.Visible);
+                            Assert.False(control.BusyIndicator.Visible);
+                        }
                     }
+                    finally { BootstrapThemeManager.CurrentTheme = original; }
                 },
                 TimeSpan.FromSeconds(10));
         }
@@ -235,25 +447,54 @@ namespace MyDmsVn.Desktop.Tests
                     using (var fixture = new Fixture())
                     using (var control = new GoodsReceiptControl(fixture.List, fixture.Editor))
                     {
+                        fixture.Api.CurrentReceipt = ReceiptApiClient.Receipt(status: "Draft");
+                        using var form = new Form { Size = new System.Drawing.Size(1500, 850) };
+                        form.Controls.Add(control);
+                        form.Show();
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
                         control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
 
                         control.WarehouseLookup.Text = "remote warehouse";
                         control.LastOperation.GetAwaiter().GetResult();
                         Assert.Equal("remote warehouse", fixture.WarehouseSource.Requests.Last().Search);
+                        Assert.Equal("remote warehouse", control.WarehouseLookup.Text);
+                        Assert.True(control.WarehouseLookup.HasPendingText);
 
                         control.EmployeeLookup.Text = "remote employee";
                         control.LastOperation.GetAwaiter().GetResult();
                         Assert.Equal("remote employee", fixture.EmployeeSource.Requests.Last().Search);
+                        Assert.Equal("remote employee", control.EmployeeLookup.Text);
+                        Assert.True(control.EmployeeLookup.HasPendingText);
 
+                        BeginInline(control, 1);
                         control.ProductLookup.Text = "remote product";
                         control.LastOperation.GetAwaiter().GetResult();
                         Assert.Equal("remote product", fixture.ProductSource.Requests.Last().Search);
+                        Assert.Equal("remote product", control.ProductLookup.Text);
+                        Assert.True(control.ProductLookup.HasPendingText);
                     }
                 },
                 TimeSpan.FromSeconds(10));
         }
 
+        [Fact]
+        public void Explicit_new_discards_uncommitted_lookup_text_in_an_unsaved_empty_draft()
+        {
+            StaTest.Run(token =>
+            {
+                using var fixture = new Fixture();
+                using var control = new GoodsReceiptControl(fixture.List, fixture.Editor);
+                control.ActivateAsync(token).GetAwaiter().GetResult();
+                control.WarehouseLookup.Text = "remote warehouse";
+                control.LastOperation.GetAwaiter().GetResult();
+                Assert.True(control.WarehouseLookup.HasPendingText);
+                Assert.Null(fixture.Editor.WarehouseId);
+                control.NewButton.PerformClick();
+                Assert.Empty(control.WarehouseLookup.Text);
+                Assert.False(control.WarehouseLookup.HasPendingText);
+                Assert.Null(control.WarehouseLookup.SelectedValue);
+            }, TimeSpan.FromSeconds(10));
+        }
         [Fact]
         public void Receipt_line_keeps_a_historical_product_selected_outside_the_active_page()
         {
@@ -272,8 +513,8 @@ namespace MyDmsVn.Desktop.Tests
                         control.ActivateAsync(cancellationToken).GetAwaiter().GetResult();
                         control.SelectReceiptAsync(41, cancellationToken).GetAwaiter().GetResult();
 
-                        Assert.Equal(99, control.ProductLookup.SelectedValue);
-                        Assert.Equal("P99 - Historical product", control.ProductLookup.CommittedDisplayText);
+                        Assert.Equal(99, control.LineGrid[1, 1].Value);
+                        Assert.Equal("P99 - Historical product", fixture.Editor.Lines[0].ProductDisplayName);
                     }
                 },
                 TimeSpan.FromSeconds(10));
@@ -382,7 +623,7 @@ namespace MyDmsVn.Desktop.Tests
 
                         control.SaveButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
-                        control.QuantityEditor.Value = 9.125m;
+                        InlineReceiptTestDriver.SetValue(control, 2, 9.125m);
                         control.SaveButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
 
@@ -449,7 +690,7 @@ namespace MyDmsVn.Desktop.Tests
 
                         control.RefreshButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
-                        control.UnitCostEditor.Value = 7.4321m;
+                        InlineReceiptTestDriver.SetValue(control, 3, 7.4321m);
                         control.SaveButton.PerformClick();
                         control.LastOperation.GetAwaiter().GetResult();
 
@@ -574,6 +815,7 @@ namespace MyDmsVn.Desktop.Tests
                     Assert.Equal(2, fixture.Api.ListCalls);
 
                     control.Dispose();
+                    Assert.True(control.VersionLabel.IsDisposed);
 
                     Assert.Throws<ObjectDisposedException>(
                         (Action)(() => _ = fixture.List.RefreshAsync(CancellationToken.None)));
@@ -646,7 +888,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
                         Assert.Equal(3, control.WarehouseLookup.SelectedValue);
                         Assert.Equal(5, control.EmployeeLookup.SelectedValue);
-                        Assert.Equal(7, control.ProductLookup.SelectedValue);
+                        Assert.Equal(7, control.LineGrid[1, 1].Value);
 
                         warehouseControl.ActivateButton.PerformClick();
                         warehouseControl.LastOperation.GetAwaiter().GetResult();
@@ -666,7 +908,7 @@ namespace MyDmsVn.Desktop.Tests
                         Assert.Equal(7, fixture.Editor.Lines.Single().ProductId);
                         Assert.Equal(3, control.WarehouseLookup.SelectedValue);
                         Assert.Equal(5, control.EmployeeLookup.SelectedValue);
-                        Assert.Equal(7, control.ProductLookup.SelectedValue);
+                        Assert.Equal(7, control.LineGrid[1, 1].Value);
                         Assert.Empty(guard.Exceptions);
                     }
                 },
@@ -722,6 +964,8 @@ namespace MyDmsVn.Desktop.Tests
             public LookupSource(CatalogKind kind) => Kind = kind;
             public CatalogKind Kind { get; }
             public bool SelectedIsActive { get; set; } = true;
+            public bool HoldQueries { get; set; }
+            public List<TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>> Pending { get; } = new List<TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>>();
             public IList<CatalogLookupRequest> Requests { get; } = new List<CatalogLookupRequest>();
 
             public Task<ApiResponse<IReadOnlyList<CatalogLookupDto>>> LookupAsync(
@@ -729,6 +973,12 @@ namespace MyDmsVn.Desktop.Tests
                 CancellationToken cancellationToken)
             {
                 Requests.Add(request);
+                if (HoldQueries)
+                {
+                    var pending = new TaskCompletionSource<ApiResponse<IReadOnlyList<CatalogLookupDto>>>();
+                    Pending.Add(pending);
+                    return pending.Task; // Deliberately ignores cancellation to exercise generation fences.
+                }
                 return Task.FromResult(
                     ApiResponse<IReadOnlyList<CatalogLookupDto>>.Success(
                         new[] { new CatalogLookupDto(Kind == CatalogKind.Product ? 7 : 3, Kind.ToString(), "Choice", SelectedIsActive) }));
@@ -829,6 +1079,7 @@ namespace MyDmsVn.Desktop.Tests
             public ApiError? GetError { get; set; }
             public int GetCalls { get; private set; }
             public GoodsReceiptDto CurrentReceipt { get; set; } = Receipt();
+            public IReadOnlyList<GoodsReceiptDto>? ListRows { get; set; }
             public UpdateGoodsReceiptDraftRequest? LastUpdate { get; private set; }
             public PostGoodsReceiptRequest? LastPost { get; private set; }
             public int CreateCalls { get; private set; }
@@ -848,7 +1099,7 @@ namespace MyDmsVn.Desktop.Tests
                         ApiResponse<PagedResult<GoodsReceiptDto>>.Failure(ListError));
                 }
                 var response = ApiResponse<PagedResult<GoodsReceiptDto>>.Success(
-                    new PagedResult<GoodsReceiptDto>(new[] { CurrentReceipt }, request.PageNumber, 25, 30));
+                    new PagedResult<GoodsReceiptDto>(ListRows ?? new[] { CurrentReceipt }, request.PageNumber, 25, 30));
                 if (!ControlListResponse)
                 {
                     return Task.FromResult(response);
