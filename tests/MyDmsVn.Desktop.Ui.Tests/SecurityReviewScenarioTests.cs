@@ -19,6 +19,77 @@ namespace MyDmsVn.Desktop.Ui.Tests;
 public sealed class SecurityReviewScenarioTests
 {
     [Fact]
+    public void Account_dialog_tracks_product_theme_while_open()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, _) =>
+        {
+            var previous = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+            ExceptionDispatchInfo? failure = null;
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo người dùng");
+                if (dialog == null) return;
+                try
+                {
+                    var field = dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<TextBox>().First();
+                    field.Text = "review text";
+                    field.Select(2, 4);
+                    foreach (var mode in new[] { MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark, MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Light })
+                    {
+                        MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(mode);
+                        Assert.Same(field, dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<TextBox>().First());
+                        Assert.Equal(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Colors.Surface, field.BackColor);
+                        Assert.Equal(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme.Colors.Text, field.ForeColor);
+                        Assert.Equal("Segoe UI", field.Font.Name);
+                        Assert.Equal(10f, field.Font.SizeInPoints);
+                        Assert.Equal("review text", field.Text);
+                        Assert.Equal(2, field.SelectionStart);
+                        Assert.Equal(4, field.SelectionLength);
+                    }
+                }
+                catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
+                finally { timer.Stop(); dialog.Close(); }
+            };
+            try
+            {
+                timer.Start();
+                control.UserDetail.HeaderActions.Controls.OfType<Button>().Single(button => button.Text == "Tạo người dùng…").PerformClick();
+                Assert.False(timer.Enabled, "Account dialog did not open.");
+                failure?.Throw();
+            }
+            finally { timer.Stop(); MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme = previous; }
+        });
+
+    [Fact]
+    public void Disposed_dialog_is_not_retained_by_theme_subscription()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (_, _) =>
+        {
+            var previous = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                var root = CreateDisposedAppearanceRoot();
+                MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme =
+                    BusinessCompactAppearance.CreateTheme(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                Assert.False(root.IsAlive, "A disposed dialog remains rooted after changing the theme.");
+            }
+            finally { MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme = previous; }
+        });
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference CreateDisposedAppearanceRoot()
+    {
+        var dialog = new Form();
+        dialog.Controls.Add(new TextBox());
+        BusinessCompactAppearance.Apply(dialog);
+        var reference = new WeakReference(dialog);
+        dialog.Dispose();
+        return reference;
+    }
+
+    [Fact]
     public void Held_password_conflict_can_be_released_from_its_modal_without_repeating_the_secret()
         => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L03, (_, _) =>
         {

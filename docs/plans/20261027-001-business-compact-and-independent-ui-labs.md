@@ -1,6 +1,6 @@
 # Business Compact conformance and independent UI Labs — active roadmap
 
-**Selected:** 2026-10-27 · **Status:** ACTIVE / UIL-T00 documentation complete; runtime implementation NOT STARTED · **Task prefix:** `UIL`
+**Selected:** 2026-10-27 · **Status:** ACTIVE / UIL-T00 and UIL-T01 complete; UIL-T02 IN PROGRESS · **Task prefix:** `UIL`
 **Inspected source:** [`main@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9), after [PR #53](https://github.com/chung6a8m/MyDmsVn/pull/53).
 **Goal:** Make Business Compact and the pinned WinFormsKit the repeatable basis for UI work, and let Sales and Security be launched and reviewed independently in an environment that reproduces the product's presentation.
 **Architecture:** Two thin net48 WinExe launchers; the existing UI Lab project becomes a shared library with neutral host infrastructure and separately owned module forms/tools. Keep the current production WinForms assembly, one scenario assembly and one UI test assembly initially. Both Labs use the product's theme/bootstrap and real production controls with fake ports.
@@ -53,8 +53,8 @@ The ledger records current task progress; native decision cells remain `NOT APPR
 | Task | Deliverable | Depends on | Implementation / evidence | Owner decision |
 |---|---|---|---|---|
 | UIL-T00 | Current control inventory, exceptions and repo UI workflow | Roadmap adoption | COMPLETE — [inventory, workflow exercise and pending evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md) | Not a native gate |
-| UIL-T01 | Shared product/Lab Business Compact theme and presentation bootstrap | T00 | NOT STARTED | Covered by later candidate review |
-| UIL-T02 | Independent Sales/Security launchers, lifecycle and direct test setup | T01 | NOT STARTED | Covered by later candidate review |
+| UIL-T01 | Shared product/Lab Business Compact theme and presentation bootstrap | T00 | COMPLETE — [presentation and measured geometry](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t01-physical-125-first-observation); visual acceptance remains open | Covered by later candidate review |
+| UIL-T02 | Independent Sales/Security launchers, lifecycle and direct test setup | T01 | IN PROGRESS — [source organization only](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t02-partial-source-organization); T01 remains open | Covered by later candidate review |
 | UIL-T03 | Role permissions + account-dialog pilot, native evidence | T02 | NOT STARTED | Await T04 |
 | UIL-T04 | Owner review of the pilot baseline | T03 | NOT STARTED | **NOT APPROVED** |
 | UIL-T05 | Apply approved baseline to remaining Security views/dialogs | T04 approval | NOT STARTED | Await T06 |

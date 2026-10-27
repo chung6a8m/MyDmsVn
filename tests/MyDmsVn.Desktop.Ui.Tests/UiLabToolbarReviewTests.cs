@@ -19,6 +19,32 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class UiLabToolbarReviewTests
 {
     [Fact]
+    public void Lab_startup_and_theme_toggle_use_product_palette_and_preserve_reduced_motion()
+    {
+        var previous = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme =
+                MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapTheme.CreateDefault(
+                    MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Light, true);
+            Run(SalesScenarioId.S01Draft, null, (form, guard, token) =>
+            {
+                var current = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+                Assert.Equal(BusinessCompactAppearance.CreateTheme(current.Mode).Colors.Primary, current.Colors.Primary);
+                Assert.True(current.ReducedMotion);
+                var button = form.Controls.OfType<Panel>().SelectMany(p => p.Controls.OfType<FlowLayoutPanel>()).SelectMany(p => p.Controls.OfType<Button>()).First(b => b.Text == "Light / Dark");
+                button.PerformClick();
+                current = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+                Assert.Equal(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark, current.Mode);
+                Assert.Equal(BusinessCompactAppearance.CreateTheme(current.Mode).Colors.Primary, current.Colors.Primary);
+                Assert.True(current.ReducedMotion);
+                Assert.Empty(guard.Exceptions);
+            });
+        }
+        finally { MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme = previous; }
+    }
+
+    [Fact]
     public void Native_close_click_preserves_pending_customer_query_when_prompt_cancels()
     {
         var prompts = 0;

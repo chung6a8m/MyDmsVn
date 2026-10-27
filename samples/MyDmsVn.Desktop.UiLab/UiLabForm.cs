@@ -60,6 +60,17 @@ internal sealed class UiLabForm : Form
     private readonly Label _status = new Label { AutoSize = true, Text = "Starting...", Padding = new Padding(8) };
     private readonly TextBox _journal = new TextBox { ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Bottom, Height = 110 };
     private readonly Panel _workspace = new Panel { Dock = DockStyle.Fill };
+    private readonly FlowLayoutPanel _viewportControls = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34, WrapContents = false };
+    private readonly Button _reviewMode = new Button { Name = "ReviewModeToggle", Text = "Review mode (F11)", AutoSize = true };
+    private bool _reviewModeActive;
+    private bool _restoreFitAfterReview;
+    private readonly Panel _viewportHost = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+    private readonly NumericUpDown _viewportWidth = new NumericUpDown { Name = "ReviewViewportWidth", Minimum = 1, Maximum = 10000, Value = 952, Width = 65, AccessibleName = "Measured content width" };
+    private readonly NumericUpDown _viewportHeight = new NumericUpDown { Name = "ReviewViewportHeight", Minimum = 1, Maximum = 10000, Value = 657, Width = 65, AccessibleName = "Measured content height" };
+    private readonly Button _viewportApply = new Button { Name = "ReviewViewportApply", Text = "Fixed viewport", AutoSize = true };
+    private readonly Button _viewportFree = new Button { Text = "Fit Lab", AutoSize = true };
+    private readonly Label _viewportDiagnostics = new Label { Name = "ViewportDiagnostics", Dock = DockStyle.Fill, AccessibleName = "Viewport diagnostics" };
+    private bool _fixedViewport;
     private readonly System.Windows.Forms.Timer _diagnostics = new System.Windows.Forms.Timer { Interval = 300 };
     private readonly WorkspaceCloseCoordinator _closeCoordinator;
     private SalesScenarioData? _data;
@@ -117,6 +128,7 @@ internal sealed class UiLabForm : Form
 
     internal UiLabForm(Func<WorkspaceCloseState, CancellationToken, Task<WorkspaceCloseChoice>> closePrompt)
     {
+        BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(BootstrapThemeManager.CurrentTheme.Mode);
         Text = "MyDmsVn UI Lab";
         Size = new Size(1250, 850);
         StartPosition = FormStartPosition.CenterScreen;
@@ -134,9 +146,19 @@ internal sealed class UiLabForm : Form
             _securityAdvanceMembershipUserRevision, _securityAdvanceMembershipRoleRevision, _securityDenyMembership });
         _toolbarHost.Controls.Add(_securityReviewPanel);
         _toolbarHost.Controls.Add(toolbar);
-        Controls.Add(_workspace);
+        _viewportControls.Controls.AddRange(new Control[] { new Label { Text = "Shell content W × H (measure):", AutoSize = true, Padding = new Padding(0, 5, 0, 0) }, _viewportWidth, _viewportHeight, _viewportApply, _viewportFree, _reviewMode });
+        _viewportHost.Controls.Add(_workspace);
+        Controls.Add(_viewportHost);
         Controls.Add(_journal);
+        var diagnosticsPanel = new Panel { Dock = DockStyle.Bottom, Height = 42 };
+        diagnosticsPanel.Controls.Add(_viewportDiagnostics);
+        Controls.Add(diagnosticsPanel);
+        Controls.Add(_viewportControls);
         Controls.Add(_toolbarHost);
+        _reviewMode.Click += (_, __) => ToggleReviewMode();
+        _viewportApply.Click += (_, __) => SetReviewViewport(true);
+        _viewportFree.Click += (_, __) => SetReviewViewport(false);
+        _viewportHost.Resize += (_, __) => UpdateViewportDiagnostics();
         _module.Items.AddRange(new object[] { "Sales", "Security" });
         _module.SelectedIndex = 0;
         _scenario.Items.AddRange(Enum.GetValues(typeof(SalesScenarioId)).Cast<object>().ToArray());
@@ -150,7 +172,7 @@ internal sealed class UiLabForm : Form
         _securityMutationOutcome.Items.AddRange(new object[] { "Success", "No-op grant", "Validation", "Forbidden", "Conflict", "Hold success", "Hold failure", "Uncertain" });
         _securityMutationOutcome.SelectedIndex = 0;
         _module.SelectedIndexChanged += async (_, __) => { if (_resetting) return; _scenario.Items.Clear(); _scenario.Items.AddRange(Enum.GetValues(_module.SelectedIndex == 1 ? typeof(SecurityScenarioId) : typeof(SalesScenarioId)).Cast<object>().ToArray()); _scenario.SelectedIndex = 0; if (IsHandleCreated) await ResetSafelyAsync(); };
-        _theme.Click += (_, __) => BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+        _theme.Click += (_, __) => BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
         _reset.Click += async (_, __) => await ResetSafelyAsync();
         _scenario.SelectedIndexChanged += async (_, __) => { if (IsHandleCreated) await ResetSafelyAsync(); };
         _closeWorkspace.Click += async (_, __) => await CloseWorkspaceSafelyAsync();
@@ -177,6 +199,7 @@ internal sealed class UiLabForm : Form
         _diagnostics.Tick += (_, __) =>
         {
             RefreshDiagnostics();
+            UpdateViewportDiagnostics();
             SetCommands(!_resetting && !_closingWorkspace && !_poisoned);
             UpdateModalMutationRelease();
         };
@@ -385,6 +408,59 @@ internal sealed class UiLabForm : Form
         SetCommands(true);
     }
 
+    protected override bool ProcessCmdKey(ref Message message, Keys keyData)
+    {
+        if (keyData == Keys.F11) { ToggleReviewMode(); return true; }
+        return base.ProcessCmdKey(ref message, keyData);
+    }
+
+    private void ToggleReviewMode()
+    {
+        _reviewModeActive = !_reviewModeActive;
+        if (_reviewModeActive && !_fixedViewport)
+        {
+            _restoreFitAfterReview = true;
+            var currentSize = _workspace.ClientSize;
+            _workspace.Dock = DockStyle.None;
+            _workspace.Location = Point.Empty;
+            _workspace.ClientSize = currentSize;
+        }
+        else if (!_reviewModeActive && _restoreFitAfterReview)
+        {
+            _restoreFitAfterReview = false;
+            _workspace.Dock = DockStyle.Fill;
+        }
+        _toolbarHost.Visible = !_reviewModeActive;
+        _viewportControls.Visible = !_reviewModeActive;
+        _journal.Visible = !_reviewModeActive;
+        PerformLayout();
+        UpdateViewportDiagnostics();
+    }
+
+    private void SetReviewViewport(bool fixedViewport)
+    {
+        _fixedViewport = fixedViewport;
+        if (fixedViewport)
+        {
+            _workspace.Dock = DockStyle.None;
+            _workspace.Location = Point.Empty;
+            _workspace.ClientSize = new Size((int)_viewportWidth.Value, (int)_viewportHeight.Value);
+        }
+        else
+        {
+            _workspace.Dock = DockStyle.Fill;
+        }
+        _viewportHost.PerformLayout();
+        UpdateViewportDiagnostics();
+    }
+
+    private void UpdateViewportDiagnostics()
+    {
+        var workArea = Screen.FromControl(this).WorkingArea;
+        var clipped = (_fixedViewport || _restoreFitAfterReview) && (_workspace.Width > _viewportHost.ClientSize.Width || _workspace.Height > _viewportHost.ClientSize.Height);
+        _viewportDiagnostics.Text = $"Outer: {Width}×{Height}; Client: {ClientSize.Width}×{ClientSize.Height}; Content: {_workspace.ClientSize.Width}×{_workspace.ClientSize.Height}; DeviceDpi: {_workspace.DeviceDpi}; Physical scale: unverified;\nWork area: {workArea.Width}×{workArea.Height}; " + (clipped ? "viewport clipped; scroll to inspect" : "viewport visible") + (_reviewModeActive ? "; F11 restores tools" : "");
+    }
+
     private void ToggleSecurityReview()
     {
         if (_securityData == null) return;
@@ -425,6 +501,7 @@ internal sealed class UiLabForm : Form
                 scene.Journal.Record("Security.ReviewTargetSwitch", new
                     { Target = targetType, OriginalTargetId = preview.Import.TargetId, AlternateTargetId = alternateId });
             });
+        BusinessCompactAppearance.Apply(dialog);
         return dialog.ShowDialog(this) == DialogResult.OK;
     }
 
