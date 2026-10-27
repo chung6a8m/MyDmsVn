@@ -176,9 +176,13 @@ The five checked-in images below were visually inspected before inclusion and co
 
 ### Findings and UIL-T04 decision
 
-- Disabled action text in Dark remains low contrast, as first recorded at UIL-T01. It is visible in the pilot evidence and remains **OPEN**; T04 must decide whether it is an accepted bounded exception or requires pilot correction.
-- The native `Form` shell exception and its OS-chrome/no-backdrop cost remain pending explicit Owner disposition.
-- The two direct-permission constrained-layout failures remain outside the pilot and OPEN for UIL-T05; UIL-T03 does not convert them into acceptance.
+- Disabled action text in Dark remains low contrast, as first recorded at UIL-T01. It is visible in the pilot evidence and is an Owner-accepted bounded exception for this exact pilot baseline; the approval does not assert improved contrast.
+- The native `Form` shell and its OS-chrome/no-backdrop cost are an Owner-accepted bounded exception for this exact pilot baseline. The accepted exception does not create a generic toolkit waiver or authorize a vendor workaround/pin change.
+- The Owner accepted exclusion of the two direct-permission constrained-layout failures from the T04 pilot decision. Both failures remain **OPEN for UIL-T05**; they are not waived or converted into passing results.
 - No SQL, actual Login, product-host parity, package or release verification was selected or performed.
 
-**UIL-T04 status:** REVIEW READY / awaiting the Owner's dated explicit approve or reject decision for the exact candidate above. **Owner decision: NOT APPROVED.** No decision timestamp, approved scope or accepted exception is recorded yet. UIL-T05 remains blocked until that explicit decision is added to the roadmap and this evidence record.
+**UIL-T04 Owner decision — APPROVED at 2026-10-27 15:03:12 +07:00.** In direct response to the request to approve or reject this exact UIL-T04 candidate together with the listed exceptions, the Owner stated: `Tôi approve các ngoại lệ trên`.
+
+The approval covers the Role permissions composition and representative create-user dialog baseline on runtime source `fa777156d3bc0cc37c1a32495672a8091e5e70b0`, the unchanged WinFormsKit/SourceGrid pins recorded above, and the physical 100%/125% Light/Dark normal/constrained evidence matrix. It accepts the Dark disabled-action contrast and native `Form` shell as bounded pilot exceptions, and accepts keeping the two out-of-pilot direct-permission failures open for UIL-T05 rather than treating them as T04 blockers. Material changes to the approved pilot surfaces reopen focused review.
+
+UIL-T05 is unblocked but remains **NOT STARTED**. This approval does not establish final UIL-T06 approval, product-host parity, SQL, actual Login, package, release or production acceptance.
