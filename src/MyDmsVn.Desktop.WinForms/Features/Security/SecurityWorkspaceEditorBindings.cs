@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -47,8 +48,41 @@ internal sealed class SecurityWorkspaceEditorBindings
     readonly Button _assignRole;
     readonly Button _removeRole;
     readonly Label _membershipHint = new() { AutoSize = true, AccessibleName = "Thông báo gán vai trò" };
+    SecurityDataset<PermissionCatalogItemDto>? _grantCatalogSnapshot;
+    GrantCatalogEntry[] _activeGrantEntries = Array.Empty<GrantCatalogEntry>();
+    Dictionary<string, GrantCatalogEntry> _activeGrantByKey = new(StringComparer.Ordinal);
+    string[] _grantModuleOptions = { "Tất cả nhóm" };
+    string[] _directGrantKeys = Array.Empty<string>();
+    SecurityRolePermissionDraft? _grantDraftSnapshot;
+    long _grantDraftRevision = -1;
+    IReadOnlyList<SecurityPermissionChange> _grantChanges = Array.Empty<SecurityPermissionChange>();
+    HashSet<string> _draftGrantedKeys = new(StringComparer.Ordinal);
+    HashSet<string> _changedGrantKeys = new(StringComparer.Ordinal);
+    SecurityRoleDto? _grantRoleSnapshot;
+    HashSet<string> _roleGrantedKeys = new(StringComparer.Ordinal);
     bool _rendering;
     SecurityWorkspaceViewModel Vm => _control.ViewModel;
+
+    sealed class GrantCatalogEntry
+    {
+        internal GrantCatalogEntry(PermissionCatalogItemDto item)
+        {
+            Item = item;
+            var name = SecurityPresentation.Name(item);
+            SearchText = item.Key + " " + name + " " + item.Description;
+            Display = name + Environment.NewLine + item.Key;
+            PendingDisplay = Display + " · Chưa lưu";
+            ToolTip = name + " · " + item.Key + " · " + item.Module;
+            PendingToolTip = ToolTip + " · Chưa lưu";
+        }
+
+        internal PermissionCatalogItemDto Item { get; }
+        internal string SearchText { get; }
+        internal string Display { get; }
+        internal string PendingDisplay { get; }
+        internal string ToolTip { get; }
+        internal string PendingToolTip { get; }
+    }
 
     internal SecurityWorkspaceEditorBindings(SecurityWorkspaceControl control)
     {
@@ -217,6 +251,47 @@ internal sealed class SecurityWorkspaceEditorBindings
             }));
         };
     }
+    void RefreshGrantCatalogSnapshot()
+    {
+        if (ReferenceEquals(_grantCatalogSnapshot, Vm.Catalog)) return;
+        _grantCatalogSnapshot = Vm.Catalog;
+        _activeGrantByKey = new Dictionary<string, GrantCatalogEntry>(StringComparer.Ordinal);
+        var entries = new List<GrantCatalogEntry>();
+        foreach (var item in Vm.Catalog.Items.Where(item => item.Status == "Active"))
+        {
+            if (_activeGrantByKey.ContainsKey(item.Key)) continue;
+            var entry = new GrantCatalogEntry(item);
+            _activeGrantByKey.Add(item.Key, entry);
+            entries.Add(entry);
+        }
+        _activeGrantEntries = entries.ToArray();
+        _grantModuleOptions = new[] { "Tất cả nhóm" }.Concat(_activeGrantEntries.Select(entry => entry.Item.Module).Distinct().OrderBy(value => value)).ToArray();
+        _directGrantKeys = _activeGrantEntries.Select(entry => entry.Item.Key).ToArray();
+    }
+
+    void RefreshGrantMembershipSnapshot(SecurityRolePermissionDraft? draft, SecurityRoleDto? role)
+    {
+        if (draft == null)
+        {
+            _grantDraftSnapshot = null;
+            _grantDraftRevision = -1;
+            _grantChanges = Array.Empty<SecurityPermissionChange>();
+            _draftGrantedKeys.Clear();
+            _changedGrantKeys.Clear();
+        }
+        else if (!ReferenceEquals(_grantDraftSnapshot, draft) || _grantDraftRevision != draft.LocalEditRevision)
+        {
+            _grantDraftSnapshot = draft;
+            _grantDraftRevision = draft.LocalEditRevision;
+            _grantChanges = draft.Changes;
+            _draftGrantedKeys = new HashSet<string>(draft.DesiredKeys, StringComparer.Ordinal);
+            _changedGrantKeys = new HashSet<string>(_grantChanges.Select(change => change.PermissionKey), StringComparer.Ordinal);
+        }
+        if (ReferenceEquals(_grantRoleSnapshot, role)) return;
+        _grantRoleSnapshot = role;
+        _roleGrantedKeys = new HashSet<string>(role?.PermissionKeys ?? Array.Empty<string>(), StringComparer.Ordinal);
+    }
+
     void Render()
     {
         _rendering = true;
@@ -258,28 +333,37 @@ internal sealed class SecurityWorkspaceEditorBindings
             _recovery.Visible = Vm.RequiresRecovery || partialForbidden;
             foreach (var button in _recovery.Controls.OfType<Button>()) button.Visible = Vm.RequiresRecovery;
             _recoveryReview.Enabled = Vm.CanReviewRecovery;
-            _grantSummary.Text = Vm.RoleDraft == null ? "Chọn Sửa quyền để bắt đầu bản nháp" : Vm.RoleDraft.Changes.Count + " thay đổi chưa lưu trong toàn bộ danh mục";
+            var roleDraft = Vm.RoleDraft;
+            var role = Vm.SelectedRole;
+            RefreshGrantCatalogSnapshot();
+            RefreshGrantMembershipSnapshot(roleDraft, role);
+            var roleChanges = roleDraft == null ? null : _grantChanges;
+            _grantSummary.Text = roleDraft == null ? "Chọn Sửa quyền để bắt đầu bản nháp" : roleChanges!.Count + " thay đổi chưa lưu trong toàn bộ danh mục";
             var roleEditorAvailable = Vm.IsCurrent && Vm.Roles.IsCurrent(Vm.OwnerVersion) && Vm.Catalog.IsCurrent(Vm.OwnerVersion) &&
                 Vm.SelectedRole != null && !Vm.IsBusy && !Vm.RequiresRecovery;
-            _editRolePermissions.Enabled = roleEditorAvailable && Vm.RoleDraft == null;
-            _grantDiscard.Enabled = roleEditorAvailable && Vm.RoleDraft != null;
-            _grantSave.Enabled = roleEditorAvailable && Vm.RoleDraft?.IsDirty == true;
-            _grantActions.Visible = Vm.RoleDraft != null;
-            _grantSummary.Visible = Vm.RoleDraft != null;
+            _editRolePermissions.Enabled = roleEditorAvailable && roleDraft == null;
+            _grantDiscard.Enabled = roleEditorAvailable && roleDraft != null;
+            _grantSave.Enabled = roleEditorAvailable && roleChanges?.Count > 0;
+            _grantActions.Visible = roleDraft != null;
+            _grantSummary.Visible = roleDraft != null;
             var selectedGrant = _grants.CurrentRow?.Tag as string;
-            var role = Vm.SelectedRole;
+            var draftOwnsRole = roleDraft != null && roleDraft.RoleId == role?.RoleId;
+            var grantedKeys = draftOwnsRole ? _draftGrantedKeys : _roleGrantedKeys;
+            var changedKeys = roleDraft == null ? null : _changedGrantKeys;
             var selectedModule = _grantModule.SelectedItem as string;
-            var modules = Vm.Catalog.Items.Where(k => k.Status == "Active").Select(k => k.Module).Distinct().OrderBy(value => value).ToArray();
-            _grantModule.Items.Clear();
-            _grantModule.Items.Add("Tất cả nhóm");
-            _grantModule.Items.AddRange(modules.Cast<object>().ToArray());
+            if (_grantModule.Items.Count != _grantModuleOptions.Length || _grantModuleOptions.Where((value, index) => !string.Equals(_grantModule.Items[index] as string, value, StringComparison.Ordinal)).Any())
+            {
+                _grantModule.Items.Clear();
+                _grantModule.Items.AddRange(_grantModuleOptions.Cast<object>().ToArray());
+            }
             _grantModule.SelectedIndex = selectedModule != null && _grantModule.Items.Contains(selectedModule) ? _grantModule.Items.IndexOf(selectedModule) : 0;
-            var activeKeys = Vm.Catalog.Items.Where(k => k.Status == "Active")
-                .Where(k => _grantModule.SelectedIndex == 0 || k.Module == _grantModule.Text)
-                .Where(k => _grantSearch.Text.Length == 0 || (k.Key + " " + SecurityPresentation.Name(k) + " " + k.Description).IndexOf(_grantSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0)
-                .Where(k => !_grantedOnly.Checked || (Vm.RoleDraft?.DesiredKeys.Contains(k.Key) ?? role?.PermissionKeys.Contains(k.Key) == true))
-                .Select(k => k.Key).ToArray();
-            if (_grants.Rows.Count != activeKeys.Length || activeKeys.Where((key, index) => !string.Equals(_grants.Rows[index].Tag as string, key, StringComparison.Ordinal)).Any())
+            var activeKeys = _activeGrantEntries
+                .Where(entry => _grantModule.SelectedIndex == 0 || entry.Item.Module == _grantModule.Text)
+                .Where(entry => _grantSearch.Text.Length == 0 || entry.SearchText.IndexOf(_grantSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                .Where(entry => !_grantedOnly.Checked || grantedKeys.Contains(entry.Item.Key))
+                .Select(entry => entry.Item.Key).ToArray();
+            var grantPresentationChanged = _grants.Rows.Count != activeKeys.Length || activeKeys.Where((key, index) => !string.Equals(_grants.Rows[index].Tag as string, key, StringComparison.Ordinal)).Any();
+            if (grantPresentationChanged)
             {
                 _grants.Rows.Clear();
                 foreach (var key in activeKeys)
@@ -292,23 +376,29 @@ internal sealed class SecurityWorkspaceEditorBindings
             for (var index = 0; index < activeKeys.Length; index++)
             {
                 var key = activeKeys[index];
-                var item = Vm.Catalog.Items.First(k => k.Key == key);
-                var granted = Vm.RoleDraft != null && Vm.RoleDraft.RoleId == role?.RoleId ? Vm.RoleDraft.DesiredKeys.Contains(key) : role?.PermissionKeys.Contains(key) == true;
-                var pending = Vm.RoleDraft?.Changes.Any(change => change.PermissionKey == key) == true;
+                var entry = _activeGrantByKey[key];
+                var item = entry.Item;
+                var granted = grantedKeys.Contains(key);
+                var pending = changedKeys?.Contains(key) == true;
                 var row = _grants.Rows[index];
-                row.Cells[0].Value = granted;
-                row.Cells[1].Value = SecurityPresentation.Name(item) + Environment.NewLine + key + (pending ? " · Chưa lưu" : "");
-                row.Cells[2].Value = item.Module;
+                var display = pending ? entry.PendingDisplay : entry.Display;
+                var tooltip = pending ? entry.PendingToolTip : entry.ToolTip;
+                if (!Equals(row.Cells[0].Value, granted)) { row.Cells[0].Value = granted; grantPresentationChanged = true; }
+                if (!Equals(row.Cells[1].Value, display)) { row.Cells[1].Value = display; grantPresentationChanged = true; }
+                if (!Equals(row.Cells[2].Value, item.Module)) { row.Cells[2].Value = item.Module; grantPresentationChanged = true; }
                 foreach (DataGridViewCell cell in row.Cells)
-                    cell.ToolTipText = SecurityPresentation.Name(item) + " · " + key + " · " + item.Module + (pending ? " · Chưa lưu" : "");
+                    if (!string.Equals(cell.ToolTipText, tooltip, StringComparison.Ordinal)) { cell.ToolTipText = tooltip; grantPresentationChanged = true; }
             }
             _grants.Enabled = role != null && Vm.Catalog.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
             LayoutGrantArea();
-            _grants.Refresh();
-            _grants.AccessibleDescription = Vm.RoleDraft == null ? "Chỉ xem. Chọn Sửa quyền để thay đổi." : "Đang sửa quyền của vai trò.";
+            if (grantPresentationChanged) _grants.Refresh();
+            _grants.AccessibleDescription = roleDraft == null ? "Chỉ xem. Chọn Sửa quyền để thay đổi." : "Đang sửa quyền của vai trò.";
             var selected = Vm.DirectPermissionKey;
-            _directKey.Items.Clear();
-            foreach (var key in Vm.Catalog.Items.Where(k => k.Status == "Active")) _directKey.Items.Add(key.Key);
+            if (_directKey.Items.Count != _directGrantKeys.Length || _directGrantKeys.Where((key, index) => !string.Equals(_directKey.Items[index] as string, key, StringComparison.Ordinal)).Any())
+            {
+                _directKey.Items.Clear();
+                _directKey.Items.AddRange(_directGrantKeys.Cast<object>().ToArray());
+            }
             _directKey.SelectedItem = selected;
             _directKey.Enabled = !Vm.IsBusy && !Vm.RequiresRecovery;
             _inherit.Checked = Vm.DirectDecision == null;
@@ -502,6 +592,33 @@ internal sealed class SecurityWorkspaceEditorBindings
             TextRole = BootstrapTextRole.Danger, Margin = new Padding(0, 8, 0, 0)
         };
         fields.Controls.Add(validation);
+        BootstrapTextBox? invalidFeedbackInput = null;
+        var clearingSecret = false;
+        void ShowFieldFeedback(Control field, string message)
+        {
+            validation.Text = message;
+            invalidFeedbackInput = field as BootstrapTextBox;
+            if (invalidFeedbackInput != null) invalidFeedbackInput.ValidationState = BootstrapValidationState.Invalid;
+        }
+        void ClearSecret()
+        {
+            clearingSecret = true;
+            try { password.Clear(); }
+            finally { clearingSecret = false; }
+        }
+        foreach (var input in inputs) input.TextChanged += (_, _) =>
+        {
+            if (clearingSecret || !ReferenceEquals(input, invalidFeedbackInput)) return;
+            var invalid = ValidateIdentityFields(true, true, identityFields);
+            if (invalid.HasValue && ReferenceEquals(invalid.Value.Field, input))
+            {
+                validation.Text = invalid.Value.Message;
+                return;
+            }
+            input.ValidationState = BootstrapValidationState.None;
+            invalidFeedbackInput = null;
+            validation.Text = "";
+        };
         var save = new BootstrapButton { Text = "Lưu thông tin", AutoSize = true, Variant = BootstrapVariant.Primary, TabIndex = 0 };
         var cancel = new BootstrapButton { Text = "Hủy", AutoSize = true, Variant = BootstrapVariant.Secondary, Outline = true, DialogResult = DialogResult.Cancel, TabIndex = 1 };
         var reload = new BootstrapButton { Text = "Tải lại để đối chiếu", AutoSize = true, Variant = BootstrapVariant.Secondary, Outline = true, Visible = false, TabIndex = 2 };
@@ -519,12 +636,13 @@ internal sealed class SecurityWorkspaceEditorBindings
             save.Enabled = false;
             try
             {
+                invalidFeedbackInput = null;
+                validation.Text = "";
                 foreach (var input in inputs) input.ValidationState = BootstrapValidationState.None;
                 var invalid = ValidateIdentityFields(true, true, identityFields);
                 if (invalid.HasValue)
                 {
-                    validation.Text = invalid.Value.Message;
-                    ((BootstrapTextBox)invalid.Value.Field).ValidationState = BootstrapValidationState.Invalid;
+                    ShowFieldFeedback(invalid.Value.Field, invalid.Value.Message);
                     invalid.Value.Field.Focus();
                     return;
                 }
@@ -533,16 +651,16 @@ internal sealed class SecurityWorkspaceEditorBindings
                 else if (!dialog.IsDisposed)
                 {
                     var field = PresentIdentityFeedback(validation, reload, identityFields);
-                    if (field is BootstrapTextBox input) input.ValidationState = BootstrapValidationState.Invalid;
+                    if (field != null) ShowFieldFeedback(field, validation.Text);
                     (field ?? (Vm.RequiresRecovery ? reload : name)).Focus();
                 }
             }
-            finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
+            finally { ClearSecret(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
         };
         // A separate presentation owner; toolkit composites retain ownership of native editor internals.
         BusinessCompactAppearance.Apply(dialog);
         try { dialog.ShowDialog(_control); }
-        finally { password.Clear(); }
+        finally { ClearSecret(); }
         return Task.CompletedTask;
     }
 

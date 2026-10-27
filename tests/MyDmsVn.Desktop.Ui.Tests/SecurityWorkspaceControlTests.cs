@@ -568,6 +568,70 @@ public sealed class SecurityWorkspaceControlTests
     });
 
     [Fact]
+    public void Role_grant_large_catalog_native_search_reuses_unchanged_rows_without_dispatch() =>
+        Run(SecurityScenarioId.SEC_L01, scene =>
+        {
+            var catalog = scene.Data.Catalog;
+            var extras = Enumerable.Range(0, 600)
+                .Select(index => new PermissionCatalogItemDto("Zp.Review." + index.ToString("D4"), "Zp.Review",
+                    "Zp review permission " + index.ToString("D4"), "Active"));
+            scene.Data.Catalog = new PermissionCatalogDto(catalog.ApplicationVersion, catalog.CatalogDigest,
+                catalog.Items.Concat(extras).ToArray());
+        }, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var search = Assert.Single(Descendants(control.RoleDetail, typeof(BootstrapTextBox)).Cast<BootstrapTextBox>(),
+                input => input.AccessibleName == "Tìm quyền vai trò");
+            var grants = Assert.Single(Descendants(control.RoleDetail, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>());
+            var driver = new NativeLookupTypingDriver(search);
+            driver.TypeCharacter('Z');
+            Assert.Equal(600, grants.Rows.Count);
+            var row = grants.Rows[0];
+            var display = row.Cells[1].Value;
+            var tooltip = row.Cells[1].ToolTipText;
+
+            driver.TypeCharacter('p');
+
+            Assert.Equal("Zp", driver.Text);
+            Assert.Equal(2, driver.SelectionStart);
+            Assert.Equal(0, driver.SelectionLength);
+            Assert.True(search.ContainsFocus);
+            Assert.Equal(600, grants.Rows.Count);
+            Assert.Same(row, grants.Rows[0]);
+            Assert.Same(display, grants.Rows[0].Cells[1].Value);
+            Assert.Same(tooltip, grants.Rows[0].Cells[1].ToolTipText);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
+    public void Role_grant_duplicate_active_key_preserves_first_definition_without_render_failure() =>
+        Run(SecurityScenarioId.SEC_L01, scene =>
+        {
+            var catalog = scene.Data.Catalog;
+            var first = catalog.Items.First(item => item.Key == "Sales.Receipts.Read");
+            var duplicate = new PermissionCatalogItemDto(first.Key, "Duplicate.Module", "Duplicate definition", "Active");
+            scene.Data.Catalog = new PermissionCatalogDto(catalog.ApplicationVersion, catalog.CatalogDigest,
+                catalog.Items.Concat(new[] { duplicate }).ToArray());
+        }, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            var search = Assert.Single(Descendants(control.RoleDetail, typeof(BootstrapTextBox)).Cast<BootstrapTextBox>(),
+                input => input.AccessibleName == "Tìm quyền vai trò");
+            search.Text = "Sales.Receipts.Read";
+            var grants = Assert.Single(Descendants(control.RoleDetail, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>());
+
+            var row = Assert.Single(grants.Rows.Cast<DataGridViewRow>());
+            Assert.Equal("Sales", row.Cells[2].Value);
+            search.Text = "Duplicate definition";
+            Assert.Empty(grants.Rows.Cast<DataGridViewRow>());
+            var directKey = Assert.Single(Descendants(control.UserDetail, typeof(ComboBox)).Cast<ComboBox>(),
+                combo => combo.AccessibleName == "Quyền riêng");
+            Assert.Equal(directKey.Items.Cast<string>().Distinct(StringComparer.Ordinal).Count(), directKey.Items.Count);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Fact]
     public void Role_editor_has_filters_history_and_contextual_recovery() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
         control.Tabs.SelectedIndex = 1;
@@ -939,6 +1003,17 @@ public sealed class SecurityWorkspaceControlTests
                 var password = Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu tạm");
                 Assert.Equal(BootstrapValidationState.Invalid, Assert.IsType<BootstrapTextBox>(name).ValidationState);
                 Assert.True(name.ContainsFocus);
+                var error = Assert.Single(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.AccessibleName == "Lỗi thông tin");
+                Assert.NotEmpty(error.Text);
+                var nameDriver = new NativeLookupTypingDriver(name);
+                nameDriver.TypeCharacter('n');
+                Assert.Equal("n", nameDriver.Text);
+                Assert.Equal(1, nameDriver.SelectionStart);
+                Assert.Equal(0, nameDriver.SelectionLength);
+                Assert.True(name.ContainsFocus);
+                Assert.Equal(BootstrapValidationState.None, Assert.IsType<BootstrapTextBox>(name).ValidationState);
+                Assert.Empty(error.Text);
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                 var email = Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Email");
                 foreach (var invalid in new[]
                 {
@@ -1061,9 +1136,21 @@ public sealed class SecurityWorkspaceControlTests
                     }
                     else
                     {
-                        Assert.True(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Tên đăng nhập").ContainsFocus);
-                        Assert.Equal(BootstrapValidationState.Invalid, Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Tên đăng nhập")).ValidationState);
+                        var name = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Tên đăng nhập"));
+                        Assert.True(name.ContainsFocus);
+                        Assert.Equal(BootstrapValidationState.Invalid, name.ValidationState);
                         Assert.True(Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Lưu thông tin").Enabled);
+                        timer.Stop();
+                        var driver = new NativeLookupTypingDriver(name);
+                        driver.SelectRange(0, driver.Text.Length);
+                        driver.TypeCharacter('r');
+                        Assert.Equal("r", driver.Text);
+                        Assert.Equal(1, driver.SelectionStart);
+                        Assert.Equal(0, driver.SelectionLength);
+                        Assert.True(name.ContainsFocus);
+                        Assert.Equal(BootstrapValidationState.None, name.ValidationState);
+                        Assert.Empty(error.Text);
+                        Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                     }
                     timer.Stop();
                     dialog.Close();
@@ -1711,7 +1798,11 @@ public sealed class SecurityWorkspaceControlTests
         Assert.InRange(unused, 0, 16);
     }
 
-    internal static void Run(SecurityScenarioId id, Action<SecurityWorkspaceControl, SecurityScenario> action)
+    internal static void Run(SecurityScenarioId id, Action<SecurityWorkspaceControl, SecurityScenario> action) =>
+        Run(id, _ => { }, action);
+
+    internal static void Run(SecurityScenarioId id, Action<SecurityScenario> configure,
+        Action<SecurityWorkspaceControl, SecurityScenario> action)
     {
         StaTest.Run(token =>
         {
@@ -1725,6 +1816,7 @@ public sealed class SecurityWorkspaceControlTests
                 try
                 {
                     using var data = SecurityScenarioCatalog.Create(id);
+                    configure(data);
                     if (id == SecurityScenarioId.SEC_L09)
                         data.Catalog.Error = new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Forbidden", "Catalog denied");
                     using var form = new Form
