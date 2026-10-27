@@ -69,7 +69,9 @@ public sealed class SecurityNativeAndResetTests
                 try
                 {
                     opened = true;
-                    Assert.True(dialog.Controls.Cast<Control>().SelectMany(Descendants).OfType<TextBox>().First().Focus());
+                    var field = SecurityWorkspaceControlTests.DialogInputs(dialog).First();
+                    field.Focus();
+                    Assert.True(field.ContainsFocus);
                     NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
                     Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
                 }
