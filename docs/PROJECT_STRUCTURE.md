@@ -1,6 +1,6 @@
 # Current solution and project structure
 
-**Audited source baseline:** historical commit `6ee6951c58f6e4ad92f991521ff5c553d2d22526` (merged PR #48), 2026-10-25. The net48 project/source orientation is represented below; this refresh supplies no new runtime acceptance. The [execution index](plans/README.md) has no active roadmap after the [2026-10-27 main archive](archive/20261027-main-roadmap-reset/README.md), while [UI-NEXT](ui-next/README.md) retains historical implementation evidence. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and unfinished acceptance.
+**Audited source baseline:** historical commit `6ee6951c58f6e4ad92f991521ff5c553d2d22526` (merged PR #48), 2026-10-25. The net48 project/source orientation is represented below; this refresh supplies no new runtime acceptance. The [execution index](plans/README.md) selects current authorized work, while [UI-NEXT](ui-next/README.md) retains historical implementation evidence. The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves earlier candidate evidence and unfinished acceptance.
 
 ## Source projects
 
@@ -79,3 +79,4 @@ UI-NEXT's [historical implementation plan](archive/20261025-pre-next-roadmap/ui-
 | `deployment/release/Publish-LocalRelease.ps1` | Existing net48 Local validation/release packaging. |
 
 Keep helper dependencies compatible with net48 and test support inside its existing test owners. Use `-f net48` in test commands; a newer SDK does not change the target runtime. Any future runtime reactivation must review the actual source/project/lock graph under a separately approved plan. UI-NEXT does not reactivate AppCore or upgrade the framework. Sales files are implemented source; consult actual source and the linked UI-NEXT records rather than treating historical proposal wording as current implementation status. Historical evidence remains tied to its exact revision and scope.
+

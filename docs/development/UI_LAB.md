@@ -2,11 +2,17 @@
 
 The UI Lab is a separate net48 WinForms development host for the existing `SalesReceiptControl` and the Security workspace candidate. It is intended for inspecting input, session and response races without a SQL instance or real Login. The Lab does not run the production Local adapter or prove Server authorization, SQL behavior or a release package. The [archived A0/A1 record](../archive/20261025-pre-next-roadmap/plans/20261024-001-a0-a1-sales-ui-lab.md) retains historical Sales evidence; this page owns repeatable use and commands.
 
+## Current host and selected independent-Lab target
+
+At the inspected `main@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9` baseline, one executable starts Sales and provides a Sales/Security module picker. The build/start instructions below describe that implemented host. The active [UIL roadmap](../plans/20261027-001-business-compact-and-independent-ui-labs.md) selects two direct launchers, `MyDmsVn.Desktop.UiLab.Sales` and `.Security`, with separate module-owned runtime graphs and shared neutral infrastructure. Those launchers are **not implemented by this documentation PR**.
+
+[Independent UI Labs](../design/INDEPENDENT_UI_LABS.md) defines project/lifecycle boundaries. [Business Compact](../design/BUSINESS_COMPACT.md) requires the same product theme/bootstrap, typography, measured workspace content bounds and theme switching in both Labs, including owned dialogs. The current Lab's default-theme toggle does not meet that target merely because it hosts the production controls. UIL-T01/T02 implement and verify the target, then replace the current commands and module-selection instructions in this runbook. Keep one scenario assembly and one serialized Ui.Tests assembly initially.
+
 ## Security candidate boundary
 
-The host now offers a **Sales / Security** module picker. Security constructs the candidate `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` from the production source assemblies with deterministic fake ports. The [Security UI specification](../design/SECURITY_ADMINISTRATION_UI.md), [review guide](SECURITY_UI_LAB_REVIEW.md) and [implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) define the target, exercises and sole task/gate state. Scenario IDs alone do not establish that their exercises passed.
+The current host offers a **Sales / Security** module picker. Security constructs the candidate `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` from the production source assemblies with deterministic fake ports. The [Security UI specification](../design/SECURITY_ADMINISTRATION_UI.md) and [review guide](SECURITY_UI_LAB_REVIEW.md) define behavior and exercises; the [active UIL plan](../plans/20261027-001-business-compact-and-independent-ui-labs.md) owns new task/gate state. Scenario IDs alone do not establish that their exercises passed.
 
-The Lab candidate remains SQL-free. The Owner approved its reviewed source at SEC-T05 on 2026-10-26, and the production Security factory now creates the same `SecurityWorkspaceControl` through session-bound Local ports. SEC-T06–SEC-T08 results and remaining limits are recorded in the [plan](../plans/20261025-002-security-administration-ui-lab-first.md) and [post-gate evidence](../evidence/security/20261025-security-local-sql.md). Historical Sales Lab passes do not approve Security.
+The Lab candidate remains SQL-free. The Owner approved its reviewed source at SEC-T05 on 2026-10-26, and the production Security factory now creates the same `SecurityWorkspaceControl` through session-bound Local ports. SEC-T06–SEC-T08 results and remaining limits are recorded in the [archived plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) and [post-gate evidence](../evidence/security/20261025-security-local-sql.md). Historical Sales Lab passes do not approve Security, and historical SEC approval does not approve a later Business Compact candidate.
 
 ## Prerequisites and source boundaries
 
@@ -69,18 +75,26 @@ The fake call journal records request and response operations and stores request
 
 ## Focused tests and evidence
 
-Restore first; run the new project as a whole once for the implementation candidate, with a fresh TRX directory:
+Restore first and select the changed behavior under the active task and test policy. The following is a focused Security example using existing source names, with discovery and a fresh TRX directory. It is not a recorded result; inspect the discovered cases before executing. Until UIL-T02 changes their setup, some selected Security host tests still instantiate Sales first.
 
 ```powershell
 $results = 'TestResults/ui-lab-' + [guid]::NewGuid().ToString('N')
+$uiFilter = 'FullyQualifiedName~Security'
 dotnet test tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj `
-  -c Debug -f net48 --no-restore `
+  -c Debug -f net48 --no-restore --list-tests --filter $uiFilter
+if ($LASTEXITCODE -ne 0) { throw 'UiLab test discovery failed.' }
+# Inspect discovery: no missing mandatory cases and no empty selection.
+dotnet test tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj `
+  -c Debug -f net48 --no-restore --filter $uiFilter `
   --logger 'trx;LogFileName=ui-lab.trx' --results-directory $results
 if ($LASTEXITCODE -ne 0) { throw 'UiLab tests failed.' }
 ```
 
 Existing `Desktop.Tests` and `Desktop.Session.Tests` cases stay in their original owners; no legacy test has been retired or moved. `Ui.Tests` adds scenario/native cases and links the small `NativeLookupTypingDriver` helper source. Its `NativeDriverIndependenceTests` checks that the linked driver can send a native key without the Goods Receipt test fixture. This helper correction does not transfer the old driver behavior or prove replacement of any legacy test.
 
+For Sales Lab behavior, the baseline class set is `SalesScenarioBehaviorTests`, `UiLabResetTests` and `UiLabToolbarReviewTests`; `FullyQualifiedName~Sales` alone misses the latter two. `NativeDriverIndependenceTests` belongs to shared helper verification. Select affected classes/methods and verify discovery; UIL-T02 may introduce explicit module grouping/traits, but no such new filter is assumed until implemented.
+
 For later edits, select a test class/method only after checking the current source and nonempty `--list-tests` discovery. Native checks require an interactive desktop, serialized STA execution, exception/DataError capture, finite waits and deterministic disposal. Per-key date/lookup proof must inspect raw text, caret or selection and focus after actual keyboard input; whole-string assignment is insufficient. Run one GUI command at a time. An in-process STA timeout cannot kill a noncooperative UI thread; use the existing bounded GUI-owned subprocess where a fatal/hang probe requires it.
 
 Record source/test/gitlink revisions, toolchain, bitness and DPI where relevant; exact selected/discovered/executed Facts/Theory rows, pass/fail/skip counts and TRX path; scenario observations, cleanup, evaluated dependency graph and remaining limitations. A missing/zero/skipped mandatory case is not PASS. Choose additional regression only for shared behavior actually changed, following [TEST_POLICY](../TEST_POLICY.md), [TEST_STRATEGY](../TEST_STRATEGY.md) and [tests/README](../../tests/README.md). Historical Sales/GUI evidence belongs to its original candidate. The Lab does not provide new SQL, actual Login, package or production acceptance.
+

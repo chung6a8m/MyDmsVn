@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. Use the [execution index](../plans/README.md) for current work; [UI-NEXT](../ui-next/README.md) retains historical candidate records. The [latest archive](../archive/20261027-main-roadmap-reset/README.md) retires Sidebar and Security bounded execution plans; [older archives](../archive/README.md) and unfinished acceptance remain preserved. No successor roadmap is selected. [TEST_POLICY](../TEST_POLICY.md) remains the sole test-execution policy.
+Current decisions and explicit owner instructions supersede older examples. Implementation status is separate from approved direction. Use the [execution index](../plans/README.md) for current work; [UI-NEXT](../ui-next/README.md) retains historical candidate records. The [latest archive](../archive/20261027-main-roadmap-reset/README.md) retires Sidebar and Security bounded execution plans; [older archives](../archive/README.md) and unfinished acceptance remain preserved. [TEST_POLICY](../TEST_POLICY.md) remains the sole test-execution policy.
 
 | ADR | Decision | Current status |
 |---|---|---|
@@ -19,3 +19,4 @@ Current decisions and explicit owner instructions supersede older examples. Impl
 Historical approvals and measurements are indexed in [History](../HISTORY.md). Do not describe a documentation decision as delivered code, restore an obsolete policy from Git, or reopen a completed plan from its old task ID.
 
 A new decision record should state date, owner decision/status, context, scope, consequences, verification and superseded documents. Record a real changed decision explicitly; routine implementation choices within an approved plan do not create a new approval gate.
+

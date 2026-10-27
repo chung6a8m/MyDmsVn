@@ -4,6 +4,8 @@
 
 [Historical BCF plan](../../archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) · [Design](../../BUSINESS_COMPACT_REFINEMENT.md) · [Acceptance](../../BUSINESS_COMPACT_REFINEMENT_ACCEPTANCE.md)
 
+[Current Business Compact policy](../../design/BUSINESS_COMPACT.md) carries the durable visual/control contract. The image register and original BCF interpretation below retain their historical scope; they do not approve a later implementation candidate.
+
 ## Reference register
 
 | File | Target | Pixels | SHA-256 |
@@ -25,3 +27,4 @@ The images are design inputs, not screenshots of implemented MyDmsVn, runtime ve
 - `01-catalog-light.png`: MyDmsVn compact product catalog workspace-1.png.
 - `02-goods-receipt.png`: MyDmsVn inventory receipt workspace-3.png.
 - `03-catalog-graphite.png`: MyDmsVn graphite catalog workspace-2.png.
+

@@ -1,6 +1,6 @@
 # Documentation index — main
 
-**Updated:** 2026-10-27. [Execution index](plans/README.md): **no active roadmap**. [2026-10-27 archive](archive/20261027-main-roadmap-reset/README.md) closes the previous Sidebar and Security execution queues after they reached main through PR #52. These are bounded source/evidence milestones; no archived tests or approvals are silently transferred to another candidate.
+**Updated:** 2026-10-27. The [execution index](plans/README.md) selects [Business Compact conformance and independent UI Labs](plans/20261027-001-business-compact-and-independent-ui-labs.md). Implementation is NOT STARTED and native gates are NOT APPROVED. The [2026-10-27 archive](archive/20261027-main-roadmap-reset/README.md) preserves the previous Sidebar and Security execution queues after they reached main through PR #52. Archived tests and approvals remain tied to their original candidates.
 
 ## Current work and Codex entry points
 
@@ -8,11 +8,13 @@
 |---|---|
 | [AGENTS.md](../AGENTS.md) | Current repository rules, safety and scope-selection discipline |
 | [AI_CONTEXT.md](../AI_CONTEXT.md) | Current source context, candidate evidence distinctions and acceptance limits |
-| [Execution index](plans/README.md) | Single selector for newly authorized dated plans; currently empty |
+| [Execution index](plans/README.md) · [active UIL roadmap](plans/20261027-001-business-compact-and-independent-ui-labs.md) | Single plan selector and sole task/status owner for the selected workstream |
 | [Development-plan alias](DEVELOPMENT_PLAN.md) | Stable compatibility entry point to that index |
 | [Test policy](TEST_POLICY.md) | Sole source-owned execution policy |
 | [Test strategy](TEST_STRATEGY.md) · [test commands](../tests/README.md) | Coverage and direct scoped test commands |
 | [UI Lab runbook](development/UI_LAB.md) | SQL-free Sales and Security scenario host, reset and usage |
+| [Business Compact policy](design/BUSINESS_COMPACT.md) | Durable visual/control contract, toolkit mapping, justified exceptions and native evidence |
+| [Independent UI Labs](design/INDEPENDENT_UI_LABS.md) | Selected direct Sales/Security launchers and shared product-presentation contract; implementation target |
 | [Security UI specification](design/SECURITY_ADMINISTRATION_UI.md) · [Security Lab review](development/SECURITY_UI_LAB_REVIEW.md) | Implemented UI contracts and repeatable review exercises, not active task checklists |
 | [Architecture](ARCHITECTURE.md) · [ADRs](adr/README.md) | Current principles, decisions and historical source distinctions |
 
@@ -22,7 +24,7 @@ The Owner-approved Security SQL-free candidate gate SEC-T05 was followed by boun
 
 [PRD](PRD.md) · [Architecture](ARCHITECTURE.md) · [Project structure](PROJECT_STRUCTURE.md) · [Tech stack](TECH_STACK.md) · [Contracts](CONTRACTS.md) · [Persistence](PERSISTENCE.md) · [Data model](DATA_MODEL.md) · [Security](SECURITY.md) · [ADRs](adr/README.md)
 
-The implemented Sales rules remain in [business design](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). BCF's [design](BUSINESS_COMPACT_REFINEMENT.md) and [unchanged reference images](design-references/business-compact/README.md) retain the existing composition and input boundaries. These references do not create an alternate execution queue.
+The implemented Sales rules remain in [business design](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). The current [Business Compact policy](design/BUSINESS_COMPACT.md) carries the durable visual/control contract; BCF's [design](BUSINESS_COMPACT_REFINEMENT.md) and [unchanged reference images](design-references/business-compact/README.md) retain original composition and input references. These references do not create an alternate execution queue.
 
 ## Archived plans and evidence
 
@@ -45,3 +47,4 @@ Historical evidence retains its original dates, revisions, failures and signed e
 [SQL configuration/security](CONFIGURATION_AND_SQL_SECURITY.md) · [Schema/migration runbook](SCHEMA_COMPATIBILITY_AND_MIGRATION_RUNBOOK.md) · [Security administration](SECURITY_ADMINISTRATION_RUNBOOK.md) · [Diagnostics](LOCAL_DIAGNOSTICS_AND_TROUBLESHOOTING.md) · [Release packaging](LOCAL_RELEASE_PACKAGING.md)
 
 Runbooks describe source behavior and safe procedures. [Release prerequisites](DEFERRED_WORK.md#release-prerequisites) remain UNACCEPTED / UNSCHEDULED and excluded from the active queue. [Retired/out-of-scope directions](DEFERRED_WORK.md) contain no alternative task order; [History](HISTORY.md) records prior decisions without replacing their evidence.
+

@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-25. **Authority:** the owner's replacement test policy after complete SQL framework removal. This remains the sole execution policy; [TEST_STRATEGY](TEST_STRATEGY.md) owns coverage and [tests/README](../tests/README.md) owns commands. Runtime, resource ownership and evidence safeguards are unchanged.
 
-**Current work (2026-10-27):** the [execution index](plans/README.md) has no active selected plan after the [main documentation archive](archive/20261027-main-roadmap-reset/README.md). Selected and separately authorized changes use this policy and their stated scope for verification; archived work is not inherited. [UI-NEXT](ui-next/README.md) and the DateInput correction retain historical candidate evidence; their old prompts are not active instructions. Markdown-only work requires diff/link/status/encoding checks and establishes no runtime evidence.
+**Current work (2026-10-27):** the [execution index](plans/README.md) selects the Business Compact and independent UI Labs plan; that plan owns task state and scoped verification. Selected and separately authorized changes use this policy and their stated scope for verification; archived work is not inherited. [UI-NEXT](ui-next/README.md) and the DateInput correction retain historical candidate evidence; their old prompts are not active instructions. Markdown-only work requires diff/link/status/encoding checks and establishes no runtime evidence.
 
 The [archive boundary](archive/20261023-pre-ui-next/README.md) preserves prior unfinished acceptance and full SAL integration repeats without scheduling them as current work. [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) records product/package `f5039cb` and separate GUI test `4697744`, with candidate-specific core/SQL/package/native100 runnable automation PASS; native125, attended observations and dated Owner acceptance remain OPEN. R3/R4 source fixes are reviewed/approved. Preserve original failures and historical signed BCF/BCI/GUI-P5/L2DB/RESP scopes. No archive action completes a missing case or grants production acceptance.
 
@@ -114,3 +114,4 @@ Keep raw TRX, Theory values, SQL identifiers, connection data and detailed diagn
 ## L2DB-T06 cutover note
 
 T06 removes active RepoDb/Dapper dependencies and mechanically replaces test/fixture SQL calls with independent native SqlClient oracles. The accepted reset/seed/ownership/drain contract above remains fixed. [T06 evidence](L2DB_VERIFICATION.md#l2db-t06--transitional-provider-and-test-graph-cleanup) records separate review, case/row reconciliation and affected boundary reruns; it does not replace RESP history or broaden the subsequently completed T07 package/limited Local smoke to full P5 GUI or P6 acceptance.
+

@@ -1,6 +1,6 @@
 # Test projects and commands — MyDmsVn
 
-**Updated:** 2026-10-25. [TEST_POLICY](../docs/TEST_POLICY.md) alone owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. The [execution index](../docs/plans/README.md) currently has no active selected follow-up; successor work requires explicit activation, and this page owns runnable commands, not task progress. [UI-NEXT](../docs/ui-next/README.md) retains historical candidate evidence. No external SQL test framework is restored.
+**Updated:** 2026-10-27. [TEST_POLICY](../docs/TEST_POLICY.md) alone owns execution scope and [TEST_STRATEGY](../docs/TEST_STRATEGY.md) owns coverage. The [execution index](../docs/plans/README.md) selects authorized follow-up and its sole task-state owner; successor work requires explicit activation, and this page owns runnable commands, not task progress. [UI-NEXT](../docs/ui-next/README.md) retains historical candidate evidence. No external SQL test framework is restored.
 
 <a id="active-ui-next-commands-and-evidence"></a>
 
@@ -209,3 +209,4 @@ T06 source/row reconciliation and sequential six-owner results are in [verificat
 ### BCF-T05 receipt verification — 2026-10-21
 
 Source/test `991530f` implements guarded receipt List/Detail. [T05 evidence](../docs/evidence/bcf/20261021-t05-receipt-presentation.md) records native100 301/301 and native125 295/295 runnable affected passes, with 116/116 measured Dark lookup rows at each scale. Native100 has 69 additional default-theme control/inline passes within its 185-row supplementary invocation; those 69 are not Dark evidence. All four frozen invocations total 897 executed passes, with 464 clean measured lookup observer/drain records and 26 reviewed captures. Discovery301/295 excludes only six strict wide native125 capture rows from the latter selector; fitted legacy layout rows stay selected. No rebuild occurs between contexts. Existing T02 attended acceptance is preserved for its own candidate; no new package/Login, attended receipt or T06/Owner acceptance is claimed.
+

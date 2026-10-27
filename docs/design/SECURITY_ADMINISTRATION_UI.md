@@ -2,7 +2,7 @@
 
 **Design basis:** Owner-reviewed conversation and mockups, 2026-10-25. **Original inspected baseline:** commit `0216701835cc3326124a94760186989c1ac4f729` (historical). **Implementation state:** the reviewed candidate and bounded Local/SQL handoff are implemented; the [archived plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) and [evidence](../evidence/security/20261025-security-local-sql.md) retain exact acceptance and remaining limits.
 
-The [archived implementation plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) retains historical task state and verification; no active roadmap is selected. The [visual references](../design-references/security-administration/README.md) illustrate composition; this specification and the Owner's explicit corrections take precedence over illustrative values in the wireframes and original conversation mockups. The [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) defines the repeatable review exercises.
+The [archived implementation plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) retains historical task state and verification. The active [Business Compact and independent UI Labs roadmap](../plans/20261027-001-business-compact-and-independent-ui-labs.md) selects presentation/toolkit conformance and separate Lab startup; its implementation is NOT STARTED. The durable [Business Compact policy](BUSINESS_COMPACT.md) governs visual/control choices, and [Independent UI Labs](INDEPENDENT_UI_LABS.md) defines the selected host design. This specification retains business ownership, permission, draft and recovery behavior. The [visual references](../design-references/security-administration/README.md) illustrate composition; this specification and the Owner's explicit corrections take precedence over illustrative values in the wireframes and original conversation mockups. The [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) defines the repeatable review exercises.
 
 ## 1. Intent, scope and decisions
 
@@ -17,7 +17,7 @@ Replace the ambiguous shared Users/Roles/Permissions editor with **Quản trị 
 | SEC-UI-05 — Owner's user-header correction | Remove the role chips and the separate manage/assign-role link from **every user header**, including the direct-decision view. Membership information/actions belong to **Vai trò (n)**. |
 | SEC-UI-06 — Owner's role-header correction | Remove the separate people icon and member-count text next to the role's active badge. The detail count belongs to **Thành viên (n)**. Counts in the role master list are permitted. |
 | SEC-UI-07 — Read versus edit | Effective rows are read-only and explain sources. Role grants use binary checkboxes. User direct decisions use three named radio options. |
-| SEC-UI-08 — Approval order | Review the actual candidate component in a SQL-free UI Lab and obtain dated Owner approval before Local cutover, SQL integration work or SQL verification. A mockup or documentation PR is not that approval. |
+| SEC-UI-08 — Approval order | Review the actual candidate component in a SQL-free UI Lab and obtain dated Owner approval at the selected plan's gate. The original candidate required this before its completed Local cutover/SQL work. The current UIL plan requires a pilot gate before broad SEC conformance and final native approval before product-host parity/handoff; no new SQL work is selected. A mockup or documentation PR is not that approval. |
 
 Preserve account/role create, update and activation, password reset, membership management, direct decisions, role grants and contextual JSON import. Keep .NET Framework 4.8, the current architecture, permission rules, transport DTOs, SQL procedures and dependency pins. No new authentication protocol, permission registry CRUD, automatic grants, role inheritance, audit-history screen, database migration or generic UI framework is selected.
 
@@ -48,7 +48,7 @@ The Lab references Contracts/Desktop.Application/WinForms and its sample scenari
 
 ## 3. Layout, copy and accessibility
 
-- Keep the existing application shell/navigation identity. The Security workspace owns its internal layout; the [Sidebar plan](../plans/20261025-001-sidebar-navigation-horizontal-scrollbar.md) owns navigation overflow.
+- Keep the existing application shell/navigation identity. The Security workspace owns its internal layout; the [archived Sidebar plan](../archive/20261027-main-roadmap-reset/plans/20261025-001-sidebar-navigation-horizontal-scrollbar.md) retains navigation-overflow implementation and bounded evidence.
 - Use a compact master/detail layout: normal master width approximately 240–280 logical pixels, reducible toward 180 at the existing minimum shell size. Keep the detail identity visible above its child tabs. Avoid a third permanent information column.
 - Retain the existing shell's normal outer size `1200 × 760` and minimum `900 × 600`; record actual client/work-area bounds at review. Reflow labels/toolbars and use local vertical scrolling at constrained sizes. Do not increase shell minimum size, shrink text to fit, or introduce workspace-wide horizontal scrolling. Long keys/names may ellipsize with full accessible text, tooltip and selected-row detail/copy access.
 - Prefer existing compact tokens; target 32–36 logical-pixel input/button heights, approximately 28–32 table-row height and 8/12-pixel spacing where the pinned controls permit. These are design targets to validate in the Lab, not a request to hard-code colors or bypass scaling.
@@ -57,6 +57,8 @@ The Lab references Contracts/Desktop.Application/WinForms and its sample scenari
 - Keep logical keyboard order, visible focus, accessible names/values and native per-key editing. No double-click mutation. Space changes a focused role checkbox's draft value only; radio choices have explicit labels. Enter in a search field must not trigger a mutation.
 - Search/filter rebinding must preserve raw text, caret/range and stable selected identity. Changing a filter cannot erase hidden draft changes or change the mutation target.
 - Use one clear create action per object context. Use explicit action names: **Lưu thông tin**, **Lưu quyền vai trò**, **Lưu quyền này**, **Gán vai trò**, **Gỡ vai trò**, **Hủy thay đổi**. Put activate/deactivate/password actions in contextual menus/dialogs, with target names visible.
+
+For the selected conformance work, map each surface to the pinned toolkit or a documented capability exception under [Business Compact](BUSINESS_COMPACT.md). The initial native pilot is **Quyền của vai trò** with its structured grant table and one account create/edit dialog. The product and independent SEC Lab must share theme/bootstrap, typography and actual client geometry, including dialog presentation. Current reference images and historical screenshots guide composition but do not approve this later candidate.
 
 Conversation mockup captions and illustrative counts are not runtime copy or fixed data. Display canonical permission keys from the catalog/assignment data; never implement shortened example keys such as `Products.Read` or `Inventory.Read`.
 
@@ -213,3 +215,4 @@ The [UI Labs guide](../development/SECURITY_UI_LAB_REVIEW.md) covers successful,
 The plan's **SEC-T05** gate requires nonempty discovered/executed selected tests, reviewed screenshots/observations, exact source/test/toolkit revisions, resolved blocking findings and dated explicit Owner approval of the running candidate. This document and the conversation mockups define the target; neither establishes that gate as passed.
 
 Only then may **SEC-T06–SEC-T08** connect the reviewed candidate to Local, perform focused real-SQL verification and reconcile the bounded handoff. Any subsequent visible behavior or shared-contract change reopens affected Lab review before relying on its earlier approval. Historical Sales/Sidebar/SQL/release evidence stays with its own candidate and scope.
+
