@@ -82,6 +82,7 @@ internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Contr
         if (!sameRows)
         {
             ClearHoverDescription();
+            var focused = FocusedItem?.Tag;
             var visible = Items.Cast<ListViewItem>().FirstOrDefault(item => item.Bounds.Bottom > 0)?.Tag;
             BeginUpdate();
             try
@@ -95,6 +96,9 @@ internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Contr
                 }
                 var anchor = Items.Cast<ListViewItem>().FirstOrDefault(item => SameIdentity(item.Tag, visible));
                 anchor?.EnsureVisible();
+                var focus = Items.Cast<ListViewItem>().FirstOrDefault(item => SameIdentity(item.Tag, focused)) ??
+                    Items.Cast<ListViewItem>().FirstOrDefault(item => SameIdentity(item.Tag, selected));
+                if (focus != null) focus.Focused = true;
             }
             finally { EndUpdate(); }
         }

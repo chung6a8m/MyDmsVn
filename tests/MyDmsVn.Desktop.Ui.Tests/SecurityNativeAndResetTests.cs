@@ -45,13 +45,70 @@ public sealed class SecurityNativeAndResetTests
             Assert.True(activity.ContainsFocus, "Tab from search should focus the activity filter.");
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
             Assert.True(list.ContainsFocus, "Tab from activity filter should focus the master list.");
-            var selected = Assert.Single(list.SelectedItems.Cast<ListViewItem>());
-            selected.Focused = true;
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
             Assert.True(Assert.Single(list.SelectedIndices.Cast<int>()) == 1,
                 "Native Down: " + string.Join(";", list.Items.Cast<ListViewItem>().Select(item => item.Index + "=" + item.Bounds)) +
                 "; focused=" + list.FocusedItem?.Index + "; HWND=" + GetFocus() + "; list=" + list.Handle);
             Assert.Equal(roles ? 202 : 102, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+        });
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Native_master_down_keeps_selected_owner_after_reload_or_filter_rebind(bool roles, bool reload) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var list = roles ? control.Roles : control.Users;
+            var search = roles ? control.RoleSearch : control.UserSearch;
+            var activity = roles ? control.RoleActivity : control.UserActivity;
+            var bounds = list.Items[1].GetBounds(ItemBoundsPortion.Label);
+            NativeLookupTypingDriver.Click(list, new Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2));
+            Assert.Equal(1, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.Equal(roles ? 202 : 102, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            search.Focus();
+            Assert.True(search.ContainsFocus);
+            var editor = GetFocus();
+            if (reload)
+            {
+                // Fresh DTO instances retain domain IDs, as on a successful server reload.
+                for (var i = 0; i < scene.Data.Users.Count; i++)
+                {
+                    var user = scene.Data.Users[i];
+                    scene.Data.Users[i] = new SecurityUserDto(user.UserId, user.Username, user.DisplayName, user.Email,
+                        user.IsActive, user.AssignmentRevision, user.RoleIds, user.DirectDecisions, user.IsProtectedAccount);
+                }
+                for (var i = 0; i < scene.Data.Roles.Count; i++)
+                {
+                    var role = scene.Data.Roles[i];
+                    scene.Data.Roles[i] = new SecurityRoleDto(role.RoleId, role.Name, role.IsActive,
+                        role.AssignmentRevision, role.MemberUserIds, role.PermissionKeys);
+                }
+                var operation = control.ActivateAsync(default);
+                Until(() => operation.IsCompleted);
+                operation.GetAwaiter().GetResult();
+            }
+            else
+            {
+                activity.SelectedIndex = roles ? 1 : 2;
+                activity.SelectedIndex = 0;
+            }
+            Assert.True(search.ContainsFocus);
+            Assert.Equal(editor, GetFocus());
+            AssertNativeSelection(editor, 0, 0);
+            Assert.Equal(roles ? 202 : 102, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            Assert.Equal(1, Assert.Single(list.SelectedIndices.Cast<int>()));
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.True(activity.ContainsFocus);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.True(list.ContainsFocus);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Equal(2, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.Equal(roles ? 203 : 103, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
     [Theory]
