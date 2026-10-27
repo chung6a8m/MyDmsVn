@@ -14,7 +14,7 @@ namespace MyDmsVn.Desktop.WinForms.Features.Security;
 internal sealed class SecurityWorkspaceEditorBindings
 {
     readonly SecurityWorkspaceControl _control;
-    readonly BootstrapDataGridView _grants = new()
+    readonly RoleGrantGrid _grants = new()
     {
         Dock = DockStyle.Fill, AccessibleName = "Cấp quyền cho vai trò", ReadOnly = true,
         AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false,
@@ -643,5 +643,16 @@ internal sealed class SecurityWorkspaceEditorBindings
         panel.Controls.Add(button);
         button.Click += async (_, _) => await _control.TrackOperation(action());
         return button;
+    }
+}
+
+internal sealed class RoleGrantGrid : BootstrapDataGridView
+{
+    protected override void WndProc(ref Message message)
+    {
+        // Only the app-owned text-cell fallback needs a repeat guard. Keep native checkbox messages intact.
+        if (message.Msg == 0x0100 && message.WParam.ToInt32() == (int)Keys.Space &&
+            (message.LParam.ToInt64() & (1L << 30)) != 0 && CurrentCell?.ColumnIndex > 0) return;
+        base.WndProc(ref message);
     }
 }

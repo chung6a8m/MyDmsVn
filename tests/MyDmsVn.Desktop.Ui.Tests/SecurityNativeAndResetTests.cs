@@ -436,6 +436,48 @@ public sealed class SecurityNativeAndResetTests
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Native_role_space_autorepeat_toggles_once_until_keyup(int column) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
+        {
+            control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            Assert.True(control.ViewModel.BeginRolePermissions());
+            var grants = Assert.Single(Descendants(control.RoleDetail).OfType<BootstrapDataGridView>());
+            var index = GrantIndex(grants, "Sales.Receipts.Post");
+            grants.CurrentCell = grants.Rows[index].Cells[column];
+            Assert.True(grants.Focus());
+            Assert.Equal(grants.Handle, GetFocus());
+            var draft = control.ViewModel.RoleDraft!;
+
+            Assert.True(PostMessage(grants.Handle, 0x0100, new IntPtr((int)Keys.Space), new IntPtr(1)));
+            System.Windows.Forms.Application.DoEvents();
+            Assert.True(Granted(grants, index));
+            Assert.Equal(1, draft.LocalEditRevision);
+            for (var repeat = 0; repeat < 3; repeat++)
+            {
+                Assert.True(PostMessage(grants.Handle, 0x0100, new IntPtr((int)Keys.Space), new IntPtr((1L << 30) | 1)));
+                System.Windows.Forms.Application.DoEvents();
+                Assert.True(Granted(grants, index));
+                Assert.Equal(1, draft.LocalEditRevision);
+            }
+            Assert.True(PostMessage(grants.Handle, 0x0101, new IntPtr((int)Keys.Space), new IntPtr((1L << 31) | (1L << 30) | 1)));
+            System.Windows.Forms.Application.DoEvents();
+            Assert.Equal(1, draft.LocalEditRevision);
+            Assert.Collection(draft.Changes, change =>
+            {
+                Assert.Equal("Sales.Receipts.Post", change.PermissionKey);
+                Assert.True(change.Granted);
+            });
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Space);
+            Assert.False(Granted(grants, index));
+            Assert.Equal(2, draft.LocalEditRevision);
+            Assert.Empty(draft.Changes);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
     [Fact]
     public void Native_space_on_permission_name_toggles_only_the_selected_canonical_key() =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L07, (control, scene) =>
@@ -874,6 +916,7 @@ public sealed class SecurityNativeAndResetTests
         Assert.True(condition(), "Security native/Reset operation did not complete within its bounded pump.");
     }
 
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] static extern IntPtr GetFocus();
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
