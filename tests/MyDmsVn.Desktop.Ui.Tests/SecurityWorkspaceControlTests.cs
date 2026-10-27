@@ -537,6 +537,37 @@ public sealed class SecurityWorkspaceControlTests
     });
 
     [Fact]
+    public void Role_grant_review_fixture_exposes_long_text_through_active_group_and_search() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        const string key = "UiLab.ReviewOnly.LongCanonicalPermissionKeyForNativeRoleGridOverflowAndTooltipInspection";
+        const string label = "Chỉ dùng để duyệt giao diện UI Lab: kiểm tra nhãn quyền tiếng Việt rất dài, xuống dòng và khả năng đọc đầy đủ trong bảng quyền của vai trò";
+        control.Tabs.SelectedIndex = 1;
+        var grants = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapDataGridView)).Cast<BootstrapDataGridView>());
+        var modules = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapComboBox)).Cast<BootstrapComboBox>());
+        var search = Assert.Single(Descendants(control.RoleDetail.GrantArea, typeof(BootstrapTextBox)).Cast<BootstrapTextBox>());
+        Assert.Contains("UiLab.ReviewOnly", modules.Items.Cast<string>());
+        Assert.DoesNotContain("Legacy", modules.Items.Cast<string>());
+        modules.SelectedItem = "UiLab.ReviewOnly";
+        var row = Assert.Single(grants.Rows.Cast<DataGridViewRow>());
+        Assert.Equal(key, row.Tag);
+        Assert.Equal(label + Environment.NewLine + key, row.Cells[1].Value);
+        Assert.Equal("UiLab.ReviewOnly", row.Cells[2].Value);
+        Assert.Contains(label, row.Cells[1].ToolTipText);
+        Assert.Contains(key, row.Cells[1].ToolTipText);
+        Assert.False(Granted(grants, 0));
+        foreach (var query in new[] { "nhãn quyền tiếng Việt rất dài", "LongCanonicalPermissionKeyForNativeRoleGrid" })
+        {
+            search.Text = query;
+            Assert.Equal(key, Assert.Single(grants.Rows.Cast<DataGridViewRow>()).Tag);
+        }
+        search.Text = "Sales.Receipts.Read";
+        Assert.Empty(grants.Rows.Cast<DataGridViewRow>());
+        modules.SelectedItem = "Sales";
+        Assert.Equal("Sales.Receipts.Read", Assert.Single(grants.Rows.Cast<DataGridViewRow>()).Tag);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Fact]
     public void Role_editor_has_filters_history_and_contextual_recovery() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
         control.Tabs.SelectedIndex = 1;

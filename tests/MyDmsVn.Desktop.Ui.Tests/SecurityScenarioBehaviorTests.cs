@@ -13,6 +13,28 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class SecurityScenarioBehaviorTests
 {
     [Fact]
+    public void Review_fixture_keeps_real_keys_and_adds_one_unassigned_long_label_key()
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);
+        const string reviewKey = "UiLab.ReviewOnly.LongCanonicalPermissionKeyForNativeRoleGridOverflowAndTooltipInspection";
+        const string reviewLabel = "Chỉ dùng để duyệt giao diện UI Lab: kiểm tra nhãn quyền tiếng Việt rất dài, xuống dòng và khả năng đọc đầy đủ trong bảng quyền của vai trò";
+        var review = Assert.Single(scene.Data.Catalog.Items, item => item.Key == reviewKey);
+        Assert.Equal(reviewLabel, review.Description);
+        Assert.Equal("UiLab.ReviewOnly", review.Module);
+        Assert.Equal("Active", review.Status);
+        Assert.Equal(new[]
+        {
+            "Inventory.Stock.Audit", "Inventory.Stock.Export", "Inventory.Stock.Read",
+            "Sales.Receipts.Post", "Sales.Receipts.Read", "Sales.Receipts.Write", reviewKey
+        }, scene.Data.Catalog.Items.Where(item => item.Status == "Active").Select(item => item.Key).OrderBy(key => key, System.StringComparer.Ordinal));
+        Assert.All(scene.Data.Roles, role => Assert.DoesNotContain(reviewKey, role.PermissionKeys));
+        Assert.All(scene.Data.Users, user => Assert.DoesNotContain(user.DirectDecisions, decision => decision.PermissionKey == reviewKey));
+        Assert.Contains(scene.Data.Catalog.Items, item => item.Key == "Legacy.Deprecated" && item.Status == "Deprecated");
+        Assert.Contains("Legacy.Orphan", scene.Data.Roles.Single(role => role.RoleId == 201).PermissionKeys);
+        Assert.DoesNotContain(scene.Data.Catalog.Items, item => item.Key == "Legacy.Orphan");
+    }
+
+    [Fact]
     public async Task Held_import_preview_cannot_publish_after_session_replacement()
     {
         using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L09);

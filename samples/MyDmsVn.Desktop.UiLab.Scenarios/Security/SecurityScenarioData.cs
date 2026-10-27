@@ -24,6 +24,9 @@ public sealed class SecurityScenarioData
         new PermissionCatalogItemDto("Inventory.Stock.Read", "Inventory", "Xem tồn kho", "Active"),
         new PermissionCatalogItemDto("Inventory.Stock.Audit", "Inventory", "Kiểm tra tồn kho", "Active"),
         new PermissionCatalogItemDto("Inventory.Stock.Export", "Inventory", "Xuất danh sách tồn kho", "Active"),
+        // Review-only fake definition: exercises long role-grid text, never product authorization.
+        new PermissionCatalogItemDto("UiLab.ReviewOnly.LongCanonicalPermissionKeyForNativeRoleGridOverflowAndTooltipInspection", "UiLab.ReviewOnly",
+            "Chỉ dùng để duyệt giao diện UI Lab: kiểm tra nhãn quyền tiếng Việt rất dài, xuống dòng và khả năng đọc đầy đủ trong bảng quyền của vai trò", "Active"),
         new PermissionCatalogItemDto("Legacy.Deprecated", "Legacy", "Quyền ngừng hỗ trợ", "Deprecated")
     });
 }
