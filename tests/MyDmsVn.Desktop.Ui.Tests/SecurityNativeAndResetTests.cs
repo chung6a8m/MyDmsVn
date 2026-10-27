@@ -465,7 +465,7 @@ public sealed class SecurityNativeAndResetTests
                 Assert.True(Granted(grants, index));
                 Assert.Equal(1, draft.LocalEditRevision);
             }
-            Assert.True(PostMessage(grants.Handle, 0x0101, new IntPtr((int)Keys.Space), new IntPtr((1L << 31) | (1L << 30) | 1)));
+            Assert.True(PostMessage(grants.Handle, 0x0101, new IntPtr((int)Keys.Space), new IntPtr(unchecked((int)0xC0000001))));
             System.Windows.Forms.Application.DoEvents();
             Assert.Equal(1, draft.LocalEditRevision);
             Assert.Collection(draft.Changes, change =>
