@@ -255,8 +255,9 @@ public sealed class SecurityNativeAndResetTests
                 try
                 {
                     opened = true;
-                    Assert.Equal("Hủy", Assert.IsType<Button>(dialog.CancelButton).Text);
-                    Assert.True(dialog.Controls.Cast<Control>().SelectMany(Descendants).OfType<TextBox>().First().Focus());
+                    Assert.Equal("Hủy", Assert.IsType<BootstrapButton>(dialog.CancelButton).Text);
+                    SecurityWorkspaceControlTests.DialogInputs(dialog).First().Focus();
+                    Assert.True(SecurityWorkspaceControlTests.DialogInputs(dialog).First().ContainsFocus);
                     NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
                     Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
                 }

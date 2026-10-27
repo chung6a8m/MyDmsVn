@@ -118,7 +118,7 @@ public sealed class SecurityReviewScenarioTests
                 try
                 {
                     var fields = Assert.Single(dialog.Controls.OfType<FlowLayoutPanel>());
-                    var password = Assert.Single(fields.Controls.OfType<TextBox>());
+                    var password = Assert.IsType<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapTextBox>(Assert.Single(SecurityWorkspaceControlTests.DialogInputs(dialog)));
                     var save = Assert.Single(fields.Controls.OfType<Button>(), button => button.Text == "Xác nhận");
                     var release = fields.Controls.OfType<Button>().FirstOrDefault(button => button.AccessibleName == "Release held Security mutation (Lab)");
                     if (phase == 0)
@@ -129,6 +129,8 @@ public sealed class SecurityReviewScenarioTests
                             return;
                         }
                         Assert.False(release.Enabled);
+                        Assert.True(release.Left >= 0 && release.Right <= fields.ClientSize.Width,
+                            "The modal release action must remain within the command area.");
                         password.Text = "lab-fixture-only";
                         save.PerformClick();
                         phase = 1;
@@ -144,7 +146,7 @@ public sealed class SecurityReviewScenarioTests
                     }
                     else if (phase == 2 && scene.Journal.Entries.Any(entry => entry.Operation == "Security.Mutate.Result"))
                     {
-                        var validation = Assert.Single(fields.Controls.OfType<Label>(), label => label.AccessibleName == "Lỗi mật khẩu");
+                        var validation = Assert.Single(password.Parent!.Controls.OfType<Label>(), label => label.AccessibleName == "Lỗi mật khẩu");
                         if (!validation.Text.Contains("Xung đột")) return;
                         Assert.Empty(password.Text);
                         Assert.Single(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");

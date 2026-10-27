@@ -515,74 +515,18 @@ internal sealed class SecurityWorkspaceEditorBindings
     async Task IdentityDialogAsync(bool userTarget, bool create)
     {
         if (!await AdmitAsync()) return;
-        if (userTarget && create) { await CreateUserDialogAsync(); return; }
-        var user = Vm.SelectedUser;
-        var role = Vm.SelectedRole;
-        if (!create && (userTarget ? user == null || user.IsProtectedAccount : role == null)) return;
-        using var dialog = new MutationDialog { Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name), Width = 440, Height = userTarget ? (create ? 430 : 380) : 240, StartPosition = FormStartPosition.CenterParent };
-        var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
-        var name = new TextBox { Width = 380, AccessibleName = userTarget ? "Tên đăng nhập" : "Tên vai trò", Text = create ? "" : userTarget ? user!.Username : role!.Name };
-        var display = new TextBox { Width = 380, AccessibleName = "Tên hiển thị", Text = create ? "" : user?.DisplayName ?? "" };
-        var email = new TextBox { Width = 380, AccessibleName = "Email", Text = create ? "" : user?.Email ?? "" };
-        var password = new TextBox { Width = 380, AccessibleName = "Mật khẩu tạm", UseSystemPasswordChar = true };
-        var identityFields = (Name: (Control)name, Display: (Control)display, Email: (Control)email, Password: (Control)password);
-        void AddField(string caption, TextBox field)
-        {
-            fields.Controls.Add(new Label { Text = caption, AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
-            fields.Controls.Add(field);
-        }
-        AddField(userTarget ? "Tên đăng nhập" : "Tên vai trò", name);
-        if (userTarget)
-        {
-            AddField("Tên hiển thị", display);
-            AddField("Email", email);
-            if (create) AddField("Mật khẩu tạm", password);
-        }
-        var validation = new Label { AutoSize = true, AccessibleName = "Lỗi thông tin" };
-        fields.Controls.Add(validation);
-        var reload = new Button { Text = "Tải lại để đối chiếu", AutoSize = true, Visible = false };
-        fields.Controls.Add(reload);
-        var save = new Button { Text = "Lưu thông tin", AutoSize = true };
-        var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
-        fields.Controls.Add(save); fields.Controls.Add(cancel); dialog.Controls.Add(fields);
-        dialog.AcceptButton = save;
-        dialog.CancelButton = cancel;
-        var closeGuard = new MutationDialogCloseGuard(dialog, cancel, validation, _control, Vm);
-        reload.Click += async (_, _) => await ReloadDialogAsync(dialog, validation, reload);
-        save.Click += async (_, _) =>
-        {
-            save.Enabled = false;
-            try
-            {
-                var invalid = ValidateIdentityFields(userTarget, create, identityFields);
-                if (invalid.HasValue)
-                {
-                    validation.Text = invalid.Value.Message;
-                    invalid.Value.Field.Focus();
-                    return;
-                }
-                var saved = await ExecuteIdentityMutationAsync(userTarget, create,
-                    create ? 0 : userTarget ? user!.UserId : role!.RoleId,
-                    create ? null : userTarget ? user!.AssignmentRevision : role!.AssignmentRevision, identityFields, closeGuard);
-                if (saved) dialog.Close();
-                else if (!dialog.IsDisposed)
-                {
-                    var field = PresentIdentityFeedback(validation, reload, identityFields);
-                    (field ?? (Vm.RequiresRecovery ? reload : name)).Focus();
-                }
-            }
-            finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
-        };
-        BusinessCompactAppearance.Apply(dialog);
-        dialog.ShowDialog(_control);
-        password.Clear();
+        await ShowIdentityDialogAsync(userTarget, create);
     }
 
-    Task CreateUserDialogAsync()
+    Task ShowIdentityDialogAsync(bool userTarget, bool create)
     {
+        var user = Vm.SelectedUser;
+        var role = Vm.SelectedRole;
+        if (!create && (userTarget ? user == null || user.IsProtectedAccount : role == null)) return Task.CompletedTask;
         using var dialog = new MutationDialog
         {
-            Text = "Tạo người dùng", Width = 480, Height = 470, StartPosition = FormStartPosition.CenterParent,
+            Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name),
+            Width = 480, Height = userTarget ? (create ? 470 : 400) : 260, StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false
         };
         var body = new BootstrapPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12), SurfaceRole = BootstrapSurfaceRole.Surface };
@@ -602,10 +546,16 @@ internal sealed class SecurityWorkspaceEditorBindings
             fields.Controls.Add(input);
             return input;
         }
-        var name = AddField("Tên đăng nhập", 0);
-        var display = AddField("Tên hiển thị", 1);
-        var email = AddField("Email", 2);
-        var password = AddField("Mật khẩu tạm", 3, true);
+        var name = AddField(userTarget ? "Tên đăng nhập" : "Tên vai trò", 0);
+        var display = userTarget ? AddField("Tên hiển thị", 1) : new BootstrapTextBox();
+        var email = userTarget ? AddField("Email", 2) : new BootstrapTextBox();
+        var password = userTarget && create ? AddField("Mật khẩu tạm", 3, true) : new BootstrapTextBox();
+        using var unusedFields = new Panel();
+        foreach (var input in new[] { display, email, password })
+            if (input.Parent == null) unusedFields.Controls.Add(input);
+        name.Text = create ? "" : userTarget ? user!.Username : role!.Name;
+        display.Text = create ? "" : user?.DisplayName ?? "";
+        email.Text = create ? "" : user?.Email ?? "";
         var inputs = new[] { name, display, email, password };
         var identityFields = (Name: (Control)name, Display: (Control)display, Email: (Control)email, Password: (Control)password);
         var validation = new BootstrapLabel
@@ -632,7 +582,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         foreach (var input in inputs) input.TextChanged += (_, _) =>
         {
             if (clearingSecret || !ReferenceEquals(input, invalidFeedbackInput)) return;
-            var invalid = ValidateIdentityFields(true, true, identityFields);
+            var invalid = ValidateIdentityFields(userTarget, create, identityFields);
             if (invalid.HasValue && ReferenceEquals(invalid.Value.Field, input))
             {
                 validation.Text = invalid.Value.Message;
@@ -662,14 +612,16 @@ internal sealed class SecurityWorkspaceEditorBindings
                 invalidFeedbackInput = null;
                 validation.Text = "";
                 foreach (var input in inputs) input.ValidationState = BootstrapValidationState.None;
-                var invalid = ValidateIdentityFields(true, true, identityFields);
+                var invalid = ValidateIdentityFields(userTarget, create, identityFields);
                 if (invalid.HasValue)
                 {
                     ShowFieldFeedback(invalid.Value.Field, invalid.Value.Message);
                     invalid.Value.Field.Focus();
                     return;
                 }
-                var saved = await ExecuteIdentityMutationAsync(true, true, 0, null, identityFields, closeGuard);
+                var saved = await ExecuteIdentityMutationAsync(userTarget, create,
+                    create ? 0 : userTarget ? user!.UserId : role!.RoleId,
+                    create ? null : userTarget ? user!.AssignmentRevision : role!.AssignmentRevision, identityFields, closeGuard);
                 if (saved) dialog.Close();
                 else if (!dialog.IsDisposed)
                 {
@@ -682,8 +634,7 @@ internal sealed class SecurityWorkspaceEditorBindings
         };
         // A separate presentation owner; toolkit composites retain ownership of native editor internals.
         BusinessCompactAppearance.Apply(dialog);
-        try { dialog.ShowDialog(_control); }
-        finally { ClearSecret(); }
+        ShowOwnedMutationDialog(dialog, ClearSecret);
         return Task.CompletedTask;
     }
 
@@ -733,16 +684,41 @@ internal sealed class SecurityWorkspaceEditorBindings
     async Task PasswordAsync()
     {
         if (!await AdmitAsync() || Vm.SelectedUser is not { IsProtectedAccount: false } user) return;
-        using var dialog = new MutationDialog { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 230, StartPosition = FormStartPosition.CenterParent };
-        var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
-        var password = new TextBox { Width = 360, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới" };
-        var validation = new Label { AutoSize = true, AccessibleName = "Lỗi mật khẩu" };
-        var reload = new Button { Text = "Tải lại để đối chiếu", AutoSize = true, Visible = false };
-        var save = new Button { Text = "Xác nhận", AutoSize = true };
-        var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
-        fields.Controls.Add(new Label { Text = "Mật khẩu mới", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
-        fields.Controls.Add(password); fields.Controls.Add(validation); fields.Controls.Add(reload); fields.Controls.Add(save); fields.Controls.Add(cancel);
-        dialog.Controls.Add(fields);
+        using var dialog = new MutationDialog
+        {
+            Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 480, Height = 260, StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false
+        };
+        var body = new BootstrapPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12), SurfaceRole = BootstrapSurfaceRole.Surface, TabIndex = 0 };
+        var fields = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, TabIndex = 0 };
+        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        var password = new BootstrapTextBox { Dock = DockStyle.Top, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới", TabIndex = 0, Margin = new Padding(0, 0, 0, 4) };
+        var validation = new BootstrapLabel { AutoSize = true, MaximumSize = new System.Drawing.Size(400, 0), AccessibleName = "Lỗi mật khẩu", AccessibleRole = AccessibleRole.Alert, TextRole = BootstrapTextRole.Danger, Margin = new Padding(0, 8, 0, 0) };
+        var reload = new BootstrapButton { Text = "Tải lại để đối chiếu", AutoSize = true, Visible = false, Variant = BootstrapVariant.Secondary, Outline = true, TabIndex = 2 };
+        var save = new BootstrapButton { Text = "Xác nhận", AutoSize = true, Variant = BootstrapVariant.Primary, TabIndex = 0 };
+        var cancel = new BootstrapButton { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel, Variant = BootstrapVariant.Secondary, Outline = true, TabIndex = 1 };
+        fields.Controls.Add(new BootstrapLabel { Text = "Mật khẩu mới", AutoSize = true, Margin = new Padding(0, 8, 0, 4), TabStop = false });
+        fields.Controls.Add(password); fields.Controls.Add(validation);
+        body.Controls.Add(fields);
+        dialog.Controls.Add(body);
+        var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 56, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8), WrapContents = false, TabIndex = 1 };
+        footer.Controls.AddRange(new Control[] { save, cancel, reload });
+        dialog.Controls.Add(footer);
+        dialog.Shown += (_, _) => password.Focus();
+        var clearingSecret = false;
+        void ClearSecret()
+        {
+            clearingSecret = true;
+            try { password.Clear(); }
+            finally { clearingSecret = false; }
+        }
+        password.TextChanged += (_, _) =>
+        {
+            if (clearingSecret || password.ValidationState != BootstrapValidationState.Invalid) return;
+            if (password.Text.Length == 0 || Encoding.UTF8.GetByteCount(password.Text) > 72) return;
+            password.ValidationState = BootstrapValidationState.None;
+            validation.Text = "";
+        };
         dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
         var closeGuard = new MutationDialogCloseGuard(dialog, cancel, validation, _control, Vm);
@@ -755,6 +731,7 @@ internal sealed class SecurityWorkspaceEditorBindings
                 if (password.Text.Length == 0 || Encoding.UTF8.GetByteCount(password.Text) > 72)
                 {
                     validation.Text = "Mật khẩu phải có từ 1 đến 72 byte UTF-8.";
+                    password.ValidationState = BootstrapValidationState.Invalid;
                     password.Focus();
                     return;
                 }
@@ -769,19 +746,41 @@ internal sealed class SecurityWorkspaceEditorBindings
                 else if (!dialog.IsDisposed)
                 {
                     validation.Text = Vm.LastMutationFeedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
+                    if (Vm.LastMutationFeedback?.Field == "password") password.ValidationState = BootstrapValidationState.Invalid;
                     reload.Visible = Vm.RequiresRecovery;
                     (Vm.RequiresRecovery ? (Control)reload : password).Focus();
                 }
             }
-            finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
+            finally { ClearSecret(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
         };
         BusinessCompactAppearance.Apply(dialog);
+        ShowOwnedMutationDialog(dialog, ClearSecret);
+    }
+
+    void ShowOwnedMutationDialog(MutationDialog dialog, Action clearSecret)
+    {
+        void OwnerChanged(object? sender, EventArgs args)
+        {
+            if (Vm.IsCurrent && !_control.IsDisposed || dialog.IsDisposed) return;
+            clearSecret();
+            dialog.Close();
+        }
+        Vm.Changed += OwnerChanged;
+        _control.Disposed += OwnerChanged;
         try { dialog.ShowDialog(_control); }
-        finally { password.Clear(); }
+        finally
+        {
+            Vm.Changed -= OwnerChanged;
+            _control.Disposed -= OwnerChanged;
+            clearSecret();
+        }
     }
 
     sealed class MutationDialog : Form
     {
+        // BC-08: pinned BootstrapModalHeader.ApplyTypography can dispose a Font retained by
+        // its native title Label on an equal-font theme switch. Keep OS chrome until T06
+        // disposition; app-owned body/validation/commands use public toolkit controls.
         internal Func<bool>? ShouldBlockClose { get; set; }
 
         protected override void WndProc(ref Message message)

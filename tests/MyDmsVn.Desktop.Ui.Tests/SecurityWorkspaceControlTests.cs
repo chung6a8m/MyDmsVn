@@ -1269,6 +1269,129 @@ public sealed class SecurityWorkspaceControlTests
         }
         finally { BootstrapThemeManager.CurrentTheme = priorTheme; }
     });
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void Secret_dialog_closes_and_clears_input_on_owner_boundary(bool create, bool disposeOwner) => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var command = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == (create ? "Tạo người dùng…" : "Đặt lại mật khẩu…"));
+        ExceptionDispatchInfo? failure = null;
+        BootstrapTextBox? secret = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => create ? form.Text == "Tạo người dùng" : form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) return;
+            timer.Stop();
+            try
+            {
+                secret = Assert.Single(DialogInputs(dialog).OfType<BootstrapTextBox>(), input => input.UseSystemPasswordChar);
+                secret.Text = "session-bound-fixture";
+                if (disposeOwner) control.Dispose();
+                else data.Session.Replace();
+                Assert.Empty(secret.Text);
+                Assert.NotEqual(DialogResult.None, dialog.DialogResult);
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            }
+            catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
+            finally { dialog.Close(); }
+        };
+        timer.Start(); command.PerformClick();
+        Assert.False(timer.Enabled);
+        failure?.Throw();
+        Assert.NotNull(secret);
+        Assert.True(secret!.IsDisposed);
+        Assert.Empty(secret.Text);
+    });
+
+    [Theory]
+    [InlineData("edit-user")]
+    [InlineData("create-role")]
+    [InlineData("edit-role")]
+    [InlineData("password")]
+    public void Remaining_identity_dialogs_keep_toolkit_validation_native_input_and_open_theme(string kind) => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var roles = kind.Contains("role");
+        if (roles) control.Tabs.SelectedIndex = 1;
+        var caption = kind == "edit-user" ? "Sửa thông tin…" : kind == "create-role" ? "Tạo vai trò…" : kind == "edit-role" ? "Sửa tên…" : "Đặt lại mật khẩu…";
+        var command = Assert.Single(Descendants(roles ? (Control)control.RoleDetail : control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == caption);
+        ExceptionDispatchInfo? failure = null;
+        var prior = BootstrapThemeManager.CurrentTheme;
+        BootstrapTextBox? secret = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo vai trò" || form.Text.StartsWith("Sửa — ") || form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) return;
+            timer.Stop();
+            try
+            {
+                var inputs = DialogInputs(dialog).Select(input => Assert.IsType<BootstrapTextBox>(input)).OrderBy(input => input.TabIndex).ToArray();
+                var first = inputs[0];
+                Assert.True(first.ContainsFocus);
+                Assert.Equal(kind == "password" ? "Mật khẩu mới" : roles ? "Tên vai trò" : "Tên đăng nhập", first.AccessibleName);
+                if (kind != "create-role") Assert.Contains(roles ? control.ViewModel.SelectedRole!.Name : control.ViewModel.SelectedUser!.DisplayName, dialog.Text);
+                var save = Assert.IsType<BootstrapButton>(dialog.AcceptButton);
+                var cancel = Assert.IsType<BootstrapButton>(dialog.CancelButton);
+                Assert.Equal(BootstrapVariant.Primary, save.Variant);
+                Assert.False(save.Outline);
+                Assert.Equal(BootstrapVariant.Secondary, cancel.Variant);
+                first.Clear();
+                save.PerformClick();
+                Assert.True(first.ContainsFocus);
+                Assert.Equal(BootstrapValidationState.Invalid, first.ValidationState);
+                var validation = Assert.Single(Descendants(dialog, typeof(BootstrapLabel)).Cast<BootstrapLabel>(), label => label.AccessibleRole == AccessibleRole.Alert);
+                Assert.False(string.IsNullOrEmpty(validation.Text));
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                var driver = new NativeLookupTypingDriver(first);
+                foreach (var character in "pilot") driver.TypeCharacter(character);
+                Assert.Equal(BootstrapValidationState.None, first.ValidationState);
+                Assert.Empty(validation.Text);
+                driver.SelectRange(1, 2);
+                foreach (var mode in new[] { BootstrapThemeMode.Dark, BootstrapThemeMode.Light })
+                {
+                    BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(mode);
+                    System.Windows.Forms.Application.DoEvents();
+                    Assert.Equal("pilot", driver.Text);
+                    Assert.Equal(1, driver.SelectionStart);
+                    Assert.Equal(2, driver.SelectionLength);
+                    driver.AssertFocused();
+                    Assert.Equal(10f, first.Font.SizeInPoints);
+                    Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, first.BackColor);
+                    Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Danger, validation.ForeColor);
+                    Assert.False(save.Font.GetHeight() <= 0);
+                }
+                driver.TypeCharacter('X');
+                Assert.Equal("pXot", driver.Text);
+                if (kind == "password") { secret = first; Assert.True(first.UseSystemPasswordChar); }
+                for (var index = 1; index < inputs.Length; index++)
+                {
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+                    Assert.True(inputs[index].ContainsFocus);
+                }
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+                Assert.True(save.ContainsFocus);
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+                Assert.True(cancel.ContainsFocus);
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
+            }
+            catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
+            finally { dialog.Close(); }
+        };
+        try
+        {
+            timer.Start(); command.PerformClick();
+            Assert.False(timer.Enabled);
+            failure?.Throw();
+            if (secret != null) { Assert.Empty(secret.Text); Assert.True(secret.IsDisposed); }
+            Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        }
+        finally { BootstrapThemeManager.CurrentTheme = prior; }
+    });
+
     [Fact]
     public void User_create_public_inputs_keep_native_tab_typing_and_theme_state() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
     {
@@ -1649,7 +1772,12 @@ public sealed class SecurityWorkspaceControlTests
                     else if (kind == "edit-user")
                         Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Tên hiển thị").Text = "Held Review User";
                     if (secret != null) secret.Text = "fixture-only-password";
-                    save.PerformClick();
+                    phase = 1;
+                    timer.Stop(); // Native input pumps messages; do not re-enter the initial dispatch.
+                    DialogInputs(dialog).First().Focus();
+                    Assert.True(DialogInputs(dialog).First().ContainsFocus);
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                    timer.Start();
                     var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate").Request);
                     var expected = kind switch
                     {
@@ -1660,7 +1788,6 @@ public sealed class SecurityWorkspaceControlTests
                         _ => (SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, 101, (long?)11)
                     };
                     Assert.Equal(expected, (request.Target, request.Operation, request.TargetId, request.ExpectedRevision));
-                    phase = 1;
                 }
                 else if (phase == 1)
                 {
@@ -1675,6 +1802,8 @@ public sealed class SecurityWorkspaceControlTests
                     var focusTarget = (Control?)secret ?? DialogInputs(dialog).First();
                     focusTarget.Focus();
                     Assert.True(focusTarget.ContainsFocus);
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                     NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
                     Assert.True(dialog.Visible);
                     Assert.Equal(DialogResult.None, dialog.DialogResult);
@@ -1746,7 +1875,7 @@ public sealed class SecurityWorkspaceControlTests
             {
                 var save = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận");
                 Assert.Contains(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.Visible && label.Text == "Mật khẩu mới");
-                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                var password = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới"));
                 save.PerformClick();
                 Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                 Assert.True(dialog.Visible);
@@ -1754,7 +1883,7 @@ public sealed class SecurityWorkspaceControlTests
                 save.PerformClick();
                 Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                 Assert.Empty(password.Text);
-                Assert.True(password.Focused);
+                Assert.True(password.ContainsFocus);
             }
             catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); }
             finally { dialog.Close(); }
@@ -1769,7 +1898,7 @@ public sealed class SecurityWorkspaceControlTests
     {
         var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đặt lại mật khẩu…");
         ExceptionDispatchInfo? dialogError = null;
-        TextBox? secret = null;
+        BootstrapTextBox? secret = null;
         using var timer = new System.Windows.Forms.Timer { Interval = 30 };
         timer.Tick += (_, _) =>
         {
@@ -1778,9 +1907,10 @@ public sealed class SecurityWorkspaceControlTests
             timer.Stop();
             try
             {
-                secret = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                secret = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới"));
                 secret.Text = "new-temporary-password";
-                Assert.True(secret.Focus());
+                secret.Focus();
+                Assert.True(secret.ContainsFocus);
                 NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
                 Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
             }
@@ -1813,7 +1943,7 @@ public sealed class SecurityWorkspaceControlTests
             if (dialog == null) { if (phase == 2) timer.Stop(); return; }
             try
             {
-                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                var password = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới"));
                 if (phase == 0)
                 {
                     phase = 1;
@@ -1842,7 +1972,7 @@ public sealed class SecurityWorkspaceControlTests
                         phase = 2;
                         return;
                     }
-                    else Assert.True(password.Focused);
+                    else Assert.True(password.ContainsFocus);
                     timer.Stop();
                     dialog.Close();
                 }
@@ -1884,7 +2014,7 @@ public sealed class SecurityWorkspaceControlTests
             if (dialog == null) { if (phase == 4) timer.Stop(); return; }
             try
             {
-                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                var password = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới"));
                 var reload = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Tải lại để đối chiếu");
                 if (phase == 0)
                 {
@@ -1953,13 +2083,13 @@ public sealed class SecurityWorkspaceControlTests
             {
                 if (phase == 0)
                 {
-                    Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới").Text = "fixture-only-password";
+                    Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới").Text = "fixture-only-password";
                     Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận").PerformClick();
                     phase = 1;
                 }
                 else if (control.ViewModel.RequiresRecovery)
                 {
-                    Assert.Empty(Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới").Text);
+                    Assert.Empty(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới").Text);
                     Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Hủy").PerformClick();
                     timer.Stop();
                 }
