@@ -1,6 +1,6 @@
 # Security administration — UI and behavior specification
 
-**Design basis:** Owner-reviewed conversation and mockups, 2026-10-25. **Inspected source:** `0216701835cc3326124a94760186989c1ac4f729` on `v1a-pro-ui-next`. **Implementation state:** proposed; this document does not report a running UI or SQL acceptance.
+**Design basis:** Owner-reviewed conversation and mockups, 2026-10-25. **Original inspected baseline:** `0216701835cc3326124a94760186989c1ac4f729` on `v1a-pro-ui-next`. **Implementation state:** the reviewed candidate and bounded Local/SQL handoff are implemented; the [plan](../plans/20261025-002-security-administration-ui-lab-first.md) and [evidence](../evidence/security/20261025-security-local-sql.md) own exact acceptance and remaining limits.
 
 The [implementation plan](../plans/20261025-002-security-administration-ui-lab-first.md) owns task state and verification. The [visual references](../design-references/security-administration/README.md) illustrate composition; this specification and the Owner's explicit corrections take precedence over illustrative values in the wireframes and original conversation mockups. The [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) defines the repeatable review exercises.
 
@@ -27,22 +27,22 @@ Preserve account/role create, update and activation, password reset, membership 
 2. **Chosen:** object-scoped desktop workspace, read-only catalog and production components exercised with fake ports in the existing UI Lab. This preserves the current service boundary while making edit ownership visible.
 3. An atomic replace-all-role-grants command would require a new contract/server/SQL transaction. This scope instead defines an explicit serial-save workflow with partial-success recovery; it does not promise batch atomicity.
 
-These are planning decisions for review, not claims that new classes or behaviors already exist.
+These decisions defined the reviewed candidate. Runtime outcomes and limitations are recorded in the plan and evidence, not inferred from this specification.
 
 ## 2. Source baseline and component ownership
 
-| Existing source | Fact at the inspected commit |
+| Source at the original baseline | Fact at the inspected commit and current disposition |
 |---|---|
-| [SecurityAdministrationControl](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityAdministrationControl.cs) | Three basic tabs; shared assignment target selector; immediate membership/permission mutation; no `IWorkspaceCloseParticipant`. |
-| [SecurityAdministrationViewModel](../../src/MyDmsVn.Desktop.Application/Security/SecurityAdministrationViewModel.cs) | Single-item commands and textual explanations; successful datasets can coexist with failed/stale datasets. Its `IsAssigned` metadata is not an effective-authorization result. |
+| `SecurityAdministrationControl.cs` (retired baseline source) | Three basic tabs; shared assignment target selector; immediate membership/permission mutation; no `IWorkspaceCloseParticipant`. Removed at SEC-T06. Current [SecurityWorkspaceControl](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceControl.cs) owns presentation. |
+| `SecurityAdministrationViewModel.cs` (retired baseline source) | Single-item commands and textual explanations; successful datasets could coexist with failed/stale datasets. Its `IsAssigned` metadata was not an effective-authorization result. Removed at SEC-T06. Current [SecurityWorkspaceViewModel](../../src/MyDmsVn.Desktop.Application/Security/SecurityWorkspaceViewModel.cs) owns session-scoped state. |
 | [FeatureApiClients](../../src/MyDmsVn.Desktop.Application/FeatureApiClients.cs) | Existing `ISecurityAdministrationApiClient` and `IPermissionCatalogApiClient`. No bulk replacement or arbitrary-selected-user authorization endpoint. |
 | [Administration DTOs](../../src/MyDmsVn.Contracts/Security/SecurityAdministrationDtos.cs) | User role IDs/direct decisions/protection marker; role member IDs/granted keys; returned primary and related assignment revisions. |
 | [Mutation request](../../src/MyDmsVn.Contracts/Security/SecurityAdministrationMutationRequest.cs) | One operation/key/decision plus expected revisions; role grants and user direct decisions have different meanings. |
 | [Catalog DTO](../../src/MyDmsVn.Contracts/Security/PermissionCatalogDto.cs) | Key, module, description, lifecycle; friendly Vietnamese display names are a presentation concern. |
-| [UI Lab runbook](../development/UI_LAB.md) | Existing host/scenarios cover Sales; Security hosting and scenarios are proposed additions. |
+| [UI Lab runbook](../development/UI_LAB.md) | The host originally covered Sales; the SQL-free Security candidate and scenarios were added in SEC-T00–SEC-T04. |
 | [WorkspaceCloseCoordinator](../../src/MyDmsVn.Desktop.WinForms/WorkspaceCloseCoordinator.cs) and [WorkspaceFeedbackHost](../../src/MyDmsVn.Desktop.WinForms/WorkspaceFeedbackHost.cs) | Reuse existing close admission and workspace-owned feedback rather than a new global mechanism. |
 
-**Proposed candidate:** `SecurityWorkspaceViewModel` in Desktop.Application and `SecurityWorkspaceControl` plus focused views in Desktop.WinForms. They are application-owned production components, initially constructed only by the UI Lab. The current production factory continues constructing the legacy control until the Owner gate passes. Post-gate cutover reuses the exact reviewed candidate; it does not rebuild a second UI from screenshots. A temporary coexistence is allowed only across that cutover; map legacy tests before retiring obsolete UI paths.
+**Implemented candidate:** `SecurityWorkspaceViewModel` in Desktop.Application and `SecurityWorkspaceControl` plus focused views in Desktop.WinForms are application-owned production components. The SQL-free Lab constructed the same candidate for review. After the dated SEC-T05 Owner approval, SEC-T06 bound its Local ports and switched the production factory to it; duplicate legacy UI paths were retired and test obligations mapped in the [post-gate evidence](../evidence/security/20261025-security-local-sql.md).
 
 The Lab references Contracts/Desktop.Application/WinForms and its sample scenarios. It must not compose Local, Server, DbMigrator, SQL fixtures or real login/configuration. Existing Sales scenarios remain usable. The pinned toolkit is `vendor/MyDmsVn.WinFormsKit@c232a4c09dc0386a5bd8bb484a5c991acae827d5`; SourceGrid inside it is `f4e457b43582bf01892f50bdc74aa480531e5944`. Reuse the pinned controls, theme tokens, alert/toast/validation/spinner and lifetime primitives. Any proven vendor change requires its own reviewed upstream change and explicit pin; it is not assumed here.
 
@@ -151,7 +151,7 @@ An operation captures the owner and submitted local edit revision. The post-gate
 
 ### 7.2 Serial role save — selected implementation decision
 
-The existing port accepts one key per request. A proposed `SecurityAssignmentSaveCoordinator` calls raw `ISecurityAdministrationApiClient.MutateAsync`; it must not loop legacy `SetRolePermissionAsync`, which hides individual outcomes and refreshes on each call.
+The existing port accepts one key per request. The implemented `SecurityAssignmentSaveCoordinator` calls raw `ISecurityAdministrationApiClient.MutateAsync`; it does not loop legacy `SetRolePermissionAsync`, which hides individual outcomes and refreshes on each call.
 
 1. Freeze role ID, original grant set, desired set, loaded role revision and operation/session owner. Sort changed Active keys with ordinal comparison; do not manufacture changes for filtered/inactive/orphan keys.
 2. Send one existing Role/SetPermission command at a time. After each success, chain the exact returned `AssignmentRevision`, including successful `Changed == false` responses. Never use `revision + 1`, parallel writes or a guessed retry token.
@@ -176,9 +176,9 @@ These names are new design decisions, not baseline APIs. Define them in Desktop.
 | `SecuritySaveOutcome` | Completion (`NoChanges`, `Complete`, `Partial`, `NoneConfirmed`) is separate from stop reason (`None`, `Rejected`, `Conflict`, `Forbidden`, `CanceledBeforeDispatch`, `OutcomeUnknown`) and refresh outcome. Retain each confirmed/rejected/uncertain/unattempted item; partial completion can coexist with a conflict or unknown result. No error-swallowing `Task`-only API for batch orchestration. |
 | `SecurityWorkspaceViewModel` / `SecurityWorkspaceControl` | View-model takes an explicit captured session version plus already-bound administration/catalog ports and owns datasets/drafts/commands; control maps state to existing close/feedback interfaces. Lab fake constructors bind that same owner. The production factory captures/binds once and returns this candidate only after the UI Labs gate. |
 
-Post-gate Local admission follows the existing Sales pattern: proposed application-only `ForSession(long expectedSessionVersion)` methods on the administration and catalog ports retain an immutable version and use the existing dispatcher's `SendForCurrentSessionAsync` path. Same-version binding returns the same instance; rebinding to another version is rejected. The factory captures one version for both ports and the candidate. A bound `Auth.SessionChanged` response fences presentation; an already admitted old-actor write may still finish, so it is not evidence of rollback. No new transport endpoint, request field or SQL procedure is selected.
+Post-gate Local admission follows the existing Sales pattern: implemented application-only `ForSession(long expectedSessionVersion)` methods on the administration and catalog ports retain an immutable version and use the existing dispatcher's `SendForCurrentSessionAsync` path. Same-version binding returns the same instance; rebinding to another version is rejected. The factory captures one version for both ports and the candidate. A bound `Auth.SessionChanged` response fences presentation; an already admitted old-actor write may still finish, so it is not evidence of rollback. No new transport endpoint, request field or SQL procedure was added.
 
-Settle private implementation details within these responsibilities. Any new transport endpoint, atomic batch, registry mutation or changed permission precedence requires revising the spec and affected gate rather than being inferred from a proposed name.
+Keep private implementation details within these responsibilities. Any new transport endpoint, atomic batch, registry mutation or changed permission precedence requires revising the spec and affected gate rather than being inferred from a type name.
 
 ## 8. Import and independent access boundaries
 

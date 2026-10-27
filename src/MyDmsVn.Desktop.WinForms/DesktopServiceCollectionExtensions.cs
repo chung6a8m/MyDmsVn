@@ -47,30 +47,30 @@ namespace MyDmsVn.Desktop.WinForms
         private readonly ISecurityAdministrationApiClient _administration;
         private readonly IPermissionCatalogApiClient _catalog;
         private readonly IDesktopSession _session;
-        private readonly IDesktopNotificationService _notifications;
-        private readonly IDesktopExceptionReporter? _exceptionReporter;
+        private readonly IUiDispatcher _dispatcher;
 
         public SecurityAdministrationControlFactory(
             ISecurityAdministrationApiClient administration,
             IPermissionCatalogApiClient catalog,
             IDesktopSession session,
-            IDesktopNotificationService notifications,
-            IDesktopExceptionReporter? exceptionReporter = null)
+            IUiDispatcher dispatcher)
         {
             _administration = administration;
             _catalog = catalog;
             _session = session;
-            _notifications = notifications;
-            _exceptionReporter = exceptionReporter;
+            _dispatcher = dispatcher;
         }
 
-        public Control Create() => new SecurityAdministrationControl(
-            new SecurityAdministrationViewModel(
-                _administration,
-                _catalog,
+        public Control Create()
+        {
+            var ownerVersion = _session.Version;
+            return new SecurityWorkspaceControl(new SecurityWorkspaceViewModel(
+                _administration.ForSession(ownerVersion),
+                _catalog.ForSession(ownerVersion),
                 _session,
-                _notifications,
-                _exceptionReporter));
+                _dispatcher,
+                ownerVersion));
+        }
     }
 
     internal sealed class CatalogControlFactory : ICatalogControlFactory

@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Contracts;
 using MyDmsVn.Contracts.Security;
@@ -10,21 +11,44 @@ namespace MyDmsVn.Desktop.Infrastructure.Local;
 internal sealed class LocalSecurityAdministrationApiClient : ISecurityAdministrationApiClient
 {
     private readonly LocalRequestDispatcher _dispatcher;
+    private readonly long? _expectedSessionVersion;
 
-    public LocalSecurityAdministrationApiClient(LocalRequestDispatcher dispatcher) => _dispatcher = dispatcher;
+    public LocalSecurityAdministrationApiClient(LocalRequestDispatcher dispatcher) : this(dispatcher, null) { }
+
+    private LocalSecurityAdministrationApiClient(LocalRequestDispatcher dispatcher, long? expectedSessionVersion)
+    {
+        _dispatcher = dispatcher;
+        _expectedSessionVersion = expectedSessionVersion;
+    }
+
+    public ISecurityAdministrationApiClient ForSession(long expectedSessionVersion)
+    {
+        if (_expectedSessionVersion.HasValue)
+        {
+            if (_expectedSessionVersion.Value != expectedSessionVersion)
+                throw new InvalidOperationException("A Security administration client cannot be rebound to another session.");
+            return this;
+        }
+        return new LocalSecurityAdministrationApiClient(_dispatcher, expectedSessionVersion);
+    }
+
+    private Task<ApiResponse<T>> SendAsync<T>(MyDmsVn.Server.Application.ApplicationRequest<T> request, CancellationToken token) =>
+        _expectedSessionVersion.HasValue
+            ? _dispatcher.SendForCurrentSessionAsync(request, null, token, _expectedSessionVersion)
+            : _dispatcher.SendAsync(request, null, token);
 
     public Task<ApiResponse<System.Collections.Generic.IReadOnlyList<SecurityUserDto>>> ListUsersAsync(
         CancellationToken cancellationToken) =>
-        _dispatcher.SendAsync(new ListSecurityUsersQuery(), null, cancellationToken);
+        SendAsync(new ListSecurityUsersQuery(), cancellationToken);
 
     public Task<ApiResponse<System.Collections.Generic.IReadOnlyList<SecurityRoleDto>>> ListRolesAsync(
         CancellationToken cancellationToken) =>
-        _dispatcher.SendAsync(new ListSecurityRolesQuery(), null, cancellationToken);
+        SendAsync(new ListSecurityRolesQuery(), cancellationToken);
 
     public Task<ApiResponse<SecurityAdministrationResultDto>> MutateAsync(
         SecurityAdministrationMutationRequest request,
         CancellationToken cancellationToken) =>
-        _dispatcher.SendAsync(
+        SendAsync(
             new MutateSecurityAdministrationCommand(
                 (SecurityAdministrationTarget)(int)request.Target,
                 (SecurityAdministrationOperation)(int)request.Operation,
@@ -40,7 +64,6 @@ internal sealed class LocalSecurityAdministrationApiClient : ISecurityAdministra
                 request.ExpectedRevision,
                 request.ExpectedRelatedRevision,
                 request.CorrelationId),
-            null,
             cancellationToken);
 
     public Task<ApiResponse<PermissionAssignmentImportPreviewDto>> PreviewPermissionImportAsync(
@@ -48,9 +71,8 @@ internal sealed class LocalSecurityAdministrationApiClient : ISecurityAdministra
         int targetId,
         string json,
         CancellationToken cancellationToken) =>
-        _dispatcher.SendAsync(
+        SendAsync(
             new PreviewPermissionAssignmentImportQuery(targetType, targetId, json),
-            null,
             cancellationToken);
 
     public Task<ApiResponse<PermissionAssignmentImportResultDto>> ApplyPermissionImportAsync(
@@ -58,13 +80,12 @@ internal sealed class LocalSecurityAdministrationApiClient : ISecurityAdministra
         int targetId,
         PermissionAssignmentImportRequest request,
         CancellationToken cancellationToken) =>
-        _dispatcher.SendAsync(
+        SendAsync(
             new ApplyPermissionAssignmentImportCommand(
                 targetType,
                 targetId,
                 request.Json,
                 request.ExpectedTargetRevision,
                 request.ExpectedCatalogDigest),
-            null,
             cancellationToken);
 }

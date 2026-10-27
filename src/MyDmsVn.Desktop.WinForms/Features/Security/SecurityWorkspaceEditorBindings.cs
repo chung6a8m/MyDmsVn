@@ -1,0 +1,616 @@
+﻿using System;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
+using MyDmsVn.Contracts.Security;
+using MyDmsVn.Desktop.Application.Security;
+
+namespace MyDmsVn.Desktop.WinForms.Features.Security;
+
+internal sealed class SecurityWorkspaceEditorBindings
+{
+    readonly SecurityWorkspaceControl _control;
+    readonly RoleGrantList _grants = new() { Dock = DockStyle.Fill, CheckOnClick = true, AccessibleName = "Cấp quyền cho vai trò" };
+    readonly TextBox _grantSearch = new() { Width = 145, AccessibleName = "Tìm quyền vai trò" };
+    readonly ComboBox _grantModule = new() { Width = 115, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Nhóm quyền vai trò" };
+    readonly CheckBox _grantedOnly = new() { Text = "Chỉ quyền đã cấp", AutoSize = true };
+    readonly Label _grantSummary = new() { Dock = DockStyle.Bottom, Height = 20 };
+    readonly ComboBox _directKey = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Quyền riêng" };
+    readonly RadioButton _inherit = new BootstrapRadioButton { Text = "Theo vai trò", AutoSize = true };
+    readonly RadioButton _allow = new BootstrapRadioButton { Text = "Cho phép", AutoSize = true };
+    readonly RadioButton _deny = new BootstrapRadioButton { Text = "Từ chối", AutoSize = true };
+    readonly Label _status = new() { AutoSize = true };
+    readonly Label _directPreview = new() { Dock = DockStyle.Bottom, Height = 58, AutoEllipsis = true };
+    readonly FlowLayoutPanel _recovery = Commands();
+    readonly Button _recoveryReview;
+    readonly ToolTip _maintenanceTip = new();
+    readonly Button _createUser;
+    readonly Button _editUser;
+    readonly Button _resetPassword;
+    readonly Button _changeUserState;
+    readonly Button _editRolePermissions;
+    readonly Button _grantDiscard;
+    readonly Button _grantSave;
+    readonly Button _assignRole;
+    readonly Button _removeRole;
+    readonly Label _membershipHint = new() { AutoSize = true, AccessibleName = "Thông báo gán vai trò" };
+    bool _rendering;
+    SecurityWorkspaceViewModel Vm => _control.ViewModel;
+
+    internal SecurityWorkspaceEditorBindings(SecurityWorkspaceControl control)
+    {
+        _control = control;
+        var roleCommands = control.RoleDetail.HeaderActions;
+        Add(roleCommands, "Tạo vai trò…", () => IdentityDialogAsync(false, true));
+        Add(roleCommands, "Sửa tên…", () => IdentityDialogAsync(false, false));
+        Add(roleCommands, "Đổi trạng thái…", () => ActivationAsync(false));
+        _editRolePermissions = Add(roleCommands, "Sửa quyền", () =>
+        {
+            if (Vm.BeginRolePermissions())
+            {
+                control.RoleDetail.Tabs.SelectedIndex = 0;
+                _grantSearch.Focus();
+            }
+            return Task.CompletedTask;
+        });
+        var grantFilters = Commands();
+        grantFilters.Height = 38;
+        grantFilters.Controls.AddRange(new Control[] { _grantSearch, _grantModule, _grantedOnly });
+        var grantActions = Commands();
+        grantActions.Dock = DockStyle.Bottom;
+        grantActions.Height = 42;
+        _grantDiscard = Add(grantActions, "Hủy thay đổi", () => { Vm.DiscardEditor(); return Task.CompletedTask; });
+        _grantSave = Add(grantActions, "Lưu quyền vai trò", () => Vm.SaveEditorAsync(default));
+        control.RoleDetail.GrantArea.Controls.Add(_grants);
+        control.RoleDetail.GrantArea.Controls.Add(_grantSummary);
+        control.RoleDetail.GrantArea.Controls.Add(grantActions);
+        control.RoleDetail.GrantArea.Controls.Add(grantFilters);
+        _grantModule.Items.Add("Tất cả nhóm");
+        _grantModule.SelectedIndex = 0;
+        _grantSearch.TextChanged += (_, _) => { if (!_rendering) Render(); };
+        _grantModule.SelectedIndexChanged += (_, _) => { if (!_rendering) Render(); };
+        _grantedOnly.CheckedChanged += (_, _) => { if (!_rendering) Render(); };
+        _grants.FormattingEnabled = true;
+        _grants.Format += (_, e) =>
+        {
+            if (e.ListItem is not string key) return;
+            var item = Vm.Catalog.Items.FirstOrDefault(k => k.Key == key);
+            var pending = Vm.RoleDraft?.Changes.Any(change => change.PermissionKey == key) == true ? "  ·  Chưa lưu" : "";
+            e.Value = item == null ? key : SecurityPresentation.Name(item) + "  ·  " + key + "  ·  " + item.Module + pending;
+        };
+        _grants.SpacePressed += () =>
+        {
+            if (Vm.RoleDraft != null && _grants.SelectedItem is string key)
+                Vm.SetRoleGranted(key, !Vm.RoleDraft.DesiredKeys.Contains(key));
+        };
+        _grants.ItemCheck += (_, e) =>
+        {
+            if (_rendering) return;
+            var draft = Vm.RoleDraft;
+            if (draft == null)
+            {
+                e.NewValue = e.CurrentValue;
+                return;
+            }
+            if (_grants.Items[e.Index] is not string key) return;
+            var granted = e.NewValue == CheckState.Checked;
+            // ItemCheck precedes the native list update; render only after that update.
+            _control.BeginInvoke(new Action(() =>
+            {
+                if (!_control.IsDisposed && Vm.IsCurrent && ReferenceEquals(Vm.RoleDraft, draft) &&
+                    Vm.SelectedRoleId == draft.RoleId && Vm.OwnerVersion == draft.SessionVersion)
+                    Vm.SetRoleGranted(key, granted);
+            }));
+        };
+        var direct = Commands();
+        direct.Height = 70;
+        direct.Controls.AddRange(new Control[] { _directKey, _inherit, _allow, _deny });
+        control.UserDetail.Tabs.TabPages[3].Controls.Add(direct);
+        var directActions = Commands();
+        directActions.Dock = DockStyle.Bottom;
+        directActions.Height = 42;
+        Add(directActions, "Hủy", () => { Vm.DiscardEditor(); return Task.CompletedTask; });
+        Add(directActions, "Lưu quyền này", () => Vm.SaveEditorAsync(default));
+        control.UserDetail.Tabs.TabPages[3].Controls.Add(_directPreview);
+        control.UserDetail.Tabs.TabPages[3].Controls.Add(directActions);
+        control.UserDetail.DirectPermissionRequested += key => _ = control.TrackOperation(OpenDirectAsync(key));
+        _directKey.SelectedIndexChanged += async (_, _) =>
+        {
+            if (_rendering || _directKey.SelectedItem is not string key) return;
+            if (await AdmitAsync()) Vm.BeginDirectPermission(key);
+            Render();
+        };
+        foreach (var radio in new[] { _inherit, _allow, _deny }) radio.CheckedChanged += (_, _) =>
+        {
+            if (!_rendering && radio.Checked) Vm.SetDirectDecision(_inherit.Checked ? null : _allow.Checked);
+        };
+        var membership = Commands();
+        _assignRole = Add(membership, "Gán vai trò…", async () =>
+        {
+            var userId = Vm.SelectedUserId;
+            if (!CanManageMembership() || !await AdmitAsync() || Vm.SelectedUserId != userId || !CanManageMembership()) return;
+            using var dialog = new Form { Text = "Gán vai trò — " + Vm.SelectedUser!.DisplayName, Width = 450, Height = 210, StartPosition = FormStartPosition.CenterParent };
+            var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+            var roles = new ComboBox { Width = 390, DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Name", AccessibleName = "Vai trò" };
+            foreach (var role in Vm.Roles.Items) roles.Items.Add(role);
+            var ok = new Button { Text = "Xác nhận gán", AutoSize = true, DialogResult = DialogResult.OK };
+            var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
+            fields.Controls.Add(new Label { Text = "Vai trò", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
+            fields.Controls.Add(roles); fields.Controls.Add(ok); fields.Controls.Add(cancel);
+            dialog.Controls.Add(fields);
+            dialog.AcceptButton = ok;
+            dialog.CancelButton = cancel;
+            if (dialog.ShowDialog(control) == DialogResult.OK && roles.SelectedItem is SecurityRoleDto selected) await Vm.SetMembershipAsync(selected.RoleId, true, default);
+        });
+        _removeRole = Add(membership, "Gỡ vai trò", async () =>
+        {
+            var user = Vm.SelectedUser;
+            var index = control.UserDetail.Memberships.SelectedIndex;
+            if (!CanManageMembership() || user == null || index < 0 || index >= user.RoleIds.Count || !await AdmitAsync() ||
+                Vm.SelectedUserId != user.UserId || !CanManageMembership()) return;
+            var roleId = user.RoleIds[index];
+            var role = Vm.Roles.Items.FirstOrDefault(r => r.RoleId == roleId);
+            if (role == null) return;
+            var name = role.Name;
+            if (MessageBox.Show(control, "Gỡ " + name + " khỏi " + user.DisplayName + "?", "Gỡ vai trò", MessageBoxButtons.OKCancel) == DialogResult.OK) await Vm.SetMembershipAsync(roleId, false, default);
+        });
+        membership.Controls.Add(_membershipHint);
+        control.UserDetail.Tabs.TabPages[1].Controls.Add(membership);
+        control.UserDetail.Memberships.SelectedIndexChanged += (_, _) => RenderMembershipActions();
+        var profile = control.UserDetail.HeaderActions;
+        _createUser = Add(profile, "Tạo người dùng…", () => IdentityDialogAsync(true, true));
+        _editUser = Add(profile, "Sửa thông tin…", () => IdentityDialogAsync(true, false));
+        _resetPassword = Add(profile, "Đặt lại mật khẩu…", () => PasswordAsync());
+        _changeUserState = Add(profile, "Đổi trạng thái…", () => ActivationAsync(true));
+        _recovery.Dock = DockStyle.Bottom;
+        _recovery.Height = 54;
+        _recovery.Controls.Add(_status);
+        Add(_recovery, "Tải lại để đối chiếu", async () => { await Vm.ReloadForComparisonAsync(default); }, themed: false);
+        _recoveryReview = Add(_recovery, "Đã đối chiếu — lập diff mới", () =>
+        {
+            if (control.RecoveryConfirmationOverride?.Invoke() ??
+                MessageBox.Show(control, "Giữ ý định và tính lại thay đổi từ dữ liệu vừa tải? Không xác nhận kết quả lệnh chưa rõ.",
+                    "Đối chiếu", MessageBoxButtons.OKCancel) == DialogResult.OK)
+                Vm.ReviewRecoveryAndRebase();
+            return Task.CompletedTask;
+        }, themed: false);
+        control.UserDetail.Controls.Add(_recovery);
+        GuardTabs(control.Tabs);
+        GuardTabs(control.UserDetail.Tabs);
+        GuardTabs(control.RoleDetail.Tabs);
+        Vm.Changed += Changed;
+        control.Disposed += (_, _) => { Vm.Changed -= Changed; _maintenanceTip.Dispose(); };
+        Render();
+    }
+
+    void Changed(object? sender, EventArgs e) => Render();
+    void GuardTabs(TabControl tabs)
+    {
+        var navigationVersion = 0;
+        tabs.Selecting += async (_, e) =>
+        {
+            var requestVersion = ++navigationVersion;
+            if (Vm.CanNavigate) return;
+            e.Cancel = true;
+            var destination = e.TabPage;
+            var ownerVersion = Vm.OwnerVersion;
+            if (!await AdmitAsync() || destination == null || tabs.IsDisposed || !tabs.IsHandleCreated) return;
+            // A synchronous Discard can finish inside Selecting. Resume selection after WinForms finishes canceling it.
+            tabs.BeginInvoke(new Action(() =>
+            {
+                if (!_control.IsDisposed && !tabs.IsDisposed && Vm.IsCurrent && Vm.OwnerVersion == ownerVersion &&
+                    requestVersion == navigationVersion &&
+                    Vm.CanNavigate && tabs.TabPages.Contains(destination))
+                    tabs.SelectedTab = destination;
+            }));
+        };
+    }
+    void Render()
+    {
+        _rendering = true;
+        try
+        {
+            _status.Text = Vm.EditingStatus;
+            var actionFeedback = Vm.LastMutationOperation == SecurityAdministrationOperationDto.SetActive
+                ? Vm.LastMutationFeedback?.Message : null;
+            _control.UserDetail.ActionFeedback.Text = Vm.LastMutationTarget == SecurityAdministrationTargetDto.User &&
+                Vm.LastMutationTargetId == Vm.SelectedUserId ? actionFeedback ?? "" : "";
+            _control.UserDetail.ActionFeedback.Visible = _control.UserDetail.ActionFeedback.Text.Length > 0;
+            _control.RoleDetail.ActionFeedback.Text = Vm.LastMutationTarget == SecurityAdministrationTargetDto.Role &&
+                Vm.LastMutationTargetId == Vm.SelectedRoleId ? actionFeedback ?? "" : "";
+            _control.RoleDetail.ActionFeedback.Visible = _control.RoleDetail.ActionFeedback.Text.Length > 0;
+            var user = Vm.SelectedUser;
+            var usersAvailable = Vm.IsCurrent && Vm.Users.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
+            _createUser.Enabled = usersAvailable;
+            var canMaintainUser = usersAvailable && user is { IsProtectedAccount: false };
+            var maintenanceHint = user?.IsProtectedAccount == true ? "Tài khoản được bảo vệ — bảo trì bên ngoài màn này." :
+                user == null ? "Chọn người dùng để thực hiện." : "";
+            foreach (var action in new[] { _editUser, _resetPassword, _changeUserState })
+            {
+                action.Enabled = canMaintainUser;
+                action.AccessibleDescription = maintenanceHint;
+                _maintenanceTip.SetToolTip(action, maintenanceHint);
+            }
+            RenderMembershipActions();
+            var partialForbidden = Vm.LastSaveOutcome?.Completion == SecuritySaveCompletion.Partial &&
+                Vm.LastSaveOutcome.StopReason == SecuritySaveStopReason.Forbidden &&
+                (Vm.LastSaveTarget == SecurityAdministrationTargetDto.Role ? Vm.Roles.State == SecurityDatasetState.Forbidden :
+                    Vm.Users.State == SecurityDatasetState.Forbidden);
+            var recoveryOwner = (Vm.RequiresRecovery ? Vm.RecoveryTarget : Vm.LastSaveTarget) == SecurityAdministrationTargetDto.Role
+                ? (Control)_control.RoleDetail : _control.UserDetail;
+            if (_recovery.Parent != recoveryOwner)
+            {
+                recoveryOwner.Controls.Add(_recovery);
+                _recovery.BringToFront();
+            }
+            _recovery.Visible = Vm.RequiresRecovery || partialForbidden;
+            foreach (var button in _recovery.Controls.OfType<Button>()) button.Visible = Vm.RequiresRecovery;
+            _recoveryReview.Enabled = Vm.CanReviewRecovery;
+            _grantSummary.Text = Vm.RoleDraft == null ? "Chọn Sửa quyền để bắt đầu bản nháp" : Vm.RoleDraft.Changes.Count + " thay đổi chưa lưu trong toàn bộ danh mục";
+            var roleEditorAvailable = Vm.IsCurrent && Vm.Roles.IsCurrent(Vm.OwnerVersion) && Vm.Catalog.IsCurrent(Vm.OwnerVersion) &&
+                Vm.SelectedRole != null && !Vm.IsBusy && !Vm.RequiresRecovery;
+            _editRolePermissions.Enabled = roleEditorAvailable && Vm.RoleDraft == null;
+            _grantDiscard.Enabled = roleEditorAvailable && Vm.RoleDraft != null;
+            _grantSave.Enabled = roleEditorAvailable && Vm.RoleDraft?.IsDirty == true;
+            var selectedGrant = _grants.SelectedItem as string;
+            var role = Vm.SelectedRole;
+            var selectedModule = _grantModule.SelectedItem as string;
+            var modules = Vm.Catalog.Items.Where(k => k.Status == "Active").Select(k => k.Module).Distinct().OrderBy(value => value).ToArray();
+            _grantModule.Items.Clear();
+            _grantModule.Items.Add("Tất cả nhóm");
+            _grantModule.Items.AddRange(modules.Cast<object>().ToArray());
+            _grantModule.SelectedIndex = selectedModule != null && _grantModule.Items.Contains(selectedModule) ? _grantModule.Items.IndexOf(selectedModule) : 0;
+            var activeKeys = Vm.Catalog.Items.Where(k => k.Status == "Active")
+                .Where(k => _grantModule.SelectedIndex == 0 || k.Module == _grantModule.Text)
+                .Where(k => _grantSearch.Text.Length == 0 || (k.Key + " " + SecurityPresentation.Name(k) + " " + k.Description).IndexOf(_grantSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                .Where(k => !_grantedOnly.Checked || (Vm.RoleDraft?.DesiredKeys.Contains(k.Key) ?? role?.PermissionKeys.Contains(k.Key) == true))
+                .Select(k => k.Key).ToArray();
+            if (_grants.Items.Count != activeKeys.Length || activeKeys.Where((key, index) => !string.Equals(_grants.Items[index] as string, key, StringComparison.Ordinal)).Any())
+            {
+                _grants.Items.Clear();
+                foreach (var key in activeKeys) _grants.Items.Add(key);
+                if (selectedGrant != null) _grants.SelectedIndex = _grants.Items.IndexOf(selectedGrant);
+            }
+            for (var index = 0; index < activeKeys.Length; index++)
+            {
+                var key = activeKeys[index];
+                var granted = Vm.RoleDraft != null && Vm.RoleDraft.RoleId == role?.RoleId ? Vm.RoleDraft.DesiredKeys.Contains(key) : role?.PermissionKeys.Contains(key) == true;
+                if (_grants.GetItemChecked(index) != granted) _grants.SetItemChecked(index, granted);
+            }
+            _grants.Enabled = role != null && Vm.Catalog.IsCurrent(Vm.OwnerVersion) && !Vm.IsBusy && !Vm.RequiresRecovery;
+            _grants.Refresh();
+            _grants.AccessibleDescription = Vm.RoleDraft == null ? "Chỉ xem. Chọn Sửa quyền để thay đổi." : "Đang sửa quyền của vai trò.";
+            var selected = Vm.DirectPermissionKey;
+            _directKey.Items.Clear();
+            foreach (var key in Vm.Catalog.Items.Where(k => k.Status == "Active")) _directKey.Items.Add(key.Key);
+            _directKey.SelectedItem = selected;
+            _directKey.Enabled = !Vm.IsBusy && !Vm.RequiresRecovery;
+            _inherit.Checked = Vm.DirectDecision == null;
+            _allow.Checked = Vm.DirectDecision == true;
+            _deny.Checked = Vm.DirectDecision == false;
+            foreach (var radio in new[] { _inherit, _allow, _deny }) radio.Enabled = selected != null && !Vm.IsBusy && !Vm.RequiresRecovery;
+            _directPreview.Text = DirectPreview();
+        }
+        finally { _rendering = false; }
+    }
+
+    bool CanManageMembership() => Vm.IsCurrent && Vm.Users.IsCurrent(Vm.OwnerVersion) && Vm.Roles.IsCurrent(Vm.OwnerVersion) &&
+        Vm.SelectedUser is { IsProtectedAccount: false } && !Vm.IsBusy && !Vm.RequiresRecovery;
+
+    void RenderMembershipActions()
+    {
+        var user = Vm.SelectedUser;
+        var hint = Vm.Users.State == SecurityDatasetState.Forbidden ? "Không đủ quyền quản lý người dùng." :
+            !Vm.IsCurrent || !Vm.Users.IsCurrent(Vm.OwnerVersion) ? "Người dùng chưa khả dụng." :
+            user == null ? "Chọn người dùng để quản lý vai trò." :
+            user.IsProtectedAccount ? "Tài khoản được bảo vệ — bảo trì bên ngoài màn này." :
+            !Vm.Roles.IsCurrent(Vm.OwnerVersion) ? "Vai trò chưa khả dụng — tải lại dữ liệu trước khi thay đổi." :
+            Vm.IsBusy ? "Đang xử lý thay đổi." :
+            Vm.RequiresRecovery ? "Cần đối chiếu kết quả trước khi thay đổi." : "";
+        if (hint.Length == 0 && Vm.LastMutationOperation == SecurityAdministrationOperationDto.SetMembership &&
+            Vm.LastMutationTarget == SecurityAdministrationTargetDto.User && Vm.LastMutationTargetId == user?.UserId)
+            hint = Vm.LastMutationFeedback?.Message ?? "";
+        var canManage = CanManageMembership();
+        _assignRole.Enabled = canManage;
+        var index = _control.UserDetail.Memberships.SelectedIndex;
+        var canRemove = canManage && index >= 0 && index < user!.RoleIds.Count &&
+            Vm.Roles.Items.Any(role => role.RoleId == user.RoleIds[index]);
+        _removeRole.Enabled = canRemove;
+        _assignRole.AccessibleDescription = hint;
+        _removeRole.AccessibleDescription = canRemove ? "" : hint.Length > 0 ? hint : "Chọn vai trò để gỡ.";
+        _membershipHint.Text = hint;
+        _membershipHint.Visible = hint.Length > 0;
+        _maintenanceTip.SetToolTip(_assignRole, hint);
+        _maintenanceTip.SetToolTip(_removeRole, _removeRole.AccessibleDescription);
+    }
+
+    async Task OpenDirectAsync(string key)
+    {
+        if (!await AdmitAsync()) return;
+        if (!Vm.BeginDirectPermission(key)) return;
+        _control.UserDetail.Tabs.SelectedIndex = 3;
+        Render();
+    }
+
+    string DirectPreview()
+    {
+        var key = Vm.DirectPermissionKey;
+        var user = Vm.SelectedUser;
+        if (key == null || user == null) return "Chọn một mã quyền để xem kết quả dự kiến.";
+        var committed = SecurityPermissionProjection.Evaluate(Vm.Snapshot, key);
+        var decisions = user.DirectDecisions.Where(item => item.PermissionKey != key).ToList();
+        if (Vm.DirectDecision.HasValue) decisions.Add(new SecurityDecisionDto(key, Vm.DirectDecision));
+        var draftUser = new SecurityUserDto(user.UserId, user.Username, user.DisplayName, user.Email, user.IsActive,
+            user.AssignmentRevision, user.RoleIds, decisions, user.IsProtectedAccount);
+        var draftSnapshot = new SecurityProjectionSnapshot(draftUser, Vm.Users, Vm.Roles, Vm.Catalog, Vm.OwnerVersion);
+        var preview = SecurityPermissionProjection.Evaluate(draftSnapshot, key);
+        return "Đã lưu: " + SecurityPresentation.Result(committed.Result) + " · " + SecurityPresentation.Source(committed) + Environment.NewLine +
+            "Kết quả dự kiến (chưa lưu): " + SecurityPresentation.Result(preview.Result) + " · " + SecurityPresentation.Source(preview);
+    }
+
+    Task<bool> AdmitAsync() => _control.AdmitNavigationAsync();
+
+    async Task IdentityDialogAsync(bool userTarget, bool create)
+    {
+        if (!await AdmitAsync()) return;
+        var user = Vm.SelectedUser;
+        var role = Vm.SelectedRole;
+        if (!create && (userTarget ? user == null || user.IsProtectedAccount : role == null)) return;
+        using var dialog = new MutationDialog { Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name), Width = 440, Height = userTarget ? (create ? 430 : 380) : 240, StartPosition = FormStartPosition.CenterParent };
+        var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var name = new TextBox { Width = 380, AccessibleName = userTarget ? "Tên đăng nhập" : "Tên vai trò", Text = create ? "" : userTarget ? user!.Username : role!.Name };
+        var display = new TextBox { Width = 380, AccessibleName = "Tên hiển thị", Text = create ? "" : user?.DisplayName ?? "" };
+        var email = new TextBox { Width = 380, AccessibleName = "Email", Text = create ? "" : user?.Email ?? "" };
+        var password = new TextBox { Width = 380, AccessibleName = "Mật khẩu tạm", UseSystemPasswordChar = true };
+        void AddField(string caption, TextBox field)
+        {
+            fields.Controls.Add(new Label { Text = caption, AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
+            fields.Controls.Add(field);
+        }
+        AddField(userTarget ? "Tên đăng nhập" : "Tên vai trò", name);
+        if (userTarget)
+        {
+            AddField("Tên hiển thị", display);
+            AddField("Email", email);
+            if (create) AddField("Mật khẩu tạm", password);
+        }
+        var validation = new Label { AutoSize = true, AccessibleName = "Lỗi thông tin" };
+        fields.Controls.Add(validation);
+        var reload = new Button { Text = "Tải lại để đối chiếu", AutoSize = true, Visible = false };
+        fields.Controls.Add(reload);
+        var save = new Button { Text = "Lưu thông tin", AutoSize = true };
+        var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
+        fields.Controls.Add(save); fields.Controls.Add(cancel); dialog.Controls.Add(fields);
+        dialog.AcceptButton = save;
+        dialog.CancelButton = cancel;
+        var closeGuard = new MutationDialogCloseGuard(dialog, cancel, validation, _control, Vm);
+        reload.Click += async (_, _) => await ReloadDialogAsync(dialog, validation, reload);
+        save.Click += async (_, _) =>
+        {
+            save.Enabled = false;
+            try
+            {
+                TextBox? invalid = null;
+                if (string.IsNullOrWhiteSpace(name.Text) || name.Text.Length > 100)
+                {
+                    invalid = name;
+                    validation.Text = "Tên phải có từ 1 đến 100 ký tự.";
+                }
+                else if (userTarget && (string.IsNullOrWhiteSpace(display.Text) || display.Text.Length > 100))
+                {
+                    invalid = display;
+                    validation.Text = "Tên hiển thị phải có từ 1 đến 100 ký tự.";
+                }
+                else if (userTarget && email.Text.Length > 254)
+                {
+                    invalid = email;
+                    validation.Text = "Email không được vượt quá 254 ký tự.";
+                }
+                else if (userTarget && create && (password.Text.Length == 0 || Encoding.UTF8.GetByteCount(password.Text) > 72))
+                {
+                    invalid = password;
+                    validation.Text = "Mật khẩu tạm phải có từ 1 đến 72 byte UTF-8.";
+                }
+                if (invalid != null)
+                {
+                    invalid.Focus();
+                    return;
+                }
+                closeGuard.Begin();
+                bool saved;
+                try
+                {
+                    saved = await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(userTarget ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role,
+                        create ? SecurityAdministrationOperationDto.Create : SecurityAdministrationOperationDto.Update,
+                        create ? 0 : userTarget ? user!.UserId : role!.RoleId, name: name.Text, displayName: userTarget ? display.Text : null, email: userTarget ? email.Text : null,
+                        password: create && userTarget ? password.Text : null, expectedRevision: create ? null : userTarget ? user!.AssignmentRevision : role!.AssignmentRevision), default);
+                }
+                finally { closeGuard.End(); }
+                if (saved) dialog.Close();
+                else if (!dialog.IsDisposed)
+                {
+                    var feedback = Vm.LastMutationFeedback;
+                    validation.Text = feedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
+                    reload.Visible = Vm.RequiresRecovery;
+                    var field = feedback?.Field switch
+                    {
+                        "name" => name,
+                        "displayName" => display,
+                        "email" => email,
+                        "password" => password,
+                        _ => null
+                    };
+                    ((Control?)field ?? (Vm.RequiresRecovery ? reload : name)).Focus();
+                }
+            }
+            finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
+        };
+        dialog.ShowDialog(_control);
+        password.Clear();
+    }
+
+    async Task PasswordAsync()
+    {
+        if (!await AdmitAsync() || Vm.SelectedUser is not { IsProtectedAccount: false } user) return;
+        using var dialog = new MutationDialog { Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 420, Height = 230, StartPosition = FormStartPosition.CenterParent };
+        var fields = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var password = new TextBox { Width = 360, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới" };
+        var validation = new Label { AutoSize = true, AccessibleName = "Lỗi mật khẩu" };
+        var reload = new Button { Text = "Tải lại để đối chiếu", AutoSize = true, Visible = false };
+        var save = new Button { Text = "Xác nhận", AutoSize = true };
+        var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
+        fields.Controls.Add(new Label { Text = "Mật khẩu mới", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
+        fields.Controls.Add(password); fields.Controls.Add(validation); fields.Controls.Add(reload); fields.Controls.Add(save); fields.Controls.Add(cancel);
+        dialog.Controls.Add(fields);
+        dialog.AcceptButton = save;
+        dialog.CancelButton = cancel;
+        var closeGuard = new MutationDialogCloseGuard(dialog, cancel, validation, _control, Vm);
+        reload.Click += async (_, _) => await ReloadDialogAsync(dialog, validation, reload);
+        save.Click += async (_, _) =>
+        {
+            save.Enabled = false;
+            try
+            {
+                if (password.Text.Length == 0 || Encoding.UTF8.GetByteCount(password.Text) > 72)
+                {
+                    validation.Text = "Mật khẩu phải có từ 1 đến 72 byte UTF-8.";
+                    password.Focus();
+                    return;
+                }
+                closeGuard.Begin();
+                bool saved;
+                try
+                {
+                    saved = await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, user.UserId, password: password.Text, expectedRevision: user.AssignmentRevision), default);
+                }
+                finally { closeGuard.End(); }
+                if (saved) dialog.Close();
+                else if (!dialog.IsDisposed)
+                {
+                    validation.Text = Vm.LastMutationFeedback?.Message ?? "Không thể lưu thay đổi trong trạng thái hiện tại.";
+                    reload.Visible = Vm.RequiresRecovery;
+                    (Vm.RequiresRecovery ? (Control)reload : password).Focus();
+                }
+            }
+            finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
+        };
+        try { dialog.ShowDialog(_control); }
+        finally { password.Clear(); }
+    }
+
+    sealed class MutationDialog : Form
+    {
+        internal Func<bool>? ShouldBlockClose { get; set; }
+
+        protected override void WndProc(ref Message message)
+        {
+            // Block native X / Alt+F4 before WinForms can set a modal Cancel result.
+            if (ShouldBlockClose?.Invoke() == true && (message.Msg == 0x0010 ||
+                message.Msg == 0x0112 && (message.WParam.ToInt64() & 0xFFF0) == 0xF060)) return;
+            base.WndProc(ref message);
+        }
+    }
+
+    sealed class MutationDialogCloseGuard
+    {
+        readonly MutationDialog _dialog;
+        readonly Button _cancel;
+        readonly Label _status;
+        readonly SecurityWorkspaceControl _owner;
+        readonly SecurityWorkspaceViewModel _viewModel;
+        bool _pending;
+
+        internal MutationDialogCloseGuard(MutationDialog dialog, Button cancel, Label status, SecurityWorkspaceControl owner, SecurityWorkspaceViewModel viewModel)
+        {
+            _dialog = dialog;
+            _cancel = cancel;
+            _status = status;
+            _owner = owner;
+            _viewModel = viewModel;
+            dialog.ShouldBlockClose = () => _pending && !_owner.IsDisposed && _viewModel.IsCurrent;
+            dialog.FormClosing += (_, args) =>
+            {
+                if (_pending && !_owner.IsDisposed && _viewModel.IsCurrent)
+                {
+                    args.Cancel = true;
+                    _dialog.DialogResult = DialogResult.None;
+                }
+            };
+        }
+
+        internal void Begin()
+        {
+            _pending = true;
+            _dialog.ControlBox = false;
+            _status.Text = "Đang lưu…";
+            _cancel.Enabled = false;
+            _dialog.CancelButton = null;
+        }
+
+        internal void End()
+        {
+            _pending = false;
+            if (_dialog.IsDisposed) return;
+            _dialog.ControlBox = true;
+            _cancel.Enabled = true;
+            _dialog.CancelButton = _cancel;
+        }
+    }
+
+    async Task ReloadDialogAsync(Form dialog, Label validation, Button reload)
+    {
+        reload.Enabled = false;
+        try
+        {
+            if (await Vm.ReloadForComparisonAsync(default) && Vm.CanReviewRecovery)
+                dialog.Close();
+            else if (!dialog.IsDisposed)
+                validation.Text = "Chưa tải lại được dữ liệu có quyền truy cập. Hãy thử lại hoặc hủy.";
+        }
+        finally { if (!dialog.IsDisposed) reload.Enabled = true; }
+    }
+
+    async Task ActivationAsync(bool userTarget)
+    {
+        if (!await AdmitAsync()) return;
+        var user = Vm.SelectedUser; var role = Vm.SelectedRole;
+        if (userTarget ? user == null || user.IsProtectedAccount : role == null) return;
+        var name = userTarget ? user!.DisplayName : role!.Name;
+        var active = userTarget ? user!.IsActive : role!.IsActive;
+        if (MessageBox.Show(_control, (active ? "Ngừng hoạt động " : "Kích hoạt ") + name + (userTarget ? "?" : "? Các thành viên vẫn được giữ; quyền của vai trò chỉ có hiệu lực khi hoạt động."), "Đổi trạng thái", MessageBoxButtons.OKCancel) != DialogResult.OK) return;
+        await Vm.ExecuteMutationAsync(new SecurityAdministrationMutationRequest(userTarget ? SecurityAdministrationTargetDto.User : SecurityAdministrationTargetDto.Role,
+            SecurityAdministrationOperationDto.SetActive, userTarget ? user!.UserId : role!.RoleId, isActive: !active,
+            expectedRevision: userTarget ? user!.AssignmentRevision : role!.AssignmentRevision), default);
+    }
+
+    static FlowLayoutPanel Commands() => new() { Dock = DockStyle.Top, Height = 70, AutoScroll = true, WrapContents = true };
+    Button Add(FlowLayoutPanel panel, string text, Func<Task> action, bool themed = true)
+    {
+        Button button = themed
+            ? new BootstrapButton { Text = text, AutoSize = true, Variant = BootstrapVariant.Primary, Outline = true, ButtonSize = BootstrapButtonSize.Small }
+            : new Button { Text = text, AutoSize = true };
+        panel.Controls.Add(button);
+        button.Click += async (_, _) => await _control.TrackOperation(action());
+        return button;
+    }
+}
+
+internal sealed class RoleGrantList : CheckedListBox
+{
+    internal event Action? SpacePressed;
+
+    protected override void WndProc(ref Message message)
+    {
+        if ((message.Msg == 0x0100 || message.Msg == 0x0101 || message.Msg == 0x0102) && message.WParam.ToInt32() == (int)Keys.Space)
+        {
+            if (message.Msg == 0x0100 && (message.LParam.ToInt64() & (1L << 30)) == 0)
+                SpacePressed?.Invoke();
+            return;
+        }
+        base.WndProc(ref message);
+    }
+}

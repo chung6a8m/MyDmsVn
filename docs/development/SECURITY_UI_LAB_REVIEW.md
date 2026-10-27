@@ -10,10 +10,8 @@ change runs no GUI or SQL checks and establishes no runtime acceptance.
 
 - Baseline: `v1a-pro-ui-next` at `0216701835cc3326124a94760186989c1ac4f729`; baseline WinFormsKit gitlink: `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Record the actual candidate and gitlinks for every
   review; baseline facts are not candidate evidence.
-- `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` are proposed new types in the existing production WinForms and Desktop.Application assemblies. They do not exist in that baseline. The Lab must
-  construct those actual candidate types, not a sample-only imitation.
-- Keep the production factory on legacy `SecurityAdministrationControl` through the Owner review gate. SEC-T00–SEC-T04 produce the reviewable candidate; SEC-T05 obtains the explicit Owner decision. SEC-T06
-  performs Local cutover only after approval, reusing the reviewed candidate. SEC-T07 owns focused SQL integration; SEC-T08 owns handoff.
+- `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` were proposed relative to that baseline and are now implemented in the production WinForms and Desktop.Application assemblies. The Lab constructs those actual types, not a sample-only imitation.
+- The production factory stayed on the legacy control until the Owner approved SEC-T05 on 2026-10-26. SEC-T06 then cut over to the reviewed candidate; SEC-T07 focused SQL integration and SEC-T08 handoff are recorded in the [plan](../plans/20261025-002-security-administration-ui-lab-first.md) and [post-gate evidence](../evidence/security/20261025-security-local-sql.md).
 - Use interactive Windows, .NET Framework 4.8, the pinned SDK/submodules and a real WinForms message pump. No connection string, SQL instance or real Login is required for this review.
 - New security fakes implement the existing `ISecurityAdministrationApiClient` and `IPermissionCatalogApiClient` ports. Reuse `ScenarioGate<T>`, `ScenarioJournal`, `ScenarioDesktopSession` and the scenario
   assembly's `ScenarioTaskTracker` where appropriate.
@@ -82,6 +80,10 @@ all permissions are allowed. Inactive ordinary accounts remain editable through 
 2. Only there, explicitly add/remove a role. Inspect User-target requests and confirmed counts from both perspectives; inject a stale user revision, then a stale role revision.
 3. Deny `Security.Users.Manage` while allowing role management; separately make Users data unavailable while role data remains available. Try the member-navigation action and membership commands.
 
+For the two stale-revision cases in the SQL-free Lab, Reset `SEC_L04` between cases and open **Security review tools** before opening the membership dialog. Click **Advance U101 revision** or **Advance R202 revision**, then use U101 → **Vai trò (2)** → **Gán vai trò…** to select R202 **Kiểm soát** and confirm. The fixture journal must show the corresponding `Security.ReviewTargetRevision` before exactly one User-target `SetMembership target=101 related=202 revision=11 relatedRevision=22` and a Conflict result. The visible membership remains unchanged and the recovery action requires explicit reload/diff review. These controls affect only the Lab fixture.
+
+To check a continuing membership denial independently of role-management controls, use `SEC_L04` and open **Security review tools**. Check **Deny membership writes**, then send a U101 `SetMembership` request from **Vai trò (2)**. The Lab returns Forbidden and clears Users presentation while Roles/catalog remain available. Use **Reload Security** to restore the fixture's readable Users data; the checkbox stays checked, so another explicit membership request is also denied. The checkbox only controls `User/SetMembership` responses in the SQL-free Lab. It does not emulate the full server permission policy.
+
 Expected: `Thành viên (n)` has no add/remove-members editor and sends no membership writes. **Mở người dùng** routes to the selected user's `Vai trò (n)` only when authorized and navigation is admitted.
 All membership writes originate in that user tab and use User-target `SetMembership` with primary user and related role revisions from the latest successful authorized loads. They require `Security.Users.Manage`; role-management
 access alone cannot authorize them. Respect both returned revisions and reload both affected entities. Conflict is visible with no automatic retry. Missing Users access prevents member-name disclosure
@@ -92,6 +94,8 @@ and user navigation; known member IDs/counts remain distinct from unavailable pr
 1. Inspect keys with direct Allow, direct Deny, active-role grants, inactive-only role grants, multiple sources and no assignment.
 2. Inspect a Deprecated key, `U-INACTIVE` and `U-PROTECTED`. Open source details without entering an edit flow.
 3. Independently withhold Users, Roles or catalog information, then restore it by explicit authorized reload.
+
+For one combined-source review in `SEC_L05`, open **Security review tools** with U101's **Quyền hiệu lực** selected. Leave **Hold read** unchecked; arm **Roles / Failure**, then **Catalog / Forbidden**, and use **Reload Security** once. Distinct armed sources are consumed by that reload; arming the same source twice is refused. Use a second explicit Reload to restore the fixture's successful responses. The Lab permits only one held read at a time.
 
 Expected: effective permissions and source details are read-only. Direct Deny wins over ordinary role grants; inactive roles do not contribute effective grants; only confirmed applicable data supports a
 conclusion. Unknown/Deprecated keys are never offered as new grants. Missing required source data produces `Chưa xác định`, not a claimed runtime denial. Protected status explains the edit lock without
@@ -132,6 +136,12 @@ treating missing data as an empty state. Partial completion and stop reason rema
 2. Start import from an authorized selected user or role context; inspect preview, additions, target revision and catalog digest; cancel confirmation, then repeat and confirm.
 3. Inject malformed/unknown/Deprecated keys, inactive/protected or unauthorized target, stale preview, target switch and catalog change before Apply.
 
+For stale-preview review in the SQL-free Lab, choose a valid contextual import, then use **Đổi revision đối tượng** or **Đổi catalog digest** in the Lab confirmation dialog before **Áp dụng**. Reset between cases. Inspect the dialog's original preview revision/digest, the journal's Preview → review fault → Apply order, the reported Conflict and the unchanged assignment. For target-switch review, use **Đổi đối tượng** before confirmation; the selected user/role changes, the old preview is invalidated, and the journal must contain no Apply. These controls change only the Lab fixture or its current selection.
+
+For late-preview review, open **Security review tools** and press **Hold next Preview** before selecting a valid contextual JSON import. Once the journal records `Security.ImportPreview` and the workspace shows that JSON is being checked, press **Replace session**, then **Release Preview**. The old response must not open confirmation or Apply, and the replacement session must not regain the old role, catalog or assignment presentation. Reset before another case.
+
+For a Forbidden Preview response, select an active user or role in `SEC_L09`, open **Security review tools**, press **Deny next Preview**, then choose a valid contextual JSON file. Verify `Security.Forbidden`, the affected source's denied state, no confirmation and no `Security.ImportApply`. Explicitly reload, select the target again and repeat Preview without re-arming; the fault is one-shot. Cancel its confirmation. Separately select inactive and protected fixture targets and verify that contextual import is disabled before a file can be chosen. These Lab observations do not prove server authorization.
+
 Expected: catalog navigation never dispatches an assignment mutation. Import is contextual and additive, retains the existing preview/confirmation contract and cannot act as replace-all role Save. Cancel
 dispatches no Apply. Apply uses the exact preview target/revision/digest and revalidation result. Stale/invalid/unauthorized/inactive/protected cases remain rejected without automatic retry; a late preview cannot
 confirm another target.
@@ -142,6 +152,8 @@ confirm another target.
 2. Exercise each specified Save, Discard and Cancel decision; then fail, conflict or hold Save and repeat Close.
 3. Verify the same editor identity/revision and draft before and after rejected navigation; inspect the actual close-coordinator path.
 4. While a draft is dirty, invoke activation/password/rename or another same-entity mutation and ordinary Refresh; exercise Save/Discard/Stay before any baseline replacement. Separately use explicit recovery reload after partial/uncertain Save.
+
+In the current workspace, the product **Làm mới** button is on **Quyền hiệu lực** and the read-only catalog, not the direct-decision editor. From a dirty direct draft, first record the subtab/top-tab Save/Discard/Stay admission needed to reach that button, then test Refresh. The UI Lab toolbar's **Reload Security** helper is a separate path.
 
 Expected: the specification's draft ownership/admission rules are consistent at every boundary. Cancel/rejected Save keeps the draft and relevant focus; Discard is explicit. Confirmed Save admits Close
 only for the same editor/revision and required successful refresh. Other same-entity mutations and ordinary baseline-replacing refresh resolve the draft first; they cannot silently erase it or invalidate it through a competing revision. Recovery reload loads current state for comparison with retained intent, without replay. Busy/uncertain state cannot be dismissed through an ordinary navigation shortcut. Reset is not a substitute for this scenario.
@@ -203,10 +215,9 @@ if ($LASTEXITCODE -ne 0) { throw 'UiLab tests failed.' }
 ```
 
 Existing `UiLabResetTests` and `UiLabToolbarReviewTests` are valid preservation selectors. New Security case names/selectors must be verified against implemented source and discovered cases before use.
-Record actual Facts/Theory rows, outcomes and skipped/missing cases; zero discovery or an unexplained skip cannot establish a pass. Keep legacy `SecurityAdministrationViewModelTests`,
-`SecurityControlAcceptanceTests` and `SecurityAdministrationFormTests` in their existing owners and run only the affected scope under [TEST_POLICY](../TEST_POLICY.md).
+Record actual Facts/Theory rows, outcomes and skipped/missing cases; zero discovery or an unexplained skip cannot establish a pass. SEC-T06 retired the duplicate legacy control/view-model and mapped their tests to the candidate owners in the [post-gate evidence](../evidence/security/20261025-security-local-sql.md); `SecurityAdministrationFormTests` now exercises the candidate. Run only the affected scope under [TEST_POLICY](../TEST_POLICY.md).
 
-No Lab result proves Server authorization, SQL transaction behavior, real Login, production wiring or package acceptance. No SQL test or adapter cutover belongs before the Owner UI Labs gate.
+No Lab result alone proves Server authorization, SQL transaction behavior, real Login, production wiring or package acceptance. The Owner gate was approved on 2026-10-26; the later Local/SQL results are recorded separately in the plan and post-gate evidence.
 
 ## Gate evidence template
 

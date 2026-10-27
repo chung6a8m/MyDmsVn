@@ -219,7 +219,7 @@ namespace MyDmsVn.Desktop.Tests
                     using (var shell = provider.GetRequiredService<FoundationShellForm>())
                     {
                         Assert.IsType<GoodsReceiptControl>(control);
-                        Assert.IsType<SecurityAdministrationControl>(security);
+                        Assert.IsType<SecurityWorkspaceControl>(security);
                         Assert.NotNull(shell);
                     }
                 },

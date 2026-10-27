@@ -1,6 +1,6 @@
 # Execution-plan index
 
-**Updated:** 2026-10-25 · **Base branch:** `v1a-pro-ui-next`
+**Updated:** 2026-10-26 · **Base branch:** `v1a-pro-ui-next`
 
 ## Current plan
 
@@ -9,15 +9,15 @@ The Owner-requested Sidebar follow-up and the planned Security workspace are sep
 | Workstream | Scope and status owner | Design/review references |
 |---|---|---|
 | Sidebar navigation | [Sidebar Navigation Horizontal Scrollbar](20261025-001-sidebar-navigation-horizontal-scrollbar.md): complete within the Owner-selected SQL-free hosted-shell scope; the plan owns exact evidence and limitations. | [Reviewed zero-tab and Products-tab screenshots](../design-references/sidebar-horizontal-scrollbar/README.md) |
-| Planned Security workspace | [Security Administration — UI Lab First](20261025-002-security-administration-ui-lab-first.md): UI/behavior design, implementation sequence and the Owner review dependency. | [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) · [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) |
+| Security workspace | [Security Administration — UI Lab First](20261025-002-security-administration-ui-lab-first.md): Owner-approved SQL-free candidate, completed bounded SEC-T06–SEC-T08 cutover/integration/handoff, with attended and release limits retained. | [UI and behavior specification](../design/SECURITY_ADMINISTRATION_UI.md) · [UI Labs review guide](../development/SECURITY_UI_LAB_REVIEW.md) |
 
-The current UI Lab remains Sales-only. The planned Security extension must exercise the actual candidate component in the SQL-free Lab and obtain dated explicit Owner approval at **SEC-T05** before **SEC-T06 Local cutover** or **SEC-T07 SQL integration** begins. This documentation PR and its mockups do not approve that gate or establish implementation/runtime acceptance. Record any future task execution and gate decision only in the plan that owns that scope.
+The UI Lab now hosts Sales and the SQL-free Security candidate. The Owner approved the reviewed Security candidate at **SEC-T05** on 2026-10-26; **SEC-T06 Local cutover**, **SEC-T07 focused SQL integration** and **SEC-T08 bounded handoff** are recorded in the Security plan and [post-gate evidence](../evidence/security/20261025-security-local-sql.md). Its incomplete attended matrix and other stated limits remain open. Record any future task execution and gate decision only in the plan that owns that scope.
 
 Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the plan for the authorized scope and [TEST_POLICY](../TEST_POLICY.md). [TEST_STRATEGY](../TEST_STRATEGY.md) owns coverage and [tests/README](../../tests/README.md) owns commands. Continue only work authorized by the Owner; archived tasks and prompts do not supply that authorization.
 
 ## Selecting the next roadmap
 
-These are bounded, separately owned follow-ups after the [2026-10-25 archive boundary](../archive/20261025-pre-next-roadmap/README.md). The Sidebar plan retains its source-based diagnosis and focused Windows verification. The Security plan adds the requested workspace design and UI-Labs-first implementation sequence without replacing Sidebar tasks or activating a broader product/release roadmap.
+These are bounded, separately owned follow-ups after the [2026-10-25 archive boundary](../archive/20261025-pre-next-roadmap/README.md). The Sidebar plan retains its source-based diagnosis and focused Windows verification. The Security plan records the UI-Labs-first implementation and bounded handoff without replacing Sidebar tasks or activating a broader product/release roadmap.
 
 Do not carry forward unfinished UI-NEXT/SAL acceptance, old integration repeats, release prerequisites or other proposed phases automatically. Any additional selected follow-up must cite the original evidence and define its own scope; archival neither completes nor waives it.
 
