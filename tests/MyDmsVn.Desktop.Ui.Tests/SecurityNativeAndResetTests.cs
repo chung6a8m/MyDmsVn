@@ -36,13 +36,22 @@ public sealed class SecurityNativeAndResetTests
             var form = control.FindForm()!;
             NativeLookupTypingDriver.Activate(form);
             var search = roles ? control.RoleSearch : control.UserSearch;
+            Assert.IsType<BootstrapTextBox>((object)search);
             var activity = roles ? control.RoleActivity : control.UserActivity;
             var list = roles ? control.Roles : control.Users;
-            Assert.True(search.Focus());
+            search.Focus();
+            Assert.True(search.ContainsFocus);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
             Assert.True(activity.ContainsFocus, "Tab from search should focus the activity filter.");
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
             Assert.True(list.ContainsFocus, "Tab from activity filter should focus the master list.");
+            var selected = Assert.Single(list.SelectedItems.Cast<ListViewItem>());
+            selected.Focused = true;
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.True(Assert.Single(list.SelectedIndices.Cast<int>()) == 1,
+                "Native Down: " + string.Join(";", list.Items.Cast<ListViewItem>().Select(item => item.Index + "=" + item.Bounds)) +
+                "; focused=" + list.FocusedItem?.Index + "; HWND=" + GetFocus() + "; list=" + list.Handle);
+            Assert.Equal(roles ? 202 : 102, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
         });
 
     [Theory]
@@ -811,8 +820,11 @@ public sealed class SecurityNativeAndResetTests
                 ObserveNativeScale(form, control);
                 var owner = control.ViewModel.SelectedUserId;
                 var search = control.UserSearch;
-                Assert.True(search.Focus());
-                var handle = search.Handle;
+                Assert.IsType<BootstrapTextBox>((object)search);
+                search.Focus();
+                Assert.True(search.ContainsFocus);
+                var handle = GetFocus();
+                Assert.NotEqual(search.Handle, handle);
                 var text = "";
                 foreach (var character in "inactive")
                 {
@@ -820,25 +832,25 @@ public sealed class SecurityNativeAndResetTests
                     text += character;
                     System.Windows.Forms.Application.DoEvents();
                     Assert.Equal(text, search.Text);
-                    Assert.Equal(text.Length, search.SelectionStart);
-                    Assert.Equal(0, search.SelectionLength);
+                    AssertNativeSelection(handle, text.Length, 0);
                     Assert.Equal(handle, GetFocus());
                     Assert.Equal(owner, control.ViewModel.SelectedUserId);
                 }
                 Assert.Single(control.Users.Items);
-                Assert.Equal(102, ((SecurityUserDto)control.Users.Items[0]).UserId);
+                Assert.Equal(102, ((SecurityUserDto)control.Users.Items[0].Tag).UserId);
                 SendMessage(handle, 0x00B1, new IntPtr(2), new IntPtr(4));
-                Assert.Equal(2, search.SelectionStart);
-                Assert.Equal(2, search.SelectionLength);
+                AssertNativeSelection(handle, 2, 2);
                 SendMessage(handle, 0x0102, new IntPtr('X'), IntPtr.Zero);
                 System.Windows.Forms.Application.DoEvents();
                 Assert.Equal("inXtive", search.Text);
-                Assert.Equal(3, search.SelectionStart);
-                Assert.Equal(0, search.SelectionLength);
+                AssertNativeSelection(handle, 3, 0);
                 Assert.Empty(control.Users.Items);
                 Assert.Equal(handle, GetFocus());
                 Assert.Equal(owner, control.ViewModel.SelectedUserId);
                 Assert.True(search.RectangleToScreen(search.ClientRectangle).Width > 0);
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                Assert.True(search.ContainsFocus);
+                Assert.Equal(owner, control.ViewModel.SelectedUserId);
                 Assert.DoesNotContain(scene.Journal.Entries, e => e.Operation.Contains("Mutate"));
             }
             finally { BootstrapThemeManager.CurrentTheme = priorTheme; }
@@ -906,6 +918,13 @@ public sealed class SecurityNativeAndResetTests
             form.Close();
             Until(() => form.IsDisposed);
         });
+
+    static void AssertNativeSelection(IntPtr editor, int start, int length)
+    {
+        var range = unchecked((uint)SendMessage(editor, 0x00B0, IntPtr.Zero, IntPtr.Zero).ToInt64());
+        Assert.Equal(start, (int)(range & 0xffff));
+        Assert.Equal(length, (int)(range >> 16) - start);
+    }
 
     static void Until(Func<bool> condition)
     {

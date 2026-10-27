@@ -20,6 +20,83 @@ namespace MyDmsVn.Desktop.Tests;
 [Trait("Module", "Security")]
 public sealed class SecurityWorkspaceControlTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Toolkit_master_tiles_preserve_owner_native_selection_and_theme(bool roles) => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        if (roles) control.Tabs.SelectedIndex = 1;
+        var list = Assert.IsAssignableFrom<BootstrapListView>((object)(roles ? control.Roles : control.Users));
+        Assert.IsType<BootstrapTextBox>((object)(roles ? control.RoleSearch : control.UserSearch));
+        Assert.IsType<BootstrapComboBox>(roles ? control.RoleActivity : control.UserActivity);
+        Assert.IsType<BootstrapLabel>(roles ? control.RolePaneStatus : control.UserPaneStatus);
+        Assert.IsType<BootstrapPanel>(list.Parent);
+        Assert.Equal(View.Tile, list.View);
+        Assert.False(list.MultiSelect);
+        Assert.False(list.HideSelection);
+        Assert.Equal(2, list.Items[0].SubItems.Count);
+        var item = list.Items[1];
+        item.Selected = true;
+        item.Focused = true;
+        Assert.True(list.Focus());
+        var owner = roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId;
+        Assert.Equal(roles ? 202 : 102, owner);
+        var prior = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            foreach (var mode in new[] { BootstrapThemeMode.Dark, BootstrapThemeMode.Light })
+            {
+                BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(mode);
+                list.Refresh();
+                Assert.Same(item, Assert.Single(list.SelectedItems.Cast<ListViewItem>()));
+                Assert.Same(item, list.FocusedItem);
+                Assert.True(list.ContainsFocus);
+                Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, list.BackColor);
+                Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, list.ForeColor);
+                Assert.NotEqual(list.BackColor, list.ForeColor);
+                Assert.Equal(owner, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            }
+        }
+        finally { BootstrapThemeManager.CurrentTheme = prior; }
+    });
+
+    [Fact]
+    public void Toolkit_master_render_keeps_native_item_focus_scroll_and_full_identity() => Run(SecurityScenarioId.SEC_L01, scene =>
+    {
+        var original = scene.Data.Users[0];
+        for (var i = 0; i < 40; i++)
+            scene.Data.Users.Add(new SecurityUserDto(1000 + i, "scroll-" + i, "Người dùng " + i, original.Email,
+                true, original.AssignmentRevision, original.RoleIds, original.DirectDecisions, false));
+    }, (control, _) =>
+    {
+        var list = control.Users;
+        var selected = Assert.Single(list.SelectedItems.Cast<ListViewItem>());
+        selected.Focused = true;
+        list.Focus();
+        list.Items[list.Items.Count - 1].EnsureVisible();
+        System.Windows.Forms.Application.DoEvents();
+        var before = list.Items.Cast<ListViewItem>().Select(item => item.Bounds).ToArray();
+        control.ViewModel.SelectUser(control.ViewModel.SelectedUserId!.Value);
+        Assert.Same(selected, Assert.Single(list.SelectedItems.Cast<ListViewItem>()));
+        Assert.Same(selected, list.FocusedItem);
+        Assert.True(list.ContainsFocus);
+        Assert.Equal(before, list.Items.Cast<ListViewItem>().Select(item => item.Bounds).ToArray());
+        Assert.Contains("lan", list.AccessibleDescription);
+        Assert.Contains(selected.Text, list.AccessibleDescription);
+    });
+
+    [Fact]
+    public void Master_hover_does_not_replace_selected_accessible_identity() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        control.ViewModel.SelectUser(102);
+        var selected = control.ViewModel.SelectedUser!;
+        HoverFirstRow(control.Users);
+        Assert.Contains("lan", TooltipText(control.Users));
+        Assert.Contains(selected.DisplayName, control.Users.AccessibleDescription);
+        Assert.Contains(selected.Username, control.Users.AccessibleDescription);
+        Assert.Equal(selected.UserId, control.ViewModel.SelectedUserId);
+    });
+
     [Fact]
     public void Security_tabs_use_themed_native_headers_at_every_level() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
@@ -376,18 +453,20 @@ public sealed class SecurityWorkspaceControlTests
             ";ACTIONS=" + control.UserDetail.HeaderActions.ClientSize.Width);
         Assert.InRange(control.Users.Parent!.Width, width == 900 ? 180 : 240, width == 900 ? 220 : 280);
         Assert.True(control.Users.ClientSize.Width - 20 >= 150, "Master secondary text needs a visible line in the expanded shell.");
-        Assert.True(control.Users.ItemHeight >= 69);
-        Assert.Contains("lan", control.Users.GetItemText(control.Users.Items[0]));
+        Assert.InRange(control.Users.TileSize.Height, 56, 80);
+        Assert.Contains("lan", control.Users.Items[0].SubItems[1].Text);
         AssertActionReachable(control.UserDetail.HeaderActions);
         control.Tabs.SelectedIndex = 1;
         System.Windows.Forms.Application.DoEvents();
         Assert.InRange(control.Roles.Parent!.Width, width == 900 ? 180 : 240, width == 900 ? 220 : 280);
         Assert.True(control.Roles.ClientSize.Width - 20 >= 150);
-        Assert.Contains("thành viên", control.Roles.GetItemText(control.Roles.Items[0]));
+        Assert.Contains("thành viên", control.Roles.Items[0].SubItems[1].Text);
         AssertActionReachable(control.RoleDetail.HeaderActions);
     });
-    [Fact]
-    public void Master_tooltip_scrubs_identity_on_rebind_forbidden_and_session_replacement() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    [Theory]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.Forbidden)]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.InternalServerError)]
+    public void Master_tooltip_scrubs_identity_on_rebind_forbidden_and_session_replacement(MyDmsVn.Contracts.ApiStatusCode status) => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
     {
         HoverFirstRow(control.Users);
         Assert.Contains("lan", TooltipText(control.Users));
@@ -399,7 +478,7 @@ public sealed class SecurityWorkspaceControlTests
         HoverFirstRow(control.Users);
         Assert.Contains("replacement", TooltipText(control.Users));
         Assert.DoesNotContain("lan", TooltipText(control.Users));
-        scene.Administration.UsersError = new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Denied", "Denied");
+        scene.Administration.UsersError = new MyDmsVn.Contracts.ApiError(status, "Unavailable", "Unavailable");
         Wait(control.ActivateAsync(default));
         Assert.Empty(control.Users.Items);
         Assert.Equal("", TooltipText(control.Users));
@@ -454,7 +533,7 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Single(control.Users.Items);
         Assert.Equal(owner, control.ViewModel.SelectedUserId);
         control.UserSearch.Clear();
-        Assert.Equal(owner, ((MyDmsVn.Contracts.Security.SecurityUserDto)control.Users.SelectedItem).UserId);
+        Assert.Equal(owner, ((SecurityUserDto)Assert.Single(control.Users.SelectedItems.Cast<ListViewItem>()).Tag).UserId);
         control.PermissionCatalog.Lifecycle.SelectedIndex = 2;
         Assert.Single(control.PermissionCatalog.Keys.Rows);
         Assert.Equal("Legacy.Deprecated", control.PermissionCatalog.Keys.Rows[0].Cells[1].Value);
@@ -520,9 +599,9 @@ public sealed class SecurityWorkspaceControlTests
     [Fact]
     public void Master_and_identity_views_show_separate_hierarchy() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
-        Assert.Equal(DrawMode.OwnerDrawFixed, control.Users.DrawMode);
-        Assert.True(control.Users.ItemHeight >= 50);
-        Assert.Equal(DrawMode.OwnerDrawFixed, control.Roles.DrawMode);
+        Assert.True(control.Users.OwnerDraw);
+        Assert.True(control.Users.TileSize.Height >= 50);
+        Assert.True(control.Roles.OwnerDraw);
         Assert.NotEmpty(control.UserDetail.Header.Text);
         Assert.Contains("@", control.UserDetail.HeaderMetadata.Text);
         Assert.Contains("hoạt động", control.UserDetail.HeaderState.Text, StringComparison.OrdinalIgnoreCase);
@@ -1756,7 +1835,7 @@ public sealed class SecurityWorkspaceControlTests
             Assert.Equal(1, control.UserDetail.Tabs.SelectedIndex);
             Assert.Equal(102, control.ViewModel.SelectedUserId);
             Assert.Equal("", control.UserSearch.Text);
-            Assert.Same(control.ViewModel.SelectedUser, control.Users.SelectedItem);
+            Assert.Same(control.ViewModel.SelectedUser, Assert.Single(control.Users.SelectedItems.Cast<ListViewItem>()).Tag);
             Assert.Null(control.ViewModel.RoleDraft);
         }
         Assert.Equal(resolution == SecurityDraftResolution.Save ? 1 : 0,
@@ -1860,6 +1939,8 @@ public sealed class SecurityWorkspaceControlTests
     {
         StaTest.Run(token =>
         {
+            // Match the product/Lab common-controls activation context: native Tile requires v6.
+            System.Windows.Forms.Application.EnableVisualStyles();
             using var guard = new WinFormsTestGuard();
             ExceptionDispatchInfo? error = null;
             using var loop = new ApplicationContext();
@@ -1942,13 +2023,18 @@ public sealed class SecurityWorkspaceControlTests
         }
     }
 
-    static void HoverFirstRow(ListBox list)
+    static void HoverFirstRow(ListView list)
     {
+        for (Control? parent = list.Parent; parent != null; parent = parent.Parent)
+            if (parent is TabPage page) ((TabControl)page.Parent!).SelectedTab = page;
+        System.Windows.Forms.Application.DoEvents();
         var method = list.GetType().GetMethod("OnMouseMove", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-        method.Invoke(list, new object[] { new MouseEventArgs(MouseButtons.None, 0, 5, list.ItemHeight / 2, 0) });
+        var bounds = list.Items[0].GetBounds(ItemBoundsPortion.Label);
+        Assert.False(bounds.IsEmpty);
+        method.Invoke(list, new object[] { new MouseEventArgs(MouseButtons.None, 0, bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2, 0) });
     }
 
-    static string TooltipText(ListBox list)
+    static string TooltipText(ListView list)
     {
         var field = list.GetType().GetField("_itemTip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
         return ((ToolTip)field.GetValue(list)!).GetToolTip(list);
