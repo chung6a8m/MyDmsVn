@@ -1,0 +1,59 @@
+# Business Compact and independent UI Labs — candidate evidence
+
+This is the UIL candidate inventory and evidence record; [the roadmap](../../plans/20261027-001-business-compact-and-independent-ui-labs.md) alone owns task status. UIL-T00 is documentation/source inspection, not native acceptance. Later results must identify their own exact candidate and retain failures and corrections.
+
+## Inspected baseline — UIL-T00
+
+- Source `eaea1a244b6d52b75ada3f7767386a2a6011fecd` (worktree based on clean main); roadmap's earlier inspected source is `8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`. Source inspection used that worktree and the clean original checkout for initialized vendor contents.
+- Consumer gitlink `MyDmsVn.WinFormsKit@c232a4c09dc0386a5bd8bb484a5c991acae827d5`; nested SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. No vendor change. [Pinned component contracts](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/c232a4c09dc0386a5bd8bb484a5c991acae827d5/docs/components/controls/COMPONENTS.md) and source are the API authority.
+- Windows, PowerShell, net48 target; inspection only. No runtime/test binary/package candidate, SQL, GUI, physical DPI measurement or native Owner decision exists for T00.
+
+## Theme and geometry facts
+
+`BootstrapTheme` publicly accepts mode, colors, metrics, typography and reduced motion; `CreateDefault`, `BootstrapThemeManager.CurrentTheme` and `ThemeChanged` exist. `BootstrapThemeMetrics.Default` has unscaled control heights 28/32/38, radii 4/6/8, border/focus 1/2 and spacing 4/8/12/16/24. `BootstrapThemeTypography.Default` uses Segoe UI body 9, small 8.25, label 9 bold, heading small 11 bold, heading medium 14 bold. Constructors permit explicit token sets; no public Business Compact preset is asserted.
+
+[BusinessCompactAppearance](../../../src/MyDmsVn.Desktop.WinForms/BusinessCompactAppearance.cs) `CreateTheme` customizes colors, retains default metrics/typography and current ReducedMotion; `Apply` styles against the installed theme. App-owned roles are Segoe UI body 10, heading 14, secondary 9, brand 15 bold, strong 10 bold. It respects vendor-owned composite children and disposes subscriptions/fonts. [FoundationShellForm](../../../src/MyDmsVn.Desktop.WinForms/FoundationShellForm.cs) installs and switches `CreateTheme`; [UiLabForm](../../../samples/MyDmsVn.Desktop.UiLab/UiLabForm.cs) switches with `CreateDefault`. The mixed Lab starts Sales, has outer size 1250 × 850; shell outer size 1200 × 760 and minimum 900 × 600 are not content measurements. Product workspace bounds, actual physical scale and open-dialog parity: **NOT MEASURED**. Reconcile toolkit and app typography through public ownership during T01; gallery profiles and any new facade are not existing product APIs.
+
+## Security component inventory
+
+These are source observations and candidate choices under [BC-07/08](../../design/BUSINESS_COMPACT.md). Existing native interactive controls are migration candidates, **not approved exceptions**. Each proposed replacement requires binding, keyboard, accessibility, DPI, lifetime and theme verification; a capability gap requires a separate explicit decision and evidence.
+
+| Surface / source | Current | Pinned capability / assessment and preservation |
+|---|---|---|
+| Workspace users/roles master, search/activity, status — [workspace](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceControl.cs), [presentation](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityPresentation.cs) | `SecurityMasterListBox` owner-drawn; native `TextBox`, `ComboBox`, labels; `BusinessCompactWorkspaceTabs` | `BootstrapTextBox`, `BootstrapComboBox`, `BootstrapTabControl`; evaluate `BootstrapListView`, `BootstrapListGroup` or grid for rich rows. Master custom rendering is **OPEN**, not a justified exception: compare multiline, selection/hit testing, tooltip, focus and accessibility before deciding. Existing `Master` signature takes concrete native types; textbox is not a native `TextBox` subclass. |
+| Role grant pilot — [editor bindings](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceEditorBindings.cs), [role detail](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityRoleDetailView.cs) | `RoleGrantList : CheckedListBox` concatenates name/key/group; native search, group combo, granted-only checkbox, summary; toolkit save/discard buttons | Assess `BootstrapDataGridView` with draft-only checkbox and Cấp/Quyền/Nhóm columns, `BootstrapTextBox`, `BootstrapComboBox`, `BootstrapCheckBox`, `BootstrapButton`. Preserve Space, search Enter safety, hidden draft count, ordered key saves, recovery and canonical key access. Native checklist retained only pending assessment; no capability justification yet. |
+| Role identity, historical grants and members — role detail | Native labels, history and member `ListBox`, native OpenUser; toolkit tabs | Semantic labels/panels, toolkit list/grid and contextual `BootstrapButton`; preserve read-only history/member navigation admission, selection identity and count placement. List exceptions **OPEN**. |
+| User identity/profile, memberships, effective and direct permissions — [user detail](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityUserDetailView.cs), editor bindings | Native labels, membership/direct `ListBox`, read-only `DataGridView`, text explanation/search, combos and buttons; toolkit tabs and `BootstrapRadioButton` decision choices | Semantic surfaces/labels, grid/list, text/combo/button; retain read-only projection, nullable three-choice semantics, selection, long keys and dataset-unavailable distinction. Effective rows have two lines at height 45; measure content and scaling, do not force single-line density. List/grid/text exceptions **OPEN**. |
+| Read-only catalog — [catalog](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityPermissionCatalogView.cs) | Native grid, search/details text, group list, lifecycle combo, copy/refresh; hidden module combo synchronizes groups | `BootstrapDataGridView`, text, combo, list and buttons; preserve read-only, copy/full key, filters and group selection model. Native interactive controls **OPEN**. |
+| Commands, status and recovery — workspace/editor/import bindings | `Add` generally creates `BootstrapButton` Primary/Outline/Small; native status labels and some buttons | Retain toolkit buttons with meaningful hierarchy; evaluate `BootstrapLabel`, `BootstrapAlert`, validation, `BootstrapToastContainer`, `BootstrapSpinner`/`BootstrapBusyHost` per context. Busy does not authorize operations or replace recovery. Current uniform variants require review. |
+| Account create/edit, role create/edit and password reset — editor bindings | `MutationDialog` native Form, text/password boxes, labels/validation, native save/cancel/reload | Evaluate `BootstrapTextBox` public password and validation APIs, semantic labels and `BootstrapButton`; retain native modal ownership, close guard, pending/recovery, focus and Accept/Cancel behavior. Native fields/buttons **OPEN**; Form window chrome is OS-owned, not an interactive toolkit exception. |
+| Membership assign/remove and activation — editor bindings | Native assignment Form/ComboBox/buttons and `MessageBox` confirmations | Evaluate toolkit combo/buttons and dialog composition; preserve target, navigation admission, modal focus and confirmation. Assignment controls **OPEN**; OS window chrome is native. Whether OS confirmation remains is **OPEN** pending capability/behavior assessment. |
+| Import — [import bindings](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceImportBindings.cs) | Native import buttons/status, OS `OpenFileDialog` and `MessageBox` preview confirmation; Lab supplies review dialog | `BootstrapButton` and semantic feedback; OS file picker is appropriate for file selection. Assess preview/confirmation accessibility and ownership; confirmation disposition **OPEN**. Never record JSON or secrets. |
+| Layout throughout | Native panels, split and flow/table layouts | Valid layout primitives under BC-07; ensure app surfaces, spacing, reflow and focus are reviewed. |
+
+No interactive native/custom exception above has been approved. Where retained, record alternatives assessed, concrete gap, required behavior, native evidence and disposition in this record; generic upstream work and pin changes require separate authorization.
+
+## Workflow exercise — proposed role grant edit
+
+A read-only walkthrough routes the proposal to UIL-T03, after T01/T02, using the direct Security Lab only after it exists. Map the current checklist to the candidate grid and filters above, with account dialog in the pilot. Candidate source scope: `SecurityWorkspaceEditorBindings.cs`, `SecurityRoleDetailView.cs`, `SecurityPresentation.cs` and only necessary collaborators. Candidate test starting points in `tests/MyDmsVn.Desktop.Ui.Tests`: `SecurityAssignmentDraftTests`, `SecurityAssignmentSaveTests`, `SecurityReviewScenarioTests`, `SecurityNativeAndResetTests` and relevant lifetime/control tests; verify actual discovery and select changed behavior, not assumed counts. Exercise draft retention under filters, Space, safe Enter, serial revision/recovery, modal focus/validation and lifecycle. Record actual source/test/pin, fixture, client bounds, physical 100%/125%, DeviceDpi, Light/Dark observations and screenshots including long keys, selected/disabled/validation states. T04 requires explicit dated Owner pilot decision before T05. An independent read-only walkthrough before and after loading the skill selected this same scope and gates; the latter also checked the skill links. This is instruction-routing evidence, not a runtime test or a claim that the unguided walkthrough failed. This walkthrough executes no UI and grants no T03 authorization ahead of dependencies.
+
+## T00 document verification
+
+Skill Creator `quick_validate.py` passed using a temporary PyYAML dependency after the default Python lacked it. Independent read-only workflow exercise checked routing and skill links. Local Markdown links/anchors, UTF-8 without BOM, CRLF and Git diff whitespace were checked for changed documents; no GUI, SQL, runtime build or test was selected. The new worktree vendor submodule is uninitialized; the exact pinned initialized original checkout supplied vendor source inspection.
+
+## T01 starting scope and pending candidate fields
+
+T01 examines `BusinessCompactAppearance.cs`, `FoundationShellForm.cs`, Lab `Program.cs`/`UiLabForm.cs`, optional narrowly necessary assembly access, and affected existing Desktop/Ui.Tests theme, control and lifetime tests. Inspect actual test cases and discover nonempty selections before running; include startup/toggle, open dialog when supported, ReducedMotion, typography, geometry and disposal for changed boundaries. No new facade is asserted as existing. T01 has not been implemented or tested.
+
+| Evidence field | Current record |
+|---|---|
+| Candidate source/test revisions and hashes; package | PENDING; no package selected |
+| Toolkit and SourceGrid pins | Baseline above; revalidate for each candidate |
+| Environment, physical scale, DeviceDpi, outer/client/content bounds | PENDING native measurement |
+| Module entry point, fixture/actions, theme and dialog | PENDING; direct launchers do not yet exist |
+| Test selectors, discovery, execution, sanitized TRX and cleanup | NOT RUN |
+| Screenshots and independent native observations, findings/corrections | NOT RUN / PENDING |
+| Exceptions and disposition | OPEN as inventoried; no native exception approval |
+| Pilot Owner decision UIL-T04 | NOT APPROVED |
+| Final Owner decision UIL-T06 | NOT APPROVED |
+| Product-host parity / SQL / actual Login / package / release | NOT RUN / outside T00; no acceptance implied |

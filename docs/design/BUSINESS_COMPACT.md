@@ -142,7 +142,7 @@ Verification follows [TEST_POLICY](../TEST_POLICY.md), [TEST_STRATEGY](../TEST_S
 
 ## 7. One focused repository UI skill
 
-Roadmap task **UIL-T00** owns creation of the repository skill **`mydmsvn-winforms-ui`**, with proposed path `.agents/skills/mydmsvn-winforms-ui/SKILL.md`. This documentation PR **does not create or install the skill**. Current policy remains in these documents; the skill routes execution through them instead of duplicating a competing standard.
+The repository skill [mydmsvn-winforms-ui](../../.agents/skills/mydmsvn-winforms-ui/SKILL.md) routes UI work through this policy and the selected roadmap. The [candidate inventory](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md) records source observations and pending exceptions; this policy remains the durable authority.
 
 The skill must contain:
 

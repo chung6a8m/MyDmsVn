@@ -1,13 +1,13 @@
 # Business Compact conformance and independent UI Labs — active roadmap
 
-**Selected:** 2026-10-27 · **Status:** ACTIVE / implementation NOT STARTED · **Task prefix:** `UIL`
+**Selected:** 2026-10-27 · **Status:** ACTIVE / UIL-T00 documentation complete; runtime implementation NOT STARTED · **Task prefix:** `UIL`
 **Inspected source:** [`main@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9), after [PR #53](https://github.com/chung6a8m/MyDmsVn/pull/53).
 **Goal:** Make Business Compact and the pinned WinFormsKit the repeatable basis for UI work, and let Sales and Security be launched and reviewed independently in an environment that reproduces the product's presentation.
 **Architecture:** Two thin net48 WinExe launchers; the existing UI Lab project becomes a shared library with neutral host infrastructure and separately owned module forms/tools. Keep the current production WinForms assembly, one scenario assembly and one UI test assembly initially. Both Labs use the product's theme/bootstrap and real production controls with fake ports.
 **Tech stack:** .NET Framework 4.8, WinForms, existing Bootstrap5WinFormUI/BootstrapSourceGrid identities from pinned WinFormsKit, existing xUnit/STA helpers and direct `dotnet test`.
 **Specifications:** [Business Compact policy](../design/BUSINESS_COMPACT.md), [independent UI Labs](../design/INDEPENDENT_UI_LABS.md), [Security UI and behavior](../design/SECURITY_ADMINISTRATION_UI.md).
 
-This is the sole task/status owner for the selected workstream. The Owner approved the design direction and requested this documentation PR and active roadmap. That approval selects the work; it is **not** native approval of a new candidate, implementation evidence, permission to merge this PR, or production-release acceptance. This PR changes documentation only. Implementation starts with `UIL-T00` after the roadmap is adopted; subsequent work follows the dependencies below.
+This is the sole task/status owner for the selected workstream. The Owner approved the design direction and requested this documentation PR and active roadmap. That approval selects the work; it is **not** native approval of a new candidate, implementation evidence, permission to merge this PR, or production-release acceptance. The roadmap activation changed documentation only. UIL-T00 records the inventory and repository workflow; runtime work follows the dependencies below.
 
 ## 1. Current source and reason for the work
 
@@ -48,11 +48,11 @@ The following constraints apply to every task:
 
 ## 3. Task ledger and dependencies
 
-The implementation/evidence cells are initially `NOT STARTED`; the native decision cells are `NOT APPROVED`. Update this table and the linked candidate evidence as work happens. Do not create another status ledger in a skill, runbook or design document.
+The ledger records current task progress; native decision cells remain `NOT APPROVED` until the named Owner gates. Update this table and the linked candidate evidence as work happens. Do not create another status ledger in a skill, runbook or design document.
 
 | Task | Deliverable | Depends on | Implementation / evidence | Owner decision |
 |---|---|---|---|---|
-| UIL-T00 | Current control inventory, exceptions and repo UI workflow | Roadmap adoption | NOT STARTED — first eligible task | Not a native gate |
+| UIL-T00 | Current control inventory, exceptions and repo UI workflow | Roadmap adoption | COMPLETE — [inventory, workflow exercise and pending evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md) | Not a native gate |
 | UIL-T01 | Shared product/Lab Business Compact theme and presentation bootstrap | T00 | NOT STARTED | Covered by later candidate review |
 | UIL-T02 | Independent Sales/Security launchers, lifecycle and direct test setup | T01 | NOT STARTED | Covered by later candidate review |
 | UIL-T03 | Role permissions + account-dialog pilot, native evidence | T02 | NOT STARTED | Await T04 |
