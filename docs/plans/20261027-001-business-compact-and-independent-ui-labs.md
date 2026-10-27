@@ -1,17 +1,17 @@
 # Business Compact conformance and independent UI Labs — active roadmap
 
-**Selected:** 2026-10-27 · **Status:** ACTIVE / implementation NOT STARTED · **Task prefix:** `UIL`
+**Selected:** 2026-10-27 · **Status:** ACTIVE / UIL-T00–UIL-T02 complete within recorded scopes · **Task prefix:** `UIL`
 **Inspected source:** [`main@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9), after [PR #53](https://github.com/chung6a8m/MyDmsVn/pull/53).
 **Goal:** Make Business Compact and the pinned WinFormsKit the repeatable basis for UI work, and let Sales and Security be launched and reviewed independently in an environment that reproduces the product's presentation.
 **Architecture:** Two thin net48 WinExe launchers; the existing UI Lab project becomes a shared library with neutral host infrastructure and separately owned module forms/tools. Keep the current production WinForms assembly, one scenario assembly and one UI test assembly initially. Both Labs use the product's theme/bootstrap and real production controls with fake ports.
 **Tech stack:** .NET Framework 4.8, WinForms, existing Bootstrap5WinFormUI/BootstrapSourceGrid identities from pinned WinFormsKit, existing xUnit/STA helpers and direct `dotnet test`.
 **Specifications:** [Business Compact policy](../design/BUSINESS_COMPACT.md), [independent UI Labs](../design/INDEPENDENT_UI_LABS.md), [Security UI and behavior](../design/SECURITY_ADMINISTRATION_UI.md).
 
-This is the sole task/status owner for the selected workstream. The Owner approved the design direction and requested this documentation PR and active roadmap. That approval selects the work; it is **not** native approval of a new candidate, implementation evidence, permission to merge this PR, or production-release acceptance. This PR changes documentation only. Implementation starts with `UIL-T00` after the roadmap is adopted; subsequent work follows the dependencies below.
+This is the sole task/status owner for the selected workstream. The Owner approved the design direction and requested this documentation PR and active roadmap. That approval selects the work; it is **not** native approval of a new candidate, implementation evidence, permission to merge this PR, or production-release acceptance. The roadmap activation changed documentation only. UIL-T00 records the inventory and repository workflow; runtime work follows the dependencies below.
 
 ## 1. Current source and reason for the work
 
-The current [UI Lab program](../../samples/MyDmsVn.Desktop.UiLab/Program.cs) starts one [UiLabForm](../../samples/MyDmsVn.Desktop.UiLab/UiLabForm.cs). Its Sales/Security selector defaults to Sales; Security review therefore traverses a Sales startup. The same form owns both modules' fixture/control fields and developer tools. Some [Security review tests](../../tests/MyDmsVn.Desktop.Ui.Tests/SecurityReviewScenarioTests.cs) reproduce that sequence. Splitting only the dropdown's initial selection would leave the unwanted runtime coupling.
+At the inspected baseline, the [UI Lab program](https://github.com/chung6a8m/MyDmsVn/blob/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9/samples/MyDmsVn.Desktop.UiLab/Program.cs) starts one [UiLabForm](https://github.com/chung6a8m/MyDmsVn/blob/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9/samples/MyDmsVn.Desktop.UiLab/UiLabForm.cs). Its Sales/Security selector defaults to Sales; Security review therefore traverses a Sales startup. The same form owns both modules' fixture/control fields and developer tools. Some [Security review tests](../../tests/MyDmsVn.Desktop.Ui.Tests/SecurityReviewScenarioTests.cs) reproduce that sequence. Splitting only the dropdown's initial selection would leave the unwanted runtime coupling.
 
 The product [FoundationShellForm](../../src/MyDmsVn.Desktop.WinForms/FoundationShellForm.cs) installs and switches [BusinessCompactAppearance.CreateTheme](../../src/MyDmsVn.Desktop.WinForms/BusinessCompactAppearance.cs). The Lab's theme switch instead uses `BootstrapTheme.CreateDefault`. Calling `BusinessCompactAppearance.Apply` on a workspace styles from the current theme; it does not install the product theme. A Lab screenshot can consequently differ from product presentation even when both hosts use the same workspace control.
 
@@ -22,7 +22,7 @@ Security already uses production `SecurityWorkspaceControl`/`SecurityWorkspaceVi
 | WinFormsKit gitlink | `c232a4c09dc0386a5bd8bb484a5c991acae827d5` at `vendor/MyDmsVn.WinFormsKit`; retained Bootstrap5WinFormUI/BootstrapSourceGrid assembly and namespace identities |
 | Nested SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944`; no blanket replacement or upgrade |
 | UI Lab solution | [MyDmsVn.UiLab.sln](../../MyDmsVn.UiLab.sln) currently lists the mixed launcher, Scenarios and Ui.Tests projects; new launchers below are proposed |
-| Scenario source | [ScenarioInfrastructure](../../samples/MyDmsVn.Desktop.UiLab.Scenarios/ScenarioInfrastructure.cs) mixes reusable infrastructure with Sales-specific types; source ownership can be separated within the existing assembly |
+| Scenario source | [ScenarioInfrastructure](https://github.com/chung6a8m/MyDmsVn/blob/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9/samples/MyDmsVn.Desktop.UiLab.Scenarios/ScenarioInfrastructure.cs) mixes reusable infrastructure with Sales-specific types; source ownership can be separated within the existing assembly |
 | Test ownership | [Ui.Tests project](../../tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj) links existing small native helpers; [assembly policy](../../tests/MyDmsVn.Desktop.Ui.Tests/AssemblyInfo.cs) disables parallelization |
 | Existing integration | Production already composes the reviewed Security control through Local ports; there is no legacy Security factory cutover left to repeat |
 
@@ -48,13 +48,13 @@ The following constraints apply to every task:
 
 ## 3. Task ledger and dependencies
 
-The implementation/evidence cells are initially `NOT STARTED`; the native decision cells are `NOT APPROVED`. Update this table and the linked candidate evidence as work happens. Do not create another status ledger in a skill, runbook or design document.
+The ledger records current task progress; native decision cells remain `NOT APPROVED` until the named Owner gates. Update this table and the linked candidate evidence as work happens. Do not create another status ledger in a skill, runbook or design document.
 
 | Task | Deliverable | Depends on | Implementation / evidence | Owner decision |
 |---|---|---|---|---|
-| UIL-T00 | Current control inventory, exceptions and repo UI workflow | Roadmap adoption | NOT STARTED — first eligible task | Not a native gate |
-| UIL-T01 | Shared product/Lab Business Compact theme and presentation bootstrap | T00 | NOT STARTED | Covered by later candidate review |
-| UIL-T02 | Independent Sales/Security launchers, lifecycle and direct test setup | T01 | NOT STARTED | Covered by later candidate review |
+| UIL-T00 | Current control inventory, exceptions and repo UI workflow | Roadmap adoption | COMPLETE — [inventory, workflow exercise and pending evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md) | Not a native gate |
+| UIL-T01 | Shared product/Lab Business Compact theme and presentation bootstrap | T00 | COMPLETE — [presentation and measured geometry](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t01-physical-125-first-observation); visual acceptance remains open | Covered by later candidate review |
+| UIL-T02 | Independent Sales/Security launchers, lifecycle and direct test setup | T01 | COMPLETE — [launcher and lifecycle evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t02-independent-launchers-and-lifecycle); no native approval implied | Covered by later candidate review |
 | UIL-T03 | Role permissions + account-dialog pilot, native evidence | T02 | NOT STARTED | Await T04 |
 | UIL-T04 | Owner review of the pilot baseline | T03 | NOT STARTED | **NOT APPROVED** |
 | UIL-T05 | Apply approved baseline to remaining Security views/dialogs | T04 approval | NOT STARTED | Await T06 |

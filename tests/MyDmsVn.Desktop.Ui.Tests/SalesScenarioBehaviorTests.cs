@@ -12,6 +12,7 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 
+[Trait("Module", "Sales")]
 public sealed class SalesScenarioBehaviorTests
 {
     [Fact]

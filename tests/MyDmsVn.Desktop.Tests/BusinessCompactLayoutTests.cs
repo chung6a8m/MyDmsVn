@@ -18,6 +18,37 @@ public sealed class BusinessCompactLayoutTests
     public BusinessCompactLayoutTests(ITestOutputHelper output) { _output = output; }
 
     [Theory]
+    [InlineData(1200, 760)]
+    [InlineData(900, 600)]
+    public void Report_shell_workspace_client_geometry(int width, int height) => StaTest.Run(token =>
+    {
+        using var guard = new WinFormsTestGuard();
+        using var shell = new FoundationShellForm(new FoundationViewModel(new FoundationShellFormTests.ReadyApiClient(), new DesktopNotificationCenter()));
+        using var content = new Panel();
+        shell.Size = new Size(width, height);
+        shell.OpenWorkspace("measure", "Measure", content, shell.WorkspaceSessionVersion);
+        shell.Show();
+        System.Windows.Forms.Application.DoEvents();
+        _output.WriteLine("requested outer={0}x{1}; actual outer={2}; shell client={3}; content client={4}; DeviceDpi={5}; work area={6}",
+            width, height, shell.Size, shell.ClientSize, content.ClientSize, content.DeviceDpi, Screen.FromControl(shell).WorkingArea);
+        Assert.True(content.ClientSize.Width > 0 && content.ClientSize.Height > 0);
+        using (var probe = new GuiProcessProbeFixture(package: false, inline: true))
+        {
+            foreach (var target in new[] { (Name: "shell", Control: (Control)shell), (Name: "content", Control: (Control)content) })
+            {
+                var execution = GuiOwnedProcess.RunAsync(probe.Start(target.Control.Handle.ToInt64() + " measure-sales " + System.Diagnostics.Process.GetCurrentProcess().Id), TimeSpan.FromSeconds(15), token);
+                while (!execution.IsCompleted) { System.Windows.Forms.Application.DoEvents(); Thread.Yield(); }
+                var result = execution.GetAwaiter().GetResult();
+                Assert.True(result.CleanupVerified);
+                Assert.True(result.ExitCode == 0, result.StandardOutput + result.StandardError);
+                Assert.Contains("SAL_NATIVE_ENVIRONMENT=", result.StandardOutput);
+                _output.WriteLine("TARGET=" + target.Name + "\n" + result.StandardOutput);
+            }
+        }
+        Assert.Empty(guard.Exceptions);
+    }, TimeSpan.FromSeconds(15));
+
+    [Theory]
     [InlineData(944, 600, BootstrapThemeMode.Light)]
     [InlineData(944, 600, BootstrapThemeMode.Dark)]
     [InlineData(1680, 900, BootstrapThemeMode.Light)]

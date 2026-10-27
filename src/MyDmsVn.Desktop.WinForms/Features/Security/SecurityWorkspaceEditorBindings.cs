@@ -144,6 +144,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             dialog.Controls.Add(fields);
             dialog.AcceptButton = ok;
             dialog.CancelButton = cancel;
+            BusinessCompactAppearance.Apply(dialog);
             if (dialog.ShowDialog(control) == DialogResult.OK && roles.SelectedItem is SecurityRoleDto selected) await Vm.SetMembershipAsync(selected.RoleId, true, default);
         });
         _removeRole = Add(membership, "Gỡ vai trò", async () =>
@@ -449,6 +450,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             }
             finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
         };
+        BusinessCompactAppearance.Apply(dialog);
         dialog.ShowDialog(_control);
         password.Clear();
     }
@@ -498,6 +500,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             }
             finally { password.Clear(); if (!dialog.IsDisposed) save.Enabled = !Vm.RequiresRecovery; }
         };
+        BusinessCompactAppearance.Apply(dialog);
         try { dialog.ShowDialog(_control); }
         finally { password.Clear(); }
     }

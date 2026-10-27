@@ -16,8 +16,80 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 
+[Trait("Module", "Sales")]
 public sealed class UiLabToolbarReviewTests
 {
+    [Fact]
+    public void Lab_startup_and_theme_toggle_use_product_palette_and_preserve_reduced_motion()
+    {
+        var previous = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme =
+                MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapTheme.CreateDefault(
+                    MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Light, true);
+            Run(SalesScenarioId.S01Draft, null, (form, guard, token) =>
+            {
+                var current = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+                Assert.Equal(BusinessCompactAppearance.CreateTheme(current.Mode).Colors.Primary, current.Colors.Primary);
+                Assert.True(current.ReducedMotion);
+                var button = form.Controls.OfType<Panel>().SelectMany(p => p.Controls.OfType<Panel>()).SelectMany(p => p.Controls.OfType<FlowLayoutPanel>()).SelectMany(p => p.Controls.OfType<Button>()).First(b => b.Text == "Light / Dark");
+                button.PerformClick();
+                current = MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme;
+                Assert.Equal(MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeMode.Dark, current.Mode);
+                Assert.Equal(BusinessCompactAppearance.CreateTheme(current.Mode).Colors.Primary, current.Colors.Primary);
+                Assert.True(current.ReducedMotion);
+                Assert.Empty(guard.Exceptions);
+            });
+        }
+        finally { MyDmsVn.Bootstrap5WinFormUI.Theme.BootstrapThemeManager.CurrentTheme = previous; }
+    }
+
+    [Fact]
+    public void Narrow_sales_toolbar_keeps_access_and_reload_release_reachable_without_resizing_fixed_viewport()
+    {
+        Run(SalesScenarioId.S01Draft, null, (form, guard, token) =>
+        {
+            form.ClientSize = new Size(900, 700);
+            var width = Assert.IsType<NumericUpDown>(Assert.Single(form.Controls.Find("ReviewViewportWidth", true)));
+            var height = Assert.IsType<NumericUpDown>(Assert.Single(form.Controls.Find("ReviewViewportHeight", true)));
+            var viewportApply = Assert.IsType<Button>(Assert.Single(form.Controls.Find("ReviewViewportApply", true)));
+            width.Value = 652;
+            height.Value = 497;
+            viewportApply.PerformClick();
+            var control = form.CurrentSalesControl!;
+            var viewport = control.ClientSize;
+            var toolbar = Assert.IsType<FlowLayoutPanel>(form.ApplyAccessButton.Parent);
+            var status = toolbar.Controls.OfType<Label>().Single();
+            status.Text = "A long review status describes an error and the recovery action for the current workspace.";
+            System.Windows.Forms.Application.DoEvents();
+
+            void ClickVisible(Button button)
+            {
+                var scrollArea = Assert.IsType<Panel>(toolbar.Parent);
+                Assert.True(scrollArea.VerticalScroll.Visible, "Toolbar scroll bar is unavailable.");
+                Assert.True(PostMessage(scrollArea.Handle, 0x0115, new IntPtr(7), IntPtr.Zero)); // WM_VSCROLL / SB_BOTTOM
+                System.Windows.Forms.Application.DoEvents();
+                var bounds = scrollArea.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
+                Assert.True(scrollArea.ClientRectangle.Contains(bounds),
+                    $"{button.Text} is clipped: bounds={bounds}, toolbar viewport={scrollArea.ClientRectangle}.");
+                Assert.True(button.Enabled, button.Text + " is disabled.");
+                NativeLookupTypingDriver.Click(button, Center(button));
+            }
+
+            form.PermissionVariantSelector.SelectedIndex = 2;
+            ClickVisible(form.ApplyAccessButton);
+            Until(() => !WriteAllowed(form.CurrentScenarioData!), token, "Deny Write did not apply.");
+            ClickVisible(form.HoldReloadButton);
+            control.ReloadButton.PerformClick();
+            Until(() => control.Editor.IsBusy && form.ReleaseReloadButton.Enabled, token, "Reload did not reach its gate.");
+            ClickVisible(form.ReleaseReloadButton);
+            Until(() => !control.Editor.IsBusy && control.LastOperation.IsCompleted, token, "Reload did not complete.");
+            Assert.Equal(viewport, control.ClientSize);
+            Assert.Empty(guard.Exceptions);
+        });
+    }
+
     [Fact]
     public void Native_close_click_preserves_pending_customer_query_when_prompt_cancels()
     {
@@ -167,7 +239,7 @@ public sealed class UiLabToolbarReviewTests
 
     private static void Run(SalesScenarioId id,
         Func<WorkspaceCloseState, CancellationToken, Task<WorkspaceCloseChoice>>? prompt,
-        Action<UiLabForm, WinFormsTestGuard, CancellationToken> action)
+        Action<SalesLabForm, WinFormsTestGuard, CancellationToken> action)
     {
         StaTest.Run(token =>
         {
@@ -178,10 +250,10 @@ public sealed class UiLabToolbarReviewTests
             startup.CreateControl();
             startup.BeginInvoke(new Action(() =>
             {
-                UiLabForm? form = null;
+                SalesLabForm? form = null;
                 try
                 {
-                    form = prompt == null ? new UiLabForm() : new UiLabForm(prompt);
+                    form = prompt == null ? new SalesLabForm() : new SalesLabForm(prompt);
                     form.Show();
                     Until(() => form.CurrentScenarioData != null && form.CurrentSalesControl != null &&
                         !form.IsResetting, token, "Initial UI Lab workspace did not activate.");

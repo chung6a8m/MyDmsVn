@@ -12,7 +12,7 @@ Inspected source: [`MyDmsVn@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`](https://g
 |---|---|
 | [BusinessCompactAppearance](../../src/MyDmsVn.Desktop.WinForms/BusinessCompactAppearance.cs) | `CreateTheme` supplies the product palette; `Apply` styles against the current theme. Calling `Apply` alone does not install the product theme. |
 | [FoundationShellForm](../../src/MyDmsVn.Desktop.WinForms/FoundationShellForm.cs) | Startup and theme switching use `BusinessCompactAppearance.CreateTheme`. Both Labs must share this configuration path. |
-| [UiLabForm](../../samples/MyDmsVn.Desktop.UiLab/UiLabForm.cs) | One mixed host defaults to Sales; its theme toggle uses `BootstrapTheme.CreateDefault`. Its current outer size of `1250 × 850` does not establish product content-area parity. |
+| [UiLabForm](https://github.com/chung6a8m/MyDmsVn/blob/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9/samples/MyDmsVn.Desktop.UiLab/UiLabForm.cs) | One mixed host defaults to Sales; its theme toggle uses `BootstrapTheme.CreateDefault`. Its current outer size of `1250 × 850` does not establish product content-area parity. |
 | [SecurityWorkspaceControl](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceControl.cs) and [editor bindings](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceEditorBindings.cs) | Some toolkit controls already exist, including tabs/buttons/radio buttons. Search/filter fields, the grants checklist and some dialogs still use native controls or custom presentation; inventory and assess each relevant location. |
 | [SecurityUserDetailView](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityUserDetailView.cs) | Effective-permission rows contain a friendly name and key on two lines, with height 45. Assess content and scaling before selecting density; a row above 32 is not automatically wrong. |
 
@@ -142,7 +142,7 @@ Verification follows [TEST_POLICY](../TEST_POLICY.md), [TEST_STRATEGY](../TEST_S
 
 ## 7. One focused repository UI skill
 
-Roadmap task **UIL-T00** owns creation of the repository skill **`mydmsvn-winforms-ui`**, with proposed path `.agents/skills/mydmsvn-winforms-ui/SKILL.md`. This documentation PR **does not create or install the skill**. Current policy remains in these documents; the skill routes execution through them instead of duplicating a competing standard.
+The repository skill [mydmsvn-winforms-ui](../../.agents/skills/mydmsvn-winforms-ui/SKILL.md) routes UI work through this policy and the selected roadmap. The [candidate inventory](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md) records source observations and pending exceptions; this policy remains the durable authority.
 
 The skill must contain:
 

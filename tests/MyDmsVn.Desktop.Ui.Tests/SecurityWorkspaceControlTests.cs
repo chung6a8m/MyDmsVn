@@ -17,6 +17,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 namespace MyDmsVn.Desktop.Tests;
+[Trait("Module", "Security")]
 public sealed class SecurityWorkspaceControlTests
 {
     [Fact]
@@ -31,25 +32,29 @@ public sealed class SecurityWorkspaceControlTests
     });
 
     [Fact]
-    public void Lab_module_selection_mounts_candidate_and_preserves_sales_reset() => Run(SecurityScenarioId.SEC_L01, (_, _) =>
+    [Trait("Module", "Common")]
+    public void Module_hosts_mount_and_close_their_own_workspace_directly() => Run(SecurityScenarioId.SEC_L01, (_, _) =>
     {
-        using var form = new MyDmsVn.Desktop.UiLab.UiLabForm();
-        form.Show();
-        Until(() => form.CurrentSalesControl != null && !form.IsResetting);
-        var sales = form.CurrentSalesControl!;
-        form.ModuleSelector.SelectedIndex = 1;
-        Until(() => form.CurrentSecurityControl != null && !form.IsResetting);
-        Assert.True(sales.IsDisposed);
-        Assert.Null(form.CurrentSalesControl);
-        var security = form.CurrentSecurityControl!;
-        Assert.IsType<SecurityWorkspaceControl>(security);
-        Assert.Equal(SecurityDatasetState.Ready, security.ViewModel.Users.State);
-        form.ModuleSelector.SelectedIndex = 0;
-        Until(() => form.CurrentSalesControl != null && !form.IsResetting);
-        Assert.True(security.IsDisposed);
-        Assert.Null(form.CurrentSecurityControl);
-        form.CloseWorkspaceButton.PerformClick();
-        Until(() => form.CurrentSalesControl == null);
+        using (var securityHost = new MyDmsVn.Desktop.UiLab.SecurityLabForm())
+        {
+            securityHost.Show();
+            Until(() => securityHost.CurrentSecurityControl != null && !securityHost.IsResetting);
+            var security = securityHost.CurrentSecurityControl!;
+            Assert.IsType<SecurityWorkspaceControl>(security);
+            Assert.Equal(SecurityDatasetState.Ready, security.ViewModel.Users.State);
+            securityHost.CloseWorkspaceButton.PerformClick();
+            Until(() => securityHost.CurrentSecurityControl == null);
+            Assert.True(security.IsDisposed);
+        }
+        using (var salesHost = new MyDmsVn.Desktop.UiLab.SalesLabForm())
+        {
+            salesHost.Show();
+            Until(() => salesHost.CurrentSalesControl != null && !salesHost.IsResetting);
+            var sales = salesHost.CurrentSalesControl!;
+            salesHost.CloseWorkspaceButton.PerformClick();
+            Until(() => salesHost.CurrentSalesControl == null);
+            Assert.True(sales.IsDisposed);
+        }
     });
 
     [Theory]
@@ -99,8 +104,7 @@ public sealed class SecurityWorkspaceControlTests
         try
         {
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
-            using var lab = new MyDmsVn.Desktop.UiLab.UiLabForm { ClientSize = new System.Drawing.Size(900, 600) };
-            lab.ModuleSelector.SelectedIndex = 1;
+            using var lab = new MyDmsVn.Desktop.UiLab.SecurityLabForm { ClientSize = new System.Drawing.Size(900, 600) };
             lab.Show();
             Until(() => lab.CurrentSecurityControl is { IsDisposed: false } && !lab.IsResetting && lab.StatusText.Contains("ready"));
             var workspace = lab.CurrentSecurityControl!;
@@ -126,8 +130,7 @@ public sealed class SecurityWorkspaceControlTests
         try
         {
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
-            using var lab = new MyDmsVn.Desktop.UiLab.UiLabForm { ClientSize = new System.Drawing.Size(900, 600) };
-            lab.ModuleSelector.SelectedIndex = 1;
+            using var lab = new MyDmsVn.Desktop.UiLab.SecurityLabForm { ClientSize = new System.Drawing.Size(900, 600) };
             lab.Show();
             Until(() => lab.CurrentSecurityControl is { IsDisposed: false } && !lab.IsResetting && lab.StatusText.Contains("ready"));
             var workspace = lab.CurrentSecurityControl!;

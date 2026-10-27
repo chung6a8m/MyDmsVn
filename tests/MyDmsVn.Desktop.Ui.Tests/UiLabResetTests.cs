@@ -13,6 +13,7 @@ using Xunit;
 
 namespace MyDmsVn.Desktop.Tests;
 
+[Trait("Module", "Sales")]
 public sealed class UiLabResetTests
 {
     [Theory]
@@ -31,7 +32,7 @@ public sealed class UiLabResetTests
             {
                 try
                 {
-                    using var form = new UiLabForm();
+                    using var form = new SalesLabForm();
                     form.Show();
                     Until(() => form.CurrentScenarioData != null && form.CurrentSalesControl != null && !form.IsResetting,
                         token, "Initial UI Lab workspace did not activate.");
