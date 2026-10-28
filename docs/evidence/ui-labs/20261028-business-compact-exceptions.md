@@ -1,6 +1,6 @@
 # Bằng chứng candidate khắc phục các ngoại lệ Business Compact — 2026-10-28
 
-**Phạm vi được chọn:** Owner chọn [kế hoạch khắc phục ba ngoại lệ](../../plans/20261028-001-business-compact-exceptions.md) và [thiết kế](../../design/BUSINESS_COMPACT_EXCEPTION_CLOSURE.md) tương ứng: action disabled trong Dark, khung hộp thoại Security và văn bản nhiều dòng chỉ đọc. Các thay đổi source đã được triển khai trong các tree source/test của candidate ghi dưới đây. **Focused Windows/native tests PASS; review Light/Dark × normal/minimum ở physical 100%/125% PASS; Owner PENDING. Cả ba ngoại lệ vẫn OPEN.**
+**Phạm vi được chọn:** Owner chọn [kế hoạch khắc phục ba ngoại lệ](../../plans/20261028-001-business-compact-exceptions.md) và [thiết kế](../../design/BUSINESS_COMPACT_EXCEPTION_CLOSURE.md) tương ứng: action disabled trong Dark, khung hộp thoại Security và văn bản nhiều dòng chỉ đọc. Các thay đổi source đã được triển khai trong các tree source/test của candidate ghi dưới đây. **Focused Windows/native tests PASS; review Light/Dark × normal/minimum ở physical 100%/125% PASS; Owner APPROVED ngày 2026-10-28. Cả ba ngoại lệ CLOSED trong phạm vi này.**
 
 Báo cáo này chỉ ghi candidate mới. [Evidence UIL gốc](20261027-business-compact-and-independent-ui-labs.md), các quyết định có ngày và phạm vi giới hạn của nó, cùng xác nhận Owner tập trung đang chờ riêng cho sửa focus `3b5f95e2d7d1414f0ffe97f47a3bdef58f33d786` được giữ nguyên. Việc chọn task này hoặc kết quả compiler của nó không phê duyệt sửa đổi trước đó và không mở lại ma trận UIL lịch sử.
 
@@ -11,7 +11,7 @@ Báo cáo này chỉ ghi candidate mới. [Evidence UIL gốc](20261027-business
 | Mục | Giá trị Windows cuối |
 |---|---|
 | App code/test revision | `f492a7f87ac3cff5d6eac91bf9430899dc48e925`; source tree `a5083a939408501cdf86e40fc6548e2b4323e5a4`, samples tree `53f7fe35de808c5c6d732791a3da753e31ae2bea`, tests tree `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
-| Toolkit final pin | `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; code/test execution revision `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; source tree `d2edfe81dd4d4949889fa5cae69bc6129a8a8837`, tests tree `7dfba0532f79b3052a3039b94b64446b91f797ec` |
+| Toolkit final evidence/approval pin | `0f6c7c335b099eb1cd583fe550043be6237da7e9`; approved presented candidate `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; code/test execution revision `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; source tree `d2edfe81dd4d4949889fa5cae69bc6129a8a8837`, tests tree `7dfba0532f79b3052a3039b94b64446b91f797ec` |
 | Nested SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944`; không đổi |
 | Host | Windows 11 Home Single Language 10.0.26300 x64; interactive desktop 1920×1080, work area 1920×1032 |
 | Toolchain | SDK `8.0.427`; MSBuild `17.11.69`; .NET Framework 4.8; .NET Desktop Runtime 8.0.32/8.0.33 |
@@ -72,6 +72,12 @@ Display scale thực sự là 125% được xác nhận trước và sau review 
 - [physical 125% Light / minimum / Catalog long read-only](screenshots/20261028-exc-t05/physical125-light-minimum-catalog.png)
 - [physical 125% Dark / minimum / password modal](screenshots/20261028-exc-t05/physical125-dark-minimum-password-modal.png)
 
+## Quyết định Owner
+
+Ngày 2026-10-28, sau khi nhận bộ kết quả cụ thể cho app evidence candidate `8efe9bff806aefa49e6ab6ee90efeb34d06fafc0` và toolkit evidence candidate `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`, Owner trả lời rõ **“APPROVED”** cho ba ngoại lệ EXC-T01–T03. Quyết định đóng action disabled, khung modal Security và multiline read-only trên đúng candidate đã trình. Commit toolkit `0f6c7c335b099eb1cd583fe550043be6237da7e9` và commit app chứa đoạn này chỉ ghi quyết định/cập nhật routing, không đổi immutable source/test trees hoặc mở rộng approval sang SQL, Login thực tế, Designer, package, deployment hay release.
+
+Theo yêu cầu tách riêng trong prompt và evidence lịch sử, câu trả lời này không tự phê duyệt source focus correction `3b5f95e2d7d1414f0ffe97f47a3bdef58f33d786`; focused Owner confirmation đó vẫn PENDING.
+
 ## Định danh candidate và môi trường
 
 | Mục | Giá trị đã ghi |
@@ -83,7 +89,7 @@ Display scale thực sự là 125% được xác nhận trước và sau review 
 | Tree `tests` của app | `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
 | Gitlink toolkit trước sửa | `c232a4c09dc0386a5bd8bb484a5c991acae827d5` |
 | Baseline toolkit upstream | `efe2e7212fd36e32c91b914bdc5e4081947124fc`; cùng tree với pin consumer trước sửa |
-| Candidate/pin toolkit cuối | `e06ba1e31f63e60d4a88fd65122f044e27dc7e56` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); code/test revision native `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; consumer checkout sạch. Các commit sau execution chỉ cập nhật tài liệu/evidence; source/test trees chính xác không đổi và native results tiếp tục áp dụng |
+| Candidate/pin toolkit cuối | `0f6c7c335b099eb1cd583fe550043be6237da7e9` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); Owner approved presented pin `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; code/test revision native `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; consumer checkout sạch. Các commit sau execution chỉ cập nhật tài liệu/evidence; source/test trees chính xác không đổi và native results tiếp tục áp dụng |
 | SourceGrid lồng bên trong | `f4e457b43582bf01892f50bdc74aa480531e5944`; không đổi |
 | Host/toolchain | Checkpoint native: Windows 11 10.0.26300 x64, SDK `8.0.427`, MSBuild `17.11.69`, .NET Framework 4.8 và Desktop Runtime 8.0.32/8.0.33. Linux cross-build lịch sử được giữ riêng bên dưới |
 | Target sản phẩm/test | `net48`, Debug, x86 cho app/consumer; toolkit `net48` và `net8.0-windows` |
@@ -96,9 +102,9 @@ Candidate app được định danh bằng commit chứa report này, ba tree so
 
 | Ngoại lệ | Thay đổi source của candidate | Trạng thái hiện tại |
 |---|---|---|
-| Action disabled trong Dark | Palette disabled của toolkit dùng secondary surface và màu chữ bình thường, giữ hành vi/border disabled; fixture UI tập trung có assertion và kiểm thử vẽ bằng palette Business Compact Light/Dark thực tế | **OPEN** — tests và physical-100/125 appearance/inertness PASS; Owner PENDING |
-| Khung hộp thoại Security native | Các hộp thoại tài khoản/password/ghi dữ liệu, quyết định và review import không dùng SQL hiện có được bố trí qua `BootstrapModal.BodyPanel`/`FooterPanel` public; bộ duyệt theme của app và công cụ Lab giải phóng mutation đang giữ đi qua các vùng public đó; vòng đời Font tiêu đề của toolkit được sửa | **OPEN** — focused lifecycle/keyboard/cleanup tests và physical-100/125 appearance PASS; Owner PENDING |
-| Văn bản nhiều dòng chỉ đọc native | `SecurityUserDetailView.Explanation` và `SecurityPermissionCatalogView.Details` dùng hợp đồng multiline/wrap/scrollbar bổ sung của `BootstrapTextBox`, giữ văn bản, chiều cao và accessible name hiện có | **OPEN** — controls/adapter/consumer tests và physical-100/125 native selection/copy/scroll/accessibility PASS; Owner PENDING |
+| Action disabled trong Dark | Palette disabled của toolkit dùng secondary surface và màu chữ bình thường, giữ hành vi/border disabled; fixture UI tập trung có assertion và kiểm thử vẽ bằng palette Business Compact Light/Dark thực tế | **CLOSED** — tests và physical-100/125 appearance/inertness PASS; Owner APPROVED 2026-10-28 |
+| Khung hộp thoại Security native | Các hộp thoại tài khoản/password/ghi dữ liệu, quyết định và review import không dùng SQL hiện có được bố trí qua `BootstrapModal.BodyPanel`/`FooterPanel` public; bộ duyệt theme của app và công cụ Lab giải phóng mutation đang giữ đi qua các vùng public đó; vòng đời Font tiêu đề của toolkit được sửa | **CLOSED** — focused lifecycle/keyboard/cleanup tests và physical-100/125 appearance PASS; Owner APPROVED 2026-10-28 |
+| Văn bản nhiều dòng chỉ đọc native | `SecurityUserDetailView.Explanation` và `SecurityPermissionCatalogView.Details` dùng hợp đồng multiline/wrap/scrollbar bổ sung của `BootstrapTextBox`, giữ văn bản, chiều cao và accessible name hiện có | **CLOSED** — controls/adapter/consumer tests và physical-100/125 native selection/copy/scroll/accessibility PASS; Owner APPROVED 2026-10-28 |
 
 Mã nguồn app liên quan: [BusinessCompactAppearance](../../../src/MyDmsVn.Desktop.WinForms/BusinessCompactAppearance.cs), [SecurityWorkspaceEditorBindings](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceEditorBindings.cs), [SecurityDecisionDialog](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityDecisionDialog.cs), [SecurityImportReviewDialog](../../../samples/MyDmsVn.Desktop.UiLab/SecurityImportReviewDialog.cs), [SecurityLabForm](../../../samples/MyDmsVn.Desktop.UiLab/Security/SecurityLabForm.cs), [SecurityUserDetailView](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityUserDetailView.cs) và [SecurityPermissionCatalogView](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityPermissionCatalogView.cs).
 
@@ -113,12 +119,12 @@ Fixture mới trong source là [SecurityToolkitExceptionTests](../../../tests/My
 | Locked restore app với overlay Linux tạm thời | **PASS**, không đổi project/lockfile được quản lý trong Git | Kết quả chuẩn bị; chưa phải app compilation hoặc native execution |
 | Lần compile app đầu tiên sau restore | **FAILED: 2 lỗi CS0103** trong fixture mới do tham chiếu helper từ `MyDmsVn.Desktop.Tests` nhưng thiếu namespace import; đã bổ sung import | Lượt này không báo lỗi compiler của production code; kết quả compile thất bại được giữ trong report |
 | Cross-build app `MyDmsVn.UiLab.sln` Debug net48/x86 sau khi sửa import của test | **PASS — 0 cảnh báo, 0 lỗi; 10.64 giây** | Bản mirror cục bộ của đúng production source upstream; đây là lượt trước khi pin gitlink cuối |
-| Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; pin final evidence-only `e06ba1e31f63e60d4a88fd65122f044e27dc7e56` không đổi source/test/project/lockfile; không claim thêm một lượt restore cho commit Markdown-only |
+| Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; final evidence/approval pin `0f6c7c335b099eb1cd583fe550043be6237da7e9` không đổi source/test/project/lockfile; không claim thêm một lượt restore cho commit Markdown-only |
 | Build app cuối `MyDmsVn.UiLab.sln` Debug net48/x86 theo source/test pin chính xác, gồm Theory palette thực tế | **PASS — 0 cảnh báo, 0 lỗi; 11.65 giây** | Dùng đúng source/test trees ghi ở trên; final pin chỉ đổi evidence nên không chạy lại build hoặc native tests |
 | Toolkit CI Release trên `windows-2022`, cả hai TFM | **PASS — build-only** tại [run 40710094747](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40710094747) | `head_sha` đúng `1b9c345aa2afd85e38a72d575485c3abdf559451`; không chạy native tests |
-| Toolkit CI pre-physical evidence pin | **PASS — build-only** tại [run 40721595107](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40721595107) | `head_sha` đúng `01672482250ed1f5a1ed99f10250efa697d78638`; final `e06ba1e` chỉ đổi Markdown evidence/context, không có CI claim mới; focused native tests vẫn là evidence local Windows ở checkpoint |
+| Toolkit CI exact approved evidence pin | **PASS — build-only** tại [run 40727842682](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40727842682) | `head_sha` đúng `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; final `0f6c7c3` chỉ ghi approval/routing, không đổi source/test trees; focused native tests vẫn là evidence local Windows ở checkpoint |
 | Windows discovery/execution | **PASS** | Toolkit controls 75/75/TFM, adapters 40/40/TFM; consumer 163/163 net48/x86; 0 fail/skip; TRX local ignored |
-| Owner review native tập trung | **PENDING** | Việc người dùng cho phép triển khai không phải phê duyệt native của candidate |
+| Owner review native tập trung | **APPROVED — 2026-10-28** | Owner trả lời rõ “APPROVED” sau khi nhận bộ kết quả cho exact app/toolkit candidate; ba ngoại lệ CLOSED trong phạm vi này |
 
 Các lệnh toolkit được người thực hiện ghi lại, chạy từ checkout toolkit upstream:
 
@@ -151,17 +157,17 @@ Sandbox ban đầu chặn SDK/build truy cập thông tin process qua `/proc` (`
 
 Toolkit `.github/workflows/build.yml` định nghĩa workflow chỉ build trên `windows-2022`, không chạy native tests. [Run 40710094747](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40710094747) có `status=completed`, `conclusion=success`, `head_sha=1b9c345aa2afd85e38a72d575485c3abdf559451`; bắt đầu `2026-10-28T14:51:32Z`, cập nhật `2026-10-28T14:53:23Z`. Đây là build Release trên Windows cho implementation handoff trước native fixture/evidence, không phải native test execution. App không có `.github/workflows`.
 
-## Phần Windows/native còn cần thực hiện
+## Hoàn tất Windows/native
 
 Theo [TEST_POLICY](../../TEST_POLICY.md), [tests/README](../../../tests/README.md) và [UI Lab runbook](../../development/UI_LAB.md), discovery/execution focused đã hoàn tất tuần tự với STA/finite pumping/cleanup như checkpoint. Toolkit đã bao phủ cả hai target và adapter consumer bị ảnh hưởng.
 
-Physical 100%/125% Light/Dark × normal/minimum đã PASS. Lượt 125% dùng probe per-monitor-aware xác nhận effective DPI 120×120 và ghi riêng `DeviceDpi=96` của Lab net48. Phần còn lại là xin quyết định Owner trên đúng candidate. Không chạy lại SQL/Login/package/release.
+Physical 100%/125% Light/Dark × normal/minimum đã PASS. Lượt 125% dùng probe per-monitor-aware xác nhận effective DPI 120×120 và ghi riêng `DeviceDpi=96` của Lab net48. Owner APPROVED đúng candidate ngày 2026-10-28. Không chạy lại SQL/Login/package/release cho thay đổi docs-only ghi quyết định.
 
-## Các mục kiểm chứng còn cần hoàn tất
+## Trạng thái kiểm chứng và quyết định
 
 - **RECORDED:** API test gate, compiled public API delta/fingerprint, pin chính xác, build và focused Windows discovery/execution totals.
 - **RECORDED:** physical-100/125 native observations, independent DPI probe và selected screenshots.
-- **PENDING:** quyết định Owner tập trung rõ ràng cho candidate này.
+- **RECORDED:** quyết định Owner APPROVED ngày 2026-10-28 cho ba ngoại lệ trên exact candidate đã trình.
 
 ## Mục review riêng — source focus correction `3b5f95e2`
 
@@ -169,4 +175,4 @@ Physical 100%/125% Light/Dark × normal/minimum đã PASS. Lượt 125% dùng pr
 
 **Focused Owner confirmation cho `3b5f95e2`: PENDING.** Nghiệm thu ba ngoại lệ EXC-T01–T03 không tự phê duyệt mục này.
 
-Cả ba ngoại lệ vẫn **OPEN**. Xác nhận Owner tập trung riêng cho `3b5f95e2` cũng vẫn **PENDING**. SQL, Login thực tế, package, deployment và release acceptance nằm ngoài phạm vi được chọn; không chuyển acceptance lịch sử sang candidate này.
+Cả ba ngoại lệ đã **CLOSED** theo quyết định Owner ngày 2026-10-28. Xác nhận Owner tập trung riêng cho `3b5f95e2` vẫn **PENDING**. SQL, Login thực tế, Designer, package, deployment và release acceptance nằm ngoài phạm vi được chọn; không chuyển acceptance lịch sử sang candidate này.
