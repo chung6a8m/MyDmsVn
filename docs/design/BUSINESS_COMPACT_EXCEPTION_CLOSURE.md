@@ -4,7 +4,7 @@
 
 ## Mục tiêu và baseline
 
-Làm cho action disabled dễ đọc và phân biệt được trạng thái; dùng modal của toolkit an toàn khi đổi theme; đưa khả năng hiển thị, chọn và cuộn văn bản nhiều dòng của hai vùng chi tiết Security chỉ đọc về toolkit. Baseline app là `5386a6d8efe23099c436eb7ef62141df8d3896b8`; pin WinFormsKit trước sửa là `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Upstream main `efe2e7212fd36e32c91b914bdc5e4081947124fc` có cùng tree với commit app dùng trước sửa. Implementation pin ban đầu là `1b9c345aa2afd85e38a72d575485c3abdf559451`; sau sửa fixture Windows và cập nhật evidence, candidate tích hợp cuối pin `50369b67a17c33d458cba9fda58d1d67d2426838` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2), checkout consumer sạch. Giữ SourceGrid tại `f4e457b43582bf01892f50bdc74aa480531e5944`.
+Làm cho action disabled dễ đọc và phân biệt được trạng thái; dùng modal của toolkit an toàn khi đổi theme; đưa khả năng hiển thị, chọn và cuộn văn bản nhiều dòng của hai vùng chi tiết Security chỉ đọc về toolkit. Baseline app là `5386a6d8efe23099c436eb7ef62141df8d3896b8`; pin WinFormsKit trước sửa là `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Upstream main `efe2e7212fd36e32c91b914bdc5e4081947124fc` có cùng tree với commit app dùng trước sửa. Implementation pin ban đầu là `1b9c345aa2afd85e38a72d575485c3abdf559451`; sau sửa fixture Windows và cập nhật evidence, candidate tích hợp cuối pin `e06ba1e31f63e60d4a88fd65122f044e27dc7e56` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2), checkout consumer sạch. Giữ SourceGrid tại `f4e457b43582bf01892f50bdc74aa480531e5944`.
 
 ## Các phương án và thiết kế được chọn
 
