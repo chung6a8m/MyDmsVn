@@ -43,13 +43,14 @@ public sealed class UiLabModalOwnershipTests
 
     [Fact]
     public void Security_lab_close_prompt_lost_foreground_fails_bounded_cleans_only_its_prompt_and_recovers()
-        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, scene) =>
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, __) =>
         {
             using var lab = new SecurityLabForm();
             using var unrelated = new Form { Text = "Unrelated foreground window" };
             lab.Show();
             unrelated.Show();
             Until(() => lab.CurrentSecurityControl != null && !lab.IsResetting);
+            var labScene = Assert.IsType<SecurityScenario>(lab.CurrentSecurityScenarioData);
             var control = lab.CurrentSecurityControl!;
             control.Tabs.SelectedIndex = 1;
             Assert.True(control.ViewModel.BeginRolePermissions());
@@ -79,7 +80,7 @@ public sealed class UiLabModalOwnershipTests
             Assert.False(control.IsDisposed);
             Assert.True(control.ViewModel.HasDirtyEditor);
             Assert.Equal(editorIdentity, control.ViewModel.EditorIdentity);
-            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            Assert.DoesNotContain(labScene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
     [Theory]
