@@ -29,6 +29,87 @@ public sealed class SecurityNativeAndResetTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Role_catalog_native_filter_retains_caret_range_key_and_enter_never_writes(bool dark) =>
+        Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            var prior = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = MyDmsVn.Desktop.WinForms.BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+                control.Tabs.SelectedIndex = 2;
+                NativeLookupTypingDriver.Activate(control.FindForm()!);
+                var catalog = control.PermissionCatalog;
+                catalog.Keys.CurrentCell = catalog.Keys.Rows.Cast<DataGridViewRow>().Single(row => (string)row.Cells[1].Value == "Sales.Receipts.Post").Cells[0];
+                var search = Assert.IsType<BootstrapTextBox>((object)catalog.Search);
+                search.Focus();
+                var editor = GetFocus();
+                var text = "";
+                foreach (var character in "Sales.")
+                {
+                    SendMessage(editor, 0x0102, new IntPtr(character), IntPtr.Zero);
+                    text += character;
+                    System.Windows.Forms.Application.DoEvents();
+                    Assert.Equal(text, search.Text);
+                    AssertNativeSelection(editor, text.Length, 0);
+                    Assert.Equal(editor, GetFocus());
+                    Assert.Equal("Sales.Receipts.Post", catalog.Keys.CurrentRow!.Cells[1].Value);
+                }
+                SendMessage(editor, 0x00B1, new IntPtr(0), new IntPtr(5));
+                control.ViewModel.SelectRole(201);
+                AssertNativeSelection(editor, 0, 5);
+                Assert.Equal(editor, GetFocus());
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                Assert.Equal("Sales.Receipts.Post", catalog.Keys.CurrentRow!.Cells[1].Value);
+                Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            }
+            finally { BootstrapThemeManager.CurrentTheme = prior; }
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void User_detail_effective_native_filter_retains_caret_key_and_owner_without_write(bool dark) =>
+        Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            var prior = BootstrapThemeManager.CurrentTheme;
+            try
+            {
+                BootstrapThemeManager.CurrentTheme = MyDmsVn.Desktop.WinForms.BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+                control.UserDetail.Tabs.SelectedIndex = 2;
+                NativeLookupTypingDriver.Activate(control.FindForm()!);
+                var detail = control.UserDetail;
+                var row = Assert.Single(detail.Effective.Rows.Cast<DataGridViewRow>(), item => Equals(item.Tag, "Sales.Receipts.Post"));
+                detail.Effective.CurrentCell = row.Cells[0];
+                var search = Assert.IsType<BootstrapTextBox>((object)detail.Search);
+                search.Focus();
+                Assert.True(search.ContainsFocus);
+                var editor = GetFocus();
+                var text = "";
+                foreach (var character in "Sales.")
+                {
+                    SendMessage(editor, 0x0102, new IntPtr(character), IntPtr.Zero);
+                    text += character;
+                    System.Windows.Forms.Application.DoEvents();
+                    Assert.Equal(text, search.Text);
+                    AssertNativeSelection(editor, text.Length, 0);
+                    Assert.Equal(editor, GetFocus());
+                    Assert.Equal("Sales.Receipts.Post", detail.Effective.CurrentRow!.Tag);
+                    Assert.Equal(101, control.ViewModel.SelectedUserId);
+                }
+                SendMessage(editor, 0x00B1, new IntPtr(0), new IntPtr(5));
+                control.ViewModel.SelectUser(101);
+                AssertNativeSelection(editor, 0, 5);
+                Assert.Equal(editor, GetFocus());
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                Assert.Contains("Quyền riêng: Từ chối", detail.Explanation.Text);
+                Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            }
+            finally { BootstrapThemeManager.CurrentTheme = prior; }
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Native_tab_moves_from_search_through_filter_to_master_list(bool roles) =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, _) =>
         {
@@ -36,13 +117,111 @@ public sealed class SecurityNativeAndResetTests
             var form = control.FindForm()!;
             NativeLookupTypingDriver.Activate(form);
             var search = roles ? control.RoleSearch : control.UserSearch;
+            Assert.IsType<BootstrapTextBox>((object)search);
             var activity = roles ? control.RoleActivity : control.UserActivity;
             var list = roles ? control.Roles : control.Users;
-            Assert.True(search.Focus());
+            search.Focus();
+            Assert.True(search.ContainsFocus);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
             Assert.True(activity.ContainsFocus, "Tab from search should focus the activity filter.");
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
             Assert.True(list.ContainsFocus, "Tab from activity filter should focus the master list.");
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.True(Assert.Single(list.SelectedIndices.Cast<int>()) == 1,
+                "Native Down: " + string.Join(";", list.Items.Cast<ListViewItem>().Select(item => item.Index + "=" + item.Bounds)) +
+                "; focused=" + list.FocusedItem?.Index + "; HWND=" + GetFocus() + "; list=" + list.Handle);
+            Assert.Equal(roles ? 202 : 102, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+        });
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Native_master_down_keeps_selected_owner_after_reload_or_filter_rebind(bool roles, bool reload) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var list = roles ? control.Roles : control.Users;
+            var search = roles ? control.RoleSearch : control.UserSearch;
+            var activity = roles ? control.RoleActivity : control.UserActivity;
+            var bounds = list.Items[1].GetBounds(ItemBoundsPortion.Label);
+            NativeLookupTypingDriver.Click(list, new Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2));
+            Assert.Equal(1, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.Equal(roles ? 202 : 102, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            search.Focus();
+            Assert.True(search.ContainsFocus);
+            var editor = GetFocus();
+            if (reload)
+            {
+                // Fresh DTO instances retain domain IDs, as on a successful server reload.
+                for (var i = 0; i < scene.Data.Users.Count; i++)
+                {
+                    var user = scene.Data.Users[i];
+                    scene.Data.Users[i] = new SecurityUserDto(user.UserId, user.Username, user.DisplayName, user.Email,
+                        user.IsActive, user.AssignmentRevision, user.RoleIds, user.DirectDecisions, user.IsProtectedAccount);
+                }
+                for (var i = 0; i < scene.Data.Roles.Count; i++)
+                {
+                    var role = scene.Data.Roles[i];
+                    scene.Data.Roles[i] = new SecurityRoleDto(role.RoleId, role.Name, role.IsActive,
+                        role.AssignmentRevision, role.MemberUserIds, role.PermissionKeys);
+                }
+                var operation = control.ActivateAsync(default);
+                Until(() => operation.IsCompleted);
+                operation.GetAwaiter().GetResult();
+            }
+            else
+            {
+                activity.SelectedIndex = roles ? 1 : 2;
+                activity.SelectedIndex = 0;
+            }
+            Assert.True(search.ContainsFocus);
+            Assert.Equal(editor, GetFocus());
+            AssertNativeSelection(editor, 0, 0);
+            Assert.Equal(roles ? 202 : 102, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            Assert.Equal(1, Assert.Single(list.SelectedIndices.Cast<int>()));
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.True(activity.ContainsFocus);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+            Assert.True(list.ContainsFocus);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Equal(2, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.Equal(roles ? 203 : 103, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Native_master_down_continues_from_programmatic_domain_selection(bool roles) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var list = roles ? control.Roles : control.Users;
+            var search = roles ? control.RoleSearch : control.UserSearch;
+
+            list.Items[0].Selected = true;
+            list.Items[0].Focused = true;
+            Assert.True(list.Focus());
+            Assert.Equal(0, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.Equal(0, list.FocusedItem?.Index);
+
+            search.Focus();
+            Assert.True(search.ContainsFocus);
+            if (roles) control.ViewModel.SelectRole(202);
+            else control.ViewModel.SelectUser(102);
+
+            Assert.True(search.ContainsFocus, "Domain selection must not move keyboard focus to the master list.");
+            Assert.Equal(1, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.True(list.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+
+            Assert.Equal(2, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.Equal(roles ? 203 : 103, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
     [Theory]
@@ -108,8 +287,9 @@ public sealed class SecurityNativeAndResetTests
                 try
                 {
                     opened = true;
-                    Assert.Equal("Hủy", Assert.IsType<Button>(dialog.CancelButton).Text);
-                    Assert.True(dialog.Controls.Cast<Control>().SelectMany(Descendants).OfType<TextBox>().First().Focus());
+                    Assert.Equal("Hủy", Assert.IsType<BootstrapButton>(dialog.CancelButton).Text);
+                    SecurityWorkspaceControlTests.DialogInputs(dialog).First().Focus();
+                    Assert.True(SecurityWorkspaceControlTests.DialogInputs(dialog).First().ContainsFocus);
                     NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
                     Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
                 }
@@ -242,7 +422,7 @@ public sealed class SecurityNativeAndResetTests
                     Assert.Contains(Descendants(dialog).OfType<Label>(), item => item.Visible && item.Text == "Vai trò");
                     var roles = Assert.Single(Descendants(dialog).OfType<ComboBox>());
                     Assert.Equal("Vai trò", roles.AccessibleName);
-                    Assert.Equal("Hủy", Assert.IsType<Button>(dialog.CancelButton).Text);
+                    Assert.Equal("Hủy", Assert.IsType<BootstrapButton>(dialog.CancelButton).Text);
                     Assert.True(roles.Focus());
                     NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
                     Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
@@ -313,7 +493,8 @@ public sealed class SecurityNativeAndResetTests
                 item => item.Text == "Gỡ vai trò");
             Assert.False(remove.Enabled);
             Assert.True(memberships.Focus());
-            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            // Details ListView may select its first item on focus; Home names this fixture's intended role.
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Home);
             Assert.Equal(0, memberships.SelectedIndex);
             Assert.True(remove.Enabled);
             for (var i = 0; i < 3 && !remove.ContainsFocus; i++)
@@ -362,7 +543,7 @@ public sealed class SecurityNativeAndResetTests
             var remove = Assert.Single(Descendants(control.UserDetail.Tabs.TabPages[1]).OfType<Button>(),
                 item => item.Text == "Gỡ vai trò");
             Assert.True(memberships.Focus());
-            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Home);
             Assert.Equal(0, memberships.SelectedIndex);
             for (var i = 0; i < 3 && !remove.ContainsFocus; i++)
                 NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
@@ -426,7 +607,12 @@ public sealed class SecurityNativeAndResetTests
             Assert.Equal(-1, members.SelectedIndex);
             Assert.False(open.Enabled);
             Assert.True(members.Focus());
+            // Native Details ListView may select its first row on focus; name the target explicitly.
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Home);
+            Assert.Equal(0, members.SelectedIndex);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Equal(1, members.SelectedIndex);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Up);
             Assert.Equal(0, members.SelectedIndex);
             Assert.True(open.Enabled);
             NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
@@ -465,7 +651,7 @@ public sealed class SecurityNativeAndResetTests
                 Assert.True(Granted(grants, index));
                 Assert.Equal(1, draft.LocalEditRevision);
             }
-            Assert.True(PostMessage(grants.Handle, 0x0101, new IntPtr((int)Keys.Space), new IntPtr((1L << 31) | (1L << 30) | 1)));
+            Assert.True(PostMessage(grants.Handle, 0x0101, new IntPtr((int)Keys.Space), new IntPtr(unchecked((int)0xC0000001))));
             System.Windows.Forms.Application.DoEvents();
             Assert.Equal(1, draft.LocalEditRevision);
             Assert.Collection(draft.Changes, change =>
@@ -811,8 +997,11 @@ public sealed class SecurityNativeAndResetTests
                 ObserveNativeScale(form, control);
                 var owner = control.ViewModel.SelectedUserId;
                 var search = control.UserSearch;
-                Assert.True(search.Focus());
-                var handle = search.Handle;
+                Assert.IsType<BootstrapTextBox>((object)search);
+                search.Focus();
+                Assert.True(search.ContainsFocus);
+                var handle = GetFocus();
+                Assert.NotEqual(search.Handle, handle);
                 var text = "";
                 foreach (var character in "inactive")
                 {
@@ -820,25 +1009,25 @@ public sealed class SecurityNativeAndResetTests
                     text += character;
                     System.Windows.Forms.Application.DoEvents();
                     Assert.Equal(text, search.Text);
-                    Assert.Equal(text.Length, search.SelectionStart);
-                    Assert.Equal(0, search.SelectionLength);
+                    AssertNativeSelection(handle, text.Length, 0);
                     Assert.Equal(handle, GetFocus());
                     Assert.Equal(owner, control.ViewModel.SelectedUserId);
                 }
                 Assert.Single(control.Users.Items);
-                Assert.Equal(102, ((SecurityUserDto)control.Users.Items[0]).UserId);
+                Assert.Equal(102, ((SecurityUserDto)control.Users.Items[0].Tag).UserId);
                 SendMessage(handle, 0x00B1, new IntPtr(2), new IntPtr(4));
-                Assert.Equal(2, search.SelectionStart);
-                Assert.Equal(2, search.SelectionLength);
+                AssertNativeSelection(handle, 2, 2);
                 SendMessage(handle, 0x0102, new IntPtr('X'), IntPtr.Zero);
                 System.Windows.Forms.Application.DoEvents();
                 Assert.Equal("inXtive", search.Text);
-                Assert.Equal(3, search.SelectionStart);
-                Assert.Equal(0, search.SelectionLength);
+                AssertNativeSelection(handle, 3, 0);
                 Assert.Empty(control.Users.Items);
                 Assert.Equal(handle, GetFocus());
                 Assert.Equal(owner, control.ViewModel.SelectedUserId);
                 Assert.True(search.RectangleToScreen(search.ClientRectangle).Width > 0);
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                Assert.True(search.ContainsFocus);
+                Assert.Equal(owner, control.ViewModel.SelectedUserId);
                 Assert.DoesNotContain(scene.Journal.Entries, e => e.Operation.Contains("Mutate"));
             }
             finally { BootstrapThemeManager.CurrentTheme = priorTheme; }
@@ -906,6 +1095,13 @@ public sealed class SecurityNativeAndResetTests
             form.Close();
             Until(() => form.IsDisposed);
         });
+
+    static void AssertNativeSelection(IntPtr editor, int start, int length)
+    {
+        var range = unchecked((uint)SendMessage(editor, 0x00B0, IntPtr.Zero, IntPtr.Zero).ToInt64());
+        Assert.Equal(start, (int)(range & 0xffff));
+        Assert.Equal(length, (int)(range >> 16) - start);
+    }
 
     static void Until(Func<bool> condition)
     {

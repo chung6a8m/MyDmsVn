@@ -4,7 +4,6 @@ using System.Linq;
 using System.Windows.Forms;
 using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application.Security;
-using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Desktop.WinForms.Features.Security;
 
@@ -51,40 +50,149 @@ internal static class SecurityPresentation
     };
 }
 
-internal sealed class SecurityMasterListBox : ListBox
+// Business content and identity only; native selection, rendering and theme lifetime stay in WinFormsKit.
+internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapListView
 {
     readonly ToolTip _itemTip = new();
-    int _tipIndex = -1;
     string _tipText = "";
+    bool _tileExtentRefreshPending;
+    ListViewItem? _resizeTopAnchor;
 
-    internal SecurityMasterListBox()
+    internal SecurityMasterListView()
     {
-        DrawMode = DrawMode.OwnerDrawFixed;
-        ItemHeight = 74;
-        IntegralHeight = false;
+        Dock = DockStyle.Fill;
+        View = View.Tile;
+        MultiSelect = false;
+        HideSelection = false;
+        FullRowSelect = true;
+        BorderStyle = BorderStyle.None;
+        // Tile projects the primary label plus ordinal subitems 1..Columns.Count at this pin.
+        Columns.Add("Thông tin");
+        SizeChanged += (_, _) => UpdateTileSize();
+        DpiChangedAfterParent += (_, _) => UpdateTileSize();
+        UpdateTileSize();
     }
+
+    protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
+    {
+        if (!_tileExtentRefreshPending && IsHandleCreated && Items.Count > 0 &&
+            (width != Width || height != Height))
+            _resizeTopAnchor = Items.Cast<ListViewItem>().FirstOrDefault(item =>
+                item.Bounds.Bottom > 0 && item.Bounds.Top < ClientSize.Height);
+        base.SetBoundsCore(x, y, width, height, specified);
+    }
+
+    void UpdateTileSize()
+    {
+        ApplyTileSize(false);
+        if (!IsHandleCreated || _tileExtentRefreshPending) return;
+        _tileExtentRefreshPending = true;
+        BeginInvoke(new Action(() =>
+        {
+            _tileExtentRefreshPending = false;
+            if (!IsDisposed && !Disposing)
+            {
+                ApplyTileSize(true);
+                if (_resizeTopAnchor?.ListView == this) _resizeTopAnchor.EnsureVisible();
+            }
+            _resizeTopAnchor = null;
+        }));
+    }
+
+    void ApplyTileSize(bool resetNativeExtent)
+    {
+        var target = new Size(Math.Max(1, ClientSize.Width - SystemInformation.VerticalScrollBarWidth),
+            BusinessCompactAppearance.Scale(this, 64));
+        // Native Tile view updates its scroll range after WM_SIZE completes. A deferred
+        // public-contract width pulse recomputes that extent without replacing scrolling.
+        if (resetNativeExtent)
+            TileSize = new Size(Math.Max(1, target.Width - 1), target.Height);
+        TileSize = target;
+    }
+
+    internal void Rebind(System.Collections.Generic.IEnumerable<object> source, object? selected)
+    {
+        var values = source.ToArray();
+        var sameRows = values.Length == Items.Count &&
+            values.Select((value, index) => ReferenceEquals(value, Items[index].Tag)).All(same => same);
+        var selectedIdentityChanged = sameRows &&
+            !SameIdentity(SelectedItems.Count == 1 ? SelectedItems[0].Tag : null, selected);
+        if (!sameRows)
+        {
+            ClearHoverDescription();
+            var focused = FocusedItem?.Tag;
+            var visible = Items.Cast<ListViewItem>().FirstOrDefault(item => item.Bounds.Bottom > 0)?.Tag;
+            BeginUpdate();
+            try
+            {
+                Items.Clear();
+                foreach (var value in values)
+                {
+                    var title = value is SecurityUserDto user ? user.DisplayName : ((SecurityRoleDto)value).Name;
+                    var row = new ListViewItem(new[] { title, Metadata(value) }) { Tag = value, UseItemStyleForSubItems = false };
+                    Items.Add(row);
+                }
+                var anchor = Items.Cast<ListViewItem>().FirstOrDefault(item => SameIdentity(item.Tag, visible));
+                anchor?.EnsureVisible();
+                var focus = Items.Cast<ListViewItem>().FirstOrDefault(item => SameIdentity(item.Tag, focused)) ??
+                    Items.Cast<ListViewItem>().FirstOrDefault(item => SameIdentity(item.Tag, selected));
+                if (focus != null) focus.Focused = true;
+            }
+            finally { EndUpdate(); }
+        }
+        ListViewItem? selectedItem = null;
+        foreach (ListViewItem item in Items)
+        {
+            var shouldSelect = SameIdentity(item.Tag, selected);
+            if (shouldSelect) selectedItem = item;
+            if (item.Selected != shouldSelect) item.Selected = shouldSelect;
+        }
+        if (selectedIdentityChanged && selectedItem != null) selectedItem.Focused = true;
+        UpdateAccessibleIdentity();
+    }
+
+    void UpdateAccessibleIdentity() => AccessibleDescription = SelectedItems.Count == 1
+        ? FullText(SelectedItems[0].Tag) : _tipText;
+
+    protected override void OnSelectedIndexChanged(EventArgs e)
+    {
+        base.OnSelectedIndexChanged(e);
+        UpdateAccessibleIdentity();
+    }
+
+    static bool SameIdentity(object? left, object? right) => ReferenceEquals(left, right) ||
+        (left is SecurityUserDto user && right is SecurityUserDto otherUser ? user.UserId == otherUser.UserId :
+        left is SecurityRoleDto role && right is SecurityRoleDto otherRole && role.RoleId == otherRole.RoleId);
+
+    static string Metadata(object item) => item is SecurityUserDto user
+        ? "@" + user.Username + " · " + (user.IsActive ? "Hoạt động" : "Ngừng hoạt động") +
+            (user.IsProtectedAccount ? " · Được bảo vệ" : "")
+        : item is SecurityRoleDto role
+            ? role.MemberUserIds.Count + " thành viên · " + (role.IsActive ? "Hoạt động" : "Ngừng hoạt động") : "";
+
+    internal static string FullText(object item) =>
+        (item is SecurityUserDto user ? user.DisplayName : item is SecurityRoleDto role ? role.Name : "") + " · " + Metadata(item);
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        var index = IndexFromPoint(e.Location);
-        var tooltip = index < 0 || index >= Items.Count ? "" : FullText(Items[index]);
-        if (index == _tipIndex && string.Equals(tooltip, _tipText, StringComparison.Ordinal)) return;
-        _tipIndex = index;
-        _tipText = tooltip;
-        AccessibleDescription = tooltip;
-        _itemTip.SetToolTip(this, tooltip);
+        var item = GetItemAt(e.X, e.Y);
+        var text = item == null ? "" : FullText(item.Tag);
+        if (_tipText == text) return;
+        _tipText = text;
+        UpdateAccessibleIdentity();
+        _itemTip.SetToolTip(this, text);
     }
 
     protected override void OnMouseLeave(EventArgs e)
     {
         ClearHoverDescription();
+        UpdateAccessibleIdentity();
         base.OnMouseLeave(e);
     }
 
     internal void ClearHoverDescription()
     {
-        _tipIndex = -1;
         _tipText = "";
         AccessibleDescription = "";
         _itemTip.Hide(this);
@@ -93,44 +201,7 @@ internal sealed class SecurityMasterListBox : ListBox
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
-        {
-            ClearHoverDescription();
-            _itemTip.Dispose();
-        }
+        if (disposing) { ClearHoverDescription(); _itemTip.Dispose(); }
         base.Dispose(disposing);
-    }
-
-    internal static string FullText(object item) => item is SecurityUserDto user
-        ? user.DisplayName + " · @" + user.Username + " · " + (user.IsActive ? "Hoạt động" : "Ngừng hoạt động")
-        : item is SecurityRoleDto role
-            ? role.Name + " · " + role.MemberUserIds.Count + " thành viên · " + (role.IsActive ? "Hoạt động" : "Ngừng hoạt động")
-            : item.ToString() ?? "";
-
-    protected override void OnDrawItem(DrawItemEventArgs e)
-    {
-        if (e.Index < 0 || e.Index >= Items.Count) return;
-        var theme = BootstrapThemeManager.CurrentTheme.Colors;
-        var selected = (e.State & DrawItemState.Selected) != 0;
-        using var background = new SolidBrush(selected ? theme.SurfaceSecondary : theme.Surface);
-        e.Graphics.FillRectangle(background, e.Bounds);
-        var item = Items[e.Index];
-        var title = item is SecurityUserDto user ? user.DisplayName : item is SecurityRoleDto role ? role.Name : item.ToString() ?? "";
-        var sub = item is SecurityUserDto u ? u.Username : item is SecurityRoleDto r ? r.MemberUserIds.Count + " thành viên" : "";
-        var active = item is SecurityUserDto uu ? uu.IsActive : item is SecurityRoleDto rr && rr.IsActive;
-        var status = active ? "Hoạt động" : "Ngừng hoạt động";
-        var textWidth = Math.Max(0, e.Bounds.Width - 20);
-        var titleRect = new Rectangle(e.Bounds.Left + 10, e.Bounds.Top + 4, textWidth, 20);
-        var subRect = new Rectangle(e.Bounds.Left + 10, e.Bounds.Top + 27, textWidth, 19);
-        var badgeWidth = Math.Min(128, textWidth);
-        var badgeRect = new Rectangle(e.Bounds.Left + 10, e.Bounds.Top + 50, badgeWidth, 19);
-        using var badgeBackground = new SolidBrush(theme.SurfaceSecondary);
-        using var badgeBorder = new Pen(theme.MutedText);
-        e.Graphics.FillRectangle(badgeBackground, badgeRect);
-        e.Graphics.DrawRectangle(badgeBorder, badgeRect);
-        TextRenderer.DrawText(e.Graphics, title, Font, titleRect, theme.Text, TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
-        TextRenderer.DrawText(e.Graphics, sub, Font, subRect, theme.MutedText, TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
-        TextRenderer.DrawText(e.Graphics, status, Font, badgeRect, theme.Text, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-        if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
     }
 }

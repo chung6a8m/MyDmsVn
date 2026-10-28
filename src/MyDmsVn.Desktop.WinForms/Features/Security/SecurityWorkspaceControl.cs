@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application.Security;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 namespace MyDmsVn.Desktop.WinForms.Features.Security;
 public sealed partial class SecurityWorkspaceControl : UserControl, IActivatableDesktopControl
@@ -16,33 +17,27 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
     {
         Dock = DockStyle.Fill
     };
-    public ListBox Users { get; } = new SecurityMasterListBox
-    {
-        Dock = DockStyle.Fill,
-        DisplayMember = "DisplayName"
-    };
-    public ListBox Roles { get; } = new SecurityMasterListBox
-    {
-        Dock = DockStyle.Fill,
-        DisplayMember = "Name"
-    };
+    public BootstrapListView Users { get; } = new SecurityMasterListView { AccessibleName = "Người dùng" };
+    public BootstrapListView Roles { get; } = new SecurityMasterListView { AccessibleName = "Vai trò" };
     public SecurityUserDetailView UserDetail { get; } = new();
     public SecurityRoleDetailView RoleDetail { get; } = new();
     public SecurityPermissionCatalogView PermissionCatalog { get; } = new();
-    public Label DatasetStatus { get; } = new()
+    public BootstrapLabel DatasetStatus { get; } = new()
     {
         Dock = DockStyle.Top,
-        Height = 30
+        Height = 30,
+        TextRole = BootstrapTextRole.Warning,
+        AccessibleRole = AccessibleRole.StatusBar
     };
-    public Label UserPaneStatus { get; } = new() { Dock = DockStyle.Top, Height = 28, AutoEllipsis = true };
-    public Label RolePaneStatus { get; } = new() { Dock = DockStyle.Top, Height = 28, AutoEllipsis = true };
+    public BootstrapLabel UserPaneStatus { get; } = new() { Dock = DockStyle.Top, Height = 36, AutoEllipsis = true, AccessibleRole = AccessibleRole.StatusBar };
+    public BootstrapLabel RolePaneStatus { get; } = new() { Dock = DockStyle.Top, Height = 36, AutoEllipsis = true, AccessibleRole = AccessibleRole.StatusBar };
     public Task LastOperation { get; private set; } = Task.CompletedTask;
     internal Task TrackOperation(Task operation) => LastOperation = operation;
 
-    public TextBox UserSearch { get; } = new() { Dock = DockStyle.Top, AccessibleName = "Tìm người dùng" };
-    public TextBox RoleSearch { get; } = new() { Dock = DockStyle.Top, AccessibleName = "Tìm vai trò" };
-    public ComboBox UserActivity { get; } = new() { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Trạng thái người dùng" };
-    public ComboBox RoleActivity { get; } = new() { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Trạng thái vai trò" };
+    public BootstrapTextBox UserSearch { get; } = new() { Dock = DockStyle.Top, AccessibleName = "Tìm người dùng", PlaceholderText = "Tìm người dùng" };
+    public BootstrapTextBox RoleSearch { get; } = new() { Dock = DockStyle.Top, AccessibleName = "Tìm vai trò", PlaceholderText = "Tìm vai trò" };
+    public BootstrapComboBox UserActivity { get; } = new() { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Trạng thái người dùng" };
+    public BootstrapComboBox RoleActivity { get; } = new() { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Trạng thái vai trò" };
     Font? _identityFont;
     Font? _catalogFont;
     bool _rendering;
@@ -58,20 +53,9 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         Tabs.TabPages[2].Controls.Add(PermissionCatalog);
         Controls.Add(Tabs);
         Controls.Add(DatasetStatus);
-        Users.FormattingEnabled = Roles.FormattingEnabled = true;
-        Users.Format += (_, args) =>
-        {
-            if (args.ListItem is SecurityUserDto user)
-                args.Value = user.DisplayName + ", " + user.Username + ", " + (user.IsActive ? "đang hoạt động" : "ngừng hoạt động") + (user.IsProtectedAccount ? ", tài khoản được bảo vệ" : "");
-        };
-        Roles.Format += (_, args) =>
-        {
-            if (args.ListItem is SecurityRoleDto role)
-                args.Value = role.Name + ", " + role.MemberUserIds.Count + " thành viên, " + (role.IsActive ? "đang hoạt động" : "ngừng hoạt động");
-        };
         Users.SelectedIndexChanged += async (_, __) =>
         {
-            if (!_rendering && Users.SelectedItem is SecurityUserDto u)
+            if (!_rendering && Users.SelectedItems.Count == 1 && Users.SelectedItems[0].Tag is SecurityUserDto u)
             {
                 if (ViewModel.SelectedUserId != u.UserId && !await AdmitNavigationAsync()) { Render(); return; }
                 ViewModel.SelectUser(u.UserId);
@@ -79,7 +63,7 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         };
         Roles.SelectedIndexChanged += async (_, __) =>
         {
-            if (!_rendering && Roles.SelectedItem is SecurityRoleDto r)
+            if (!_rendering && Roles.SelectedItems.Count == 1 && Roles.SelectedItems[0].Tag is SecurityRoleDto r)
             {
                 if (ViewModel.SelectedRoleId != r.RoleId && !await AdmitNavigationAsync()) { Render(); return; }
                 ViewModel.SelectRole(r.RoleId);
@@ -104,16 +88,18 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         Render();
     }
 
-    static Control Master(Control list, TextBox search, ComboBox activity, Label status)
+    static Control Master(Control list, BootstrapTextBox search, BootstrapComboBox activity, BootstrapLabel status)
     {
-        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var panel = new BootstrapPanel { Dock = DockStyle.Fill, Padding = new Padding(8), SurfaceRole = BootstrapSurfaceRole.Surface };
         search.TabIndex = 0;
         activity.TabIndex = 1;
         list.TabIndex = 2;
         activity.Items.AddRange(new object[] { "Tất cả trạng thái", "Đang hoạt động", "Ngừng hoạt động" });
         activity.SelectedIndex = 0;
         panel.Controls.Add(list);
+        panel.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 8 });
         panel.Controls.Add(activity);
+        panel.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 8 });
         panel.Controls.Add(search);
         panel.Controls.Add(status);
         return panel;
@@ -140,16 +126,27 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         _rendering = true;
         try
         {
-            (Users as SecurityMasterListBox)?.ClearHoverDescription();
-            (Roles as SecurityMasterListBox)?.ClearHoverDescription();
-            Users.Items.Clear();
-            Roles.Items.Clear();
-            foreach (var user in ViewModel.Users.Items.Where(user => (UserActivity.SelectedIndex < 1 || user.IsActive == (UserActivity.SelectedIndex == 1)) && (user.DisplayName + " " + user.Username).IndexOf(UserSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0)) Users.Items.Add(user);
-            foreach (var role in ViewModel.Roles.Items.Where(role => (RoleActivity.SelectedIndex < 1 || role.IsActive == (RoleActivity.SelectedIndex == 1)) && role.Name.IndexOf(RoleSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0)) Roles.Items.Add(role);
-            Users.SelectedItem = ViewModel.SelectedUser;
-            Roles.SelectedItem = ViewModel.SelectedRole;
+            ((SecurityMasterListView)Users).Rebind(ViewModel.Users.Items.Where(user =>
+                (UserActivity.SelectedIndex < 1 || user.IsActive == (UserActivity.SelectedIndex == 1)) &&
+                (user.DisplayName + " " + user.Username).IndexOf(UserSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0).Cast<object>(), ViewModel.SelectedUser);
+            ((SecurityMasterListView)Roles).Rebind(ViewModel.Roles.Items.Where(role =>
+                (RoleActivity.SelectedIndex < 1 || role.IsActive == (RoleActivity.SelectedIndex == 1)) &&
+                role.Name.IndexOf(RoleSearch.Text, StringComparison.CurrentCultureIgnoreCase) >= 0).Cast<object>(), ViewModel.SelectedRole);
+            SetPaneStatus(UserPaneStatus, ViewModel.Users.State, ViewModel.Users.Items.Count, Users.Items.Count, "người dùng");
+            SetPaneStatus(RolePaneStatus, ViewModel.Roles.State, ViewModel.Roles.Items.Count, Roles.Items.Count, "vai trò");
         }
         finally { _rendering = rendering; }
+    }
+
+    static void SetPaneStatus(BootstrapLabel label, SecurityDatasetState state, int count, int visible, string kind)
+    {
+        label.Text = state == SecurityDatasetState.Ready
+            ? count == 0 ? "Chưa có " + kind : visible == 0 ? "Không có kết quả phù hợp" : ""
+            : SecurityPresentation.Dataset(state);
+        label.TextRole = state == SecurityDatasetState.Forbidden || state == SecurityDatasetState.Failed
+            ? BootstrapTextRole.Danger : BootstrapTextRole.Muted;
+        label.AccessibleDescription = label.Text;
+        label.Visible = label.Text.Length > 0;
     }
 
     static void Compose(TabPage page, Control list, Control detail)
@@ -190,6 +187,11 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
             grid.ColumnHeadersDefaultCellStyle.BackColor = colors.SurfaceSecondary;
             grid.ColumnHeadersDefaultCellStyle.ForeColor = colors.Text;
         }
+        // Public toolkit composites own their private native editors and theme subscriptions.
+        if (root is BootstrapBusyHost busy) { ApplyTheme(busy.Content); return; }
+        if (root is BootstrapPanel panel) { foreach (Control child in panel.Controls) ApplyTheme(child); return; }
+        for (var type = root.GetType(); type != null; type = type.BaseType)
+            if (type.Namespace == "MyDmsVn.Bootstrap5WinFormUI.Controls" && root is not TabControl) return;
         foreach (Control child in root.Controls) ApplyTheme(child);
     }
     void StyleHeadings()
@@ -212,14 +214,6 @@ public sealed partial class SecurityWorkspaceControl : UserControl, IActivatable
         try
         {
             FilterMasters();
-            UserPaneStatus.Text = ViewModel.Users.State == SecurityDatasetState.Ready
-                ? ViewModel.Users.Items.Count == 0 ? "Chưa có người dùng" : ""
-                : "Người dùng: " + SecurityPresentation.Dataset(ViewModel.Users.State);
-            RolePaneStatus.Text = ViewModel.Roles.State == SecurityDatasetState.Ready
-                ? ViewModel.Roles.Items.Count == 0 ? "Chưa có vai trò" : ""
-                : "Vai trò: " + SecurityPresentation.Dataset(ViewModel.Roles.State);
-            UserPaneStatus.Visible = UserPaneStatus.Text.Length > 0;
-            RolePaneStatus.Visible = RolePaneStatus.Text.Length > 0;
             DatasetStatus.Text = "Người dùng: " + SecurityPresentation.Dataset(ViewModel.Users.State) + " · Vai trò: " + SecurityPresentation.Dataset(ViewModel.Roles.State) + " · Danh mục: " + SecurityPresentation.Dataset(ViewModel.Catalog.State);
             DatasetStatus.Visible = ViewModel.Users.State != SecurityDatasetState.Ready || ViewModel.Roles.State != SecurityDatasetState.Ready || ViewModel.Catalog.State != SecurityDatasetState.Ready;
             UserDetail.Render(ViewModel);

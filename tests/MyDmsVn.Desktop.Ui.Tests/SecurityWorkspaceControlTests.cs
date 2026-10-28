@@ -21,6 +21,312 @@ namespace MyDmsVn.Desktop.Tests;
 public sealed class SecurityWorkspaceControlTests
 {
     [Fact]
+    public void Role_catalog_render_preserves_selected_definition_native_row_and_filter_identity() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 2;
+        var catalog = control.PermissionCatalog;
+        catalog.ModuleGroups.SelectedIndex = catalog.Module.Items.IndexOf("Sales");
+        var row = catalog.Keys.Rows.Cast<DataGridViewRow>().Single(item => (string)item.Cells[1].Value == "Sales.Receipts.Post");
+        catalog.Keys.CurrentCell = row.Cells[0];
+        catalog.Keys.Focus();
+        control.ViewModel.SelectRole(201);
+        Assert.Same(row, catalog.Keys.CurrentRow);
+        Assert.True(catalog.Keys.ContainsFocus);
+        Assert.Equal("Sales", catalog.Module.Text);
+        Assert.Equal(catalog.Module.SelectedIndex, catalog.ModuleGroups.SelectedIndex);
+        Assert.Contains("Sales.Receipts.Post", catalog.Details.Text);
+        catalog.Search.Text = "Sales.";
+        Assert.Same(row, catalog.Keys.CurrentRow);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Role_catalog_toolkit_surfaces_keep_read_only_theme_focus_and_copy(bool dark) => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var prior = BootstrapThemeManager.CurrentTheme;
+        var clipboard = Clipboard.ContainsText() ? Clipboard.GetText() : null;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 1;
+            Assert.IsAssignableFrom<BootstrapListView>((object)control.RoleDetail.Members);
+            Assert.IsAssignableFrom<BootstrapListView>((object)control.RoleDetail.Permissions);
+            Assert.IsType<BootstrapButton>(control.RoleDetail.OpenUser);
+            Assert.IsType<BootstrapLabel>(control.RoleDetail.HistoryTitle);
+            control.RoleDetail.Members.SelectedIndex = 1;
+            Assert.True(control.RoleDetail.Members.Focus());
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, control.RoleDetail.Members.BackColor);
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Home);
+            Assert.Equal(0, control.RoleDetail.Members.SelectedIndex);
+            Assert.DoesNotContain(control.RoleDetail.HeaderState.Text, "thành viên", StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("Thành viên (2)", control.RoleDetail.Tabs.TabPages[1].Text);
+            var catalog = control.PermissionCatalog;
+            control.Tabs.SelectedIndex = 2;
+            Assert.IsType<BootstrapDataGridView>(catalog.Keys);
+            Assert.IsType<BootstrapTextBox>((object)catalog.Search);
+            Assert.IsType<BootstrapComboBox>(catalog.Module);
+            Assert.IsType<BootstrapComboBox>(catalog.Lifecycle);
+            Assert.IsAssignableFrom<BootstrapListView>((object)catalog.ModuleGroups);
+            Assert.IsType<BootstrapButton>(catalog.CopyKey);
+            Assert.IsType<BootstrapButton>(catalog.RefreshButton);
+            Assert.IsType<BootstrapLabel>(catalog.Heading);
+            Assert.IsType<BootstrapPanel>(catalog.Keys.Parent);
+            Assert.True(catalog.Keys.ReadOnly && !catalog.Keys.AllowUserToAddRows && !catalog.Keys.AllowUserToDeleteRows);
+            Assert.True(catalog.Details.Multiline && catalog.Details.ReadOnly);
+            Assert.Equal("Chi tiết định nghĩa quyền đã chọn", catalog.Details.AccessibleName);
+            var row = catalog.Keys.Rows.Cast<DataGridViewRow>().Single(item => (string)item.Cells[1].Value == "Sales.Receipts.Post");
+            catalog.Keys.CurrentCell = row.Cells[0];
+            Assert.Contains("Sales.Receipts.Post", catalog.Details.Text);
+            Assert.Equal("Sales.Receipts.Post", row.Cells[1].ToolTipText);
+            Assert.True(catalog.Details.Focus());
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, catalog.Details.BackColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, catalog.Details.ForeColor);
+            catalog.CopyKey.PerformClick();
+            Assert.Equal("Sales.Receipts.Post", Clipboard.GetText());
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        }
+        finally
+        {
+            if (clipboard != null) Clipboard.SetText(clipboard); else Clipboard.Clear();
+            BootstrapThemeManager.CurrentTheme = prior;
+        }
+    });
+
+    [Fact]
+    public void Role_catalog_same_owner_render_keeps_native_member_and_catalog_rows_scroll_and_identity() => Run(SecurityScenarioId.SEC_L01, scene =>
+    {
+        var user = scene.Data.Users[0];
+        var ids = Enumerable.Range(1000, 45).ToArray();
+        foreach (var id in ids)
+            scene.Data.Users.Add(new SecurityUserDto(id, "member-" + id, "Thành viên " + id, user.Email, true,
+                user.AssignmentRevision, user.RoleIds, user.DirectDecisions, false));
+        var role = scene.Data.Roles[0];
+        scene.Data.Roles[0] = new SecurityRoleDto(role.RoleId, role.Name, role.IsActive, role.AssignmentRevision, ids, role.PermissionKeys);
+        var catalog = scene.Data.Catalog;
+        scene.Data.Catalog = new PermissionCatalogDto(catalog.ApplicationVersion, catalog.CatalogDigest, catalog.Items.Concat(
+            ids.Select(id => new PermissionCatalogItemDto("Long.Canonical.Key." + id, "Long", "Tên quyền " + id, "Active"))).ToArray());
+    }, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        var members = Assert.IsAssignableFrom<BootstrapListView>((object)control.RoleDetail.Members);
+        control.RoleDetail.Members.SelectedIndex = 30;
+        members.Items[30].Focused = true;
+        members.Items[30].EnsureVisible();
+        members.Focus();
+        var selected = members.Items[30];
+        var top = members.TopItem;
+        control.ViewModel.SelectRole(201);
+        Assert.Same(selected, Assert.Single(members.SelectedItems.Cast<ListViewItem>()));
+        Assert.Same(selected, members.FocusedItem);
+        Assert.Same(top, members.TopItem);
+        Assert.True(members.ContainsFocus);
+        control.Tabs.SelectedIndex = 2;
+        var catalog = control.PermissionCatalog;
+        catalog.ModuleGroups.SelectedIndex = catalog.Module.Items.IndexOf("Long");
+        catalog.Keys.CurrentCell = catalog.Keys.Rows[30].Cells[0];
+        catalog.Keys.FirstDisplayedScrollingRowIndex = 26;
+        catalog.Keys.Focus();
+        var row = catalog.Keys.CurrentRow;
+        var scroll = catalog.Keys.FirstDisplayedScrollingRowIndex;
+        control.ViewModel.SelectRole(201);
+        Assert.Same(row, catalog.Keys.CurrentRow);
+        Assert.Equal(scroll, catalog.Keys.FirstDisplayedScrollingRowIndex);
+        Assert.True(catalog.Keys.ContainsFocus);
+        Assert.Equal("Long", catalog.Module.Text);
+        Assert.Equal(catalog.Module.SelectedIndex, catalog.ModuleGroups.SelectedIndex);
+        Assert.Contains("Long.Canonical.Key.1030", catalog.Details.Text);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Fact]
+    public void Role_catalog_unavailable_users_scrub_profile_text_and_prevent_member_navigation() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        control.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Tabs.SelectedIndex = 1;
+        control.RoleDetail.Members.SelectedIndex = 0;
+        scene.Administration.UsersError = new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Forbidden", "Unavailable");
+        Wait(control.ActivateAsync(default));
+        Assert.Equal(2, control.RoleDetail.Members.Items.Count);
+        control.RoleDetail.Members.SelectedIndex = 0;
+        Assert.Contains("Chi tiết không khả dụng", control.RoleDetail.Members.SelectedItem!.ToString());
+        Assert.DoesNotContain("@lan", control.RoleDetail.Members.SelectedItem!.ToString());
+        Assert.False(control.RoleDetail.OpenUser.Enabled);
+        control.RoleDetail.OpenUser.PerformClick();
+        Assert.Equal(1, control.Tabs.SelectedIndex);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void User_detail_toolkit_surfaces_preserve_identity_read_only_explanation_and_theme(bool dark) => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var prior = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            var detail = control.UserDetail;
+            Assert.IsType<BootstrapLabel>(detail.Header);
+            Assert.IsType<BootstrapLabel>(detail.HeaderMetadata);
+            Assert.IsType<BootstrapLabel>(detail.HeaderState);
+            Assert.IsType<BootstrapPanel>(detail.Header.Parent);
+            Assert.Contains(Descendants(detail.Tabs.TabPages[0], typeof(BootstrapLabel)).Cast<BootstrapLabel>(),
+                label => label.Text == control.ViewModel.SelectedUser!.DisplayName);
+            Assert.IsAssignableFrom<BootstrapListView>((object)detail.Memberships);
+            Assert.IsAssignableFrom<BootstrapListView>((object)detail.DirectDecisions);
+            Assert.IsType<BootstrapDataGridView>(detail.Effective);
+            Assert.IsType<BootstrapTextBox>((object)detail.Search);
+            Assert.IsType<BootstrapComboBox>(detail.Module);
+            Assert.IsType<BootstrapComboBox>(detail.Result);
+            Assert.IsType<BootstrapButton>(detail.RefreshButton);
+            Assert.IsType<BootstrapButton>(detail.OpenDirectPermission);
+            Assert.IsType<BootstrapButton>(control.UserImportButton);
+            detail.Tabs.SelectedIndex = 2;
+            var row = Assert.Single(detail.Effective.Rows.Cast<DataGridViewRow>(), item => Equals(item.Tag, "Sales.Receipts.Post"));
+            detail.Effective.CurrentCell = row.Cells[0];
+            Assert.Contains(Environment.NewLine + "Sales.Receipts.Post", row.Cells[0].Value.ToString());
+            Assert.True(row.Height >= TextRenderer.MeasureText("A" + Environment.NewLine + "A", detail.Effective.Font).Height);
+            Assert.True(detail.Explanation.Multiline && detail.Explanation.ReadOnly);
+            Assert.Equal("Giải thích quyền hiệu lực đã tải", detail.Explanation.AccessibleName);
+            Assert.Contains("Quyền riêng: Từ chối", detail.Explanation.Text);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, detail.Explanation.BackColor);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, detail.Explanation.ForeColor);
+            Assert.True(detail.Explanation.Focus());
+            Assert.True(detail.Explanation.ContainsFocus);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        }
+        finally { BootstrapThemeManager.CurrentTheme = prior; }
+    });
+
+    [Fact]
+    public void User_detail_membership_actions_keep_native_selection_and_contextual_hierarchy() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var detail = control.UserDetail;
+        detail.Tabs.SelectedIndex = 1;
+        Assert.IsAssignableFrom<BootstrapListView>((object)detail.Memberships);
+        detail.Memberships.SelectedIndex = 1;
+        Assert.True(detail.Memberships.Focus());
+        control.ViewModel.SelectUser(101);
+        Assert.Equal(1, detail.Memberships.SelectedIndex);
+        Assert.Contains("không cấp quyền", detail.Memberships.SelectedItem!.ToString());
+        NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Up);
+        Assert.Equal(0, detail.Memberships.SelectedIndex);
+        var actions = Descendants(detail.Tabs.TabPages[1], typeof(BootstrapButton)).Cast<BootstrapButton>().ToArray();
+        Assert.False(Assert.Single(actions, button => button.Text == "Gán vai trò…").Outline);
+        var remove = Assert.Single(actions, button => button.Text == "Gỡ vai trò");
+        Assert.True(remove.Outline);
+        Assert.Equal(BootstrapVariant.Danger, remove.Variant);
+        foreach (var action in actions)
+        {
+            detail.Tabs.TabPages[1].ScrollControlIntoView(action);
+            Assert.True(action.Focus());
+            Assert.True(detail.Tabs.TabPages[1].RectangleToScreen(detail.Tabs.TabPages[1].ClientRectangle)
+                .Contains(action.RectangleToScreen(action.ClientRectangle)));
+        }
+        Assert.Equal(101, control.ViewModel.SelectedUserId);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Fact]
+    public void User_detail_direct_selector_uses_toolkit_without_changing_nullable_draft_or_committed_projection() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    {
+        var detail = control.UserDetail;
+        detail.Tabs.SelectedIndex = 3;
+        var selector = Assert.IsType<BootstrapComboBox>(Assert.Single(Descendants(detail.Tabs.TabPages[3], typeof(ComboBox))));
+        selector.SelectedItem = "Sales.Receipts.Post";
+        var committed = Assert.Single(detail.Effective.Rows.Cast<DataGridViewRow>(), row => Equals(row.Tag, "Sales.Receipts.Post")).Cells[1].Value;
+        foreach (var choice in new[] { "Theo vai trò", "Cho phép", "Từ chối" })
+        {
+            Assert.Single(Descendants(detail, typeof(RadioButton)).Cast<RadioButton>(), radio => radio.Text == choice).Checked = true;
+            Assert.Equal(choice == "Theo vai trò" ? (bool?)null : choice == "Cho phép", control.ViewModel.DirectDecision);
+            Assert.Equal("Sales.Receipts.Post", control.ViewModel.DirectPermissionKey);
+            Assert.Equal(committed, Assert.Single(detail.Effective.Rows.Cast<DataGridViewRow>(), row => Equals(row.Tag, "Sales.Receipts.Post")).Cells[1].Value);
+        }
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Toolkit_master_tiles_preserve_owner_native_selection_and_theme(bool roles) => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        if (roles) control.Tabs.SelectedIndex = 1;
+        var list = Assert.IsAssignableFrom<BootstrapListView>((object)(roles ? control.Roles : control.Users));
+        Assert.IsType<BootstrapTextBox>((object)(roles ? control.RoleSearch : control.UserSearch));
+        Assert.IsType<BootstrapComboBox>(roles ? control.RoleActivity : control.UserActivity);
+        Assert.IsType<BootstrapLabel>(roles ? control.RolePaneStatus : control.UserPaneStatus);
+        Assert.IsType<BootstrapPanel>(list.Parent);
+        Assert.Equal(View.Tile, list.View);
+        Assert.False(list.MultiSelect);
+        Assert.False(list.HideSelection);
+        Assert.Equal(2, list.Items[0].SubItems.Count);
+        var item = list.Items[1];
+        item.Selected = true;
+        item.Focused = true;
+        Assert.True(list.Focus());
+        var owner = roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId;
+        Assert.Equal(roles ? 202 : 102, owner);
+        var prior = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            foreach (var mode in new[] { BootstrapThemeMode.Dark, BootstrapThemeMode.Light })
+            {
+                BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(mode);
+                list.Refresh();
+                Assert.Same(item, Assert.Single(list.SelectedItems.Cast<ListViewItem>()));
+                Assert.Same(item, list.FocusedItem);
+                Assert.True(list.ContainsFocus);
+                Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, list.BackColor);
+                Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, list.ForeColor);
+                Assert.NotEqual(list.BackColor, list.ForeColor);
+                Assert.Equal(owner, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            }
+        }
+        finally { BootstrapThemeManager.CurrentTheme = prior; }
+    });
+
+    [Fact]
+    public void Toolkit_master_render_keeps_native_item_focus_scroll_and_full_identity() => Run(SecurityScenarioId.SEC_L01, scene =>
+    {
+        var original = scene.Data.Users[0];
+        for (var i = 0; i < 40; i++)
+            scene.Data.Users.Add(new SecurityUserDto(1000 + i, "scroll-" + i, "Người dùng " + i, original.Email,
+                true, original.AssignmentRevision, original.RoleIds, original.DirectDecisions, false));
+    }, (control, _) =>
+    {
+        var list = control.Users;
+        var selected = Assert.Single(list.SelectedItems.Cast<ListViewItem>());
+        selected.Focused = true;
+        list.Focus();
+        list.Items[list.Items.Count - 1].EnsureVisible();
+        System.Windows.Forms.Application.DoEvents();
+        var before = list.Items.Cast<ListViewItem>().Select(item => item.Bounds).ToArray();
+        control.ViewModel.SelectUser(control.ViewModel.SelectedUserId!.Value);
+        Assert.Same(selected, Assert.Single(list.SelectedItems.Cast<ListViewItem>()));
+        Assert.Same(selected, list.FocusedItem);
+        Assert.True(list.ContainsFocus);
+        Assert.Equal(before, list.Items.Cast<ListViewItem>().Select(item => item.Bounds).ToArray());
+        Assert.Contains("lan", list.AccessibleDescription);
+        Assert.Contains(selected.Text, list.AccessibleDescription);
+    });
+
+    [Fact]
+    public void Master_hover_does_not_replace_selected_accessible_identity() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
+    {
+        control.ViewModel.SelectUser(102);
+        var selected = control.ViewModel.SelectedUser!;
+        HoverFirstRow(control.Users);
+        Assert.Contains("lan", TooltipText(control.Users));
+        Assert.Contains(selected.DisplayName, control.Users.AccessibleDescription);
+        Assert.Contains(selected.Username, control.Users.AccessibleDescription);
+        Assert.Equal(selected.UserId, control.ViewModel.SelectedUserId);
+    });
+
+    [Fact]
     public void Security_tabs_use_themed_native_headers_at_every_level() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
         foreach (var tabs in new[] { control.Tabs, control.UserDetail.Tabs, control.RoleDetail.Tabs })
@@ -58,6 +364,62 @@ public sealed class SecurityWorkspaceControlTests
     });
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Minimum_user_direct_editor_keeps_commands_and_feedback_reachable(bool dark) => Run(SecurityScenarioId.SEC_L01, (_, _) =>
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            using var lab = new MyDmsVn.Desktop.UiLab.SecurityLabForm { ClientSize = new System.Drawing.Size(900, 600) };
+            lab.Show();
+            Until(() => lab.CurrentSecurityControl is { IsDisposed: false } && !lab.IsResetting && lab.StatusText.Contains("ready"));
+            var workspace = lab.CurrentSecurityControl!;
+            workspace.UserDetail.Tabs.SelectedIndex = 3;
+            Assert.True(workspace.ViewModel.BeginDirectPermission("Sales.Receipts.Post"));
+            workspace.SetImportDialogs(() => "invalid JSON", _ => false);
+            workspace.UserImportButton.PerformClick();
+            Wait(workspace.LastOperation);
+            Assert.False(string.IsNullOrWhiteSpace(workspace.ViewModel.ImportStatus));
+            var tab = workspace.UserDetail.Tabs.TabPages[3];
+            var selector = Assert.Single(Descendants(tab, typeof(ComboBox)).Cast<ComboBox>());
+            var buttons = Descendants(tab, typeof(Button)).Cast<Button>().ToArray();
+            var save = Assert.Single(buttons, button => button.Text == "Lưu quyền này");
+            var cancel = Assert.Single(buttons, button => button.Text == "Hủy");
+            var labels = Descendants(tab, typeof(Label)).Cast<Label>().ToArray();
+            var preview = Assert.Single(labels, label => label.Text.Contains("Kết quả dự kiến"));
+            var status = Assert.Single(labels, label => label.Text == workspace.ViewModel.ImportStatus);
+            // Regression: fixed docked regions can clip commands/feedback even if the list has a minimum height.
+            foreach (var item in new Control[] { status, selector }.Concat(Descendants(tab, typeof(RadioButton)))
+                .Concat(new Control[] { workspace.UserImportButton, preview, save, cancel }))
+            {
+                tab.ScrollControlIntoView(item);
+                if (item.CanSelect) Assert.True(item.Focus());
+                System.Windows.Forms.Application.DoEvents();
+                var viewport = tab.RectangleToScreen(tab.ClientRectangle);
+                var bounds = item.RectangleToScreen(item.ClientRectangle);
+                Assert.True(item.Visible && viewport.Contains(bounds), $"{item.AccessibleName ?? item.Text}: {bounds}; Direct viewport {viewport}");
+                var region = item;
+                while (region.Parent != tab) region = region.Parent!;
+                var center = tab.PointToClient(new System.Drawing.Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2));
+                Assert.Same(region, tab.GetChildAtPoint(center));
+            }
+            Assert.False(tab.HorizontalScroll.Visible);
+            Assert.False(workspace.HorizontalScroll.Visible);
+            workspace.ViewModel.SetDirectDecision(true);
+            selector.Focus();
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Assert.True(workspace.ViewModel.HasDirtyEditor);
+            cancel.PerformClick();
+            Assert.False(workspace.ViewModel.HasDirtyEditor);
+            Assert.False(Assert.Single(workspace.ViewModel.SelectedUser!.DirectDecisions, decision => decision.PermissionKey == "Sales.Receipts.Post").Decision);
+            lab.CloseWorkspaceButton.PerformClick();
+        }
+        finally { BootstrapThemeManager.CurrentTheme = theme; }
+    });
+
+    [Theory]
     [InlineData(900, 600, false)]
     [InlineData(900, 600, true)]
     [InlineData(1200, 760, false)]
@@ -91,6 +453,55 @@ public sealed class SecurityWorkspaceControlTests
             Assert.True(control.RoleDetail.GrantArea.Width > 0);
             Assert.True(control.RoleDetail.HeaderActions.Controls.Cast<Control>().Last().Right <= control.RoleDetail.HeaderActions.ClientSize.Width);
             AssertHeaderUsesActionRows(control.RoleDetail.HeaderActions);
+        }
+        finally { BootstrapThemeManager.CurrentTheme = theme; }
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Minimum_security_lists_do_not_expose_native_horizontal_scroll(bool dark) => Run(SecurityScenarioId.SEC_L01, scene =>
+    {
+        var user = scene.Data.Users[0];
+        var role = scene.Data.Roles[0];
+        for (var index = 0; index < 40; index++)
+        {
+            scene.Data.Users.Add(new SecurityUserDto(1000 + index, "scroll-" + index, "Người dùng " + index,
+                user.Email, true, user.AssignmentRevision, user.RoleIds, user.DirectDecisions, false));
+            scene.Data.Roles.Add(new SecurityRoleDto(1000 + index, "Vai trò " + index, true,
+                role.AssignmentRevision, Array.Empty<int>(), Array.Empty<string>()));
+        }
+        var catalog = scene.Data.Catalog;
+        scene.Data.Catalog = new PermissionCatalogDto(catalog.ApplicationVersion, catalog.CatalogDigest,
+            catalog.Items.Concat(Enumerable.Range(0, 40).Select(index => new PermissionCatalogItemDto(
+                "Security.NativeScroll." + index, "Module " + index, "Quyền kiểm tra " + index, "Active"))).ToArray());
+    }, (control, _) =>
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(dark ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            var form = control.FindForm()!;
+            var users = NativeHorizontalScrollAfterConstrain(form, control, 0, control.Users);
+            var roles = NativeHorizontalScrollAfterConstrain(form, control, 1, control.Roles);
+            var groups = NativeHorizontalScrollAfterConstrain(form, control, 2, control.PermissionCatalog.ModuleGroups);
+            Console.WriteLine("NATIVE_SCROLL=Users normal " + users.Normal.Description + ", minimum " + users.Minimum.Description +
+                "; Roles normal " + roles.Normal.Description + ", minimum " + roles.Minimum.Description +
+                "; Catalog groups normal " + groups.Normal.Description + ", minimum " + groups.Minimum.Description);
+
+            var offenders = new[]
+                {
+                    ("Users normal", users.Normal), ("Users minimum", users.Minimum),
+                    ("Roles normal", roles.Normal), ("Roles minimum", roles.Minimum),
+                    ("Catalog groups normal", groups.Normal), ("Catalog groups minimum", groups.Minimum)
+                }
+                .Where(item => item.Item2.Visible)
+                .Select(item => item.Item1 + " " + item.Item2.Description)
+                .ToArray();
+            Assert.True(offenders.Length == 0, "Unexpected native horizontal scroll: " + string.Join("; ", offenders));
+            Assert.True(control.Users.Scrollable);
+            Assert.True(control.Roles.Scrollable);
+            Assert.True(control.PermissionCatalog.ModuleGroups.Scrollable);
         }
         finally { BootstrapThemeManager.CurrentTheme = theme; }
     });
@@ -322,18 +733,20 @@ public sealed class SecurityWorkspaceControlTests
             ";ACTIONS=" + control.UserDetail.HeaderActions.ClientSize.Width);
         Assert.InRange(control.Users.Parent!.Width, width == 900 ? 180 : 240, width == 900 ? 220 : 280);
         Assert.True(control.Users.ClientSize.Width - 20 >= 150, "Master secondary text needs a visible line in the expanded shell.");
-        Assert.True(control.Users.ItemHeight >= 69);
-        Assert.Contains("lan", control.Users.GetItemText(control.Users.Items[0]));
+        Assert.InRange(control.Users.TileSize.Height, 56, 80);
+        Assert.Contains("lan", control.Users.Items[0].SubItems[1].Text);
         AssertActionReachable(control.UserDetail.HeaderActions);
         control.Tabs.SelectedIndex = 1;
         System.Windows.Forms.Application.DoEvents();
         Assert.InRange(control.Roles.Parent!.Width, width == 900 ? 180 : 240, width == 900 ? 220 : 280);
         Assert.True(control.Roles.ClientSize.Width - 20 >= 150);
-        Assert.Contains("thành viên", control.Roles.GetItemText(control.Roles.Items[0]));
+        Assert.Contains("thành viên", control.Roles.Items[0].SubItems[1].Text);
         AssertActionReachable(control.RoleDetail.HeaderActions);
     });
-    [Fact]
-    public void Master_tooltip_scrubs_identity_on_rebind_forbidden_and_session_replacement() => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+    [Theory]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.Forbidden)]
+    [InlineData(MyDmsVn.Contracts.ApiStatusCode.InternalServerError)]
+    public void Master_tooltip_scrubs_identity_on_rebind_forbidden_and_session_replacement(MyDmsVn.Contracts.ApiStatusCode status) => Run(SecurityScenarioId.SEC_L01, (control, scene) =>
     {
         HoverFirstRow(control.Users);
         Assert.Contains("lan", TooltipText(control.Users));
@@ -345,7 +758,7 @@ public sealed class SecurityWorkspaceControlTests
         HoverFirstRow(control.Users);
         Assert.Contains("replacement", TooltipText(control.Users));
         Assert.DoesNotContain("lan", TooltipText(control.Users));
-        scene.Administration.UsersError = new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.Forbidden, "Denied", "Denied");
+        scene.Administration.UsersError = new MyDmsVn.Contracts.ApiError(status, "Unavailable", "Unavailable");
         Wait(control.ActivateAsync(default));
         Assert.Empty(control.Users.Items);
         Assert.Equal("", TooltipText(control.Users));
@@ -400,7 +813,7 @@ public sealed class SecurityWorkspaceControlTests
         Assert.Single(control.Users.Items);
         Assert.Equal(owner, control.ViewModel.SelectedUserId);
         control.UserSearch.Clear();
-        Assert.Equal(owner, ((MyDmsVn.Contracts.Security.SecurityUserDto)control.Users.SelectedItem).UserId);
+        Assert.Equal(owner, ((SecurityUserDto)Assert.Single(control.Users.SelectedItems.Cast<ListViewItem>()).Tag).UserId);
         control.PermissionCatalog.Lifecycle.SelectedIndex = 2;
         Assert.Single(control.PermissionCatalog.Keys.Rows);
         Assert.Equal("Legacy.Deprecated", control.PermissionCatalog.Keys.Rows[0].Cells[1].Value);
@@ -439,7 +852,9 @@ public sealed class SecurityWorkspaceControlTests
     {
         control.Tabs.SelectedIndex = 2;
         Assert.Equal(data.Data.Catalog.Items.Count, control.PermissionCatalog.Keys.Rows.Count);
-        var actions = Descendants(control.PermissionCatalog, typeof(Button)).Cast<Button>().Select(button => button.Text).ToArray();
+        // The toolkit search composite owns its native clear button; it is not a catalog command.
+        var actions = Descendants(control.PermissionCatalog, typeof(Button)).Cast<Button>()
+            .Where(button => !control.PermissionCatalog.Search.Contains(button)).Select(button => button.Text).ToArray();
         Assert.Equal(2, actions.Length);
         Assert.Contains("Sao chép mã quyền", actions);
         Assert.Contains("Làm mới", actions);
@@ -466,9 +881,9 @@ public sealed class SecurityWorkspaceControlTests
     [Fact]
     public void Master_and_identity_views_show_separate_hierarchy() => Run(SecurityScenarioId.SEC_L01, (control, _) =>
     {
-        Assert.Equal(DrawMode.OwnerDrawFixed, control.Users.DrawMode);
-        Assert.True(control.Users.ItemHeight >= 50);
-        Assert.Equal(DrawMode.OwnerDrawFixed, control.Roles.DrawMode);
+        Assert.True(control.Users.OwnerDraw);
+        Assert.True(control.Users.TileSize.Height >= 50);
+        Assert.True(control.Roles.OwnerDraw);
         Assert.NotEmpty(control.UserDetail.Header.Text);
         Assert.Contains("@", control.UserDetail.HeaderMetadata.Text);
         Assert.Contains("hoạt động", control.UserDetail.HeaderState.Text, StringComparison.OrdinalIgnoreCase);
@@ -905,6 +1320,129 @@ public sealed class SecurityWorkspaceControlTests
         }
         finally { BootstrapThemeManager.CurrentTheme = priorTheme; }
     });
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void Secret_dialog_closes_and_clears_input_on_owner_boundary(bool create, bool disposeOwner) => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var command = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == (create ? "Tạo người dùng…" : "Đặt lại mật khẩu…"));
+        ExceptionDispatchInfo? failure = null;
+        BootstrapTextBox? secret = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => create ? form.Text == "Tạo người dùng" : form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) return;
+            timer.Stop();
+            try
+            {
+                secret = Assert.Single(DialogInputs(dialog).OfType<BootstrapTextBox>(), input => input.UseSystemPasswordChar);
+                secret.Text = "session-bound-fixture";
+                if (disposeOwner) control.Dispose();
+                else data.Session.Replace();
+                Assert.Empty(secret.Text);
+                Assert.NotEqual(DialogResult.None, dialog.DialogResult);
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+            }
+            catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
+            finally { dialog.Close(); }
+        };
+        timer.Start(); command.PerformClick();
+        Assert.False(timer.Enabled);
+        failure?.Throw();
+        Assert.NotNull(secret);
+        Assert.True(secret!.IsDisposed);
+        Assert.Empty(secret.Text);
+    });
+
+    [Theory]
+    [InlineData("edit-user")]
+    [InlineData("create-role")]
+    [InlineData("edit-role")]
+    [InlineData("password")]
+    public void Remaining_identity_dialogs_keep_toolkit_validation_native_input_and_open_theme(string kind) => Run(SecurityScenarioId.SEC_L03, (control, data) =>
+    {
+        var roles = kind.Contains("role");
+        if (roles) control.Tabs.SelectedIndex = 1;
+        var caption = kind == "edit-user" ? "Sửa thông tin…" : kind == "create-role" ? "Tạo vai trò…" : kind == "edit-role" ? "Sửa tên…" : "Đặt lại mật khẩu…";
+        var command = Assert.Single(Descendants(roles ? (Control)control.RoleDetail : control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == caption);
+        ExceptionDispatchInfo? failure = null;
+        var prior = BootstrapThemeManager.CurrentTheme;
+        BootstrapTextBox? secret = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == "Tạo vai trò" || form.Text.StartsWith("Sửa — ") || form.Text.StartsWith("Đặt lại mật khẩu — "));
+            if (dialog == null) return;
+            timer.Stop();
+            try
+            {
+                var inputs = DialogInputs(dialog).Select(input => Assert.IsType<BootstrapTextBox>(input)).OrderBy(input => input.TabIndex).ToArray();
+                var first = inputs[0];
+                Assert.True(first.ContainsFocus);
+                Assert.Equal(kind == "password" ? "Mật khẩu mới" : roles ? "Tên vai trò" : "Tên đăng nhập", first.AccessibleName);
+                if (kind != "create-role") Assert.Contains(roles ? control.ViewModel.SelectedRole!.Name : control.ViewModel.SelectedUser!.DisplayName, dialog.Text);
+                var save = Assert.IsType<BootstrapButton>(dialog.AcceptButton);
+                var cancel = Assert.IsType<BootstrapButton>(dialog.CancelButton);
+                Assert.Equal(BootstrapVariant.Primary, save.Variant);
+                Assert.False(save.Outline);
+                Assert.Equal(BootstrapVariant.Secondary, cancel.Variant);
+                first.Clear();
+                save.PerformClick();
+                Assert.True(first.ContainsFocus);
+                Assert.Equal(BootstrapValidationState.Invalid, first.ValidationState);
+                var validation = Assert.Single(Descendants(dialog, typeof(BootstrapLabel)).Cast<BootstrapLabel>(), label => label.AccessibleRole == AccessibleRole.Alert);
+                Assert.False(string.IsNullOrEmpty(validation.Text));
+                Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+                var driver = new NativeLookupTypingDriver(first);
+                foreach (var character in "pilot") driver.TypeCharacter(character);
+                Assert.Equal(BootstrapValidationState.None, first.ValidationState);
+                Assert.Empty(validation.Text);
+                driver.SelectRange(1, 2);
+                foreach (var mode in new[] { BootstrapThemeMode.Dark, BootstrapThemeMode.Light })
+                {
+                    BootstrapThemeManager.CurrentTheme = BusinessCompactAppearance.CreateTheme(mode);
+                    System.Windows.Forms.Application.DoEvents();
+                    Assert.Equal("pilot", driver.Text);
+                    Assert.Equal(1, driver.SelectionStart);
+                    Assert.Equal(2, driver.SelectionLength);
+                    driver.AssertFocused();
+                    Assert.Equal(10f, first.Font.SizeInPoints);
+                    Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, first.BackColor);
+                    Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Danger, validation.ForeColor);
+                    Assert.False(save.Font.GetHeight() <= 0);
+                }
+                driver.TypeCharacter('X');
+                Assert.Equal("pXot", driver.Text);
+                if (kind == "password") { secret = first; Assert.True(first.UseSystemPasswordChar); }
+                for (var index = 1; index < inputs.Length; index++)
+                {
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+                    Assert.True(inputs[index].ContainsFocus);
+                }
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+                Assert.True(save.ContainsFocus);
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Tab);
+                Assert.True(cancel.ContainsFocus);
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+                Assert.Equal(DialogResult.Cancel, dialog.DialogResult);
+            }
+            catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
+            finally { dialog.Close(); }
+        };
+        try
+        {
+            timer.Start(); command.PerformClick();
+            Assert.False(timer.Enabled);
+            failure?.Throw();
+            if (secret != null) { Assert.Empty(secret.Text); Assert.True(secret.IsDisposed); }
+            Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        }
+        finally { BootstrapThemeManager.CurrentTheme = prior; }
+    });
+
     [Fact]
     public void User_create_public_inputs_keep_native_tab_typing_and_theme_state() => Run(SecurityScenarioId.SEC_L03, (control, data) =>
     {
@@ -1224,6 +1762,65 @@ public sealed class SecurityWorkspaceControlTests
         dialogError?.Throw();
         Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
+
+    [Fact]
+    public void Held_password_mutation_closes_and_scrubs_its_modal_on_session_replacement_before_late_completion() =>
+        Run(SecurityScenarioId.SEC_L03, (control, data) =>
+        {
+            var gate = data.Administration.HoldNextMutation(true);
+            var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(),
+                button => button.Text == "Đặt lại mật khẩu…");
+            ExceptionDispatchInfo? dialogError = null;
+            BootstrapTextBox? secret = null;
+            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>()
+                    .FirstOrDefault(form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+                if (dialog == null) return;
+                timer.Stop();
+                try
+                {
+                    secret = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog),
+                        field => field.AccessibleName == "Mật khẩu mới"));
+                    secret.Text = "replacement-session-secret";
+                    Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(),
+                        button => button.Text == "Xác nhận").PerformClick();
+                    Assert.True(control.ViewModel.IsBusy);
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+
+                    data.Session.Replace();
+                    Assert.Empty(secret.Text);
+                    Assert.False(control.ViewModel.IsCurrent);
+                    gate.Complete(MyDmsVn.Contracts.ApiResponse<SecurityAdministrationResultDto>.Failure(
+                        new MyDmsVn.Contracts.ApiError(MyDmsVn.Contracts.ApiStatusCode.BadRequest,
+                            "ValidationError", "Late fixture outcome.")));
+                }
+                catch (Exception error)
+                {
+                    dialogError = ExceptionDispatchInfo.Capture(error);
+                    gate.Cancel();
+                    if (!dialog.IsDisposed) dialog.Close();
+                }
+            };
+            timer.Start();
+            reset.PerformClick();
+            Assert.False(timer.Enabled, "The held password dialog did not reach session replacement.");
+            dialogError?.Throw();
+            Until(() => data.Administration.OutstandingOperations.All(operation => operation.IsCompleted));
+            System.Windows.Forms.Application.DoEvents();
+
+            Assert.NotNull(secret);
+            Assert.Empty(secret!.Text);
+            Assert.DoesNotContain(System.Windows.Forms.Application.OpenForms.Cast<Form>(),
+                form => form.Text.StartsWith("Đặt lại mật khẩu — "));
+            Assert.Empty(control.Users.Items);
+            Assert.Empty(control.Roles.Items);
+            Assert.Null(control.ViewModel.LastMutationFeedback);
+            Assert.DoesNotContain("replacement-session-secret",
+                string.Join(" ", data.Journal.Entries.Select(entry => entry.ToString())));
+            Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
     [Theory]
     [InlineData("create-user", "success")]
     [InlineData("edit-user", "success")]
@@ -1285,7 +1882,12 @@ public sealed class SecurityWorkspaceControlTests
                     else if (kind == "edit-user")
                         Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Tên hiển thị").Text = "Held Review User";
                     if (secret != null) secret.Text = "fixture-only-password";
-                    save.PerformClick();
+                    phase = 1;
+                    timer.Stop(); // Native input pumps messages; do not re-enter the initial dispatch.
+                    DialogInputs(dialog).First().Focus();
+                    Assert.True(DialogInputs(dialog).First().ContainsFocus);
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                    timer.Start();
                     var request = Assert.IsType<SecurityMutationJournalEntry>(Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate").Request);
                     var expected = kind switch
                     {
@@ -1296,7 +1898,6 @@ public sealed class SecurityWorkspaceControlTests
                         _ => (SecurityAdministrationTargetDto.User, SecurityAdministrationOperationDto.SetPassword, 101, (long?)11)
                     };
                     Assert.Equal(expected, (request.Target, request.Operation, request.TargetId, request.ExpectedRevision));
-                    phase = 1;
                 }
                 else if (phase == 1)
                 {
@@ -1311,6 +1912,8 @@ public sealed class SecurityWorkspaceControlTests
                     var focusTarget = (Control?)secret ?? DialogInputs(dialog).First();
                     focusTarget.Focus();
                     Assert.True(focusTarget.ContainsFocus);
+                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+                    Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                     NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
                     Assert.True(dialog.Visible);
                     Assert.Equal(DialogResult.None, dialog.DialogResult);
@@ -1382,7 +1985,7 @@ public sealed class SecurityWorkspaceControlTests
             {
                 var save = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận");
                 Assert.Contains(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.Visible && label.Text == "Mật khẩu mới");
-                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                var password = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới"));
                 save.PerformClick();
                 Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                 Assert.True(dialog.Visible);
@@ -1390,7 +1993,7 @@ public sealed class SecurityWorkspaceControlTests
                 save.PerformClick();
                 Assert.DoesNotContain(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
                 Assert.Empty(password.Text);
-                Assert.True(password.Focused);
+                Assert.True(password.ContainsFocus);
             }
             catch (Exception error) { dialogError = ExceptionDispatchInfo.Capture(error); }
             finally { dialog.Close(); }
@@ -1405,7 +2008,7 @@ public sealed class SecurityWorkspaceControlTests
     {
         var reset = Assert.Single(Descendants(control.UserDetail, typeof(Button)).Cast<Button>(), button => button.Text == "Đặt lại mật khẩu…");
         ExceptionDispatchInfo? dialogError = null;
-        TextBox? secret = null;
+        BootstrapTextBox? secret = null;
         using var timer = new System.Windows.Forms.Timer { Interval = 30 };
         timer.Tick += (_, _) =>
         {
@@ -1414,9 +2017,10 @@ public sealed class SecurityWorkspaceControlTests
             timer.Stop();
             try
             {
-                secret = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                secret = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới"));
                 secret.Text = "new-temporary-password";
-                Assert.True(secret.Focus());
+                secret.Focus();
+                Assert.True(secret.ContainsFocus);
                 NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
                 Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");
             }
@@ -1449,7 +2053,7 @@ public sealed class SecurityWorkspaceControlTests
             if (dialog == null) { if (phase == 2) timer.Stop(); return; }
             try
             {
-                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                var password = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới"));
                 if (phase == 0)
                 {
                     phase = 1;
@@ -1478,7 +2082,7 @@ public sealed class SecurityWorkspaceControlTests
                         phase = 2;
                         return;
                     }
-                    else Assert.True(password.Focused);
+                    else Assert.True(password.ContainsFocus);
                     timer.Stop();
                     dialog.Close();
                 }
@@ -1520,7 +2124,7 @@ public sealed class SecurityWorkspaceControlTests
             if (dialog == null) { if (phase == 4) timer.Stop(); return; }
             try
             {
-                var password = Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới");
+                var password = Assert.IsType<BootstrapTextBox>(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới"));
                 var reload = Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Tải lại để đối chiếu");
                 if (phase == 0)
                 {
@@ -1589,13 +2193,13 @@ public sealed class SecurityWorkspaceControlTests
             {
                 if (phase == 0)
                 {
-                    Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới").Text = "fixture-only-password";
+                    Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới").Text = "fixture-only-password";
                     Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Xác nhận").PerformClick();
                     phase = 1;
                 }
                 else if (control.ViewModel.RequiresRecovery)
                 {
-                    Assert.Empty(Assert.Single(Descendants(dialog, typeof(TextBox)).Cast<TextBox>(), field => field.AccessibleName == "Mật khẩu mới").Text);
+                    Assert.Empty(Assert.Single(DialogInputs(dialog), field => field.AccessibleName == "Mật khẩu mới").Text);
                     Assert.Single(Descendants(dialog, typeof(Button)).Cast<Button>(), button => button.Text == "Hủy").PerformClick();
                     timer.Stop();
                 }
@@ -1702,7 +2306,7 @@ public sealed class SecurityWorkspaceControlTests
             Assert.Equal(1, control.UserDetail.Tabs.SelectedIndex);
             Assert.Equal(102, control.ViewModel.SelectedUserId);
             Assert.Equal("", control.UserSearch.Text);
-            Assert.Same(control.ViewModel.SelectedUser, control.Users.SelectedItem);
+            Assert.Same(control.ViewModel.SelectedUser, Assert.Single(control.Users.SelectedItems.Cast<ListViewItem>()).Tag);
             Assert.Null(control.ViewModel.RoleDraft);
         }
         Assert.Equal(resolution == SecurityDraftResolution.Save ? 1 : 0,
@@ -1745,7 +2349,7 @@ public sealed class SecurityWorkspaceControlTests
         control.RoleDetail.Tabs.SelectedIndex = 1;
         control.RoleDetail.Members.SelectedIndex = 0;
 
-        Assert.Contains("Chi tiết không khả dụng", control.RoleDetail.Members.GetItemText(control.RoleDetail.Members.SelectedItem));
+        Assert.Contains("Chi tiết không khả dụng", control.RoleDetail.Members.SelectedItem!.ToString());
         Assert.False(control.RoleDetail.OpenUser.Enabled);
         control.RoleDetail.OpenUser.PerformClick();
         Assert.Equal(1, control.Tabs.SelectedIndex);
@@ -1806,6 +2410,8 @@ public sealed class SecurityWorkspaceControlTests
     {
         StaTest.Run(token =>
         {
+            // Match the product/Lab common-controls activation context: native Tile requires v6.
+            System.Windows.Forms.Application.EnableVisualStyles();
             using var guard = new WinFormsTestGuard();
             ExceptionDispatchInfo? error = null;
             using var loop = new ApplicationContext();
@@ -1856,6 +2462,88 @@ public sealed class SecurityWorkspaceControlTests
     [DllImport("user32.dll")]
     static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
+    [DllImport("user32.dll")]
+    static extern int GetWindowLong(IntPtr window, int index);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    static extern bool GetScrollInfo(IntPtr window, int bar, ref ScrollInfo scrollInfo);
+
+    const int GwlStyle = -16;
+    const int WsHscroll = 0x00100000;
+    const int WsVscroll = 0x00200000;
+    const int SbHorz = 0;
+    const uint SifAll = 0x17;
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct ScrollInfo
+    {
+        public uint Size;
+        public uint Mask;
+        public int Minimum;
+        public int Maximum;
+        public uint Page;
+        public int Position;
+        public int TrackPosition;
+    }
+
+    static (bool Visible, string Description) NativeHorizontalScroll(ListView list)
+    {
+        list.CreateControl();
+        list.PerformLayout();
+        System.Windows.Forms.Application.DoEvents();
+        var info = new ScrollInfo { Size = (uint)Marshal.SizeOf<ScrollInfo>(), Mask = SifAll };
+        var hasInfo = GetScrollInfo(list.Handle, SbHorz, ref info);
+        var visible = (GetWindowLong(list.Handle, GwlStyle) & WsHscroll) != 0;
+        return (visible, "client=" + list.ClientSize.Width + "x" + list.ClientSize.Height +
+            ", range=" + (hasInfo ? info.Minimum + ".." + info.Maximum : "unavailable") +
+            ", page=" + (hasInfo ? info.Page.ToString() : "unavailable") +
+            ", tile=" + list.TileSize.Width + "x" + list.TileSize.Height +
+            ", column=" + (list.Columns.Count == 0 ? "none" : list.Columns[0].Width.ToString()) +
+            ", item=" + (list.Items.Count == 0 ? "none" : list.Items[0].Bounds.ToString()));
+    }
+
+    static ((bool Visible, string Description) Normal, (bool Visible, string Description) Minimum) NativeHorizontalScrollAfterConstrain(Form form,
+        SecurityWorkspaceControl control, int tabIndex, ListView list)
+    {
+        form.ClientSize = new System.Drawing.Size(952, 657);
+        control.Tabs.SelectedIndex = tabIndex;
+        form.PerformLayout();
+        control.PerformLayout();
+        System.Windows.Forms.Application.DoEvents();
+        var selected = list.Items[Math.Min(35, list.Items.Count - 1)];
+        selected.Selected = true;
+        selected.Focused = true;
+        selected.EnsureVisible();
+        Assert.True(list.Focus());
+        System.Windows.Forms.Application.DoEvents();
+        var top = NativeTopItem(list);
+        Assert.NotNull(top);
+        Assert.NotSame(list.Items[0], top);
+        var accessibleIdentity = list.AccessibleDescription;
+        var normal = NativeHorizontalScroll(list);
+        Assert.True((GetWindowLong(list.Handle, GwlStyle) & WsVscroll) != 0,
+            "Expected native vertical scroll at normal geometry: " + normal.Description);
+        form.ClientSize = new System.Drawing.Size(652, 497);
+        form.PerformLayout();
+        control.PerformLayout();
+        System.Windows.Forms.Application.DoEvents();
+        var minimum = NativeHorizontalScroll(list);
+        Assert.True((GetWindowLong(list.Handle, GwlStyle) & WsVscroll) != 0,
+            "Expected native vertical scroll at minimum geometry: " + minimum.Description);
+        Assert.Same(selected, Assert.Single(list.SelectedItems.Cast<ListViewItem>()));
+        Assert.Same(selected, list.FocusedItem);
+        Assert.Same(top, NativeTopItem(list));
+        Assert.True(list.ContainsFocus);
+        Assert.Equal(accessibleIdentity, list.AccessibleDescription);
+        return (normal, minimum);
+    }
+
+    static ListViewItem? NativeTopItem(ListView list) => list.View == View.Details
+        ? list.TopItem
+        : list.Items.Cast<ListViewItem>().FirstOrDefault(item =>
+            item.Bounds.Bottom > 0 && item.Bounds.Top < list.ClientSize.Height);
+
     static void Wait(Task task)
     {
         var timer = Stopwatch.StartNew();
@@ -1888,13 +2576,18 @@ public sealed class SecurityWorkspaceControlTests
         }
     }
 
-    static void HoverFirstRow(ListBox list)
+    static void HoverFirstRow(ListView list)
     {
+        for (Control? parent = list.Parent; parent != null; parent = parent.Parent)
+            if (parent is TabPage page) ((TabControl)page.Parent!).SelectedTab = page;
+        System.Windows.Forms.Application.DoEvents();
         var method = list.GetType().GetMethod("OnMouseMove", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-        method.Invoke(list, new object[] { new MouseEventArgs(MouseButtons.None, 0, 5, list.ItemHeight / 2, 0) });
+        var bounds = list.Items[0].GetBounds(ItemBoundsPortion.Label);
+        Assert.False(bounds.IsEmpty);
+        method.Invoke(list, new object[] { new MouseEventArgs(MouseButtons.None, 0, bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2, 0) });
     }
 
-    static string TooltipText(ListBox list)
+    static string TooltipText(ListView list)
     {
         var field = list.GetType().GetField("_itemTip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
         return ((ToolTip)field.GetValue(list)!).GetToolTip(list);
