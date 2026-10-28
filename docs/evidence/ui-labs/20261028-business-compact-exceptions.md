@@ -11,7 +11,7 @@ Báo cáo này chỉ ghi candidate mới. [Evidence UIL gốc](20261027-business
 | Mục | Giá trị Windows cuối |
 |---|---|
 | App code/test revision | `f492a7f87ac3cff5d6eac91bf9430899dc48e925`; source tree `a5083a939408501cdf86e40fc6548e2b4323e5a4`, samples tree `53f7fe35de808c5c6d732791a3da753e31ae2bea`, tests tree `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
-| Toolkit final pin | `0167248c1d33013d18710e0c837fbc005338ec52`; code/test execution revision `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; source tree `d2edfe81dd4d4949889fa5cae69bc6129a8a8837`, tests tree `7dfba0532f79b3052a3039b94b64446b91f797ec` |
+| Toolkit final pin | `01672482250ed1f5a1ed99f10250efa697d78638`; code/test execution revision `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; source tree `d2edfe81dd4d4949889fa5cae69bc6129a8a8837`, tests tree `7dfba0532f79b3052a3039b94b64446b91f797ec` |
 | Nested SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944`; không đổi |
 | Host | Windows 11 Home Single Language 10.0.26300 x64; interactive desktop 1920×1080, work area 1920×1032 |
 | Toolchain | SDK `8.0.427`; MSBuild `17.11.69`; .NET Framework 4.8; .NET Desktop Runtime 8.0.32/8.0.33 |
@@ -69,7 +69,7 @@ Physical 125% Light/Dark × normal/minimum vẫn phải chạy sau khi Display s
 | Tree `tests` của app | `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
 | Gitlink toolkit trước sửa | `c232a4c09dc0386a5bd8bb484a5c991acae827d5` |
 | Baseline toolkit upstream | `efe2e7212fd36e32c91b914bdc5e4081947124fc`; cùng tree với pin consumer trước sửa |
-| Candidate/pin toolkit cuối | `0167248c1d33013d18710e0c837fbc005338ec52` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); code/test revision native `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; consumer checkout sạch. Locked restore/build/native tests theo source/test trees chính xác PASS |
+| Candidate/pin toolkit cuối | `01672482250ed1f5a1ed99f10250efa697d78638` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); code/test revision native `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; consumer checkout sạch. Locked restore/build/native tests theo source/test trees chính xác PASS |
 | SourceGrid lồng bên trong | `f4e457b43582bf01892f50bdc74aa480531e5944`; không đổi |
 | Host/toolchain | Checkpoint native: Windows 11 10.0.26300 x64, SDK `8.0.427`, MSBuild `17.11.69`, .NET Framework 4.8 và Desktop Runtime 8.0.32/8.0.33. Linux cross-build lịch sử được giữ riêng bên dưới |
 | Target sản phẩm/test | `net48`, Debug, x86 cho app/consumer; toolkit `net48` và `net8.0-windows` |
@@ -99,7 +99,7 @@ Fixture mới trong source là [SecurityToolkitExceptionTests](../../../tests/My
 | Locked restore app với overlay Linux tạm thời | **PASS**, không đổi project/lockfile được quản lý trong Git | Kết quả chuẩn bị; chưa phải app compilation hoặc native execution |
 | Lần compile app đầu tiên sau restore | **FAILED: 2 lỗi CS0103** trong fixture mới do tham chiếu helper từ `MyDmsVn.Desktop.Tests` nhưng thiếu namespace import; đã bổ sung import | Lượt này không báo lỗi compiler của production code; kết quả compile thất bại được giữ trong report |
 | Cross-build app `MyDmsVn.UiLab.sln` Debug net48/x86 sau khi sửa import của test | **PASS — 0 cảnh báo, 0 lỗi; 10.64 giây** | Bản mirror cục bộ của đúng production source upstream; đây là lượt trước khi pin gitlink cuối |
-| Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; pin final docs/test-fixture-only là `0167248c1d33013d18710e0c837fbc005338ec52`; không đổi project/lockfile |
+| Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; pin final docs/test-fixture-only là `01672482250ed1f5a1ed99f10250efa697d78638`; không đổi project/lockfile |
 | Build app cuối `MyDmsVn.UiLab.sln` Debug net48/x86 theo pin chính xác, gồm Theory palette thực tế | **PASS — 0 cảnh báo, 0 lỗi; 11.65 giây** | Dùng đúng pin và tree source/samples/tests ghi ở trên; không chạy native tests |
 | Toolkit CI Release trên `windows-2022`, cả hai TFM | **PASS — build-only** tại [run 40710094747](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40710094747) | `head_sha` đúng `1b9c345aa2afd85e38a72d575485c3abdf559451`; không chạy native tests |
 | Windows discovery/execution | **PASS** | Toolkit controls 75/75/TFM, adapters 40/40/TFM; consumer 163/163 net48/x86; 0 fail/skip; TRX local ignored |
