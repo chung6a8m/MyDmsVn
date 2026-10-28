@@ -83,8 +83,10 @@ public sealed class SecurityWorkspaceControlTests
             catalog.Keys.CurrentCell = row.Cells[0];
             Assert.Contains("Sales.Receipts.Post", catalog.Details.Text);
             Assert.Equal("Sales.Receipts.Post", row.Cells[1].ToolTipText);
-            Assert.True(catalog.Details.Focus());
-            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.SurfaceSecondary, Assert.Single(catalog.Details.Controls.OfType<TextBox>()).BackColor);
+            catalog.Details.Focus();
+            var detailsEditor = Assert.Single(catalog.Details.Controls.OfType<TextBox>());
+            Assert.True(catalog.Details.ContainsFocus && detailsEditor.Focused);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.SurfaceSecondary, detailsEditor.BackColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, catalog.Details.ForeColor);
             catalog.CopyKey.PerformClick();
             Assert.Equal("Sales.Receipts.Post", Clipboard.GetText());
@@ -197,10 +199,11 @@ public sealed class SecurityWorkspaceControlTests
             Assert.Equal(ScrollBars.Vertical, detail.Explanation.ScrollBars);
             Assert.Equal("Giải thích quyền hiệu lực đã tải", detail.Explanation.AccessibleName);
             Assert.Contains("Quyền riêng: Từ chối", detail.Explanation.Text);
-            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.SurfaceSecondary, Assert.Single(detail.Explanation.Controls.OfType<TextBox>()).BackColor);
+            var explanationEditor = Assert.Single(detail.Explanation.Controls.OfType<TextBox>());
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.SurfaceSecondary, explanationEditor.BackColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, detail.Explanation.ForeColor);
-            Assert.True(detail.Explanation.Focus());
-            Assert.True(detail.Explanation.ContainsFocus);
+            detail.Explanation.Focus();
+            Assert.True(detail.Explanation.ContainsFocus && explanationEditor.Focused);
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         }
         finally { BootstrapThemeManager.CurrentTheme = prior; }
@@ -856,9 +859,10 @@ public sealed class SecurityWorkspaceControlTests
     {
         control.Tabs.SelectedIndex = 2;
         Assert.Equal(data.Data.Catalog.Items.Count, control.PermissionCatalog.Keys.Rows.Count);
-        // The toolkit search composite owns its native clear button; it is not a catalog command.
+        // Toolkit text composites own hidden native clear buttons; they are not catalog commands.
         var actions = Descendants(control.PermissionCatalog, typeof(Button)).Cast<Button>()
-            .Where(button => !control.PermissionCatalog.Search.Contains(button)).Select(button => button.Text).ToArray();
+            .Where(button => button.Visible && !control.PermissionCatalog.Search.Contains(button))
+            .Select(button => button.Text).ToArray();
         Assert.Equal(2, actions.Length);
         Assert.Contains("Sao chép mã quyền", actions);
         Assert.Contains("Làm mới", actions);
