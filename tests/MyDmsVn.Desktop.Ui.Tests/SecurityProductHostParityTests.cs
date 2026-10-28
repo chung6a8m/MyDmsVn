@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using MyDmsVn.Contracts;
+using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application;
 using MyDmsVn.Desktop.Tests;
 using MyDmsVn.Desktop.UiLab;
@@ -117,7 +118,7 @@ public sealed class SecurityProductHostParityTests
     public void Sidebar_security_close_reopen_and_session_boundaries_own_the_production_control(bool replaceSession) => Run((token, guard) =>
     {
         using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L01);
-        using var shell = CreateShell(scene);
+        using var shell = CreateShell(scene, rebindSession: true);
         shell.Show();
         var first = OpenThroughSidebar(shell, guard, token);
         var firstPage = Assert.Single(shell.Workspace.TabPages.Cast<TabPage>());
@@ -158,8 +159,19 @@ public sealed class SecurityProductHostParityTests
         Assert.False(third.ViewModel.IsCurrent);
         Assert.Empty(shell.Workspace.TabPages);
         Assert.Equal(scene.Session.Version, shell.WorkspaceSessionVersion);
+        var current = third;
+        if (replaceSession)
+        {
+            Assert.Null(shell.Navigation.SelectedItem);
+            current = OpenThroughSidebar(shell, guard, token);
+            Assert.NotSame(third, current);
+            Assert.NotSame(third.ViewModel, current.ViewModel);
+            Assert.Equal(scene.Session.Version, current.ViewModel.OwnerVersion);
+            Assert.True(current.ViewModel.IsCurrent);
+        }
         shell.SignOut();
         Pump(token);
+        Assert.True(current.IsDisposed);
         Assert.False(shell.Navigation.Enabled);
         Assert.False(shell.Workspace.Enabled);
         Assert.Null(shell.OpenSecurityAdministration());
@@ -243,14 +255,17 @@ public sealed class SecurityProductHostParityTests
         finally { timer.Stop(); }
     });
 
-    private static FoundationShellForm CreateShell(SecurityScenario scene)
+    private static FoundationShellForm CreateShell(SecurityScenario scene, bool rebindSession = false)
     {
         var dispatcher = new SynchronizationContextUiDispatcher(SynchronizationContext.Current ?? throw new InvalidOperationException("A UI context is required."));
         var other = new RejectUnrelatedFactories();
         var notifications = new DesktopNotificationCenter();
+        var root = new SessionBindingSecurityPorts(scene);
+        ISecurityAdministrationApiClient administration = rebindSession ? root : scene.Administration;
+        IPermissionCatalogApiClient catalog = rebindSession ? root : scene.Catalog;
         return new FoundationShellForm(new FoundationViewModel(new ReadyFoundationApi(), notifications), scene.Session,
             notifications, other, other, other,
-            new SecurityAdministrationControlFactory(scene.Administration, scene.Catalog, scene.Session, dispatcher), other);
+            new SecurityAdministrationControlFactory(administration, catalog, scene.Session, dispatcher), other);
     }
 
     private static SecurityWorkspaceControl OpenThroughSidebar(FoundationShellForm shell, WinFormsTestGuard guard, CancellationToken token)
@@ -356,6 +371,27 @@ public sealed class SecurityProductHostParityTests
     {
         public Task<ApiResponse<FoundationStatus>> GetStatusAsync(FoundationStatusRequest request, CancellationToken token) =>
             Task.FromResult(ApiResponse<FoundationStatus>.Success(new FoundationStatus(true, "SQL-free product host")));
+    }
+
+    // Mirrors production root ports: only ForSession admits calls. Each workspace
+    // captures its own bound ports while the fixture data survives session replacement.
+    private sealed class SessionBindingSecurityPorts : ISecurityAdministrationApiClient, IPermissionCatalogApiClient
+    {
+        private readonly SecurityScenario _scene;
+        internal SessionBindingSecurityPorts(SecurityScenario scene) => _scene = scene;
+
+        ISecurityAdministrationApiClient ISecurityAdministrationApiClient.ForSession(long expectedSessionVersion) =>
+            new ScenarioSecurityAdministrationApiClient(_scene.Data, _scene.Session, expectedSessionVersion, _scene.Journal);
+        IPermissionCatalogApiClient IPermissionCatalogApiClient.ForSession(long expectedSessionVersion) =>
+            new ScenarioPermissionCatalogApiClient(_scene.Data, _scene.Session, expectedSessionVersion, _scene.Journal);
+
+        public Task<ApiResponse<IReadOnlyList<SecurityUserDto>>> ListUsersAsync(CancellationToken token) => throw Unbound();
+        public Task<ApiResponse<IReadOnlyList<SecurityRoleDto>>> ListRolesAsync(CancellationToken token) => throw Unbound();
+        public Task<ApiResponse<PermissionCatalogDto>> GetCatalogAsync(CancellationToken token) => throw Unbound();
+        public Task<ApiResponse<SecurityAdministrationResultDto>> MutateAsync(SecurityAdministrationMutationRequest request, CancellationToken token) => throw Unbound();
+        public Task<ApiResponse<PermissionAssignmentImportPreviewDto>> PreviewPermissionImportAsync(PermissionImportTargetTypeDto targetType, int targetId, string json, CancellationToken token) => throw Unbound();
+        public Task<ApiResponse<PermissionAssignmentImportResultDto>> ApplyPermissionImportAsync(PermissionImportTargetTypeDto targetType, int targetId, PermissionAssignmentImportRequest request, CancellationToken token) => throw Unbound();
+        private static InvalidOperationException Unbound() => new InvalidOperationException("Security root ports must be bound through ForSession.");
     }
 
     private sealed class RejectUnrelatedFactories : ICatalogControlFactory, IGoodsReceiptControlFactory, IInventoryControlFactory, ISalesReceiptControlFactory
