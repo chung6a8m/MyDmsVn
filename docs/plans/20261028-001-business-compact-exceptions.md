@@ -59,7 +59,7 @@ Tệp: upstream `Controls/BootstrapTextBox.cs`, các kiểm thử multiline/tư�
 
 Tệp: `vendor/MyDmsVn.WinFormsKit`, `BusinessCompactAppearance.cs`, Security editor bindings/các hộp thoại quyết định và import, `SecurityUserDetailView.cs`, `SecurityPermissionCatalogView.cs`, công cụ Lab giải phóng thao tác đang giữ và các kiểm thử UI theo phạm vi.
 
-- [x] Pin implementation ban đầu `1b9c345aa2afd85e38a72d575485c3abdf559451`, sau native fixture/evidence và quyết định Owner cập nhật pin cuối `0f6c7c335b099eb1cd583fe550043be6237da7e9` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); giữ nguyên SourceGrid lồng bên trong.
+- [x] Pin implementation ban đầu `1b9c345aa2afd85e38a72d575485c3abdf559451`, sau native fixture/evidence, quyết định Owner và review findings cập nhật pin cuối `a5dd3cec6daba71943549afac628e13727c00da5` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); giữ nguyên SourceGrid lồng bên trong.
 - [x] Chuyển nội dung/action của hộp thoại hiện có vào body/footer public; giữ các điều kiện chặn close/session/recovery, dữ liệu bí mật và công cụ Lab giải phóng thao tác đang giữ.
 - [x] Chỉ theme các vùng nội dung public do app sở hữu và chuyển hai vùng văn bản chỉ đọc sang toolkit.
 - [x] Thêm kiểm thử hồi quy consumer tập trung trước khi đổi hành vi; giữ các kiểm thử native hiện có và cập nhật các assertion phụ thuộc native chrome được thay.

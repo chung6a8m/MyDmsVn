@@ -11,7 +11,7 @@ Báo cáo này chỉ ghi candidate mới. [Evidence UIL gốc](20261027-business
 | Mục | Giá trị Windows cuối |
 |---|---|
 | App code/test revision | `f492a7f87ac3cff5d6eac91bf9430899dc48e925`; source tree `a5083a939408501cdf86e40fc6548e2b4323e5a4`, samples tree `53f7fe35de808c5c6d732791a3da753e31ae2bea`, tests tree `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
-| Toolkit final evidence/approval pin | `0f6c7c335b099eb1cd583fe550043be6237da7e9`; approved presented candidate `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; code/test execution revision `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; source tree `d2edfe81dd4d4949889fa5cae69bc6129a8a8837`, tests tree `7dfba0532f79b3052a3039b94b64446b91f797ec` |
+| Toolkit final evidence/approval pin | `a5dd3cec6daba71943549afac628e13727c00da5`; approved presented candidate `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; code/test execution revision `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; source tree `d2edfe81dd4d4949889fa5cae69bc6129a8a8837`, tests tree `7dfba0532f79b3052a3039b94b64446b91f797ec`. Commit cuối chỉ sửa tài liệu review; source/test trees không đổi |
 | Nested SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944`; không đổi |
 | Host | Windows 11 Home Single Language 10.0.26300 x64; interactive desktop 1920×1080, work area 1920×1032 |
 | Toolchain | SDK `8.0.427`; MSBuild `17.11.69`; .NET Framework 4.8; .NET Desktop Runtime 8.0.32/8.0.33 |
@@ -23,6 +23,16 @@ Báo cáo này chỉ ghi candidate mới. [Evidence UIL gốc](20261027-business
 ### Focused tests và lỗi đã xử lý
 
 Discovery được chạy trên đúng project/TFM/filter trước execution. Raw TRX nằm dưới `.superpowers/sdd/20261028-001-business-compact-exceptions/results/`, bị ignore và không commit. Mọi GUI run tuần tự; lượt full consumer cuối xác nhận không còn `testhost` hoặc cửa sổ do test sở hữu.
+
+Các lệnh consumer Windows thực tế dưới đây được chạy từ root app bằng PowerShell. VSTest launcher `17.11.1` báo process x64; `PlatformTarget=x86` và `RunConfiguration.TargetPlatform=x86` đặt assembly/test target x86. `--blame-hang-timeout 5m` là timeout chẩn đoán. Discovery và full rerun cuối dùng cùng exact filter; TRX cuối ánh xạ trực tiếp tới hàng 163/163 bên dưới. Exact commands/filters cho bốn lượt toolkit 75/75 và 40/40 được ghi tại [toolkit evidence](../../../vendor/MyDmsVn.WinFormsKit/docs/verification/20261028-business-compact-exceptions.md#checkpoint-windowsnative-exc-t05).
+
+```powershell
+$consumerFilter = 'FullyQualifiedName~SecurityToolkitExceptionTests|FullyQualifiedName~SecurityWorkspaceControlTests|FullyQualifiedName~SecurityReviewScenarioTests|FullyQualifiedName~UiLabModalOwnershipTests|FullyQualifiedName~SecurityProductHostParityTests'
+$resultsRoot = Join-Path (Get-Location) '.superpowers\sdd\20261028-001-business-compact-exceptions\results'
+
+dotnet test tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj -c Debug -f net48 --no-restore --no-build --list-tests --filter $consumerFilter --blame-hang --blame-hang-timeout 5m -p:PlatformTarget=x86 -- RunConfiguration.TargetPlatform=x86
+dotnet test tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj -c Debug -f net48 --no-restore --no-build -p:PlatformTarget=x86 --filter $consumerFilter --blame-hang --blame-hang-timeout 5m --logger 'trx;LogFileName=consumer-net48-x86.trx' --results-directory $resultsRoot\consumer-net48-x86-rerun -- RunConfiguration.TargetPlatform=x86
+```
 
 | Owner / target | Discovered | Executed | Pass / fail / skip | Thời gian TRX |
 |---|---:|---:|---:|---:|
@@ -74,7 +84,7 @@ Display scale thực sự là 125% được xác nhận trước và sau review 
 
 ## Quyết định Owner
 
-Ngày 2026-10-28, sau khi nhận bộ kết quả cụ thể cho app evidence candidate `8efe9bff806aefa49e6ab6ee90efeb34d06fafc0` và toolkit evidence candidate `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`, Owner trả lời rõ **“APPROVED”** cho ba ngoại lệ EXC-T01–T03. Quyết định đóng action disabled, khung modal Security và multiline read-only trên đúng candidate đã trình. Commit toolkit `0f6c7c335b099eb1cd583fe550043be6237da7e9` và commit app chứa đoạn này chỉ ghi quyết định/cập nhật routing, không đổi immutable source/test trees hoặc mở rộng approval sang SQL, Login thực tế, Designer, package, deployment hay release.
+Ngày 2026-10-28, sau khi nhận bộ kết quả cụ thể cho app evidence candidate `8efe9bff806aefa49e6ab6ee90efeb34d06fafc0` và toolkit evidence candidate `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`, Owner trả lời rõ **“APPROVED”** cho ba ngoại lệ EXC-T01–T03. Quyết định đóng action disabled, khung modal Security và multiline read-only trên đúng candidate đã trình. Commit toolkit `a5dd3cec6daba71943549afac628e13727c00da5` và commit app chứa đoạn này chỉ ghi quyết định/cập nhật review/routing, không đổi immutable source/test trees hoặc mở rộng approval sang SQL, Login thực tế, Designer, package, deployment hay release.
 
 Theo yêu cầu tách riêng trong prompt và evidence lịch sử, câu trả lời này không tự phê duyệt source focus correction `3b5f95e2d7d1414f0ffe97f47a3bdef58f33d786`; focused Owner confirmation đó vẫn PENDING.
 
@@ -89,7 +99,7 @@ Theo yêu cầu tách riêng trong prompt và evidence lịch sử, câu trả l
 | Tree `tests` của app | `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
 | Gitlink toolkit trước sửa | `c232a4c09dc0386a5bd8bb484a5c991acae827d5` |
 | Baseline toolkit upstream | `efe2e7212fd36e32c91b914bdc5e4081947124fc`; cùng tree với pin consumer trước sửa |
-| Candidate/pin toolkit cuối | `0f6c7c335b099eb1cd583fe550043be6237da7e9` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); Owner approved presented pin `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; code/test revision native `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; consumer checkout sạch. Các commit sau execution chỉ cập nhật tài liệu/evidence; source/test trees chính xác không đổi và native results tiếp tục áp dụng |
+| Candidate/pin toolkit cuối | `a5dd3cec6daba71943549afac628e13727c00da5` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); Owner approved presented pin `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; code/test revision native `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; consumer checkout sạch. Các commit sau execution chỉ cập nhật tài liệu/evidence/review; source/test trees chính xác không đổi và native results tiếp tục áp dụng |
 | SourceGrid lồng bên trong | `f4e457b43582bf01892f50bdc74aa480531e5944`; không đổi |
 | Host/toolchain | Checkpoint native: Windows 11 10.0.26300 x64, SDK `8.0.427`, MSBuild `17.11.69`, .NET Framework 4.8 và Desktop Runtime 8.0.32/8.0.33. Linux cross-build lịch sử được giữ riêng bên dưới |
 | Target sản phẩm/test | `net48`, Debug, x86 cho app/consumer; toolkit `net48` và `net8.0-windows` |
@@ -119,10 +129,13 @@ Fixture mới trong source là [SecurityToolkitExceptionTests](../../../tests/My
 | Locked restore app với overlay Linux tạm thời | **PASS**, không đổi project/lockfile được quản lý trong Git | Kết quả chuẩn bị; chưa phải app compilation hoặc native execution |
 | Lần compile app đầu tiên sau restore | **FAILED: 2 lỗi CS0103** trong fixture mới do tham chiếu helper từ `MyDmsVn.Desktop.Tests` nhưng thiếu namespace import; đã bổ sung import | Lượt này không báo lỗi compiler của production code; kết quả compile thất bại được giữ trong report |
 | Cross-build app `MyDmsVn.UiLab.sln` Debug net48/x86 sau khi sửa import của test | **PASS — 0 cảnh báo, 0 lỗi; 10.64 giây** | Bản mirror cục bộ của đúng production source upstream; đây là lượt trước khi pin gitlink cuối |
-| Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; final evidence/approval pin `0f6c7c335b099eb1cd583fe550043be6237da7e9` không đổi source/test/project/lockfile; không claim thêm một lượt restore cho commit Markdown-only |
-| Build app cuối `MyDmsVn.UiLab.sln` Debug net48/x86 theo source/test pin chính xác, gồm Theory palette thực tế | **PASS — 0 cảnh báo, 0 lỗi; 11.65 giây** | Dùng đúng source/test trees ghi ở trên; final pin chỉ đổi evidence nên không chạy lại build hoặc native tests |
+| Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; final evidence/approval/review pin `a5dd3cec6daba71943549afac628e13727c00da5` không đổi source/test/project/lockfile; không claim thêm một lượt restore cho commit Markdown-only |
+| Build app Linux lịch sử `MyDmsVn.UiLab.sln` Debug net48/x86, gồm Theory palette thực tế | **PASS — 0 cảnh báo, 0 lỗi; 11.65 giây** | Provenance chính xác: app `9a620e10fd7d8d3246c1f180d28a62e26a84eeec`, source tree `a5083a939408501cdf86e40fc6548e2b4323e5a4`, samples tree `53f7fe35de808c5c6d732791a3da753e31ae2bea`, tests tree `6ceb7954df45971ec0bd10209c1572304d0757ea`, toolkit pin `1b9c345aa2afd85e38a72d575485c3abdf559451`. Không gán thời gian này cho tests tree hiện tại `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
+| Build/native candidate Windows hiện tại | **PASS — app code/test `f492a7f87ac3cff5d6eac91bf9430899dc48e925`, tests tree `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c`; toolkit code/test `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`** | App `MyDmsVn.UiLab.sln` Debug net48/x86 và toolkit all-scope hai TFM đều 0 warning/error; Windows focused totals/TRX là bằng chứng riêng ở checkpoint, không kế thừa thời gian 11.65 giây lịch sử |
 | Toolkit CI Release trên `windows-2022`, cả hai TFM | **PASS — build-only** tại [run 40710094747](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40710094747) | `head_sha` đúng `1b9c345aa2afd85e38a72d575485c3abdf559451`; không chạy native tests |
-| Toolkit CI exact approved evidence pin | **PASS — build-only** tại [run 40727842682](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40727842682) | `head_sha` đúng `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; final `0f6c7c3` chỉ ghi approval/routing, không đổi source/test trees; focused native tests vẫn là evidence local Windows ở checkpoint |
+| Toolkit CI exact approved evidence pin | **PASS — build-only** tại [run 40727842682](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40727842682) | `head_sha` đúng `e06ba1e31f63e60d4a88fd65122f044e27dc7e56`; final `a5dd3ce` chỉ ghi approval/routing/review, không đổi source/test trees; focused native tests vẫn là evidence local Windows ở checkpoint |
+| Toolkit CI intermediate review pin | **PASS — build-only** tại [run 40785846939](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40785846939) | `head_sha` đúng `4eb0172a1986f8918eef096efb968478df31e084`; workflow Windows 2022 hoàn tất trước correction đường dẫn TRX, không thay native evidence local |
+| Toolkit CI exact final review pin | **PASS — build-only** tại [run 40786442922](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40786442922) | `head_sha` đúng `a5dd3cec6daba71943549afac628e13727c00da5`; workflow Windows 2022 build cả hai TFM và xác nhận committed dependency locks không đổi |
 | Windows discovery/execution | **PASS** | Toolkit controls 75/75/TFM, adapters 40/40/TFM; consumer 163/163 net48/x86; 0 fail/skip; TRX local ignored |
 | Owner review native tập trung | **APPROVED — 2026-10-28** | Owner trả lời rõ “APPROVED” sau khi nhận bộ kết quả cho exact app/toolkit candidate; ba ngoại lệ CLOSED trong phạm vi này |
 

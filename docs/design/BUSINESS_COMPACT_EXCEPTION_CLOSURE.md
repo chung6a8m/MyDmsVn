@@ -1,10 +1,10 @@
 # Thiết kế khắc phục ba ngoại lệ Business Compact đã được chọn
 
-**Phạm vi được chọn:** Yêu cầu của Owner ngày 2026-10-28 chọn rõ ba nội dung cần sửa: action disabled trong Dark, khung hộp thoại Security đang dùng native Form và văn bản Security nhiều dòng chỉ đọc đang dùng native TextBox. Các lựa chọn dưới đây là quyết định kỹ thuật cho yêu cầu này; phê duyệt native của candidate vẫn đang chờ.
+**Phạm vi được chọn:** Yêu cầu của Owner ngày 2026-10-28 chọn rõ ba nội dung cần sửa: action disabled trong Dark, khung hộp thoại Security đang dùng native Form và văn bản Security nhiều dòng chỉ đọc đang dùng native TextBox. Focused Windows/native tests và physical-100/125 review đã PASS; Owner APPROVED exact candidate ngày 2026-10-28. Cả ba ngoại lệ CLOSED trong phạm vi này.
 
 ## Mục tiêu và baseline
 
-Làm cho action disabled dễ đọc và phân biệt được trạng thái; dùng modal của toolkit an toàn khi đổi theme; đưa khả năng hiển thị, chọn và cuộn văn bản nhiều dòng của hai vùng chi tiết Security chỉ đọc về toolkit. Baseline app là `5386a6d8efe23099c436eb7ef62141df8d3896b8`; pin WinFormsKit trước sửa là `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Upstream main `efe2e7212fd36e32c91b914bdc5e4081947124fc` có cùng tree với commit app dùng trước sửa. Implementation pin ban đầu là `1b9c345aa2afd85e38a72d575485c3abdf559451`; final evidence/approval pin là `0f6c7c335b099eb1cd583fe550043be6237da7e9` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2), checkout consumer sạch. Giữ SourceGrid tại `f4e457b43582bf01892f50bdc74aa480531e5944`. Owner APPROVED exact candidate trình ngày 2026-10-28; ba ngoại lệ CLOSED trong phạm vi thiết kế này.
+Làm cho action disabled dễ đọc và phân biệt được trạng thái; dùng modal của toolkit an toàn khi đổi theme; đưa khả năng hiển thị, chọn và cuộn văn bản nhiều dòng của hai vùng chi tiết Security chỉ đọc về toolkit. Baseline app là `5386a6d8efe23099c436eb7ef62141df8d3896b8`; pin WinFormsKit trước sửa là `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Upstream main `efe2e7212fd36e32c91b914bdc5e4081947124fc` có cùng tree với commit app dùng trước sửa. Implementation pin ban đầu là `1b9c345aa2afd85e38a72d575485c3abdf559451`; final evidence/approval/review pin là `a5dd3cec6daba71943549afac628e13727c00da5` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2), checkout consumer sạch. Giữ SourceGrid tại `f4e457b43582bf01892f50bdc74aa480531e5944`. Owner APPROVED exact candidate trình ngày 2026-10-28; ba ngoại lệ CLOSED trong phạm vi thiết kế này.
 
 ## Các phương án và thiết kế được chọn
 
