@@ -53,7 +53,7 @@ The ledger records current task progress; native decision cells remain `NOT APPR
 | Task | Deliverable | Depends on | Implementation / evidence | Owner decision |
 |---|---|---|---|---|
 | UIL-T00 | Current control inventory, exceptions and repo UI workflow | Roadmap adoption | COMPLETE — [inventory, workflow exercise and pending evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md) | Not a native gate |
-| UIL-T01 | Shared product/Lab Business Compact theme and presentation bootstrap | T00 | COMPLETE — [presentation and measured geometry](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t01-physical-125-first-observation); subsequent bounded native approval is recorded at T04/T06 | Covered by later candidate review |
+| UIL-T01 | Shared product/Lab Business Compact theme and presentation bootstrap | T00 | COMPLETE — [presentation and measured geometry](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t01-completed-bounded-presentation-contract); subsequent bounded native approval is recorded at T04/T06 | Covered by later candidate review |
 | UIL-T02 | Independent Sales/Security launchers, lifecycle and direct test setup | T01 | COMPLETE — [launcher and lifecycle evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t02-independent-launchers-and-lifecycle); no native approval implied | Covered by later candidate review |
 | UIL-T03 | Role permissions + account-dialog pilot, native evidence | T02 | COMPLETE — [exact candidate, focused verification and native matrix](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t03-native-sec-pilot-and-t04-review-package) | Approved at T04 on 2026-10-27 15:03:12 +07:00 |
 | UIL-T04 | Owner review of the pilot baseline | T03 | COMPLETE — [dated Owner approval, scope and bounded exceptions](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#findings-and-uil-t04-decision) | **APPROVED — 2026-10-27 15:03:12 +07:00** |
@@ -63,6 +63,8 @@ The ledger records current task progress; native decision cells remain `NOT APPR
 | UIL-T08 | Reconcile docs, commands, evidence and handoff | T07; resolve affected review findings | COMPLETE — [documentation reconciliation, reproducible commands and bounded handoff](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#uil-t08-documentation-and-bounded-handoff) | Closed only the accepted bounded scope |
 
 Use a focused implementation commit for each task or coherent slice; retain evidence/correction commits where useful. No task is complete merely because its code compiles or its document exists. A material visual change after T04/T06 reopens the affected review; do not discard original findings.
+
+The Owner-selected 2026-10-28 review-findings follow-up is recorded separately in the [candidate evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#2026-10-28-review-findings-follow-up). It does not change the completed bounded status of UIL-T00–UIL-T08 or rewrite their historical observations. The new selected/focused correction is implemented and focused-verification complete, but remains **PENDING focused Owner confirmation** because it changes affected native keyboard behavior after the approved candidate. This does not reopen the full T04/T06 matrix or add SQL, actual Login, package, release or deployment scope.
 
 ## 4. Implementation tasks
 

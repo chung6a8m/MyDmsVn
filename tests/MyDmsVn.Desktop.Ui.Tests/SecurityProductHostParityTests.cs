@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -176,6 +177,73 @@ public sealed class SecurityProductHostParityTests
         Assert.False(shell.Workspace.Enabled);
         Assert.Null(shell.OpenSecurityAdministration());
         Assert.Empty(shell.Workspace.TabPages);
+        Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+    });
+
+    [Fact]
+    public void Product_dirty_close_uses_native_owned_prompt_and_escape_keeps_workspace_and_draft() => Run((token, guard) =>
+    {
+        using var scene = SecurityScenarioCatalog.Create(SecurityScenarioId.SEC_L10);
+        using var shell = CreateShell(scene);
+        shell.Show();
+        var control = OpenThroughSidebar(shell, guard, token);
+        var page = Assert.Single(shell.Workspace.TabPages.Cast<TabPage>());
+        control.Tabs.SelectedIndex = 1;
+        Assert.True(control.ViewModel.BeginRolePermissions());
+        control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+        var editorIdentity = control.ViewModel.EditorIdentity;
+        Assert.True(control.ViewModel.HasDirtyEditor);
+        NativeLookupTypingDriver.Activate(shell);
+
+        var observed = false;
+        ExceptionDispatchInfo? failure = null;
+        var watch = Stopwatch.StartNew();
+        using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+        timer.Tick += (_, __) =>
+        {
+            var dialog = GetForegroundWindow();
+            var className = WindowText(dialog, className: true);
+            GetWindowThreadProcessId(dialog, out var processId);
+            if (dialog == IntPtr.Zero || className != "#32770" || processId != (uint)Process.GetCurrentProcess().Id)
+            {
+                if (watch.Elapsed < TimeSpan.FromSeconds(5)) return;
+                timer.Stop();
+                failure = ExceptionDispatchInfo.Capture(new TimeoutException("Native product Close prompt did not appear within 5 seconds."));
+                return;
+            }
+            timer.Stop();
+            try
+            {
+                observed = true;
+                Assert.Equal("Close workspace", WindowText(dialog, className: false));
+                Assert.Equal(shell.Handle, GetWindow(dialog, 4));
+                var focus = GetFocus();
+                Assert.NotEqual(IntPtr.Zero, focus);
+                Assert.True(IsChild(dialog, focus), "Native Close prompt must own the keyboard focus.");
+                _output.WriteLine("PRODUCT_CLOSE owner={0}; title={1}; focused={2}",
+                    GetWindow(dialog, 4), WindowText(dialog, false), WindowText(focus, false));
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+            }
+            catch (Exception error)
+            {
+                failure = ExceptionDispatchInfo.Capture(error);
+                NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
+            }
+        };
+        try
+        {
+            timer.Start();
+            Assert.True(shell.Workspace.RequestTabClose(page, TabCloseReason.Keyboard));
+            Assert.False(timer.Enabled, "Native product Close prompt did not complete its bounded observation.");
+            failure?.Throw();
+        }
+        finally { timer.Stop(); }
+
+        Assert.True(observed);
+        Assert.Same(page, Assert.Single(shell.Workspace.TabPages.Cast<TabPage>()));
+        Assert.False(control.IsDisposed);
+        Assert.True(control.ViewModel.HasDirtyEditor);
+        Assert.Equal(editorIdentity, control.ViewModel.EditorIdentity);
         Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
     });
 
@@ -366,6 +434,22 @@ public sealed class SecurityProductHostParityTests
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWindowEnabled(IntPtr window);
+
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern IntPtr GetFocus();
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsChild(IntPtr parent, IntPtr child);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder text, int count);
+
+    private static string WindowText(IntPtr window, bool className)
+    {
+        var text = new StringBuilder(256);
+        if (className) GetClassName(window, text, text.Capacity);
+        else GetWindowText(window, text, text.Capacity);
+        return text.ToString();
+    }
 
     private sealed class ReadyFoundationApi : IFoundationApiClient
     {

@@ -115,7 +115,7 @@ internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Contr
         var values = source.ToArray();
         var sameRows = values.Length == Items.Count &&
             values.Select((value, index) => ReferenceEquals(value, Items[index].Tag)).All(same => same);
-        var selectedIdentityChanged = sameRows &&
+        var selectedIdentityChanged =
             !SameIdentity(SelectedItems.Count == 1 ? SelectedItems[0].Tag : null, selected);
         if (!sameRows)
         {

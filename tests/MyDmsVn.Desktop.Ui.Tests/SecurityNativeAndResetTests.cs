@@ -227,6 +227,43 @@ public sealed class SecurityNativeAndResetTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Native_role_member_open_aligns_selected_and_focused_user_after_hidden_target_filter(bool activityFilter) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var users = control.Users;
+            users.Items[0].Selected = true;
+            users.Items[0].Focused = true;
+            Assert.True(users.Focus());
+            Assert.Equal(101, ((SecurityUserDto)Assert.Single(users.SelectedItems.Cast<ListViewItem>()).Tag).UserId);
+            Assert.Equal(101, ((SecurityUserDto)users.FocusedItem!.Tag).UserId);
+
+            if (activityFilter) control.UserActivity.SelectedIndex = 1;
+            else control.UserSearch.Text = "lan";
+            Assert.DoesNotContain(users.Items.Cast<ListViewItem>(), item => ((SecurityUserDto)item.Tag).UserId == 102);
+
+            control.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Tabs.SelectedIndex = 1;
+            control.RoleDetail.Members.SelectedIndex = 1;
+            Assert.True(control.RoleDetail.OpenUser.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Enter);
+            Until(() => control.LastOperation.IsCompleted);
+            control.LastOperation.GetAwaiter().GetResult();
+
+            Assert.Equal(0, control.Tabs.SelectedIndex);
+            Assert.Equal(102, control.ViewModel.SelectedUserId);
+            Assert.Equal(102, ((SecurityUserDto)Assert.Single(users.SelectedItems.Cast<ListViewItem>()).Tag).UserId);
+            Assert.Equal(102, ((SecurityUserDto)users.FocusedItem!.Tag).UserId);
+            Assert.True(users.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+            Assert.Equal(103, ((SecurityUserDto)Assert.Single(users.SelectedItems.Cast<ListViewItem>()).Tag).UserId);
+            Assert.Equal(103, control.ViewModel.SelectedUserId);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Native_enter_activates_explicit_create_without_mutating_on_cancel(bool roles) =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
         {
