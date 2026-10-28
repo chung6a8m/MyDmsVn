@@ -195,6 +195,38 @@ public sealed class SecurityNativeAndResetTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Native_master_down_continues_from_programmatic_domain_selection(bool roles) =>
+        SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
+        {
+            if (roles) control.Tabs.SelectedIndex = 1;
+            NativeLookupTypingDriver.Activate(control.FindForm()!);
+            var list = roles ? control.Roles : control.Users;
+            var search = roles ? control.RoleSearch : control.UserSearch;
+
+            list.Items[0].Selected = true;
+            list.Items[0].Focused = true;
+            Assert.True(list.Focus());
+            Assert.Equal(0, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.Equal(0, list.FocusedItem?.Index);
+
+            search.Focus();
+            Assert.True(search.ContainsFocus);
+            if (roles) control.ViewModel.SelectRole(202);
+            else control.ViewModel.SelectUser(102);
+
+            Assert.True(search.ContainsFocus, "Domain selection must not move keyboard focus to the master list.");
+            Assert.Equal(1, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.True(list.Focus());
+            NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Down);
+
+            Assert.Equal(2, Assert.Single(list.SelectedIndices.Cast<int>()));
+            Assert.Equal(roles ? 203 : 103, roles ? control.ViewModel.SelectedRoleId : control.ViewModel.SelectedUserId);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Native_enter_activates_explicit_create_without_mutating_on_cancel(bool roles) =>
         SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L01, (control, scene) =>
         {

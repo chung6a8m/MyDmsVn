@@ -115,6 +115,8 @@ internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Contr
         var values = source.ToArray();
         var sameRows = values.Length == Items.Count &&
             values.Select((value, index) => ReferenceEquals(value, Items[index].Tag)).All(same => same);
+        var selectedIdentityChanged = sameRows &&
+            !SameIdentity(SelectedItems.Count == 1 ? SelectedItems[0].Tag : null, selected);
         if (!sameRows)
         {
             ClearHoverDescription();
@@ -138,11 +140,14 @@ internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Contr
             }
             finally { EndUpdate(); }
         }
+        ListViewItem? selectedItem = null;
         foreach (ListViewItem item in Items)
         {
             var shouldSelect = SameIdentity(item.Tag, selected);
+            if (shouldSelect) selectedItem = item;
             if (item.Selected != shouldSelect) item.Selected = shouldSelect;
         }
+        if (selectedIdentityChanged && selectedItem != null) selectedItem.Focused = true;
         UpdateAccessibleIdentity();
     }
 
@@ -155,9 +160,9 @@ internal sealed class SecurityMasterListView : MyDmsVn.Bootstrap5WinFormUI.Contr
         UpdateAccessibleIdentity();
     }
 
-    static bool SameIdentity(object? left, object? right) =>
-        left is SecurityUserDto user && right is SecurityUserDto otherUser ? user.UserId == otherUser.UserId :
-        left is SecurityRoleDto role && right is SecurityRoleDto otherRole && role.RoleId == otherRole.RoleId;
+    static bool SameIdentity(object? left, object? right) => ReferenceEquals(left, right) ||
+        (left is SecurityUserDto user && right is SecurityUserDto otherUser ? user.UserId == otherUser.UserId :
+        left is SecurityRoleDto role && right is SecurityRoleDto otherRole && role.RoleId == otherRole.RoleId);
 
     static string Metadata(object item) => item is SecurityUserDto user
         ? "@" + user.Username + " · " + (user.IsActive ? "Hoạt động" : "Ngừng hoạt động") +
