@@ -760,6 +760,7 @@ namespace MyDmsVn.Desktop.WinForms
             _documents.Values.CopyTo(pages, 0);
             Workspace.TabPages.Clear();
             _documents.Clear();
+            Navigation.SelectedItem = null;
             foreach (var page in pages)
             {
                 page.Dispose();

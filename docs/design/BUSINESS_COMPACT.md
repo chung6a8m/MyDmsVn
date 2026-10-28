@@ -1,6 +1,6 @@
 # Business Compact — design and control policy
 
-**Status:** current design policy selected by the Owner on 2026-10-27; runtime conformance must be established for each candidate. **Selected implementation scope:** [Business Compact and independent UI Labs](../plans/20261027-001-business-compact-and-independent-ui-labs.md). This policy remains current when an execution roadmap is archived.
+**Status:** current design policy selected by the Owner on 2026-10-27; runtime conformance must be established for each candidate. The bounded [Business Compact and independent UI Labs](../plans/20261027-001-business-compact-and-independent-ui-labs.md) implementation and handoff are complete, with exact candidate evidence linked from that roadmap. This policy remains current when an execution roadmap is completed or archived.
 
 Read with [Security UI and behavior](SECURITY_ADMINISTRATION_UI.md), [Independent UI Labs](INDEPENDENT_UI_LABS.md), [UI Lab runbook](../development/UI_LAB.md) and [Security review guide](../development/SECURITY_UI_LAB_REVIEW.md). This policy governs presentation and control selection; the Security specification retains business rules, authorization, state and recovery. Historical tasks and approvals retain their original boundaries.
 

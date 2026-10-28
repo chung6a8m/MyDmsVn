@@ -32,7 +32,7 @@ The catalog retains the reference sequence label `04`. No separate direct-editor
 
 The SVGs document layout, control ownership and visible copy. Their drawing bounds do not prescribe a WinForms client size or physical monitor scale. The running candidate must fit the existing shell bounds and undergo the required Light/Dark, physical native100/native125, keyboard, focus and workflow review.
 
-The linked UI Labs review guide defines repeatable scenarios and evidence fields. The selected roadmap requires native pilot approval before expanding the new presentation across SEC and final candidate approval before product-host parity/handoff. Both gates begin NOT APPROVED. These wireframes and historical executed screenshots do not establish those new decisions.
+The linked UI Labs review guide defines repeatable scenarios and evidence fields. The selected roadmap records bounded native pilot and final candidate approval before its completed product-host parity/handoff. These wireframes and historical executed screenshots do not establish or transfer those decisions to another candidate; the roadmap and candidate evidence own their exact state.
 
 ## Preview
 
