@@ -13,9 +13,8 @@ public sealed class SecurityPermissionCatalogView : UserControl
     public Button CopyKey { get; } = new BootstrapButton { Text = "Sao chép mã quyền", Dock = DockStyle.Bottom, Height = 34, Variant = BootstrapVariant.Secondary, Outline = true };
     public Button RefreshButton { get; } = new BootstrapButton { Text = "Làm mới", AutoSize = true, Variant = BootstrapVariant.Secondary, Outline = true };
     public Label Count { get; } = new BootstrapLabel { Dock = DockStyle.Bottom, Height = 24, TextRole = BootstrapTextRole.Muted };
-    // The pinned BootstrapTextBox exposes only a single-line editor; selected long definitions
-    // require native multiline text selection/copy and vertical scrolling through public APIs.
-    public TextBox Details { get; } = new() { Dock = DockStyle.Bottom, Multiline = true, ReadOnly = true, Height = 116, ScrollBars = ScrollBars.Vertical, AccessibleName = "Chi tiết định nghĩa quyền đã chọn" };
+    // Toolkit-owned multiline text preserves native read-only selection, copying and scrolling.
+    public BootstrapTextBox Details { get; } = new() { Dock = DockStyle.Bottom, Multiline = true, ReadOnly = true, Height = 116, ScrollBars = ScrollBars.Vertical, AccessibleName = "Chi tiết định nghĩa quyền đã chọn" };
     public BootstrapTextBox Search { get; } = new() { Width = 210, AccessibleName = "Tìm khóa quyền", PlaceholderText = "Tìm tên hoặc mã quyền" };
     public ComboBox Module { get; } = new BootstrapComboBox { Width = 140, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Phân hệ quyền" };
     public SecurityDetailListView ModuleGroups { get; } = new() { Dock = DockStyle.Fill, AccessibleName = "Nhóm quyền" };

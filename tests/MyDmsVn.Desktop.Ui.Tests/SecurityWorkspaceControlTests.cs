@@ -75,14 +75,18 @@ public sealed class SecurityWorkspaceControlTests
             Assert.IsType<BootstrapLabel>(catalog.Heading);
             Assert.IsType<BootstrapPanel>(catalog.Keys.Parent);
             Assert.True(catalog.Keys.ReadOnly && !catalog.Keys.AllowUserToAddRows && !catalog.Keys.AllowUserToDeleteRows);
+            Assert.IsType<BootstrapTextBox>(catalog.Details);
             Assert.True(catalog.Details.Multiline && catalog.Details.ReadOnly);
+            Assert.Equal(ScrollBars.Vertical, catalog.Details.ScrollBars);
             Assert.Equal("Chi tiết định nghĩa quyền đã chọn", catalog.Details.AccessibleName);
             var row = catalog.Keys.Rows.Cast<DataGridViewRow>().Single(item => (string)item.Cells[1].Value == "Sales.Receipts.Post");
             catalog.Keys.CurrentCell = row.Cells[0];
             Assert.Contains("Sales.Receipts.Post", catalog.Details.Text);
             Assert.Equal("Sales.Receipts.Post", row.Cells[1].ToolTipText);
-            Assert.True(catalog.Details.Focus());
-            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, catalog.Details.BackColor);
+            catalog.Details.Focus();
+            var detailsEditor = Assert.Single(catalog.Details.Controls.OfType<TextBox>());
+            Assert.True(catalog.Details.ContainsFocus && detailsEditor.Focused);
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.SurfaceSecondary, detailsEditor.BackColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, catalog.Details.ForeColor);
             catalog.CopyKey.PerformClick();
             Assert.Equal("Sales.Receipts.Post", Clipboard.GetText());
@@ -190,13 +194,16 @@ public sealed class SecurityWorkspaceControlTests
             detail.Effective.CurrentCell = row.Cells[0];
             Assert.Contains(Environment.NewLine + "Sales.Receipts.Post", row.Cells[0].Value.ToString());
             Assert.True(row.Height >= TextRenderer.MeasureText("A" + Environment.NewLine + "A", detail.Effective.Font).Height);
+            Assert.IsType<BootstrapTextBox>(detail.Explanation);
             Assert.True(detail.Explanation.Multiline && detail.Explanation.ReadOnly);
+            Assert.Equal(ScrollBars.Vertical, detail.Explanation.ScrollBars);
             Assert.Equal("Giải thích quyền hiệu lực đã tải", detail.Explanation.AccessibleName);
             Assert.Contains("Quyền riêng: Từ chối", detail.Explanation.Text);
-            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, detail.Explanation.BackColor);
+            var explanationEditor = Assert.Single(detail.Explanation.Controls.OfType<TextBox>());
+            Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.SurfaceSecondary, explanationEditor.BackColor);
             Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Text, detail.Explanation.ForeColor);
-            Assert.True(detail.Explanation.Focus());
-            Assert.True(detail.Explanation.ContainsFocus);
+            detail.Explanation.Focus();
+            Assert.True(detail.Explanation.ContainsFocus && explanationEditor.Focused);
             Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         }
         finally { BootstrapThemeManager.CurrentTheme = prior; }
@@ -852,9 +859,10 @@ public sealed class SecurityWorkspaceControlTests
     {
         control.Tabs.SelectedIndex = 2;
         Assert.Equal(data.Data.Catalog.Items.Count, control.PermissionCatalog.Keys.Rows.Count);
-        // The toolkit search composite owns its native clear button; it is not a catalog command.
+        // Toolkit text composites own hidden native clear buttons; they are not catalog commands.
         var actions = Descendants(control.PermissionCatalog, typeof(Button)).Cast<Button>()
-            .Where(button => !control.PermissionCatalog.Search.Contains(button)).Select(button => button.Text).ToArray();
+            .Where(button => button.Visible && !control.PermissionCatalog.Search.Contains(button))
+            .Select(button => button.Text).ToArray();
         Assert.Equal(2, actions.Length);
         Assert.Contains("Sao chép mã quyền", actions);
         Assert.Contains("Làm mới", actions);
@@ -1483,7 +1491,9 @@ public sealed class SecurityWorkspaceControlTests
                     Assert.Equal("pilot", driver.Text);
                     Assert.Equal(1, driver.SelectionStart);
                     Assert.Equal(2, driver.SelectionLength);
-                    Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Body, modal.BackColor);
+                    Assert.IsAssignableFrom<BootstrapModal>(modal);
+                    Assert.Equal(BootstrapModalBackdropMode.Static, ((BootstrapModal)modal).BackdropMode);
+                    Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, modal.BackColor);
                     Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, inputs[0].Parent.Parent.BackColor);
                 }
                 driver.TypeCharacter('X');
@@ -1905,7 +1915,8 @@ public sealed class SecurityWorkspaceControlTests
                     Assert.True(dialog.Visible);
                     Assert.False(save.Enabled);
                     Assert.False(cancel.Enabled);
-                    Assert.False(dialog.ControlBox);
+                    Assert.False(Assert.IsAssignableFrom<BootstrapModal>(dialog).ShowCloseButton);
+                    Assert.False(((BootstrapModal)dialog).CloseOnEscape);
                     Assert.Contains(Descendants(dialog, typeof(Label)).Cast<Label>(), label => label.Text == "Đang lưu…");
                     cancel.PerformClick();
                     Assert.True(dialog.Visible);
@@ -1938,7 +1949,8 @@ public sealed class SecurityWorkspaceControlTests
                 {
                     Assert.True(dialog.Visible);
                     Assert.True(cancel.Enabled);
-                    Assert.True(dialog.ControlBox);
+                    Assert.True(Assert.IsAssignableFrom<BootstrapModal>(dialog).ShowCloseButton);
+                    Assert.True(((BootstrapModal)dialog).CloseOnEscape);
                     Assert.True(control.ViewModel.RequiresRecovery);
                     if (secret != null) Assert.Empty(secret.Text);
                     Assert.Single(data.Journal.Entries, entry => entry.Operation == "Security.Mutate");

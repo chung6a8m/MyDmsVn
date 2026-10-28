@@ -38,7 +38,7 @@ The user retains the repository's current net48 profile. Neither [RESP](archive/
 
 Current application persistence uses LINQ to DB and typed native SqlClient behind existing interfaces. DbUp owns controlled schema deployment. Microsoft DI composes the Local WinForms host; MediatR, FluentValidation and ErrorOr remain inside their defined Application/adapter boundaries. Cross-process DTOs and JSON are independent of SQL/UI providers. See [ARCHITECTURE](ARCHITECTURE.md), [PERSISTENCE](PERSISTENCE.md) and [CONTRACTS](CONTRACTS.md).
 
-The shared UI source is pinned at `vendor/MyDmsVn.WinFormsKit/` revision `c232a4c09dc0386a5bd8bb484a5c991acae827d5`, with SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. Existing Bootstrap5WinFormUI and BootstrapSourceGrid assembly names remain valid; use the checked-in WinFormsKit project paths. These are source pins at the audited baseline, not new verification results.
+The shared UI source is pinned at `vendor/MyDmsVn.WinFormsKit/` revision `a5dd3cec6daba71943549afac628e13727c00da5`, with SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. Existing Bootstrap5WinFormUI and BootstrapSourceGrid assembly names remain valid; use the checked-in WinFormsKit project paths. The exception-correction candidate has focused Windows/native PASS and dated Owner APPROVED/CLOSED evidence; this pin's final review commit changes documentation only, not the verified source/test trees.
 
 ## Delivered dependency cutover
 

@@ -54,7 +54,7 @@ UI-NEXT's [historical implementation plan](archive/20261025-pre-next-roadmap/ui-
 | Infrastructure persistence | `src/MyDmsVn.Server.Infrastructure/Persistence/{SqlUnitOfWorkFactory,ISqlExecutionContext,SqlConnectionFactory,SqlPersistenceBuilder,LinqToDbSessionFactory,LinqToDbMappingSchemaProvider}.cs`. |
 | Schema | `src/MyDmsVn.Server.DbMigrator/Scripts/001_PersistenceFoundation.sql` through `010_DirectSalesAndValuation.sql`; exact names in [PERSISTENCE](PERSISTENCE.md). |
 | Implemented WinForms presentation seams | `BusinessCompactAppearance.cs`, `BusinessCompactNavigation.cs`, `GoodsReceiptLinesGrid.cs`, `GoodsReceiptLinesGridAdapter.cs`, `ReceiptNumericInput.cs` and `ReceiptDecimalInputProfiles.cs` in `src/MyDmsVn.Desktop.WinForms/`; `SalesReceiptControl.cs` and its grid/adapter own the Sales workspace; `CatalogControl.cs` remains shared by four catalogs. |
-| UI dependency | `vendor/MyDmsVn.WinFormsKit/` at `c232a4c09dc0386a5bd8bb484a5c991acae827d5`; contains UI core, grid adapter and SourceGrid at `f4e457b43582bf01892f50bdc74aa480531e5944`. Existing Bootstrap5WinFormUI/BootstrapSourceGrid assembly names remain valid. |
+| UI dependency | `vendor/MyDmsVn.WinFormsKit/` at `a5dd3cec6daba71943549afac628e13727c00da5`; contains UI core, grid adapter and SourceGrid at `f4e457b43582bf01892f50bdc74aa480531e5944`. Existing Bootstrap5WinFormUI/BootstrapSourceGrid assembly names remain valid. The three exception corrections are Windows/native PASS and Owner APPROVED/CLOSED within their evidence scope. |
 
 `Application/Features/...`, `Application/Abstractions/Persistence` and Infrastructure `Persistence/Repositories`/`EntityMaps` were earlier blueprint examples. They are not the current file layout; use source-owned paths when changing code.
 

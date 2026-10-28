@@ -193,7 +193,7 @@ internal sealed class SecurityWorkspaceEditorBindings
             dialog.Body.Controls.Add(roles);
             dialog.Body.Controls.Add(new BootstrapLabel { Text = "Vai trò", AutoSize = true, Dock = DockStyle.Top });
             dialog.Message.BringToFront();
-            dialog.Shown += (_, _) => roles.Focus();
+            dialog.InitialFocusControl = roles;
             BusinessCompactAppearance.Apply(dialog);
             if (dialog.ShowOwned(control) == DialogResult.OK && roles.SelectedItem is SecurityRoleDto selected &&
                 CanManageMembership() && Vm.SelectedUserId == user.UserId && Vm.SelectedUser?.AssignmentRevision == user.AssignmentRevision &&
@@ -549,13 +549,12 @@ internal sealed class SecurityWorkspaceEditorBindings
         {
             Text = create ? "Tạo " + (userTarget ? "người dùng" : "vai trò") : "Sửa — " + (userTarget ? user!.DisplayName : role!.Name),
             Width = 480, Height = userTarget ? (create ? 470 : 400) : 260, StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false
+            MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false
         };
-        var body = new BootstrapPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12), SurfaceRole = BootstrapSurfaceRole.Surface };
+        var body = dialog.BodyPanel;
         var fields = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, TabIndex = 0 };
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         body.Controls.Add(fields);
-        dialog.Controls.Add(body);
         BootstrapTextBox AddField(string caption, int index, bool secret = false)
         {
             var label = new BootstrapLabel { Text = caption, AutoSize = true, Margin = new Padding(0, 8, 0, 4), TabStop = false };
@@ -617,11 +616,11 @@ internal sealed class SecurityWorkspaceEditorBindings
         var save = new BootstrapButton { Text = "Lưu thông tin", AutoSize = true, Variant = BootstrapVariant.Primary, TabIndex = 0 };
         var cancel = new BootstrapButton { Text = "Hủy", AutoSize = true, Variant = BootstrapVariant.Secondary, Outline = true, DialogResult = DialogResult.Cancel, TabIndex = 1 };
         var reload = new BootstrapButton { Text = "Tải lại để đối chiếu", AutoSize = true, Variant = BootstrapVariant.Secondary, Outline = true, Visible = false, TabIndex = 2 };
-        var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 56, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8), WrapContents = false, TabIndex = 1 };
+        var footer = dialog.FooterPanel;
+        footer.TabIndex = 1;
         footer.Controls.AddRange(new Control[] { save, cancel, reload });
-        dialog.Controls.Add(footer);
         body.TabIndex = 0;
-        dialog.Shown += (_, _) => name.Focus();
+        dialog.InitialFocusControl = name;
         dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
         var closeGuard = new MutationDialogCloseGuard(dialog, cancel, validation, _control, Vm);
@@ -709,9 +708,10 @@ internal sealed class SecurityWorkspaceEditorBindings
         using var dialog = new MutationDialog
         {
             Text = "Đặt lại mật khẩu — " + user.DisplayName, Width = 480, Height = 260, StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false
+            MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false
         };
-        var body = new BootstrapPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12), SurfaceRole = BootstrapSurfaceRole.Surface, TabIndex = 0 };
+        var body = dialog.BodyPanel;
+        body.TabIndex = 0;
         var fields = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, TabIndex = 0 };
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var password = new BootstrapTextBox { Dock = DockStyle.Top, UseSystemPasswordChar = true, AccessibleName = "Mật khẩu mới", TabIndex = 0, Margin = new Padding(0, 0, 0, 4) };
@@ -722,11 +722,10 @@ internal sealed class SecurityWorkspaceEditorBindings
         fields.Controls.Add(new BootstrapLabel { Text = "Mật khẩu mới", AutoSize = true, Margin = new Padding(0, 8, 0, 4), TabStop = false });
         fields.Controls.Add(password); fields.Controls.Add(validation);
         body.Controls.Add(fields);
-        dialog.Controls.Add(body);
-        var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 56, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8), WrapContents = false, TabIndex = 1 };
+        var footer = dialog.FooterPanel;
+        footer.TabIndex = 1;
         footer.Controls.AddRange(new Control[] { save, cancel, reload });
-        dialog.Controls.Add(footer);
-        dialog.Shown += (_, _) => password.Focus();
+        dialog.InitialFocusControl = password;
         var clearingSecret = false;
         void ClearSecret()
         {
@@ -798,11 +797,16 @@ internal sealed class SecurityWorkspaceEditorBindings
         }
     }
 
-    sealed class MutationDialog : Form
+    sealed class MutationDialog : BootstrapModal
     {
-        // BC-08: pinned BootstrapModalHeader.ApplyTypography can dispose a Font retained by
-        // its native title Label on an equal-font theme switch. Keep OS chrome until T06
-        // disposition; app-owned body/validation/commands use public toolkit controls.
+        internal MutationDialog()
+        {
+            ModalSize = BootstrapModalSize.Custom;
+            BackdropMode = BootstrapModalBackdropMode.Static;
+            FooterPanel.WrapContents = true;
+            FooterPanel.AutoSize = true;
+            FooterPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        }
         internal Func<bool>? ShouldBlockClose { get; set; }
 
         protected override void WndProc(ref Message message)
@@ -844,7 +848,8 @@ internal sealed class SecurityWorkspaceEditorBindings
         internal void Begin()
         {
             _pending = true;
-            _dialog.ControlBox = false;
+            _dialog.ShowCloseButton = false;
+            _dialog.CloseOnEscape = false;
             _status.Text = "Đang lưu…";
             _cancel.Enabled = false;
             _dialog.CancelButton = null;
@@ -854,7 +859,8 @@ internal sealed class SecurityWorkspaceEditorBindings
         {
             _pending = false;
             if (_dialog.IsDisposed) return;
-            _dialog.ControlBox = true;
+            _dialog.ShowCloseButton = true;
+            _dialog.CloseOnEscape = true;
             _cancel.Enabled = true;
             _dialog.CancelButton = _cancel;
         }

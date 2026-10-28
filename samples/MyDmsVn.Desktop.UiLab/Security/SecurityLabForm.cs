@@ -345,7 +345,7 @@ internal sealed class SecurityLabForm : UiLabHostForm
         if (originControl == null || originScene == null || !ReferenceEquals(originControl.FindForm(), this)) return;
         var dialog = System.Windows.Forms.Application.OpenForms.Cast<Form>().FirstOrDefault(form =>
             form.Modal && ReferenceEquals(form.Owner, this) && form.Text.StartsWith("Đặt lại mật khẩu — ", StringComparison.Ordinal));
-        var fields = dialog?.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+        var fields = (dialog as MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapModal)?.FooterPanel;
         if (fields == null) return;
         var release = fields.Controls.OfType<Button>().FirstOrDefault(button => button.Name == "SecurityLabReleaseMutation");
         if (release == null && _releaseSecurityMutation != null)

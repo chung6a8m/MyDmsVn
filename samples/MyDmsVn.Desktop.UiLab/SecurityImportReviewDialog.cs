@@ -6,7 +6,7 @@ using MyDmsVn.Desktop.WinForms;
 
 namespace MyDmsVn.Desktop.UiLab;
 
-internal sealed class SecurityImportReviewDialog : Form
+internal sealed class SecurityImportReviewDialog : BootstrapModal
 {
     internal Button AdvanceTargetRevisionButton { get; } = new BootstrapButton
         { Text = "Đổi revision đối tượng", AutoSize = true };
@@ -20,28 +20,28 @@ internal sealed class SecurityImportReviewDialog : Form
     internal SecurityImportReviewDialog(string summary, Action advanceTargetRevision,
         Action rotateCatalogDigest, Action? switchTarget = null)
     {
+        ModalSize = BootstrapModalSize.Custom;
+        BackdropMode = BootstrapModalBackdropMode.Static;
+        FooterPanel.WrapContents = true;
+        FooterPanel.AutoSize = true;
+        FooterPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Text = "Xem trước nhập quyền — UI Lab";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(530, 260);
         Size = new Size(610, 300);
-        FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = false;
 
-        // Same c232a4c BootstrapModalHeader typography compatibility exception as the
-        // product decision dialog. Lab fault controls never enter production composition.
+        // Lab fault controls remain inside public body content and never enter production.
         var details = new BootstrapLabel
         {
             Text = summary, AutoSize = true, MaximumSize = new Size(530, 0), Dock = DockStyle.Top, TabStop = false,
             AccessibleName = "Bản xem trước nhập quyền", AccessibleDescription = summary
         };
-        var body = new BootstrapPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12), SurfaceRole = BootstrapSurfaceRole.Surface };
-        body.Controls.Add(details);
-        body.SizeChanged += (_, _) => details.MaximumSize = new Size(Math.Max(1, body.ClientSize.Width - 40), 0);
-        var controls = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true,
-            FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(8)
-        };
+        var content = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1 };
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        void FitDetails() => details.MaximumSize = new Size(Math.Max(1, BodyPanel.ClientSize.Width - BodyPanel.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth), 0);
+        BodyPanel.SizeChanged += (_, _) => FitDetails();
+        var controls = FooterPanel;
         var cancel = new BootstrapButton { Text = "Hủy", AutoSize = true, Variant = BootstrapVariant.Secondary, Outline = true };
         var instruction = new BootstrapLabel
         {
@@ -56,10 +56,10 @@ internal sealed class SecurityImportReviewDialog : Form
         {
             ConfirmButton, cancel
         });
-        Controls.Add(body);
-        Controls.Add(faults);
-        Controls.Add(controls);
-        Controls.Add(instruction);
+        content.Controls.Add(details);
+        content.Controls.Add(instruction);
+        content.Controls.Add(faults);
+        BodyPanel.Controls.Add(content);
 
         AdvanceTargetRevisionButton.Click += (_, _) =>
         {
@@ -81,6 +81,8 @@ internal sealed class SecurityImportReviewDialog : Form
         cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         AcceptButton = ConfirmButton;
         CancelButton = cancel;
+        InitialFocusControl = ConfirmButton;
         BusinessCompactAppearance.Apply(this);
+        FitDetails();
     }
 }

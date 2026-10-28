@@ -277,6 +277,8 @@ public sealed class SecurityProductHostParityTests
             {
                 Assert.NotNull(dialog);
                 observed = dialog!;
+                Assert.IsAssignableFrom<BootstrapModal>(observed);
+                Assert.Equal(BootstrapModalBackdropMode.Static, ((BootstrapModal)observed).BackdropMode);
                 Assert.Same(shell, observed.Owner);
                 Assert.False(IsWindowEnabled(shell.Handle), "The product owner HWND must be disabled while its modal is open.");
                 var fields = Children(observed).OfType<BootstrapTextBox>().ToArray();
@@ -289,7 +291,7 @@ public sealed class SecurityProductHostParityTests
                     Pump(token);
                     Assert.Equal(expected, BootstrapThemeManager.CurrentTheme.Mode);
                     Assert.True(BootstrapThemeManager.CurrentTheme.ReducedMotion);
-                    Assert.Equal(expected == BootstrapThemeMode.Dark ? Color.FromArgb(22, 31, 41) : Color.FromArgb(245, 247, 251), observed.BackColor);
+                    Assert.Equal(BootstrapThemeManager.CurrentTheme.Colors.Surface, observed.BackColor);
                     Assert.Equal(expected == BootstrapThemeMode.Dark ? Color.FromArgb(29, 39, 51) : Color.White, secret.BackColor);
                     Assert.Equal("Segoe UI", secret.Font.Name);
                     Assert.Equal(10f, secret.Font.SizeInPoints);
