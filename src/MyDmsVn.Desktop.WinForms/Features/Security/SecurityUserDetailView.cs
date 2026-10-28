@@ -17,9 +17,8 @@ public sealed class SecurityUserDetailView : UserControl
     public TabControl Tabs { get; } = new BusinessCompactWorkspaceTabs { Dock = DockStyle.Fill };
     public SecurityDetailListView Memberships { get; } = new() { AccessibleName = "Vai trò của người dùng" };
     public DataGridView Effective { get; } = new BootstrapDataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false, AutoGenerateColumns = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, StandardTab = true, AccessibleName = "Quyền hiệu lực đã tải", EmptyStateText = "Không có quyền phù hợp bộ lọc." };
-    // The pinned BootstrapTextBox owns a single-line EDIT and exposes no Multiline/ScrollBars contract.
-    // Native read-only EDIT retains multiline selection, copy, vertical scroll and keyboard accessibility.
-    public TextBox Explanation { get; } = new() { Dock = DockStyle.Bottom, Height = 88, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, AccessibleName = "Giải thích quyền hiệu lực đã tải" };
+    // Toolkit-owned multiline text preserves native read-only selection, copying and scrolling.
+    public BootstrapTextBox Explanation { get; } = new() { Dock = DockStyle.Bottom, Height = 88, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, AccessibleName = "Giải thích quyền hiệu lực đã tải" };
     public BootstrapTextBox Search { get; } = new() { Width = 150, AccessibleName = "Tìm quyền hiệu lực", PlaceholderText = "Tìm quyền…" };
     public ComboBox Module { get; } = new BootstrapComboBox { Width = 135, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Phân hệ quyền hiệu lực" };
     public ComboBox Result { get; } = new BootstrapComboBox { Width = 145, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Kết quả quyền hiệu lực" };

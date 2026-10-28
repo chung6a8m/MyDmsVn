@@ -1,6 +1,6 @@
 # Independent Sales and Security UI Labs
 
-**Status:** implemented and handed off within the bounded scope recorded by the [archived Business Compact and independent UI Labs roadmap](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md). The roadmap retains historical task state; its candidate evidence records dated native decisions, physical-100/125 product-host parity and remaining limits. The [execution index](../plans/README.md) selects no next implementation roadmap. This specification remains the durable host and lifecycle contract.
+**Status:** implemented and handed off within the bounded scope recorded by the [archived Business Compact and independent UI Labs roadmap](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md). The roadmap retains historical task state; its candidate evidence records dated native decisions, physical-100/125 product-host parity and remaining limits. The [execution index](../plans/README.md) now selects the narrow [three-exception correction plan](../plans/20261028-001-business-compact-exceptions.md); its [new candidate evidence](../evidence/ui-labs/20261028-business-compact-exceptions.md) retains Windows/native verification and Owner approval as separate pending work. This specification remains the durable host and lifecycle contract.
 
 **Inspected baseline:** [`main@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9). This design complements the durable [Business Compact policy](BUSINESS_COMPACT.md), [Security UI specification](SECURITY_ADMINISTRATION_UI.md), [current Lab runbook](../development/UI_LAB.md) and [Security review guide](../development/SECURITY_UI_LAB_REVIEW.md).
 
@@ -61,7 +61,7 @@ Initialize the theme before creating controls. Theme changes use the same factor
 
 Dark is the primary visual reference; Light must retain the same structure, spacing, action hierarchy, focus and semantic readability. Each Lab runs as its own process, so one Lab's theme selection must not require or mutate the other Lab's session.
 
-The exact toolkit baseline remains `vendor/MyDmsVn.WinFormsKit@c232a4c09dc0386a5bd8bb484a5c991acae827d5`, with nested SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. Any proven dependency gap follows the separate upstream change/pin process; splitting launchers does not select an upgrade.
+The original UIL toolkit baseline was `vendor/MyDmsVn.WinFormsKit@c232a4c09dc0386a5bd8bb484a5c991acae827d5`, with nested SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. Any proven dependency gap follows the separate upstream change/pin process; splitting launchers does not select an upgrade. The separately selected [exception-correction plan](../plans/20261028-001-business-compact-exceptions.md) now pins `1b9c345aa2afd85e38a72d575485c3abdf559451`; its native acceptance remains pending.
 
 ### Product content bounds
 

@@ -62,7 +62,7 @@ internal sealed class BusinessCompactAppearance : IDisposable
     }
     private void Attach(Control control)
     {
-        if (VendorOwnsChildren(control) && !(control is TabControl) && !(control is BootstrapPanel) && !(control is BootstrapBusyHost)) return;
+        if (VendorOwnsChildren(control) && !(control is TabControl) && !(control is BootstrapPanel) && !(control is BootstrapBusyHost) && !(control is BootstrapModal)) return;
         if (!_attached.Add(control)) return;
         control.ControlAdded += OnControlAdded;
         control.ControlRemoved += OnControlRemoved;
@@ -75,10 +75,13 @@ internal sealed class BusinessCompactAppearance : IDisposable
         control.ControlRemoved -= OnControlRemoved;
         foreach (var child in OwnedChildren(control)) Detach(child);
     }
-    // TabPages, a semantic panel's Controls and a busy host's Content are public app content.
+    private static bool IsModalContent(Control control) => control.FindForm() is BootstrapModal modal &&
+        (ReferenceEquals(control, modal.BodyPanel) || ReferenceEquals(control, modal.FooterPanel));
+    // Only public modal body/footer, tab pages and exposed panel/busy content are app-owned.
     // Other vendor composite children belong to the component and must remain untouched.
     private static IEnumerable<Control> OwnedChildren(Control control) => control is TabControl tabs
         ? tabs.TabPages.Cast<Control>()
+        : control is BootstrapModal modal ? new Control[] { modal.BodyPanel, modal.FooterPanel }
         : control is BootstrapBusyHost busy ? new[] { busy.Content }
         : control is BootstrapPanel panel ? panel.Controls.Cast<Control>()
         : VendorOwnsChildren(control) ? Enumerable.Empty<Control>() : control.Controls.Cast<Control>();
@@ -86,6 +89,7 @@ internal sealed class BusinessCompactAppearance : IDisposable
     {
         if (_disposed || sender is not Control owner || !_attached.Contains(owner)) return;
         if (sender is BootstrapBusyHost busy && !ReferenceEquals(e.Control, busy.Content)) return;
+        if (sender is BootstrapModal modal && !ReferenceEquals(e.Control, modal.BodyPanel) && !ReferenceEquals(e.Control, modal.FooterPanel)) return;
         Attach(e.Control); Style(e.Control);
     }
     private void OnControlRemoved(object? sender, ControlEventArgs e) => Detach(e.Control);
@@ -101,7 +105,7 @@ internal sealed class BusinessCompactAppearance : IDisposable
         var dark = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Dark;
         var colors = BootstrapThemeManager.CurrentTheme.Colors;
         var typography = control.Tag as string ?? control.Name;
-        var semantic = control is BootstrapPanel || control is BootstrapLabel;
+        var semantic = control is BootstrapPanel || control is BootstrapLabel || control is BootstrapModal || IsModalContent(control);
         if (!semantic)
             control.Font = typography == "CompactHeading" ? _heading : control.Name == "CompactBrand" ? _brand : control.Name == "CompactUser" ? _strong : typography == "CompactSecondary" || typography == "CompactSection" ? _secondary : _body;
         if (!semantic && (control is Panel || control is TabPage || control is Form || control is UserControl || control is Label))
@@ -111,6 +115,7 @@ internal sealed class BusinessCompactAppearance : IDisposable
             for (var parent = control; parent != null && !(parent is CatalogControl); parent = parent.Parent)
             {
                 if (parent.Name == "CatalogInspector" || parent.Name == "CatalogResultsSurface") { control.BackColor = colors.Surface; break; }
+                if (IsModalContent(parent)) { control.BackColor = colors.Surface; break; }
                 if (parent is BootstrapPanel surface)
                 {
                     control.BackColor = surface.SurfaceRole == BootstrapSurfaceRole.Surface ? colors.Surface :

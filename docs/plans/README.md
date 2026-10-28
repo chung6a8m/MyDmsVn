@@ -1,10 +1,12 @@
 # Execution-plan index
 
-**Updated:** 2026-10-28 · **Inspected archive source:** [`main@57a45491d97b2efb15e79b1140b52e876641167d`](https://github.com/chung6a8m/MyDmsVn/commit/57a45491d97b2efb15e79b1140b52e876641167d) · **Status:** NO NEXT IMPLEMENTATION ROADMAP SELECTED
+**Updated:** 2026-10-28 · **Inspected archive source:** [`main@57a45491d97b2efb15e79b1140b52e876641167d`](https://github.com/chung6a8m/MyDmsVn/commit/57a45491d97b2efb15e79b1140b52e876641167d) · **Status:** BUSINESS COMPACT EXCEPTION CORRECTIONS SELECTED; NATIVE APPROVAL PENDING
 
 ## Current plan
 
-**No next implementation roadmap is selected.** The [Business Compact and independent UI Labs plan](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) is archived with UIL-T00–UIL-T08 complete within their recorded bounded scopes. Its dated UIL-T04/T06 approvals, UIL-T07 product-host parity and UIL-T08 handoff remain tied to their exact candidates and exceptions; the historical runtime/test handoff is `8ec1ff71ef0a6a7cf4befa88bbd7bed2616827a0`.
+**Selected on 2026-10-28:** the [three selected Business Compact exceptions](20261028-001-business-compact-exceptions.md) plan owns the narrow disabled-action, Security modal and read-only multiline corrections. The [selected design](../design/BUSINESS_COMPACT_EXCEPTION_CLOSURE.md) records the implementation boundary; [candidate evidence](../evidence/ui-labs/20261028-business-compact-exceptions.md) separates implemented source, compiler checks, Windows/native execution and Owner approval. The task starts from app `5386a6d8efe23099c436eb7ef62141df8d3896b8` and toolkit pin `c232a4c09dc0386a5bd8bb484a5c991acae827d5`; the reviewed toolkit commit is now `1b9c345aa2afd85e38a72d575485c3abdf559451`, and exact-pin consumer cross-build has passed. Windows/native execution and Owner approval remain pending. The exceptions remain OPEN until the selected evidence supports closure.
+
+The [Business Compact and independent UI Labs plan](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) is archived with UIL-T00–UIL-T08 complete within their recorded bounded scopes. Its dated UIL-T04/T06 approvals, UIL-T07 product-host parity and UIL-T08 handoff remain tied to their exact candidates and exceptions; the historical runtime/test handoff is `8ec1ff71ef0a6a7cf4befa88bbd7bed2616827a0`.
 
 **Retained decision — focused Owner confirmation is PENDING.** The separately selected [2026-10-28 source focus correction](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#2026-10-28-review-findings-follow-up) at `3b5f95e2d7d1414f0ffe97f47a3bdef58f33d786`, retained in the inspected HEAD, is implemented and focused-verification complete. Archival preserves this outstanding decision; it does not approve the correction or reopen the full UIL native matrix.
 

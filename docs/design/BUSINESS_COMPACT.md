@@ -1,6 +1,6 @@
 # Business Compact — design and control policy
 
-**Status:** current design policy selected by the Owner on 2026-10-27; runtime conformance must be established for each candidate. The bounded [Business Compact and independent UI Labs](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) implementation and handoff are complete and archived, with exact candidate evidence linked from that roadmap. The [execution index](../plans/README.md) selects no next implementation roadmap. This policy remains current.
+**Status:** current design policy selected by the Owner on 2026-10-27; runtime conformance must be established for each candidate. The bounded [Business Compact and independent UI Labs](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) implementation and handoff are complete and archived, with exact candidate evidence linked from that roadmap. The [execution index](../plans/README.md) now selects the narrow [three-exception correction plan](../plans/20261028-001-business-compact-exceptions.md); its [new candidate evidence](../evidence/ui-labs/20261028-business-compact-exceptions.md) retains Windows/native verification and Owner approval as separate pending work. This policy remains current.
 
 Read with [Security UI and behavior](SECURITY_ADMINISTRATION_UI.md), [Independent UI Labs](INDEPENDENT_UI_LABS.md), [UI Lab runbook](../development/UI_LAB.md) and [Security review guide](../development/SECURITY_UI_LAB_REVIEW.md). This policy governs presentation and control selection; the Security specification retains business rules, authorization, state and recovery. Historical tasks and approvals retain their original boundaries.
 
@@ -69,9 +69,11 @@ Reflow toolbars/labels and use local vertical scrolling where appropriate. Prese
 
 ### BC-06 — Exact pin and real contracts
 
-The baseline is `vendor/MyDmsVn.WinFormsKit@c232a4c09dc0386a5bd8bb484a5c991acae827d5`, with SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. [Component contracts at the pin](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/c232a4c09dc0386a5bd8bb484a5c991acae827d5/docs/components/controls/COMPONENTS.md) define available capabilities/APIs. Compatible `MyDmsVn.Bootstrap5WinFormUI` namespaces and older assembly identities remain; the repository name does not require namespace migration.
+Pin của candidate sửa ba ngoại lệ là `vendor/MyDmsVn.WinFormsKit@1b9c345aa2afd85e38a72d575485c3abdf559451`, with SourceGrid `f4e457b43582bf01892f50bdc74aa480531e5944`. [Component contracts at the pin](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/1b9c345aa2afd85e38a72d575485c3abdf559451/docs/components/controls/COMPONENTS.md) define available capabilities/APIs. Compatible `MyDmsVn.Bootstrap5WinFormUI` namespaces and older assembly identities remain; the repository name does not require namespace migration.
 
-Before creating a component or selecting a native control, inspect the controls and compositions available at the pin. Do not infer an API from a gallery label, demo image or latest upstream. [ControlGallery at the pin](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/c232a4c09dc0386a5bd8bb484a5c991acae827d5/samples/ControlGallery/MainForm.cs) is a reference; demo font profiles do not automatically become a public Business Compact preset.
+Before creating a component or selecting a native control, inspect the controls and compositions available at the pin. Do not infer an API from a gallery label, demo image or latest upstream. [ControlGallery at the pin](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/1b9c345aa2afd85e38a72d575485c3abdf559451/samples/ControlGallery/MainForm.cs) is a reference; demo font profiles do not automatically become a public Business Compact preset.
+
+Mốc UIL lịch sử dùng `c232a4c09dc0386a5bd8bb484a5c991acae827d5`; [candidate mới](BUSINESS_COMPACT_EXCEPTION_CLOSURE.md) bổ sung multiline và sửa modal/disabled action. Pin mới chưa có Windows/native acceptance; lịch sử UIL giữ nguyên.
 
 ### BC-07 — Default Security mapping
 
@@ -79,6 +81,8 @@ Before creating a component or selecting a native control, inspect the controls 
 |---|---|---|
 | Create/save/cancel/open/copy commands | `BootstrapButton`; existing toolbar composition when appropriate | Meaningful variant/outline/size, accessible name, focus, enabled state and validation admission. |
 | Search, names, email, passwords | `BootstrapTextBox` | Native editing, caret/range, IME, read-only/validation and public password masking. Do not assume it derives from native `TextBox`. |
+| Văn bản chỉ đọc nhiều dòng cần chọn/copy/cuộn | `BootstrapTextBox` với `Multiline`, `WordWrap`, `ScrollBars` | Giữ native editor, nội dung và accessible name; kiểm chứng selection/copy/scroll trên Windows. |
+| Identity/password/decision và Lab import-review dialogs | `BootstrapModal` với public `BodyPanel`/`FooterPanel` | App giữ pending-close/session/recovery/secret ownership; native theme-switch/owner/keyboard evidence vẫn cần thực hiện. |
 | Simple filters/selectors needing native binding | `BootstrapComboBox` | One selection model and native `Items`/binding/events. Native popup/arrow OS chrome is part of the contract; record it during review. |
 | Selectors needing search/grouping/managed presentation | `BootstrapSelect` when the capability is needed | A separate control, not a drop-in ComboBox. Verify identity, keyboard, popup/lifetime; do not invent a workflow merely to use it. |
 | Draft toggles and boolean filters | `BootstrapCheckBox` | Space changes the correct owner's draft; checking does not automatically dispatch a write. |

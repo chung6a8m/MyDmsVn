@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyDmsVn.Contracts;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Contracts.Security;
 using MyDmsVn.Desktop.Application.Security;
 using MyDmsVn.Desktop.WinForms;
@@ -85,8 +86,8 @@ public sealed class SecurityReviewScenarioTests
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static WeakReference CreateDisposedAppearanceRoot()
     {
-        var dialog = new Form();
-        dialog.Controls.Add(new TextBox());
+        var dialog = new BootstrapModal();
+        dialog.BodyPanel.Controls.Add(new BootstrapTextBox());
         BusinessCompactAppearance.Apply(dialog);
         var reference = new WeakReference(dialog);
         dialog.Dispose();
@@ -117,7 +118,7 @@ public sealed class SecurityReviewScenarioTests
                 if (dialog == null) return;
                 try
                 {
-                    var fields = Assert.Single(dialog.Controls.OfType<FlowLayoutPanel>());
+                    var fields = Assert.IsAssignableFrom<BootstrapModal>(dialog).FooterPanel;
                     var password = Assert.IsType<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapTextBox>(Assert.Single(SecurityWorkspaceControlTests.DialogInputs(dialog)));
                     var save = Assert.Single(fields.Controls.OfType<Button>(), button => button.Text == "Xác nhận");
                     var release = fields.Controls.OfType<Button>().FirstOrDefault(button => button.AccessibleName == "Release held Security mutation (Lab)");
@@ -129,7 +130,8 @@ public sealed class SecurityReviewScenarioTests
                             return;
                         }
                         Assert.False(release.Enabled);
-                        Assert.True(release.Left >= 0 && release.Right <= fields.ClientSize.Width,
+                        Assert.True(release.Left >= 0 && release.Right <= fields.ClientSize.Width &&
+                            release.Top >= 0 && release.Bottom <= fields.ClientSize.Height,
                             "The modal release action must remain within the command area.");
                         password.Text = "lab-fixture-only";
                         save.PerformClick();

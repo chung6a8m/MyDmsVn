@@ -200,7 +200,7 @@ public sealed class UiLabModalOwnershipTests
             }
             try
             {
-                var fields = Assert.Single(dialog.Controls.OfType<FlowLayoutPanel>());
+                var fields = Assert.IsAssignableFrom<MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapModal>(dialog).FooterPanel;
                 var release = fields.Controls.OfType<Button>().FirstOrDefault(button => button.Name == "SecurityLabReleaseMutation");
                 // Give both host timers time to tick; absence before then does not prove ownership.
                 if (watch.Elapsed < TimeSpan.FromMilliseconds(800)) return;
