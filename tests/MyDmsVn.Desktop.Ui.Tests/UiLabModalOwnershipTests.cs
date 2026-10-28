@@ -2,8 +2,6 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.ExceptionServices;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Desktop.Tests;
@@ -31,54 +29,57 @@ public sealed class UiLabModalOwnershipTests
             Assert.True(control.ViewModel.HasDirtyEditor);
             NativeLookupTypingDriver.Activate(lab);
 
-            var observed = false;
-            ExceptionDispatchInfo? failure = null;
-            var watch = Stopwatch.StartNew();
-            using var timer = new System.Windows.Forms.Timer { Interval = 30 };
-            timer.Tick += (_, __) =>
-            {
-                var dialog = GetForegroundWindow();
-                GetWindowThreadProcessId(dialog, out var processId);
-                if (dialog == IntPtr.Zero || WindowText(dialog, className: true) != "#32770" ||
-                    processId != (uint)Process.GetCurrentProcess().Id)
-                {
-                    if (watch.Elapsed < TimeSpan.FromSeconds(5)) return;
-                    timer.Stop();
-                    failure = ExceptionDispatchInfo.Capture(new TimeoutException("Native Security Lab Close prompt did not appear within 5 seconds."));
-                    return;
-                }
-                timer.Stop();
-                try
-                {
-                    observed = true;
-                    Assert.Equal("UI Lab", WindowText(dialog, className: false));
-                    Assert.Equal(lab.Handle, GetWindow(dialog, 4));
-                    var focus = GetFocus();
-                    Assert.NotEqual(IntPtr.Zero, focus);
-                    Assert.True(IsChild(dialog, focus), "Native Security Lab Close prompt must own the keyboard focus.");
-                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
-                }
-                catch (Exception error)
-                {
-                    failure = ExceptionDispatchInfo.Capture(error);
-                    NativeLookupTypingDriver.KeyOnFocusedOwnedWindow(Keys.Escape);
-                }
-            };
-            try
-            {
-                timer.Start();
-                lab.CloseWorkspaceButton.PerformClick();
-                Assert.False(timer.Enabled, "Native Security Lab Close prompt did not complete its bounded observation.");
-                failure?.Throw();
-            }
-            finally { timer.Stop(); }
+            using var observer = new NativeMessageBoxObserver(lab.Handle, "UI Lab");
+            observer.Invoke(lab.CloseWorkspaceButton.PerformClick);
 
-            Assert.True(observed);
+            Assert.True(observer.Observed);
+            Assert.False(observer.DialogStillOpen);
             Assert.Same(control, lab.CurrentSecurityControl);
             Assert.False(control.IsDisposed);
             Assert.True(control.ViewModel.HasDirtyEditor);
             Assert.Equal(editorIdentity, control.ViewModel.EditorIdentity);
             Assert.Contains("Close rejected", lab.StatusText);
+        });
+
+    [Fact]
+    public void Security_lab_close_prompt_lost_foreground_fails_bounded_cleans_only_its_prompt_and_recovers()
+        => SecurityWorkspaceControlTests.Run(SecurityScenarioId.SEC_L10, (_, scene) =>
+        {
+            using var lab = new SecurityLabForm();
+            using var unrelated = new Form { Text = "Unrelated foreground window" };
+            lab.Show();
+            unrelated.Show();
+            Until(() => lab.CurrentSecurityControl != null && !lab.IsResetting);
+            var control = lab.CurrentSecurityControl!;
+            control.Tabs.SelectedIndex = 1;
+            Assert.True(control.ViewModel.BeginRolePermissions());
+            control.ViewModel.SetRoleGranted("Sales.Receipts.Post", true);
+            var editorIdentity = control.ViewModel.EditorIdentity;
+            NativeLookupTypingDriver.Activate(lab);
+
+            using (var failed = new NativeMessageBoxObserver(lab.Handle, "UI Lab",
+                _ => NativeLookupTypingDriver.Activate(unrelated)))
+            {
+                var watch = Stopwatch.StartNew();
+                var failure = Assert.Throws<InvalidOperationException>(new Action(() =>
+                    failed.Invoke(lab.CloseWorkspaceButton.PerformClick)));
+                Assert.True(watch.Elapsed < TimeSpan.FromSeconds(6), failure.ToString());
+                Assert.Contains("foreground", failure.Message, StringComparison.OrdinalIgnoreCase);
+                Assert.True(failed.Observed);
+                Assert.False(failed.DialogStillOpen);
+                Assert.False(unrelated.IsDisposed);
+                Assert.True(unrelated.Visible);
+            }
+
+            NativeLookupTypingDriver.Activate(lab);
+            using (var recovered = new NativeMessageBoxObserver(lab.Handle, "UI Lab"))
+                recovered.Invoke(lab.CloseWorkspaceButton.PerformClick);
+
+            Assert.Same(control, lab.CurrentSecurityControl);
+            Assert.False(control.IsDisposed);
+            Assert.True(control.ViewModel.HasDirtyEditor);
+            Assert.Equal(editorIdentity, control.ViewModel.EditorIdentity);
+            Assert.DoesNotContain(scene.Journal.Entries, entry => entry.Operation == "Security.Mutate");
         });
 
     [Theory]
@@ -236,19 +237,4 @@ public sealed class UiLabModalOwnershipTests
         }
     }
 
-    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] private static extern IntPtr GetFocus();
-    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
-    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
-    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsChild(IntPtr parent, IntPtr child);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder text, int count);
-
-    private static string WindowText(IntPtr window, bool className)
-    {
-        var text = new StringBuilder(256);
-        if (className) GetClassName(window, text, text.Capacity);
-        else GetWindowText(window, text, text.Capacity);
-        return text.ToString();
-    }
 }
