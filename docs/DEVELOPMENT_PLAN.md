@@ -1,6 +1,8 @@
 # Development-plan entry point
 
-**Current routing (2026-10-27):** Follow [the execution index](plans/README.md) for the selected Business Compact and independent UI Labs roadmap, its authorized scope and sole task-state owner. This file is a compatibility entry point; it has no separate task list or progress table.
+**Current routing (2026-10-28):** Follow [the execution index](plans/README.md) for explicitly authorized scope and the sole plan selector. **No next implementation roadmap is selected.** This file is a compatibility entry point; it has no separate task list or progress table.
+
+The completed-bounded [Business Compact and independent UI Labs plan](archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) is frozen in the [2026-10-28 archive](archive/20261028-business-compact-and-independent-ui-labs/README.md). Its later source focus correction remains **PENDING focused Owner confirmation**, while the subsequent #59/#60 test/evidence corrections are complete; the current execution index and [original evidence](evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#2026-10-28-review-findings-follow-up) retain those distinctions.
 
 The former [Sidebar](archive/20261027-main-roadmap-reset/plans/20261025-001-sidebar-navigation-horizontal-scrollbar.md) and [Security UI-Lab-first](archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) plans are frozen in the [2026-10-27 main archive](archive/20261027-main-roadmap-reset/README.md). Merged source and bounded verification are preserved; incomplete attended, native, actual Login and release acceptance remain candidate-specific and unscheduled.
 

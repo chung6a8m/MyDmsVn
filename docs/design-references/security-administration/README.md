@@ -2,7 +2,7 @@
 
 These three SVG wireframes recreate the three approved conversation layouts using the current specification's labels and canonical permission keys. They are precise composition references for review, not byte copies of the original PNGs, screenshots of an executed application, or evidence of UI Lab acceptance. The deleted image and older variants are excluded.
 
-Read the [UI and behavior specification](../../design/SECURITY_ADMINISTRATION_UI.md), durable [Business Compact policy](../../design/BUSINESS_COMPACT.md), active [Business Compact and independent UI Labs roadmap](../../plans/20261027-001-business-compact-and-independent-ui-labs.md) and [UI Labs review guide](../../development/SECURITY_UI_LAB_REVIEW.md). The specification and the Owner's explicit corrections are normative. The original [Security plan](../../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) retains its historical decisions.
+Read the [UI and behavior specification](../../design/SECURITY_ADMINISTRATION_UI.md), durable [Business Compact policy](../../design/BUSINESS_COMPACT.md), archived [Business Compact and independent UI Labs roadmap](../../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) and [UI Labs review guide](../../development/SECURITY_UI_LAB_REVIEW.md). The specification and the Owner's explicit corrections are normative. The [execution index](../../plans/README.md) selects no next implementation roadmap. The original [Security plan](../../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) retains its historical decisions.
 
 ## Included views
 
@@ -32,7 +32,7 @@ The catalog retains the reference sequence label `04`. No separate direct-editor
 
 The SVGs document layout, control ownership and visible copy. Their drawing bounds do not prescribe a WinForms client size or physical monitor scale. The running candidate must fit the existing shell bounds and undergo the required Light/Dark, physical native100/native125, keyboard, focus and workflow review.
 
-The linked UI Labs review guide defines repeatable scenarios and evidence fields. The selected roadmap records bounded native pilot and final candidate approval before its completed product-host parity/handoff. These wireframes and historical executed screenshots do not establish or transfer those decisions to another candidate; the roadmap and candidate evidence own their exact state.
+The linked UI Labs review guide defines repeatable scenarios and evidence fields. The archived UIL roadmap records bounded native pilot and final candidate approval before its completed product-host parity/handoff. These wireframes and historical executed screenshots do not establish or transfer those decisions to another candidate; the archived roadmap and candidate evidence retain their exact state and remaining confirmation limits.
 
 ## Preview
 

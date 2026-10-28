@@ -1,6 +1,6 @@
 # Business Compact — design and control policy
 
-**Status:** current design policy selected by the Owner on 2026-10-27; runtime conformance must be established for each candidate. The bounded [Business Compact and independent UI Labs](../plans/20261027-001-business-compact-and-independent-ui-labs.md) implementation and handoff are complete, with exact candidate evidence linked from that roadmap. This policy remains current when an execution roadmap is completed or archived.
+**Status:** current design policy selected by the Owner on 2026-10-27; runtime conformance must be established for each candidate. The bounded [Business Compact and independent UI Labs](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) implementation and handoff are complete and archived, with exact candidate evidence linked from that roadmap. The [execution index](../plans/README.md) selects no next implementation roadmap. This policy remains current.
 
 Read with [Security UI and behavior](SECURITY_ADMINISTRATION_UI.md), [Independent UI Labs](INDEPENDENT_UI_LABS.md), [UI Lab runbook](../development/UI_LAB.md) and [Security review guide](../development/SECURITY_UI_LAB_REVIEW.md). This policy governs presentation and control selection; the Security specification retains business rules, authorization, state and recovery. Historical tasks and approvals retain their original boundaries.
 
@@ -166,4 +166,4 @@ The skill contains no SQL credentials, selects no roadmap automatically, and add
 | Ownership | Separate module graphs/tools; finite reset/close/session drain; late completions cannot repopulate presentation. |
 | Explicit decision | Dated Owner approval for the exact candidate/gate, or `NOT APPROVED` with findings; no inherited approval from an earlier candidate. |
 
-Detailed matrices, task states and gates live in the [active roadmap](../plans/20261027-001-business-compact-and-independent-ui-labs.md) and its evidence. When that roadmap is archived, this policy remains current for subsequent UI changes. Archival neither turns unresolved limits into PASS nor selects additional implementation work.
+Detailed UIL matrices, task states and gates remain in the [archived roadmap](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) and its evidence. This policy remains current for subsequent UI changes selected through the [execution index](../plans/README.md). Archival neither turns unresolved limits into PASS nor selects additional implementation work.
