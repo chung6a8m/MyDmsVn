@@ -56,7 +56,7 @@ Kích thước normal dùng content 952×657 trong host 1200×760; minimum dùng
 - [physical 100% Dark / normal / Catalog long read-only](screenshots/20261028-exc-t05/physical100-dark-normal-catalog-long-readonly.png)
 - [physical 100% Light / minimum / Catalog](screenshots/20261028-exc-t05/physical100-light-minimum-catalog.png)
 
-Physical 125% Light/Dark × normal/minimum vẫn phải chạy sau khi Display scale thực sự là 125%, Lab khởi động lại và báo `DeviceDpi=120`. Không chuyển kết quả automated DPI hoặc 100% thành PASS cho hàng này.
+Physical 125% Light/Dark × normal/minimum vẫn phải chạy sau khi Display scale thực sự là 125% và probe per-monitor-aware độc lập xác nhận effective DPI 120×120/125%. Khởi động lại Lab và ghi `DeviceDpi` riêng; theo runbook, net48 host có thể vẫn báo 96 nên giá trị đó không thay physical-scale probe. Không chuyển kết quả automated DPI hoặc 100% thành PASS cho hàng này.
 
 ## Định danh candidate và môi trường
 
@@ -102,6 +102,7 @@ Fixture mới trong source là [SecurityToolkitExceptionTests](../../../tests/My
 | Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; pin final docs/test-fixture-only là `01672482250ed1f5a1ed99f10250efa697d78638`; không đổi project/lockfile |
 | Build app cuối `MyDmsVn.UiLab.sln` Debug net48/x86 theo pin chính xác, gồm Theory palette thực tế | **PASS — 0 cảnh báo, 0 lỗi; 11.65 giây** | Dùng đúng pin và tree source/samples/tests ghi ở trên; không chạy native tests |
 | Toolkit CI Release trên `windows-2022`, cả hai TFM | **PASS — build-only** tại [run 40710094747](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40710094747) | `head_sha` đúng `1b9c345aa2afd85e38a72d575485c3abdf559451`; không chạy native tests |
+| Toolkit CI final evidence pin | **PASS — build-only** tại [run 40721595107](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40721595107) | `head_sha` đúng `01672482250ed1f5a1ed99f10250efa697d78638`; focused native tests vẫn là evidence local Windows ở checkpoint, không phải CI claim |
 | Windows discovery/execution | **PASS** | Toolkit controls 75/75/TFM, adapters 40/40/TFM; consumer 163/163 net48/x86; 0 fail/skip; TRX local ignored |
 | Owner review native tập trung | **PENDING** | Việc người dùng cho phép triển khai không phải phê duyệt native của candidate |
 
@@ -140,7 +141,7 @@ Toolkit `.github/workflows/build.yml` định nghĩa workflow chỉ build trên 
 
 Theo [TEST_POLICY](../../TEST_POLICY.md), [tests/README](../../../tests/README.md) và [UI Lab runbook](../../development/UI_LAB.md), discovery/execution focused đã hoàn tất tuần tự với STA/finite pumping/cleanup như checkpoint. Toolkit đã bao phủ cả hai target và adapter consumer bị ảnh hưởng.
 
-Physical 100% Light/Dark × normal/minimum đã PASS. Phần còn lại là chạy lại ma trận ở physical 125%/`DeviceDpi=120`, cập nhật ảnh/evidence nếu đạt và xin quyết định Owner trên đúng candidate. Không chạy lại SQL/Login/package/release.
+Physical 100% Light/Dark × normal/minimum đã PASS. Phần còn lại là dùng probe per-monitor-aware xác nhận physical 125%/effective DPI 120×120, chạy lại ma trận và ghi `DeviceDpi` của Lab riêng (có thể vẫn là 96), cập nhật ảnh/evidence nếu đạt và xin quyết định Owner trên đúng candidate. Không chạy lại SQL/Login/package/release.
 
 ## Các mục kiểm chứng còn cần hoàn tất
 
