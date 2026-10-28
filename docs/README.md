@@ -1,6 +1,6 @@
 # Documentation index — main
 
-**Updated:** 2026-10-27. The [execution index](plans/README.md) selects [Business Compact conformance and independent UI Labs](plans/20261027-001-business-compact-and-independent-ui-labs.md). Implementation is NOT STARTED and native gates are NOT APPROVED. The [2026-10-27 archive](archive/20261027-main-roadmap-reset/README.md) preserves the previous Sidebar and Security execution queues after they reached main through PR #52. Archived tests and approvals remain tied to their original candidates.
+**Updated:** 2026-10-28. The [execution index](plans/README.md) selects the completed-bounded [Business Compact conformance and independent UI Labs](plans/20261027-001-business-compact-and-independent-ui-labs.md) roadmap. Separate Sales/Security launchers, bounded pilot/final Owner decisions and physical-100/125 product-host parity are recorded in the [current candidate evidence](evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md). No further task, SQL, actual Login, package or release acceptance is selected. The [2026-10-27 archive](archive/20261027-main-roadmap-reset/README.md) preserves the previous Sidebar and Security execution queues; archived tests and approvals remain tied to their original candidates.
 
 ## Current work and Codex entry points
 
@@ -14,11 +14,11 @@
 | [Test strategy](TEST_STRATEGY.md) · [test commands](../tests/README.md) | Coverage and direct scoped test commands |
 | [UI Lab runbook](development/UI_LAB.md) | SQL-free Sales and Security scenario host, reset and usage |
 | [Business Compact policy](design/BUSINESS_COMPACT.md) | Durable visual/control contract, toolkit mapping, justified exceptions and native evidence |
-| [Independent UI Labs](design/INDEPENDENT_UI_LABS.md) | Selected direct Sales/Security launchers and shared product-presentation contract; implementation target |
+| [Independent UI Labs](design/INDEPENDENT_UI_LABS.md) | Implemented direct Sales/Security launchers, neutral shared host/lifecycle and product-presentation boundaries |
 | [Security UI specification](design/SECURITY_ADMINISTRATION_UI.md) · [Security Lab review](development/SECURITY_UI_LAB_REVIEW.md) | Implemented UI contracts and repeatable review exercises, not active task checklists |
 | [Architecture](ARCHITECTURE.md) · [ADRs](adr/README.md) | Current principles, decisions and historical source distinctions |
 
-The Owner-approved Security SQL-free candidate gate SEC-T05 was followed by bounded SEC-T06–SEC-T08 Local/SQL work. [Plan in archive](archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md), [Lab evidence](evidence/security/20261025-security-ui-lab.md) and [Local/SQL evidence](evidence/security/20261025-security-local-sql.md) retain remaining incomplete attended/native and release limits. Sidebar's [bounded evidence](evidence/sidebar/20261025-sidebar-horizontal-scrollbar.md) does not imply production-package acceptance.
+The current UIL evidence records bounded Security pilot/final approval, focused native-focus confirmation and SQL-free product-shell parity on runtime/test candidate `8ec1ff71ef0a6a7cf4befa88bbd7bed2616827a0`; it does not prove actual Login, Local/Server authorization, SQL transactions, package acceptance, release or deployment. Separately, the Owner-approved historical Security SQL-free candidate gate SEC-T05 was followed by bounded SEC-T06–SEC-T08 Local/SQL work. [Plan in archive](archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md), [Lab evidence](evidence/security/20261025-security-ui-lab.md) and [Local/SQL evidence](evidence/security/20261025-security-local-sql.md) retain remaining incomplete attended/native and release limits. Sidebar's [bounded evidence](evidence/sidebar/20261025-sidebar-horizontal-scrollbar.md) does not imply production-package acceptance.
 
 ## Product and implementation references
 

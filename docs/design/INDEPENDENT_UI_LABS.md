@@ -1,6 +1,6 @@
 # Independent Sales and Security UI Labs
 
-**Status:** selected implementation design, 2026-10-27; runtime changes are **NOT IMPLEMENTED** by the documentation PR. The sole task/status owner is the [Business Compact and independent UI Labs roadmap](../plans/20261027-001-business-compact-and-independent-ui-labs.md). Its native visual gates start **NOT APPROVED**.
+**Status:** implemented and handed off within the bounded scope recorded by the [Business Compact and independent UI Labs roadmap](../plans/20261027-001-business-compact-and-independent-ui-labs.md). The roadmap remains the sole task/status owner; its candidate evidence records dated native decisions, physical-100/125 product-host parity and remaining limits.
 
 **Inspected baseline:** [`main@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9). This design complements the durable [Business Compact policy](BUSINESS_COMPACT.md), [Security UI specification](SECURITY_ADMINISTRATION_UI.md), [current Lab runbook](../development/UI_LAB.md) and [Security review guide](../development/SECURITY_UI_LAB_REVIEW.md).
 
@@ -14,7 +14,7 @@ Each Lab must reproduce the product's presentation environment: the same theme c
 
 No new generic UI framework, toolkit copy, business API, permission rule, SQL contract or legacy Security factory cutover is selected. The production factory already uses `SecurityWorkspaceControl`; the roadmap improves the presentation of that existing component and verifies its composition in the product host.
 
-## 2. Observed source and required changes
+## 2. Original observed source and implemented changes
 
 | Baseline fact | Design consequence |
 |---|---|
@@ -26,22 +26,22 @@ No new generic UI framework, toolkit copy, business API, permission rule, SQL co
 | [`ScenarioInfrastructure`](https://github.com/chung6a8m/MyDmsVn/blob/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9/samples/MyDmsVn.Desktop.UiLab.Scenarios/ScenarioInfrastructure.cs) includes both neutral utilities and Sales-specific types. | Separate neutral and module-specific source ownership without requiring new scenario assemblies. |
 | [`SecurityReviewScenarioTests`](../../tests/MyDmsVn.Desktop.Ui.Tests/SecurityReviewScenarioTests.cs) waits for Sales before switching to Security. | Change the relevant test setup to direct Security startup; a test-name filter alone does not fix this dependency. |
 
-The baseline already has production Security components, native tests and historical review evidence. This work must preserve their useful behavior and exact acceptance limits. New design documentation is not evidence that a new candidate renders correctly.
+The baseline already had production Security components, native tests and historical review evidence. The implemented work preserves their useful behavior and exact acceptance limits. Design documentation alone is never evidence that a later candidate renders correctly.
 
-## 3. Project and ownership design
+## 3. Implemented project and ownership design
 
-The following project changes and names are **implementation targets**, not files/APIs available at the inspected baseline:
+The following project graph is implemented at the bounded handoff candidate; the table's responsibilities remain design constraints for later changes:
 
 | Target | Responsibility | Dependency boundary |
 |---|---|---|
 | `samples/MyDmsVn.Desktop.UiLab.Sales/` | Thin net48 `WinExe`: STA startup, shared bootstrap, launch Sales form. | References shared Lab assembly; no Security startup or selector. |
 | `samples/MyDmsVn.Desktop.UiLab.Security/` | Thin net48 `WinExe`: STA startup, shared bootstrap, launch Security form. | References shared Lab assembly; no Sales startup or selector. |
-| Existing `samples/MyDmsVn.Desktop.UiLab/` converted to a class library, retaining assembly name | Neutral host/lifecycle/presentation helpers plus module-owned forms under separate `Sales/` and `Security/` source areas. | References production WinForms and Scenarios as today. Common host code does not branch on SAL/SEC or store either module's graph. |
-| Existing `samples/MyDmsVn.Desktop.UiLab.Scenarios/` | Deterministic fixture and fake-port implementations grouped into `Common/`, `Sales/`, `Security/`. | Remains free of WinForms, Local and SQL composition. |
-| Existing `tests/MyDmsVn.Desktop.Ui.Tests/` | Common, SAL and SEC tests grouped by ownership, with direct module-host setup where needed. | Retains linked STA/native helpers and one serialized test assembly. |
-| Existing `MyDmsVn.UiLab.sln` | Lists both launchers, reusable Lab code, Scenarios and UI tests. | No second solution or production project split is required. |
+| `samples/MyDmsVn.Desktop.UiLab/`, a class library retaining its assembly name | Neutral host/lifecycle/presentation helpers plus module-owned forms under separate `Sales/` and `Security/` source areas. | References production WinForms and Scenarios. Common host code does not branch on SAL/SEC or store either module's graph. |
+| `samples/MyDmsVn.Desktop.UiLab.Scenarios/` | Deterministic fixture and fake-port implementations grouped into `Common/`, `Sales/`, `Security/`. | Remains free of WinForms, Local and SQL composition. |
+| `tests/MyDmsVn.Desktop.Ui.Tests/` | Common, SAL and SEC tests grouped by ownership, with direct module-host setup where needed. | Retains linked STA/native helpers and one serialized test assembly. |
+| `MyDmsVn.UiLab.sln` | Lists both launchers, reusable Lab code, Scenarios and UI tests. | No second solution or production project split is required. |
 
-Keep launcher APIs small. A public entry/factory facade in the Lab assembly may expose the two launch choices while module forms and test hooks remain internal. Exact type/method names are chosen and recorded during implementation; this specification does not assert an existing `UiLabBootstrap` or `BusinessCompactPreset` API.
+Keep launcher APIs small. The implemented public `UiLabEntry.RunSales()` and `UiLabEntry.RunSecurity()` facade exposes the two launch choices while module forms and test hooks remain internal. There is no `UiLabBootstrap` or `BusinessCompactPreset` public API.
 
 Retaining `MyDmsVn.Desktop.UiLab` as the reusable assembly preserves the existing production [`InternalsVisibleTo`](../../src/MyDmsVn.Desktop.WinForms/Properties/AssemblyInfo.cs) boundary. Its [test friend access](../../samples/MyDmsVn.Desktop.UiLab/Properties/AssemblyInfo.cs) can continue to serve `MyDmsVn.Desktop.Ui.Tests`. Do not make production internals public merely to let thin launchers start a form. Any changed friend/reference boundary must be explicit in the implementation diff.
 
@@ -114,7 +114,7 @@ Current source-verified class groups provide a starting point, subject to discov
 
 `FullyQualifiedName~Sales` alone misses the two SAL classes named `UiLabResetTests` and `UiLabToolbarReviewTests`. If implementation introduces module traits or renames classes, update selectors and verify actual nonempty discovery. Do not claim a filter fixes a test body that still starts Sales before Security.
 
-The following illustrates a **future** focused run after the host changes have been implemented and built on interactive Windows; it is not a result of this documentation PR:
+The following illustrates a reusable focused run on interactive Windows; it is a command example, not a recorded result:
 
 ```powershell
 $uiTests = 'tests/MyDmsVn.Desktop.Ui.Tests/MyDmsVn.Desktop.Ui.Tests.csproj'
@@ -131,13 +131,13 @@ Use the sole [TEST_POLICY](../TEST_POLICY.md), [TEST_STRATEGY](../TEST_STRATEGY.
 
 ## 7. Implementation sequence and launch instructions
 
-The active roadmap owns dependency order and task state. Its intended sequence is: component/skill preparation (`UIL-T00`), shared appearance bootstrap (`UIL-T01`), independent launchers (`UIL-T02`), native Security pilot (`UIL-T03`) and Owner pilot approval (`UIL-T04`), complete Security presentation (`UIL-T05`), final native approval (`UIL-T06`), SQL-free product-host parity plus affected Sales regression (`UIL-T07`), then handoff (`UIL-T08`).
+The roadmap owns dependency order and task state. Its completed sequence is: component/skill preparation (`UIL-T00`), shared appearance bootstrap (`UIL-T01`), independent launchers (`UIL-T02`), native Security pilot (`UIL-T03`) and Owner pilot approval (`UIL-T04`), complete Security presentation (`UIL-T05`), final native approval (`UIL-T06`), SQL-free product-host parity plus affected Sales regression (`UIL-T07`), then handoff (`UIL-T08`).
 
-`UIL-T02` must change project types/references, solution entries, launcher programs, module forms, scenario source ownership and relevant tests together. It also updates current run instructions and output names; a documentation-only project rename is insufficient. Retire the mixed module selector from active startup and test paths, then remove obsolete mixed-host code once no active reference needs it.
+`UIL-T02` changed project types/references, solution entries, launcher programs, module forms, scenario source ownership and relevant tests together. It retired the mixed module selector from active startup/test paths and removed obsolete mixed-host code.
 
-After implementation, Visual Studio offers `MyDmsVn.Desktop.UiLab.Sales` and `MyDmsVn.Desktop.UiLab.Security` as explicit startup projects. Launching Security with F5 must not require first opening Sales. Existing runbook commands remain the authority for the currently implemented host until that task updates them.
+Visual Studio offers `MyDmsVn.Desktop.UiLab.Sales` and `MyDmsVn.Desktop.UiLab.Security` as explicit startup projects. Launching Security with F5 does not require first opening Sales. The current runbook owns repeatable launch commands.
 
-These are **proposed future build commands**, not commands supported by the baseline checkout:
+These are supported build commands for the implemented launchers:
 
 ```powershell
 dotnet restore MyDmsVn.UiLab.sln --locked-mode

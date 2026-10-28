@@ -6,9 +6,9 @@ Read the [UI Lab runbook](UI_LAB.md), [test policy](../TEST_POLICY.md), [test co
 
 ## Current Business Compact review scope
 
-Use the durable [Business Compact policy](../design/BUSINESS_COMPACT.md) and [independent Lab specification](../design/INDEPENDENT_UI_LABS.md). UIL-T03/T04 review **Quyền của vai trò** and one account create/edit dialog as a native pilot; only explicit pilot approval permits broad SEC conformance. UIL-T06 separately reviews the completed SEC candidate before the SQL-free product-host check in UIL-T07. Both new gates start NOT APPROVED; the active plan owns their state.
+Use the durable [Business Compact policy](../design/BUSINESS_COMPACT.md) and [independent Lab specification](../design/INDEPENDENT_UI_LABS.md). UIL-T04 approved the native **Quyền của vai trò**/account-dialog pilot baseline; UIL-T06 and its focused native-focus correction have bounded Owner approval. UIL-T07 completed SQL-free product-host parity and affected shared/Sales regression. Read the roadmap and [current candidate evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md) for exact revisions, decisions, exceptions and remaining limits. Material changes reopen the affected review.
 
-Review the real production controls in the direct SEC Lab after UIL-T02 exists, using the product theme/bootstrap, typography and measured content-client bounds. Cover Dark/Light and physical 100%/125% at normal/minimum product geometry, changed dialogs, command hierarchy, long labels/keys, selected/disabled/focus states and preserved native editing. Record toolkit mappings and justified native/custom exceptions. The existing commands below still build the mixed host until UIL-T02 updates them; a new launcher or result is not implied by this documentation change.
+Open `MyDmsVn.Desktop.UiLab.Security` directly and review the real production controls with the shared product theme/bootstrap, typography and measured content-client bounds. Cover Dark/Light and physical 100%/125% at normal/minimum product geometry, changed dialogs, command hierarchy, long labels/keys, selected/disabled/focus states and preserved native editing. Record toolkit mappings and justified native/custom exceptions. The commands below build that launcher; the shared `MyDmsVn.Desktop.UiLab` project is a library.
 
 Select relevant scenarios below for changed presentation/bindings and preserve their behavioral expectations. Historical gaps remain recorded in original evidence; the new plan does not silently select the entire unfinished historical matrix or another SQL round. Reset is a developer fixture boundary; verify ordinary Close admission separately.
 
@@ -17,7 +17,7 @@ Select relevant scenarios below for changed presentation/bindings and preserve t
 - Original historical baseline: commit `0216701835cc3326124a94760186989c1ac4f729`; baseline WinFormsKit gitlink: `c232a4c09dc0386a5bd8bb484a5c991acae827d5`. Record the actual candidate and gitlinks for every
   review; baseline facts are not candidate evidence.
 - `SecurityWorkspaceControl` and `SecurityWorkspaceViewModel` were proposed relative to that baseline and are now implemented in the production WinForms and Desktop.Application assemblies. The Lab constructs those actual types, not a sample-only imitation.
-- The production factory stayed on the legacy control until the Owner approved SEC-T05 on 2026-10-26. SEC-T06 then cut over to the reviewed candidate; SEC-T07 focused SQL integration and SEC-T08 handoff are recorded in the [plan](../plans/20261025-002-security-administration-ui-lab-first.md) and [post-gate evidence](../evidence/security/20261025-security-local-sql.md).
+- The production factory stayed on the legacy control until the Owner approved SEC-T05 on 2026-10-26. SEC-T06 then cut over to the reviewed candidate; SEC-T07 focused SQL integration and SEC-T08 handoff are recorded in the [archived plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) and [post-gate evidence](../evidence/security/20261025-security-local-sql.md).
 - Use interactive Windows, .NET Framework 4.8, the pinned SDK/submodules and a real WinForms message pump. No connection string, SQL instance or real Login is required for this review.
 - New security fakes implement the existing `ISecurityAdministrationApiClient` and `IPermissionCatalogApiClient` ports. Reuse `ScenarioGate<T>`, `ScenarioJournal`, `ScenarioDesktopSession` and the scenario
   assembly's `ScenarioTaskTracker` where appropriate.
@@ -227,7 +227,7 @@ if ($LASTEXITCODE -ne 0) { throw 'UiLab tests failed.' }
 Existing `UiLabResetTests` and `UiLabToolbarReviewTests` are Sales preservation selectors, alongside `SalesScenarioBehaviorTests`; `~Sales` alone misses the first two. Include affected Sales/common checks when host/theme/lifecycle is shared. New case names or module-trait selectors must be verified against implemented source and discovered cases before use.
 Record actual Facts/Theory rows, outcomes and skipped/missing cases; zero discovery or an unexplained skip cannot establish a pass. SEC-T06 retired the duplicate legacy control/view-model and mapped their tests to the candidate owners in the [post-gate evidence](../evidence/security/20261025-security-local-sql.md); `SecurityAdministrationFormTests` now exercises the candidate. Run only the affected scope under [TEST_POLICY](../TEST_POLICY.md).
 
-No Lab result alone proves Server authorization, SQL transaction behavior, real Login, production wiring or package acceptance. The historical SEC-T05 Owner gate was approved on 2026-10-26; later Local/SQL results remain in the archived plan and post-gate evidence. The new UIL pilot/final decisions require their own exact-candidate observations and explicit approval.
+No Lab result alone proves Server authorization, SQL transaction behavior, real Login, production wiring or package acceptance. The historical SEC-T05 Owner gate was approved on 2026-10-26; later Local/SQL results remain in the archived plan and post-gate evidence. Current UIL pilot/final decisions are recorded against their exact candidates; any later candidate requires its own affected observations and explicit approval.
 
 ## Gate evidence template
 
@@ -246,7 +246,7 @@ Copy this template into the plan-linked candidate evidence record. Do not mainta
 | Isolation and lifecycle | `[pending: no-SQL composition, redaction, cancellation/drain/disposal and timeout outcome]` |
 | Findings and corrections | `[pending: original failures, fixes, affected reruns, remaining issues and explicit exceptions]` |
 | Owner review | `[pending: Owner identity, review date/time, exact candidate, explicit approve/reject decision and scope]` |
-| Next-work dependency | `[UIL-T04 approval before broad SEC changes; UIL-T06 approval before final product-host parity; original SEC-T05 and SEC-T06–T08 remain historical]` |
+| Next-work dependency | `[follow the current execution index; material UI changes reopen the affected review; original SEC-T05 and SEC-T06–T08 remain historical; no automatic SQL/release task]` |
 
 Approval requires an explicit dated Owner statement tied to the reviewed candidate and declared exceptions. A PR merge, document approval, screenshot acknowledgement or green fake test suite does not
 substitute for that decision. If the reviewed UI changes before product-host verification or handoff, record the difference and obtain review of the affected behavior; do not substitute an unreviewed implementation under the approved candidate's evidence.

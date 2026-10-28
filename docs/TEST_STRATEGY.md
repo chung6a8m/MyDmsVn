@@ -1,6 +1,6 @@
 # Test coverage — MyDmsVn
 
-**Updated:** 2026-10-25. This document owns behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) owns commands. The [execution index](plans/README.md) selects the authorized follow-up and its scoped verification; successor work requires explicit activation. [UI-NEXT](ui-next/README.md) retains historical candidate evidence rather than a current task queue.
+**Updated:** 2026-10-28. This document owns behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) owns commands. The [execution index](plans/README.md) selects the authorized follow-up and its scoped verification; successor work requires explicit activation. [UI-NEXT](ui-next/README.md) retains historical candidate evidence rather than a current task queue.
 
 The [archive boundary](archive/20261023-pre-ui-next/README.md) retires old queues without completing their open acceptance. [SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`; candidate-specific runnable automation passed, while native125, attended observations and dated Owner acceptance remain OPEN. R3/R4 source fixes are reviewed/approved. BCF/BCI/GUI-P5/L2DB/RESP retain their exact historical signed scopes and exceptions.
 
@@ -38,9 +38,9 @@ Inventory remains the existing SQL test owner for sales/value persistence. Do no
 | Schema | `MyDmsVn.Server.Infrastructure.Migrations.Tests` | Clean/no-op migration, partial/unknown/future schema, maintenance principals |
 | SQL infrastructure | `MyDmsVn.Server.Infrastructure.IntegrationTests` | Local fresh-database ownership/cleanup, configuration rejection and concurrency probes; inspect source to distinguish real SQL from pure tests |
 | Desktop | `MyDmsVn.Desktop.Session.Tests`, `MyDmsVn.Desktop.Tests` | Pure session/ViewModel behavior and guarded WinForms interaction respectively |
-| Sales UI Lab | `MyDmsVn.Desktop.Ui.Tests` | Focused fake-contract/scenario and native Sales control checks; moved old coverage requires an explicit old → behavior → replacement mapping |
+| Sales/Security UI Labs | `MyDmsVn.Desktop.Ui.Tests` | Focused fake-contract/scenario, direct-host parity and native module checks; moved old coverage requires an explicit old → behavior → replacement mapping |
 
-Paths are under `tests/`. The A1 Lab adds an eleventh net48 test owner; the ten baseline projects and their historical evidence remain distinct. The former standalone SQL framework and its tests are removed. Historical product .NET 8 coverage is parked. [UI Lab runbook](development/UI_LAB.md) covers its source-bound scenarios and commands.
+Paths are under `tests/`. The A1 Lab added the eleventh net48 test owner; it now covers both direct Sales and Security Labs while the ten baseline projects and their historical evidence remain distinct. The former standalone SQL framework and its tests are removed. Historical product .NET 8 coverage is parked. [UI Lab runbook](development/UI_LAB.md) covers its source-bound scenarios and commands.
 
 ## Persistence and migrations
 
