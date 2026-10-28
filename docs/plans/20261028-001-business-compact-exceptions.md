@@ -6,7 +6,7 @@
 **Kiến trúc:** Sửa WinFormsKit tương thích, cập nhật một gitlink chính xác, dùng nội dung modal public và các hợp đồng ứng dụng Security hiện có.
 **Công nghệ:** C#/WinForms; toolkit net48 và net8.0-windows; app net48; các helper native NUnit/xUnit hiện có.
 **Đặc tả:** [Thiết kế được chọn](../design/BUSINESS_COMPACT_EXCEPTION_CLOSURE.md).
-**Ngày chọn:** 2026-10-28. **Trạng thái:** source đã triển khai, đã pin upstream chính xác và cross-build PASS; source và bằng chứng build sẵn sàng review; kiểm chứng Windows/native và phê duyệt Owner NOT RUN / PENDING.
+**Ngày chọn:** 2026-10-28. **Trạng thái:** source đã triển khai; focused Windows/native tests PASS; review Light/Dark × normal/minimum ở physical 100% PASS; physical 125% BLOCKED do chưa đổi được Display scale; Owner PENDING.
 
 ## Ràng buộc chung
 
@@ -24,11 +24,11 @@ Giữ assembly identities, pin SourceGrid, trách nhiệm nghiệp vụ/permissi
 
 | Công việc | Kết quả cần giao | Triển khai | Kiểm chứng / nghiệm thu |
 |---|---|---|---|
-| EXC-T01 | Palette action disabled của toolkit và kiểm thử hồi quy có ý nghĩa | IMPLEMENTED | Cross-build PASS; native NOT RUN |
-| EXC-T02 | Sửa vòng đời Font tiêu đề modal của toolkit và kiểm thử hồi quy | IMPLEMENTED | Cross-build PASS; native NOT RUN |
-| EXC-T03 | Hợp đồng public cho văn bản nhiều dòng và kiểm thử hồi quy của toolkit | IMPLEMENTED | Cross-build và compiled API review PASS; native NOT RUN |
-| EXC-T04 | Pin upstream chính xác và tích hợp modal/text Security | SOURCE IMPLEMENTED; đã pin `1b9c345aa2afd85e38a72d575485c3abdf559451` | Consumer locked restore/build theo pin cuối PASS; native NOT RUN |
-| EXC-T05 | Evidence Windows/native tập trung, quyết định Owner và bàn giao | Source/pin/build sẵn sàng review; native còn chờ | Windows/native NOT RUN; Owner PENDING |
+| EXC-T01 | Palette action disabled của toolkit và kiểm thử hồi quy có ý nghĩa | IMPLEMENTED | Focused tests PASS; consumer physical 100% PASS; 125%/Owner PENDING |
+| EXC-T02 | Sửa vòng đời Font tiêu đề modal của toolkit và kiểm thử hồi quy | IMPLEMENTED | Focused tests PASS; consumer physical 100% PASS; 125%/Owner PENDING |
+| EXC-T03 | Hợp đồng public cho văn bản nhiều dòng và kiểm thử hồi quy của toolkit | IMPLEMENTED | Controls/adapter tests và compiled API PASS; consumer physical 100% PASS; 125%/Owner PENDING |
+| EXC-T04 | Pin upstream chính xác và tích hợp modal/text Security | SOURCE IMPLEMENTED; pin cuối được ghi trong evidence EXC-T05 | Consumer locked restore/build và focused native tests PASS |
+| EXC-T05 | Evidence Windows/native tập trung, quyết định Owner và bàn giao | Tests và physical-100 evidence hoàn tất | Physical 125% BLOCKED; Owner PENDING |
 
 ## EXC-T01 — Action disabled
 
@@ -42,7 +42,7 @@ Tệp: upstream `Controls/BootstrapButtonRenderLogic.cs`, các kiểm thử butt
 
 Tệp: upstream `Controls/BootstrapModalHeader.cs`, các kiểm thử typography/theme của modal theo phạm vi.
 
-- [x] Thêm kiểm thử hồi quy cho trường hợp đổi theme với typography không đổi khiến title giữ Font đã dispose. Tái hiện native/RED-GREEN vẫn NOT RUN trên Linux.
+- [x] Thêm kiểm thử hồi quy cho trường hợp đổi theme với typography không đổi khiến title giữ Font đã dispose. Linux chỉ cross-build; Windows native selection cuối PASS như evidence EXC-T05.
 - [x] Tái sử dụng typography do toolkit sở hữu khi không đổi; chỉ thay/dispose Font sở hữu khi giá trị thực sự thay đổi.
 - [ ] Kiểm chứng đổi theme lặp, đo/vẽ title, đổi typography và disposal cuối qua các helper modal hiện có.
 
@@ -59,7 +59,7 @@ Tệp: upstream `Controls/BootstrapTextBox.cs`, các kiểm thử multiline/tư�
 
 Tệp: `vendor/MyDmsVn.WinFormsKit`, `BusinessCompactAppearance.cs`, Security editor bindings/các hộp thoại quyết định và import, `SecurityUserDetailView.cs`, `SecurityPermissionCatalogView.cs`, công cụ Lab giải phóng thao tác đang giữ và các kiểm thử UI theo phạm vi.
 
-- [x] Pin commit upstream đã review `1b9c345aa2afd85e38a72d575485c3abdf559451` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); checkout consumer sạch, giữ nguyên SourceGrid lồng bên trong.
+- [x] Pin implementation ban đầu `1b9c345aa2afd85e38a72d575485c3abdf559451`, sau native fixture/evidence cập nhật pin cuối `0167248c1d33013d18710e0c837fbc005338ec52` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); giữ nguyên SourceGrid lồng bên trong.
 - [x] Chuyển nội dung/action của hộp thoại hiện có vào body/footer public; giữ các điều kiện chặn close/session/recovery, dữ liệu bí mật và công cụ Lab giải phóng thao tác đang giữ.
 - [x] Chỉ theme các vùng nội dung public do app sở hữu và chuyển hai vùng văn bản chỉ đọc sang toolkit.
 - [x] Thêm kiểm thử hồi quy consumer tập trung trước khi đổi hành vi; giữ các kiểm thử native hiện có và cập nhật các assertion phụ thuộc native chrome được thay.
@@ -67,9 +67,9 @@ Tệp: `vendor/MyDmsVn.WinFormsKit`, `BusinessCompactAppearance.cs`, Security ed
 
 ## EXC-T05 — Nghiệm thu native và bàn giao
 
-- [ ] Discovery và chạy thực tế các lựa chọn toolkit/consumer theo phạm vi trên Windows tương tác, tuần tự, dùng các helper hữu hạn hiện có.
-- [ ] Kiểm tra các vùng bị ảnh hưởng trong Light/Dark ở 100%/125%, kích thước thông thường/tối thiểu, đổi theme khi hộp thoại mở, action disabled và multiline copy/scroll.
-- [ ] Ghi evidence đúng candidate và quyết định Owner có ngày; giữ các ngoại lệ OPEN cho đến khi evidence hỗ trợ đóng chúng.
+- [x] Discovery và chạy thực tế các lựa chọn toolkit/consumer theo phạm vi trên Windows tương tác, tuần tự, dùng các helper hữu hạn hiện có.
+- [ ] Kiểm tra các vùng bị ảnh hưởng trong Light/Dark ở 100%/125%, kích thước thông thường/tối thiểu, đổi theme khi hộp thoại mở, action disabled và multiline copy/scroll. Physical 100% PASS; 125% BLOCKED chờ đổi Display scale.
+- [ ] Ghi evidence đúng candidate và quyết định Owner có ngày; evidence kỹ thuật hiện tại đã cập nhật, nhưng Owner vẫn PENDING và ba ngoại lệ vẫn OPEN.
 - [x] Cập nhật contracts/routing hiện hành và cung cấp chính xác thay đổi upstream/consumer cùng giới hạn còn lại.
 
 ## Lệnh kiểm chứng
