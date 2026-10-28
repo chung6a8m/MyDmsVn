@@ -6,7 +6,7 @@
 **Kiến trúc:** Sửa WinFormsKit tương thích, cập nhật một gitlink chính xác, dùng nội dung modal public và các hợp đồng ứng dụng Security hiện có.
 **Công nghệ:** C#/WinForms; toolkit net48 và net8.0-windows; app net48; các helper native NUnit/xUnit hiện có.
 **Đặc tả:** [Thiết kế được chọn](../design/BUSINESS_COMPACT_EXCEPTION_CLOSURE.md).
-**Ngày chọn:** 2026-10-28. **Trạng thái:** source đã triển khai; focused Windows/native tests PASS; review Light/Dark × normal/minimum ở physical 100% PASS; physical 125% BLOCKED do chưa đổi được Display scale; Owner PENDING.
+**Ngày chọn:** 2026-10-28. **Trạng thái:** source đã triển khai; focused Windows/native tests PASS; review Light/Dark × normal/minimum ở physical 100%/125% PASS; Owner PENDING.
 
 ## Ràng buộc chung
 
@@ -24,11 +24,11 @@ Giữ assembly identities, pin SourceGrid, trách nhiệm nghiệp vụ/permissi
 
 | Công việc | Kết quả cần giao | Triển khai | Kiểm chứng / nghiệm thu |
 |---|---|---|---|
-| EXC-T01 | Palette action disabled của toolkit và kiểm thử hồi quy có ý nghĩa | IMPLEMENTED | Focused tests PASS; consumer physical 100% PASS; 125%/Owner PENDING |
-| EXC-T02 | Sửa vòng đời Font tiêu đề modal của toolkit và kiểm thử hồi quy | IMPLEMENTED | Focused tests PASS; consumer physical 100% PASS; 125%/Owner PENDING |
-| EXC-T03 | Hợp đồng public cho văn bản nhiều dòng và kiểm thử hồi quy của toolkit | IMPLEMENTED | Controls/adapter tests và compiled API PASS; consumer physical 100% PASS; 125%/Owner PENDING |
+| EXC-T01 | Palette action disabled của toolkit và kiểm thử hồi quy có ý nghĩa | IMPLEMENTED | Focused tests và consumer physical 100%/125% PASS; Owner PENDING |
+| EXC-T02 | Sửa vòng đời Font tiêu đề modal của toolkit và kiểm thử hồi quy | IMPLEMENTED | Focused tests và consumer physical 100%/125% PASS; Owner PENDING |
+| EXC-T03 | Hợp đồng public cho văn bản nhiều dòng và kiểm thử hồi quy của toolkit | IMPLEMENTED | Controls/adapter tests, compiled API và consumer physical 100%/125% PASS; Owner PENDING |
 | EXC-T04 | Pin upstream chính xác và tích hợp modal/text Security | SOURCE IMPLEMENTED; pin cuối được ghi trong evidence EXC-T05 | Consumer locked restore/build và focused native tests PASS |
-| EXC-T05 | Evidence Windows/native tập trung, quyết định Owner và bàn giao | Tests và physical-100 evidence hoàn tất | Physical 125% BLOCKED; Owner PENDING |
+| EXC-T05 | Evidence Windows/native tập trung, quyết định Owner và bàn giao | Tests và physical-100/125 evidence hoàn tất | Owner PENDING |
 
 ## EXC-T01 — Action disabled
 
@@ -36,7 +36,7 @@ Tệp: upstream `Controls/BootstrapButtonRenderLogic.cs`, các kiểm thử butt
 
 - [x] Thêm kiểm thử hồi quy cho palette/khả năng đọc và trạng thái disabled trước khi đổi production code.
 - [x] Dùng secondary surface trung tính và màu chữ bình thường với border disabled hiện có; giữ native disabled input/accessible state.
-- [ ] Kiểm chứng mặc định Light/Dark và palette app, sự khác biệt với enabled Secondary outline, và trạng thái disabled không đổi theo hover/pressed.
+- [x] Kiểm chứng mặc định Light/Dark và palette app, sự khác biệt với enabled Secondary outline, và trạng thái disabled không đổi theo hover/pressed.
 
 ## EXC-T02 — Vòng đời modal
 
@@ -44,7 +44,7 @@ Tệp: upstream `Controls/BootstrapModalHeader.cs`, các kiểm thử typography
 
 - [x] Thêm kiểm thử hồi quy cho trường hợp đổi theme với typography không đổi khiến title giữ Font đã dispose. Linux chỉ cross-build; Windows native selection cuối PASS như evidence EXC-T05.
 - [x] Tái sử dụng typography do toolkit sở hữu khi không đổi; chỉ thay/dispose Font sở hữu khi giá trị thực sự thay đổi.
-- [ ] Kiểm chứng đổi theme lặp, đo/vẽ title, đổi typography và disposal cuối qua các helper modal hiện có.
+- [x] Kiểm chứng đổi theme lặp, đo/vẽ title, đổi typography và disposal cuối qua các helper modal hiện có.
 
 ## EXC-T03 — Văn bản nhiều dòng
 
@@ -53,13 +53,13 @@ Tệp: upstream `Controls/BootstrapTextBox.cs`, các kiểm thử multiline/tư�
 - [x] Thêm kiểm thử cho layout theo chiều dọc, chế độ wrap/scroll, chọn/sao chép khi chỉ đọc và hình học single-line không đổi.
 - [x] Thêm các property chuyển tiếp native có tài liệu, giữ mặc định tương thích và chỉ đổi layout khi multiline.
 - [x] Giữ cùng đối tượng native editor; chuyển metadata accessibility public đến EDIT đang focus.
-- [ ] Kiểm chứng TextBox, accessory/validation hiện có và các adapter owner bị ảnh hưởng bằng các lựa chọn đã discovery.
+- [x] Kiểm chứng TextBox, accessory/validation hiện có và các adapter owner bị ảnh hưởng bằng các lựa chọn đã discovery.
 
 ## EXC-T04 — Consumer
 
 Tệp: `vendor/MyDmsVn.WinFormsKit`, `BusinessCompactAppearance.cs`, Security editor bindings/các hộp thoại quyết định và import, `SecurityUserDetailView.cs`, `SecurityPermissionCatalogView.cs`, công cụ Lab giải phóng thao tác đang giữ và các kiểm thử UI theo phạm vi.
 
-- [x] Pin implementation ban đầu `1b9c345aa2afd85e38a72d575485c3abdf559451`, sau native fixture/evidence cập nhật pin cuối `01672482250ed1f5a1ed99f10250efa697d78638` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); giữ nguyên SourceGrid lồng bên trong.
+- [x] Pin implementation ban đầu `1b9c345aa2afd85e38a72d575485c3abdf559451`, sau native fixture/evidence cập nhật pin cuối `50369b67a17c33d458cba9fda58d1d67d2426838` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); giữ nguyên SourceGrid lồng bên trong.
 - [x] Chuyển nội dung/action của hộp thoại hiện có vào body/footer public; giữ các điều kiện chặn close/session/recovery, dữ liệu bí mật và công cụ Lab giải phóng thao tác đang giữ.
 - [x] Chỉ theme các vùng nội dung public do app sở hữu và chuyển hai vùng văn bản chỉ đọc sang toolkit.
 - [x] Thêm kiểm thử hồi quy consumer tập trung trước khi đổi hành vi; giữ các kiểm thử native hiện có và cập nhật các assertion phụ thuộc native chrome được thay.
@@ -68,7 +68,7 @@ Tệp: `vendor/MyDmsVn.WinFormsKit`, `BusinessCompactAppearance.cs`, Security ed
 ## EXC-T05 — Nghiệm thu native và bàn giao
 
 - [x] Discovery và chạy thực tế các lựa chọn toolkit/consumer theo phạm vi trên Windows tương tác, tuần tự, dùng các helper hữu hạn hiện có.
-- [ ] Kiểm tra các vùng bị ảnh hưởng trong Light/Dark ở 100%/125%, kích thước thông thường/tối thiểu, đổi theme khi hộp thoại mở, action disabled và multiline copy/scroll. Physical 100% PASS; 125% BLOCKED chờ đổi Display scale.
+- [x] Kiểm tra các vùng bị ảnh hưởng trong Light/Dark ở 100%/125%, kích thước thông thường/tối thiểu, đổi theme khi hộp thoại mở, action disabled và multiline copy/scroll. Physical 100%/125% PASS; lượt 125% dùng probe per-monitor-aware 120×120 và ghi riêng `DeviceDpi: 96` của Lab net48.
 - [ ] Ghi evidence đúng candidate và quyết định Owner có ngày; evidence kỹ thuật hiện tại đã cập nhật, nhưng Owner vẫn PENDING và ba ngoại lệ vẫn OPEN.
 - [x] Cập nhật contracts/routing hiện hành và cung cấp chính xác thay đổi upstream/consumer cùng giới hạn còn lại.
 

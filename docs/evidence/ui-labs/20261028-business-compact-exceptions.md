@@ -1,6 +1,6 @@
 # Bằng chứng candidate khắc phục các ngoại lệ Business Compact — 2026-10-28
 
-**Phạm vi được chọn:** Owner chọn [kế hoạch khắc phục ba ngoại lệ](../../plans/20261028-001-business-compact-exceptions.md) và [thiết kế](../../design/BUSINESS_COMPACT_EXCEPTION_CLOSURE.md) tương ứng: action disabled trong Dark, khung hộp thoại Security và văn bản nhiều dòng chỉ đọc. Các thay đổi source đã được triển khai trong các tree source/test của candidate ghi dưới đây. **Focused Windows/native tests PASS; review Light/Dark × normal/minimum ở physical 100% PASS; physical 125% BLOCKED chờ đổi Display scale; Owner PENDING. Cả ba ngoại lệ vẫn OPEN.**
+**Phạm vi được chọn:** Owner chọn [kế hoạch khắc phục ba ngoại lệ](../../plans/20261028-001-business-compact-exceptions.md) và [thiết kế](../../design/BUSINESS_COMPACT_EXCEPTION_CLOSURE.md) tương ứng: action disabled trong Dark, khung hộp thoại Security và văn bản nhiều dòng chỉ đọc. Các thay đổi source đã được triển khai trong các tree source/test của candidate ghi dưới đây. **Focused Windows/native tests PASS; review Light/Dark × normal/minimum ở physical 100%/125% PASS; Owner PENDING. Cả ba ngoại lệ vẫn OPEN.**
 
 Báo cáo này chỉ ghi candidate mới. [Evidence UIL gốc](20261027-business-compact-and-independent-ui-labs.md), các quyết định có ngày và phạm vi giới hạn của nó, cùng xác nhận Owner tập trung đang chờ riêng cho sửa focus `3b5f95e2d7d1414f0ffe97f47a3bdef58f33d786` được giữ nguyên. Việc chọn task này hoặc kết quả compiler của nó không phê duyệt sửa đổi trước đó và không mở lại ma trận UIL lịch sử.
 
@@ -11,14 +11,14 @@ Báo cáo này chỉ ghi candidate mới. [Evidence UIL gốc](20261027-business
 | Mục | Giá trị Windows cuối |
 |---|---|
 | App code/test revision | `f492a7f87ac3cff5d6eac91bf9430899dc48e925`; source tree `a5083a939408501cdf86e40fc6548e2b4323e5a4`, samples tree `53f7fe35de808c5c6d732791a3da753e31ae2bea`, tests tree `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
-| Toolkit final pin | `01672482250ed1f5a1ed99f10250efa697d78638`; code/test execution revision `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; source tree `d2edfe81dd4d4949889fa5cae69bc6129a8a8837`, tests tree `7dfba0532f79b3052a3039b94b64446b91f797ec` |
+| Toolkit final pin | `50369b67a17c33d458cba9fda58d1d67d2426838`; code/test execution revision `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; source tree `d2edfe81dd4d4949889fa5cae69bc6129a8a8837`, tests tree `7dfba0532f79b3052a3039b94b64446b91f797ec` |
 | Nested SourceGrid | `f4e457b43582bf01892f50bdc74aa480531e5944`; không đổi |
 | Host | Windows 11 Home Single Language 10.0.26300 x64; interactive desktop 1920×1080, work area 1920×1032 |
 | Toolchain | SDK `8.0.427`; MSBuild `17.11.69`; .NET Framework 4.8; .NET Desktop Runtime 8.0.32/8.0.33 |
 | Build | Toolkit `Debug` all-scope PASS cả hai TFM, 0 warning/error, 12,61 giây. App `MyDmsVn.UiLab.sln` locked restore/build `Debug`, `net48`, x86 PASS, 0 warning/error |
 | Executable review | `samples/MyDmsVn.Desktop.UiLab.Security/bin/Debug/net48/MyDmsVn.Desktop.UiLab.Security.exe` từ worktree candidate; SQL-free Security Lab |
 | Physical 100% | Registry monitor setting tương ứng `DpiValue=-1`, `AppliedDPI=96`; Lab `DeviceDpi=96`; không dùng expected-scale hoặc resize ảnh làm DPI evidence |
-| Physical 125% | **BLOCKED** — Windows Settings trong phiên không xuất accessibility surface điều khiển được; không dùng registry hack vì đó không phải physical-DPI proof |
+| Physical 125% | **PASS** — Windows Display scale 125%; registry monitor `DpiValue=0`; thread `PER_MONITOR_AWARE_V2` gọi `GetDpiForMonitor` trả 120×120, `HRESULT=0`; logical work area 1536×816 trên desktop 1920×1080. Lab net48 báo `DeviceDpi=96`, được ghi riêng và không dùng làm physical-scale proof |
 
 ### Focused tests và lỗi đã xử lý
 
@@ -56,7 +56,21 @@ Kích thước normal dùng content 952×657 trong host 1200×760; minimum dùng
 - [physical 100% Dark / normal / Catalog long read-only](screenshots/20261028-exc-t05/physical100-dark-normal-catalog-long-readonly.png)
 - [physical 100% Light / minimum / Catalog](screenshots/20261028-exc-t05/physical100-light-minimum-catalog.png)
 
-Physical 125% Light/Dark × normal/minimum vẫn phải chạy sau khi Display scale thực sự là 125% và probe per-monitor-aware độc lập xác nhận effective DPI 120×120/125%. Khởi động lại Lab và ghi `DeviceDpi` riêng; theo runbook, net48 host có thể vẫn báo 96 nên giá trị đó không thay physical-scale probe. Không chuyển kết quả automated DPI hoặc 100% thành PASS cho hàng này.
+### Review physical 125%
+
+Display scale thực sự là 125% được xác nhận trước và sau review bằng process độc lập đặt thread `PER_MONITOR_AWARE_V2`: `GetDpiForMonitor=120×120`, `HRESULT=0`; logical work area là 1536×816 trên desktop 1920×1080. UI Lab net48 vẫn báo `DeviceDpi=96`; đây là giá trị host được ghi riêng, không phủ định probe physical scale và không bị thay bằng DPI giả lập.
+
+| Ngoại lệ | Light normal/minimum | Dark normal/minimum | Kết quả thao tác native ở physical 125% |
+|---|---|---|---|
+| Action disabled | PASS | PASS | Protected account giữ Edit/Reset/State neutral-disabled, khác Create Secondary outline enabled; UIA tiếp tục báo disabled và không có dialog/dispatch |
+| Toolkit modal | PASS | PASS | Password modal Light normal và Dark minimum giữ title, initial focus, backdrop, footer và validation surface trong work area; native tests vẫn sở hữu theme-switch/keyboard/pending-close/secret-cleanup semantics |
+| Multiline read-only | PASS | PASS | Catalog long detail wrap và scroll đúng ở normal/minimum; key dài, mô tả tiếng Việt và nút copy còn truy cập được; không có clipping sai ngoài truncation/scroll có chủ ý |
+
+Ảnh 125% đã rà soát, chỉ chứa dữ liệu giả của Lab:
+
+- [physical 125% Dark / normal / protected disabled actions](screenshots/20261028-exc-t05/physical125-dark-normal-protected-disabled.png)
+- [physical 125% Light / minimum / Catalog long read-only](screenshots/20261028-exc-t05/physical125-light-minimum-catalog.png)
+- [physical 125% Dark / minimum / password modal](screenshots/20261028-exc-t05/physical125-dark-minimum-password-modal.png)
 
 ## Định danh candidate và môi trường
 
@@ -69,12 +83,12 @@ Physical 125% Light/Dark × normal/minimum vẫn phải chạy sau khi Display s
 | Tree `tests` của app | `bbb6f3d5af953d6ee9db3a27ef4889fa3b32f55c` |
 | Gitlink toolkit trước sửa | `c232a4c09dc0386a5bd8bb484a5c991acae827d5` |
 | Baseline toolkit upstream | `efe2e7212fd36e32c91b914bdc5e4081947124fc`; cùng tree với pin consumer trước sửa |
-| Candidate/pin toolkit cuối | `01672482250ed1f5a1ed99f10250efa697d78638` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); code/test revision native `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; consumer checkout sạch. Locked restore/build/native tests theo source/test trees chính xác PASS |
+| Candidate/pin toolkit cuối | `50369b67a17c33d458cba9fda58d1d67d2426838` theo [PR #2](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/2); code/test revision native `a71d64bd82eb40123eafef4c5a6832e53d7ef9ca`; consumer checkout sạch. Commit cuối chỉ cập nhật evidence physical 125%; source/test trees chính xác không đổi và native results tiếp tục áp dụng |
 | SourceGrid lồng bên trong | `f4e457b43582bf01892f50bdc74aa480531e5944`; không đổi |
 | Host/toolchain | Checkpoint native: Windows 11 10.0.26300 x64, SDK `8.0.427`, MSBuild `17.11.69`, .NET Framework 4.8 và Desktop Runtime 8.0.32/8.0.33. Linux cross-build lịch sử được giữ riêng bên dưới |
 | Target sản phẩm/test | `net48`, Debug, x86 cho app/consumer; toolkit `net48` và `net8.0-windows` |
 | Điều kiện cache | Cache không được xóa; build cuối dùng restored assets và warm cache. Không có clean-restore claim |
-| Screenshot/quan sát native mới | Physical 100%/DeviceDpi 96 PASS; hai ảnh selected ở `screenshots/20261028-exc-t05/`; physical 125% BLOCKED |
+| Screenshot/quan sát native mới | Physical 100%/DeviceDpi 96 PASS; physical 125% với probe 120×120 và Lab `DeviceDpi=96` PASS; năm ảnh selected ở `screenshots/20261028-exc-t05/` |
 
 Candidate app được định danh bằng commit chứa report này, ba tree source/samples/tests ở trên và pin toolkit chính xác. Kết quả build cuối bên dưới dùng đúng pin và các tree đó. Các lần restore/compile trước đó được giữ riêng để phân biệt lỗi đã sửa, build trên bản mirror source và build cuối theo gitlink.
 
@@ -82,9 +96,9 @@ Candidate app được định danh bằng commit chứa report này, ba tree so
 
 | Ngoại lệ | Thay đổi source của candidate | Trạng thái hiện tại |
 |---|---|---|
-| Action disabled trong Dark | Palette disabled của toolkit dùng secondary surface và màu chữ bình thường, giữ hành vi/border disabled; fixture UI tập trung có assertion và kiểm thử vẽ bằng palette Business Compact Light/Dark thực tế | **OPEN** — tests và physical-100 appearance/inertness PASS; physical 125% và Owner PENDING |
-| Khung hộp thoại Security native | Các hộp thoại tài khoản/password/ghi dữ liệu, quyết định và review import không dùng SQL hiện có được bố trí qua `BootstrapModal.BodyPanel`/`FooterPanel` public; bộ duyệt theme của app và công cụ Lab giải phóng mutation đang giữ đi qua các vùng public đó; vòng đời Font tiêu đề của toolkit được sửa | **OPEN** — focused lifecycle/keyboard/cleanup tests và physical-100 appearance PASS; physical 125% và Owner PENDING |
-| Văn bản nhiều dòng chỉ đọc native | `SecurityUserDetailView.Explanation` và `SecurityPermissionCatalogView.Details` dùng hợp đồng multiline/wrap/scrollbar bổ sung của `BootstrapTextBox`, giữ văn bản, chiều cao và accessible name hiện có | **OPEN** — controls/adapter/consumer tests và physical-100 native selection/copy/scroll/accessibility PASS; physical 125% và Owner PENDING |
+| Action disabled trong Dark | Palette disabled của toolkit dùng secondary surface và màu chữ bình thường, giữ hành vi/border disabled; fixture UI tập trung có assertion và kiểm thử vẽ bằng palette Business Compact Light/Dark thực tế | **OPEN** — tests và physical-100/125 appearance/inertness PASS; Owner PENDING |
+| Khung hộp thoại Security native | Các hộp thoại tài khoản/password/ghi dữ liệu, quyết định và review import không dùng SQL hiện có được bố trí qua `BootstrapModal.BodyPanel`/`FooterPanel` public; bộ duyệt theme của app và công cụ Lab giải phóng mutation đang giữ đi qua các vùng public đó; vòng đời Font tiêu đề của toolkit được sửa | **OPEN** — focused lifecycle/keyboard/cleanup tests và physical-100/125 appearance PASS; Owner PENDING |
+| Văn bản nhiều dòng chỉ đọc native | `SecurityUserDetailView.Explanation` và `SecurityPermissionCatalogView.Details` dùng hợp đồng multiline/wrap/scrollbar bổ sung của `BootstrapTextBox`, giữ văn bản, chiều cao và accessible name hiện có | **OPEN** — controls/adapter/consumer tests và physical-100/125 native selection/copy/scroll/accessibility PASS; Owner PENDING |
 
 Mã nguồn app liên quan: [BusinessCompactAppearance](../../../src/MyDmsVn.Desktop.WinForms/BusinessCompactAppearance.cs), [SecurityWorkspaceEditorBindings](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceEditorBindings.cs), [SecurityDecisionDialog](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityDecisionDialog.cs), [SecurityImportReviewDialog](../../../samples/MyDmsVn.Desktop.UiLab/SecurityImportReviewDialog.cs), [SecurityLabForm](../../../samples/MyDmsVn.Desktop.UiLab/Security/SecurityLabForm.cs), [SecurityUserDetailView](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityUserDetailView.cs) và [SecurityPermissionCatalogView](../../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityPermissionCatalogView.cs).
 
@@ -99,10 +113,10 @@ Fixture mới trong source là [SecurityToolkitExceptionTests](../../../tests/My
 | Locked restore app với overlay Linux tạm thời | **PASS**, không đổi project/lockfile được quản lý trong Git | Kết quả chuẩn bị; chưa phải app compilation hoặc native execution |
 | Lần compile app đầu tiên sau restore | **FAILED: 2 lỗi CS0103** trong fixture mới do tham chiếu helper từ `MyDmsVn.Desktop.Tests` nhưng thiếu namespace import; đã bổ sung import | Lượt này không báo lỗi compiler của production code; kết quả compile thất bại được giữ trong report |
 | Cross-build app `MyDmsVn.UiLab.sln` Debug net48/x86 sau khi sửa import của test | **PASS — 0 cảnh báo, 0 lỗi; 10.64 giây** | Bản mirror cục bộ của đúng production source upstream; đây là lượt trước khi pin gitlink cuối |
-| Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; pin final docs/test-fixture-only là `01672482250ed1f5a1ed99f10250efa697d78638`; không đổi project/lockfile |
-| Build app cuối `MyDmsVn.UiLab.sln` Debug net48/x86 theo pin chính xác, gồm Theory palette thực tế | **PASS — 0 cảnh báo, 0 lỗi; 11.65 giây** | Dùng đúng pin và tree source/samples/tests ghi ở trên; không chạy native tests |
+| Locked restore app theo pin implementation | **PASS**, dùng cùng lệnh overlay đã ghi | Consumer checkout sạch tại `1b9c345aa2afd85e38a72d575485c3abdf559451`; pin final evidence-only `50369b67a17c33d458cba9fda58d1d67d2426838` không đổi source/test/project/lockfile; không claim thêm một lượt restore cho commit Markdown-only |
+| Build app cuối `MyDmsVn.UiLab.sln` Debug net48/x86 theo source/test pin chính xác, gồm Theory palette thực tế | **PASS — 0 cảnh báo, 0 lỗi; 11.65 giây** | Dùng đúng source/test trees ghi ở trên; final pin chỉ đổi evidence nên không chạy lại build hoặc native tests |
 | Toolkit CI Release trên `windows-2022`, cả hai TFM | **PASS — build-only** tại [run 40710094747](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40710094747) | `head_sha` đúng `1b9c345aa2afd85e38a72d575485c3abdf559451`; không chạy native tests |
-| Toolkit CI final evidence pin | **PASS — build-only** tại [run 40721595107](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40721595107) | `head_sha` đúng `01672482250ed1f5a1ed99f10250efa697d78638`; focused native tests vẫn là evidence local Windows ở checkpoint, không phải CI claim |
+| Toolkit CI pre-physical evidence pin | **PASS — build-only** tại [run 40721595107](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/actions/runs/40721595107) | `head_sha` đúng `01672482250ed1f5a1ed99f10250efa697d78638`; final `50369b6` chỉ đổi Markdown evidence, không có CI claim mới; focused native tests vẫn là evidence local Windows ở checkpoint |
 | Windows discovery/execution | **PASS** | Toolkit controls 75/75/TFM, adapters 40/40/TFM; consumer 163/163 net48/x86; 0 fail/skip; TRX local ignored |
 | Owner review native tập trung | **PENDING** | Việc người dùng cho phép triển khai không phải phê duyệt native của candidate |
 
@@ -141,13 +155,13 @@ Toolkit `.github/workflows/build.yml` định nghĩa workflow chỉ build trên 
 
 Theo [TEST_POLICY](../../TEST_POLICY.md), [tests/README](../../../tests/README.md) và [UI Lab runbook](../../development/UI_LAB.md), discovery/execution focused đã hoàn tất tuần tự với STA/finite pumping/cleanup như checkpoint. Toolkit đã bao phủ cả hai target và adapter consumer bị ảnh hưởng.
 
-Physical 100% Light/Dark × normal/minimum đã PASS. Phần còn lại là dùng probe per-monitor-aware xác nhận physical 125%/effective DPI 120×120, chạy lại ma trận và ghi `DeviceDpi` của Lab riêng (có thể vẫn là 96), cập nhật ảnh/evidence nếu đạt và xin quyết định Owner trên đúng candidate. Không chạy lại SQL/Login/package/release.
+Physical 100%/125% Light/Dark × normal/minimum đã PASS. Lượt 125% dùng probe per-monitor-aware xác nhận effective DPI 120×120 và ghi riêng `DeviceDpi=96` của Lab net48. Phần còn lại là xin quyết định Owner trên đúng candidate. Không chạy lại SQL/Login/package/release.
 
 ## Các mục kiểm chứng còn cần hoàn tất
 
 - **RECORDED:** API test gate, compiled public API delta/fingerprint, pin chính xác, build và focused Windows discovery/execution totals.
-- **RECORDED:** physical-100 native observations và selected screenshots.
-- **PENDING:** physical-125 observations và quyết định Owner tập trung rõ ràng cho candidate này.
+- **RECORDED:** physical-100/125 native observations, independent DPI probe và selected screenshots.
+- **PENDING:** quyết định Owner tập trung rõ ràng cho candidate này.
 
 ## Mục review riêng — source focus correction `3b5f95e2`
 
