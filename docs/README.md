@@ -1,6 +1,8 @@
 # Documentation index — main
 
-**Updated:** 2026-10-28. The [execution index](plans/README.md) selects the completed-bounded [Business Compact conformance and independent UI Labs](plans/20261027-001-business-compact-and-independent-ui-labs.md) roadmap. Separate Sales/Security launchers, bounded pilot/final Owner decisions and physical-100/125 product-host parity are recorded in the [current candidate evidence](evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md). No further task, SQL, actual Login, package or release acceptance is selected. The [2026-10-27 archive](archive/20261027-main-roadmap-reset/README.md) preserves the previous Sidebar and Security execution queues; archived tests and approvals remain tied to their original candidates.
+**Updated:** 2026-10-28. The [execution index](plans/README.md) selects **no next implementation roadmap**. The completed-bounded [Business Compact and independent UI Labs plan](archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) is frozen in the [2026-10-28 archive](archive/20261028-business-compact-and-independent-ui-labs/README.md), inspected at [`main@57a45491`](https://github.com/chung6a8m/MyDmsVn/commit/57a45491d97b2efb15e79b1140b52e876641167d). Separate Sales/Security launchers, bounded pilot/final Owner decisions and physical-100/125 product-host parity remain tied to their original [candidate evidence](evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md). The [2026-10-27 archive](archive/20261027-main-roadmap-reset/README.md) preserves the earlier Sidebar and Security execution queues.
+
+The [source focus correction](evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#2026-10-28-review-findings-follow-up) remains **PENDING focused Owner confirmation** after implementation and focused verification. The later [Issue #59](evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#issue-59--native-close-observer-cleanup) and [Issue #60](evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#issue-60--lab-close-journal-ownership-assertion) test/evidence corrections are complete. Their closures and archival do not grant native, SQL, actual Login, package or release acceptance.
 
 ## Current work and Codex entry points
 
@@ -8,7 +10,8 @@
 |---|---|
 | [AGENTS.md](../AGENTS.md) | Current repository rules, safety and scope-selection discipline |
 | [AI_CONTEXT.md](../AI_CONTEXT.md) | Current source context, candidate evidence distinctions and acceptance limits |
-| [Execution index](plans/README.md) · [active UIL roadmap](plans/20261027-001-business-compact-and-independent-ui-labs.md) | Single plan selector and sole task/status owner for the selected workstream |
+| [Execution index](plans/README.md) | Sole selector for explicitly authorized work; no next implementation roadmap selected |
+| [Archived UIL plan](archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) | Historical task/status owner for completed-bounded UIL-T00–UIL-T08 |
 | [Development-plan alias](DEVELOPMENT_PLAN.md) | Stable compatibility entry point to that index |
 | [Test policy](TEST_POLICY.md) | Sole source-owned execution policy |
 | [Test strategy](TEST_STRATEGY.md) · [test commands](../tests/README.md) | Coverage and direct scoped test commands |
@@ -18,7 +21,7 @@
 | [Security UI specification](design/SECURITY_ADMINISTRATION_UI.md) · [Security Lab review](development/SECURITY_UI_LAB_REVIEW.md) | Implemented UI contracts and repeatable review exercises, not active task checklists |
 | [Architecture](ARCHITECTURE.md) · [ADRs](adr/README.md) | Current principles, decisions and historical source distinctions |
 
-The current UIL evidence records bounded Security pilot/final approval, focused native-focus confirmation and SQL-free product-shell parity on runtime/test candidate `8ec1ff71ef0a6a7cf4befa88bbd7bed2616827a0`; it does not prove actual Login, Local/Server authorization, SQL transactions, package acceptance, release or deployment. Separately, the Owner-approved historical Security SQL-free candidate gate SEC-T05 was followed by bounded SEC-T06–SEC-T08 Local/SQL work. [Plan in archive](archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md), [Lab evidence](evidence/security/20261025-security-ui-lab.md) and [Local/SQL evidence](evidence/security/20261025-security-local-sql.md) retain remaining incomplete attended/native and release limits. Sidebar's [bounded evidence](evidence/sidebar/20261025-sidebar-horizontal-scrollbar.md) does not imply production-package acceptance.
+Historical UIL evidence records bounded Security pilot/final approval, focused native-focus confirmation for `fcdf235` and SQL-free product-shell parity on runtime/test candidate `8ec1ff71ef0a6a7cf4befa88bbd7bed2616827a0`; it does not prove actual Login, Local/Server authorization, SQL transactions, package acceptance, release or deployment. Separately, the Owner-approved historical Security SQL-free candidate gate SEC-T05 was followed by bounded SEC-T06–SEC-T08 Local/SQL work. [Plan in archive](archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md), [Lab evidence](evidence/security/20261025-security-ui-lab.md) and [Local/SQL evidence](evidence/security/20261025-security-local-sql.md) retain remaining incomplete attended/native and release limits. Sidebar's [bounded evidence](evidence/sidebar/20261025-sidebar-horizontal-scrollbar.md) does not imply production-package acceptance.
 
 ## Product and implementation references
 
@@ -27,6 +30,8 @@ The current UIL evidence records bounded Security pilot/final approval, focused 
 The implemented Sales rules remain in [business design](DIRECT_SALES.md), [costing](DIRECT_SALES_COSTING.md), [query/UI](DIRECT_SALES_QUERY_AND_UI.md) and [ADR 0011](adr/0011-direct-sales-and-moving-average-costing.md). The current [Business Compact policy](design/BUSINESS_COMPACT.md) carries the durable visual/control contract; BCF's [design](BUSINESS_COMPACT_REFINEMENT.md) and [unchanged reference images](design-references/business-compact/README.md) retain original composition and input references. These references do not create an alternate execution queue.
 
 ## Archived plans and evidence
+
+[2026-10-28 Business Compact and independent UI Labs archive](archive/20261028-business-compact-and-independent-ui-labs/README.md) · [Frozen UIL selector](archive/20261028-business-compact-and-independent-ui-labs/plans/README.md)
 
 [2026-10-27 main archive: Sidebar and Security](archive/20261027-main-roadmap-reset/README.md) · [Retired plan index](archive/20261027-main-roadmap-reset/plans/README.md)
 

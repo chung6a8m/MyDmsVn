@@ -1,14 +1,18 @@
 # Execution-plan index
 
-**Updated:** 2026-10-28 · **Original source baseline:** [`main@8de4451573e8`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9) · **Runtime/test handoff:** `8ec1ff71ef0a6a7cf4befa88bbd7bed2616827a0` · **Status:** SELECTED ROADMAP COMPLETE WITHIN BOUNDED SCOPE
+**Updated:** 2026-10-28 · **Inspected archive source:** [`main@57a45491d97b2efb15e79b1140b52e876641167d`](https://github.com/chung6a8m/MyDmsVn/commit/57a45491d97b2efb15e79b1140b52e876641167d) · **Status:** NO NEXT IMPLEMENTATION ROADMAP SELECTED
 
 ## Current plan
 
-**Selected:** [Business Compact conformance and independent UI Labs](20261027-001-business-compact-and-independent-ui-labs.md). The Owner approved this direction and requested the documentation PR/activation. That plan is the sole task/status owner for UIL-T00–UIL-T08: control inventory and repository UI workflow, shared product/Lab presentation, independent Sales/Security launchers, SEC native pilot and approval, remaining SEC conformance, final approval, focused product-host/shared regression and handoff.
+**No next implementation roadmap is selected.** The [Business Compact and independent UI Labs plan](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) is archived with UIL-T00–UIL-T08 complete within their recorded bounded scopes. Its dated UIL-T04/T06 approvals, UIL-T07 product-host parity and UIL-T08 handoff remain tied to their exact candidates and exceptions; the historical runtime/test handoff is `8ec1ff71ef0a6a7cf4befa88bbd7bed2616827a0`.
 
-UIL-T00–UIL-T08 are complete within the roadmap's recorded bounded scope. UIL-T04 and UIL-T06 have dated Owner decisions; UIL-T07 records SQL-free physical-100/125 product-host parity, the session/sidebar correction and focused shared/Sales regression. No further task, SQL, actual Login, package or release acceptance is selected. The durable [Business Compact policy](../design/BUSINESS_COMPACT.md) and [Lab specification](../design/INDEPENDENT_UI_LABS.md) own the selected contracts; they do not duplicate task status. Sidebar PR #50 and Security PR #51 remain archived with their original bounded evidence. Neither OPEN historical acceptance nor an archived handoff is an implicit additional task.
+**Retained decision — focused Owner confirmation is PENDING.** The separately selected [2026-10-28 source focus correction](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#2026-10-28-review-findings-follow-up) at `3b5f95e2d7d1414f0ffe97f47a3bdef58f33d786`, retained in the inspected HEAD, is implemented and focused-verification complete. Archival preserves this outstanding decision; it does not approve the correction or reopen the full UIL native matrix.
 
-Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the selected dated plan and its design references → [TEST_POLICY](../TEST_POLICY.md). Current [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md), [TEST_STRATEGY](../TEST_STRATEGY.md) and [tests/README](../../tests/README.md) remain valid references.
+The later test-only corrections for [Issue #59](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#issue-59--native-close-observer-cleanup) at `bc2a2f1b5f3361782b6fd6b77d07a323008e01bf` and [Issue #60](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#issue-60--lab-close-journal-ownership-assertion) at `57a45491d97b2efb15e79b1140b52e876641167d` are complete within their recorded implementation and focused-verification scopes. Issue #59 was closed as `completed` on explicit Owner direction; that tracking action and the test-only results do not grant native approval or resolve the pending source-correction confirmation.
+
+The [archive boundary](../archive/20261028-business-compact-and-independent-ui-labs/README.md) preserves these distinctions. The durable [Business Compact policy](../design/BUSINESS_COMPACT.md) and [Lab specification](../design/INDEPENDENT_UI_LABS.md) remain current contracts. Archived tasks, open acceptance and completed handoffs do not select additional implementation, SQL, actual Login, package, release or deployment work.
+
+Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this index → the explicitly authorized scope and selected dated plan when present → [TEST_POLICY](../TEST_POLICY.md). Current [Architecture](../ARCHITECTURE.md), [ADRs](../adr/README.md), [TEST_STRATEGY](../TEST_STRATEGY.md) and [tests/README](../../tests/README.md) remain valid references.
 
 ## New-roadmap activation policy
 
@@ -21,6 +25,7 @@ Use [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → this ind
 
 | Boundary | Records and limitations |
 |---|---|
+| [2026-10-28 Business Compact and independent UI Labs](../archive/20261028-business-compact-and-independent-ui-labs/README.md) | Completed bounded UIL-T00–UIL-T08; separate source focus correction confirmation **PENDING**; Issue #59/#60 test-only corrections complete within their recorded scopes. |
 | [2026-10-27 main reset](../archive/20261027-main-roadmap-reset/README.md) | [Sidebar plan](../archive/20261027-main-roadmap-reset/plans/20261025-001-sidebar-navigation-horizontal-scrollbar.md) (hosted-shell only) and [Security plan](../archive/20261027-main-roadmap-reset/plans/20261025-002-security-administration-ui-lab-first.md) (Owner-approved SEC-T05 plus bounded Local/SQL; incomplete SEC-T04/attended acceptance). |
 | [2026-10-25 archive](../archive/20261025-pre-next-roadmap/README.md) | UI-NEXT and A0/A1, retained A3 consumer and candidate-specific limitations |
 | [UI-NEXT historical index](../ui-next/README.md) | DateInput and T13 candidate failures, corrections and bounded results |

@@ -1,6 +1,6 @@
 # Independent Sales and Security UI Labs
 
-**Status:** implemented and handed off within the bounded scope recorded by the [Business Compact and independent UI Labs roadmap](../plans/20261027-001-business-compact-and-independent-ui-labs.md). The roadmap remains the sole task/status owner; its candidate evidence records dated native decisions, physical-100/125 product-host parity and remaining limits.
+**Status:** implemented and handed off within the bounded scope recorded by the [archived Business Compact and independent UI Labs roadmap](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md). The roadmap retains historical task state; its candidate evidence records dated native decisions, physical-100/125 product-host parity and remaining limits. The [execution index](../plans/README.md) selects no next implementation roadmap. This specification remains the durable host and lifecycle contract.
 
 **Inspected baseline:** [`main@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9). This design complements the durable [Business Compact policy](BUSINESS_COMPACT.md), [Security UI specification](SECURITY_ADMINISTRATION_UI.md), [current Lab runbook](../development/UI_LAB.md) and [Security review guide](../development/SECURITY_UI_LAB_REVIEW.md).
 
@@ -12,7 +12,7 @@ Each Lab must reproduce the product's presentation environment: the same theme c
 
 **Chosen scope:** two executable launchers in the existing repository and `MyDmsVn.UiLab.sln`, shared neutral host infrastructure, and independently owned module presentation/runtime graphs. Keep the production WinForms assembly, scenario assembly and UI test assembly shared initially. This provides independent launch and use; it does not promise independent compilation of all SAL and SEC source.
 
-No new generic UI framework, toolkit copy, business API, permission rule, SQL contract or legacy Security factory cutover is selected. The production factory already uses `SecurityWorkspaceControl`; the roadmap improves the presentation of that existing component and verifies its composition in the product host.
+No new generic UI framework, toolkit copy, business API, permission rule, SQL contract or legacy Security factory cutover is selected. The production factory already uses `SecurityWorkspaceControl`; the completed roadmap improved the presentation of that existing component and verified its composition in the product host.
 
 ## 2. Original observed source and implemented changes
 
@@ -131,7 +131,7 @@ Use the sole [TEST_POLICY](../TEST_POLICY.md), [TEST_STRATEGY](../TEST_STRATEGY.
 
 ## 7. Implementation sequence and launch instructions
 
-The roadmap owns dependency order and task state. Its completed sequence is: component/skill preparation (`UIL-T00`), shared appearance bootstrap (`UIL-T01`), independent launchers (`UIL-T02`), native Security pilot (`UIL-T03`) and Owner pilot approval (`UIL-T04`), complete Security presentation (`UIL-T05`), final native approval (`UIL-T06`), SQL-free product-host parity plus affected Sales regression (`UIL-T07`), then handoff (`UIL-T08`).
+The archived roadmap records dependency order and historical task state. Its completed sequence is: component/skill preparation (`UIL-T00`), shared appearance bootstrap (`UIL-T01`), independent launchers (`UIL-T02`), native Security pilot (`UIL-T03`) and Owner pilot approval (`UIL-T04`), complete Security presentation (`UIL-T05`), final native approval (`UIL-T06`), SQL-free product-host parity plus affected Sales regression (`UIL-T07`), then handoff (`UIL-T08`).
 
 `UIL-T02` changed project types/references, solution entries, launcher programs, module forms, scenario source ownership and relevant tests together. It retired the mixed module selector from active startup/test paths and removed obsolete mixed-host code.
 
@@ -163,6 +163,6 @@ Read each successful build's actual executable path and bitness; do not assume a
 | Completed Security candidate | Reviewed Users, Roles, Catalog and affected dialogs/states, remaining defects explicitly recorded, and separate dated Owner approval before the selected product-host integration check. |
 | Handoff | Updated executable/run/test guidance, current project/API names, focused results, evidence limits and no claim of SQL/Login/package/release acceptance. |
 
-Documentation approval selects this design and its roadmap. It does not approve native visuals. Historical SEC-T05 approval remains valid only for its recorded candidate and scope; it does not approve this later Business Compact revision. Mockup SVGs, isolated control screenshots and stretched captures cannot establish product-context parity.
+The original documentation approval selected this design and its roadmap. It did not approve native visuals. Historical SEC-T05 approval remains valid only for its recorded candidate and scope; it does not approve this later Business Compact revision. Mockup SVGs, isolated control screenshots and stretched captures cannot establish product-context parity.
 
-The Security review guide supplies repeatable exercises and evidence fields. The active plan records current gate state; this specification remains the durable architecture/acceptance contract rather than a second task ledger. If a later task identifies a genuine service, SQL or toolkit API gap, record it and select the needed scope explicitly instead of expanding this presentation roadmap silently.
+The Security review guide supplies repeatable exercises and evidence fields. The archived plan preserves UIL gate decisions; any new task and gate state follow the [execution index](../plans/README.md). This specification remains the durable architecture/acceptance contract rather than a second task ledger. If a later task identifies a genuine service, SQL or toolkit API gap, record it and select the needed scope explicitly instead of reopening the archived presentation roadmap implicitly.
