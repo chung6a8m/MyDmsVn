@@ -1,6 +1,6 @@
 # WinFormsKit input/popup consumer acceptance — candidate 2026-10-29
 
-**Scope:** [selected consumer plan](../../plans/20261029-001-input-popup-consumer-acceptance.md) on MyDmsVn. Toolkit Owner approved the canonical 100%/125% Light/Dark visual set on [WinFormsKit PR #3](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/3). This report records a separate app candidate. **Automated consumer gates and inspected UI Lab host surfaces PASS; the Owner has not yet decided the product-host visual acceptance presented here.**
+**Scope:** [selected consumer plan](../../plans/20261029-001-input-popup-consumer-acceptance.md) on MyDmsVn. Toolkit Owner approved the canonical 100%/125% Light/Dark visual set on [WinFormsKit PR #3](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/pull/3). This report records a separate app candidate. **Automated consumer gates and inspected UI Lab host surfaces PASS. On 2026-10-29 the Owner replied “Consumer acceptance: Tôi approve.” for the presented app candidate `003db0a` and its comparison board; consumer acceptance is APPROVED/CLOSED within this selected scope.**
 
 ## Candidate and boundaries
 
@@ -63,8 +63,8 @@ The interactive Security catalog showed TextBox/ComboBox aligned, Refresh reacha
 
 The local comparison board is `artifacts/verification/20261029-input-popup-consumer/index.html` (served during review at `http://127.0.0.1:8766/index.html`). Its 14 JPG captures and local raw TRX are ignored and are not part of the Git candidate. The board presents Security catalog and Sales Customer Lookup at 100%/125% × Light/Dark, plus selected native ComboBox popup frames. Captures contain only SQL-free Lab fixtures.
 
-## Decision and remaining gates
+## Owner decision and remaining boundaries
 
 - **PASS for this candidate:** exact toolkit pin and SourceGrid provenance, locked restore/build, focused native/geometry/product-host tests at 100% and 125%, x86 net48 repeat at 100%, interactive SQL-free Lab observation and review board preparation.
-- **PENDING Owner product-host visual decision:** the prior Owner APPROVED statement applies to the WinFormsKit canonical visual board, not these MyDmsVn Security/Sales images. Keep consumer acceptance overall **PENDING** until the Owner reviews this app board. An explicit decision should reference app candidate `95916e3` and toolkit pin `433e5b5`.
+- **APPROVED/CLOSED for this selected consumer scope, 2026-10-29:** after review of the app board, the Owner replied **“Consumer acceptance: Tôi approve.”** The decision applies to app evidence candidate `003db0aaf2cc06e5ec1c126b5dc5e04d89870e48` (code/test/pin `95916e33650648ef9753223605b5e679d6944d2a`) with exact WinFormsKit pin `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`. This documentation update records that decision without changing the reviewed source, tests or gitlink.
 - **Outside this selected scope:** actual Login/SQL, package/release, physical 150%/200%, complete Security scenario matrix, Sales attended business acceptance and toolkit pairwise matrix. None is inferred as PASS from this consumer check.

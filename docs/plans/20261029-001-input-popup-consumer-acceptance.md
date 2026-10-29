@@ -18,3 +18,5 @@
 ## Acceptance boundary
 
 This consumer scope needs an exact pin/build, nonempty focused GUI tests, physical 100%/125% host observations and an honest report. The Owner's toolkit visual approval does not by itself approve the product host. If a product visual decision is needed, present its exact candidate and evidence to the Owner. SQL, actual Login, package/release, physical 150%/200% and the toolkit pairwise matrix remain separate scopes.
+
+**Outcome, 2026-10-29:** The [candidate evidence](../evidence/ui-labs/20261029-input-popup-consumer-acceptance.md) records code/test/pin `95916e3`, app evidence candidate `003db0a`, toolkit pin `433e5b5`, focused Windows/native and physical 100%/125% results, and the local comparison board. The Owner replied “Consumer acceptance: Tôi approve.” for this presented app candidate. This plan is complete within the scope above; its listed external gates remain separate.
