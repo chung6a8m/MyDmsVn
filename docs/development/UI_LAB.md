@@ -4,7 +4,7 @@ The UI Lab is a separate net48 WinForms development host for the existing `Sales
 
 ## Independent Lab hosts
 
-`MyDmsVn.Desktop.UiLab.Sales` and `MyDmsVn.Desktop.UiLab.Security` open their own module directly. The shared `MyDmsVn.Desktop.UiLab` library owns neutral host lifecycle, theme and viewport; each module form owns its fixture, workspace and tools. One scenario assembly and one serialized Ui.Tests assembly remain shared. The [archived roadmap](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) preserves bounded UIL task and gate status. The [execution index](../plans/README.md) selects no next implementation roadmap.
+`MyDmsVn.Desktop.UiLab.Sales` and `MyDmsVn.Desktop.UiLab.Security` open their own module directly. The shared `MyDmsVn.Desktop.UiLab` library owns neutral host lifecycle, theme and viewport; each module form owns its fixture, workspace and tools. One scenario assembly and one serialized Ui.Tests assembly remain shared. The [archived roadmap](../archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) preserves bounded UIL task and gate status. The [execution index](../plans/README.md) selects the current composition adoption scope.
 
 Both hosts use the product Business Compact theme factory. Enter measured shell content W × H, select **Fixed viewport**, and use **Review mode (F11)** to hide tools without resizing the workspace. Diagnostics distinguish reported `DeviceDpi` from physical scale, which must be measured independently; a clipped viewport is reported explicitly. Measurements and limitations are in the [candidate evidence](../evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md). [Independent UI Labs](../design/INDEPENDENT_UI_LABS.md) defines the implemented boundaries.
 
@@ -14,6 +14,10 @@ Both hosts use the product Business Compact theme factory. Enter measured shell 
 | Minimum | 900 × 600 | 884 × 561 | 652 × 497 |
 
 These reported process-coordinate bounds were verified with independently measured physical 100% and 125% displays; the net48 hosts reported `DeviceDpi=96` in both contexts, so they are not independent physical-pixel measurements. Enter the content size, then select **Fixed viewport**. Developer chrome can clip the normal viewport; use the host scrollbar or F11 without enlarging the target content. Shared `BusinessCompactAppearance.CreateTheme` preserves the product metrics, typography and ReducedMotion setting.
+
+## Composition adoption pilot
+
+Start from [UI Composition Mapping](../design/UI_COMPOSITION_MAPPING.md), reconcile recipe source/handoff with the app runtime pin, then use `MyDmsVn.Desktop.UiLab.Security` with the production `SecurityPermissionCatalogView` and existing fake ports. [CMP-T04 in the active plan](../plans/20261030-001-business-compact-composition-adoption.md#cmp-t04--product-pilot-với-danh-mục-quyền) owns the pilot and focused test selection; [new app evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md) separates the docs checkpoint from GUI/native results. Keep the two-pane read-only catalog and Business Compact configuration. UIC-02 is a source compatibility reference for the existing user-edit dialog; it does not authorize dialog changes. A newer recipe source or toolkit verification result does not upgrade the runtime gitlink or establish app acceptance.
 
 ## Security candidate boundary
 
