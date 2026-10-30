@@ -1,6 +1,8 @@
 # UI Composition Mapping
 
-**Scope:** CMP-T03–CMP-T05 của [completed bounded plan](../plans/20261030-001-business-compact-composition-adoption.md), ngày 30/10/2026. Mapping source/API đã được xác nhận trên product catalog ở CMP-T04, không cần sửa source/runtime; [clean-context routing/handoff CMP-T05](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t05--routing-review-and-handoff) tìm đúng recipe, production view và focused test owners, không cần sửa routing. [Business Compact](BUSINESS_COMPACT.md) sở hữu theme, geometry và action hierarchy; [evidence app](../evidence/ui-labs/20261030-ui-composition-adoption.md) sở hữu checkpoint và giới hạn.
+**Active expansion:** [CEX roadmap](../plans/20261030-002-editable-lines-sal-adoption.md) and [selected design](EDITABLE_LINES_SAL_ADOPTION.md) add planned UIC-03/UIC-04 routes below. Existing UIC-01/UIC-02 mappings and historical evidence retain their scope. Recipe/runtime/app revisions remain separate.
+
+**Completed mapping scope:** CMP-T03–CMP-T05 của [completed bounded plan](../plans/20261030-001-business-compact-composition-adoption.md), ngày 30/10/2026. Mapping source/API đã được xác nhận trên product catalog ở CMP-T04, không cần sửa source/runtime; [clean-context routing/handoff CMP-T05](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t05--routing-review-and-handoff) tìm đúng recipe, production view và focused test owners, không cần sửa routing. [Business Compact](BUSINESS_COMPACT.md) sở hữu theme, geometry và action hierarchy; [evidence app](../evidence/ui-labs/20261030-ui-composition-adoption.md) sở hữu checkpoint và giới hạn.
 
 ## Source và runtime độc lập
 
@@ -35,3 +37,33 @@
 | Evidence / giới hạn | [Exception evidence](../evidence/ui-labs/20261028-business-compact-exceptions.md) giữ approval modal cũ trong phạm vi cũ. CMP-T05 đối chiếu source tại app `4c05c7598d86b45dbd1bb90c2098733394c063e8`: toolkit fields/validation + focus lỗi đầu, Save Primary/Cancel Secondary, modal/footer và owner/session/recovery guards phù hợp để tham chiếu. **NO-CHANGE**: chưa có gap được chứng minh để chọn follow-up. `MaximumSize=400` của validation và Cancel đóng/admission là khác biệt cần hiểu theo contract app, không tự là lỗi. Long-error wrapping ở mọi viewport/DPI chưa được chứng minh. **NOT RUN** app GUI/native mới; không tuyên bố dialog đạt recipe hoặc Owner visual acceptance mới. |
 
 Nếu không có recipe phù hợp, tiếp tục theo Business Compact và pinned capability map. Chỉ đề xuất recipe sau nhu cầu lặp lại hoặc lỗi phối hợp đáng kể có bằng chứng; không tạo framework chỉ vì thiếu mẫu.
+
+
+## UIC-03 — Editable Lines → SAL (PLANNED)
+
+| Field | Planned mapping / current constraint |
+|---|---|
+| Owner | CEX-K01/K03 toolkit; CEX-A01/A02 app |
+| Recipe | GridGallery recipe selected by the companion plan; source/test candidate not implemented at activation. Record immutable SHA after K01. |
+| Public API | Source-confirmed at runtime pin: grid-owned `BootstrapEditors.CreateLookupBox(Type)` / `CreateDecimalInput(Type, DecimalInputProfile)` and typed `BootstrapControl`. Reconcile every API actually used by frozen recipe before marking compatible. |
+| Product surface | [SalesReceiptControl](../../src/MyDmsVn.Desktop.WinForms/SalesReceiptControl.cs), [SalesReceiptLinesGridAdapter](../../src/MyDmsVn.Desktop.WinForms/SalesReceiptLinesGridAdapter.cs), production instance in [SalesLabForm](../../samples/MyDmsVn.Desktop.UiLab/Sales/SalesLabForm.cs). |
+| Preserve | Seven columns/manual price/duplicate rows/Gift; pending versus committed, stable line identity, existing numeric snapshot/patch; keyset/Pending-Applied criteria; List/Detail control identity; Save/Post and unknown-outcome recovery. |
+| Deviations | Demo Apply/Restore, fake reference data and sample numeric/derived rules do not replace application contracts. Use existing app session/feedback/validation helpers; do not import Gallery types. |
+| Verification route | CEX-A02; native `SalesScenarioBehaviorTests` selectors in [handoff](../development/COMPOSITION_EXPANSION_CODEX_HANDOFF.md); add focused grid/session/host cases only for affected boundaries. |
+| State | PLANNED — no new recipe compatibility, runtime/native or Owner acceptance claimed; [new evidence](../evidence/ui-labs/20261030-composition-expansion.md). |
+
+## UIC-04 — Master–Detail → Security Users/Roles (PLANNED)
+
+| Field | Planned mapping / current constraint |
+|---|---|
+| Owner | CEX-K02/K03 toolkit; CEX-A01/A03 app |
+| Recipe | Neutral read-only flat-list/detail in ControlGallery; candidate source not implemented at activation. |
+| Product surface | [SecurityWorkspaceControl](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceControl.cs), existing `Master/Compose` for Users/Roles and their detail views. |
+| Preserve | Current layout/identity/filter behavior, native selection/focus/scroll, dirty navigation admission, editor revision and recovery. Product owns hidden-selected-owner policy; sample filter policy does not discard app drafts. |
+| Deviations | App role/user detail includes permissions and mutations outside read-only recipe. No broad SEC/identity-dialog redesign; SAL keeps existing List/Detail modes. |
+| Verification route | CEX-A03; selected `SecurityWorkspaceControlTests` native methods in handoff; module-specific measured client geometry and evidence. |
+| State | PLANNED — NO-CHANGE is a valid pilot outcome after verification; no new app approval at activation. |
+
+## Existing production helpers and CEX decision route
+
+Start with `BusinessCompactAppearance`, `WorkspaceFeedbackHost`, `WorkspaceBusyBinder`, `FieldValidationBinder`, `InlineEditSession<TLine>` and numeric paste helpers, plus Security-local header/master composition. CEX-A04 records concrete consumers and USE AS IS / NOT APPLICABLE / CANDIDATE; NO EXTRACTION is valid. Only the bounded internal caption/editor wrapper in [design §7](EDITABLE_LINES_SAL_ADOPTION.md#7-điều-kiện-helper-và-phạm-vi-đã-cho-phép) is conditionally authorized for extraction. A shared-looking footer does not make permission/session/document/recovery logic generic.
