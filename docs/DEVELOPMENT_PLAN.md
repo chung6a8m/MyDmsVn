@@ -1,6 +1,6 @@
 # Development-plan entry point
 
-**Current routing (2026-10-30):** Follow [the execution index](plans/README.md) and the active [Business Compact composition adoption plan](plans/20261030-001-business-compact-composition-adoption.md). The plan owns app tasks CMP-T03–CMP-T05 and links toolkit-owned CMP-T01/CMP-T02. Implementation and native evidence remain to be produced; this file is a compatibility entry point with no separate task list or progress table.
+**Current routing (2026-10-30):** Follow [the execution index](plans/README.md) and the completed-bounded [Business Compact composition adoption plan](plans/20261030-001-business-compact-composition-adoption.md). The plan owns app tasks CMP-T03–CMP-T05 and links toolkit-owned CMP-T01/CMP-T02. Toolkit source/test correction `bdac29b` and handoff `078eb34` are recorded in mapping/evidence without an app runtime-pin change or a new app native gate; this file is a compatibility entry point with no separate task list or progress table.
 
 The [three Business Compact exception corrections](plans/20261028-001-business-compact-exceptions.md) remain completed only within their recorded [candidate evidence](evidence/ui-labs/20261028-business-compact-exceptions.md).
 

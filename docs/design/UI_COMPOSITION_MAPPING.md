@@ -4,8 +4,8 @@
 
 ## Source và runtime độc lập
 
-- Recipe source được Owner duyệt: toolkit `1420f252ca198cd4409e0e945fa6433b30b943b3`.
-- Handoff `d439cbdb043e1b798d1f991f0266350d9f61441e`: [guide](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/d439cbdb043e1b798d1f991f0266350d9f61441e/docs/guides/UI_COMPOSITION_RECIPES.md), [plan/status owner CMP-T01–T02](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/d439cbdb043e1b798d1f991f0266350d9f61441e/docs/plans/20261030-001-ui-composition-recipes.md), [toolkit evidence](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/d439cbdb043e1b798d1f991f0266350d9f61441e/docs/verification/20261030-ui-composition-recipes.md).
+- Recipe source accessibility correction: toolkit `bdac29bf4aca20db6618570ecd9a354630bc2e5f`; nó chỉ bỏ `AccessibleName` tĩnh của các label thông báo động để `AccessibilityObject.Name` cung cấp `Text` hiện tại.
+- Handoff correction `078eb348ac40b7a7e762a9b3f8b4da3fb19f314c`: [guide](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/078eb348ac40b7a7e762a9b3f8b4da3fb19f314c/docs/guides/UI_COMPOSITION_RECIPES.md), [plan/status owner CMP-T01–T02](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/078eb348ac40b7a7e762a9b3f8b4da3fb19f314c/docs/plans/20261030-001-ui-composition-recipes.md), [toolkit evidence](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/078eb348ac40b7a7e762a9b3f8b4da3fb19f314c/docs/verification/20261030-ui-composition-recipes.md). Owner visual approval source `1420f252ca198cd4409e0e945fa6433b30b943b3` được giữ riêng như quyết định lịch sử, không chuyển sang correction/AT.
 - Runtime app giữ gitlink `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`. Đọc recipe không cần nâng pin, reference ControlGallery hoặc kế thừa `DemoFormBase`.
 - Đối chiếu source tại hai SHA xác nhận TextBox, ComboBox, Button, DataGridView, CheckBox, Label, validation enum và theme manager không đổi. Các public capabilities bên dưới có tại runtime pin; demo class/helper/snapshot không phải API UI core. Đây là kiểm tra source, không là app runtime verification.
 
@@ -13,7 +13,7 @@
 
 | Trường | Mapping |
 |---|---|
-| Recipe source | [CompositionListDemoForm.cs@1420f25](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/1420f252ca198cd4409e0e945fa6433b30b943b3/samples/ControlGallery/CompositionListDemoForm.cs); guide/plan/evidence tại handoff ở trên |
+| Recipe source | [CompositionListDemoForm.cs@bdac29b](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/bdac29bf4aca20db6618570ecd9a354630bc2e5f/samples/ControlGallery/CompositionListDemoForm.cs); guide/plan/evidence correction tại handoff ở trên; visual approval `1420f25` là lịch sử riêng |
 | Runtime pin / public API | `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`: `BootstrapTextBox.Text/TextChanged/KeyDown`; `BootstrapComboBox.Items/SelectedIndex`; `BootstrapButton.Click/Variant/Outline`; `BootstrapDataGridView.ReadOnly/EmptyStateText/Loading/LoadingText` và native rows/columns; `BootstrapThemeManager.ThemeChanged`; native layout primitives. Recipe DataSource là khả năng có sẵn, không yêu cầu đổi cách catalog bind rows. |
 | Product surface | [SecurityPermissionCatalogView](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityPermissionCatalogView.cs), production control trong Security workspace; áp BC-01–BC-06, BC-08, BC-09 và BC-11–BC-12. |
 | Giữ và chuyển thể | Giữ hai pane nhóm/catalog 23/77, filters wrap, grid chỉ đọc, details chọn/copy, refresh phụ và tìm theo friendly name/key/description. Giữ canonical Module selector và group-list sync, lifecycle Active/Deprecated, selection key, native row identity và scroll anchor khi cùng owner. Không biến catalog thành list một pane chỉ để giống demo. |
@@ -26,7 +26,7 @@
 
 | Trường | Mapping |
 |---|---|
-| Recipe source | [CompositionEditDemoForm.cs@1420f25](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/1420f252ca198cd4409e0e945fa6433b30b943b3/samples/ControlGallery/CompositionEditDemoForm.cs); guide/plan/evidence tại cùng handoff ở trên |
+| Recipe source | [CompositionEditDemoForm.cs@bdac29b](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/bdac29bf4aca20db6618570ecd9a354630bc2e5f/samples/ControlGallery/CompositionEditDemoForm.cs); guide/plan/evidence correction tại cùng handoff ở trên; visual approval `1420f25` là lịch sử riêng |
 | Runtime pin / public API | `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`: `BootstrapLabel.Text/MaximumSize/TextRole`; `BootstrapTextBox.Text/Focus/ValidationState/Multiline/WordWrap/ScrollBars`; `BootstrapValidationState.Invalid`; `BootstrapComboBox.Items/SelectedIndex`; `BootstrapCheckBox.Checked`; `BootstrapButton.Click/Variant/Outline`; native scroll/layout và theme manager. Chỉ chuyển thể khả năng cần thiết, không thêm fields demo vào dialog. |
 | Product surface | [SecurityWorkspaceEditorBindings](../../src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceEditorBindings.cs): “Sửa thông tin…” → `IdentityDialogAsync(true, false)` → `ShowIdentityDialogAsync(true, false)`. **Compatibility reference only**, không sửa dialog trong adoption scope. Áp BC-01–BC-06, BC-08–BC-09 và BC-11–BC-12. |
 | Giữ và chuyển thể | Tham khảo field/error wrapping, focus field lỗi đầu, Save chính/Cancel phụ và commands truy cập được ở viewport nhỏ. Product giữ `MutationDialog : BootstrapModal`, dữ liệu user, validation/server feedback, busy/close admission, recovery và originating-owner/session guards hiện hữu. |
