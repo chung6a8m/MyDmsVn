@@ -1,6 +1,8 @@
 # Development-plan entry point
 
-**Current routing (2026-10-28):** Follow [the execution index](plans/README.md) for explicitly authorized scope and the sole plan selector. The selected scope is the [three Business Compact exception corrections](plans/20261028-001-business-compact-exceptions.md), with source/build/native/Owner distinctions in [new candidate evidence](evidence/ui-labs/20261028-business-compact-exceptions.md). This file is a compatibility entry point; it has no separate task list or progress table.
+**Current routing (2026-10-30):** Follow [the execution index](plans/README.md) and the active [Business Compact composition adoption plan](plans/20261030-001-business-compact-composition-adoption.md). The plan owns app tasks CMP-T03–CMP-T05 and links toolkit-owned CMP-T01/CMP-T02. Implementation and native evidence remain to be produced; this file is a compatibility entry point with no separate task list or progress table.
+
+The [three Business Compact exception corrections](plans/20261028-001-business-compact-exceptions.md) remain completed only within their recorded [candidate evidence](evidence/ui-labs/20261028-business-compact-exceptions.md).
 
 The completed-bounded [Business Compact and independent UI Labs plan](archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) is frozen in the [2026-10-28 archive](archive/20261028-business-compact-and-independent-ui-labs/README.md). Its later source focus correction remains **PENDING focused Owner confirmation**, while the subsequent #59/#60 test/evidence corrections are complete; the current execution index and [original evidence](evidence/ui-labs/20261027-business-compact-and-independent-ui-labs.md#2026-10-28-review-findings-follow-up) retain those distinctions.
 

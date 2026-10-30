@@ -1,10 +1,16 @@
 # Execution-plan index
 
-**Updated:** 2026-10-28 · **Inspected archive source:** [`main@57a45491d97b2efb15e79b1140b52e876641167d`](https://github.com/chung6a8m/MyDmsVn/commit/57a45491d97b2efb15e79b1140b52e876641167d) · **Status:** BUSINESS COMPACT EXC-T05 OWNER-APPROVED; THREE EXCEPTIONS CLOSED
+**Updated:** 2026-10-30 · **Status:** ACTIVE — BUSINESS COMPACT COMPOSITION ADOPTION · **Inspected source:** [`main@16c24738`](https://github.com/chung6a8m/MyDmsVn/commit/16c24738a4758ccdceb1f3509f4e37adb0d03464)
 
 ## Current plan
 
-**Selected and completed 2026-10-29:** [Input/popup WinFormsKit consumer acceptance](20261029-001-input-popup-consumer-acceptance.md) is the narrow follow-up authorized by the Owner after approving toolkit canonical physical 100%/125% visuals. It pins an exact toolkit candidate and verifies Security catalog filters and Sales/GoodsReceipt Lookup in the MyDmsVn host. Its candidate evidence is recorded separately; historical Business Compact and UI Lab decisions below retain their original scope.
+**Selected by the Owner on 2026-10-30:** [Business Compact composition adoption](20261030-001-business-compact-composition-adoption.md). This plan owns CMP-T03–CMP-T05 and coordinates two generic Gallery recipes plus one read-only Security catalog pilot. [WinFormsKit companion plan](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/main/docs/plans/20261030-001-ui-composition-recipes.md) owns CMP-T01/CMP-T02. Each task has one status owner; this index only selects the work.
+
+The activation is documentation-only. Implementation tasks remain PLANNED at their owners; new native verification/visual acceptance is not supplied by this commit. Begin with UIC-01, then the UIC-01 skill/mapping checkpoint and the catalog pilot; CMP-T03 remains in progress until the UIC-02 mapping is complete before handoff. Keep the existing runtime toolkit gitlink unless a distinct compatibility change is selected. Master-detail, SourceGrid editing, identity-dialog changes, SQL and release work are outside this queue.
+
+## Completed scopes and retained decisions
+
+**Completed on 2026-10-29:** [Input/popup WinFormsKit consumer acceptance](20261029-001-input-popup-consumer-acceptance.md) is the narrow follow-up authorized by the Owner after approving toolkit canonical physical 100%/125% visuals. It pins an exact toolkit candidate and verifies Security catalog filters and Sales/GoodsReceipt Lookup in the MyDmsVn host. Its candidate evidence is recorded separately; historical Business Compact and UI Lab decisions below retain their original scope.
 
 The [candidate consumer evidence](../evidence/ui-labs/20261029-input-popup-consumer-acceptance.md) records app `95916e3`/evidence `003db0a` with toolkit pin `433e5b5`: focused native/product-host tests pass at physical 100%/125%, with a local Light/Dark comparison board. The Owner approved consumer acceptance for that exact presented app candidate on 2026-10-29; this narrow plan is complete within its recorded scope.
 
