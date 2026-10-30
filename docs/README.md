@@ -15,7 +15,7 @@ The [source focus correction](evidence/ui-labs/20261027-business-compact-and-ind
 | [AGENTS.md](../AGENTS.md) | Current repository rules, safety and scope-selection discipline |
 | [AI_CONTEXT.md](../AI_CONTEXT.md) | Current source context, candidate evidence distinctions and acceptance limits |
 | [Execution index](plans/README.md) | Sole selector for explicitly authorized work; current composition adoption scope |
-| [Active composition adoption plan](plans/20261030-001-business-compact-composition-adoption.md) | App tasks CMP-T03–CMP-T05, dependencies, file map, scoped verification and handoff; toolkit tasks have their own owner |
+| [Completed composition adoption plan](plans/20261030-001-business-compact-composition-adoption.md) | App tasks CMP-T03–CMP-T05, dependencies, file map, scoped verification and handoff; toolkit tasks have their own owner |
 | [Completed exception plan](plans/20261028-001-business-compact-exceptions.md) · [design](design/BUSINESS_COMPACT_EXCEPTION_CLOSURE.md) · [candidate evidence](evidence/ui-labs/20261028-business-compact-exceptions.md) | Disabled actions, Security modal/text corrections; implementation, verification and approval tracked separately |
 | [Archived UIL plan](archive/20261028-business-compact-and-independent-ui-labs/plans/20261027-001-business-compact-and-independent-ui-labs.md) | Historical task/status owner for completed-bounded UIL-T00–UIL-T08 |
 | [Development-plan alias](DEVELOPMENT_PLAN.md) | Stable compatibility entry point to that index |

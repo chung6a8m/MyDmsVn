@@ -115,7 +115,7 @@ Master-detail, SourceGrid inline editing, public layout helper và áp dụng to
 | docs/guides/UI_COMPOSITION_RECIPES.md | Mới: mục lục và hợp đồng của hai mẫu |
 | docs/verification/20261030-ui-composition-recipes.md | Mới: candidate, các kiểm chứng thực tế và giới hạn |
 | docs/README.md | Link tài liệu recipe |
-| docs/plans/20261030-001-ui-composition-recipes.md | Companion plan ACTIVE trong toolkit; owner trạng thái CMP-T01/CMP-T02 |
+| docs/plans/20261030-001-ui-composition-recipes.md | Companion plan đã COMPLETE (bounded) trong toolkit; owner trạng thái CMP-T01/CMP-T02 |
 | docs/ROADMAP.md | Entry selector toolkit dẫn đến companion plan; không sao chép status ledger |
 
 Mỗi form mới có constructor không tham số, theo convention demo hiện hữu, và có thể được tạo bằng Func<Form>. Có thể khai báo public class trong assembly demo như các form hiện hữu; đây không phải API của assembly UI core.
