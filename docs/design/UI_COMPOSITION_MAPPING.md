@@ -1,6 +1,6 @@
 # UI Composition Mapping
 
-**Scope:** CMP-T03 của [active plan](../plans/20261030-001-business-compact-composition-adoption.md), ngày 30/10/2026. Đây là mapping source/API; product pilot CMP-T04 và routing review CMP-T05 còn PLANNED. [Business Compact](BUSINESS_COMPACT.md) sở hữu theme, geometry và action hierarchy; [evidence app](../evidence/ui-labs/20261030-ui-composition-adoption.md) sở hữu checkpoint và giới hạn.
+**Scope:** CMP-T03/CMP-T04 của [active plan](../plans/20261030-001-business-compact-composition-adoption.md), ngày 30/10/2026. Mapping source/API đã được xác nhận trên product catalog ở CMP-T04, không cần sửa source/runtime; routing review CMP-T05 còn PLANNED. [Business Compact](BUSINESS_COMPACT.md) sở hữu theme, geometry và action hierarchy; [evidence app](../evidence/ui-labs/20261030-ui-composition-adoption.md) sở hữu checkpoint và giới hạn.
 
 ## Source và runtime độc lập
 
@@ -20,7 +20,7 @@
 | State / ownership | Giữ `Catalog.IsCurrent(OwnerVersion)`, state loading/empty/no-match/unavailable và count chưa biết; không map trạng thái chưa biết thành 0. App giữ authorization, fake ports, session generations, cancellation, refresh và clipboard. Không thêm assignment/mutation hay yêu cầu `Security.Mutate` cho flow đọc. |
 | Deviations | Bỏ demo scenario controls/dataset, `DemoDataGridRowMetrics` và Gallery profiles/metrics. Product dùng Business Compact theme/bootstrap và row metrics hiện hữu; không chuyển query trim hoặc state machine demo thành contract app. Không thêm pagination/count contract. |
 | Lab / test owner | [Security Lab runbook](../development/UI_LAB.md), launcher `MyDmsVn.Desktop.UiLab.Security`; production catalog qua fake ports hiện hữu. `MyDmsVn.Desktop.Ui.Tests`: [SecurityWorkspaceControlTests](../../tests/MyDmsVn.Desktop.Ui.Tests/SecurityWorkspaceControlTests.cs) sở hữu read-only/filter/selection/copy/geometry; [SecurityPaneStateTests](../../tests/MyDmsVn.Desktop.Ui.Tests/SecurityPaneStateTests.cs) sở hữu state; [SecurityProductHostParityTests](../../tests/MyDmsVn.Desktop.Ui.Tests/SecurityProductHostParityTests.cs) sở hữu Lab/product theme và identity parity. Chọn method theo diff và plan §5.2. |
-| Evidence / giới hạn | [CMP-T03 checkpoint](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t03--checkpoint) mở đầu vào CMP-T04. [Consumer evidence 29/10](../evidence/ui-labs/20261029-input-popup-consumer-acceptance.md) chỉ giữ giá trị đúng candidate/phạm vi cũ. CMP-T04 phải xác định evidence còn áp dụng, quan sát geometry/behavior còn thiếu và gap trước khi quyết định sửa source. Chưa có app candidate/native decision mới. |
+| Evidence / giới hạn | [CMP-T04 pilot](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t04--product-pilot): production catalog SEC_L01, normal/minimum content 952×657 / 652×497, focused GUI 20/20 và long-key/details/theme quan sát bổ sung; không phát hiện gap cần sửa layout. Source/sample/test trees và runtime pin trùng [consumer candidate 29/10](../evidence/ui-labs/20261029-input-popup-consumer-acceptance.md), nên evidence physical100/125 còn áp dụng đúng phạm vi cũ. Lượt bổ sung báo DeviceDpi=96, physical scale unverified; không là physical100/125 repeat hoặc Owner decision mới. |
 
 ## UIC-02 — Compact Edit Form → user-edit reference
 

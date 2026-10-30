@@ -10,7 +10,7 @@
 
 **Spec:** Thiết kế đã được Owner chọn ở mục 2 của tài liệu này, cùng [Business Compact policy](https://github.com/chung6a8m/MyDmsVn/blob/16c24738a4758ccdceb1f3509f4e37adb0d03464/docs/design/BUSINESS_COMPACT.md) và [Independent UI Labs](https://github.com/chung6a8m/MyDmsVn/blob/16c24738a4758ccdceb1f3509f4e37adb0d03464/docs/design/INDEPENDENT_UI_LABS.md).
 
-**Status:** ACTIVE — Owner đã phê duyệt plan ngày **30/10/2026**. CMP-T03 **COMPLETE** trong phạm vi docs/skill routing; CMP-T04/CMP-T05 **PLANNED**, plan completion/acceptance **OPEN**. [App evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md) ghi checkpoint và reconciliation với runtime pin. Toolkit đã bàn giao hai recipes tại source `1420f252ca198cd4409e0e945fa6433b30b943b3`, docs/status/evidence handoff `d439cbdb043e1b798d1f991f0266350d9f61441e`. App GUI/native mới **NOT RUN**; không có quyết định Owner visual mới cho app.
+**Status:** ACTIVE — Owner đã phê duyệt plan ngày **30/10/2026**. CMP-T03 **COMPLETE** trong phạm vi docs/skill routing; CMP-T04 **COMPLETE — no source/runtime change**; CMP-T05 **PLANNED**, plan completion/acceptance **OPEN**. [App evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md) ghi checkpoint, focused GUI 20/20 và quan sát catalog bổ sung. Toolkit đã bàn giao hai recipes tại source `1420f252ca198cd4409e0e945fa6433b30b943b3`, docs/status/evidence handoff `d439cbdb043e1b798d1f991f0266350d9f61441e`. Không có candidate visual hoặc quyết định Owner visual mới cho app.
 
 ## 0. Roadmap hiện hành và quyền sở hữu trạng thái
 
@@ -21,10 +21,10 @@
 | CMP-T01 — UIC-01 Filter Results | WinFormsKit companion plan | Xem owner toolkit | Bước triển khai đầu tiên; tạo sample, recipe và focused evidence |
 | CMP-T02 — UIC-02 Compact Edit Form | WinFormsKit companion plan | Xem owner toolkit | Dùng contract recipe của CMP-T01; độc lập với nghiệp vụ app |
 | CMP-T03 — Skill và mapping | MyDmsVn, plan này | COMPLETE — docs/skill routing | Mapping UIC-01/UIC-02 và runtime API reconciliation hoàn tất; checkpoint UIC-01 mở đầu vào CMP-T04, không cấp app acceptance |
-| CMP-T04 — Catalog product pilot | MyDmsVn, plan này | PLANNED | CMP-T01 + checkpoint UIC-01 của CMP-T03; không cần chờ CMP-T02 hoặc toàn bộ CMP-T03 hoàn tất |
+| CMP-T04 — Catalog product pilot | MyDmsVn, plan này | COMPLETE — no source/runtime change | Mapping xác nhận qua production Lab, focused GUI 20/20 và evidence còn áp dụng; không phát hiện gap cần sửa layout |
 | CMP-T05 — Routing review và handoff | MyDmsVn, plan này | PLANNED | CMP-T01–CMP-T04 đạt tiêu chí tại owner tương ứng |
 
-Thứ tự áp dụng đã chọn: CMP-T01 → checkpoint UIC-01 của CMP-T03 → CMP-T04. CMP-T03 hiện đã hoàn tất cả mapping/link UIC-02; CMP-T04 là bước app tiếp theo. CMP-T05 chờ toàn bộ CMP-T01–CMP-T04 hoàn tất. Native GUI trên cùng desktop luôn tuần tự.
+Thứ tự áp dụng đã chọn: CMP-T01 → checkpoint UIC-01 của CMP-T03 → CMP-T04. CMP-T03 hiện đã hoàn tất cả mapping/link UIC-02; CMP-T04 đã xác nhận catalog hiện hữu phù hợp. CMP-T05 là bước app tiếp theo, chưa thực hiện. Native GUI trên cùng desktop luôn tuần tự.
 
 **Design approval:** phạm vi và thiết kế được Owner chọn ngày 30/10/2026. **Runtime/visual approval:** chưa có candidate composition mới được nghiệm thu; việc chọn plan không tạo PASS hoặc đóng các quyết định lịch sử. Nếu CMP-T04 không thay production/runtime, dùng bằng chứng còn áp dụng và chỉ bổ sung quan sát cần cho mapping; nếu có candidate visual mới, ghi quyết định Owner cho đúng candidate trước khi đóng scope đó.
 
@@ -188,6 +188,8 @@ Mỗi mapping record gồm:
 
 ### CMP-T04 — Product pilot với Danh mục quyền
 
+**Status:** COMPLETE — no source/runtime change, 30/10/2026; [pilot evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t04--product-pilot). App source/test `cc498975f49c0b42f87b6e4c52c10a3c5c635cf9`; runtime pin `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`. Production/sample/test trees trùng consumer candidate `95916e3`; 20/20 focused rows PASS và Lab normal/minimum bổ sung không chỉ ra gap cần sửa. Không tạo candidate visual mới hoặc cấp approval mới; physical100/125 mới không chạy.
+
 **Owner:** MyDmsVn. **Depends on:** CMP-T01 và checkpoint UIC-01 của CMP-T03. Không yêu cầu toàn bộ CMP-T03 DONE; có thể làm trước khi UIC-02 và mapping tương ứng hoàn tất.
 
 **Files:** SecurityPermissionCatalogView.cs khi có gap; app evidence; các test owners hiện hữu trong file map khi bị ảnh hưởng.
@@ -207,14 +209,14 @@ Mỗi mapping record gồm:
 - Product outer size không bị nhầm với workspace client size.
 
 **Steps:**
-- [ ] Mở đúng production view trong Lab Security, ghi app SHA, runtime pin, theme và content viewport.
-- [ ] Chạy/đọc lại các bằng chứng còn áp dụng; đo gap theo BC-04/05/09/11. Nếu không có gap, ghi mapping được xác nhận và giữ source.
-- [ ] Nếu có gap, mô tả cụ thể expected/actual và tái hiện bằng một test hoặc thao tác native phù hợp trước khi sửa.
-- [ ] Sửa tối thiểu phần bố cục của catalog; giữ filters/data/state semantics. Không áp một CRUD scaffold lên màn hình chỉ đọc.
-- [ ] Chọn đúng methods từ SecurityWorkspaceControlTests, SecurityPaneStateTests, SecurityProductHostParityTests; bổ sung assertion cho gap chưa được bao phủ.
-- [ ] Verify tại UI Lab và SQL-free product host khi source change ảnh hưởng presentation/parity; ghi bounds, environment và native observations.
-- [ ] Review exact candidate với Owner theo policy nếu có candidate visual mới cần duyệt; giữ quyết định và giới hạn theo đúng phạm vi.
-- [ ] Commit source/test/evidence liên quan. Không sửa shared appearance hoặc Lab host nếu gap nằm trong catalog.
+- [x] Mở production catalog trong Security Lab SEC_L01; ghi app/pin/theme, outer/client/content và DeviceDpi trong evidence.
+- [x] Đọc lại consumer evidence còn áp dụng, xác nhận tree identity và BC-04/05/09/11; không có gap cụ thể, giữ source.
+- [x] Disposition tái hiện/TDD: không áp dụng vì không có gap hoặc behavior change; không tạo test RED giả.
+- [x] Disposition layout fix: không cần; giữ catalog, filters/data/state, shared appearance và Lab host.
+- [x] Chọn methods từ ba test owners yêu cầu; bổ sung hai methods hiện hữu vào selection cho native typing và narrow filter geometry, discovery/execution 20/20, không thêm assertion trùng lặp.
+- [x] Quan sát Lab tại 952×657 và 652×497; focused SQL-free product-host parity hiện hữu PASS ở normal/minimum Light/Dark. Không mở rộng physical matrix vì source/runtime không đổi.
+- [x] Disposition Owner gate: không có candidate visual mới; giữ approval cũ đúng candidate/phạm vi, không tuyên bố approval mới.
+- [x] Commit evidence/status; không thay source/test/runtime pin.
 
 **Done:** Pilot đã chứng minh recipe và skill dùng được trong sản phẩm, cùng bằng chứng về hành vi và geometry tương ứng. Một kết quả “view hiện tại phù hợp; không cần sửa layout” là hợp lệ, nhưng phải có mapping và bằng chứng áp dụng rõ.
 
