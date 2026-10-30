@@ -4,6 +4,8 @@
 
 Read with [Security UI and behavior](SECURITY_ADMINISTRATION_UI.md), [Independent UI Labs](INDEPENDENT_UI_LABS.md), [UI Lab runbook](../development/UI_LAB.md) and [Security review guide](../development/SECURITY_UI_LAB_REVIEW.md). This policy governs presentation and control selection; the Security specification retains business rules, authorization, state and recovery. Historical tasks and approvals retain their original boundaries.
 
+For composition work, follow [UI Composition Mapping](UI_COMPOSITION_MAPPING.md) → exact recipe source/public API reconciliation → [Security Lab pilot path](../development/UI_LAB.md#composition-adoption-pilot). The [active adoption plan](../plans/20261030-001-business-compact-composition-adoption.md) owns scope/status; mapping does not transfer Gallery metrics or toolkit acceptance into product acceptance.
+
 ## 1. Basis and observed gaps
 
 Inspected source: [`MyDmsVn@8de4451573e8a9a033d7e5a0b07e5f22ef3018b9`](https://github.com/chung6a8m/MyDmsVn/commit/8de4451573e8a9a033d7e5a0b07e5f22ef3018b9). These observations describe the baseline before roadmap implementation, not runtime changes made by this documentation PR.

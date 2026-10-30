@@ -10,21 +10,21 @@
 
 **Spec:** Thiết kế đã được Owner chọn ở mục 2 của tài liệu này, cùng [Business Compact policy](https://github.com/chung6a8m/MyDmsVn/blob/16c24738a4758ccdceb1f3509f4e37adb0d03464/docs/design/BUSINESS_COMPACT.md) và [Independent UI Labs](https://github.com/chung6a8m/MyDmsVn/blob/16c24738a4758ccdceb1f3509f4e37adb0d03464/docs/design/INDEPENDENT_UI_LABS.md).
 
-**Status:** ACTIVE — Owner đã phê duyệt plan và yêu cầu kích hoạt roadmap ngày **30/10/2026**. Commit kích hoạt chỉ thay đổi tài liệu. Implementation của CMP-T01–CMP-T05 chưa bắt đầu; native verification **NOT RUN**, quyết định visual cho candidate mới **PENDING**. Tên class, tests và tài liệu đầu ra của các task vẫn là tên dự kiến cho đến khi có source tương ứng.
+**Status:** ACTIVE — Owner đã phê duyệt plan ngày **30/10/2026**. CMP-T03 **COMPLETE** trong phạm vi docs/skill routing; CMP-T04/CMP-T05 **PLANNED**, plan completion/acceptance **OPEN**. [App evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md) ghi checkpoint và reconciliation với runtime pin. Toolkit đã bàn giao hai recipes tại source `1420f252ca198cd4409e0e945fa6433b30b943b3`, docs/status/evidence handoff `d439cbdb043e1b798d1f991f0266350d9f61441e`. App GUI/native mới **NOT RUN**; không có quyết định Owner visual mới cho app.
 
 ## 0. Roadmap hiện hành và quyền sở hữu trạng thái
 
-[Execution index](README.md) chọn plan này cho scope composition adoption. [Plan toolkit](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/main/docs/plans/20261030-001-ui-composition-recipes.md) là owner duy nhất của CMP-T01/CMP-T02; plan này sở hữu CMP-T03/CMP-T04/CMP-T05 và điều phối điều kiện hoàn thành toàn scope. Các entry pages chỉ dẫn đến owner, không duy trì bảng tiến độ khác.
+[Execution index](README.md) chọn plan này cho scope composition adoption. [Plan toolkit tại handoff](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/d439cbdb043e1b798d1f991f0266350d9f61441e/docs/plans/20261030-001-ui-composition-recipes.md) là owner duy nhất của CMP-T01/CMP-T02; plan này sở hữu CMP-T03/CMP-T04/CMP-T05 và điều phối điều kiện hoàn thành toàn scope. Các entry pages chỉ dẫn đến owner, không duy trì bảng tiến độ khác.
 
 | Task | Owner trạng thái | Trạng thái tại owner này | Điều kiện bắt đầu hoặc hoàn tất |
 |---|---|---|---|
 | CMP-T01 — UIC-01 Filter Results | WinFormsKit companion plan | Xem owner toolkit | Bước triển khai đầu tiên; tạo sample, recipe và focused evidence |
 | CMP-T02 — UIC-02 Compact Edit Form | WinFormsKit companion plan | Xem owner toolkit | Dùng contract recipe của CMP-T01; độc lập với nghiệp vụ app |
-| CMP-T03 — Skill và mapping | MyDmsVn, plan này | PLANNED | Có source revision cụ thể của UIC-01; checkpoint UIC-01 mở pilot; hoàn tất cả UIC-02 trước handoff |
+| CMP-T03 — Skill và mapping | MyDmsVn, plan này | COMPLETE — docs/skill routing | Mapping UIC-01/UIC-02 và runtime API reconciliation hoàn tất; checkpoint UIC-01 mở đầu vào CMP-T04, không cấp app acceptance |
 | CMP-T04 — Catalog product pilot | MyDmsVn, plan này | PLANNED | CMP-T01 + checkpoint UIC-01 của CMP-T03; không cần chờ CMP-T02 hoặc toàn bộ CMP-T03 hoàn tất |
 | CMP-T05 — Routing review và handoff | MyDmsVn, plan này | PLANNED | CMP-T01–CMP-T04 đạt tiêu chí tại owner tương ứng |
 
-Ưu tiên một vòng áp dụng sớm: CMP-T01 → checkpoint UIC-01 của CMP-T03 → CMP-T04. CMP-T02 có thể làm song song sau khi định dạng recipe rõ; CMP-T03 chuyển sang IN PROGRESS khi bắt đầu và chỉ hoàn tất sau khi mapping/link UIC-02 đã đầy đủ. CMP-T05 chờ toàn bộ CMP-T01–CMP-T04 hoàn tất. Native GUI trên cùng desktop luôn tuần tự.
+Thứ tự áp dụng đã chọn: CMP-T01 → checkpoint UIC-01 của CMP-T03 → CMP-T04. CMP-T03 hiện đã hoàn tất cả mapping/link UIC-02; CMP-T04 là bước app tiếp theo. CMP-T05 chờ toàn bộ CMP-T01–CMP-T04 hoàn tất. Native GUI trên cùng desktop luôn tuần tự.
 
 **Design approval:** phạm vi và thiết kế được Owner chọn ngày 30/10/2026. **Runtime/visual approval:** chưa có candidate composition mới được nghiệm thu; việc chọn plan không tạo PASS hoặc đóng các quyết định lịch sử. Nếu CMP-T04 không thay production/runtime, dùng bằng chứng còn áp dụng và chỉ bổ sung quan sát cần cho mapping; nếu có candidate visual mới, ghi quyết định Owner cho đúng candidate trước khi đóng scope đó.
 
@@ -80,7 +80,7 @@ Hai mẫu nền tảng, một đường tra cứu ngắn trong skill và một p
 - Pilot bắt buộc: SecurityPermissionCatalogView trong UI Lab Security hiện hữu.
 - Tham chiếu cho UIC-02: dialog “Sửa thông tin…” của người dùng, userTarget=true/create=false. Đợt này lập mapping và đánh giá mức phù hợp; thay đổi dialog là follow-up chỉ khi có vấn đề cụ thể.
 
-UIC-01/UIC-02 là mã mẫu đề xuất mới. Các class mới được nêu ở file map chưa tồn tại tại baseline.
+UIC-01/UIC-02 chưa tồn tại tại activation baseline; source thực đã có tại candidate `1420f252ca198cd4409e0e945fa6433b30b943b3`. [Mapping](../design/UI_COMPOSITION_MAPPING.md) dẫn tới từng form và handoff docs; các app pilot changes vẫn phụ thuộc gap cụ thể.
 
 | Cách làm | Đánh đổi | Quyết định đã chọn |
 |---|---|---|
@@ -150,11 +150,13 @@ Không thay các file source/test chỉ để có diff. Evidence có thể ghi �
 - CMP-T01 cung cấp CompositionListDemoForm(), UIC-01, source reference cụ thể và evidence của filter/results/state/layout/lifetime.
 - CMP-T02 cung cấp CompositionEditDemoForm(), UIC-02, source reference cụ thể và evidence của validation/save/cancel/theme/layout.
 - Handoff phải tách recipe source SHA khỏi runtime pin của MyDmsVn. App pilot chỉ dùng public API đã có tại pin hoặc ghi dependency follow-up rõ ràng.
-- Tests, source APIs và evidence của hai recipes chưa tồn tại chỉ vì plan đã ACTIVE; đọc source thực tại candidate bàn giao.
+- Tests, source APIs và evidence phải đọc tại candidate bàn giao; [mapping](../design/UI_COMPOSITION_MAPPING.md) cố định source và handoff SHA, không suy implementation chỉ từ trạng thái ACTIVE.
 
 ### CMP-T03 — Nối recipe vào skill và Business Compact
 
 **Owner:** MyDmsVn. **Depends on:** recipe UIC-01 có source revision cụ thể; UIC-02 hoàn thiện link trước handoff.
+
+**Status:** COMPLETE — docs/skill routing, 30/10/2026; [evidence/checkpoint](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t03--checkpoint). Không đổi product source/runtime; app GUI/native NOT RUN. Clean-context routing review thuộc CMP-T05.
 
 **Files:** SKILL.md, UI_COMPOSITION_MAPPING.md, BUSINESS_COMPACT.md, UI_LAB.md, app plan/evidence.
 
@@ -172,15 +174,15 @@ Mỗi mapping record gồm:
 - Evidence hiện có hoặc cần bổ sung; không suy luận PASS từ link source.
 
 **Steps:**
-- [ ] Thêm UI_COMPOSITION_MAPPING.md với UIC-01 → SecurityPermissionCatalogView: ghi source revision cụ thể, runtime pin và đối chiếu public APIs tại pin.
-- [ ] Bổ sung đoạn ngắn vào skill: tìm recipe liên quan, đối chiếu APIs/pin, áp BC, ghi deviations, kiểm chứng trên đúng Lab.
-- [ ] Thêm rule không tìm được recipe: tiếp tục theo policy; chỉ đề xuất recipe mới khi có nhu cầu lặp lại hay lỗi phối hợp đáng kể.
-- [ ] Thêm liên kết từ BC policy và UI Lab runbook; không sao chép toàn bộ metrics hoặc recipe vào skill. Kiểm tra đường đọc và mapping UIC-01 để mở checkpoint cho CMP-T04.
-- [ ] Khi CMP-T02 bàn giao, hoàn tất mapping/link UIC-02 → dialog user “Sửa thông tin…” như tham chiếu tương thích; không sửa dialog trong task này.
-- [ ] Kiểm tra diff, links, source/API distinctions, status và encoding; docs-only không chạy SQL/GUI.
-- [ ] Commit skill cùng các references trong repository.
+- [x] Thêm UI_COMPOSITION_MAPPING.md với UIC-01 → SecurityPermissionCatalogView: ghi source revision cụ thể, runtime pin và đối chiếu public APIs tại pin.
+- [x] Bổ sung đoạn ngắn vào skill: tìm recipe liên quan, đối chiếu APIs/pin, áp BC, ghi deviations, kiểm chứng trên đúng Lab.
+- [x] Thêm rule không tìm được recipe: tiếp tục theo policy; chỉ đề xuất recipe mới khi có nhu cầu lặp lại hay lỗi phối hợp đáng kể.
+- [x] Thêm liên kết từ BC policy và UI Lab runbook; không sao chép toàn bộ metrics hoặc recipe vào skill. Kiểm tra đường đọc và mapping UIC-01 để mở checkpoint cho CMP-T04.
+- [x] Khi CMP-T02 bàn giao, hoàn tất mapping/link UIC-02 → dialog user “Sửa thông tin…” như tham chiếu tương thích; không sửa dialog trong task này.
+- [x] Kiểm tra diff, links, source/API distinctions, status và encoding; docs-only không chạy SQL/GUI.
+- [x] Commit skill cùng các references trong repository.
 
-**Checkpoint UIC-01 mở pilot:** có source link tại commit, đối chiếu runtime APIs/pin, catalog mapping và đường skill → mapping → source đã kiểm tra; commit phần tài liệu này để CMP-T04 có đầu vào review được. Checkpoint này không đóng CMP-T03; task giữ IN PROGRESS cho đến khi mapping/source link UIC-02 cũng hoàn tất.
+**Checkpoint UIC-01 mở pilot — đạt:** có source link tại commit, đối chiếu runtime APIs/pin, catalog mapping và đường skill → mapping → source đã kiểm tra. Checkpoint riêng không đủ đóng CMP-T03; mapping/source link UIC-02 cũng đã hoàn tất trong cùng scope docs này. CMP-T04 có đầu vào review được, chưa có kết quả pilot.
 
 **Done:** Codex bắt đầu từ AGENTS/skill có thể tìm hai recipe và hiểu rõ phần nào là demo, phần nào là API, phần nào do product quyết định.
 
