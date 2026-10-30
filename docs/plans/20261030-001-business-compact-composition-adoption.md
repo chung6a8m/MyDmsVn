@@ -1,4 +1,4 @@
-# Business Compact Composition Adoption — Active Roadmap
+# Business Compact Composition Adoption — Completed Bounded Roadmap
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking. Follow repository instructions and the Owner-selected scope.
 
@@ -10,7 +10,7 @@
 
 **Spec:** Thiết kế đã được Owner chọn ở mục 2 của tài liệu này, cùng [Business Compact policy](https://github.com/chung6a8m/MyDmsVn/blob/16c24738a4758ccdceb1f3509f4e37adb0d03464/docs/design/BUSINESS_COMPACT.md) và [Independent UI Labs](https://github.com/chung6a8m/MyDmsVn/blob/16c24738a4758ccdceb1f3509f4e37adb0d03464/docs/design/INDEPENDENT_UI_LABS.md).
 
-**Status:** ACTIVE — Owner đã phê duyệt plan ngày **30/10/2026**. CMP-T03 **COMPLETE** trong phạm vi docs/skill routing; CMP-T04/CMP-T05 **PLANNED**, plan completion/acceptance **OPEN**. [App evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md) ghi checkpoint và reconciliation với runtime pin. Toolkit đã bàn giao hai recipes tại source `1420f252ca198cd4409e0e945fa6433b30b943b3`, docs/status/evidence handoff `d439cbdb043e1b798d1f991f0266350d9f61441e`. App GUI/native mới **NOT RUN**; không có quyết định Owner visual mới cho app.
+**Status:** COMPLETE — bounded composition adoption, **30/10/2026**. CMP-T03–CMP-T05 đạt deliverables tại §7; [handoff evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t05--routing-review-and-handoff) ghi clean-context routing, UIC-02 no-change và đối chiếu từng tiêu chí. Toolkit bàn giao hai recipes tại source `1420f252ca198cd4409e0e945fa6433b30b943b3`, docs/status/evidence sau merge `d439cbdb043e1b798d1f991f0266350d9f61441e`; CMP-T01/T02 có implementation, focused verification và bounded representative attended PASS, Owner APPROVED tại owner toolkit. Product pilot giữ source/runtime; không tạo candidate visual hay quyết định Owner visual mới cho app. Completion này không cấp release hoặc acceptance lịch sử còn mở.
 
 ## 0. Roadmap hiện hành và quyền sở hữu trạng thái
 
@@ -21,12 +21,12 @@
 | CMP-T01 — UIC-01 Filter Results | WinFormsKit companion plan | Xem owner toolkit | Bước triển khai đầu tiên; tạo sample, recipe và focused evidence |
 | CMP-T02 — UIC-02 Compact Edit Form | WinFormsKit companion plan | Xem owner toolkit | Dùng contract recipe của CMP-T01; độc lập với nghiệp vụ app |
 | CMP-T03 — Skill và mapping | MyDmsVn, plan này | COMPLETE — docs/skill routing | Mapping UIC-01/UIC-02 và runtime API reconciliation hoàn tất; checkpoint UIC-01 mở đầu vào CMP-T04, không cấp app acceptance |
-| CMP-T04 — Catalog product pilot | MyDmsVn, plan này | PLANNED | CMP-T01 + checkpoint UIC-01 của CMP-T03; không cần chờ CMP-T02 hoặc toàn bộ CMP-T03 hoàn tất |
-| CMP-T05 — Routing review và handoff | MyDmsVn, plan này | PLANNED | CMP-T01–CMP-T04 đạt tiêu chí tại owner tương ứng |
+| CMP-T04 — Catalog product pilot | MyDmsVn, plan này | COMPLETE — no source/runtime change | Mapping xác nhận qua production Lab, focused GUI 20/20 và evidence còn áp dụng; không phát hiện gap cần sửa layout |
+| CMP-T05 — Routing review và handoff | MyDmsVn, plan này | COMPLETE — docs-only handoff | Clean-context tìm đúng route; UIC-02 không có gap được chứng minh; refs/pin/status và §7 đã đối chiếu |
 
-Thứ tự áp dụng đã chọn: CMP-T01 → checkpoint UIC-01 của CMP-T03 → CMP-T04. CMP-T03 hiện đã hoàn tất cả mapping/link UIC-02; CMP-T04 là bước app tiếp theo. CMP-T05 chờ toàn bộ CMP-T01–CMP-T04 hoàn tất. Native GUI trên cùng desktop luôn tuần tự.
+Thứ tự áp dụng đã chọn: CMP-T01 → checkpoint UIC-01 của CMP-T03 → CMP-T04. CMP-T03 hiện đã hoàn tất cả mapping/link UIC-02; CMP-T04 đã xác nhận catalog hiện hữu phù hợp. CMP-T05 đã hoàn tất routing review và handoff; scope được chọn không còn task triển khai mở. Native GUI trên cùng desktop luôn tuần tự.
 
-**Design approval:** phạm vi và thiết kế được Owner chọn ngày 30/10/2026. **Runtime/visual approval:** chưa có candidate composition mới được nghiệm thu; việc chọn plan không tạo PASS hoặc đóng các quyết định lịch sử. Nếu CMP-T04 không thay production/runtime, dùng bằng chứng còn áp dụng và chỉ bổ sung quan sát cần cho mapping; nếu có candidate visual mới, ghi quyết định Owner cho đúng candidate trước khi đóng scope đó.
+**Design approval:** phạm vi và thiết kế được Owner chọn ngày 30/10/2026. **App runtime/visual boundary:** CMP-T04 không thay production/runtime hoặc tạo candidate visual mới; evidence còn áp dụng và quan sát bổ sung xác nhận mapping được giữ đúng phạm vi. Không có Owner visual approval app mới, không đóng các quyết định lịch sử. Candidate visual mới về sau cần scope và quyết định Owner cho đúng candidate.
 
 **Phạm vi đã chọn:** hai Gallery recipes, đường skill/mapping và một pilot catalog chỉ đọc. Sửa dialog user-edit, master-detail, SourceGrid inline-edit, public layout framework, nâng runtime toolkit và triển khai SQL/release không nằm trong queue này.
 
@@ -135,7 +135,7 @@ Không thêm project, package hay reference để phục vụ hai mẫu. File d�
 | tests/MyDmsVn.Desktop.Ui.Tests/SecurityWorkspaceControlTests.cs | Tái sử dụng hoặc bổ sung assertion đúng hành vi catalog bị ảnh hưởng |
 | tests/MyDmsVn.Desktop.Ui.Tests/SecurityPaneStateTests.cs | Owner hiện hữu cho loading/empty/unavailable |
 | tests/MyDmsVn.Desktop.Ui.Tests/SecurityProductHostParityTests.cs | Owner hiện hữu cho product/Lab geometry, theme và identity |
-| docs/plans/20261030-001-business-compact-composition-adoption.md | Plan ACTIVE này; owner trạng thái CMP-T03–CMP-T05 và phối hợp scope |
+| docs/plans/20261030-001-business-compact-composition-adoption.md | Plan này; owner trạng thái CMP-T03–CMP-T05 và phối hợp scope |
 | docs/plans/README.md | Execution index; trạng thái app chỉ có một owner |
 | AGENTS.md và AI_CONTEXT.md | Chỉ cập nhật đường đọc nếu cần khi kích hoạt/handoff |
 
@@ -182,11 +182,13 @@ Mỗi mapping record gồm:
 - [x] Kiểm tra diff, links, source/API distinctions, status và encoding; docs-only không chạy SQL/GUI.
 - [x] Commit skill cùng các references trong repository.
 
-**Checkpoint UIC-01 mở pilot — đạt:** có source link tại commit, đối chiếu runtime APIs/pin, catalog mapping và đường skill → mapping → source đã kiểm tra. Checkpoint riêng không đủ đóng CMP-T03; mapping/source link UIC-02 cũng đã hoàn tất trong cùng scope docs này. CMP-T04 có đầu vào review được, chưa có kết quả pilot.
+**Checkpoint UIC-01 mở pilot — đạt:** có source link tại commit, đối chiếu runtime APIs/pin, catalog mapping và đường skill → mapping → source đã kiểm tra. Checkpoint riêng không đủ đóng CMP-T03; mapping/source link UIC-02 cũng đã hoàn tất trong cùng scope docs này. Checkpoint này mở đầu vào CMP-T04 tại thời điểm CMP-T03; kết quả pilot hoàn tất được ghi ở mục CMP-T04 bên dưới.
 
 **Done:** Codex bắt đầu từ AGENTS/skill có thể tìm hai recipe và hiểu rõ phần nào là demo, phần nào là API, phần nào do product quyết định.
 
 ### CMP-T04 — Product pilot với Danh mục quyền
+
+**Status:** COMPLETE — no source/runtime change, 30/10/2026; [pilot evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t04--product-pilot). App source/test `cc498975f49c0b42f87b6e4c52c10a3c5c635cf9`; runtime pin `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`. Production/sample/test trees trùng consumer candidate `95916e3`; 20/20 focused rows PASS và Lab normal/minimum bổ sung không chỉ ra gap cần sửa. Không tạo candidate visual mới hoặc cấp approval mới; physical100/125 mới không chạy.
 
 **Owner:** MyDmsVn. **Depends on:** CMP-T01 và checkpoint UIC-01 của CMP-T03. Không yêu cầu toàn bộ CMP-T03 DONE; có thể làm trước khi UIC-02 và mapping tương ứng hoàn tất.
 
@@ -207,31 +209,33 @@ Mỗi mapping record gồm:
 - Product outer size không bị nhầm với workspace client size.
 
 **Steps:**
-- [ ] Mở đúng production view trong Lab Security, ghi app SHA, runtime pin, theme và content viewport.
-- [ ] Chạy/đọc lại các bằng chứng còn áp dụng; đo gap theo BC-04/05/09/11. Nếu không có gap, ghi mapping được xác nhận và giữ source.
-- [ ] Nếu có gap, mô tả cụ thể expected/actual và tái hiện bằng một test hoặc thao tác native phù hợp trước khi sửa.
-- [ ] Sửa tối thiểu phần bố cục của catalog; giữ filters/data/state semantics. Không áp một CRUD scaffold lên màn hình chỉ đọc.
-- [ ] Chọn đúng methods từ SecurityWorkspaceControlTests, SecurityPaneStateTests, SecurityProductHostParityTests; bổ sung assertion cho gap chưa được bao phủ.
-- [ ] Verify tại UI Lab và SQL-free product host khi source change ảnh hưởng presentation/parity; ghi bounds, environment và native observations.
-- [ ] Review exact candidate với Owner theo policy nếu có candidate visual mới cần duyệt; giữ quyết định và giới hạn theo đúng phạm vi.
-- [ ] Commit source/test/evidence liên quan. Không sửa shared appearance hoặc Lab host nếu gap nằm trong catalog.
+- [x] Mở production catalog trong Security Lab SEC_L01; ghi app/pin/theme, outer/client/content và DeviceDpi trong evidence.
+- [x] Đọc lại consumer evidence còn áp dụng, xác nhận tree identity và BC-04/05/09/11; không có gap cụ thể, giữ source.
+- [x] Disposition tái hiện/TDD: không áp dụng vì không có gap hoặc behavior change; không tạo test RED giả.
+- [x] Disposition layout fix: không cần; giữ catalog, filters/data/state, shared appearance và Lab host.
+- [x] Chọn methods từ ba test owners yêu cầu; bổ sung hai methods hiện hữu vào selection cho native typing và narrow filter geometry, discovery/execution 20/20, không thêm assertion trùng lặp.
+- [x] Quan sát Lab tại 952×657 và 652×497; focused SQL-free product-host parity hiện hữu PASS ở normal/minimum Light/Dark. Không mở rộng physical matrix vì source/runtime không đổi.
+- [x] Disposition Owner gate: không có candidate visual mới; giữ approval cũ đúng candidate/phạm vi, không tuyên bố approval mới.
+- [x] Commit evidence/status; không thay source/test/runtime pin.
 
 **Done:** Pilot đã chứng minh recipe và skill dùng được trong sản phẩm, cùng bằng chứng về hành vi và geometry tương ứng. Một kết quả “view hiện tại phù hợp; không cần sửa layout” là hợp lệ, nhưng phải có mapping và bằng chứng áp dụng rõ.
 
 ### CMP-T05 — Kiểm tra đường áp dụng và handoff
+
+**Status:** COMPLETE — docs-only, 30/10/2026; [routing/handoff evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t05--routing-review-and-handoff). Không có routing defect, dependency gap hoặc UIC-02 dialog gap được chứng minh; giữ skill và production source.
 
 **Owner:** MyDmsVn, có đối chiếu toolkit. **Depends on:** CMP-T01–T04.
 
 **Files:** hai recipe docs/evidence, UI_COMPOSITION_MAPPING.md, skill, hai execution indexes tương ứng.
 
 **Steps:**
-- [ ] Giao một lượt read-only cho Codex trong context sạch: đánh giá bố cục catalog hiện có theo Business Compact và đề xuất phạm vi thay đổi cần thiết. Không nhắc trực tiếp tên/path recipe trong prompt.
-- [ ] Kiểm tra Codex tìm đúng skill → mapping → source, phân biệt runtime pin, chọn đúng production view và tests. Không dùng kết quả lượt này làm bằng chứng native.
-- [ ] Sửa routing/docs nếu Codex bỏ qua hoặc hiểu sai; tránh giải quyết bằng cách chép toàn bộ source vào skill.
-- [ ] Đối chiếu UIC-02 với user-edit dialog hiện hữu. Chỉ ghi follow-up nếu có gap; không sửa ShowIdentityDialogAsync chung trong scope này.
-- [ ] Chốt source refs của recipe sau merge, runtime pin thực, app candidate và evidence links.
-- [ ] Đánh dấu từng task đúng trạng thái; chỉ close toàn plan khi các deliverables đã đạt tiêu chí ở mục 7.
-- [ ] Ghi các nhu cầu mở rộng có bằng chứng, không tự thêm vào active roadmap; commit handoff.
+- [x] Giao một lượt read-only cho Codex trong context sạch: đánh giá bố cục catalog hiện có theo Business Compact và đề xuất phạm vi thay đổi cần thiết. Không nhắc trực tiếp tên/path recipe trong prompt.
+- [x] Kiểm tra Codex tìm đúng skill → mapping → source, phân biệt runtime pin, chọn đúng production view và tests. Không dùng kết quả lượt này làm bằng chứng native.
+- [x] Disposition routing: Codex tìm đúng đường, không cần sửa skill; không chép source vào skill.
+- [x] Đối chiếu UIC-02 với user-edit dialog hiện hữu. Chỉ ghi follow-up nếu có gap; không sửa ShowIdentityDialogAsync chung trong scope này.
+- [x] Chốt source refs của recipe sau merge, runtime pin thực, app candidate và evidence links.
+- [x] Đánh dấu từng task đúng trạng thái; chỉ close toàn plan khi các deliverables đã đạt tiêu chí ở mục 7.
+- [x] Ghi các nhu cầu mở rộng có bằng chứng, không tự thêm vào active roadmap; commit handoff.
 
 **Done:** Có hai mẫu, đường sử dụng rõ, một product pilot và hướng dẫn đủ để người khác tiếp tục mà không cần chỉ dẫn miệng.
 
@@ -295,20 +299,20 @@ Title đề xuất: Route Business Compact UI work through composition recipes.
 
 Khuyến nghị thực thi từng task có review độc lập, với một người điều phối hai repo. Native GUI trên cùng Windows desktop vẫn chạy tuần tự. Mọi sửa skill phải được git commit; không phân phối một bản skill rời ngoài repository.
 
-Owner đã chọn kế hoạch ngày 30/10/2026; phần việc mỗi repo được điều hướng qua execution index hiện hữu. Implementation PRs ở trên là bước tiếp theo của roadmap. Giữ quyết định trong repository sở hữu và giữ nguyên trạng thái/evidence lịch sử.
+Owner đã chọn kế hoạch ngày 30/10/2026; phần việc mỗi repo được điều hướng qua execution index hiện hữu. Toolkit PR #6 đã merge tại handoff `d439cbdb043e1b798d1f991f0266350d9f61441e`; app đã hoàn tất source-linked mapping, pilot và handoff trong scope này. Các mục PR ở trên mô tả cách tổ chức scope, không chọn thêm task merge/publish hoặc follow-up. Giữ quyết định trong repository sở hữu và giữ nguyên trạng thái/evidence lịch sử.
 
 ## 7. Tiêu chí hoàn thành và giá trị đo được
 
 Plan chỉ hoàn thành khi:
 
-- [ ] UIC-01/UIC-02 chạy được trong Gallery hiện hữu và có tests hành vi phù hợp.
-- [ ] Recipe docs có purpose, source/API, states, layout behavior, ownership và evidence.
-- [ ] Skill dẫn tới mapping/source; mẫu và public API được phân biệt rõ.
-- [ ] Product pilot dùng production controls trong Lab thật, đúng Business Compact và runtime pin.
-- [ ] Catalog giữ read-only, selection/details/copy và state semantics; flow đọc không có Security.Mutate.
-- [ ] Native evidence cần thiết được ghi nhận đúng candidate; hạn chế hoặc quyết định còn chờ được giữ nguyên.
-- [ ] Một lượt Codex context sạch tìm và áp dụng đúng đường đọc.
-- [ ] Hai repo có source links và status thống nhất; runtime pin không bị thay đổi vô tình.
+- [x] UIC-01/UIC-02 chạy được trong Gallery hiện hữu và có tests hành vi phù hợp.
+- [x] Recipe docs có purpose, source/API, states, layout behavior, ownership và evidence.
+- [x] Skill dẫn tới mapping/source; mẫu và public API được phân biệt rõ.
+- [x] Product pilot dùng production controls trong Lab thật, đúng Business Compact và runtime pin.
+- [x] Catalog giữ read-only, selection/details/copy và state semantics; flow đọc không có Security.Mutate.
+- [x] Native evidence cần thiết được ghi nhận đúng candidate; hạn chế hoặc quyết định còn chờ được giữ nguyên.
+- [x] Một lượt Codex context sạch tìm và áp dụng đúng đường đọc.
+- [x] Hai repo có source links và status thống nhất; runtime pin không bị thay đổi vô tình.
 
 Chỉ số đánh giá thực dụng:
 
@@ -319,6 +323,8 @@ Chỉ số đánh giá thực dụng:
 5. Ghi thời gian tìm mẫu và số vòng sửa layout ở lần áp dụng thực tế tiếp theo; không đặt phần trăm tiết kiệm trước khi có số liệu.
 
 ## 8. Mở rộng sau khi có bằng chứng
+
+**Disposition CMP-T05:** chưa có nhu cầu mở rộng được chứng minh hoặc gap UIC-02 cần chọn follow-up. Các điều kiện dưới đây chỉ là điều kiện tham khảo cho lần chọn scope sau; không tạo task mới. Long-error wrapping của user-edit chưa được xác minh ở mọi viewport/DPI, nhưng thiếu phép đo không tự chứng minh lỗi.
 
 - Master-detail recipe khi ít nhất hai bề mặt thực tế cần cùng một cấu trúc; đánh giá selection/draft navigation trước khi tách abstraction.
 - Grid editing recipe khi có nhu cầu phối hợp lookup/numeric rõ; SourceGrid đặt tại GridGallery, giữ lifecycle thuộc engine/adapter/app đúng nơi.
