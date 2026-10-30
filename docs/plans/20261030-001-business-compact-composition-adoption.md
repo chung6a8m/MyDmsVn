@@ -10,11 +10,11 @@
 
 **Spec:** Thiết kế đã được Owner chọn ở mục 2 của tài liệu này, cùng [Business Compact policy](https://github.com/chung6a8m/MyDmsVn/blob/16c24738a4758ccdceb1f3509f4e37adb0d03464/docs/design/BUSINESS_COMPACT.md) và [Independent UI Labs](https://github.com/chung6a8m/MyDmsVn/blob/16c24738a4758ccdceb1f3509f4e37adb0d03464/docs/design/INDEPENDENT_UI_LABS.md).
 
-**Status:** COMPLETE — bounded composition adoption, **30/10/2026**. CMP-T03–CMP-T05 đạt deliverables tại §7; [handoff evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t05--routing-review-and-handoff) ghi clean-context routing, UIC-02 no-change và đối chiếu từng tiêu chí. Toolkit bàn giao hai recipes tại source `1420f252ca198cd4409e0e945fa6433b30b943b3`, docs/status/evidence sau merge `d439cbdb043e1b798d1f991f0266350d9f61441e`; CMP-T01/T02 có implementation, focused verification và bounded representative attended PASS, Owner APPROVED tại owner toolkit. Product pilot giữ source/runtime; không tạo candidate visual hay quyết định Owner visual mới cho app. Completion này không cấp release hoặc acceptance lịch sử còn mở.
+**Status:** COMPLETE — bounded composition adoption, **30/10/2026**. CMP-T03–CMP-T05 đạt deliverables tại §7; [handoff evidence](../evidence/ui-labs/20261030-ui-composition-adoption.md#cmp-t05--routing-review-and-handoff) ghi clean-context routing, UIC-02 no-change và đối chiếu từng tiêu chí. Toolkit bàn giao correction accessibility recipes tại source/test `bdac29bf4aca20db6618570ecd9a354630bc2e5f`, docs/status/evidence `078eb348ac40b7a7e762a9b3f8b4da3fb19f314c`; visual candidate `1420f25` và approval của nó giữ nguyên như lịch sử riêng. CMP-T01/T02 có implementation, focused verification và bounded representative attended PASS tại owner toolkit. Product pilot giữ source/runtime; không tạo candidate visual hay quyết định Owner visual mới cho app. Completion này không cấp release hoặc acceptance lịch sử còn mở.
 
 ## 0. Roadmap hiện hành và quyền sở hữu trạng thái
 
-[Execution index](README.md) chọn plan này cho scope composition adoption. [Plan toolkit tại handoff](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/d439cbdb043e1b798d1f991f0266350d9f61441e/docs/plans/20261030-001-ui-composition-recipes.md) là owner duy nhất của CMP-T01/CMP-T02; plan này sở hữu CMP-T03/CMP-T04/CMP-T05 và điều phối điều kiện hoàn thành toàn scope. Các entry pages chỉ dẫn đến owner, không duy trì bảng tiến độ khác.
+[Execution index](README.md) chọn plan này cho scope composition adoption. [Plan toolkit tại handoff correction](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/078eb348ac40b7a7e762a9b3f8b4da3fb19f314c/docs/plans/20261030-001-ui-composition-recipes.md) là owner duy nhất của CMP-T01/CMP-T02; plan này sở hữu CMP-T03/CMP-T04/CMP-T05 và điều phối điều kiện hoàn thành toàn scope. Các entry pages chỉ dẫn đến owner, không duy trì bảng tiến độ khác.
 
 | Task | Owner trạng thái | Trạng thái tại owner này | Điều kiện bắt đầu hoặc hoàn tất |
 |---|---|---|---|
@@ -80,7 +80,7 @@ Hai mẫu nền tảng, một đường tra cứu ngắn trong skill và một p
 - Pilot bắt buộc: SecurityPermissionCatalogView trong UI Lab Security hiện hữu.
 - Tham chiếu cho UIC-02: dialog “Sửa thông tin…” của người dùng, userTarget=true/create=false. Đợt này lập mapping và đánh giá mức phù hợp; thay đổi dialog là follow-up chỉ khi có vấn đề cụ thể.
 
-UIC-01/UIC-02 chưa tồn tại tại activation baseline; source thực đã có tại candidate `1420f252ca198cd4409e0e945fa6433b30b943b3`. [Mapping](../design/UI_COMPOSITION_MAPPING.md) dẫn tới từng form và handoff docs; các app pilot changes vẫn phụ thuộc gap cụ thể.
+UIC-01/UIC-02 chưa tồn tại tại activation baseline; source thực sau correction accessibility có tại `bdac29bf4aca20db6618570ecd9a354630bc2e5f`, còn visual candidate `1420f25` là historical approval riêng. [Mapping](../design/UI_COMPOSITION_MAPPING.md) dẫn tới từng form và handoff docs; các app pilot changes vẫn phụ thuộc gap cụ thể.
 
 | Cách làm | Đánh đổi | Quyết định đã chọn |
 |---|---|---|
@@ -299,7 +299,7 @@ Title đề xuất: Route Business Compact UI work through composition recipes.
 
 Khuyến nghị thực thi từng task có review độc lập, với một người điều phối hai repo. Native GUI trên cùng Windows desktop vẫn chạy tuần tự. Mọi sửa skill phải được git commit; không phân phối một bản skill rời ngoài repository.
 
-Owner đã chọn kế hoạch ngày 30/10/2026; phần việc mỗi repo được điều hướng qua execution index hiện hữu. Toolkit PR #6 đã merge tại handoff `d439cbdb043e1b798d1f991f0266350d9f61441e`; app đã hoàn tất source-linked mapping, pilot và handoff trong scope này. Các mục PR ở trên mô tả cách tổ chức scope, không chọn thêm task merge/publish hoặc follow-up. Giữ quyết định trong repository sở hữu và giữ nguyên trạng thái/evidence lịch sử.
+Owner đã chọn kế hoạch ngày 30/10/2026; phần việc mỗi repo được điều hướng qua execution index hiện hữu. Toolkit PR #6 là handoff lịch sử `d439cbdb043e1b798d1f991f0266350d9f61441e`; correction handoff `078eb348ac40b7a7e762a9b3f8b4da3fb19f314c` ghi source/test `bdac29b`. App đã hoàn tất source-linked mapping, pilot và handoff trong scope này. Các mục PR ở trên mô tả cách tổ chức scope, không chọn thêm task merge/publish hoặc follow-up. Giữ quyết định trong repository sở hữu và giữ nguyên trạng thái/evidence lịch sử.
 
 ## 7. Tiêu chí hoàn thành và giá trị đo được
 

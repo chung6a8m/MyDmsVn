@@ -4,7 +4,7 @@
 
 - Ngày 30/10/2026; task CMP-T03, [selected plan](../../plans/20261030-001-business-compact-composition-adoption.md); app inspected source/test `53b951c5974283c47b5f0bc2484d037ab312af47`, branch `codex/cmp-t03`.
 - Product/target: Windows, net48, bitness hiện hữu. Task chỉ thay Markdown/skill routing; smallest verification scope là diff, links/anchors, source/API/status và UTF-8 không BOM/CRLF.
-- Recipe source `1420f252ca198cd4409e0e945fa6433b30b943b3`; handoff docs `d439cbdb043e1b798d1f991f0266350d9f61441e`; runtime gitlink `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf` giữ nguyên. [Mapping](../../design/UI_COMPOSITION_MAPPING.md) chứa exact source/guide/plan/evidence links và product ownership.
+- Đây là refs của checkpoint CMP-T03 ban đầu: recipe source `1420f252ca198cd4409e0e945fa6433b30b943b3`; handoff docs `d439cbdb043e1b798d1f991f0266350d9f61441e`; runtime gitlink `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf` giữ nguyên. Post-handoff correction source/docs nằm ở record cuối, không thay decision visual lịch sử. [Mapping](../../design/UI_COMPOSITION_MAPPING.md) chứa exact source/guide/plan/evidence links và product ownership.
 
 ## Source/API reconciliation
 
@@ -100,7 +100,7 @@ Lượt độc lập được giao đánh giá bố cục Danh mục quyền hi�
 
 Reviewer phân biệt recipe source với runtime gitlink, sample/helper với public UI-core API; nhận diện hai-pane catalog, filter/state/count semantics, read-only/details/copy, canonical identity và app session/lifetime ownership. Reviewer chọn đúng test project `MyDmsVn.Desktop.Ui.Tests`, method-qualified selectors theo changed boundary tại plan §5.2 và owners native typing/filter geometry. Với review docs-only, reviewer không chạy lại GUI/SQL hoặc full classes/solution. Báo cáo nguồn local `cmp-t05-clean-context-report.md` thuộc workspace SDD của plan; kết quả bền vững được ghi tại mục này, không phụ thuộc file scratch để đọc handoff. Lượt routing không phải native evidence hoặc Owner visual decision.
 
-### Exact refs và candidate continuity
+### Exact refs và candidate continuity at original CMP-T05 handoff
 
 | Ref | Đối chiếu tại CMP-T05 |
 |---|---|
@@ -142,3 +142,13 @@ Docs verification: `git diff --check`; local links/anchors và exact GitHub sour
 ## Remaining limits
 
 Scope composition adoption đã hoàn tất có giới hạn; không còn task CMP-T03–T05 mở. Không có app Owner visual decision mới; CMP-T04 supplementary observation không là physical100/125 repeat. UIC-02 chưa có phép đo native mới. Confirmation `3b5f95e2`, historical acceptance và release prerequisites giữ nguyên trạng thái; không mở SQL, release, dialog rewrite hoặc archived acceptance.
+
+## Post-handoff accessibility correction
+
+**DOCS-ONLY app handoff, 30/10/2026.** Correction source/test toolkit `bdac29bf4aca20db6618570ecd9a354630bc2e5f` bỏ `AccessibleName` tĩnh của năm label thông báo động trong hai sample ControlGallery, để `AccessibilityObject.Name` phản chiếu `Text` hiện tại. Toolkit guide/plan/evidence/status tương ứng là `078eb348ac40b7a7e762a9b3f8b4da3fb19f314c`; [mapping](../../design/UI_COMPOSITION_MAPPING.md) dẫn tới source và documents cố định. Visual candidate Owner-approved `1420f252ca198cd4409e0e945fa6433b30b943b3` giữ nguyên là quyết định lịch sử, không được áp lại cho correction accessibility hay AT.
+
+App chỉ cập nhật mapping, entry pages và record handoff. `git ls-tree HEAD vendor/MyDmsVn.WinFormsKit` vẫn là `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`; không đổi app production source, sample, test, project/package graph, SQL, Lab launcher hoặc SourceGrid. Runtime pin đã có public Label/Text và controls mà mapping dùng; không checkout/nâng pin hoặc reference ControlGallery/demo assembly.
+
+Toolkit evidence ghi RED 3/3 đúng boundary accessibility trên mỗi TFM, sau correction discovery 15 cases và execution tuần tự Release net48/net8.0-windows đều 15 PASS / 0 FAIL / 0 SKIP. Đây là evidence của toolkit sample/API và không thay cho app GUI/runtime test. App không chạy build, test, GUI, SQL, actual Login, package/release, Gallery physical100/125, Narrator hoặc NVDA cho docs-only handoff này. Layout/visual không được re-accepted; không thêm Owner gate chỉ do metadata accessibility. Confirmation `3b5f95e2` và mọi giới hạn SEC/SAL/release giữ nguyên.
+
+Docs verification cho record này: diff/link/status/encoding và local git-object review của cả source `bdac29b`, handoff `078eb34`, historical visual candidate `1420f25` và runtime gitlink. Không có claim product or screen-reader acceptance mới.

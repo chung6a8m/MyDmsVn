@@ -1,6 +1,6 @@
 # Documentation index — main
 
-**Current selection: 2026-10-30.** [Business Compact composition adoption](plans/20261030-001-business-compact-composition-adoption.md) is the active roadmap: UIC-01/UIC-02 in WinFormsKit, skill/mapping integration and a read-only Security catalog pilot. The plan owns app task state and links the toolkit task owner. This activation supplies documentation routing; it does not establish sample implementation or native acceptance.
+**Current selection: 2026-10-30.** [Business Compact composition adoption](plans/20261030-001-business-compact-composition-adoption.md) is complete within its bounded scope: UIC-01/UIC-02 in WinFormsKit, skill/mapping integration and a read-only Security catalog pilot. The plan owns app task state and links the toolkit task owner. Toolkit accessibility correction source/test `bdac29b` and handoff `078eb34` update recipe references only; they do not change the app runtime pin, create app native evidence or transfer historical visual approval.
 
 ## Preserved completion and evidence
 

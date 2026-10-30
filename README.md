@@ -4,7 +4,7 @@ Windows desktop-first SME business software for Sales and Inventory. Local v1 in
 
 ## Current development status — main
 
-**Updated: 2026-10-30.** The Owner selected [Business Compact composition adoption](docs/plans/20261030-001-business-compact-composition-adoption.md): two generic Gallery recipes, a route through `mydmsvn-winforms-ui`, and one SQL-free read-only Security catalog pilot. The [execution index](docs/plans/README.md) points to the active app plan; the [toolkit companion](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/main/docs/plans/20261030-001-ui-composition-recipes.md) owns the two sample tasks. The current commit activates documentation; source implementation and native evidence follow the plan. Keep the current runtime toolkit pin and existing Business Compact/independent-Lab contracts.
+**Updated: 2026-10-30.** [Business Compact composition adoption](docs/plans/20261030-001-business-compact-composition-adoption.md) is complete within its bounded scope: two generic Gallery recipes, routing through `mydmsvn-winforms-ui`, and one SQL-free read-only Security catalog pilot. The [execution index](docs/plans/README.md) records the completed app plan; the [toolkit companion](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/078eb348ac40b7a7e762a9b3f8b4da3fb19f314c/docs/plans/20261030-001-ui-composition-recipes.md) owns the two sample tasks and the accessibility correction handoff. Source/test correction `bdac29b` is separate from historical visual approval `1420f25`; app runtime pin remains unchanged. Existing Business Compact/independent-Lab contracts and acceptance limits remain binding.
 
 ### Completed scopes and preserved acceptance
 
