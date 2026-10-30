@@ -90,7 +90,55 @@ Launched exact `samples/MyDmsVn.Desktop.UiLab.Security/bin/Release/net48/MyDmsVn
 
 **Giới hạn:** physical100/125 không chạy lại trong CMP-T04; lượt bổ sung không xác minh độc lập scale và không phải attended Owner review. Không có candidate visual mới, không ghi approval mới. Không chạy SQL, actual Login, package/release, Security full matrix, dialog rewrite hoặc CMP-T05 fresh-context review. No-gap disposition chỉ áp dụng UIC-01 catalog trong scope đã chọn; không đóng source-focus confirmation `3b5f95e2` hay acceptance lịch sử.
 
-## Remaining work
+## CMP-T05 — routing review and handoff
 
-- CMP-T05 **PLANNED**: fresh-context routing review, đối chiếu UIC-02 compatibility/gap và handoff.
-- Plan completion/acceptance **OPEN**. Không mở SQL, release, dialog rewrite hoặc archived acceptance.
+**COMPLETE — docs-only, 30/10/2026.** Task dùng báo cáo read-only độc lập trong context sạch do controller cung cấp, sau đó đối chiếu lại source/git objects trước handoff. Không sửa skill vì review không phát hiện routing defect; không sửa production, samples, tests, project graph hoặc runtime pin. Smallest verification scope là diff/link/object/status/encoding; **NOT RUN** build, test, GUI, SQL, actual Login hoặc package/release trong CMP-T05. Kết quả 20/20 và các quan sát ở CMP-T04 giữ nguyên tác giả, candidate và giới hạn của lượt đó.
+
+### Clean-context routing review
+
+Lượt độc lập được giao đánh giá bố cục Danh mục quyền hiện có theo Business Compact và đề xuất phạm vi thay đổi; prompt không cung cấp trực tiếp tên/path recipe. Reviewer tự tìm AGENTS → repository UI skill → execution index/plan → mapping → exact recipe source/handoff; tìm đúng `SecurityPermissionCatalogView`, product factory và Security Lab dùng production controls/fake ports. Kết luận **NO-CHANGE** cho catalog trong scope hiện có, không tạo diff chỉ để thể hiện adoption.
+
+Reviewer phân biệt recipe source với runtime gitlink, sample/helper với public UI-core API; nhận diện hai-pane catalog, filter/state/count semantics, read-only/details/copy, canonical identity và app session/lifetime ownership. Reviewer chọn đúng test project `MyDmsVn.Desktop.Ui.Tests`, method-qualified selectors theo changed boundary tại plan §5.2 và owners native typing/filter geometry. Với review docs-only, reviewer không chạy lại GUI/SQL hoặc full classes/solution. Báo cáo nguồn local `cmp-t05-clean-context-report.md` thuộc workspace SDD của plan; kết quả bền vững được ghi tại mục này, không phụ thuộc file scratch để đọc handoff. Lượt routing không phải native evidence hoặc Owner visual decision.
+
+### Exact refs và candidate continuity
+
+| Ref | Đối chiếu tại CMP-T05 |
+|---|---|
+| App inspected HEAD trước handoff | `4c05c7598d86b45dbd1bb90c2098733394c063e8`; tracked working tree sạch lúc bắt đầu |
+| Recipe source đã được Owner duyệt | Toolkit `1420f252ca198cd4409e0e945fa6433b30b943b3`, cả hai forms có tại object này |
+| Toolkit source/docs/status sau merge PR #6 | `d439cbdb043e1b798d1f991f0266350d9f61441e`; recipe source là ancestor; delta source → handoff chỉ là bốn file Markdown, không đổi samples/tests/runtime |
+| Toolkit task owner | [Companion ledger tại handoff](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/d439cbdb043e1b798d1f991f0266350d9f61441e/docs/plans/20261030-001-ui-composition-recipes.md): CMP-T01/T02 IMPLEMENTED; focused automation hai TFM PASS; bounded representative attended matrix PASS; Owner APPROVED `1420f25` ngày 30/10/2026. Frozen handoff còn header ACTIVE và một số step checkboxes native/review chưa đánh dấu; task ledger cùng dated attended closure ghi rõ kết quả ở trên. App giữ nguyên metadata của owner toolkit, không tự ghi toolkit plan COMPLETE hoặc dùng checkbox cũ để xóa kết quả đã có evidence. |
+| Recipe docs/evidence | [Guide](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/d439cbdb043e1b798d1f991f0266350d9f61441e/docs/guides/UI_COMPOSITION_RECIPES.md), [verification/attended closure](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/d439cbdb043e1b798d1f991f0266350d9f61441e/docs/verification/20261030-ui-composition-recipes.md); fixed source links cho UIC-01/UIC-02 nằm trong [mapping](../../design/UI_COMPOSITION_MAPPING.md) |
+| Runtime toolkit / SourceGrid | `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf` / `f4e457b43582bf01892f50bdc74aa480531e5944`; giữ nguyên. Không reference Gallery/demo assembly. |
+| Production/sample/test continuity | `src` `a5083a939408501cdf86e40fc6548e2b4323e5a4`; `samples` `53f7fe35de808c5c6d732791a3da753e31ae2bea`; `tests` `900e01fa440760c563edad23820ad88763562735`, đều trùng CMP-T04 và consumer candidate `95916e33650648ef9753223605b5e679d6944d2a` |
+
+`git ls-tree HEAD vendor/MyDmsVn.WinFormsKit`, recursive toolkit tree, `git rev-parse HEAD:src HEAD:samples HEAD:tests`, `git diff 95916e33650648ef9753223605b5e679d6944d2a HEAD -- src samples tests`, toolkit `git merge-base --is-ancestor` và `git diff --stat` xác nhận các facts trên. Đọc object bằng `git show`, không checkout/nâng dependency hoặc lấy trạng thái latest upstream. Runtime → recipe `src` delta thuộc tabs/busy; public controls dùng bởi mapping vẫn có tại pin. Product, Security launcher và UI test project vẫn target net48 qua graph hiện hữu.
+
+### UIC-02 compatibility disposition
+
+Đã đọc [shared identity builder tại app inspected HEAD](https://github.com/chung6a8m/MyDmsVn/blob/4c05c7598d86b45dbd1bb90c2098733394c063e8/src/MyDmsVn.Desktop.WinForms/Features/Security/SecurityWorkspaceEditorBindings.cs), guide UIC-02 và [modal exception evidence](20261028-business-compact-exceptions.md). “Sửa thông tin…” dùng `IdentityDialogAsync(true, false)` → `ShowIdentityDialogAsync(true, false)`; toolkit labels/inputs, validation state và first-invalid focus, Save Primary/Cancel Secondary, `MutationDialog : BootstrapModal` cùng body/footer public phù hợp cho tham chiếu recipe. App giữ authoritative mutation/server feedback, busy/close admission, recovery và originating owner/session guards.
+
+**NO-CHANGE; chưa có gap cụ thể để chọn follow-up.** Validation label `MaximumSize=400` khác recipe tính theo content, nhưng source-only khác biệt chưa chứng minh clipping. Cancel của app đóng theo admission, còn demo phục hồi snapshot cục bộ: đây là khác biệt contract hợp lệ. Long-error wrapping tại mọi viewport/DPI chưa có bằng chứng mới; không tuyên bố dialog đạt recipe acceptance. Không sửa `ShowIdentityDialogAsync`, shared builder, related dialogs hoặc secret clearing; mọi follow-up về sau cần một gap có thể tái hiện và selection riêng, với affected create-user/create-role/edit-role branches được xét đúng phạm vi.
+
+### Đối chiếu §7 và completion boundary
+
+| Deliverable §7 | Evidence và quyết định |
+|---|---|
+| Hai mẫu chạy được + tests | Source `1420f25`, toolkit ledger/evidence tại `d439cbd`; đạt đúng bounded scope của toolkit owner |
+| Recipe purpose/source/API/states/layout/ownership/evidence | Guide tại handoff và hai exact source links; đạt |
+| Skill → mapping/source, demo/API distinction | CMP-T03 mapping và clean-context discovery CMP-T05; đạt, không cần sửa routing |
+| Pilot production controls/Lab/BC/runtime pin | CMP-T04 production SEC_L01, normal/minimum và public APIs tại runtime pin; đạt, no source change |
+| Catalog read-only/selection/details/copy/state, không Security.Mutate | CMP-T04 focused 20/20 và source/state ownership; đạt trong scope catalog |
+| Native candidate evidence và limits giữ đúng | Toolkit bounded attended/approval riêng; app prior physical100/125 đúng candidate cũ + CMP-T04 supplementary DeviceDpi=96, physical scale unverified; đạt nghĩa vụ ghi evidence, không có approval app mới |
+| Clean-context routing | Lượt độc lập tìm đúng đường mà không được chỉ recipe; đạt |
+| Hai repo refs/status thống nhất, pin giữ nguyên | Exact merged toolkit refs, task ledger/dates và app §0/CMP-T03–T05 đối chiếu đúng deliverables; đạt. Frozen toolkit header/step metadata được giữ rõ ở trên, không tuyên bố toolkit plan đã đổi COMPLETE; runtime pin giữ nguyên |
+
+Vì toàn bộ deliverables §7 đã đạt và không có gap layout/tương tác còn mở trong scope được chọn, [app plan](../../plans/20261030-001-business-compact-composition-adoption.md) ghi **COMPLETE — bounded composition adoption**. UIC-02 chỉ cần compatibility disposition; không phải một pilot dialog mới. Không có candidate app visual mới nên không thêm Owner gate mới. Completion không có nghĩa mọi state ở mọi tổ hợp đã được attended; không chuyển approval toolkit thành approval app, không đóng confirmation `3b5f95e2` hoặc historical SEC/SAL/release limits.
+
+Không có nhu cầu recipe/helper/runtime upgrade hoặc dialog follow-up được chứng minh trong task này. Điều kiện mở rộng master-detail, SourceGrid editing, public helper và SAL ở plan §8 vẫn là tham khảo chưa được chọn; không thêm roadmap task. Thời gian tìm mẫu và số vòng sửa layout của lần áp dụng thực tế tiếp theo chưa đo, không đưa ra phần trăm tiết kiệm.
+
+Docs verification: `git diff --check`; local links/anchors và exact GitHub source/blob/commit paths qua local git objects; sole status owner, §7 checkboxes và planned-vs-source distinction; UTF-8 strict/no BOM, CRLF working tree/LF staged blobs. Không chạy GUI/SQL/build/test cho Markdown.
+
+## Remaining limits
+
+Scope composition adoption đã hoàn tất có giới hạn; không còn task CMP-T03–T05 mở. Không có app Owner visual decision mới; CMP-T04 supplementary observation không là physical100/125 repeat. UIC-02 chưa có phép đo native mới. Confirmation `3b5f95e2`, historical acceptance và release prerequisites giữ nguyên trạng thái; không mở SQL, release, dialog rewrite hoặc archived acceptance.
