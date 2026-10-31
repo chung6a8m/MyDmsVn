@@ -16,7 +16,8 @@ public sealed class TraceSecurityAuditSink : ISecurityAuditSink, IDisposable
     public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var category = entry.DocumentType == "WebAuthSessionReplay" ? "WebAuthSessionReplay" : "Application";
+        var category = entry.DocumentType == "WebAuthSessionReplay" || entry.DocumentType == "WebAuthRefresh" ||
+            entry.DocumentType == "WebAuthLogout" || entry.DocumentType == "WebAuthThrottled" ? entry.DocumentType : "Application";
         var action = Enum.IsDefined(typeof(SecurityAuditAction), entry.Action) ? entry.Action.ToString() : "Unknown";
         var outcome = Enum.IsDefined(typeof(SecurityAuditOutcome), entry.Outcome) ? entry.Outcome.ToString() : "Unknown";
         var actor = entry.UserId > 0 ? entry.UserId.Value.ToString(CultureInfo.InvariantCulture) : "-";

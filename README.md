@@ -1,6 +1,6 @@
 # MyDmsVn
 
-**Parallel WEB2 workstream:** WEB2-01–03 are complete within contract, net48 HTTP host and SQL refresh-session scope. See [plan](docs/plans/20261031-003-web2-http-jwt-sales-server.md), [host runbook](src/MyDmsVn.Server.HttpHost/README.md) and [actual evidence](docs/evidence/web2/20261031-http-jwt-sales.md). Auth/Sales endpoints and full IIS/browser pilot remain pending; CEX/desktop work is independent.
+**Parallel WEB2 workstream:** WEB2-01–05 are complete within bounded contract, net48 HTTP host, SQL refresh-session, auth and Sales/Catalog HTTP scope. See [plan](docs/plans/20261031-003-web2-http-jwt-sales-server.md), [host runbook](src/MyDmsVn.Server.HttpHost/README.md) and [actual evidence](docs/evidence/web2/20261031-http-jwt-sales.md). WEB2-06–10, frontend integration and full IIS/browser pilot remain pending; CEX/desktop work is independent.
 
 Windows desktop-first SME business software for Sales and Inventory. Local v1 invokes Application handlers in process through the Local adapter.
 

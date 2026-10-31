@@ -24,6 +24,7 @@ public static class Web2Pipeline
     internal const string CorrelationKey = "mydmsvn.correlation";
     public static void Configure(IAppBuilder app, WebHostOptions options, IServiceProvider services, Action<HttpConfiguration>? configureApi = null)
     {
+        var limiter = new AuthAttemptLimiter();
         var config = new HttpConfiguration { IncludeErrorDetailPolicy = IncludeErrorDetailPolicy.Never };
         config.Services.Replace(typeof(IHttpControllerActivator), new ScopedControllerActivator());
         config.MessageHandlers.Add(new ApiBoundaryHandler());
@@ -65,9 +66,10 @@ public static class Web2Pipeline
                     var admission = scope.ServiceProvider.GetRequiredService<RequestIdentityAdmission>();
                     admission.BeginCorrelation(correlation);
                     var actor = CurrentUser.Anonymous;
-                    var anonymous = context.Request.Method == "GET" && context.Request.Path.Value == "/api/v1/health";
+                    var cookieEndpoint = context.Request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase) && IsCookieEndpoint(context.Request.Path.Value);
+                    var anonymous = cookieEndpoint || context.Request.Method.Equals("GET", StringComparison.OrdinalIgnoreCase) && context.Request.Path.Value == "/api/v1/health";
                     var authorization = context.Request.Headers.GetValues("Authorization");
-                    if (!anonymous || authorization != null)
+                    if (!anonymous || !cookieEndpoint && authorization != null)
                     {
                         var token = ReadBearer(authorization);
                         var valid = token == null ? null : new BearerTokenValidator(options, scope.ServiceProvider.GetRequiredService<IUtcClock>()).Validate(token);
@@ -81,6 +83,8 @@ public static class Web2Pipeline
                     }
                     admission.Admit(actor);
                     context.Set(ScopeKey, scope.ServiceProvider);
+                    context.Set(AuthController.OptionsKey, options);
+                    context.Set(AuthController.LimiterKey, limiter);
                     await next().ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (context.Request.CallCancelled.IsCancellationRequested) { throw; }
@@ -124,12 +128,26 @@ public static class Web2Pipeline
             context.Request.Headers.Keys.Any(key => key.Equals("Forwarded", StringComparison.OrdinalIgnoreCase) || key.StartsWith("X-Forwarded-", StringComparison.OrdinalIgnoreCase)))
             return HttpJson.Error(400, "Request.InvalidTransport", "The request transport is invalid.", correlation);
         var origins = context.Request.Headers.GetValues("Origin");
-        var safeMethod = context.Request.Method == "GET" || context.Request.Method == "HEAD";
+        var safeMethod = context.Request.Method.Equals("GET", StringComparison.OrdinalIgnoreCase) || context.Request.Method.Equals("HEAD", StringComparison.OrdinalIgnoreCase);
         var sites = context.Request.Headers.GetValues("Sec-Fetch-Site");
         if ((!safeMethod && origins == null) || (origins != null && (origins.Count != 1 || origins[0] != options.PublicOrigin)) ||
             (!safeMethod && sites != null && (sites.Count != 1 || sites[0] != "same-origin")))
             return HttpJson.Error(403, "Auth.Forbidden", "Access is denied.", correlation);
+        if (context.Request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase) && IsCookieEndpoint(context.Request.Path.Value))
+        {
+            var requested = context.Request.Headers.GetValues("X-Requested-With");
+            if (requested == null || requested.Count != 1 || requested[0] != "XMLHttpRequest")
+                return HttpJson.Error(403, "Auth.Forbidden", "Access is denied.", correlation);
+        }
         return null;
+    }
+    private static bool IsCookieEndpoint(string path)
+    {
+        // Attribute routes ignore case and trailing slashes; admission must cover the same paths.
+        var route = path.TrimEnd('/');
+        return route.Equals("/api/v1/auth/login", StringComparison.OrdinalIgnoreCase) ||
+            route.Equals("/api/v1/auth/refresh", StringComparison.OrdinalIgnoreCase) ||
+            route.Equals("/api/v1/auth/logout", StringComparison.OrdinalIgnoreCase);
     }
     private static void SetHeaders(IOwinResponse response, string correlation)
     {

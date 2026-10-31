@@ -2,7 +2,7 @@
 
 **Owner:** backend repository; source inspected at `e657d8d`. [Wire/auth design](../../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) owns protocol and security rules. This directory owns the exhaustive field tables and named examples for WEB2-01; [manifest.json](manifest.json) associates payloads with routes and actual HTTP status. Frontend references this corpus rather than copying it.
 
-These are proposed HTTP v1 payloads, not captures from a running server. The dedicated host mapper (WEB2-05) and browser codec (WEB2-08) must consume these fixtures in their own executable tests. Existing Local DTOs and `ApiJson` remain unchanged; they currently emit numeric `long`/`decimal`, so serializing Local DTOs directly does **not** implement this wire contract. HTTP success is `200` for the routes below, including Create and the Post acknowledgement. Auth refresh has an empty body; logout also has an empty body. There is no refresh credential in any JSON payload.
+These hand-authored HTTP v1 examples remain contract fixtures rather than captures from a running server. WEB2-05 now consumes them through the dedicated host mapper and production HTTP routes in executable tests; [execution evidence](../../evidence/web2/20261031-http-jwt-sales.md#web2-05--2026-10-31-salescatalog-endpoints) records the exact verified scope. The browser codec remains WEB2-08. Existing Local DTOs and `ApiJson` remain unchanged and emit numeric `long`/`decimal`; serializing Local DTOs directly does **not** implement this wire contract. HTTP success is `200` for the routes below, including Create and the Post acknowledgement. Auth refresh has an empty body; logout also has an empty body. There is no refresh credential in any JSON payload.
 
 ## Source ownership
 
@@ -54,7 +54,7 @@ Decimal strings use invariant digits and optional dot; no exponent, comma or whi
 
 ## Sales request fields
 
-Route `{saleId}` is `long+` and supplied once in the route. Update/Post bodies omit `saleId`; unknown body fields are rejected by the future host before mutation. Create must send `"0"` on **every** line (existing create validator rejects positive IDs). Update allows `"0"` for a new line and a unique existing positive ID for a retained line. Product IDs may repeat independently of saved line identity.
+Route `{saleId}` is `long+` and supplied once in the route. Update/Post bodies omit `saleId`; the host rejects unknown body fields before mutation. Create must send `"0"` on **every** line (existing create validator rejects positive IDs). Update allows `"0"` for a new line and a unique existing positive ID for a retained line. Product IDs may repeat independently of saved line identity.
 
 | Payload | Exhaustive fields |
 |---|---|
@@ -94,7 +94,7 @@ Query JSON files are typed **logical query maps** for fixtures, not JSON HTTP bo
 
 The initial Sales list query has pageSize 25 and no cursor. Its one-item result is a terminal page: neither cursor is present. This agrees with the existing query service: an initial forward page cannot have a previous cursor, and an underfilled forward page has no look-ahead row to justify a next cursor. The max-int64 first identity also precludes any higher identity for backward navigation. List rows retain `SaleId DESC`, all-document totals and Product Any membership semantics.
 
-[opaque-cursor-vectors.json](opaque-cursor-vectors.json) independently supplies next/previous lexemes for lossless browser URL transport; these are not navigation claims about the terminal list fixture. Both use an anchor below max-int64 and the inspected Application field order, filter hash and Base64url rules. Golden preservation alone does not prove server cursor admission or the existence of rows on either side; WEB2-05 must exercise the existing Application parser and real keyset queries.
+[opaque-cursor-vectors.json](opaque-cursor-vectors.json) independently supplies next/previous lexemes for lossless browser URL transport; these are not navigation claims about the terminal list fixture. Both use an anchor below max-int64 and the inspected Application field order, filter hash and Base64url rules. Golden preservation alone does not prove server cursor admission or the existence of rows on either side; WEB2-05 separately exercises the existing Application parser and real SQL next/previous keyset queries, including changed-filter refusal.
 
 ## Executable corpus checks and limits
 
@@ -104,6 +104,6 @@ Run from the backend repository root with Node 22 (no install or extra npm depen
 node --test scripts/check-web2-wire-fixtures.mjs
 ```
 
-The runner uses `node:test`, strict assertions and BigInt to verify exact string/JSON preservation, declared fixture shapes, boundary values, rounding vectors, lifecycle identity/order, totals/costs, null omission, historical labels, error paths/status and lookup ownership. [sales-200-lines-expansion.json](sales-200-lines-expansion.json) defines deterministic expansion of checked request/detail templates into 200 duplicate-product rows with independent persisted IDs and exact total `0.0200`.
+The runner uses `node:test`, strict assertions and BigInt to verify exact string/JSON preservation, declared fixture shapes, boundary values, rounding vectors, lifecycle identity/order, totals/costs, null omission, historical labels, error paths/status and lookup ownership. [sales-200-lines-expansion.json](sales-200-lines-expansion.json) defines deterministic expansion of checked request/detail templates into 200 duplicate-product rows with independent persisted IDs and exact total `0.0200`. `SalesWireEndpointTests` owns SQL-free production-route/golden checks; `WebSalesHttpSqlTests` independently verifies real restricted-SQL roundtrips, max-int64 persisted identities, exact decimal caps, stock/COGS and authorization. These scopes have separate commands/results in the linked evidence.
 
 [negative-cases.json](negative-cases.json) declares JSON-pointer mutations with expected corpus violations: numeric long/decimal, overflow, noncanonical IDs, exponent/comma decimals, invalid precision, zero quantity, int32 type/range, non-leap/timezone/default sale dates, unknown root/line fields, positive create line identity, body sale ID, null Posted cost and conflicting envelope members. A passing negative corpus assertion proves only that this preflight corpus detects the declared violation. It does **not** prove an HTTP request was rejected or a browser/runtime codec exists. No production parser/schema, JWT issuance, cookie flow, SQL authorization, mutation, IIS, browser or Local parity is exercised by this runner.

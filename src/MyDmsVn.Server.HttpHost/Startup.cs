@@ -20,6 +20,7 @@ public sealed class Startup
         try
         {
             var options = WebHostOptions.FromEnvironment();
+            var sessionOptions = WebAuthSessionConfiguration.Read(Environment.GetEnvironmentVariable);
             var connection = Environment.GetEnvironmentVariable("MYDMSVN_WEB_SQL_CONNECTION_STRING");
             var superuser = Environment.GetEnvironmentVariable("MYDMSVN_WEB_SUPERUSER_USERNAME");
             if (string.IsNullOrWhiteSpace(connection) || string.IsNullOrWhiteSpace(superuser))
@@ -33,6 +34,7 @@ public sealed class Startup
             }
             var services = new ServiceCollection();
             services.AddServerApplication(superuser).AddHttpRequestIdentity();
+            services.AddSingleton(sessionOptions);
             services.Replace(ServiceDescriptor.Singleton<ISecurityAuditSink, TraceSecurityAuditSink>());
             services.AddSqlPersistence(connection!);
             provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
