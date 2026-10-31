@@ -332,7 +332,7 @@ internal sealed class AuthFixture : IDisposable
     private readonly ServiceProvider _provider;
     public WebHostOptions Options { get; }
     public TestServer Server { get; }
-    public AuthFixture()
+    public AuthFixture(Action<IServiceCollection>? configure = null, Action<IOwinContext>? configureRequest = null)
     {
         Options = new WebHostOptions(Origin, Origin, "auth-tests", "active", new Dictionary<string, byte[]> { ["active"] = Encoding.UTF8.GetBytes("active-test-key-at-least-32-bytes-long"), ["previous"] = Encoding.UTF8.GetBytes("previous-test-key-at-least-32-bytes-long") });
         var services = new ServiceCollection();
@@ -346,6 +346,7 @@ internal sealed class AuthFixture : IDisposable
         services.AddSingleton<IUserAccountValidator>(Store);
         services.AddSingleton<IPasswordHasher, TestPasswords>();
         services.AddSingleton<ILegacyPasswordVerifier, TestPasswords>();
+        configure?.Invoke(services);
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         Server = TestServer.Create(app =>
         {
@@ -353,6 +354,7 @@ internal sealed class AuthFixture : IDisposable
             app.Use(async (context, next) =>
             {
                 context.Request.RemoteIpAddress = context.Request.Headers.Get("X-Test-Remote-IP") ?? "192.0.2.1";
+                configureRequest?.Invoke(context);
                 await next();
             });
             Web2Pipeline.Configure(app, Options, _provider, config => config.Services.Replace(typeof(IAssembliesResolver), new AuthAssemblies()));

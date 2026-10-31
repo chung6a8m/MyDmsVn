@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -17,6 +18,7 @@ using MyDmsVn.Server.Infrastructure.Persistence;
 using MyDmsVn.Testing.Sql;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Formatting = Newtonsoft.Json.Formatting;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -42,6 +44,7 @@ public sealed class WebHostIisExpressTests
         Process? process = null;
         var failures = new List<Exception>();
         var drained = true;
+        int customer = 0, warehouse = 0, employee = 0, product = 0;
         try
         {
             var migration = new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString);
@@ -56,6 +59,11 @@ public sealed class WebHostIisExpressTests
                 await connection.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); " +
                     "INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",
                     new { hash = new BcryptPasswordHasher().Hash("IisSmoke_test-only-password_2026!") });
+                customer = await connection.QuerySingleAsync<int>("INSERT dbo.Customers(Code,Name) OUTPUT INSERTED.CustomerId VALUES(N'SMOKE-C',N'Smoke Customer');");
+                warehouse = await connection.QuerySingleAsync<int>("INSERT dbo.Warehouses(Code,Name) OUTPUT INSERTED.WarehouseId VALUES(N'SMOKE-W',N'Smoke Warehouse');");
+                employee = await connection.QuerySingleAsync<int>("INSERT dbo.Employees(Code,Name) OUTPUT INSERTED.EmployeeId VALUES(N'SMOKE-E',N'Smoke Employee');");
+                product = await connection.QuerySingleAsync<int>("INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'SMOKE-P',N'Smoke Product',N'EA');");
+                await connection.ExecuteAsync("INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@warehouse,@product,20,300);", new { warehouse, product });
             }
             var runDirectory = Path.Combine(Path.GetDirectoryName(published!)!, "iis-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(runDirectory);
@@ -110,6 +118,49 @@ public sealed class WebHostIisExpressTests
             var me = await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, bearer);
             Assert.Equal(200, me.Status);
             Assert.Equal("web.smoke", (string?)JObject.Parse(me.Body)["data"]!["username"]);
+            var lookup = await Request("https://localhost:44321/api/v1/catalog/products/lookup?limit=25", thumbprint!, bearer);
+            Assert.Equal(200, lookup.Status);
+            Assert.Contains(JObject.Parse(lookup.Body)["data"]!, row => (int)row["id"]! == product);
+            var saleBody = new JObject
+            {
+                ["saleDate"] = "2024-02-29", ["customerId"] = customer, ["warehouseId"] = warehouse, ["employeeId"] = employee,
+                ["lines"] = new JArray(
+                    new JObject { ["saleLineId"] = "0", ["productId"] = product, ["qty"] = "3.0000", ["unitPrice"] = "25.0000", ["isGift"] = false },
+                    new JObject { ["saleLineId"] = "0", ["productId"] = product, ["qty"] = "2.0000", ["unitPrice"] = "25.0000", ["isGift"] = true }),
+            };
+            var created = await Request("https://localhost:44321/api/v1/sales-receipts", thumbprint!, bearer, "https://localhost:44321", "POST", saleBody.ToString(Formatting.None), csrf: true);
+            Assert.Equal(200, created.Status);
+            var sale = JObject.Parse(created.Body)["data"]!;
+            Assert.Equal(JTokenType.String, sale["saleId"]!.Type);
+            Assert.Equal(JTokenType.String, sale["lines"]![0]!["saleLineId"]!.Type);
+            Assert.Equal(JTokenType.String, sale["totalAmount"]!.Type);
+            var saleUrl = "https://localhost:44321/api/v1/sales-receipts/" + (string)sale["saleId"]!;
+            var fetched = await Request(saleUrl, thumbprint!, bearer);
+            Assert.Equal(200, fetched.Status);
+            Assert.True(JToken.DeepEquals(NormalizeDraftDecimals(sale), NormalizeDraftDecimals(JObject.Parse(fetched.Body)["data"]!)));
+            saleBody["expectedVersion"] = sale["version"]!.DeepClone();
+            saleBody["note"] = "System.Web smoke update";
+            for (var index = 0; index < 2; index++) saleBody["lines"]![index]!["saleLineId"] = sale["lines"]![index]!["saleLineId"]!.DeepClone();
+            var updated = await Request(saleUrl + "/draft", thumbprint!, bearer, "https://localhost:44321", "PUT", saleBody.ToString(Formatting.None), csrf: true);
+            Assert.True(updated.Status == 200, "Sales PUT failed: status=" + updated.Status + "; contentType=" + updated.ContentType + "; correlation=" + updated.Correlation + "; error=" + (updated.Status >= 400 ? updated.Body : "<omitted>"));
+            var posted = await Request(saleUrl + "/post", thumbprint!, bearer, "https://localhost:44321", "POST",
+                new JObject { ["expectedVersion"] = JObject.Parse(updated.Body)["data"]!["version"]!.DeepClone() }.ToString(Formatting.None), csrf: true);
+            Assert.Equal(200, posted.Status);
+            var ack = JObject.Parse(posted.Body)["data"]!;
+            Assert.Equal("Posted", (string?)ack["status"]);
+            Assert.Null(ack["lines"]);
+            var postedDetail = await Request(saleUrl, thumbprint!, bearer);
+            Assert.Equal(200, postedDetail.Status);
+            var postedJson = JObject.Parse(postedDetail.Body)["data"]!;
+            Assert.Equal(JTokenType.String, postedJson["totalCost"]!.Type);
+            Assert.Equal(JTokenType.String, postedJson["lines"]![0]!["postedUnitCost"]!.Type);
+            using (var oracle = new SqlConnection(database.ConnectionString))
+            {
+                await oracle.OpenAsync();
+                Assert.Equal(15m, await oracle.QuerySingleAsync<decimal>("SELECT Quantity FROM dbo.StockBalances;"));
+                Assert.Equal(225m, await oracle.QuerySingleAsync<decimal>("SELECT InventoryValue FROM dbo.StockBalances;"));
+                Assert.Equal(2, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentType='SalesReceipt';"));
+            }
             var crossRefresh = await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://outside.invalid", method: "POST", cookie: signedIn.Cookie, csrf: true);
             Assert.Equal(403, crossRefresh.Status);
             var rotated = await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: signedIn.Cookie, csrf: true);
@@ -177,6 +228,23 @@ public sealed class WebHostIisExpressTests
         }
         throw new FileNotFoundException(relative);
     }
+    private static JToken NormalizeDraftDecimals(JToken detail)
+    {
+        var result = detail.DeepClone();
+        void Normalize(JToken owner, string name)
+        {
+            Assert.Equal(JTokenType.String, owner[name]!.Type);
+            var value = decimal.Parse((string)owner[name]!, CultureInfo.InvariantCulture);
+            Assert.Equal(value, decimal.Round(value, 4));
+            owner[name] = value.ToString("F4", CultureInfo.InvariantCulture);
+        }
+        // The contract permits shorter exact decimal forms. Gift revenue is initially "0",
+        // while SQL decimal(28,4) materializes "0.0000"; IDs/versions remain untouched.
+        Normalize(result, "totalAmount");
+        foreach (var line in result["lines"]!)
+            foreach (var name in new[] { "qty", "unitPrice", "lineAmount" }) Normalize(line, name);
+        return result;
+    }
     private sealed class WebHostSqlFactAttribute : FactAttribute
     {
         public WebHostSqlFactAttribute()
@@ -231,7 +299,7 @@ public sealed class WebHostIisExpressTests
         // Test-only pin for the explicit existing localhost TLS certificate; no runtime callback.
         request.ServerCertificateValidationCallback = (_, certificate, _, _) => certificate != null &&
             string.Equals(certificate.GetCertHashString(), thumbprint, StringComparison.OrdinalIgnoreCase);
-        if (method == "POST")
+        if (method == "POST" || method == "PUT")
         {
             var bytes = body == null ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(body);
             request.ContentType = "application/json; charset=utf-8"; request.ContentLength = bytes.Length;

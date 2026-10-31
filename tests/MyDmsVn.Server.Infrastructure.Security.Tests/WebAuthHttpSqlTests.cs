@@ -209,7 +209,7 @@ public sealed class WebAuthHttpSqlTests
         }
     }
 
-    private sealed class Scenario : IDisposable
+    internal sealed class Scenario : IDisposable
     {
         private const string Origin = "https://web2.mydmsvn.test";
         public const string Password = "HttpSql_test-only-password_2026!";
@@ -259,7 +259,7 @@ public sealed class WebAuthHttpSqlTests
         }
         public Task<Reply> Get(string path, string access) => Request(HttpMethod.Get, path, null, null, access);
         public Task<Reply> Post(string path, string? body = null, string? cookie = null) => Request(HttpMethod.Post, path, body, cookie, null);
-        private async Task<Reply> Request(HttpMethod method, string path, string? body, string? cookie, string? access)
+        internal async Task<Reply> Request(HttpMethod method, string path, string? body, string? cookie, string? access)
         {
             using var request = new HttpRequestMessage(method, Origin + "/api/v1/" + path);
             request.Headers.TryAddWithoutValidation("Origin", Origin);
@@ -284,7 +284,7 @@ public sealed class WebAuthHttpSqlTests
             throw new FileNotFoundException("Provision-MyDmsVnWebPrincipals.sql");
         }
     }
-    private sealed class Reply
+    internal sealed class Reply
     {
         public Reply(int status, string body, string[] cookies) { Status = status; Body = body; SetCookies = cookies; Json = JObject.Parse(body); }
         public int Status { get; }
@@ -314,7 +314,7 @@ public sealed class WebAuthHttpSqlTests
             catch { connection.Dispose(); throw; }
         }
     }
-    private sealed class AuditSink : ISecurityAuditSink
+    internal sealed class AuditSink : ISecurityAuditSink
     {
         private int _refreshFailures;
         public bool ThrowOnRefreshSuccess { get; set; }
