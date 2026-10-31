@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Owin;
 
@@ -32,16 +34,33 @@ internal static class SpaAssets
             if (!File.Exists(file) && Path.GetExtension(path).Length == 0) file = Path.Combine(root, "index.html");
             if (!File.Exists(file) || !ContentTypes.TryGetValue(Path.GetExtension(file), out var contentType))
             { context.Response.StatusCode = 404; return; }
+            byte[]? html = null;
+            string? nonce = null;
+            if (Path.GetExtension(file).Equals(".html", StringComparison.OrdinalIgnoreCase))
+            {
+                string source;
+                using (var reader = new StreamReader(file, Encoding.UTF8)) source = await reader.ReadToEndAsync().ConfigureAwait(false);
+                var head = source.IndexOf("<head>", StringComparison.OrdinalIgnoreCase);
+                if (head < 0) { context.Response.StatusCode = 500; return; }
+                var random = new byte[32];
+                using (var generator = RandomNumberGenerator.Create()) generator.GetBytes(random);
+                nonce = Convert.ToBase64String(random);
+                html = Encoding.UTF8.GetBytes(source.Insert(head + "<head>".Length, "<meta name=\"mydmsvn-style-nonce\" content=\"" + nonce + "\" />"));
+            }
             context.Response.ContentType = contentType;
             context.Response.Headers.Set("X-Content-Type-Options", "nosniff");
             context.Response.Headers.Set("Strict-Transport-Security", "max-age=31536000");
-            context.Response.Headers.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'");
+            context.Response.Headers.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'" + (nonce == null ? "" : " 'nonce-" + nonce + "'") + "; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'");
             context.Response.Headers.Set("Cache-Control", "no-store");
             context.Response.StatusCode = 200;
             if (context.Request.Method != "HEAD")
             {
-                using var stream = File.OpenRead(file);
-                await stream.CopyToAsync(context.Response.Body, 81920, context.Request.CallCancelled).ConfigureAwait(false);
+                if (html != null) await context.Response.Body.WriteAsync(html, 0, html.Length, context.Request.CallCancelled).ConfigureAwait(false);
+                else
+                {
+                    using var stream = File.OpenRead(file);
+                    await stream.CopyToAsync(context.Response.Body, 81920, context.Request.CallCancelled).ConfigureAwait(false);
+                }
             }
         });
     }

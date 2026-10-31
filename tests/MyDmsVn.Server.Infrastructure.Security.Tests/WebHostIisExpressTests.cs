@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Xml;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
@@ -16,6 +19,7 @@ using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using MyDmsVn.Testing.Sql;
+using MyDmsVn.Desktop.Tests;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Formatting = Newtonsoft.Json.Formatting;
@@ -28,8 +32,15 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class WebHostIisExpressTests
 {
     [WebHostSqlFact, Trait("Category", "WebHostIntegration")]
-    public async Task Published_SystemWeb_host_warms_up_with_restricted_schema11_and_serves_safe_HTTP()
+    public Task Published_SystemWeb_host_warms_up_with_restricted_schema11_and_serves_safe_HTTP() => Run(false);
+
+    [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
+    public Task Published_React_browser_uses_real_HTTPS_SQL_and_atomic_stock() => Run(true);
+
+    private static async Task Run(bool browser)
     {
+        GuiTestSafety.ThrowIfPoisoned();
+        if (browser) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
         var published = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY");
         var thumbprint = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT");
         Assert.False(string.IsNullOrWhiteSpace(published));
@@ -59,11 +70,12 @@ public sealed class WebHostIisExpressTests
                 await connection.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); " +
                     "INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",
                     new { hash = new BcryptPasswordHasher().Hash("IisSmoke_test-only-password_2026!") });
-                customer = await connection.QuerySingleAsync<int>("INSERT dbo.Customers(Code,Name) OUTPUT INSERTED.CustomerId VALUES(N'SMOKE-C',N'Smoke Customer');");
-                warehouse = await connection.QuerySingleAsync<int>("INSERT dbo.Warehouses(Code,Name) OUTPUT INSERTED.WarehouseId VALUES(N'SMOKE-W',N'Smoke Warehouse');");
-                employee = await connection.QuerySingleAsync<int>("INSERT dbo.Employees(Code,Name) OUTPUT INSERTED.EmployeeId VALUES(N'SMOKE-E',N'Smoke Employee');");
-                product = await connection.QuerySingleAsync<int>("INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'SMOKE-P',N'Smoke Product',N'EA');");
-                await connection.ExecuteAsync("INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@warehouse,@product,20,300);", new { warehouse, product });
+                customer = await connection.QuerySingleAsync<int>("INSERT dbo.Customers(Code,Name) OUTPUT INSERTED.CustomerId VALUES(N'PILOT-C',N'Pilot Customer');");
+                warehouse = await connection.QuerySingleAsync<int>("INSERT dbo.Warehouses(Code,Name) OUTPUT INSERTED.WarehouseId VALUES(N'PILOT-W',N'Pilot Warehouse');");
+                employee = await connection.QuerySingleAsync<int>("INSERT dbo.Employees(Code,Name) OUTPUT INSERTED.EmployeeId VALUES(N'PILOT-E',N'Pilot Employee');");
+                product = await connection.QuerySingleAsync<int>("INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'PILOT-P',N'Pilot Product',N'EA');");
+                await connection.ExecuteAsync("INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@warehouse,@product,@quantity,@value);", new { warehouse, product, quantity = browser ? 1000 : 20, value = browser ? 15000 : 300 });
+                if (browser) await SeedBrowserActors(connection);
             }
             var runDirectory = Path.Combine(Path.GetDirectoryName(published!)!, "iis-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(runDirectory);
@@ -102,90 +114,111 @@ public sealed class WebHostIisExpressTests
             Assert.Contains("application/json", health.ContentType);
             Assert.Equal("{\"data\":{\"status\":\"ok\"}}", health.Body);
             Assert.Equal("iis-smoke", health.Correlation);
-            var denied = await Request("https://localhost:44321/api/v1/private", thumbprint!);
-            Assert.Equal(401, denied.Status); Assert.Null(denied.Location);
-            Assert.Contains("application/json", denied.ContentType);
-            Assert.Contains("Auth.Unauthorized", denied.Body);
-            var invalid = await Request("https://localhost:44321/api/v1/health", thumbprint!, "Bearer invalid-token");
-            Assert.Equal(401, invalid.Status); Assert.DoesNotContain("invalid-token", invalid.Body);
-            var credentials = JsonConvert.SerializeObject(new { username = "web.smoke", password = "IisSmoke_test-only-password_2026!" });
-            var missingOrigin = await Request("https://localhost:44321/api/v1/auth/login", thumbprint!, method: "POST", body: credentials, csrf: true);
-            Assert.Equal(403, missingOrigin.Status);
-            var signedIn = await Request("https://localhost:44321/api/v1/auth/login", thumbprint!, origin: "https://localhost:44321", method: "POST", body: credentials, csrf: true);
-            Assert.Equal(200, signedIn.Status);
-            AssertRefreshCookie(signedIn, cleared: false);
-            var bearer = "Bearer " + (string)JObject.Parse(signedIn.Body)["data"]!["accessToken"]!;
-            var me = await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, bearer);
-            Assert.Equal(200, me.Status);
-            Assert.Equal("web.smoke", (string?)JObject.Parse(me.Body)["data"]!["username"]);
-            var lookup = await Request("https://localhost:44321/api/v1/catalog/products/lookup?limit=25", thumbprint!, bearer);
-            Assert.Equal(200, lookup.Status);
-            Assert.Contains(JObject.Parse(lookup.Body)["data"]!, row => (int)row["id"]! == product);
-            var saleBody = new JObject
+            if (browser)
             {
-                ["saleDate"] = "2024-02-29", ["customerId"] = customer, ["warehouseId"] = warehouse, ["employeeId"] = employee,
-                ["lines"] = new JArray(
-                    new JObject { ["saleLineId"] = "0", ["productId"] = product, ["qty"] = "3.0000", ["unitPrice"] = "25.0000", ["isGift"] = false },
-                    new JObject { ["saleLineId"] = "0", ["productId"] = product, ["qty"] = "2.0000", ["unitPrice"] = "25.0000", ["isGift"] = true }),
-            };
-            var created = await Request("https://localhost:44321/api/v1/sales-receipts", thumbprint!, bearer, "https://localhost:44321", "POST", saleBody.ToString(Formatting.None), csrf: true);
-            Assert.Equal(200, created.Status);
-            var sale = JObject.Parse(created.Body)["data"]!;
-            Assert.Equal(JTokenType.String, sale["saleId"]!.Type);
-            Assert.Equal(JTokenType.String, sale["lines"]![0]!["saleLineId"]!.Type);
-            Assert.Equal(JTokenType.String, sale["totalAmount"]!.Type);
-            var saleUrl = "https://localhost:44321/api/v1/sales-receipts/" + (string)sale["saleId"]!;
-            var fetched = await Request(saleUrl, thumbprint!, bearer);
-            Assert.Equal(200, fetched.Status);
-            Assert.True(JToken.DeepEquals(NormalizeDraftDecimals(sale), NormalizeDraftDecimals(JObject.Parse(fetched.Body)["data"]!)));
-            saleBody["expectedVersion"] = sale["version"]!.DeepClone();
-            saleBody["note"] = "System.Web smoke update";
-            for (var index = 0; index < 2; index++) saleBody["lines"]![index]!["saleLineId"] = sale["lines"]![index]!["saleLineId"]!.DeepClone();
-            var updated = await Request(saleUrl + "/draft", thumbprint!, bearer, "https://localhost:44321", "PUT", saleBody.ToString(Formatting.None), csrf: true);
-            Assert.True(updated.Status == 200, "Sales PUT failed: status=" + updated.Status + "; contentType=" + updated.ContentType + "; correlation=" + updated.Correlation + "; error=" + (updated.Status >= 400 ? updated.Body : "<omitted>"));
-            var posted = await Request(saleUrl + "/post", thumbprint!, bearer, "https://localhost:44321", "POST",
-                new JObject { ["expectedVersion"] = JObject.Parse(updated.Body)["data"]!["version"]!.DeepClone() }.ToString(Formatting.None), csrf: true);
-            Assert.Equal(200, posted.Status);
-            var ack = JObject.Parse(posted.Body)["data"]!;
-            Assert.Equal("Posted", (string?)ack["status"]);
-            Assert.Null(ack["lines"]);
-            var postedDetail = await Request(saleUrl, thumbprint!, bearer);
-            Assert.Equal(200, postedDetail.Status);
-            var postedJson = JObject.Parse(postedDetail.Body)["data"]!;
-            Assert.Equal(JTokenType.String, postedJson["totalCost"]!.Type);
-            Assert.Equal(JTokenType.String, postedJson["lines"]![0]!["postedUnitCost"]!.Type);
-            using (var oracle = new SqlConnection(database.ConnectionString))
-            {
-                await oracle.OpenAsync();
-                Assert.Equal(15m, await oracle.QuerySingleAsync<decimal>("SELECT Quantity FROM dbo.StockBalances;"));
-                Assert.Equal(225m, await oracle.QuerySingleAsync<decimal>("SELECT InventoryValue FROM dbo.StockBalances;"));
-                Assert.Equal(2, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentType='SalesReceipt';"));
+                foreach (var type in new[] { (Extension: "*.js", Mime: "text/javascript"), (Extension: "*.css", Mime: "text/css"), (Extension: "*.woff2", Mime: "font/woff2") })
+                {
+                    var file = Directory.GetFiles(Path.Combine(published!, "wwwroot", "assets"), type.Extension).First();
+                    var asset = await Request("https://localhost:44321/assets/" + Path.GetFileName(file), thumbprint!);
+                    Assert.True(asset.Status == 200, "Published asset failed: extension=" + type.Extension + "; status=" + asset.Status + "; contentType=" + asset.ContentType);
+                    Assert.Contains(type.Mime, asset.ContentType);
+                    Assert.Equal(File.ReadAllBytes(file), asset.Bytes);
+                }
+                foreach (var deniedPath in new[] { "/assets/missing.js", "/Web.config", "/bin/MyDmsVn.Server.HttpHost.dll" })
+                    Assert.Equal(404, (await Request("https://localhost:44321" + deniedPath, thumbprint!)).Status);
+                Assert.Equal(401, (await Request("https://localhost:44321/api/v1/missing", thumbprint!)).Status);
+                await RunBrowser(database.ConnectionString, runDirectory, customer, warehouse, employee, product);
             }
-            var crossRefresh = await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://outside.invalid", method: "POST", cookie: signedIn.Cookie, csrf: true);
-            Assert.Equal(403, crossRefresh.Status);
-            var rotated = await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: signedIn.Cookie, csrf: true);
-            Assert.Equal(200, rotated.Status);
-            AssertRefreshCookie(rotated, cleared: false);
-            Assert.NotEqual(signedIn.Cookie, rotated.Cookie);
-            var rotatedBearer = "Bearer " + (string)JObject.Parse(rotated.Body)["data"]!["accessToken"]!;
-            Assert.Equal(200, (await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, rotatedBearer)).Status);
-            var admitted = await Request("https://localhost:44321/api/v1/private", thumbprint!, bearer);
-            Assert.Equal(404, admitted.Status); Assert.Contains("application/json", admitted.ContentType);
-            Assert.Null(admitted.Location); Assert.DoesNotContain("<html", admitted.Body);
-            var signedOut = await Request("https://localhost:44321/api/v1/auth/logout", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: rotated.Cookie, csrf: true);
-            Assert.Equal(200, signedOut.Status);
-            AssertRefreshCookie(signedOut, cleared: true);
-            Assert.Equal(401, (await Request("https://localhost:44321/api/v1/private", thumbprint!, bearer)).Status);
-            Assert.Equal(401, (await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, rotatedBearer)).Status);
-            Assert.Equal(401, (await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: rotated.Cookie, csrf: true)).Status);
-            var root = await Request("https://localhost:44321/", thumbprint!);
-            var fallback = await Request("https://localhost:44321/sales/receipt/42", thumbprint!);
-            Assert.Equal(200, root.Status); Assert.Equal(200, fallback.Status); Assert.Equal(root.Body, fallback.Body);
-            Assert.Contains("text/html", fallback.ContentType);
-            Assert.Equal(404, (await Request("https://localhost:44321/missing.js", thumbprint!)).Status);
-            Assert.Equal(400, (await Request("http://localhost:18081/api/v1/health", thumbprint!)).Status);
-            var crossOrigin = await Request("https://localhost:44321/api/v1/health", thumbprint!, origin: "https://outside.invalid");
-            Assert.Equal(403, crossOrigin.Status);
+            else
+            {
+                var denied = await Request("https://localhost:44321/api/v1/private", thumbprint!);
+                Assert.Equal(401, denied.Status); Assert.Null(denied.Location);
+                Assert.Contains("application/json", denied.ContentType);
+                Assert.Contains("Auth.Unauthorized", denied.Body);
+                var invalid = await Request("https://localhost:44321/api/v1/health", thumbprint!, "Bearer invalid-token");
+                Assert.Equal(401, invalid.Status); Assert.DoesNotContain("invalid-token", invalid.Body);
+                var credentials = JsonConvert.SerializeObject(new { username = "web.smoke", password = "IisSmoke_test-only-password_2026!" });
+                var missingOrigin = await Request("https://localhost:44321/api/v1/auth/login", thumbprint!, method: "POST", body: credentials, csrf: true);
+                Assert.Equal(403, missingOrigin.Status);
+                var signedIn = await Request("https://localhost:44321/api/v1/auth/login", thumbprint!, origin: "https://localhost:44321", method: "POST", body: credentials, csrf: true);
+                Assert.Equal(200, signedIn.Status);
+                AssertRefreshCookie(signedIn, cleared: false);
+                var bearer = "Bearer " + (string)JObject.Parse(signedIn.Body)["data"]!["accessToken"]!;
+                var me = await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, bearer);
+                Assert.Equal(200, me.Status);
+                Assert.Equal("web.smoke", (string?)JObject.Parse(me.Body)["data"]!["username"]);
+                var lookup = await Request("https://localhost:44321/api/v1/catalog/products/lookup?limit=25", thumbprint!, bearer);
+                Assert.Equal(200, lookup.Status);
+                Assert.Contains(JObject.Parse(lookup.Body)["data"]!, row => (int)row["id"]! == product);
+                var saleBody = new JObject
+                {
+                    ["saleDate"] = "2024-02-29", ["customerId"] = customer, ["warehouseId"] = warehouse, ["employeeId"] = employee,
+                    ["lines"] = new JArray(
+                        new JObject { ["saleLineId"] = "0", ["productId"] = product, ["qty"] = "3.0000", ["unitPrice"] = "25.0000", ["isGift"] = false },
+                        new JObject { ["saleLineId"] = "0", ["productId"] = product, ["qty"] = "2.0000", ["unitPrice"] = "25.0000", ["isGift"] = true }),
+                };
+                var created = await Request("https://localhost:44321/api/v1/sales-receipts", thumbprint!, bearer, "https://localhost:44321", "POST", saleBody.ToString(Formatting.None), csrf: true);
+                Assert.Equal(200, created.Status);
+                var sale = JObject.Parse(created.Body)["data"]!;
+                Assert.Equal(JTokenType.String, sale["saleId"]!.Type);
+                Assert.Equal(JTokenType.String, sale["lines"]![0]!["saleLineId"]!.Type);
+                Assert.Equal(JTokenType.String, sale["totalAmount"]!.Type);
+                var saleUrl = "https://localhost:44321/api/v1/sales-receipts/" + (string)sale["saleId"]!;
+                var fetched = await Request(saleUrl, thumbprint!, bearer);
+                Assert.Equal(200, fetched.Status);
+                Assert.True(JToken.DeepEquals(NormalizeDraftDecimals(sale), NormalizeDraftDecimals(JObject.Parse(fetched.Body)["data"]!)));
+                saleBody["expectedVersion"] = sale["version"]!.DeepClone();
+                saleBody["note"] = "System.Web smoke update";
+                for (var index = 0; index < 2; index++) saleBody["lines"]![index]!["saleLineId"] = sale["lines"]![index]!["saleLineId"]!.DeepClone();
+                var updated = await Request(saleUrl + "/draft", thumbprint!, bearer, "https://localhost:44321", "PUT", saleBody.ToString(Formatting.None), csrf: true);
+                Assert.True(updated.Status == 200, "Sales PUT failed: status=" + updated.Status + "; contentType=" + updated.ContentType + "; correlation=" + updated.Correlation + "; error=" + (updated.Status >= 400 ? updated.Body : "<omitted>"));
+                var posted = await Request(saleUrl + "/post", thumbprint!, bearer, "https://localhost:44321", "POST",
+                    new JObject { ["expectedVersion"] = JObject.Parse(updated.Body)["data"]!["version"]!.DeepClone() }.ToString(Formatting.None), csrf: true);
+                Assert.Equal(200, posted.Status);
+                var ack = JObject.Parse(posted.Body)["data"]!;
+                Assert.Equal("Posted", (string?)ack["status"]);
+                Assert.Null(ack["lines"]);
+                var postedDetail = await Request(saleUrl, thumbprint!, bearer);
+                Assert.Equal(200, postedDetail.Status);
+                var postedJson = JObject.Parse(postedDetail.Body)["data"]!;
+                Assert.Equal(JTokenType.String, postedJson["totalCost"]!.Type);
+                Assert.Equal(JTokenType.String, postedJson["lines"]![0]!["postedUnitCost"]!.Type);
+                using (var oracle = new SqlConnection(database.ConnectionString))
+                {
+                    await oracle.OpenAsync();
+                    Assert.Equal(15m, await oracle.QuerySingleAsync<decimal>("SELECT Quantity FROM dbo.StockBalances;"));
+                    Assert.Equal(225m, await oracle.QuerySingleAsync<decimal>("SELECT InventoryValue FROM dbo.StockBalances;"));
+                    Assert.Equal(2, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentType='SalesReceipt';"));
+                }
+                var crossRefresh = await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://outside.invalid", method: "POST", cookie: signedIn.Cookie, csrf: true);
+                Assert.Equal(403, crossRefresh.Status);
+                var rotated = await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: signedIn.Cookie, csrf: true);
+                Assert.Equal(200, rotated.Status);
+                AssertRefreshCookie(rotated, cleared: false);
+                Assert.NotEqual(signedIn.Cookie, rotated.Cookie);
+                var rotatedBearer = "Bearer " + (string)JObject.Parse(rotated.Body)["data"]!["accessToken"]!;
+                Assert.Equal(200, (await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, rotatedBearer)).Status);
+                var admitted = await Request("https://localhost:44321/api/v1/private", thumbprint!, bearer);
+                Assert.Equal(404, admitted.Status); Assert.Contains("application/json", admitted.ContentType);
+                Assert.Null(admitted.Location); Assert.DoesNotContain("<html", admitted.Body);
+                var signedOut = await Request("https://localhost:44321/api/v1/auth/logout", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: rotated.Cookie, csrf: true);
+                Assert.Equal(200, signedOut.Status);
+                AssertRefreshCookie(signedOut, cleared: true);
+                Assert.Equal(401, (await Request("https://localhost:44321/api/v1/private", thumbprint!, bearer)).Status);
+                Assert.Equal(401, (await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, rotatedBearer)).Status);
+                Assert.Equal(401, (await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: rotated.Cookie, csrf: true)).Status);
+                var root = await Request("https://localhost:44321/", thumbprint!);
+                var fallback = await Request("https://localhost:44321/sales/receipt/42", thumbprint!);
+                Assert.Equal(200, root.Status); Assert.Equal(200, fallback.Status);
+                Assert.NotEqual(root.Body, fallback.Body);
+                string WithoutNonce(string html) => Regex.Replace(html, "<meta name=\"mydmsvn-style-nonce\" content=\"[^\"]+\" />", "");
+                Assert.Equal(WithoutNonce(root.Body), WithoutNonce(fallback.Body));
+                Assert.Contains("text/html", fallback.ContentType);
+                Assert.Equal(404, (await Request("https://localhost:44321/missing.js", thumbprint!)).Status);
+                Assert.Equal(400, (await Request("http://localhost:18081/api/v1/health", thumbprint!)).Status);
+                var crossOrigin = await Request("https://localhost:44321/api/v1/health", thumbprint!, origin: "https://outside.invalid");
+                Assert.Equal(403, crossOrigin.Status);
+            }
         }
         catch (Exception error) { failures.Add(error); }
         finally
@@ -209,7 +242,7 @@ public sealed class WebHostIisExpressTests
                 catch (Exception error) { failures.Add(error); }
                 finally { process.Dispose(); }
             }
-            if (drained)
+            if (drained && !GuiTestSafety.IsPoisoned)
             {
                 var loginDrained = false;
                 try { await login.CleanupAsync(); loginDrained = true; } catch (Exception error) { failures.Add(error); }
@@ -245,7 +278,7 @@ public sealed class WebHostIisExpressTests
             foreach (var name in new[] { "qty", "unitPrice", "lineAmount" }) Normalize(line, name);
         return result;
     }
-    private sealed class WebHostSqlFactAttribute : FactAttribute
+    private class WebHostSqlFactAttribute : FactAttribute
     {
         public WebHostSqlFactAttribute()
         {
@@ -254,6 +287,101 @@ public sealed class WebHostIisExpressTests
                     Skip = "Packaged IIS Express SQL test requires explicit publish, TLS pin and nonproduction SQL configuration.";
         }
     }
+    private sealed class WebBrowserSqlFactAttribute : WebHostSqlFactAttribute
+    {
+        public WebBrowserSqlFactAttribute()
+        {
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")))
+                Skip = "Real browser pilot requires an explicit frontend checkout with built artifacts and Playwright.";
+        }
+    }
+
+    private const string BrowserPassword = "BrowserPilot_test-only-password_2026!";
+    private static async Task SeedBrowserActors(SqlConnection connection)
+    {
+        var hash = new BcryptPasswordHasher().Hash(BrowserPassword);
+        foreach (var name in new[] { "alice", "bob", "poster" })
+        {
+            var id = await connection.QuerySingleAsync<int>("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(@name,@normalized,@name,N'Local',@hash,N'',N'BCrypt');", new { name, normalized = name.ToUpperInvariant(), hash });
+            foreach (var key in new[] { "Catalog.Products.Read", "Catalog.Customers.Read", "Catalog.Warehouses.Read", "Catalog.Employees.Read", "Sales.Receipts.Read", "Sales.Receipts.Write", "Sales.Receipts.Post" })
+            {
+                var grant = key.StartsWith("Catalog.", StringComparison.Ordinal) || name == "alice" || (name == "bob" ? key == "Sales.Receipts.Read" : key != "Sales.Receipts.Read");
+                await connection.ExecuteAsync("INSERT dbo.UserPermissions(UserId,PermissionKey,Granted) VALUES(@id,@key,@grant);", new { id, key, grant });
+            }
+        }
+    }
+
+    private static async Task RunBrowser(string connectionString, string runDirectory, int customer, int warehouse, int employee, int product)
+    {
+        var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
+        var node = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_NODE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
+        var cli = Path.Combine(checkout, "node_modules", "@playwright", "test", "cli.js");
+        Assert.True(File.Exists(node)); Assert.True(File.Exists(cli));
+        Assert.True(File.Exists(Path.Combine(checkout, "playwright.pilot.config.ts")));
+        var manifestPath = Path.Combine(runDirectory, "browser-manifest.json");
+        var resultPath = Path.Combine(runDirectory, "browser-result.json");
+        var certificatePath = Path.Combine(runDirectory, "localhost-public.pem");
+        object Actor(string username) => new { username, password = BrowserPassword };
+        var manifest = new { origin = "https://localhost:44321", actors = new { alice = Actor("alice"), bob = Actor("bob"), poster = Actor("poster") }, catalog = new { customerId = customer, warehouseId = warehouse, employeeId = employee, productId = product }, resultPath };
+        File.WriteAllText(manifestPath, JsonConvert.SerializeObject(manifest), new UTF8Encoding(false));
+        try
+        {
+            using (var certificates = new X509Store(StoreName.My, StoreLocation.LocalMachine))
+            {
+                certificates.Open(OpenFlags.ReadOnly);
+                using var certificate = certificates.Certificates.Find(X509FindType.FindByThumbprint, Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT"), false).Cast<X509Certificate2>().Single();
+                using var chain = new X509Chain();
+                chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+                Assert.True(chain.Build(certificate), "The explicitly pinned local certificate must already be OS-trusted.");
+                File.WriteAllText(certificatePath, "-----BEGIN CERTIFICATE-----\n" + Convert.ToBase64String(certificate.Export(X509ContentType.Cert), Base64FormattingOptions.InsertLineBreaks) + "\n-----END CERTIFICATE-----\n", new UTF8Encoding(false));
+            }
+            var project = Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT");
+            Assert.Contains(project, new[] { "chromium", "edge" });
+            var start = new ProcessStartInfo(node, "\"" + cli + "\" test --config playwright.pilot.config.ts --workers=1 --max-failures=1 --project=" + project)
+            { WorkingDirectory = checkout, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
+            foreach (var name in start.EnvironmentVariables.Keys.Cast<string>().Where(name => name.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase)).ToArray())
+                start.EnvironmentVariables.Remove(name);
+            start.EnvironmentVariables["MYDMSVN_WEB_PILOT_MANIFEST"] = manifestPath;
+            // Node uses its own CA set; add only the already trusted explicit fixture cert.
+            // The real browser keeps ordinary platform TLS verification; neither ignores errors.
+            start.EnvironmentVariables["NODE_EXTRA_CA_CERTS"] = certificatePath;
+            GuiProcessResult result;
+            try { result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5)); }
+            catch (GuiProcessException error)
+            {
+                File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(error.StandardOutput + error.StandardError), new UTF8Encoding(false));
+                throw new InvalidOperationException("Browser process failed; cleanup verified=" + error.CleanupVerified + ". Inspect the sanitized local browser-output.log.");
+            }
+            File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(result.StandardOutput + result.StandardError), new UTF8Encoding(false));
+            Assert.True(result.ExitCode == 0, "Browser pilot failed; inspect the local browser-output.log (redact before sharing).");
+            var posted = JArray.Parse(File.ReadAllText(resultPath));
+            Assert.NotEmpty(posted);
+            Assert.Equal(posted.Count, posted.Select(row => (string)row["saleId"]!).Distinct().Count());
+            decimal quantity = 0, cost = 0;
+            using var oracle = new SqlConnection(connectionString); await oracle.OpenAsync();
+            foreach (var row in posted)
+            {
+                var id = long.Parse((string)row["saleId"]!, CultureInfo.InvariantCulture);
+                var qty = decimal.Parse((string)row["quantity"]!, CultureInfo.InvariantCulture);
+                var amount = decimal.Parse((string)row["cost"]!, CultureInfo.InvariantCulture);
+                Assert.Equal("Posted", await oracle.QuerySingleAsync<string>("SELECT Status FROM dbo.SalesReceipts WHERE SaleId=@id;", new { id }));
+                Assert.Equal(qty, await oracle.QuerySingleAsync<decimal>("SELECT SUM(Qty) FROM dbo.SalesReceiptLines WHERE SaleId=@id;", new { id }));
+                Assert.Equal(amount, await oracle.QuerySingleAsync<decimal>("SELECT SUM(CostAmount) FROM dbo.SalesReceiptLines WHERE SaleId=@id;", new { id }));
+                quantity += qty; cost += amount;
+            }
+            Assert.Equal(posted.Count, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SalesReceipts WHERE Status='Posted';"));
+            Assert.Equal(1000m - quantity, await oracle.QuerySingleAsync<decimal>("SELECT Quantity FROM dbo.StockBalances;"));
+            Assert.Equal(15000m - cost, await oracle.QuerySingleAsync<decimal>("SELECT InventoryValue FROM dbo.StockBalances;"));
+            Assert.Equal(quantity, -(await oracle.QuerySingleAsync<decimal>("SELECT SUM(QuantityChange) FROM dbo.StockLedger WHERE DocumentType='SalesReceipt';")));
+            Assert.Equal(cost, -(await oracle.QuerySingleAsync<decimal>("SELECT SUM(v.ValueChange) FROM dbo.StockValuationEntries v JOIN dbo.StockLedger l ON l.LedgerId=v.LedgerId WHERE l.DocumentType='SalesReceipt';")));
+            Assert.Equal(await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SalesReceiptLines l JOIN dbo.SalesReceipts s ON s.SaleId=l.SaleId WHERE s.Status='Posted';"),
+                await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId JOIN dbo.SalesReceiptLines s ON s.SaleLineId=l.DocumentLineId AND s.SaleId=l.DocumentId WHERE l.DocumentType='SalesReceipt' AND l.QuantityChange=-s.Qty AND v.ValueChange=-s.CostAmount;"));
+        }
+        finally { File.Delete(manifestPath); File.Delete(certificatePath); }
+    }
+    private static string Sanitize(string output) => Regex.Replace(
+        Regex.Replace(output.Replace(BrowserPassword, "<redacted>"), "(?i)(authorization: Bearer )[^\\s]+", "$1<redacted>"),
+        "(?i)(__Host-mydmsvn-rt=)[^;\\s]+", "$1<redacted>");
     private static void AssertRefreshCookie(Reply reply, bool cleared)
     {
         Assert.NotNull(reply.SetCookie);
@@ -309,12 +437,16 @@ public sealed class WebHostIisExpressTests
         try { response = (HttpWebResponse)await request.GetResponseAsync(); }
         catch (WebException exception) when (exception.Response is HttpWebResponse) { response = (HttpWebResponse)exception.Response; }
         using (response)
-        using (var reader = new StreamReader(response.GetResponseStream()))
-            return new Reply((int)response.StatusCode, response.ContentType, await reader.ReadToEndAsync(), response.Headers["Location"], response.Headers["X-Correlation-ID"], response.Headers["Set-Cookie"]);
+        using (var bytes = new MemoryStream())
+        {
+            await response.GetResponseStream().CopyToAsync(bytes);
+            return new Reply((int)response.StatusCode, response.ContentType, bytes.ToArray(), response.Headers["Location"], response.Headers["X-Correlation-ID"], response.Headers["Set-Cookie"]);
+        }
     }
     private sealed class Reply
     {
-        public Reply(int status, string contentType, string body, string? location, string? correlation, string? setCookie) { Status = status; ContentType = contentType; Body = body; Location = location; Correlation = correlation; SetCookie = setCookie; }
+        public Reply(int status, string contentType, byte[] bytes, string? location, string? correlation, string? setCookie) { Status = status; ContentType = contentType; Bytes = bytes; Body = Encoding.UTF8.GetString(bytes); Location = location; Correlation = correlation; SetCookie = setCookie; }
+        public byte[] Bytes { get; }
         public int Status { get; } public string ContentType { get; } public string Body { get; } public string? Location { get; } public string? Correlation { get; }
         public string? SetCookie { get; }
         public string Cookie => SetCookie!.Split(';')[0].Substring("__Host-mydmsvn-rt=".Length);

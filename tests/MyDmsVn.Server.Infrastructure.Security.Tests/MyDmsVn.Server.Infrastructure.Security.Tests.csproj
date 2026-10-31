@@ -47,5 +47,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\SqlOracle\SqlTestOracle.cs" Link="SqlOracle\SqlTestOracle.cs" />
+    <Compile Include="..\MyDmsVn.Desktop.Tests\GuiOwnedProcess.cs" Link="Fixtures\GuiOwnedProcess.cs" />
   </ItemGroup>
 </Project>
