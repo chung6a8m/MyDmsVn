@@ -1,4 +1,6 @@
 # Identity, permissions and Local sessions
+> **WEB2 (Owner selected 2026-10-31, NOT IMPLEMENTED):** [companion plan](plans/20261031-003-web2-http-jwt-sales-server.md), [JWT/refresh/wire contract](design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md). Keep net48 and existing Local/Domain/Application/SQL business behavior; add a separate IIS HTTP host for ReactWebUI pilot. JWT Bearer access short-lived in browser localStorage (XSS residual), GUID refresh HttpOnly Secure Strict cookie rotated/hashed in SQL, same-origin HTTPS, string int64/decimal on *HTTP-only* DTO. Historic Local/WinForms acceptance and CEX roadmap remain independent. This note selects future implementation, not proof of HTTP/auth/SQL runtime.
+
 
 > Current scheduling boundary — routing updated 2026-10-24: this specification preserves implemented Sales/security/persistence contracts. The former SAL execution plan is [archived](archive/20261023-pre-ui-next/README.md); current work follows the [execution index](plans/README.md), without inheriting unfinished old-plan work. [UI-NEXT](ui-next/README.md) remains a historical reference. Later [T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) uses product/package `f5039cb` and GUI tests `4697744`; native125, attended observations and dated Owner acceptance remain OPEN. Dated checkpoints below retain their own evidence boundary.
 

@@ -2,6 +2,12 @@
 
 **Updated:** 2026-10-30 · **Status:** ACTIVE — EDITABLE LINES COMPOSITION AND SAL ADOPTION · **Activation source:** [`main@014e82d0`](https://github.com/chung6a8m/MyDmsVn/commit/014e82d0013b0a16d73da0b35287d79d5848cc10)
 
+## Parallel Owner-selected workstream — WEB2 net48 HTTP/JWT/Sales
+
+**2026-10-31: selected by the Owner** for [MyDmsVn.ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md): keep **net48**, add a thin IIS Web API 2 host, short-lived Bearer JWT access in **frontend localStorage** (documented XSS risk), rotate hashed GUID refresh in **HttpOnly Secure Strict cookie**, expose existing Sales/Catalog handlers with lossless v1 wire DTOs. This repository owns [WEB2 server companion plan](20261031-003-web2-http-jwt-sales-server.md), [HTTP/auth/wire contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) and [execution evidence](../evidence/web2/20261031-http-jwt-sales.md). **Tasks WEB2-01–05, 08/09, 10 are PLANNED; docs-only activation, no HTTP/SQL evidence.**
+
+**Do not replace, reorder or implicitly complete the separately active CEX-A01–A05 WinForms composition workstream.** WEB2 is a parallel, explicitly selected browser/server workstream; Codex must select a tagged task/PR in its own repo and follow its tests/boundaries. Runtime package/schema changes are authorized **only** when implementing an approved WEB2 task, not by docs creation.
+
 ## Active plan — composition expansion
 
 **Selected by the Owner on 2026-10-30:** [Editable Lines Composition and SAL Adoption](20261030-002-editable-lines-sal-adoption.md), with [selected design](../design/EDITABLE_LINES_SAL_ADOPTION.md), [Codex handoff](../development/COMPOSITION_EXPANSION_CODEX_HANDOFF.md) and [new evidence](../evidence/ui-labs/20261030-composition-expansion.md). This plan owns CEX-A01–A05. [Toolkit companion](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/main/docs/plans/20261030-002-editable-lines-master-detail-recipes.md) owns CEX-K01–K03 and separate native handoffs for UIC-03/UIC-04. Entry pages do not mirror task status.
