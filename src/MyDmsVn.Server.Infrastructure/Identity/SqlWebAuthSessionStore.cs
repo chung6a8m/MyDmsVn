@@ -14,12 +14,15 @@ public sealed class SqlWebAuthSessionStore : IWebAuthSessionStore
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IUtcClock _clock;
     private readonly ISecurityAuditWriter? _auditWriter;
+    private readonly WebAuthSessionOptions _options;
 
-    public SqlWebAuthSessionStore(IDbConnectionFactory connectionFactory, IUtcClock clock, ISecurityAuditWriter? auditWriter = null)
+    public SqlWebAuthSessionStore(IDbConnectionFactory connectionFactory, IUtcClock clock, ISecurityAuditWriter? auditWriter = null,
+        WebAuthSessionOptions? options = null)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _auditWriter = auditWriter;
+        _options = options ?? new WebAuthSessionOptions();
     }
 
     public async Task<WebAuthSessionToken?> IssueAsync(int userId, CancellationToken cancellationToken)
@@ -34,8 +37,8 @@ public sealed class SqlWebAuthSessionStore : IWebAuthSessionStore
         var now = UtcNow();
         var sessionId = Guid.NewGuid();
         var token = NewToken();
-        var expiry = now.AddDays(7);
-        var absolute = now.AddDays(30);
+        var expiry = now.AddDays(_options.IdleLifetimeDays);
+        var absolute = now.AddDays(_options.AbsoluteLifetimeDays);
         using (var command = SqlRead.Command(connection, transaction,
             "INSERT dbo.WebAuthSessions (SessionId,UserId,CreatedAtUtc,AbsoluteExpiresAtUtc,IdleExpiresAtUtc) " +
             "VALUES (@session,@user,@now,@absolute,@expiry);",
@@ -125,7 +128,7 @@ public sealed class SqlWebAuthSessionStore : IWebAuthSessionStore
         if (now < token.IssuedAtUtc) throw new InvalidOperationException("The auth clock moved backwards.");
         var child = NewToken();
         var childHash = Hash(child);
-        var expiry = now.AddDays(7);
+        var expiry = now.AddDays(_options.IdleLifetimeDays);
         if (expiry > session.AbsoluteExpiresAtUtc) expiry = session.AbsoluteExpiresAtUtc;
         await InsertTokenAsync(connection, transaction, childHash, owner.SessionId, now, expiry, cancellationToken).ConfigureAwait(false);
         using (var command = SqlRead.Command(connection, transaction,

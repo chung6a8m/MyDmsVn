@@ -15,6 +15,8 @@ using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using MyDmsVn.Testing.Sql;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -51,8 +53,9 @@ public sealed class WebHostIisExpressTests
                 await connection.ExecuteAsync("CREATE USER [" + login.Name + "] FOR LOGIN [" + login.Name + "]; CREATE USER WebSmokeMigration WITHOUT LOGIN;");
                 await connection.ExecuteAsync(File.ReadAllText(FindRootFile("deployment/sql/Provision-MyDmsVnWebPrincipals.sql"))
                     .Replace("$(WebRuntimeUser)", login.Name).Replace("$(MigrationUser)", "WebSmokeMigration"));
-                await connection.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',N'not-a-login-credential',N'',N'BCrypt'); " +
-                    "INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';");
+                await connection.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); " +
+                    "INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",
+                    new { hash = new BcryptPasswordHasher().Hash("IisSmoke_test-only-password_2026!") });
             }
             var runDirectory = Path.Combine(Path.GetDirectoryName(published!)!, "iis-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(runDirectory);
@@ -97,15 +100,33 @@ public sealed class WebHostIisExpressTests
             Assert.Contains("Auth.Unauthorized", denied.Body);
             var invalid = await Request("https://localhost:44321/api/v1/health", thumbprint!, "Bearer invalid-token");
             Assert.Equal(401, invalid.Status); Assert.DoesNotContain("invalid-token", invalid.Body);
-            var sessionStore = new SqlWebAuthSessionStore(new SqlConnectionFactory(login.ConnectionString(database.DatabaseName)), new LiveClock());
-            var session = await sessionStore.IssueAsync(1, CancellationToken.None);
-            Assert.NotNull(session);
-            var bearer = "Bearer " + Sign(key, session!.SessionId);
+            var credentials = JsonConvert.SerializeObject(new { username = "web.smoke", password = "IisSmoke_test-only-password_2026!" });
+            var missingOrigin = await Request("https://localhost:44321/api/v1/auth/login", thumbprint!, method: "POST", body: credentials, csrf: true);
+            Assert.Equal(403, missingOrigin.Status);
+            var signedIn = await Request("https://localhost:44321/api/v1/auth/login", thumbprint!, origin: "https://localhost:44321", method: "POST", body: credentials, csrf: true);
+            Assert.Equal(200, signedIn.Status);
+            AssertRefreshCookie(signedIn, cleared: false);
+            var bearer = "Bearer " + (string)JObject.Parse(signedIn.Body)["data"]!["accessToken"]!;
+            var me = await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, bearer);
+            Assert.Equal(200, me.Status);
+            Assert.Equal("web.smoke", (string?)JObject.Parse(me.Body)["data"]!["username"]);
+            var crossRefresh = await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://outside.invalid", method: "POST", cookie: signedIn.Cookie, csrf: true);
+            Assert.Equal(403, crossRefresh.Status);
+            var rotated = await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: signedIn.Cookie, csrf: true);
+            Assert.Equal(200, rotated.Status);
+            AssertRefreshCookie(rotated, cleared: false);
+            Assert.NotEqual(signedIn.Cookie, rotated.Cookie);
+            var rotatedBearer = "Bearer " + (string)JObject.Parse(rotated.Body)["data"]!["accessToken"]!;
+            Assert.Equal(200, (await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, rotatedBearer)).Status);
             var admitted = await Request("https://localhost:44321/api/v1/private", thumbprint!, bearer);
             Assert.Equal(404, admitted.Status); Assert.Contains("application/json", admitted.ContentType);
             Assert.Null(admitted.Location); Assert.DoesNotContain("<html", admitted.Body);
-            await sessionStore.RevokeAsync(session.RefreshToken, CancellationToken.None);
+            var signedOut = await Request("https://localhost:44321/api/v1/auth/logout", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: rotated.Cookie, csrf: true);
+            Assert.Equal(200, signedOut.Status);
+            AssertRefreshCookie(signedOut, cleared: true);
             Assert.Equal(401, (await Request("https://localhost:44321/api/v1/private", thumbprint!, bearer)).Status);
+            Assert.Equal(401, (await Request("https://localhost:44321/api/v1/auth/me", thumbprint!, rotatedBearer)).Status);
+            Assert.Equal(401, (await Request("https://localhost:44321/api/v1/auth/refresh", thumbprint!, origin: "https://localhost:44321", method: "POST", cookie: rotated.Cookie, csrf: true)).Status);
             var root = await Request("https://localhost:44321/", thumbprint!);
             var fallback = await Request("https://localhost:44321/sales/receipt/42", thumbprint!);
             Assert.Equal(200, root.Status); Assert.Equal(200, fallback.Status); Assert.Equal(root.Body, fallback.Body);
@@ -156,7 +177,6 @@ public sealed class WebHostIisExpressTests
         }
         throw new FileNotFoundException(relative);
     }
-    private sealed class LiveClock : IUtcClock { public DateTime UtcNow => DateTime.UtcNow; }
     private sealed class WebHostSqlFactAttribute : FactAttribute
     {
         public WebHostSqlFactAttribute()
@@ -166,14 +186,16 @@ public sealed class WebHostIisExpressTests
                     Skip = "Packaged IIS Express SQL test requires explicit publish, TLS pin and nonproduction SQL configuration.";
         }
     }
-    private static string Sign(byte[] key, Guid session)
+    private static void AssertRefreshCookie(Reply reply, bool cleared)
     {
-        string Encode(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var header = Encode(Encoding.UTF8.GetBytes("{\"alg\":\"HS256\",\"kid\":\"smoke\",\"typ\":\"JWT\"}"));
-        var body = Encode(Encoding.UTF8.GetBytes("{\"iss\":\"https://localhost:44321\",\"aud\":\"web-smoke\",\"sub\":\"1\",\"sid\":\"" + session.ToString("D") + "\",\"jti\":\"" + Guid.NewGuid().ToString("D") + "\",\"iat\":" + now + ",\"nbf\":" + now + ",\"exp\":" + (now + 600) + "}"));
-        using var hmac = new HMACSHA256(key);
-        return header + "." + body + "." + Encode(hmac.ComputeHash(Encoding.ASCII.GetBytes(header + "." + body)));
+        Assert.NotNull(reply.SetCookie);
+        var cookie = reply.SetCookie!.ToLowerInvariant();
+        Assert.StartsWith("__host-mydmsvn-rt=", cookie);
+        Assert.Contains("httponly", cookie); Assert.Contains("secure", cookie);
+        Assert.Contains("samesite=strict", cookie); Assert.Contains("path=/", cookie);
+        Assert.DoesNotContain("domain=", cookie);
+        if (cleared) Assert.Contains("max-age=0", cookie);
+        else Assert.True(Guid.TryParseExact(reply.Cookie, "D", out _));
     }
     private static string CreateConfiguration(string runDirectory, string published)
     {
@@ -193,29 +215,41 @@ public sealed class WebHostIisExpressTests
         current.AppendChild(bindings); sites.AppendChild(current);
         var path = Path.Combine(runDirectory, "applicationhost.config"); xml.Save(path); return path;
     }
-    private static async Task<Reply> Request(string url, string thumbprint, string? authorization = null, string? origin = null)
+    private static async Task<Reply> Request(string url, string thumbprint, string? authorization = null, string? origin = null,
+        string method = "GET", string? body = null, string? cookie = null, bool csrf = false)
     {
         var request = (HttpWebRequest)WebRequest.Create(url);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         using var abort = timeout.Token.Register(request.Abort);
         request.AllowAutoRedirect = false; request.Timeout = 10000; request.ReadWriteTimeout = 10000; request.KeepAlive = false;
+        request.Method = method;
         request.Headers["X-Correlation-ID"] = "iis-smoke";
         if (authorization != null) request.Headers["Authorization"] = authorization;
         if (origin != null) request.Headers["Origin"] = origin;
+        if (cookie != null) request.Headers["Cookie"] = "__Host-mydmsvn-rt=" + cookie;
+        if (csrf) { request.Headers["X-Requested-With"] = "XMLHttpRequest"; request.Headers["Sec-Fetch-Site"] = "same-origin"; }
         // Test-only pin for the explicit existing localhost TLS certificate; no runtime callback.
         request.ServerCertificateValidationCallback = (_, certificate, _, _) => certificate != null &&
             string.Equals(certificate.GetCertHashString(), thumbprint, StringComparison.OrdinalIgnoreCase);
+        if (method == "POST")
+        {
+            var bytes = body == null ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(body);
+            request.ContentType = "application/json; charset=utf-8"; request.ContentLength = bytes.Length;
+            if (bytes.Length > 0) using (var stream = await request.GetRequestStreamAsync()) await stream.WriteAsync(bytes, 0, bytes.Length);
+        }
         HttpWebResponse response;
         try { response = (HttpWebResponse)await request.GetResponseAsync(); }
         catch (WebException exception) when (exception.Response is HttpWebResponse) { response = (HttpWebResponse)exception.Response; }
         using (response)
         using (var reader = new StreamReader(response.GetResponseStream()))
-            return new Reply((int)response.StatusCode, response.ContentType, await reader.ReadToEndAsync(), response.Headers["Location"], response.Headers["X-Correlation-ID"]);
+            return new Reply((int)response.StatusCode, response.ContentType, await reader.ReadToEndAsync(), response.Headers["Location"], response.Headers["X-Correlation-ID"], response.Headers["Set-Cookie"]);
     }
     private sealed class Reply
     {
-        public Reply(int status, string contentType, string body, string? location, string? correlation) { Status = status; ContentType = contentType; Body = body; Location = location; Correlation = correlation; }
+        public Reply(int status, string contentType, string body, string? location, string? correlation, string? setCookie) { Status = status; ContentType = contentType; Body = body; Location = location; Correlation = correlation; SetCookie = setCookie; }
         public int Status { get; } public string ContentType { get; } public string Body { get; } public string? Location { get; } public string? Correlation { get; }
+        public string? SetCookie { get; }
+        public string Cookie => SetCookie!.Split(';')[0].Substring("__Host-mydmsvn-rt=".Length);
     }
     private sealed class OwnedLogin
     {

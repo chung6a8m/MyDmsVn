@@ -3,12 +3,15 @@
     <TargetFramework>net48</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
   <ItemGroup>
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Respawn" />
+    <PackageReference Include="Microsoft.Owin.Testing" VersionOverride="[4.2.3]" />
     <PackageReference Include="dbup-sqlserver" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
@@ -24,6 +27,7 @@
     <ProjectReference Include="..\..\src\MyDmsVn.Desktop.Infrastructure.Local\MyDmsVn.Desktop.Infrastructure.Local.csproj" />
     <ProjectReference Include="..\..\src\MyDmsVn.Server.DbMigrator\MyDmsVn.Server.DbMigrator.csproj" />
     <ProjectReference Include="..\..\src\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MyDmsVn.Server.HttpHost\MyDmsVn.Server.HttpHost.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\Fixtures\ReusableSqlFixture.cs" Link="Fixtures\ReusableSqlFixture.cs" />

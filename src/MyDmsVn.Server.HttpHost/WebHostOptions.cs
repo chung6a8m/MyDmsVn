@@ -42,6 +42,14 @@ public sealed class WebHostOptions
     internal byte[]? FindKey(string keyId) => _keys.TryGetValue(keyId, out var value) ? (byte[])value.Clone() : null;
     private static bool ValidKeyId(string value) => value != null && Regex.IsMatch(value, "\\A[A-Za-z0-9_-]{1,64}\\z");
 
+    private static int ReadAccessLifetime()
+    {
+        var configured = Environment.GetEnvironmentVariable("MYDMSVN_WEB_ACCESS_LIFETIME_MINUTES");
+        if (configured == null) return 10;
+        if (!int.TryParse(configured, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var minutes))
+            throw new FormatException();
+        return minutes;
+    }
     public static WebHostOptions FromEnvironment()
     {
         try
@@ -50,7 +58,8 @@ public sealed class WebHostOptions
             var keys = Required("MYDMSVN_WEB_JWT_KEYS").Split(',').Select(entry => entry.Split(':'))
                 .ToDictionary(parts => parts.Length == 2 ? parts[0] : throw new FormatException(), parts => Convert.FromBase64String(parts[1]), StringComparer.Ordinal);
             return new WebHostOptions(Required("MYDMSVN_WEB_ORIGIN"), Required("MYDMSVN_WEB_JWT_ISSUER"),
-                Required("MYDMSVN_WEB_JWT_AUDIENCE"), Required("MYDMSVN_WEB_JWT_ACTIVE_KID"), keys);
+                Required("MYDMSVN_WEB_JWT_AUDIENCE"), Required("MYDMSVN_WEB_JWT_ACTIVE_KID"), keys,
+                accessLifetimeMinutes: ReadAccessLifetime());
         }
         catch (Exception exception) when (exception is ArgumentException || exception is FormatException || exception is InvalidOperationException || exception is IndexOutOfRangeException)
         { throw new InvalidOperationException("WEB2 configuration is missing or invalid."); }

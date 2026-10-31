@@ -23,6 +23,26 @@ public sealed class WebAuthSessionSqlTests
     private static readonly CancellationToken None = CancellationToken.None;
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Configured_idle_and_absolute_lifetimes_apply_to_issue_rotation_and_expiry() => Owned(async test =>
+    {
+        var issuedAt = test.Clock.UtcNow;
+        var store = new SqlWebAuthSessionStore(test.Factory, test.Clock, options: new WebAuthSessionOptions(2, 5));
+        var token = (await store.IssueAsync(test.UserId, None))!;
+        Assert.Equal(issuedAt.AddDays(2), token.ExpiresAtUtc);
+        Assert.Equal(issuedAt.AddDays(5), token.AbsoluteExpiresAtUtc);
+        foreach (var day in new[] { 1d, 2.5d, 4d })
+        {
+            test.Clock.UtcNow = issuedAt.AddDays(day);
+            token = (await store.RotateAsync(token.RefreshToken, None))!;
+            Assert.NotNull(token);
+        }
+        Assert.Equal(issuedAt.AddDays(5), token.ExpiresAtUtc);
+        test.Clock.UtcNow = issuedAt.AddDays(5);
+        Assert.Null(await store.GetActiveUserAsync(token.SessionId, test.UserId, None));
+        Assert.Null(await store.RotateAsync(token.RefreshToken, None));
+    });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Issue_persists_only_hash_and_authoritative_session_actor() => Owned(async test =>
     {
         var issued = (await test.Store.IssueAsync(test.UserId, None))!;
