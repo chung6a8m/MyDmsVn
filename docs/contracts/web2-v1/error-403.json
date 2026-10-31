@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "Auth.Forbidden",
+    "message": "The operation is not permitted.",
+    "details": [],
+    "correlationId": "web2-fixture-403"
+  }
+}

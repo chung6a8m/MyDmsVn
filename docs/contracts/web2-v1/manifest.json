@@ -1,0 +1,186 @@
+{
+  "contractVersion": "web2-v1",
+  "sourceBaseline": "e657d8d",
+  "status": "WEB2-01 preflight; runtime HTTP mapper/codec not implemented",
+  "routeSaleId": "9223372036854775807",
+  "fixtures": [
+    {
+      "file": "auth-me-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/auth/me"
+    },
+    {
+      "file": "auth-capabilities-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/auth/capabilities?feature=sales"
+    },
+    {
+      "file": "auth-token-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "POST /api/v1/auth/login OR POST /api/v1/auth/refresh"
+    },
+    {
+      "file": "auth-logout-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "POST /api/v1/auth/logout"
+    },
+    {
+      "file": "auth-login-request.json",
+      "kind": "request",
+      "route": "POST /api/v1/auth/login"
+    },
+    {
+      "file": "sales-create-request.json",
+      "kind": "request",
+      "route": "POST /api/v1/sales-receipts"
+    },
+    {
+      "file": "sales-create-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "POST /api/v1/sales-receipts"
+    },
+    {
+      "file": "sales-update-request.json",
+      "kind": "request",
+      "route": "PUT /api/v1/sales-receipts/{saleId}/draft"
+    },
+    {
+      "file": "sales-update-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "PUT /api/v1/sales-receipts/{saleId}/draft"
+    },
+    {
+      "file": "sales-post-request.json",
+      "kind": "request",
+      "route": "POST /api/v1/sales-receipts/{saleId}/post"
+    },
+    {
+      "file": "sales-post-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "POST /api/v1/sales-receipts/{saleId}/post"
+    },
+    {
+      "file": "sales-get-draft-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/sales-receipts/{saleId}"
+    },
+    {
+      "file": "sales-get-posted-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/sales-receipts/{saleId}"
+    },
+    {
+      "file": "sales-list-query.json",
+      "kind": "query",
+      "route": "GET /api/v1/sales-receipts"
+    },
+    {
+      "file": "sales-list-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/sales-receipts"
+    },
+    {
+      "file": "sales-list-empty-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/sales-receipts"
+    },
+    {
+      "file": "catalog-lookup-query.json",
+      "kind": "query",
+      "route": "GET /api/v1/catalog/{products|customers|warehouses|employees}/lookup"
+    },
+    {
+      "file": "catalog-products-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/catalog/products/lookup"
+    },
+    {
+      "file": "catalog-customers-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/catalog/customers/lookup"
+    },
+    {
+      "file": "catalog-warehouses-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/catalog/warehouses/lookup"
+    },
+    {
+      "file": "catalog-employees-response.json",
+      "kind": "response",
+      "status": 200,
+      "route": "GET /api/v1/catalog/employees/lookup"
+    },
+    {
+      "file": "error-400.json",
+      "kind": "response",
+      "status": 400,
+      "route": "ANY matching application/auth failure"
+    },
+    {
+      "file": "error-401.json",
+      "kind": "response",
+      "status": 401,
+      "route": "ANY matching application/auth failure"
+    },
+    {
+      "file": "error-403.json",
+      "kind": "response",
+      "status": 403,
+      "route": "ANY matching application/auth failure"
+    },
+    {
+      "file": "error-404.json",
+      "kind": "response",
+      "status": 404,
+      "route": "ANY matching application/auth failure"
+    },
+    {
+      "file": "error-409.json",
+      "kind": "response",
+      "status": 409,
+      "route": "ANY matching application/auth failure"
+    },
+    {
+      "file": "numeric-vectors.json",
+      "kind": "corpus-control"
+    },
+    {
+      "file": "negative-cases.json",
+      "kind": "corpus-control"
+    },
+    {
+      "file": "sales-200-lines-expansion.json",
+      "kind": "corpus-control"
+    },
+    {
+      "file": "error-401-invalid-credentials.json",
+      "kind": "response",
+      "status": 401,
+      "route": "POST /api/v1/auth/login"
+    },
+    {
+      "file": "error-409-already-posted.json",
+      "kind": "response",
+      "status": 409,
+      "route": "PUT draft OR POST post"
+    },
+    {
+      "file": "opaque-cursor-vectors.json",
+      "kind": "corpus-control"
+    }
+  ]
+}

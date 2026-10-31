@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "SalesReceipt.AlreadyPosted",
+    "message": "The sales receipt is already posted.",
+    "details": [
+      {
+        "code": "SalesReceipt.AlreadyPosted",
+        "message": "The sales receipt is already posted."
+      }
+    ],
+    "correlationId": "web2-fixture-409-already-posted"
+  }
+}

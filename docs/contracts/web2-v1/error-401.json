@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "Auth.Unauthorized",
+    "message": "Authentication is required.",
+    "details": [],
+    "correlationId": "web2-fixture-401"
+  }
+}

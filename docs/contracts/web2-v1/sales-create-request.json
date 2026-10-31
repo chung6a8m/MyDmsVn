@@ -1,0 +1,30 @@
+{
+  "saleDate": "2024-02-29",
+  "customerId": 101,
+  "warehouseId": 102,
+  "employeeId": 103,
+  "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+  "lines": [
+    {
+      "saleLineId": "0",
+      "productId": 104,
+      "qty": "1.2500",
+      "unitPrice": "2.0000",
+      "isGift": false
+    },
+    {
+      "saleLineId": "0",
+      "productId": 104,
+      "qty": "0.0001",
+      "unitPrice": "0.5000",
+      "isGift": false
+    },
+    {
+      "saleLineId": "0",
+      "productId": 104,
+      "qty": "2.0000",
+      "unitPrice": "3.0000",
+      "isGift": true
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "queryFixture": "sales-list-query.json",
+  "nextCursor": "eyJ2IjoxLCJvcmRlciI6IlNhbGVJZERlc2MiLCJkaXJlY3Rpb24iOiJuZXh0IiwiYW5jaG9yIjo5MDA3MTk5MjU0NzQwOTkzLCJwYWdlU2l6ZSI6MjUsImZpbHRlckhhc2giOiJXZi1Ta0UwOWRfd2Etc0RvVFE0RmluUDdGR1RCa0RTUlVDNWYzYlhDblVJIn0",
+  "previousCursor": "eyJ2IjoxLCJvcmRlciI6IlNhbGVJZERlc2MiLCJkaXJlY3Rpb24iOiJwcmV2aW91cyIsImFuY2hvciI6OTAwNzE5OTI1NDc0MDk5MywicGFnZVNpemUiOjI1LCJmaWx0ZXJIYXNoIjoiV2YtU2tFMDlkX3dhLXNEb1RRNEZpblA3RkdUQmtEU1JVQzVmM2JYQ25VSSJ9"
+}

@@ -1,6 +1,6 @@
 # WEB2 companion — HTTP/JWT/Sales server vertical slice (net48)
 
-**Ngày:** 2026-10-31. **Owner chọn:** giữ `net48`, thin HTTP host, Bearer JWT short-lived trong frontend localStorage, refresh GUID trong HttpOnly cookie. **Trạng thái:** ACTIVE / PLANNED / DOCS ONLY sau khi PR này được merge. **Repo:** `chung6a8m/MyDmsVn`; **phối hợp:** [ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md). Các task HTTP ở đây **song song, độc lập** với CEX-A01–A05 (WinForms); không thay thế active composition roadmap.
+**Ngày:** 2026-10-31. **Owner chọn:** giữ `net48`, thin HTTP host, Bearer JWT short-lived trong frontend localStorage, refresh GUID trong HttpOnly cookie. **Trạng thái:** ACTIVE / WEB2-01 DONE (contract/preflight); các task runtime tiếp theo PLANNED. **Repo:** `chung6a8m/MyDmsVn`; **phối hợp:** [ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md). Các task HTTP ở đây **song song, độc lập** với CEX-A01–A05 (WinForms); không thay thế active composition roadmap.
 
 **Bắt buộc đọc:** [web2 contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [architecture](../ARCHITECTURE.md), [security](../SECURITY.md), [contracts](../CONTRACTS.md), [SQL security](../CONFIGURATION_AND_SQL_SECURITY.md), [test policy](../TEST_POLICY.md), [direct sales](../DIRECT_SALES.md), `src/MyDmsVn.Server.Application/Identity`, `Sales`, `src/MyDmsVn.Server.Infrastructure/DependencyInjection.cs` và `src/MyDmsVn.Server.DbMigrator`. Base: `main@5b9f960`; recheck fresh HEAD trước implementation. Không sao chép Runtime/desktop acceptance sang API.
 
@@ -8,7 +8,7 @@
 
 | Task (globally tracked in Web UI roadmap) | Owner | Depends | Output / gate | State |
 |---|---|---|---|---|
-| WEB2-01 — contract & host preflight | Both | — | ADR/HTTP examples/locked compatible dependencies, pilot HTTPS origin, exact schema admission | PLANNED |
+| WEB2-01 — contract & host preflight | Both | — | ADR/HTTP examples/locked compatible dependencies, pilot HTTPS origin, exact schema admission | DONE (bounded) |
 | WEB2-02 — host + scoped actor | Server | WEB2-01 | Web API 2 `net48` host, DI, bearer validate per request, HTTPS/correlation/health, no Desktop DI | PLANNED |
 | WEB2-03 — refresh persistence | Server | WEB2-01 | DbUp 011, restricted SQL permissions, hashed token store, atomic session/rotation/replay tests | PLANNED |
 | WEB2-04 — login/refresh/logout/capabilities | Server | WEB2-02,03 | JWT issue/validate, cookies+CSRF, active actor, revocation, auth negative suite | PLANNED |
@@ -25,6 +25,8 @@
 3. Chốt web DTO v1: int64/decimal là string, int32 numeric, SaleDate date-only, post ack; lập golden JSON cho success 400/401/403/404/409, User/Capability, Sales create/update/get/list/post, Catalog lookup. Ghi status mapping, legacy Local unaffected.
 4. Xác minh schema10 hiện tại, DbUp preflight (Empty/exact10/exact9 case), privilege SQL; mô tả rõ 011 chỉ chạy trên supported state, không tác động historical schema9 package hoặc unsupported prefixes.
 5. Nghiệm thu: ADR ghi trade-off localStorage XSS; contract fixtures/roundtrips thử được, target/test matrix cụ thể, không code thực thi nếu dependency/hosting compatibility chưa xác minh. Tách OPEN/blocked thực sự thay vì tự chọn ASP.NET Core.
+
+**WEB2-01 result:** [ADR 0012](../adr/0012-web2-net48-host-preflight.md), [wire v1 corpus](../contracts/web2-v1/README.md), [isolated net48 probe](../../tools/Web2.HostPreflight/README.md), [actual evidence](../evidence/web2/20261031-http-jwt-sales.md). GO cho implementation kế tiếp; NO-GO cho runtime/deployment acceptance.
 
 ## WEB2-02 — web host, request DI, bearer authorization
 

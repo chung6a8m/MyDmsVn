@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "SalesReceipt.ConcurrencyConflict",
+    "message": "The sales receipt was changed by another operation.",
+    "details": [
+      {
+        "code": "SalesReceipt.ConcurrencyConflict",
+        "message": "The sales receipt was changed by another operation."
+      }
+    ],
+    "correlationId": "web2-fixture-409"
+  }
+}

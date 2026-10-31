@@ -1,0 +1,12 @@
+{
+  "baseRequest": "sales-create-request.json",
+  "baseResponse": "sales-create-response.json",
+  "lineTemplateIndex": 0,
+  "count": 200,
+  "productId": 104,
+  "qty": "0.0001",
+  "unitPrice": "1.0000",
+  "isGift": false,
+  "firstSaleLineId": "9007199254740993",
+  "expectedTotalAmount": "0.0200"
+}

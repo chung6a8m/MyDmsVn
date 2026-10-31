@@ -1,0 +1,165 @@
+{
+  "cases": [
+    {
+      "name": "numeric-long",
+      "fixture": "sales-post-response.json",
+      "pointer": "/data/saleId",
+      "value": 9007199254740992,
+      "expectedViolation": "int64-string"
+    },
+    {
+      "name": "numeric-decimal",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/qty",
+      "value": 1.25,
+      "expectedViolation": "decimal-string"
+    },
+    {
+      "name": "long-overflow",
+      "fixture": "sales-post-response.json",
+      "pointer": "/data/saleId",
+      "value": "9223372036854775808",
+      "expectedViolation": "int64-range"
+    },
+    {
+      "name": "negative-long",
+      "fixture": "sales-post-response.json",
+      "pointer": "/data/saleId",
+      "value": "-1",
+      "expectedViolation": "int64-range"
+    },
+    {
+      "name": "noncanonical-long",
+      "fixture": "sales-post-response.json",
+      "pointer": "/data/saleId",
+      "value": "01",
+      "expectedViolation": "int64-canonical"
+    },
+    {
+      "name": "fraction-long",
+      "fixture": "sales-post-response.json",
+      "pointer": "/data/saleId",
+      "value": "1.0",
+      "expectedViolation": "int64-canonical"
+    },
+    {
+      "name": "decimal-exponent",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/qty",
+      "value": "1e2",
+      "expectedViolation": "decimal-canonical"
+    },
+    {
+      "name": "decimal-comma",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/qty",
+      "value": "1,25",
+      "expectedViolation": "decimal-canonical"
+    },
+    {
+      "name": "qty-overflow",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/qty",
+      "value": "100000000000000.0000",
+      "expectedViolation": "decimal-range"
+    },
+    {
+      "name": "qty-scale",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/qty",
+      "value": "1.00001",
+      "expectedViolation": "decimal-scale"
+    },
+    {
+      "name": "price-overflow",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/unitPrice",
+      "value": "1000000000000000.0000",
+      "expectedViolation": "decimal-range"
+    },
+    {
+      "name": "zero-qty",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/qty",
+      "value": "0",
+      "expectedViolation": "positive-qty"
+    },
+    {
+      "name": "int32-overflow",
+      "fixture": "sales-create-request.json",
+      "pointer": "/customerId",
+      "value": 2147483648,
+      "expectedViolation": "int32-range"
+    },
+    {
+      "name": "int32-string",
+      "fixture": "sales-create-request.json",
+      "pointer": "/customerId",
+      "value": "101",
+      "expectedViolation": "int32-number"
+    },
+    {
+      "name": "nonleap-date",
+      "fixture": "sales-create-request.json",
+      "pointer": "/saleDate",
+      "value": "2026-02-29",
+      "expectedViolation": "calendar-date"
+    },
+    {
+      "name": "timestamp-date",
+      "fixture": "sales-create-request.json",
+      "pointer": "/saleDate",
+      "value": "2024-02-29T00:00:00+07:00",
+      "expectedViolation": "calendar-date"
+    },
+    {
+      "name": "default-date",
+      "fixture": "sales-create-request.json",
+      "pointer": "/saleDate",
+      "value": "0001-01-01",
+      "expectedViolation": "required-sale-date"
+    },
+    {
+      "name": "unknown-root-field",
+      "fixture": "sales-create-request.json",
+      "pointer": "/actorUserId",
+      "value": 1,
+      "expectedViolation": "unknown-field"
+    },
+    {
+      "name": "unknown-line-field",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/clientLineId",
+      "value": "private-client-id",
+      "expectedViolation": "unknown-field"
+    },
+    {
+      "name": "create-positive-line-id",
+      "fixture": "sales-create-request.json",
+      "pointer": "/lines/0/saleLineId",
+      "value": "1",
+      "expectedViolation": "create-line-zero"
+    },
+    {
+      "name": "post-body-sale-id",
+      "fixture": "sales-post-request.json",
+      "pointer": "/saleId",
+      "value": "1",
+      "expectedViolation": "unknown-field"
+    },
+    {
+      "name": "null-cost-posted",
+      "fixture": "sales-get-posted-response.json",
+      "pointer": "/data/totalCost",
+      "value": null,
+      "expectedViolation": "posted-cost-required"
+    },
+    {
+      "name": "both-envelope-members",
+      "fixture": "error-400.json",
+      "pointer": "/data",
+      "value": {},
+      "expectedViolation": "envelope-exclusive"
+    }
+  ]
+}
