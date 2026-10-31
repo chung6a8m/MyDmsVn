@@ -1,0 +1,20 @@
+{
+  "data": {
+    "items": [
+      {
+        "saleId": "9223372036854775807",
+        "saleNumber": "SA0000000042",
+        "saleDate": "2024-02-29",
+        "customerId": 101,
+        "customerDisplayName": "KH101 - Khách hàng cũ",
+        "warehouseId": 102,
+        "warehouseDisplayName": "K102 - Kho cũ",
+        "employeeId": 103,
+        "employeeDisplayName": "NV103 - Nhân viên cũ",
+        "status": "Posted",
+        "totalAmount": "2.5001",
+        "lineCount": 3
+      }
+    ]
+  }
+}

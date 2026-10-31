@@ -47,7 +47,7 @@
 | `GET /api/v1/auth/capabilities?feature=sales` | Bearer | `{read,write,post}` qua `IPermissionAuthorizationService` (từng code key); chỉ UI hint, server kiểm tra lại từng operation. |
 
 - Thêm `Cache-Control: no-store` cho auth responses (kể cả lỗi), `X-Content-Type-Options: nosniff`; không cho redirect 302 đến login HTML ở API.
-- `POST login/refresh/logout` là cookie-changing endpoints: reject Origin không match exact configured public origin (bao gồm missing Origin trên browser path); check `Sec-Fetch-Site` và yêu cầu custom `X-Requested-With`/CSRF defense tương đương đã test. SameSite=Strict **không thay** đầy đủ CSRF validation; CORS không mở wildcard. Host trusted proxy chỉ nhận Forwarded/Host từ allowlisted proxy, không suy cookie Secure/redirect từ header khách gửi trực tiếp.
+- `POST login/refresh/logout` là cookie-changing endpoints: reject Origin không match exact configured public origin (bao gồm missing Origin trên browser path); check `Sec-Fetch-Site` và bắt buộc header `X-Requested-With: XMLHttpRequest` cho browser cookie-changing endpoints. `Origin` do browser tạo, client không tự gán; missing/cross-origin đều bị từ chối. Pilot template origin là `https://web2.mydmsvn.test`; đây là cấu hình mục tiêu, chưa là bằng chứng DNS/certificate/IIS đã chạy. SameSite=Strict **không thay** đầy đủ CSRF validation; CORS không mở wildcard. Host trusted proxy chỉ nhận Forwarded/Host từ allowlisted proxy, không suy cookie Secure/redirect từ header khách gửi trực tiếp.
 - Rate-limit login theo account normalize + IP với bounded attempts/backoff, generic errors, không tạo user enumeration; refresh rate-limit theo cookie/session and IP. Không đưa password/refresh/access vào diagnostics.
 
 ### 3.3 Rotation, replay, multi-tab
@@ -65,21 +65,23 @@
 
 ## 4. Wire contract v1 — mapping rõ, không mất precision
 
-Chọn HTTP-specific DTO v1 tại host; **không sửa** `MyDmsVn.Contracts.SalesContracts` của Local. Serializer áp dụng envelope/error/camelCase hiện có, dùng dedicated mapper + golden fixtures.
+Chọn HTTP-specific DTO v1 tại host; **không sửa** `MyDmsVn.Contracts.SalesContracts` của Local. Serializer áp dụng envelope/error/camelCase hiện có, dùng dedicated mapper + golden fixtures. [Canonical WEB2 v1 field tables/corpus](../contracts/web2-v1/README.md) và [manifest](../contracts/web2-v1/manifest.json) sở hữu toàn bộ field/route/status examples; frontend chỉ liên kết, không sao chép spec. WEB2-01 corpus checks không phải runtime HTTP mapper/client codec acceptance.
 
-- **Sales `long`:** trên JSON wire **string số thập phân** (`saleId`, `saleLineId`), request từ URL/body parse server-side bằng `long.TryParse` invariant, range > 0 (new saleLineId = **"0"**). Không dùng JS Number trên ID `long`.
+- **Sales `long`:** trên JSON wire **string số thập phân** (`saleId`, `saleLineId`), request từ URL/body parse server-side bằng `long.TryParse` invariant, range > 0 (new saleLineId = **"0"**; Create bắt buộc mọi line = **"0"**, Update mới cho phép existing positive line IDs). Không dùng JS Number trên ID `long`.
 - **Catalog `int`:** JSON numeric integer, nằm trong int32; TypeScript parser kiểm số nguyên an toàn trong 32 bit và normalize thành string nội bộ. `lineNo`, `pageSize`, `lineCount` cũng int32.
 - **Tất cả `decimal` kể cả nullable cost/profit:** JSON **string invariant decimal**, không exponent, chính xác theo precision của C#; scale trường khác nhau được giữ đúng (không ép postedUnitCost thành 4 decimals). Omitted null theo `ApiJson` được frontend normalize về null, không giả số 0.
 - **Ngày:** `saleDate/fromDate/toDate` đúng `yyyy-MM-dd`, không timezone; `postedAtUtc` UTC timestamp với `Z`; `version` opaque Base64 rowversion, `cursor` opaque string.
-- **Create:** body từ `SalesSaveSnapshot` chỉ có `saleDate,customerId,warehouseId,employeeId,note,lines`; line gồm `saleLineId:"0"|positive-string,productId:int32,qty:string,unitPrice:string,isGift:boolean`; **không** truyền `clientLineId`, lineNo, unit, cost, status, server number, actor. POST response là **full detail** được server materialize trước commit.
-- **Update:** `PUT /api/v1/sales-receipts/{saleId}/draft`, body chứa `expectedVersion` và field Create; ID route must match any body ID if present (prefer omit body saleId). Result full authoritative detail; concurrency mismatch -> 409.
+- **Create:** body từ `SalesSaveSnapshot` chỉ có `saleDate,customerId,warehouseId,employeeId,note,lines`; line gồm `saleLineId:"0",productId:int32,qty:string,unitPrice:string,isGift:boolean`; **không** truyền `clientLineId`, lineNo, unit, cost, status, server number, actor. POST response là **full detail** được server materialize trước commit.
+- **Update:** `PUT /api/v1/sales-receipts/{saleId}/draft`, body chứa `expectedVersion` và field Create; `saleId` chỉ ở route, body không có `saleId`; future host reject unknown body fields trước mutation. Result full authoritative detail; concurrency mismatch -> 409.
 - **Post:** `POST /api/v1/sales-receipts/{saleId}/post`, body chỉ `{expectedVersion}`; response **ack** `{saleId,status,postedAtUtc,version}`, **không** fake full detail hoặc post-commit Get nội bộ. Frontend đánh dấu Posted/read-only khi ack thành công; Get sau đó có thể fail/403, không biến ack thành failed Post.
 - **List:** `GET /api/v1/sales-receipts`, query `fromDate,toDate,customerId,warehouseId,employeeId,status,productId,search,pageSize=25,cursor`. Giữ filter-bound keyset, `saleId DESC`, Product Any, tổng toàn phiếu; giữ next/previous cursor.
 - **Get:** `GET /api/v1/sales-receipts/{saleId}` trả full detail với labels, Unit, line ordering + cost khi Posted; không phụ thuộc lookup active list để dựng nhãn cũ.
 - **Lookups:** `GET /api/v1/catalog/{products|customers|warehouses|employees}/lookup?search=...&limit=...`; tái dùng Application queries/authorization của từng catalog; không mặc định `Sales.Receipts.Read` cho lookup. Không tạo truy vấn SQL trong controller.
-- **Error:** 400 ValidationError, 401 Auth.Unauthorized/SessionExpired, 403 Auth.Forbidden, 404 NotFound, 409 Conflict/AlreadyPosted, 5xx InternalError/Unavailable. Envelope `ApiError` giữ correlation. Validation `lines[<index>].field` phải map dựa **ordered snapshot gửi đi** về `clientLineId`; fieldless issues vẫn hiển thị. Malformed JSON/data không được coi như thành công.
+- **Error:** 400 ValidationError, 401 `Auth.Unauthorized` (giữ riêng single `Auth.InvalidCredentials` từ Login), 403 Auth.Forbidden, 404 NotFound, 409 `SalesReceipt.ConcurrencyConflict`/`SalesReceipt.AlreadyPosted` (giữ business code từ `ApiResponseMapper`), 5xx InternalError/Unavailable. Envelope `ApiError` giữ correlation. Validation `lines[<index>].field` phải map dựa **ordered snapshot gửi đi** về `clientLineId`; fieldless issues vẫn hiển thị. Malformed JSON/data không được coi như thành công.
 
 ### Contract golden fixtures bắt buộc
+
+Canonical fixtures và lệnh `node --test scripts/check-web2-wire-fixtures.mjs` ở [WEB2 v1 corpus](../contracts/web2-v1/README.md). Node/BigInt checks chỉ xác nhận dữ liệu preflight; các auth/SQL/HTTP/browser scenarios dưới đây vẫn thuộc task runtime tương ứng.
 
 - `saleId = 9007199254740993` và `9223372036854775807` round-trip string; `saleLineId = "0"` khi tạo mới; reject overflow và noncanonical/negative ID.
 - Qty `99999999999999.9999`, UnitPrice `999999999999999.9999`, line amount cap, decimal carry/tie; PostedUnitCost có precision riêng; nullable omitted.

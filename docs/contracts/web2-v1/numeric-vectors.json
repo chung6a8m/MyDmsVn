@@ -1,0 +1,79 @@
+{
+  "int64": [
+    {
+      "value": "0",
+      "allowZero": true
+    },
+    {
+      "value": "9007199254740993",
+      "allowZero": false
+    },
+    {
+      "value": "9223372036854775807",
+      "allowZero": false
+    }
+  ],
+  "decimals": [
+    {
+      "field": "qty",
+      "value": "99999999999999.9999",
+      "scale": 4
+    },
+    {
+      "field": "unitPrice",
+      "value": "999999999999999.9999",
+      "scale": 4
+    },
+    {
+      "field": "lineAmount",
+      "value": "999999999999999999999999.9999",
+      "scale": 4
+    },
+    {
+      "field": "postedUnitCost",
+      "value": "99999999999999999999.99999999",
+      "scale": 8
+    },
+    {
+      "field": "grossProfit",
+      "value": "-999999999999999999999999.9999",
+      "scale": 4
+    },
+    {
+      "field": "totalCost",
+      "value": "0.0000",
+      "scale": 4
+    },
+    {
+      "field": "postedUnitCost",
+      "value": "1.00000001",
+      "scale": 8
+    }
+  ],
+  "revenue": [
+    {
+      "qty": "0.0001",
+      "unitPrice": "0.5000",
+      "isGift": false,
+      "lineAmount": "0.0001"
+    },
+    {
+      "qty": "0.0001",
+      "unitPrice": "0.4999",
+      "isGift": false,
+      "lineAmount": "0.0000"
+    },
+    {
+      "qty": "9.9999",
+      "unitPrice": "1.0001",
+      "isGift": false,
+      "lineAmount": "10.0009"
+    },
+    {
+      "qty": "99999999999999.9999",
+      "unitPrice": "999999999999999.9999",
+      "isGift": true,
+      "lineAmount": "0.0000"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "SalesReceipt.NotFound",
+    "message": "The sales receipt was not found.",
+    "details": [
+      {
+        "code": "SalesReceipt.NotFound",
+        "message": "The sales receipt was not found."
+      }
+    ],
+    "correlationId": "web2-fixture-404"
+  }
+}

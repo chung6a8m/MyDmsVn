@@ -1,0 +1,11 @@
+{
+  "fromDate": "2024-02-29",
+  "toDate": "2024-02-29",
+  "customerId": 101,
+  "warehouseId": 102,
+  "employeeId": 103,
+  "status": "Posted",
+  "productId": 104,
+  "search": "SA0000000042",
+  "pageSize": 25
+}

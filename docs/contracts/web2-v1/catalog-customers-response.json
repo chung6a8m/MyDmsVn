@@ -1,0 +1,10 @@
+{
+  "data": [
+    {
+      "id": 101,
+      "code": "KH101",
+      "name": "Khách hàng cũ",
+      "isActive": true
+    }
+  ]
+}

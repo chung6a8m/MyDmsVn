@@ -1,0 +1,18 @@
+{
+  "error": {
+    "code": "ValidationError",
+    "message": "The request is invalid.",
+    "details": [
+      {
+        "code": "Validation.PrecisionScale",
+        "message": "Quantity must be positive and fit decimal(18,4).",
+        "field": "lines[1].qty"
+      },
+      {
+        "code": "SalesReceipt.AggregateOutOfRange",
+        "message": "Document total exceeds the supported range."
+      }
+    ],
+    "correlationId": "web2-fixture-400"
+  }
+}
