@@ -1,4 +1,6 @@
 # Architecture — MyDmsVn
+> **WEB2 (Owner selected 2026-10-31, NOT IMPLEMENTED):** [companion plan](plans/20261031-003-web2-http-jwt-sales-server.md), [JWT/refresh/wire contract](design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md). Keep net48 and existing Local/Domain/Application/SQL business behavior; add a separate IIS HTTP host for ReactWebUI pilot. JWT Bearer access short-lived in browser localStorage (XSS residual), GUID refresh HttpOnly Secure Strict cookie rotated/hashed in SQL, same-origin HTTPS, string int64/decimal on *HTTP-only* DTO. Historic Local/WinForms acceptance and CEX roadmap remain independent. This note selects future implementation, not proof of HTTP/auth/SQL runtime.
+
 
 **Inspected architecture baseline:** Local v1 at historical commit `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43), 2026-10-23. The [execution index](plans/README.md) selects the Business Compact and independent UI Labs roadmap; [the 2026-10-27 main archive](archive/20261027-main-roadmap-reset/README.md) and [UI-NEXT](ui-next/README.md) retain historical design/implementation evidence. This routing update does not re-audit every technical statement below. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains source contracts and candidate acceptance limits.
 
