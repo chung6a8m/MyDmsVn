@@ -1,6 +1,6 @@
 # WEB2 — HTTP host, JWT, refresh sessions và Sales wire contract
 
-**Chọn bởi Owner:** 2026-10-31. **Trạng thái:** APPROVED DESIGN / WEB2-01–05 IMPLEMENTED (bounded host/session/auth/Sales/Catalog HTTP); WEB2-06–10 và full IIS/browser/Sales pilot chưa nghiệm thu. **Runtime:** giữ `net48`, Windows/IIS, ASP.NET Web API 2; frontend tương ứng: [MyDmsVn.ReactWebUI](https://github.com/chung6a8m/MyDmsVn.ReactWebUI). Đây là companion cho [server plan](../plans/20261031-003-web2-http-jwt-sales-server.md); không thay thế roadmap WinForms CEX đang active. Source baseline: `main@5b9f960ee4048581f107e9ee6350e1dfad462b53`. Mọi giả định về dependency/hosting phải được xác minh ở WEB2-01/02 trước khi code.
+**Chọn bởi Owner:** 2026-10-31. **Trạng thái:** APPROVED DESIGN / WEB2-01–05 IMPLEMENTED (bounded host/session/auth/Sales/Catalog HTTP); WEB2-06–09 completed trong web companion; WEB2-10 IN PROGRESS / full IIS BLOCKED. **Runtime:** giữ `net48`, Windows/IIS, ASP.NET Web API 2; frontend tương ứng: [MyDmsVn.ReactWebUI](https://github.com/chung6a8m/MyDmsVn.ReactWebUI). Đây là companion cho [server plan](../plans/20261031-003-web2-http-jwt-sales-server.md); không thay thế roadmap WinForms CEX đang active. Source baseline: `main@5b9f960ee4048581f107e9ee6350e1dfad462b53`. Mọi giả định về dependency/hosting phải được xác minh ở WEB2-01/02 trước khi code.
 
 ## 1. Bất biến và phạm vi
 
@@ -35,6 +35,8 @@
 | Session | Login tạo một AuthSession/browse-device family; logout/replay/account disable revoke session đó, chặn cả JWT chưa hết hạn. Không đồng bộ quyền qua JWT; quyền server đánh giá theo DB mỗi operation. |
 
 **Rủi ro được ghi rõ:** access token trong localStorage bị JavaScript cùng origin đọc được; XSS có thể đánh cắp bearer token. Phương án này do Owner chọn nhưng **không tương đương cookie HttpOnly/BFF về XSS resilience**. Bắt buộc security gate: CSP production không có `unsafe-inline` cho script, không inject raw HTML, sanitize untrusted content, dependency review, không third-party script cùng origin, HTTPS + HSTS + secure headers, token TTL thấp, không log/token trong telemetry/URL, browser XSS tests. Nếu gate không đạt: không gọi production-ready; đề xuất thay token storage cần Owner quyết định riêng.
+
+WEB2-10 triển khai CSP style nonce theo [host runbook](../../src/MyDmsVn.Server.HttpHost/README.md): nonce riêng mỗi HTML được bind với metadata cho AG Grid/Dockview; script policy không có unsafe-inline/unsafe-eval. Đây là hardening của candidate, không thay lựa chọn localStorage hoặc đóng full IIS acceptance.
 
 ### 3.2 Endpoints phiên
 

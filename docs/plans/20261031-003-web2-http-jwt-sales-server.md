@@ -1,6 +1,6 @@
 # WEB2 companion — HTTP/JWT/Sales server vertical slice (net48)
 
-**Ngày:** 2026-10-31. **Owner chọn:** giữ `net48`, thin HTTP host, Bearer JWT short-lived trong frontend localStorage, refresh GUID trong HttpOnly cookie. **Trạng thái:** ACTIVE / WEB2-01–05 DONE (bounded contract/host/SQL session/auth/Sales/Catalog HTTP); WEB2-06–10 PLANNED. **Repo:** `chung6a8m/MyDmsVn`; **phối hợp:** [ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md). Các task HTTP ở đây **song song, độc lập** với CEX-A01–A05 (WinForms); không thay thế active composition roadmap.
+**Ngày:** 2026-10-31. **Owner chọn:** giữ `net48`, thin HTTP host, Bearer JWT short-lived trong frontend localStorage, refresh GUID trong HttpOnly cookie. **Trạng thái:** ACTIVE / WEB2-01–05 DONE (bounded contract/host/SQL session/auth/Sales/Catalog HTTP); WEB2-06–09 completed in the web companion; WEB2-10 IN PROGRESS / full IIS BLOCKED. **Repo:** `chung6a8m/MyDmsVn`; **phối hợp:** [ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md). Các task HTTP ở đây **song song, độc lập** với CEX-A01–A05 (WinForms); không thay thế active composition roadmap.
 
 **Bắt buộc đọc:** [web2 contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [architecture](../ARCHITECTURE.md), [security](../SECURITY.md), [contracts](../CONTRACTS.md), [SQL security](../CONFIGURATION_AND_SQL_SECURITY.md), [test policy](../TEST_POLICY.md), [direct sales](../DIRECT_SALES.md), `src/MyDmsVn.Server.Application/Identity`, `Sales`, `src/MyDmsVn.Server.Infrastructure/DependencyInjection.cs` và `src/MyDmsVn.Server.DbMigrator`. Base: `main@5b9f960`; recheck fresh HEAD trước implementation. Không sao chép Runtime/desktop acceptance sang API.
 
@@ -13,8 +13,8 @@
 | WEB2-03 — refresh persistence | Server | WEB2-01 | DbUp 011, restricted SQL permissions, hashed token store, atomic session/rotation/replay tests | DONE (bounded) |
 | WEB2-04 — login/refresh/logout/capabilities | Server | WEB2-02,03 | JWT issue/validate, cookies+CSRF, active actor, revocation, auth negative suite | DONE (bounded) |
 | WEB2-05 — Sales + Catalog HTTP | Server | WEB2-02,04 | v1 routes, mapping, lossless golden fixtures, permission + SQL integration tests | DONE (bounded) |
-| WEB2-08/09 — integrated read/write | Server assists Web | WEB2-05 | Fault injection/read/write contract parity and defect fixes, not new business rules | PLANNED |
-| WEB2-10 — pilot acceptance | Both | all | Verified IIS/SQL/browser candidate, evidence and handoff | PLANNED |
+| WEB2-08/09 — integrated read/write | Server assists Web | WEB2-05 | Fault injection/read/write contract parity and defect fixes, not new business rules | DONE (bounded frontend HTTP harness; web companion) |
+| WEB2-10 — pilot acceptance | Both | all | Verified IIS/SQL/browser candidate, evidence and handoff | IN PROGRESS / full IIS BLOCKED |
 
 **PR policy:** mỗi task hoặc subtask độc lập thành PR nhỏ, base latest main, chỉ merge sau kiểm chứng; PR title kèm mã WEB2. Dừng sau từng gate, không tự chuyển sang production hoặc thay CEX. Server task hoàn thành không có nghĩa frontend/Web2 toàn scope hoàn tất.
 
@@ -91,3 +91,13 @@ Baseline backend `f563d32` (local verified WEB2-04, not merged into main), web `
 Gate A: authenticated current user/capabilities, real lookup/list/Get through IIS with 2 distinct actors. Gate B: Create/Update authoritative JSON, exact decimals/int64, rowversion/conflict. Gate C: Post creates correct stock/COGS server-side; lost-response/refresh-replay/logout/Read denial scenarios are explicit. Gate D: SSL/cookie/CSRF/CSP, SQL restricted principal, nonproduction migration/reset and reproducible evidence.
 
 Record at `docs/evidence/web2/20261031-http-jwt-sales.md` exact server/client SHAs, Node/.NET/IIS/OS/SQL, command/count, security negatives, schema version, origin, screenshots sanitized, PASS/FAIL/BLOCKED, known risks. Windows/SQL tests not run -> BLOCKED / NOT RUN. Separate feature acceptance from production rollout; deployment of schema11 and legacy desktop coexistence remains controlled pilot only.
+
+### WEB2-10 execution checkpoint — 2026-10-31
+
+- [x] Published React + net48 host on existing trusted same-origin localhost HTTPS with disposable schema11/restricted login; Chromium and Edge exercise real auth, independent rights, Save/Post and response-loss recovery with independent SQL stock/value/COGS oracles.
+- [x] Reproduce and fix native static asset404 and CSP compatibility: managed asset routing, fresh style nonce for approved component styles, frontend Zod JIT disabled; no relaxed script policy or auth bypass.
+- [x] Preserve owned worker/SQL cleanup and publish sanitized candidate-specific [evidence](../evidence/web2/20261031-http-jwt-sales.md#web2-10--2026-10-31-integrated-pilot-and-handoff).
+- [ ] Full IIS deployment acceptance: BLOCKED, this Windows11 Home machine has no full IIS/W3SVC/WAS/appcmd. IIS Express is not a substitute.
+- [ ] Operator audit destination/retention and full IIS app-pool/TLS/binding/ACL acceptance; attended candidate-specific IME/accessibility remains separate. No production release or mixed desktop/schema11 writer approval.
+
+The task stays **IN PROGRESS / full IIS acceptance BLOCKED**. Backend source/test `9480d1b`; web source/test `36c1bca`. No schema/grant/business-handler changes or production deployment were required.
