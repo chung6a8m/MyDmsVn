@@ -12,13 +12,14 @@
 | `MyDmsVn.Server.Application` | `net48` | Feature use cases, validation, authorization, persistence interfaces and transport-neutral mapping. |
 | `MyDmsVn.Server.Infrastructure` | `net48` | LINQ to DB/native SqlClient implementation of inner interfaces; T07 plan-specific correctness/package/Local smoke acceptance complete; broader release gates deferred. |
 | `MyDmsVn.Server.DbMigrator` | `net48` | Controlled DbUp schema deployment and separate maintenance commands. |
+| `MyDmsVn.Server.HttpHost` | `net48` | WEB2 IIS/SystemWeb/OWIN host, request actor and HTTP guards; [publish/configuration](../src/MyDmsVn.Server.HttpHost/README.md). |
 | `MyDmsVn.Desktop.Application` | `net48` | Contracts-based client interfaces and ViewModels. |
 | `MyDmsVn.Desktop.Infrastructure.Local` | `net48` | In-process Application dispatch, current-account checks and desktop session integration. |
 | `MyDmsVn.Desktop.WinForms` | `net48` | Shared views and the BootstrapSourceGrid adapter from the pinned WinFormsKit checkout. |
 | `MyDmsVn.Desktop.App` | `net48` | Current WinForms host and Local composition root. |
 | `MyDmsVn.Desktop.AppCore` | `net8.0-windows`, parked | Retained source outside active solution/release; not current executable coverage. |
 
-`MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` do not exist as current projects. HTTP v2 is [out of scope](DEFERRED_WORK.md#out-of-scope-directions) and needs a separate runtime decision. Do not create these projects as part of UI-NEXT.
+`MyDmsVn.Server.HttpHost` is the separate net48 WEB2 IIS composition root; dependencies are Contracts/Application/Infrastructure with no Desktop session. `MyDmsVn.Server.Api` and `MyDmsVn.Desktop.Infrastructure.Http` remain absent. See [WEB2 scope/evidence](evidence/web2/20261031-http-jwt-sales.md); this does not reopen UI-NEXT or change modern runtime decisions.
 
 ## Active test projects
 
@@ -26,6 +27,7 @@
 |---|---|---|
 | `MyDmsVn.Architecture.Tests` | `net48` | Dependency and composition boundaries. |
 | `MyDmsVn.Server.Application.Tests` | `net48` | Application, contract and pure feature behavior. |
+| `MyDmsVn.Server.HttpHost.Tests` | `net48` | SQL-free HTTP pipeline, JWT, request DI and sanitized audit. |
 | `MyDmsVn.Desktop.Session.Tests` | `net48` | Pure desktop/session behavior without the WinForms GUI owner. |
 | `MyDmsVn.Desktop.Tests` | `net48` | Existing WinForms and guarded GUI behavior. |
 | `MyDmsVn.Desktop.Ui.Tests` | `net48` | A1 Sales UI Lab scenario and native Sales behavior. |
@@ -36,7 +38,7 @@
 | `MyDmsVn.Server.Infrastructure.Migrations.Tests` | `net48` | Schema/migration and maintenance behavior. |
 | `MyDmsVn.Server.Infrastructure.IntegrationTests` | `net48` | Local owned-database helpers and remaining Operations/Local SQL scenarios; this name no longer means the entire SQL suite. |
 
-There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual owning project and source case rather than a historical proposed path. These are eleven current test projects, including the A1 Sales UI Lab owner; no standalone SQL support or runner project remains. Each SQL owner has its own csproj; a shared library or test trait does not by itself prove isolation or parallel safety.
+There is no separate current `MyDmsVn.Contracts.Tests` project. Use the actual owning project and source case rather than a historical proposed path. These are twelve current test projects, including the A1 Sales UI Lab owner; no standalone SQL support or runner project remains. Each SQL owner has its own csproj; a shared library or test trait does not by itself prove isolation or parallel safety.
 
 ## Implemented Sales locations
 
@@ -52,7 +54,7 @@ UI-NEXT's [historical implementation plan](archive/20261025-pre-next-roadmap/ui-
 | Server.Infrastructure | `Catalog/`, `Inventory/`, `Sales/`, `Identity/`, `Security/`, `Operations/`, `Persistence/`; `DependencyInjection.cs`. |
 | Application persistence contract | `src/MyDmsVn.Server.Application/Persistence/{IUnitOfWork,IUnitOfWorkFactory,UnitOfWorkState}.cs`. |
 | Infrastructure persistence | `src/MyDmsVn.Server.Infrastructure/Persistence/{SqlUnitOfWorkFactory,ISqlExecutionContext,SqlConnectionFactory,SqlPersistenceBuilder,LinqToDbSessionFactory,LinqToDbMappingSchemaProvider}.cs`. |
-| Schema | `src/MyDmsVn.Server.DbMigrator/Scripts/001_PersistenceFoundation.sql` through `010_DirectSalesAndValuation.sql`; exact names in [PERSISTENCE](PERSISTENCE.md). |
+| Schema | Desktop/default scripts001–010; opt-in web adds `011_WebAuthSessions.sql`. [Web admission](CONFIGURATION_AND_SQL_SECURITY.md#web2-schema11-và-principal-riêng) remains separate from desktop10. |
 | Implemented WinForms presentation seams | `BusinessCompactAppearance.cs`, `BusinessCompactNavigation.cs`, `GoodsReceiptLinesGrid.cs`, `GoodsReceiptLinesGridAdapter.cs`, `ReceiptNumericInput.cs` and `ReceiptDecimalInputProfiles.cs` in `src/MyDmsVn.Desktop.WinForms/`; `SalesReceiptControl.cs` and its grid/adapter own the Sales workspace; `CatalogControl.cs` remains shared by four catalogs. |
 | UI dependency | `vendor/MyDmsVn.WinFormsKit/` at `a5dd3cec6daba71943549afac628e13727c00da5`; contains UI core, grid adapter and SourceGrid at `f4e457b43582bf01892f50bdc74aa480531e5944`. Existing Bootstrap5WinFormUI/BootstrapSourceGrid assembly names remain valid. The three exception corrections are Windows/native PASS and Owner APPROVED/CLOSED within their evidence scope. |
 

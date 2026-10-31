@@ -25,7 +25,7 @@ END;";
 
     private static readonly string[] AppendOnlyTables = { "StockLedger", "StockValuationEntries" };
 
-    private static readonly string[] MutableTables =
+    private static readonly string[] DesktopMutableTables =
     {
         "Users", "Roles", "UserRoles", "RolePermissions", "UserPermissions", "SystemSecuritySettings",
         "Products", "Warehouses", "Employees", "Customers", "GoodsReceipts", "GoodsReceiptLines",
@@ -33,7 +33,7 @@ END;";
         "SalesReceipts", "SalesReceiptLines", "StockValuationEntries",
     };
 
-    private static readonly string[] AllowedConstraints =
+    private static readonly string[] DesktopAllowedConstraints =
     {
         "CK_Customers_Code_NoNul",
         "CK_Customers_Code_NotBlank",
@@ -168,7 +168,7 @@ END;";
         "PK_Warehouses",
     };
 
-    private static readonly string[] AllowedIndexes =
+    private static readonly string[] DesktopAllowedIndexes =
     {
         "IX_GoodsReceiptLines_ProductId",
         "IX_GoodsReceipts_EmployeeId",
@@ -253,6 +253,10 @@ SELECT CONVERT(nvarchar(max),(SELECT s.schema_id,s.name,s.principal_id
  WHERE is_user_defined=1 ORDER BY assembly_id FOR XML RAW)),
  CONVERT(nvarchar(max),(SELECT Id,ScriptName,Applied FROM dbo.SchemaVersions ORDER BY Id FOR XML RAW));";
 
+    private readonly bool _web;
+    private string[] MutableTables => _web ? DesktopMutableTables.Concat(new[] { "WebAuthSessions", "WebRefreshTokens" }).ToArray() : DesktopMutableTables;
+    private string[] AllowedConstraints => _web ? DesktopAllowedConstraints.Concat(new[] { "PK_WebAuthSessions", "PK_WebRefreshTokens", "FK_WebAuthSessions_Users", "FK_WebRefreshTokens_Sessions", "FK_WebRefreshTokens_Replacement", "CK_WebAuthSessions_Expiry", "CK_WebAuthSessions_Revocation", "CK_WebRefreshTokens_Expiry", "CK_WebRefreshTokens_Consumption", "CK_WebRefreshTokens_Revocation" }).OrderBy(x => x, StringComparer.Ordinal).ToArray() : DesktopAllowedConstraints;
+    private string[] AllowedIndexes => _web ? DesktopAllowedIndexes.Concat(new[] { "IX_WebAuthSessions_UserId", "IX_WebAuthSessions_Retention", "IX_WebRefreshTokens_SessionId", "UX_WebRefreshTokens_Replacement" }).OrderBy(x => x, StringComparer.Ordinal).ToArray() : DesktopAllowedIndexes;
     private readonly SqlTestDatabase _database;
     private readonly Checkpoint _checkpoint;
     private readonly Func<SqlConnection, CancellationToken, Task>? _afterTriggerDisabled;
@@ -261,9 +265,10 @@ SELECT CONVERT(nvarchar(max),(SELECT s.schema_id,s.name,s.principal_id
     private int _poisoned;
 
     private RespawnResetProfile(SqlTestDatabase database, int timeout,
-        Func<SqlConnection, CancellationToken, Task>? afterTriggerDisabled)
+        Func<SqlConnection, CancellationToken, Task>? afterTriggerDisabled, bool web)
     {
         _database = database;
+        _web = web;
         _afterTriggerDisabled = afterTriggerDisabled;
         _checkpoint = new Checkpoint
         {
@@ -282,7 +287,7 @@ SELECT CONVERT(nvarchar(max),(SELECT s.schema_id,s.name,s.principal_id
     public static async Task<RespawnResetProfile> CreateAsync(SqlTestDatabase database,
         int commandTimeoutSeconds = 60,
         Func<SqlConnection, CancellationToken, Task>? afterTriggerDisabled = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool web = false)
     {
         if (database is null) { throw new ArgumentNullException(nameof(database)); }
         if (commandTimeoutSeconds < 1 || commandTimeoutSeconds > 60)
@@ -290,7 +295,7 @@ SELECT CONVERT(nvarchar(max),(SELECT s.schema_id,s.name,s.principal_id
             throw new ArgumentOutOfRangeException(nameof(commandTimeoutSeconds));
         }
 
-        var profile = new RespawnResetProfile(database, commandTimeoutSeconds, afterTriggerDisabled);
+        var profile = new RespawnResetProfile(database, commandTimeoutSeconds, afterTriggerDisabled, web);
         using (var connection = new SqlConnection(database.ConnectionString))
         using (var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
         {
@@ -299,8 +304,9 @@ SELECT CONVERT(nvarchar(max),(SELECT s.schema_id,s.name,s.principal_id
             using (budget.Token.Register(connection.Close))
             {
                 await database.VerifyOwnershipAsync(connection, budget.Token).ConfigureAwait(false);
-                var compatibility = await new SqlSchemaCompatibilityChecker(database.ConnectionString)
-                    .CheckConnectionAsync(connection, budget.Token).ConfigureAwait(false);
+                var compatibility = web
+                    ? await SqlWebSchemaCompatibilityChecker.CheckConnectionAsync(connection, budget.Token).ConfigureAwait(false)
+                    : await new SqlSchemaCompatibilityChecker(database.ConnectionString).CheckConnectionAsync(connection, budget.Token).ConfigureAwait(false);
                 if (compatibility.Status != SchemaCompatibilityStatus.Compatible)
                 {
                     throw new InvalidOperationException("The application schema is not compatible with the reset profile.");
@@ -323,8 +329,8 @@ SELECT (SELECT COUNT(*) FROM sys.schemas s WHERE s.principal_id<>s.schema_id OR
                     }
                 }
                 await ValidateTriggerAsync(connection, budget.Token).ConfigureAwait(false);
-                await ValidateTablesAndConstraintsAsync(connection, budget.Token).ConfigureAwait(false);
-                await ValidateInitialObjectsAsync(connection, budget.Token).ConfigureAwait(false);
+                await profile.ValidateTablesAndConstraintsAsync(connection, budget.Token).ConfigureAwait(false);
+                await profile.ValidateInitialObjectsAsync(connection, budget.Token).ConfigureAwait(false);
                 profile._boundary = await ReadBoundaryAsync(connection, budget.Token).ConfigureAwait(false);
             }
         }
@@ -402,6 +408,7 @@ SELECT (SELECT COUNT(*) FROM sys.schemas s WHERE s.principal_id<>s.schema_id OR
                     }
                     budget.Token.ThrowIfCancellationRequested();
                 }
+                if (_web) await ExecuteAsync(connection, "UPDATE dbo.WebRefreshTokens SET ReplacedByTokenHash=NULL, ConsumedAtUtc=NULL WHERE ReplacedByTokenHash IS NOT NULL;", budget.Token).ConfigureAwait(false);
                 await _checkpoint.Reset(connection).ConfigureAwait(false);
                 budget.Token.ThrowIfCancellationRequested();
                 await ExecuteAsync(connection,
@@ -505,7 +512,7 @@ AND t.parent_id=OBJECT_ID(@table) AND t.is_instead_of_trigger=1 AND t.is_not_for
         }
     }
 
-    private static async Task ValidateTablesAndConstraintsAsync(SqlConnection connection, CancellationToken token)
+    private async Task ValidateTablesAndConstraintsAsync(SqlConnection connection, CancellationToken token)
     {
         using var command = new SqlCommand(@"SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0;
 SELECT SCHEMA_NAME(schema_id),name FROM sys.tables WHERE is_ms_shipped=0 ORDER BY name;
@@ -513,7 +520,7 @@ SELECT (SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trus
  + (SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1);", connection) { CommandTimeout = 30 };
         using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         await reader.ReadAsync(token).ConfigureAwait(false);
-        if (reader.GetInt32(0) != 19) { throw new InvalidOperationException("Unexpected application table boundary."); }
+        if (reader.GetInt32(0) != MutableTables.Length + 1) { throw new InvalidOperationException("Unexpected application table boundary."); }
         await reader.NextResultAsync(token).ConfigureAwait(false);
         var expected = MutableTables.Concat(new[] { "SchemaVersions" }).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         var actual = new System.Collections.Generic.List<string>();
@@ -534,7 +541,7 @@ SELECT (SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trus
         if (reader.GetInt32(0) != 0) { throw new InvalidOperationException("Disabled or untrusted constraints reject reuse."); }
     }
 
-    private static async Task ValidateInitialObjectsAsync(SqlConnection connection, CancellationToken token)
+    private async Task ValidateInitialObjectsAsync(SqlConnection connection, CancellationToken token)
     {
         using var command = new SqlCommand(@"SELECT SCHEMA_NAME(schema_id),name,type,OBJECT_NAME(parent_object_id)
 FROM sys.objects WHERE is_ms_shipped=0;
@@ -550,6 +557,7 @@ SELECT (SELECT COUNT(*) FROM sys.triggers WHERE is_ms_shipped=0)
             "P:ApplySecurityPermissionImport", "P:ReadSecurityPermissionImportTarget",
             "SO:GoodsReceiptNumberSequence", "SO:SalesReceiptNumberSequence",
             "TR:TR_StockLedger_AppendOnly", "TR:TR_StockValuationEntries_AppendOnly" };
+        if (_web) expectedModules = expectedModules.Concat(new[] { "TR:TR_Users_RevokeWebSessions" }).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         while (await reader.ReadAsync(token).ConfigureAwait(false))
         {
             var name = reader.GetString(1);
@@ -585,7 +593,7 @@ SELECT (SELECT COUNT(*) FROM sys.triggers WHERE is_ms_shipped=0)
         }
         await reader.NextResultAsync(token).ConfigureAwait(false);
         await reader.ReadAsync(token).ConfigureAwait(false);
-        if (reader.GetInt32(0) != 2)
+        if (reader.GetInt32(0) != (_web ? 3 : 2))
         {
             throw new InvalidOperationException("Unexpected initial trigger, type or assembly inventory.");
         }

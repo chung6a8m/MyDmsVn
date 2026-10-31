@@ -1,5 +1,7 @@
 # MyDmsVn
 
+**Parallel WEB2 workstream:** WEB2-01–03 are complete within contract, net48 HTTP host and SQL refresh-session scope. See [plan](docs/plans/20261031-003-web2-http-jwt-sales-server.md), [host runbook](src/MyDmsVn.Server.HttpHost/README.md) and [actual evidence](docs/evidence/web2/20261031-http-jwt-sales.md). Auth/Sales endpoints and full IIS/browser pilot remain pending; CEX/desktop work is independent.
+
 Windows desktop-first SME business software for Sales and Inventory. Local v1 invokes Application handlers in process through the Local adapter.
 
 ## Current development status — main
@@ -24,11 +26,11 @@ The [UI Lab](docs/development/UI_LAB.md) hosts Sales and the SQL-free Security c
 
 ## Current implementation
 
-- Product, WinForms and all eleven active test projects target `net48`. Desktop and separate admin migrator package as Windows x86 directories. AppCore/net8 remains PARKED / NOT SHIPPED.
+- Product, WinForms and all twelve active test projects target `net48`. Desktop and separate admin migrator package as Windows x86 directories. AppCore/net8 remains PARKED / NOT SHIPPED.
 - Clean Architecture, MediatR, FluentValidation, ErrorOr, explicit UnitOfWork, LINQ to DB plus typed native SqlClient, SQL Server and DbUp remain the current architecture.
 - Test-only Respawn reusable owned fixtures, deterministic reset/seed, dedicated fresh exceptions and direct `dotnet test`/Test Explorer are implemented. The old SQL harness, runner, gate manifest and approval-file flow remain removed.
 - WinForms uses CommunityToolkit.Mvvm and the pinned `vendor/MyDmsVn.WinFormsKit` checkout, which supplies the compatible Bootstrap5WinFormUI/BootstrapSourceGrid assemblies and pinned SourceGrid engine. Four catalogs, Goods Receipt and Sales Draft/Post, quantity/value ledger and stock inquiries, code-defined permissions and one configured superuser exist. The reviewed Security workspace is now used through the production Local composition, with bounded SQL evidence; the SQL-free Lab includes Security.
-- Sales preserves manual prices, independent duplicate Product rows, gifts and moving-average cost frozen at actual Post. Receipt/sale/reconciliation share the reviewed transaction-owned valuation protocol. Development source requires schema10; historical schema9 package evidence remains separate.
+- Sales preserves manual prices, independent duplicate Product rows, gifts and moving-average cost frozen at actual Post. Receipt/sale/reconciliation share the reviewed transaction-owned valuation protocol. Desktop development source requires schema10; WEB2 has separate exact11 admission. Historical schema9 package evidence remains separate.
 - BCI/BCF compact layout, native inline editing and lookup repairs are implemented and accepted within their recorded bounded scopes. RESP, L2DB and GUI-P5 are completed baselines; preserve their exact evidence and exceptions. Historical acceptance does not establish acceptance for a later candidate or production release.
 
 ## Working with Codex

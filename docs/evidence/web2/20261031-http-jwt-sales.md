@@ -1,6 +1,6 @@
 # Backend WEB2 — HTTP/JWT/Sales execution evidence
 
-**Date created:** 2026-10-31. **Status:** WEB2-01 DONE (contract/dependency preflight only); later tasks PLANNED. Isolated net48/Node checks PASS; live HTTP/IIS/SQL/browser acceptance NOT RUN. Cross-repo plan: [server companion](../../plans/20261031-003-web2-http-jwt-sales-server.md); [contract](../../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md); [React roadmap](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md).
+**Date created:** 2026-10-31. **Status:** WEB2-01–03 DONE within bounded contract/host/SQL-session scope; WEB2-04 onward PLANNED. Focused HTTP/SQL and published IIS Express smoke PASS; full IIS/browser/Sales pilot acceptance remains open. Cross-repo plan: [server companion](../../plans/20261031-003-web2-http-jwt-sales-server.md); [contract](../../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md); [React roadmap](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md).
 
 ## Planning baseline
 
@@ -14,8 +14,8 @@
 | Task | Server PR / commit | Actual tests and environment | Result | Unresolved risks |
 |---|---|---|---|---|
 | WEB2-01 | `350358ae9f8519efd54d46d61b80d3b7887c1dcd` | Windows/net48 24 probe rows; Node 59 corpus tests; docs checks | PASS / DONE (bounded) | No production host/auth/mapper, IIS, SQL or browser acceptance |
-| WEB2-02 | — | NOT RUN | PLANNED | IIS/actor-scoped DI |
-| WEB2-03 | — | NOT RUN | PLANNED | DbUp/SQL principal/session rotation |
+| WEB2-02 | `55ea4fd8b4aa567bdef0c723fd08b552b7b11269` | 63 HTTP/DI/JWT rows + 1 real published IIS Express/SQL smoke | PASS / DONE (bounded) | Full IIS and browser/auth/Sales endpoints pending |
+| WEB2-03 | `36c528acc932b73c8d93e2fd54089c0856fd919b` | 25 store rows (16 SQL/9 pure), 25 migration, 5 principal, 15 reset rows | PASS / DONE (bounded) | Controlled nonproduction schema11 only; no desktop coexistence or production rollout |
 | WEB2-04 | — | NOT RUN | PLANNED | JWT/cookie/CSRF/rotation |
 | WEB2-05 | — | NOT RUN | PLANNED | Sales/Catalog HTTP golden |
 | WEB2-08/09 | — | NOT RUN | PLANNED | Browser integration/real write |
@@ -49,3 +49,48 @@ Exploratory history is retained in ignored local TRX: `host-preflight.trx` and `
 Independent review inspected source, lock/assets, final TRX and status docs; no unresolved finding. ADR now matches the generated config: no IdentityModel/JWT redirect is emitted by this aligned probe; integrated-host redirect verification remains WEB2-02.
 
 **Decision:** GO for WEB2-02/03 implementation under ADR/schema gates (and frontend WEB2-06). NO-GO for runtime integration acceptance, migration/deployment, desktop/schema11 coexistence or production readiness. Katana's missing Max-Age requires the planned single host cookie writer and IIS/browser proof; schema11 needs explicit exact10 admission, separate web principal/profile, reset expansion and legacy writer drain/fail-closed checks. No next task is implemented by this preflight.
+
+## WEB2-02/03 — 2026-10-31 host and refresh persistence
+
+**Source candidate:** WEB2-03 `36c528acc932b73c8d93e2fd54089c0856fd919b`, followed by WEB2-02 `55ea4fd8b4aa567bdef0c723fd08b552b7b11269`; documentation/status changes follow separately. Branch `codex/web2-02-03`, base `1c6514ee4976a8217d1666618dfda75c1c8aee85`. Web status-only companion starts from `d3a6b0b58ed3ad1f693c07d4f3f6912a7b8ffe87` on `codex/web2-02-03-status`. This work is stacked on the contract candidate from the Owner-requested [backend PR68](https://github.com/chung6a8m/MyDmsVn/pull/68) and [web PR5](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/pull/5); no new push, PR or merge is part of this checkpoint. The earlier no-push statement above describes the earlier preflight checkpoint.
+
+Implementation: [host/runbook](../../../src/MyDmsVn.Server.HttpHost/README.md), [web SQL operations](../../CONFIGURATION_AND_SQL_SECURITY.md#web2-schema11-và-principal-riêng), [schema011](../../../src/MyDmsVn.Server.DbMigrator/Scripts/011_WebAuthSessions.sql), [store](../../../src/MyDmsVn.Server.Infrastructure/Identity/SqlWebAuthSessionStore.cs). HTTP health is real; login/refresh/logout/me/capabilities and Sales/Catalog endpoints remain WEB2-04/05. `wwwroot/index.html` is only a publish marker, not React UI. No production fake or credential bypass was added.
+
+Environment: Windows11 Home Single Language x64 `10.0.26300`, SDK8.0.427/MSBuild17.11.69, .NET Framework4.8.10008 (Release534296), VSTest17.11.1 x64/net48. SQL Server **14.0.2140.2 Developer Edition (64-bit)**, compatibility140, SQL login enabled. Existing explicit test connection targets operator-designated nonproduction master; it is never printed or substituted. IIS Express **10.0.26013.1000**, CLR4 Integrated, actual `https://localhost:44321` binding and `http://localhost:18081` negative check. The smoke pins the existing localhost TLS certificate only inside its test; browser trust/DNS for Owner template `https://web2.mydmsvn.test` was not tested or provisioned. Full IIS is not installed on this machine; browser/attended/frontend build were NOT RUN.
+
+### Executed scope
+
+All selected projects restored with `dotnet restore <project> --locked-mode` before build/test. Final TRX counters were inspected: **134 executed, 134 passed, 0 failed, 0 notExecuted** across the disjoint rows below. This is a focused scope, not a solution-wide regression.
+
+| Project/selector | Final command options / local ignored TRX | Actual result |
+|---|---|---|
+| `tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj` | `dotnet test <project> -c Release --no-restore -p:BuildProjectReferences=false --logger 'trx;LogFileName=host-final.trx' --results-directory TestResults/web2-host-final` | 63/63 PASS; SQL-free OWIN pipeline, JWT/transport negatives, real Application authorization, overlapping A/B actor scopes, cancellation/disposal and sanitized audit |
+| `tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj` / `FullyQualifiedName~WebAuthSession` | `dotnet test <project> -c Release -f net48 --no-restore --filter '<selector>' --logger 'trx;LogFileName=web2-store-final.trx' --results-directory TestResults/web2-store-final` | 25/25 PASS, 1m01s; 16 real SQL + 9 pure; all16 fresh owned allocations drained/dropped |
+| Same Security project / `FullyQualifiedName~WebPrincipalProvisioningTests` | Same Release/net48 pattern; `TestResults/web-principals/web-principals.trx` | 5/5 PASS, 23s; effective grants, rehash/sequence/auth DML, privilege negatives and desktop auth denial |
+| `tests/MyDmsVn.Server.Infrastructure.Foundation.Tests` / `FullyQualifiedName~WebAuthResetTests\|FullyQualifiedName~ReusableSqlFixtureIntegrationTests` | Same Release/net48 pattern; `TestResults/web-reset/web-reset.trx` | 15/15 PASS, 3m30s; web auth inventory/trigger/journal/ownership + 14 legacy reset/poison/failure-boundary cases |
+| `tests/MyDmsVn.Server.Infrastructure.Migrations.Tests` / expanded selector below | Same Release/net48 pattern; `TestResults/web-migrations-final/web-migrations-final.trx` | 25/25 PASS, 2m30s; fresh11, exact10→11, no-op, drift/partial/future/9 refusal, rollback and preserved historical admission |
+| Security project / `FullyQualifiedName~WebHostIisExpressTests` | `dotnet test <project> -c Release -f net48 --no-restore --filter '<selector>' --logger 'trx;LogFileName=iis-express-final.trx' --results-directory TestResults/web2-iis-final` | 1/1 PASS, 20s; real SystemWeb HTTPS + restricted SQL startup and session revocation |
+
+Final migration selector:
+
+```text
+FullyQualifiedName~WebAuthMigrationTests|FullyQualifiedName~Exact9_runtime_refuses_and_restricted_admin_upgrade_preserves_mode_and_noop|FullyQualifiedName~Every_old_prefix_remains_recovery_required_without_automatic_upgrade|FullyQualifiedName~Clean_migration_applies_once_and_repeat_is_a_no_op|FullyQualifiedName~Interrupted_old_security_baseline_is_rejected_without_mutating_existing_data|FullyQualifiedName~Losing_the_migration_lock_session_stops_schema_preflight
+```
+
+Publish executed with `./src/MyDmsVn.Server.HttpHost/Publish-Web2Host.ps1 -OutputPath TestResults/web2-02-03/publish-iis`; it performed locked restore and full referenced Release build with **0 warnings/errors**. The smoke set `MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY` to that absolute output and `MYDMSVN_WEB_TEST_TLS_THUMBPRINT` to the existing localhost binding certificate; no key/password was committed. Actual deployed Web.config contains **13 generated binding redirects** (OWIN/Newtonsoft/BCL/DI/logging/Serilog/System libraries), no IdentityModel/JWT redirect in the aligned8.23 graph. Published bin contains **0 Desktop DLLs**. Publisher requires an empty destination and never recursively deletes an existing deployment.
+
+HTTP observations: health200 `{"data":{"status":"ok"}}` with correlation; missing/invalid Bearer401 JSON and no Location; independently signed valid JWT + real SQL session reaches JSON404 for unknown API; real revoke causes the same JWT to receive401. HTTP transport400, cross-origin403, index/client-route same HTML marker, missing `.js`404. API never falls through to SPA. IIS native filtering/TLS/startup failures remain native errors outside the managed JSON contract; actual browser/cookie behavior is not claimed.
+
+Persistence observations: hash-only GUIDv4, absolute30d/idle7d, rotation/reuse, expired-ancestor replay, family isolation, logout/refresh race, disable→reenable without intervening request, boundary expiry, child/initial insert rollback, retention and audit failure after committed revoke. Three contention tests record independent SPIDs, hold a session-key U lock and verify DMV WAIT/CONVERT on that same key plus Users S lock before release; the clock advances only after confirmed blocking. Shared cleanup helper drains workers before disposal and quarantines on timeout.
+
+All ordinary SQL allocations, including the two IIS attempts, were positively owned and cleaned. IIS worker was launched hidden with isolated config, ephemeral signing key and random SID-tracked restricted login; test-admin MYDMSVN variables were removed from its environment. Cleanup stops/drains that exact process, verifies login instance/SID/no sessions and then drops the database through its ownership helper. No listener remained on44321/18081 after final smoke. Expected reset-failure probes passed their refusal assertions; no unexpected cleanup failure or retained resource was observed. New schema tests aggregate scenario+cleanup errors; that final error-path-only review correction changed no SQL/assertions/happy path and was statically reviewed, not used to claim a new dual-failure runtime scenario.
+
+### Failure history and review
+
+RED was retained: host anonymous case1FAIL; first integrated52 rows49PASS/3FAIL exposed WebAPI404 pass-through, audit lifetime and a test Host-authority fixture; audit correlation regression1FAIL reproduced real DI creation before actor admission. These are fixed; final63 host rows pass. Store input8FAIL→8PASS, Issue SQL1FAIL, maintenance input1FAIL, then lifecycle24 rows12PASS/12 expected unimplemented-rotation failures preceded final25GREEN. Migration exploration12 rows11PASS/1FAIL exposed a fault-injection THROW placed inside the trigger batch; a GO separator fixed the fixture. Temporary compile blockers and fingerprint-derivation probes were resolved before final runs and are not acceptance evidence.
+
+First IIS smoke1FAIL was a harness assertion expecting `isSuccess`; actual ApiResponse marks that property JsonIgnore and correctly emits only `data`. Source/contract inspection corrected the assertion; final smoke1PASS covers all steps. Both attempts cleaned their owned process/login/database; no host product change was needed for that correction.
+
+Independent review found no remaining P1/P2 product issue after correlation/audit, deterministic SQL handshake, bounded IIS worker shutdown and aggregate cleanup-error corrections. Static diff/encoding/local-link checks, unchanged global pins/scripts001–010/desktop grants and frontend source boundary are checked with the documentation checkpoint. Raw synthetic TRX/publish/config remain ignored under TestResults and are not committed.
+
+**Decision:** WEB2-02/03 DONE for the implemented host/session scope; next planned dependency is WEB2-04 (not started here). Full IIS deployment, DNS/browser trust for the pilot origin, actual login/refresh cookie/CSRF/rate limits, Sales HTTP, browser storage/UI and Gate A–D/production rollout remain NOT RUN / pending. Desktop remains exact10 and cannot coexist as an admitted writer on schema11. TraceSource `MyDmsVn.Web.Security` uses a fixed sanitized allowlist; operator-provisioned destination/retention is still a deployment responsibility.

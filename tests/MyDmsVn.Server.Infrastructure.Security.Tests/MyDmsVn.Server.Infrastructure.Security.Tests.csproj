@@ -33,6 +33,8 @@
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\Fixtures\ApplicationSqlCollectionFixture.cs" Link="Fixtures\ApplicationSqlCollectionFixture.cs" />
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlTestDatabase.cs" Link="SqlTestDatabase.cs" />
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlTestDatabaseName.cs" Link="SqlTestDatabaseName.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlConcurrencyCleanup.cs" Link="SqlConcurrencyCleanup.cs" />
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\SqlConcurrencyGate.cs" Link="SqlConcurrencyGate.cs" />
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\TestDatabaseMigrationRunner.cs" Link="TestDatabaseMigrationRunner.cs" />
     <EmbeddedResource Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\TestScripts\*.sql" Link="TestScripts\%(Filename)%(Extension)" />
   </ItemGroup>
