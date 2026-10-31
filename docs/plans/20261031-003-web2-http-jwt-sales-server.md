@@ -1,6 +1,6 @@
 # WEB2 companion — HTTP/JWT/Sales server vertical slice (net48)
 
-**Ngày:** 2026-10-31. **Owner chọn:** giữ `net48`, thin HTTP host, Bearer JWT short-lived trong frontend localStorage, refresh GUID trong HttpOnly cookie. **Trạng thái:** ACTIVE / WEB2-01–04 DONE (bounded contract/host/SQL session/auth); WEB2-05 trở đi PLANNED. **Repo:** `chung6a8m/MyDmsVn`; **phối hợp:** [ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md). Các task HTTP ở đây **song song, độc lập** với CEX-A01–A05 (WinForms); không thay thế active composition roadmap.
+**Ngày:** 2026-10-31. **Owner chọn:** giữ `net48`, thin HTTP host, Bearer JWT short-lived trong frontend localStorage, refresh GUID trong HttpOnly cookie. **Trạng thái:** ACTIVE / WEB2-01–05 DONE (bounded contract/host/SQL session/auth/Sales/Catalog HTTP); WEB2-06–10 PLANNED. **Repo:** `chung6a8m/MyDmsVn`; **phối hợp:** [ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md). Các task HTTP ở đây **song song, độc lập** với CEX-A01–A05 (WinForms); không thay thế active composition roadmap.
 
 **Bắt buộc đọc:** [web2 contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [architecture](../ARCHITECTURE.md), [security](../SECURITY.md), [contracts](../CONTRACTS.md), [SQL security](../CONFIGURATION_AND_SQL_SECURITY.md), [test policy](../TEST_POLICY.md), [direct sales](../DIRECT_SALES.md), `src/MyDmsVn.Server.Application/Identity`, `Sales`, `src/MyDmsVn.Server.Infrastructure/DependencyInjection.cs` và `src/MyDmsVn.Server.DbMigrator`. Base: `main@5b9f960`; recheck fresh HEAD trước implementation. Không sao chép Runtime/desktop acceptance sang API.
 
@@ -12,7 +12,7 @@
 | WEB2-02 — host + scoped actor | Server | WEB2-01 | Web API 2 `net48` host, DI, bearer validate per request, HTTPS/correlation/health, no Desktop DI | DONE (bounded) |
 | WEB2-03 — refresh persistence | Server | WEB2-01 | DbUp 011, restricted SQL permissions, hashed token store, atomic session/rotation/replay tests | DONE (bounded) |
 | WEB2-04 — login/refresh/logout/capabilities | Server | WEB2-02,03 | JWT issue/validate, cookies+CSRF, active actor, revocation, auth negative suite | DONE (bounded) |
-| WEB2-05 — Sales + Catalog HTTP | Server | WEB2-02,04 | v1 routes, mapping, lossless golden fixtures, permission + SQL integration tests | PLANNED |
+| WEB2-05 — Sales + Catalog HTTP | Server | WEB2-02,04 | v1 routes, mapping, lossless golden fixtures, permission + SQL integration tests | DONE (bounded) |
 | WEB2-08/09 — integrated read/write | Server assists Web | WEB2-05 | Fault injection/read/write contract parity and defect fixes, not new business rules | PLANNED |
 | WEB2-10 — pilot acceptance | Both | all | Verified IIS/SQL/browser candidate, evidence and handoff | PLANNED |
 
@@ -70,6 +70,15 @@ Review focus: malformed/duplicate credential or cookie input must not issue a se
 3. Catalog lookup for product/customer/warehouse/employee uses existing feature Application queries with their own Read permissions; active-only choices for editing, existing inactive reference labels come from Sales/Get.
 4. Enforce JSON/map invariants: list PageSize=25 (client-specified), opaque cursor, filters Product Any; Create/Update rows ordered, saleLineId new=`"0"`; server rowversion opaque. No browser-provided actor or synthetic permission.
 5. Tests: golden two-way JSON >2^53/int64 max and decimal boundary without Number, duplicate product mapping, 1–200 rows, 401/403/409, stale version, Post ack + Get denied, posted COGS only from SQL; compare handler/Local/HTTP business outcomes and error taxonomy.
+
+### WEB2-05 implementation checklist — 2026-10-31
+
+Baseline backend `f563d32` (local verified WEB2-04, not merged into main), web `bb83abb`; branches `codex/web2-05-sales` / `codex/web2-05-status`. Scope follows the canonical wire corpus; no new business/schema/grant contract.
+
+- [x] HttpHost request parser/response mapper and Sales/Catalog controllers: strict wire scalars, dates, unknown/duplicate fields, query limits; existing MediatR handlers and independent permissions; Post acknowledgement without Get.
+- [x] HttpHost.Tests RED/GREEN and golden corpus consumption: exact int64/decimal, inactive labels, nullable costs, duplicate/200 rows, validation field paths, HTTP status/error taxonomy.
+- [x] Restricted SQL HTTP tests: actual login, lookup rights, Draft create/update/list/get, filter-bound keyset, Post/stock/cost, stale409 and Post-only acknowledgement with Get403; owned allocation cleanup.
+- [x] Independent review, focused final HTTP/SQL and published IIS smoke; source/test candidate `3cd853df4b6d9aa6716533d891229debe5746289`, actual commands/counts/environment in [WEB2 evidence](../evidence/web2/20261031-http-jwt-sales.md#web2-05--2026-10-31-salescatalog-endpoints). Browser integration/full IIS remain later gates.
 
 ## WEB2-08/09 — integration assistance
 

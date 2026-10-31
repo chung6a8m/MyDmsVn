@@ -1,6 +1,6 @@
 # Backend WEB2 — HTTP/JWT/Sales execution evidence
 
-**Date created:** 2026-10-31. **Status:** WEB2-01–04 DONE within bounded contract/host/SQL-session/auth scope; WEB2-05 onward PLANNED. Focused HTTP/SQL and published IIS Express smoke PASS; full IIS/browser/Sales pilot acceptance remains open. Cross-repo plan: [server companion](../../plans/20261031-003-web2-http-jwt-sales-server.md); [contract](../../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md); [React roadmap](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md).
+**Date created:** 2026-10-31. **Status:** WEB2-01–05 DONE within bounded contract/host/SQL-session/auth/Sales/Catalog HTTP scope; WEB2-06–10 PLANNED. Focused HTTP/SQL and published IIS Express auth/Sales smoke PASS; full IIS/browser/Sales pilot acceptance remains open. Cross-repo plan: [server companion](../../plans/20261031-003-web2-http-jwt-sales-server.md); [contract](../../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md); [React roadmap](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md).
 
 ## Planning baseline
 
@@ -17,7 +17,7 @@
 | WEB2-02 | `55ea4fd8b4aa567bdef0c723fd08b552b7b11269` | 63 HTTP/DI/JWT rows + 1 real published IIS Express/SQL smoke | PASS / DONE (bounded) | Full IIS and browser/auth/Sales endpoints pending |
 | WEB2-03 | `36c528acc932b73c8d93e2fd54089c0856fd919b` | 25 store rows (16 SQL/9 pure), 25 migration, 5 principal, 15 reset rows | PASS / DONE (bounded) | Controlled nonproduction schema11 only; no desktop coexistence or production rollout |
 | WEB2-04 | `a0770ac082505fec1f1db52a2469a5aa392a69f4` | 147 HTTP + 33 session/SQL + 1 published IIS Express auth smoke | PASS / DONE (bounded) | Full IIS/browser/Sales acceptance remains open |
-| WEB2-05 | — | NOT RUN | PLANNED | Sales/Catalog HTTP golden |
+| WEB2-05 | `3cd853df4b6d9aa6716533d891229debe5746289` | 257 HTTP + 14 HTTP/SQL + 1 published IIS Express Sales smoke; 59 Node corpus | PASS / DONE (bounded) | Frontend integration/full IIS/browser/network-loss/production acceptance pending |
 | WEB2-08/09 | — | NOT RUN | PLANNED | Browser integration/real write |
 | WEB2-10 | — | NOT RUN | PLANNED | Full candidate acceptance |
 
@@ -133,3 +133,50 @@ Independent review identified two P2 issues before completion: route classificat
 Documentation checks: `git diff --check 4290220` (backend) and `git diff --check 60e5210` (web) PASS. The ignored local `node TestResults/web2-04-doc-check.mjs <backend-worktree> <web-worktree>` checked393 backend and58 web relative Markdown targets, UTF-8/EOL rules and changed C# BOM/CRLF with0 errors. Diff inventories confirm no historical SQL scripts, global package pins, vendor, deployment grants, web runtime/tests/package lock or WEB-01–08 evidence changed. Both original main checkouts remain untouched; work is preserved in the isolated task branches.
 
 **Decision:** WEB2-04 DONE for backend auth endpoints, focused SQL/HTTP and published IIS Express scope. Per-worker throttling resets on recycle; operator audit destination/retention and a multi-worker abuse policy require deployment validation. Full IIS, browser cookie enforcement/localStorage/multi-tab lifecycle, physical network-loss injection, Sales/Catalog HTTP, Gate A–D and production rollout remain **NOT RUN / pending**. No push, PR or merge was performed; WEB2-05–10 remain planned.
+
+## WEB2-05 — 2026-10-31 Sales/Catalog endpoints
+
+**Source/test candidate: `3cd853df4b6d9aa6716533d891229debe5746289`; DONE within bounded WEB2-05 scope.** Backend branch `codex/web2-05-sales` starts from verified local WEB2-04 `f563d32`; main remains `4290220`. Web documentation branch `codex/web2-05-status` starts from `bb83abb`; status-only commit `09fe435942f72ea482f040b7120104ffd33bed22`. No merge or frontend runtime change. The owning companion plan contains the task checklist; canonical field tables/corpus remain under `docs/contracts/web2-v1`. Documentation completion follows the source/test candidate separately.
+
+Baseline:147/147 HttpHost tests and59/59 Node corpus checks PASS. First real SQL HTTP RED:7 executed/7 failed/0 skipped,52s; existing login worked, missing Sales/Catalog routes returned404 instead of expected business responses. All owned allocations cleaned. Local TRX: `TestResults/web2-05-sales-sql-red/web2-05-sales-sql-red.trx`.
+
+Implemented scope: dedicated host-only strict UTF-8 JSON/query input and explicit output projection for Sales List/Get/Create/Update/Post and four catalog lookups. Existing Application handlers, authorization, SQL UoW, pricing/stock/cost rules and Local DTOs remain unchanged. `Startup` already registered the necessary query services/repositories through `AddSqlPersistence`; no extra production business service, package pin, schema or SQL grant was added. Post returns the acknowledgement without an eager Get. The [host runbook](../../../src/MyDmsVn.Server.HttpHost/README.md) and [canonical corpus notes](../../contracts/web2-v1/README.md) describe the implemented boundary.
+
+Focused HTTP full-project verification passed257/257 (147 retained rows plus110 new Sales/wire rows). Restricted SQL first GREEN passed7/7 in49s. After independent review reported no unresolved P1/P2 finding, the final shared-harness regression executed14/14 in88s,0 failed/0 skipped:
+
+```powershell
+dotnet restore tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj --locked-mode
+dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --filter 'FullyQualifiedName~WebSalesHttpSql|FullyQualifiedName~WebAuthHttpSql' --logger 'trx;LogFileName=web2-05-http-sql-final.trx' --results-directory TestResults/web2-05-http-sql-final
+```
+
+The final14 are seven new Sales/Catalog SQL cases and seven retained auth SQL cases, each using a fresh positively owned database and production OWIN/Application/SQL implementations through the provisioned restricted database user. Independent administrator oracles verify document/line versions, quantities, valuation and ledger rows. The new cases prove200 independent duplicate-product rows and persisted max-int64 header/line IDs as strings; exact decimal quantity/price caps including a maximal gift; leap-date preservation; authoritative Create/Update, stale409 and already-posted409; manual selling prices and gift/zero-price COGS; Product Any membership with all-line totals and bound next/previous cursors; independent live catalog Read and Sales Read/Write/Post; inactive historical labels; and ordered indexed validation fields. A separate actual Local adapter/provider authenticates and reads the posted receipt to compare IDs/totals/line costs without introducing its Desktop session into HTTP identity.
+
+Write-only Create/Update succeeds without Read; Write alone cannot Post. Granting Post to that same active actor succeeds without replacing its JWT, and the acknowledgement remains200 even though the subsequent Get is403. Denied/malformed requests preserve five business tables and both production number sequences. A test-owned transient trigger/sequence fails the first ledger insertion and observes exactly one attempt: HTTP500, unchanged Draft/version/stock and no ledger/valuation entries. This proves no automatic server mutation retry in that path, not network-loss handling, client retry behavior or a new backend idempotency contract.
+
+### Final verification and published host
+
+Environment rechecked: Windows11 `10.0.26300`, Framework4.8.10008, SDK8.0.427, Node22.14.0, IIS Express10.0.26013.1000 and VSTest17.11.1 x64/net48. SQL uses the same explicitly designated nonproduction master/test instance as WEB2-04 (previously verified SQL Server14.0.2140.2 Developer64); connection material is neither printed nor committed. Browser: **NOT RUN**; full IIS is unavailable on this host. No machine TLS/DNS/IIS provisioning or production migration/deployment was performed.
+
+Final disjoint .NET counters: **272 executed / 272 passed / 0 failed / 0 skipped** (257 HTTP,14 SQL,1 IIS case). The separate Node corpus run passed59/59; intermediate runs are not added to these totals.
+
+| Scope | Command | Actual result |
+|---|---|---|
+| HTTP/DI/auth/Sales wire, SQL-free | `dotnet test tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-restore --logger 'trx;LogFileName=http-green2.trx' --results-directory TestResults/web2-05-http-green2` | 257/257 PASS,8s runner time;147 retained +110 new rows; locked restore preceded execution |
+| Shared auth/Sales HTTP SQL | Combined Security command above | 14/14 PASS,88s;7 retained auth +7 new Sales/Catalog rows |
+| Canonical corpus | `node --test scripts/check-web2-wire-fixtures.mjs` | 59/59 PASS; fixtures themselves unchanged |
+| Publish | `./src/MyDmsVn.Server.HttpHost/Publish-Web2Host.ps1 -OutputPath TestResults/web2-05-iis/publish-put-fixed` | Release build/locked restore PASS,0 warnings/errors;13 generated redirects,0 Desktop DLLs |
+| Published HTTPS Sales/auth | `dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-build --no-restore --filter FullyQualifiedName~WebHostIisExpressTests --logger 'trx;LogFileName=iis-put-fixed.trx' --results-directory TestResults/web2-05-iis-final` | 1/1 PASS,29s; actual System.Web + SID-tracked restricted SQL LOGIN |
+
+IIS smoke explicitly sets the existing localhost certificate pin and the fresh publish directory via its two opt-in variables, then restores them. Actual login/cookie/CSRF/revoke checks remain; added proof is Catalog lookup -> Create -> Get -> PUT Draft Update -> Post acknowledgement -> Get Posted, with string ID/decimal/unit-cost tokens. Two duplicate Product rows include a paid line and a gift. Independent administrative SQL confirms quantity15, inventory value225 and two Sales ledger rows from initial20/300. The test is one xUnit result, not one result per request. All owned allocations, both failed-smoke fixtures, the final restricted login and exact IIS worker drained/cleaned; no quarantine or cleanup failure, and no listeners remained on44321/18081.
+
+### Retained failures, review and limits
+
+HTTP RED executed110 with110 missing-route failures (`TestResults/web2-05-http-red/http-red.trx`). The first HTTP GREEN attempt had109PASS/1FAIL for `?search=%`: HttpClient normalized the URI before the test reached OWIN, so the test now uses its raw-query hook to present the intended malformed input. This was an oracle correction, not a production-parser defect. Final257 pass. Initial SQL RED7/7 failures above preceded first Sales7/7 GREEN and final shared14/14 GREEN. Setup compiler corrections (a JObject cast and an ambiguous Formatting import) were fixed before executed GREEN runs.
+
+The first IIS attempt failed at strict Create/Get JSON lexeme equality,31s: gift revenue may legally be `"0"` before SQL materializes decimal(28,4) as `"0.0000"`. The corrected oracle checks string token type and four-place value precision, normalizes only decimal lexemes and leaves IDs/version/null omission distinct. The second attempt then reached actual PUT and failed404,24s. Inspection found the inherited CLR4 Integrated extensionless handler permits only GET/HEAD/POST/DEBUG, so PUT fell through to native StaticFile before OWIN. App-local Web.config now preserves those verbs and adds PUT only; no machine configuration or other verb was broadened. The final published smoke above passes that native boundary. One helper rebuild attempted while an owned IIS testhost still held its DLL was refused by MSBuild; no loaded DLL was overwritten. After process drain, a clean serialized rebuild loaded the final precision/diagnostic helper before final IIS execution.
+
+Independent review of implementation, corrected IIS oracle and the app-local PUT handler fix reports READY with no unresolved P1/P2 finding. The final14 SQL scope ran before these IIS-only oracle/config corrections; Application/SQL/auth/Sales source and those selected tests did not change. Historical WEB2-01–04 evidence above remains unchanged.
+
+Documentation verification: `git diff --check f563d32` PASS. Backend checks inspected23 changed files,371 relative Markdown targets and C# BOM/CRLF with0 errors; the ignored `python TestResults/web2-05-doc-check.py` independently checked13 changed Markdown files/371 targets, UTF-8 without BOM and working-tree CRLF. Web checks inspected6 status-only Markdown files/59 relative targets, UTF-8/LF,0 errors. Current headers/checklist consistently record bounded WEB2-01–05 completion and WEB2-06–10 pending. Frontend src/tests/lockfiles/fake evidence, existing product SQL scripts/grants, package pins, vendor and historical evidence remain unchanged by WEB2-05.
+
+**Decision:** WEB2-05 DONE for backend Sales/Catalog routes, exact HTTP mapping, focused HTTP/real-SQL/Local parity and published IIS Express scope. WEB2-06–10 remain PLANNED. Full IIS/browser frontend integration, real cookie/localStorage/multi-tab enforcement, physical network-loss/recovery cases, Gate A–D and production acceptance remain **NOT RUN / pending**. Existing per-worker throttle and operator audit destination/retention limits remain. No new business rule, schema/grant contract, frontend runtime, push, PR or merge was introduced.
