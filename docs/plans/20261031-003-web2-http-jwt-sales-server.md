@@ -1,6 +1,6 @@
 # WEB2 companion — HTTP/JWT/Sales server vertical slice (net48)
 
-**Ngày:** 2026-10-31. **Owner chọn:** giữ `net48`, thin HTTP host, Bearer JWT short-lived trong frontend localStorage, refresh GUID trong HttpOnly cookie. **Trạng thái:** ACTIVE / WEB2-01–03 DONE (bounded contract/host/SQL session); WEB2-04 trở đi PLANNED. **Repo:** `chung6a8m/MyDmsVn`; **phối hợp:** [ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md). Các task HTTP ở đây **song song, độc lập** với CEX-A01–A05 (WinForms); không thay thế active composition roadmap.
+**Ngày:** 2026-10-31. **Owner chọn:** giữ `net48`, thin HTTP host, Bearer JWT short-lived trong frontend localStorage, refresh GUID trong HttpOnly cookie. **Trạng thái:** ACTIVE / WEB2-01–04 DONE (bounded contract/host/SQL session/auth); WEB2-05 trở đi PLANNED. **Repo:** `chung6a8m/MyDmsVn`; **phối hợp:** [ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md). Các task HTTP ở đây **song song, độc lập** với CEX-A01–A05 (WinForms); không thay thế active composition roadmap.
 
 **Bắt buộc đọc:** [web2 contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [architecture](../ARCHITECTURE.md), [security](../SECURITY.md), [contracts](../CONTRACTS.md), [SQL security](../CONFIGURATION_AND_SQL_SECURITY.md), [test policy](../TEST_POLICY.md), [direct sales](../DIRECT_SALES.md), `src/MyDmsVn.Server.Application/Identity`, `Sales`, `src/MyDmsVn.Server.Infrastructure/DependencyInjection.cs` và `src/MyDmsVn.Server.DbMigrator`. Base: `main@5b9f960`; recheck fresh HEAD trước implementation. Không sao chép Runtime/desktop acceptance sang API.
 
@@ -11,7 +11,7 @@
 | WEB2-01 — contract & host preflight | Both | — | ADR/HTTP examples/locked compatible dependencies, pilot HTTPS origin, exact schema admission | DONE (bounded) |
 | WEB2-02 — host + scoped actor | Server | WEB2-01 | Web API 2 `net48` host, DI, bearer validate per request, HTTPS/correlation/health, no Desktop DI | DONE (bounded) |
 | WEB2-03 — refresh persistence | Server | WEB2-01 | DbUp 011, restricted SQL permissions, hashed token store, atomic session/rotation/replay tests | DONE (bounded) |
-| WEB2-04 — login/refresh/logout/capabilities | Server | WEB2-02,03 | JWT issue/validate, cookies+CSRF, active actor, revocation, auth negative suite | PLANNED |
+| WEB2-04 — login/refresh/logout/capabilities | Server | WEB2-02,03 | JWT issue/validate, cookies+CSRF, active actor, revocation, auth negative suite | DONE (bounded) |
 | WEB2-05 — Sales + Catalog HTTP | Server | WEB2-02,04 | v1 routes, mapping, lossless golden fixtures, permission + SQL integration tests | PLANNED |
 | WEB2-08/09 — integrated read/write | Server assists Web | WEB2-05 | Fault injection/read/write contract parity and defect fixes, not new business rules | PLANNED |
 | WEB2-10 — pilot acceptance | Both | all | Verified IIS/SQL/browser candidate, evidence and handoff | PLANNED |
@@ -51,6 +51,17 @@
 3. JWT defaults access 10min; refresh idle 7d/absolute 30d; configurable bounded values and test clock; HS256 256-bit secret from secure deployment config (not committed). `kid` rotation; test unknown kid/wrong audience/exp/nbf/alg none, malformed signature, session revoked even if JWT valid.
 4. `GET me` uses authoritative current user; `GET capabilities?feature=sales` checks three existing permission keys via `IPermissionAuthorizationService`, no new grants or superuser bypass.
 5. Tests browser-like cookie attributes, CSRF cross-origin/missing Origin, double refresh, different users; signout revokes unexpired access JWT, SQL failure safe, no credential/token in logs.
+
+### WEB2-04 implementation checklist — 2026-10-31
+
+Baseline: backend `4290220` (WEB2-02/03 merged), web `60e5210`; isolated branches `codex/web2-04-auth` / `codex/web2-04-status`. The approved contract above remains authoritative; this checklist records implementation seams, not a second protocol specification.
+
+- [x] HTTP auth: `src/MyDmsVn.Server.HttpHost` owns narrow anonymous cookie routes, `AuthController`, signing/cookie/body/throttle helpers and request-scoped Application calls. `tests/MyDmsVn.Server.HttpHost.Tests` first demonstrates missing routes, then checks successful lifecycle and negative admission. Baseline: 63/63 PASS.
+- [x] Lifetime configuration: `Server.Application/Identity/WebAuthSessionOptions.cs`, `Server.Infrastructure/Identity/SqlWebAuthSessionStore.cs`, host configuration/Startup; defaults remain idle7d/absolute30d, operator may shorten within idle1–7d/absolute1–30d with idle <= absolute. Pure configuration tests and a real SQL issue/rotate/absolute-expiry regression prove enforcement. No schema/grant change.
+- [x] SQL/host integration: extend the existing Security test owner and owned allocation/IIS Express fixture. Exercise actual LoginCommand/password verification, independently evaluated Read/Write/Post permissions, rotation/replay/concurrency/logout/disabled account. Run SQL owners sequentially; inspect nonempty TRX and cleanup.
+- [x] Final verification: focused HttpHost suite, affected Security cases, published IIS Express HTTPS smoke where available; independent code/security review and encoding/link/diff checks. Record actual source/test SHA, runtime, commands, counts, failures and limitations in WEB2 evidence in both repos. No automatic merge.
+
+Review focus: malformed/duplicate credential or cookie input must not issue a session; an expired optional Bearer must not block cookie-only refresh/logout; throttling must stay bounded under changing accounts/tokens/IPs; response/audit failures after rotation must never replay a token; logout and account disable must deny an otherwise valid unexpired JWT on the next request.
 
 ## WEB2-05 — Sales/Catalog HTTP without duplicating business
 

@@ -1,6 +1,6 @@
 # WEB2 — HTTP host, JWT, refresh sessions và Sales wire contract
 
-**Chọn bởi Owner:** 2026-10-31. **Trạng thái:** APPROVED DESIGN / NOT IMPLEMENTED. **Runtime:** giữ `net48`, Windows/IIS, ASP.NET Web API 2; frontend tương ứng: [MyDmsVn.ReactWebUI](https://github.com/chung6a8m/MyDmsVn.ReactWebUI). Đây là companion cho [server plan](../plans/20261031-003-web2-http-jwt-sales-server.md); không thay thế roadmap WinForms CEX đang active. Source baseline: `main@5b9f960ee4048581f107e9ee6350e1dfad462b53`. Mọi giả định về dependency/hosting phải được xác minh ở WEB2-01/02 trước khi code.
+**Chọn bởi Owner:** 2026-10-31. **Trạng thái:** APPROVED DESIGN / WEB2-01–04 IMPLEMENTED (bounded host/session/auth); Sales/browser chưa nghiệm thu. **Runtime:** giữ `net48`, Windows/IIS, ASP.NET Web API 2; frontend tương ứng: [MyDmsVn.ReactWebUI](https://github.com/chung6a8m/MyDmsVn.ReactWebUI). Đây là companion cho [server plan](../plans/20261031-003-web2-http-jwt-sales-server.md); không thay thế roadmap WinForms CEX đang active. Source baseline: `main@5b9f960ee4048581f107e9ee6350e1dfad462b53`. Mọi giả định về dependency/hosting phải được xác minh ở WEB2-01/02 trước khi code.
 
 ## 1. Bất biến và phạm vi
 
