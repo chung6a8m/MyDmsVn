@@ -42,6 +42,7 @@ namespace MyDmsVn.Server.Infrastructure
             services.TryAddSingleton<IPasswordHasher, BcryptPasswordHasher>();
             services.TryAddSingleton<ILegacyPasswordVerifier, UnsupportedLegacyPasswordVerifier>();
             services.TryAddScoped<SqlIdentityStore>();
+            services.TryAddScoped<IWebAuthSessionStore, SqlWebAuthSessionStore>();
             services.TryAddScoped<SqlSecurityAdministrationStore>();
             services.TryAddScoped<ISecurityAdministrationStore>(
                 serviceProvider => serviceProvider.GetRequiredService<SqlSecurityAdministrationStore>());

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using MyDmsVn.Server.Infrastructure.Operations;
 using MyDmsVn.Server.DbMigrator.SecurityProvisioning;
@@ -16,6 +16,11 @@ internal static class Program
                 args.Skip(1).ToArray(),
                 Console.Out,
                 Console.Error);
+        }
+
+        if (args.Length == 1 && string.Equals(args[0], "--web", StringComparison.Ordinal))
+        {
+            return DatabaseMigratorCommand.Run(new SqlConnectionConfigurationLoader(), Console.Out, Console.Error, web: true);
         }
 
         if (args.Length == 0)
@@ -68,7 +73,7 @@ internal static class Program
         }
 
         Console.Error.WriteLine(
-            "DbMigrator.InvalidArguments: Unknown command. Use no arguments to migrate, " +
+            "DbMigrator.InvalidArguments: Unknown command. Use no arguments for desktop schema10, --web for explicit schema11, " +
             "or use security bootstrap-superuser, recover-superuser or rename-superuser.");
         return 2;
     }
