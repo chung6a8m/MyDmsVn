@@ -1,5 +1,7 @@
 # Test coverage — MyDmsVn
 
+**WEB2 host/session coverage:** [tasks02–03](plans/20261031-003-web2-http-jwt-sales-server.md) add strict JWT/authoritative SQL actor, overlapping request scopes, JSON/HTTPS guards, exact10→11 admission, restricted web grants, transactional refresh/replay/logout/disable/expiry/rollback and auth-aware reset. [Commands](../tests/README.md#web2-httpschemasession-tests) distinguish SQL-free HTTP pipeline, real disposable SQL and opt-in published IIS Express smoke. [Evidence](evidence/web2/20261031-http-jwt-sales.md) records actual execution; no browser/auth-endpoint/Sales acceptance is inferred.
+
 **Updated:** 2026-10-28. This document owns behavioral coverage; [TEST_POLICY](TEST_POLICY.md) alone governs execution scope and [tests/README](../tests/README.md) owns commands. The [execution index](plans/README.md) selects the authorized follow-up and its scoped verification; successor work requires explicit activation. [UI-NEXT](ui-next/README.md) retains historical candidate evidence rather than a current task queue.
 
 The [archive boundary](archive/20261023-pre-ui-next/README.md) retires old queues without completing their open acceptance. [SAL-T08 evidence](evidence/sal/20261021-t08-integrated-acceptance.md) distinguishes product/package `f5039cb` from GUI test `4697744`; candidate-specific runnable automation passed, while native125, attended observations and dated Owner acceptance remain OPEN. R3/R4 source fixes are reviewed/approved. BCF/BCI/GUI-P5/L2DB/RESP retain their exact historical signed scopes and exceptions.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using MyDmsVn.Server.Infrastructure.Operations;
@@ -10,7 +10,8 @@ public static class DatabaseMigratorCommand
     public static int Run(
         SqlConnectionConfigurationLoader configurationLoader,
         TextWriter output,
-        TextWriter error)
+        TextWriter error,
+        bool web = false)
     {
         if (configurationLoader == null)
         {
@@ -31,7 +32,8 @@ public static class DatabaseMigratorCommand
         {
             var configuration = configurationLoader.Load(
                 SqlConnectionConfigurationPurpose.Migration);
-            var result = new DatabaseMigrationRunner().Migrate(configuration.ConnectionString);
+            var runner = new DatabaseMigrationRunner();
+            var result = web ? runner.MigrateWeb(configuration.ConnectionString) : runner.Migrate(configuration.ConnectionString);
             if (!result.Successful)
             {
                 error.WriteLine(

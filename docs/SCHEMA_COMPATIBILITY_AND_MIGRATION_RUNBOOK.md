@@ -1,5 +1,7 @@
 # Schema compatibility và migration runbook
 
+**WEB2 supplement (2026-10-31):** desktop/default migrator vẫn exact10. HTTP host dùng checker exact11 và migrator opt-in `--web`; admission10→11, principal riêng và retention được sở hữu tại [WEB2 SQL configuration](CONFIGURATION_AND_SQL_SECURITY.md#web2-schema11-và-principal-riêng). Không có mixed desktop10/web11 writer coexistence. Kết quả thực chạy theo [WEB2 evidence](evidence/web2/20261031-http-jwt-sales.md); các giới hạn release/SAL lịch sử dưới đây giữ nguyên.
+
 **Hiện trạng:** SAL-T01 development checkpoint, cập nhật 2026-10-22. Runtime candidate yêu cầu exact schema10; checkpoint này chưa thể triển khai độc lập vì receipt/sale/reconciliation cutover và SAL-T08 package/Owner evidence chưa hoàn tất. SEC-REBUILD/RESP/L2DB và GUI-P5 đã hoàn thành theo phạm vi được nghiệm thu; Baseline lịch sử trước SAL yêu cầu scripts001–009. Desktop và DbMigrator phát hành đều `net48`/x86, AppCore parked. DbMigrator là gói admin riêng; desktop không tự chạy DbUp hoặc security bootstrap. BCI đã triển khai/nghiệm thu trong phạm vi UI lịch sử. [BCF](archive/20261023-pre-ui-next/plans/20261021-001-business-compact-lookup-and-visual-parity.md) đã COMPLETE / OWNER ACCEPTED trong [phạm vi và ngoại lệ cuối](evidence/bcf/20261021-t06-integrated-acceptance.md#final-t06-owner-acceptance--2026-10-21) và không thay schema. Các [điều kiện schema-compatibility, recovery và phát hành](DEFERRED_WORK.md#release-prerequisites) vẫn **UNACCEPTED / UNSCHEDULED**.
 
 ## 1. Runtime schema contract hiện tại

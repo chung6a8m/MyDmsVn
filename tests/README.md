@@ -6,7 +6,7 @@
 
 ## Selecting commands and evidence
 
-Use the eleven active net48 test projects, including the shared Sales/Security UI Lab test owner, with the changed-behavior scope selected by [TEST_POLICY](../docs/TEST_POLICY.md) for separately authorized work and any plan explicitly activated through the [execution index](../docs/plans/README.md). Safe field metadata/mapping belongs to Server.Application.Tests; workspace state/lifetime belongs to Desktop.Session.Tests where controls are unnecessary; native control composition, focus and disposal belong to Desktop.Tests. Shared controls also require their upstream owner's affected tests/targets. Select real source cases, verify nonempty discovery and inspect actual TRX; proposed class names in a plan are not runnable tests and a successful zero-test filter is not PASS.
+Use the twelve active net48 test projects, including the shared Sales/Security UI Lab and WEB2 HTTP host test owners, with the changed-behavior scope selected by [TEST_POLICY](../docs/TEST_POLICY.md) for separately authorized work and any plan explicitly activated through the [execution index](../docs/plans/README.md). Safe field metadata/mapping belongs to Server.Application.Tests; workspace state/lifetime belongs to Desktop.Session.Tests where controls are unnecessary; native control composition, focus and disposal belong to Desktop.Tests. Shared controls also require their upstream owner's affected tests/targets. Select real source cases, verify nonempty discovery and inspect actual TRX; proposed class names in a plan are not runnable tests and a successful zero-test filter is not PASS.
 
 When DateInput behavior changes, use source-verified fixture/method selectors; the [historical correction plan](../docs/archive/20261025-pre-next-roadmap/ui-next/20261024-dateinput-unified-compact-correction.md) records relevant anchors. `DesktopDateInputIntegrationTests.cs` contains both a partial `GoodsReceiptControlTests` class and the `DesktopDateInputIntegrationTests` class that owns the Sales date integration cases. Filtering only `FullyQualifiedName~DesktopDateInputIntegrationTests` omits the Goods cases in the same file. Select the required classes/methods explicitly and verify discovery against source before collecting runtime evidence; filenames do not define test ownership or complete coverage.
 
@@ -18,7 +18,7 @@ For documentation-only changes, run diff/link/status/encoding checks only. No fu
 
 Run test projects directly with `dotnet test` or Test Explorer. The standalone SQL framework, its projects/tests, gate and invocation manifests, and command wrappers have been removed. The local [SqlTestDatabase](MyDmsVn.Server.Infrastructure.IntegrationTests/SqlTestDatabase.cs) helper creates a fresh uniquely owned database per call. RESP-T01 pins Respawn 4.0.0 and verifies the test-only application reset profile on net48. RESP-T02 implements exclusive collection lifecycle and the fixture-mode setting; RESP-T03 adopts all five Catalog business methods in one collection with its adapter/contamination probes. RESP-T04 also adopts seven Inventory and eight Identity/Security data-only cases; reviewed lifecycle/schema/principal/trigger/contention exceptions remain fresh.
 
-The ten baseline test projects and the shared Sales/Security UI Lab test project target **net48**:
+The ten baseline test projects, shared Sales/Security UI Lab and WEB2 HTTP host tests target **net48**:
 
 | Responsibility | Project under `tests/` |
 |---|---|
@@ -27,6 +27,7 @@ The ten baseline test projects and the shared Sales/Security UI Lab test project
 | Pure Desktop/session | `MyDmsVn.Desktop.Session.Tests` |
 | Desktop/WinForms | `MyDmsVn.Desktop.Tests` |
 | Sales/Security UI Lab scenario/native | `MyDmsVn.Desktop.Ui.Tests` |
+| HTTP pipeline/JWT/scoped actor (SQL-free) | `MyDmsVn.Server.HttpHost.Tests` |
 | SQL foundation | `MyDmsVn.Server.Infrastructure.Foundation.Tests` |
 | SQL catalogs | `MyDmsVn.Server.Infrastructure.Catalog.Tests` |
 | SQL inventory | `MyDmsVn.Server.Infrastructure.Inventory.Tests` |
@@ -88,6 +89,18 @@ if ($LASTEXITCODE -ne 0) { throw 'Catalog SQL tests failed.' }
 ```
 
 Omit `--filter` for a complete project pass. Substitute the exact owner and category for another affected scope. A focused pass proves only the selected cases. `dotnet test <project> -c Release -f net48 --list-tests --filter <filter>` can inspect discovery after restore; it does not prove SQL execution or cleanup.
+
+## WEB2 HTTP/schema/session tests
+
+WEB2 focused selectors remain in the existing SQL owners: Security `WebAuthSessionStoreTests` (pure), `WebAuthSessionSqlTests` and `WebPrincipalProvisioningTests`; Migrations `WebAuthMigrationTests`; Foundation `WebAuthResetTests` plus affected legacy reset cases. Use the source class selector with the existing locked-restore/test pattern above. Execute SQL owners sequentially and retain the owned allocation/drain safeguards.
+
+The packaged IIS Express smoke is opt-in `WebHostIisExpressTests` / `Category=WebHostIntegration` in Security.Tests. It requires the existing test SQL variable, `MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY` pointing to an empty-destination Release publish made by [Publish-Web2Host.ps1](../src/MyDmsVn.Server.HttpHost/Publish-Web2Host.ps1), and `MYDMSVN_WEB_TEST_TLS_THUMBPRINT` for the operator's existing localhost:44321 certificate. Require installed IIS Express, free44321/18081 ports and the default CLR4 Integrated config template. Missing explicit configuration skips this case and is NOT RUN for required host evidence; no test invents a SQL endpoint, TLS trust or credentials.
+
+```powershell
+dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --filter 'FullyQualifiedName~WebHostIisExpressTests' --logger 'trx;LogFileName=iis-express.trx' --results-directory TestResults/web2-iis
+```
+
+The smoke creates exact11 in a positively owned disposable database, provisions a random SID-tracked restricted SQL login, launches a hidden owned IIS Express process with an isolated config and ephemeral host secrets, then checks real HTTPS/health/401/404/revocation/static fallback. The child does not inherit test-admin `MYDMSVN_*` variables. Stop/drain that exact worker, verify login instance/SID/no sessions, then drop the owned database; uncertain cleanup retains resources and fails. No machine IIS/TLS configuration or production database is modified. The test-only localhost certificate pin never enters host source. IIS Express smoke is distinct from full IIS/browser/production acceptance.
 
 ## Complete SQL milestone
 

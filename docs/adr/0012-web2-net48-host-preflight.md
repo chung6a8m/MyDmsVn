@@ -1,5 +1,7 @@
 # ADR 0012 — WEB2 net48 HTTP host preflight
 
+**Follow-up:** WEB2-02/03 implementation and bounded HTTP/SQL/IIS Express results are recorded in [execution evidence](../evidence/web2/20261031-http-jwt-sales.md). The preflight observations below remain the WEB2-01 checkpoint.
+
 **Date:** 2026-10-31. **Decision owner:** Owner-selected WEB2-01. **Status:** dependency/API preflight verified in an isolated net48 probe; IIS/SQL/browser implementation and acceptance NOT RUN. Baseline inspected: `e657d8ddfc6dd4cf8a146ea04325a4dc9f8bd02d`. This refines the HTTP direction in [ADR 0001](0001-local-and-remote-adapters.md) and preserves [ADR 0008](0008-temporary-net8-target-pause.md), [ADR 0009](0009-linq2db-local-net48-persistence.md), [ADR 0010](0010-respawn-fixture-reuse-and-test-policy.md) and [ADR 0011](0011-direct-sales-and-moving-average-costing.md). It changes no shipped project, dependency pin, migration, desktop startup or historical acceptance.
 
 The [server plan](../plans/20261031-003-web2-http-jwt-sales-server.md) owns task status; the [HTTP/auth/wire contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) owns storage, cookie scope, TTL, CSRF, claims and wire semantics. Access JWT in localStorage remains the Owner's explicit choice with the documented XSS exfiltration risk. This ADR does not replace it with another storage design. [WEB2 evidence](../evidence/web2/20261031-http-jwt-sales.md) owns executed-candidate results and limitations.

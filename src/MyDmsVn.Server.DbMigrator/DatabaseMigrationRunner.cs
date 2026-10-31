@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using DbUp;
 using DbUp.Engine;
 using DbUp.SqlServer;
@@ -19,7 +20,11 @@ public sealed class DatabaseMigrationRunner
         "tempdb",
     };
 
-    public DatabaseUpgradeResult Migrate(string connectionString)
+    public DatabaseUpgradeResult Migrate(string connectionString) => MigrateCore(connectionString, false);
+
+    public DatabaseUpgradeResult MigrateWeb(string connectionString) => MigrateCore(connectionString, true);
+
+    private DatabaseUpgradeResult MigrateCore(string connectionString, bool web)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -29,7 +34,8 @@ public sealed class DatabaseMigrationRunner
         ValidateTargetDatabase(connectionString);
 
         using var migrationLock = DatabaseMigrationLock.Acquire(connectionString);
-        ValidateSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
+        if (web) ValidateWebSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
+        else ValidateSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
         var connectionManager = new SqlConnectionManager(
             migrationLock.TransferConnectionOwnership);
 
@@ -38,13 +44,42 @@ public sealed class DatabaseMigrationRunner
             .SqlDatabase(connectionManager)
             .WithScriptsEmbeddedInAssembly(
                 assembly,
-                resourceName => resourceName.Contains(".Scripts."))
+                resourceName => resourceName.Contains(".Scripts.") && (web ? SqlWebSchemaCompatibilityChecker.Scripts : SchemaCompatibilityPolicy.CurrentScripts).Any(script => resourceName.EndsWith(".Scripts." + script, StringComparison.Ordinal)))
             .JournalToSqlTable("dbo", "SchemaVersions")
             .WithTransactionPerScript()
             .LogToNowhere()
             .Build();
 
-        return engine.PerformUpgrade();
+        var result = engine.PerformUpgrade();
+        if (web && result.Successful)
+        {
+            var verified = new SqlWebSchemaCompatibilityChecker(connectionString).CheckAsync(System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+            if (!verified.IsCompatible) throw new DatabaseMigrationPreflightException("Migration.WebVerificationFailed", verified.SafeMessage);
+        }
+        return result;
+    }
+
+    private static void ValidateWebSchemaStateBeforeMigration(string connectionString, SqlConnection connection)
+    {
+        var state = SqlWebSchemaCompatibilityChecker.CheckConnectionAsync(connection, System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+        if (state.IsCompatible) return;
+        if (state.Status == SchemaCompatibilityStatus.Empty)
+        {
+            ValidateSchemaStateBeforeMigration(connectionString, connection);
+            return;
+        }
+        if (state.Status == SchemaCompatibilityStatus.TooOld)
+        {
+            // Frozen exact10 checker is independent of the web manifest. Never infer 9->11.
+            var source = new SqlSchemaCompatibilityChecker(connectionString).CheckConnectionAsync(connection, System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+            if (source.IsCompatible)
+            {
+                Schema10WebMaintenanceValidator.Validate(connection);
+                return;
+            }
+            throw new DatabaseMigrationPreflightException("Migration.WebUnsupportedSource", "Web migration requires a separately admitted exact schema10 source; schema9 cannot upgrade directly.");
+        }
+        throw new DatabaseMigrationPreflightException("Migration.Web" + state.Status, state.SafeMessage);
     }
 
     private static void ValidateSchemaStateBeforeMigration(

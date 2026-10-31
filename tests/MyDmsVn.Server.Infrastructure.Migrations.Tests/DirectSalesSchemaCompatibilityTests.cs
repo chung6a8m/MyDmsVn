@@ -225,7 +225,7 @@ public sealed class DirectSalesSchemaCompatibilityTests
     internal static void Install9(string cs)
     {
         var result = DeployChanges.To.SqlDatabase(cs).WithScriptsEmbeddedInAssembly(typeof(DatabaseMigrationRunner).Assembly,
-            n => n.Contains(".Scripts.") && SchemaCompatibilityPolicy.Schema9Scripts.Any(s => n.EndsWith(".Scripts." + s, StringComparison.Ordinal)))
+            n => n.Contains(".Scripts.") && !n.EndsWith("011_WebAuthSessions.sql", StringComparison.Ordinal) && SchemaCompatibilityPolicy.Schema9Scripts.Any(s => n.EndsWith(".Scripts." + s, StringComparison.Ordinal)))
             .JournalToSqlTable("dbo", "SchemaVersions").WithTransactionPerScript().LogToNowhere().Build().PerformUpgrade();
         Assert.True(result.Successful, result.Error?.ToString());
         Assert.Equal(9, result.Scripts.Count());

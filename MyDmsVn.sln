@@ -55,6 +55,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.Infrastructure.Migrations.Tests", "tests\MyDmsVn.Server.Infrastructure.Migrations.Tests\MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj", "{DDBECF01-C73B-48E4-91DC-3F16DB101074}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.HttpHost", "src\MyDmsVn.Server.HttpHost\MyDmsVn.Server.HttpHost.csproj", "{A3AA7BBE-218E-4BF6-BAF5-A187704C2D6A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDmsVn.Server.HttpHost.Tests", "tests\MyDmsVn.Server.HttpHost.Tests\MyDmsVn.Server.HttpHost.Tests.csproj", "{9DC00819-FEE3-47F8-B30A-9EEF8FA1484F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -156,6 +160,14 @@ Global
 		{DDBECF01-C73B-48E4-91DC-3F16DB101074}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DDBECF01-C73B-48E4-91DC-3F16DB101074}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DDBECF01-C73B-48E4-91DC-3F16DB101074}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A3AA7BBE-218E-4BF6-BAF5-A187704C2D6A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A3AA7BBE-218E-4BF6-BAF5-A187704C2D6A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A3AA7BBE-218E-4BF6-BAF5-A187704C2D6A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A3AA7BBE-218E-4BF6-BAF5-A187704C2D6A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9DC00819-FEE3-47F8-B30A-9EEF8FA1484F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9DC00819-FEE3-47F8-B30A-9EEF8FA1484F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9DC00819-FEE3-47F8-B30A-9EEF8FA1484F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9DC00819-FEE3-47F8-B30A-9EEF8FA1484F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{19B402F7-3500-487D-BDDF-69C76A73AC62} = {D37D8AC9-764D-4B64-810F-A0B495FC0A53}
@@ -180,5 +192,7 @@ Global
 		{23DEE51B-C7FD-44E8-8D9F-203AAAA42C5D} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
 		{93092814-57CB-444B-86A5-4316D647D71A} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
 		{DDBECF01-C73B-48E4-91DC-3F16DB101074} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
+		{A3AA7BBE-218E-4BF6-BAF5-A187704C2D6A} = {D37D8AC9-764D-4B64-810F-A0B495FC0A53}
+		{9DC00819-FEE3-47F8-B30A-9EEF8FA1484F} = {B0753A48-89C6-4A53-A79B-0F4D24CAA3E6}
 	EndGlobalSection
 EndGlobal
