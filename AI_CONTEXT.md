@@ -1,5 +1,7 @@
 # MyDmsVn — Current context for Codex
 
+**Parallel WEB2 status:** WEB2-01–03 are DONE within bounded contract, HTTP host and SQL-session scope. Read [server plan](docs/plans/20261031-003-web2-http-jwt-sales-server.md), [host configuration](src/MyDmsVn.Server.HttpHost/README.md) and [execution evidence](docs/evidence/web2/20261031-http-jwt-sales.md). Desktop/default migration remains exact10; web admission is exact11 via explicit `--web`. WEB2-04 onward, full IIS/browser and production acceptance remain pending; do not replace the CEX selection below.
+
 **Active selection — 2026-10-30:** The Owner selected [Editable Lines Composition and SAL Adoption](docs/plans/20261030-002-editable-lines-sal-adoption.md). Read the [selected design](docs/design/EDITABLE_LINES_SAL_ADOPTION.md) and [Codex handoff](docs/development/COMPOSITION_EXPANSION_CODEX_HANDOFF.md). The app plan owns CEX-A01–A05; the [toolkit companion](https://github.com/chung6a8m/MyDmsVn.WinFormsKit/blob/main/docs/plans/20261030-002-editable-lines-master-detail-recipes.md) owns CEX-K01–K03. Prioritize UIC-03 Editable Lines plus the production SAL pilot, then UIC-04 Master–Detail and Users/Roles mapping. Helper assessment is required; extraction is conditional under design §7. Runtime tasks are PLANNED; this activation is Markdown-only, with no new implementation/native acceptance. Keep runtime toolkit pin `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`; recipe source is separate. Reuse existing editors/helpers; keep SAL List/Detail, keyset, inline buffers, Save/Post and recovery contracts. Use the [new evidence record](docs/evidence/ui-labs/20261030-composition-expansion.md); preserve completed CMP and historical pending decisions.
 
 **Expansion activation baseline:** app `014e82d0013b0a16d73da0b35287d79d5848cc10`; toolkit main `25b6c77a4d95d0df112aeba389d61a58ad0ee6db`; app runtime gitlink unchanged.
@@ -36,7 +38,7 @@ SAL T00–T06 checkpoints and the T07 Sales workspace are implemented in the mer
 
 ## Current source facts
 
-- Product and all eleven active test projects target `net48`; package forms are Windows x86 Desktop.App and separate admin DbMigrator. AppCore/net8.0-windows remains PARKED / NOT SHIPPED.
+- Product and all twelve active test projects target `net48`; package forms are Windows x86 Desktop.App and separate admin DbMigrator. AppCore/net8.0-windows remains PARKED / NOT SHIPPED.
 - WinForms invokes Desktop.Application and Server.Application through the in-process Local adapter. Preserve transport-neutral DTOs, Clean Architecture and explicit UoW repository resolution.
 - Catalog/Inventory/Sales persistence uses LINQ to DB; other SQL consumers use typed native SqlClient. One explicit UoW owns the connection/current transaction, and DbUp owns schema scripts. Provider/runtime changes require separately selected scope; the current execution index owns scheduling.
 - Permissions use code-defined Active keys, current identity checks and a configured database-bound superuser. Unknown/deprecated keys deny before superuser; direct Deny wins for ordinary identities. Preserve password hashing/salt and legacy algorithm handling.
