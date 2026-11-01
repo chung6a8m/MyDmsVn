@@ -2,11 +2,13 @@
 
 **Updated:** 2026-10-30 · **Status:** ACTIVE — EDITABLE LINES COMPOSITION AND SAL ADOPTION · **Activation source:** [`main@014e82d0`](https://github.com/chung6a8m/MyDmsVn/commit/014e82d0013b0a16d73da0b35287d79d5848cc10)
 
-## Parallel Owner-selected workstream — WEB2 net48 HTTP/JWT/Sales
+## Completed parallel workstream — WEB2 net48 HTTP/JWT/Sales
 
-**2026-10-31: selected by the Owner** for [MyDmsVn.ReactWebUI Roadmap 02](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261031-002-http-jwt-sales-vertical-slice.md): keep **net48**, add a thin IIS Web API 2 host, short-lived Bearer JWT access in **frontend localStorage** (documented XSS risk), rotate hashed GUID refresh in **HttpOnly Secure Strict cookie**, expose existing Sales/Catalog handlers with lossless v1 wire DTOs. This repository owns [WEB2 server companion plan](20261031-003-web2-http-jwt-sales-server.md), [HTTP/auth/wire contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) and [execution evidence](../evidence/web2/20261031-http-jwt-sales.md). **WEB2-01–05 DONE within bounded contract/host/session/auth/Sales/Catalog HTTP scope; WEB2-06–09 completed in the web companion; WEB2-10 IN PROGRESS / full IIS BLOCKED. Scoped SQL/HTTP and published IIS Express auth/Sales smoke are verified; full IIS/browser/Sales pilot acceptance remains open.**
+**Owner closeout, 2026-11-01:** WEB2-01–09 **DONE (bounded)**; WEB2-10 **DONE within the tested IIS Express HTTPS + SQL + real Chromium/Edge pilot** with **full IIS acceptance: OWNER_ACCEPTED_EXCEPTION / NOT RUN**. The Roadmap 02 status is **COMPLETED WITH OWNER_ACCEPTED_EXCEPTION**; **no WEB2 tasks remain active**. The Owner's exception does **not** assert full IIS validation, deployment-readiness or production approval.
 
-**Do not replace, reorder or implicitly complete the separately active CEX-A01–A05 WinForms composition workstream.** WEB2 is a parallel, explicitly selected browser/server workstream; Codex must select a tagged task/PR in its own repo and follow its tests/boundaries. Runtime package/schema changes are authorized **only** when implementing an approved WEB2 task, not by docs creation.
+[WEB2 archive boundary](../archive/20261101-web2-http-jwt-sales/README.md) · [frozen backend plan](../archive/20261101-web2-http-jwt-sales/plans/20261031-003-web2-http-jwt-sales-server.md) · [legacy plan anchors](20261031-003-web2-http-jwt-sales-server.md) · [original backend evidence + Owner closeout](../evidence/web2/20261031-http-jwt-sales.md#2026-11-01--owner-closeout-and-full-iis-exception) · [HTTP/auth/wire design](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) · [frontend archive](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/archive/20261101-web2-http-jwt-sales/README.md).
+
+**Separate active selection remains unchanged:** CEX-A01–A05 *Editable Lines Composition and SAL Adoption* in the section below. Its WinForms UI/runtime/toolkit approvals are neither completed nor changed by WEB2. Full IIS app-pool/TLS/ACL, operational audit and distributed limiter policy, candidate-specific attended IME/accessibility, and production rollout remain unverified/deferred, **not PASS**. The existing backend Local/desktop release limitations remain in force.
 
 ## Active plan — composition expansion
 
