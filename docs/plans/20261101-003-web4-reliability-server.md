@@ -101,7 +101,7 @@ Update docs/plans/README.md and all routing only after scope Owner acceptance. F
 
 ### B06 mandatory operator reconciliation runbook
 
-Document a concrete, audited handoff for an unresolved key: validate actor + DB epoch + fingerprint; inspect current grants and Web operation tombstone; reconcile authoritative source, line, version, stock/valuation and COGS with restricted maintenance tooling; prove per-key serialization/in-flight state before declaring NOT_EXECUTED; only release the protected client session on positive outcome and correct current authorization. Expired response may mark a committed document but MUST NOT fabricate an editable version. If proof is incomplete, remain UNKNOWN and give the user a support correlation ID. No manual duplicate Post or direct ledger alteration is permitted.
+Document a concrete, audited handoff for an unresolved key: validate actor + DB epoch + fingerprint; inspect current grants and Web operation tombstone; reconcile authoritative source, line, version, stock/valuation and COGS with restricted maintenance tooling; prove per-key serialization/in-flight state before declaring NOT_EXECUTED; only release the protected client session on positive outcome and correct current authorization. Expired response may mark a committed document but MUST NOT fabricate an editable version. If a future terminal NOT_EXECUTED resolution is supported, create a durable CANCELLED/DO_NOT_EXECUTE key tombstone while holding the authoritative per-key fence before unlock; otherwise never claim a negative safe outcome. If proof is incomplete, remain UNKNOWN and give the user a support correlation ID. No manual duplicate Post or direct ledger alteration is permitted.
 
 
 ## 8. Mandatory acceptance and stop rules
