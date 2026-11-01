@@ -420,12 +420,13 @@ public sealed class WebHostIisExpressTests
     }
     private static async Task VerifyReceiptStock(SqlConnection oracle, JToken[] receipts, int warehouse, int product)
     {
-        Assert.Equal(receipts.Length, receipts.Select(row => (string)row["receiptId"]!).Distinct().Count());
+        var ids = VerifyReceiptResultIdentities(receipts, (await oracle.QueryAsync<long>("SELECT ReceiptId FROM dbo.GoodsReceipts WHERE Status='Posted';")).ToArray());
         decimal totalQuantity = 0, totalValue = 0;
         var totalLines = 0;
-        foreach (var row in receipts)
+        for (var index = 0; index < receipts.Length; index++)
         {
-            var id = long.Parse((string)row["receiptId"]!, CultureInfo.InvariantCulture);
+            var row = receipts[index];
+            var id = ids[index];
             var expectedQuantity = decimal.Parse((string)row["quantity"]!, CultureInfo.InvariantCulture);
             var expectedValue = decimal.Parse((string)row["value"]!, CultureInfo.InvariantCulture);
             var actor = (string)row["actor"]!;
@@ -454,13 +455,29 @@ public sealed class WebHostIisExpressTests
             Assert.Equal(expectedQuantity, quantity); Assert.Equal(expectedValue, value);
             totalQuantity += quantity; totalValue += value; totalLines += lines.Length;
         }
-        Assert.Equal(receipts.Length, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE Status='Posted';"));
         Assert.Equal(totalLines, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentType='GoodsReceipt';"));
         Assert.Equal(totalQuantity, await oracle.QuerySingleAsync<decimal>("SELECT Quantity FROM dbo.StockBalances WHERE WarehouseId=@warehouse AND ProductId=@product;", new { warehouse, product }));
         Assert.Equal(totalValue, await oracle.QuerySingleAsync<decimal>("SELECT InventoryValue FROM dbo.StockBalances WHERE WarehouseId=@warehouse AND ProductId=@product;", new { warehouse, product }));
         Assert.Equal(totalQuantity, await oracle.QuerySingleAsync<decimal>("SELECT SUM(QuantityChange) FROM dbo.StockLedger WHERE DocumentType='GoodsReceipt';"));
         Assert.Equal(totalValue, await oracle.QuerySingleAsync<decimal>("SELECT SUM(v.ValueChange) FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId WHERE l.DocumentType='GoodsReceipt';"));
         Assert.Equal(2, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockBalances;"));
+    }
+    internal static long[] VerifyReceiptResultIdentities(JToken[] receipts, long[] postedIds)
+    {
+        var ids = new long[receipts.Length];
+        var distinct = new HashSet<long>();
+        for (var index = 0; index < receipts.Length; index++)
+        {
+            var token = receipts[index]["receiptId"];
+            var text = token?.Type == JTokenType.String ? token.Value<string>() : null;
+            if (text == null || !Regex.IsMatch(text, "\\A[1-9][0-9]{0,18}\\z", RegexOptions.CultureInvariant) ||
+                !long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var id))
+                throw new InvalidDataException("Receipt result ID must be a canonical positive int64 string.");
+            if (!distinct.Add(id)) throw new InvalidDataException("Duplicate numeric receipt result ID.");
+            ids[index] = id;
+        }
+        if (!distinct.SetEquals(postedIds)) throw new InvalidDataException("Receipt result IDs must exactly match SQL Posted receipt IDs.");
+        return ids;
     }
     private static string Sanitize(string output) => Regex.Replace(
         Regex.Replace(output.Replace(BrowserPassword, "<redacted>"), "(?i)(authorization: Bearer )[^\\s]+", "$1<redacted>"),

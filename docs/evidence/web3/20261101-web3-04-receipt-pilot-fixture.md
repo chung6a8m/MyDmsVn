@@ -33,3 +33,18 @@ Read-only inspection found an existing `0.0.0.0:44321` TLS binding; no binding/c
 Run the new selector once per Chromium/Edge against fresh positively owned SQL fixtures after coordinator review, using the stable Web production build and both real pilot spec files. Record each candidate, wrapper/browser counts, first failures/corrections, independent SQL reconciliation and verified cleanup in this new evidence record. A skipped, missing or empty browser selection is NOT RUN.
 
 B04 Receipt→Sale→later Receipt valuation, Inventory read UI, all B05/F06 acceptance, attended IME/accessibility, full IIS/production and durable mutation recovery remain outside this bounded fixture checkpoint. Existing WEB2 and B02/B03 results remain their original candidate-specific evidence.
+
+## Focused review correction — numeric receipt identity
+
+Review base: `c4d516d62645514133bb9647abaa2daf215b5ef5`. The reviewer identified that string-unique `"1"` and `"01"` could both parse to receipt 1 while count/aggregate checks failed to prove receipt 2 was included. This was a defect in the fixture's identity proof, not production behavior.
+
+Receipt result IDs now require canonical positive int64 string tokens, are parsed once, reject duplicate numeric IDs and must exactly equal the physical SQL Posted receipt ID set. The validated numeric array preserves result-row order for later physical source/ledger checks. The comparison/parsing helper remains in the test fixture assembly; no test-only helper was added to production.
+
+Focused pure `WebReceiptPilotResultTests` exercise the reported alias/omission, a same-count different set, duplicate numeric IDs, noncanonical/overflow/numeric JSON IDs, order preservation and MaxInt64. Before the fix, the old comparison behavior produced 12 executed cases: 10 FAIL, 2 PASS, 0 SKIP. After the fix, 12 PASS, 0 FAIL/SKIP. These cases allocate no SQL or host resources.
+
+```powershell
+dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --filter FullyQualifiedName~WebReceiptPilotResultTests --logger 'trx;LogFileName=receipt-result-red.trx' --results-directory TestResults/web3-04-result-red
+dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --filter FullyQualifiedName~WebReceiptPilotResultTests --logger 'trx;LogFileName=receipt-result-green.trx' --results-directory TestResults/web3-04-result-green
+```
+
+Both selected commands built the affected net48 Security target successfully. Raw TRX stays local/ignored. SQL/IIS/browser execution remains NOT RUN pending coordinated pilot; the pure correction tests do not establish live seed/oracle acceptance. The correction is ready for scoped rereview before that pilot.
