@@ -1,5 +1,5 @@
 # Retired directions and scope boundaries
-> **WEB2 scope update (2026-10-31):** HTTP/JWT + Sales pilot has been expressly selected as a *new parallel workstream*, see [WEB2 companion](plans/20261031-003-web2-http-jwt-sales-server.md) and [contract](design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md). The historical UI-NEXT exclusion of HTTP below remains true for **that retired UI-NEXT scope**; it no longer means HTTP has no selected roadmap. No HTTP host/auth code or production rollout has been implemented or accepted by this docs-only update.
+> **WEB2 boundary update, 2026-11-01:** The expressly selected net48 HTTP/JWT/Sales parallel pilot [completed with Owner-accepted full-IIS exception](archive/20261101-web2-http-jwt-sales/README.md); it is no longer an active implementation queue. The original UI-NEXT HTTP exclusion in this historical table still applies only to UI-NEXT, not the implemented WEB2 host. **Full IIS NOT RUN, no production rollout approved.** The [current plan selector](plans/README.md) retains the independent CEX WinForms selection.
 
 
 **Routing updated:** 2026-10-24; the prior scope record used merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This page remains non-executable. Use the [execution index](plans/README.md) for current work; there are no tasks to execute from this page.
