@@ -1,5 +1,15 @@
 # Execution-plan index
 
+
+## Active parallel Web workstream — Roadmap 04 Reliability & Delivery Foundation (selected 2026-11-01)
+
+**Owner selected direction; documentation activation only. Backend B01–B06 are PLANNED / NOT RUN.** [Backend owning plan](20261101-003-web4-reliability-server.md) · [transaction/journal contract](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) · [ADR 0014](../adr/0014-web4-durable-operations.md) · [Codex handoff](../development/WEB4_CODEX_HANDOFF.md) · [acceptance matrix](../development/WEB4_BACKEND_ACCEPTANCE.md) · [new evidence scaffold](../evidence/web4/README.md). WEB4 covers Windows net48 SQL-free CI, Web-only operation journal/schema12 (subject to B01 source proof), all six existing Sales/Receipt Create/Update/Post APIs and coordinated frontend durable recovery, finishing with bounded real HTTPS/SQL/Chromium/Edge pilot and independent Q/V/COGS oracle.
+
+**Independent frontend owner:** https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/codex/activate-web4-reliability/docs/plans/20261101-002-web4-reliability-web.md (F01–F05). Do not duplicate frontend statuses in this index. The existing **CEX-A01–A05 remains ACTIVE and unchanged**; WEB3 remains archived; WEB2 full IIS remains NOT RUN, not PASS. Full IIS, production rollout, broader audit retention/distributed limiter and attended candidate IME/Narrator are NOT selected. No implementation or runtime test passed merely because of this docs-only activation.
+
+**Start:** review/merge both WEB4 docs PRs; execute B01 source/contract checkpoint and frontend F01 before any transaction/journal/runtime change. B02 CI may follow the checkpoint in parallel; B03→B04→B05→B06 depend on their owning gates. Use current main, not a WEB3 branch.
+
+
 **Updated:** 2026-11-01 (WEB3 archive) · **Status:** WEB3 HTTP/Inventory ARCHIVED / COMPLETED (bounded); CEX WinForms Composition remains ACTIVE and unchanged. Existing CEX activation source remains `main@014e82d0`.
 
 ## Archived completed workstream — WEB3 Goods Receipt & Inventory HTTP (2026-11-01)

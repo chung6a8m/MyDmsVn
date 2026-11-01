@@ -1,5 +1,11 @@
 # Codex instructions — MyDmsVn
 
+
+## Active parallel Roadmap 04 — WEB4 Reliability (Owner selected 2026-11-01)
+
+**Selected documents, NOT product implementation.** Backend [plan B01–B06](docs/plans/20261101-003-web4-reliability-server.md), [operation/journal proposed contract](docs/design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md), [ADR 0014](docs/adr/0014-web4-durable-operations.md), [acceptance](docs/development/WEB4_BACKEND_ACCEPTANCE.md), [Codex handoff](docs/development/WEB4_CODEX_HANDOFF.md), [evidence index](docs/evidence/web4/README.md). Companion ReactWebUI owns F01–F05. All B implementation tasks are PLANNED / NOT RUN at docs activation; do not report SQL/CI/browser implementation. **Key prerequisite:** existing Sales/Receipt handlers own explicit UoW transactions; a controller-only idempotency journal is NOT atomic. B01 must source-verify a same-UoW transaction insertion and Web-only schema path first. B02 Windows SQL-free CI; B03 web-only journal/migration; B04 six authorized Web mutations/status; B05 fresh SQL/IIS Express/Chromium+Edge independent oracle; B06 handoff/Owner closeout. Preserve CEX ACTIVE, WEB1–03 archived, desktop exact10, no business valuation rewrite, no automatic unknown write retry, no full IIS/production claim.
+
+
 Applies to the whole repository. Human-facing discussion is Vietnamese; technical documentation and identifiers are generally English unless an established runbook is Vietnamese.
 
 ## Archived Roadmap 03 — Goods Receipt & Inventory Web HTTP (Owner 2026-11-01)
