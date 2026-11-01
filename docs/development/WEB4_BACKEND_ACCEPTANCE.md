@@ -38,9 +38,7 @@
 | B4-LOCAL-01 | B03/B04 SQL Local | **On exact desktop schema10** Local/Application Create/Update/Post Sales and Goods Receipt WITHOUT WebOperationMetadata; unchanged auth/rowversion/lines/rollback/Q/V/COGS, zero journal query or new table dependency |
 | B4-LIVE-03 | B05-A→F04-A→B05-B/F04-B | Fixture/oracle ready independently of browser spec, then final paired acceptance on exact Web/backend commits and fresh owned Chromium/Edge SQL |
 
-
 | B4-OPS-02 | B05/B06 privileged operator rehearsal | Exact actor/epoch/key/fingerprint matched, authoritative SQL journal+source+ledger/valuation checked; committed vs indeterminate vs expired tombstone distinguished; never unlock Edit without version or claim 404 is safe, retain audit trail |
-
 
 ### Gate execution and evidence rules
 
