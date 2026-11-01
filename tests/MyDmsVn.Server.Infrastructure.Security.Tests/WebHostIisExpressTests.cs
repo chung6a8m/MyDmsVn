@@ -377,7 +377,7 @@ public sealed class WebHostIisExpressTests
             // The real browser keeps ordinary platform TLS verification; neither ignores errors.
             start.EnvironmentVariables["NODE_EXTRA_CA_CERTS"] = certificatePath;
             GuiProcessResult result;
-            try { result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(receiptProduct == 0 ? 5 : 10)); }
+            try { result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5)); }
             catch (GuiProcessException error)
             {
                 File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(error.StandardOutput + error.StandardError), new UTF8Encoding(false));

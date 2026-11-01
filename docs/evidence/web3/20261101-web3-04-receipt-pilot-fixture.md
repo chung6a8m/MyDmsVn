@@ -1,6 +1,6 @@
 # WEB3-04 — bounded Receipt pilot fixture preparation
 
-**Owner authorization:** 2026-11-01, "Cho phép mở rộng fixture và chạy nghiệm thu thật", for the frontend WEB3-04 real acceptance dependency. **State:** fixture implemented and compiled; IIS Express/SQL/browser acceptance NOT RUN at this preparation checkpoint. The coordinator must review the concrete diff and provide a stable selected frontend build before exclusive live execution. This does not mark B04 or all B05 complete.
+**Owner authorization:** 2026-11-01, "Cho phép mở rộng fixture và chạy nghiệm thu thật", for the frontend WEB3-04 real acceptance dependency. **State:** fixture implemented; first owned HTTPS/SQL attempt failed before browser startup, acceptance PENDING / NOT PASS. The preparation checks and first failure below remain separate. This does not mark B04 or all B05 complete.
 
 ## Candidate and scope
 
@@ -48,3 +48,24 @@ dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.In
 ```
 
 Both selected commands built the affected net48 Security target successfully. Raw TRX stays local/ignored. SQL/IIS/browser execution remains NOT RUN pending coordinated pilot; the pure correction tests do not establish live seed/oracle acceptance. The correction is ready for scoped rereview before that pilot.
+
+## Chromium attempt 1 — fixture process-budget failure
+
+Parent granted the exclusive SQL owner slot after scoped fixture rereview was clean. Backend fixture source: `b0f48bec19edbffda1e147e1e45bd260bab07aa7`; frontend production candidate: `66764fb1687519ea502dcc9c4e3a2e4ecb99fc67`. The existing publish at `publish/web3-04-receipt-b0f48be-host` was made with locked host restore and current Release build (no SkipBuild); published host DLL matched compiled SHA-256 `3A028277ACC9A85F1DEF89A0FCA991C2282E017786B0089E198B240BD76EC031`. Nine frontend dist files were copied and each published hash matched its source; ignored `TestResults/web3-04-live-preparation/web-artifact-sha256.json` retains the full artifact list.
+
+| Stable frontend asset | SHA-256 |
+|---|---|
+| `assets/index-CZjqufWD.js` | `F8B2B9ED18D9FA81448F248D5AB035BA2DCE4D6FD97122C69D5B77212C1B33DA` |
+| `assets/index-BFtattde.css` | `EE89832BFAEC4202E6DD71295535774051F18E3B089C165987468542EC41B875` |
+
+Read-only gate verified the actual `Microsoft.Data.SqlClient` parser sees the existing designated test input with explicit master, nonempty instance, no attachment and UserInstance disabled; no instance/configuration was changed or secret printed. IIS Express version `10.0.26013.1000`; Playwright `1.64.1`; installed Edge `156.0.4314.58`. Existing LocalMachine certificate chain was trusted; ports were free. The process-local publish/TLS/browser-directory/project inputs followed the runbook; browser project was Chromium and both specs were selected for the intended 15 cases (8 Sales + 7 Receipt).
+
+```powershell
+dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --no-build --filter FullyQualifiedName~Published_React_Receipt_browser_uses_real_HTTPS_SQL_and_independent_receipt_stock --logger 'trx;LogFileName=receipt-chromium.trx' --results-directory TestResults/web3-04-receipt-chromium
+```
+
+Actual result: **one .NET wrapper FAIL, zero PASS/SKIP; zero browser tests executed**. The fixture allocated/migrated its disposable schema11 database and reached the healthy HTTPS host, then passed a ten-minute combined-mode timeout to `GuiOwnedProcess.RunAsync`. That existing supervisor rejects budgets above five minutes before `NativeChild.Start`, producing `ArgumentOutOfRangeException(timeout)`. This is a fixture callsite defect, not a frontend or business failure; no browser SQL acceptance is claimed.
+
+Cleanup: the sole inner error was the invalid timeout, with no cleanup failure. Existing finally awaited exact IIS termination/drain, SID-owned login cleanup and ownership-checked database disposal. Post-run inspection found no IIS/testhost/vstest processes, both ports free, and temporary manifest/public PEM removed. Browser result, browser output and screenshots did not exist because Node was never started. The ignored first-attempt TRX remains at the command's results path. Edge was not started.
+
+Parent triage authorized the minimal correction: both modes now pass the existing five-minute budget at the shared callsite. `GuiOwnedProcess`, its maximum and cleanup policy remain unchanged. No frontend or production/business source changed. No constant-mirroring test was added. The affected Release/net48 Security build succeeded with 0 warnings/errors; existing `WebReceiptPilotResultTests` reran with 12 PASS, 0 FAIL/SKIP using `--no-restore --no-build`, logger `receipt-result-timeout-regression.trx` and results path `TestResults/web3-04-timeout-regression`. `git diff --check` passed. These pure tests do not prove the live timeout correction; Chromium attempt 2 must use a fresh owned fixture and different results path after scoped rereview. Edge remains dependent on its successful result and cleanup.

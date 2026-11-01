@@ -34,7 +34,7 @@ IDs above are illustrative; always use allocated values from the manifest. All R
 
 Receipt headers use the existing PILOT Warehouse/Employee. Receipt lines use the separate Product `WEB3-RP` (`Web3 Receipt Product`), initially with no balance. Existing Sales tests retain the `PILOT-P` key, Q=1000 and V=15000. This isolates existing Sales COGS expectations; this fixture does not establish B04's Receipt→Sale→later Receipt valuation scenario.
 
-Frontend `playwright.pilot.config.ts` must select only `web2-live.spec.ts` in default mode, and both that file and `web3-receipt-live.spec.ts` when `mode` is `web3-receipt`. Both files must actually execute. Keep retries zero, one worker, TLS validation enabled and trace/video/HAR disabled. The backend requires the Receipt spec and nonempty Sales and Receipt Post results; the owned process budget is five minutes for Sales and ten minutes for combined Receipt mode.
+Frontend `playwright.pilot.config.ts` must select only `web2-live.spec.ts` in default mode, and both that file and `web3-receipt-live.spec.ts` when `mode` is `web3-receipt`. Both files must actually execute. Keep retries zero, one worker, TLS validation enabled and trace/video/HAR disabled. The backend requires the Receipt spec and nonempty Sales and Receipt Post results. Both modes retain the existing five-minute `GuiOwnedProcess.RunAsync` execution budget and its unchanged process-tree cleanup safeguards.
 
 Keep the existing result array format for Sales rows: `{ "saleId": "...", "quantity": "...", "cost": "..." }`. Append one row per successfully committed Receipt Post, including a real Post whose response is deliberately lost:
 
