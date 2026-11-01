@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -29,7 +29,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 // Explicit packaged-host selector. Requires a published Release host and the operator's
 // existing localhost:44321 IIS Express TLS binding. Never changes machine TLS/IIS config.
-public sealed class WebHostIisExpressTests
+public sealed partial class WebHostIisExpressTests
 {
     [WebHostSqlFact, Trait("Category", "WebHostIntegration")]
     public Task Published_SystemWeb_host_warms_up_with_restricted_schema11_and_serves_safe_HTTP() => Run(false);
@@ -40,7 +40,10 @@ public sealed class WebHostIisExpressTests
     [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
     public Task Published_React_Receipt_browser_uses_real_HTTPS_SQL_and_independent_receipt_stock() => Run(true, receiptPilot: true);
 
-    private static async Task Run(bool browser, bool receiptPilot = false)
+    [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
+    public Task Published_React_integrated_browser_preserves_same_key_QV_COGS_and_warehouse_isolation() => Run(true, receiptPilot: true, integratedPilot: true);
+
+    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false)
     {
         GuiTestSafety.ThrowIfPoisoned();
         if (browser) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
@@ -59,6 +62,7 @@ public sealed class WebHostIisExpressTests
         var failures = new List<Exception>();
         var drained = true;
         int customer = 0, warehouse = 0, employee = 0, product = 0, receiptProduct = 0;
+        IntegratedCatalog? integrated = null;
         try
         {
             var migration = new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString);
@@ -84,6 +88,7 @@ public sealed class WebHostIisExpressTests
                     receiptProduct = await connection.QuerySingleAsync<int>("INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'WEB3-RP',N'Web3 Receipt Product',N'EA');");
                     await SeedReceiptActors(connection);
                 }
+                if (integratedPilot) integrated = await SeedIntegratedActorsAndCatalog(connection);
             }
             var runDirectory = Path.Combine(Path.GetDirectoryName(published!)!, "iis-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(runDirectory);
@@ -135,7 +140,7 @@ public sealed class WebHostIisExpressTests
                 foreach (var deniedPath in new[] { "/assets/missing.js", "/Web.config", "/bin/MyDmsVn.Server.HttpHost.dll" })
                     Assert.Equal(404, (await Request("https://localhost:44321" + deniedPath, thumbprint!)).Status);
                 Assert.Equal(401, (await Request("https://localhost:44321/api/v1/missing", thumbprint!)).Status);
-                await RunBrowser(database.ConnectionString, runDirectory, customer, warehouse, employee, product, receiptProduct);
+                await RunBrowser(database.ConnectionString, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated);
             }
             else
             {
@@ -334,7 +339,7 @@ public sealed class WebHostIisExpressTests
         }
     }
 
-    private static async Task RunBrowser(string connectionString, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct)
+    private static async Task RunBrowser(string connectionString, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated)
     {
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
         var node = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_NODE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
@@ -353,6 +358,13 @@ public sealed class WebHostIisExpressTests
             manifestJson["mode"] = "web3-receipt";
             foreach (var name in new[] { "receiptEditor", "receiptPoster", "receiptReader" }) manifestJson["actors"]![name] = JObject.FromObject(Actor(name));
             manifestJson["receiptCatalog"] = JObject.FromObject(new { warehouseId = warehouse, employeeId = employee, productId = receiptProduct });
+        }
+        if (integrated != null)
+        {
+            Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web3-integrated-live.spec.ts")));
+            manifestJson["mode"] = "web3-integrated";
+            foreach (var name in new[] { "integratedEditor", "balanceReader", "cardReader" }) manifestJson["actors"]![name] = JObject.FromObject(Actor(name));
+            manifestJson["integratedCatalog"] = JObject.FromObject(new { warehouseId = integrated.Warehouse, otherWarehouseId = integrated.OtherWarehouse, employeeId = employee, customerId = customer, productId = integrated.Product });
         }
         File.WriteAllText(manifestPath, manifestJson.ToString(Formatting.None), new UTF8Encoding(false));
         try
@@ -386,6 +398,12 @@ public sealed class WebHostIisExpressTests
             File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(result.StandardOutput + result.StandardError), new UTF8Encoding(false));
             Assert.True(result.ExitCode == 0, "Browser pilot failed; inspect the local browser-output.log (redact before sharing).");
             var posted = JArray.Parse(File.ReadAllText(resultPath));
+            using var oracle = new SqlConnection(connectionString); await oracle.OpenAsync();
+            VerifyPilotResultIdentities(posted,
+                (await oracle.QueryAsync<long>("SELECT ReceiptId FROM dbo.GoodsReceipts WHERE Status='Posted';")).ToArray(),
+                (await oracle.QueryAsync<long>("SELECT SaleId FROM dbo.SalesReceipts WHERE Status='Posted';")).ToArray(), integrated != null);
+            var integratedRows = posted.Where(row => (string?)row["scenario"] == "integrated").ToArray();
+            posted = new JArray(posted.Where(row => (string?)row["scenario"] == null));
             var receipts = posted.Where(row => (string?)row["documentType"] == "GoodsReceipt").ToArray();
             if (receiptProduct == 0) Assert.Empty(receipts);
             else Assert.NotEmpty(receipts);
@@ -394,7 +412,6 @@ public sealed class WebHostIisExpressTests
             Assert.NotEmpty(posted);
             Assert.Equal(posted.Count, posted.Select(row => (string)row["saleId"]!).Distinct().Count());
             decimal quantity = 0, cost = 0;
-            using var oracle = new SqlConnection(connectionString); await oracle.OpenAsync();
             foreach (var row in posted)
             {
                 var id = long.Parse((string)row["saleId"]!, CultureInfo.InvariantCulture);
@@ -405,7 +422,7 @@ public sealed class WebHostIisExpressTests
                 Assert.Equal(amount, await oracle.QuerySingleAsync<decimal>("SELECT SUM(CostAmount) FROM dbo.SalesReceiptLines WHERE SaleId=@id;", new { id }));
                 quantity += qty; cost += amount;
             }
-            Assert.Equal(posted.Count, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SalesReceipts WHERE Status='Posted';"));
+            Assert.Equal(posted.Count, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SalesReceipts s WHERE s.Status='Posted' AND EXISTS(SELECT 1 FROM dbo.SalesReceiptLines l WHERE l.SaleId=s.SaleId AND l.ProductId=@product);", new { product }));
             var salesKeyFilter = receiptProduct == 0 ? "" : " WHERE WarehouseId=@warehouse AND ProductId=@product";
             Assert.Equal(1000m - quantity, await oracle.QuerySingleAsync<decimal>("SELECT Quantity FROM dbo.StockBalances" + salesKeyFilter + ";", new { warehouse, product }));
             Assert.Equal(15000m - cost, await oracle.QuerySingleAsync<decimal>("SELECT InventoryValue FROM dbo.StockBalances" + salesKeyFilter + ";", new { warehouse, product }));
@@ -415,12 +432,14 @@ public sealed class WebHostIisExpressTests
             Assert.Equal(await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SalesReceiptLines l JOIN dbo.SalesReceipts s ON s.SaleId=l.SaleId WHERE s.Status='Posted';"),
                 await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId JOIN dbo.SalesReceiptLines s ON s.SaleLineId=l.DocumentLineId AND s.SaleId=l.DocumentId WHERE l.DocumentType='SalesReceipt' AND l.QuantityChange=-s.Qty AND v.ValueChange=-s.CostAmount;"));
             if (receiptProduct != 0) await VerifyReceiptStock(oracle, receipts, warehouse, receiptProduct);
+            if (integrated != null) await VerifyIntegratedStock(oracle, integratedRows, integrated);
+            await VerifyAllPilotMovements(oracle, warehouse, product, receiptProduct, integrated);
         }
         finally { File.Delete(manifestPath); File.Delete(certificatePath); }
     }
     private static async Task VerifyReceiptStock(SqlConnection oracle, JToken[] receipts, int warehouse, int product)
     {
-        var ids = VerifyReceiptResultIdentities(receipts, (await oracle.QueryAsync<long>("SELECT ReceiptId FROM dbo.GoodsReceipts WHERE Status='Posted';")).ToArray());
+        var ids = VerifyReceiptResultIdentities(receipts, (await oracle.QueryAsync<long>("SELECT r.ReceiptId FROM dbo.GoodsReceipts r WHERE r.Status='Posted' AND EXISTS(SELECT 1 FROM dbo.GoodsReceiptLines l WHERE l.ReceiptId=r.ReceiptId AND l.ProductId=@product);", new { product })).ToArray());
         decimal totalQuantity = 0, totalValue = 0;
         var totalLines = 0;
         for (var index = 0; index < receipts.Length; index++)
@@ -455,12 +474,11 @@ public sealed class WebHostIisExpressTests
             Assert.Equal(expectedQuantity, quantity); Assert.Equal(expectedValue, value);
             totalQuantity += quantity; totalValue += value; totalLines += lines.Length;
         }
-        Assert.Equal(totalLines, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentType='GoodsReceipt';"));
+        Assert.Equal(totalLines, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger WHERE DocumentType='GoodsReceipt' AND WarehouseId=@warehouse AND ProductId=@product;", new { warehouse, product }));
         Assert.Equal(totalQuantity, await oracle.QuerySingleAsync<decimal>("SELECT Quantity FROM dbo.StockBalances WHERE WarehouseId=@warehouse AND ProductId=@product;", new { warehouse, product }));
         Assert.Equal(totalValue, await oracle.QuerySingleAsync<decimal>("SELECT InventoryValue FROM dbo.StockBalances WHERE WarehouseId=@warehouse AND ProductId=@product;", new { warehouse, product }));
-        Assert.Equal(totalQuantity, await oracle.QuerySingleAsync<decimal>("SELECT SUM(QuantityChange) FROM dbo.StockLedger WHERE DocumentType='GoodsReceipt';"));
-        Assert.Equal(totalValue, await oracle.QuerySingleAsync<decimal>("SELECT SUM(v.ValueChange) FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId WHERE l.DocumentType='GoodsReceipt';"));
-        Assert.Equal(2, await oracle.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockBalances;"));
+        Assert.Equal(totalQuantity, await oracle.QuerySingleAsync<decimal>("SELECT SUM(QuantityChange) FROM dbo.StockLedger WHERE DocumentType='GoodsReceipt' AND WarehouseId=@warehouse AND ProductId=@product;", new { warehouse, product }));
+        Assert.Equal(totalValue, await oracle.QuerySingleAsync<decimal>("SELECT SUM(v.ValueChange) FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId WHERE l.DocumentType='GoodsReceipt' AND l.WarehouseId=@warehouse AND l.ProductId=@product;", new { warehouse, product }));
     }
     internal static long[] VerifyReceiptResultIdentities(JToken[] receipts, long[] postedIds)
     {

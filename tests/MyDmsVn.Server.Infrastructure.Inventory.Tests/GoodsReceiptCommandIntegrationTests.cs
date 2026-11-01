@@ -878,6 +878,22 @@ public sealed class GoodsReceiptCommandIntegrationTests
             Assert.Equal(1m, await connection.QuerySingleAsync<decimal>(
                 "SELECT Quantity FROM dbo.StockBalances WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
                 new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
+            Assert.Equal(2m, await connection.QuerySingleAsync<decimal>(
+                "SELECT InventoryValue FROM dbo.StockBalances WHERE WarehouseId = @warehouseId AND ProductId = @productId;",
+                new { warehouseId = seed.WarehouseId, productId = seed.Product1Id }));
+            Assert.Equal(1, await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockValuationEntries;"));
+            Assert.Equal(1, await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.StockLedger l " +
+                "JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId " +
+                "JOIN dbo.GoodsReceiptLines r ON r.ReceiptId=l.DocumentId AND r.ReceiptLineId=l.DocumentLineId " +
+                "JOIN dbo.GoodsReceipts h ON h.ReceiptId=r.ReceiptId " +
+                "WHERE l.DocumentType='GoodsReceipt' AND h.ReceiptId=@receiptId AND h.Status='Posted' " +
+                "AND l.WarehouseId=h.WarehouseId AND l.ProductId=r.ProductId " +
+                "AND l.QuantityChange=1 AND r.Quantity=1 AND r.UnitCost=2 AND v.ValueChange=2 " +
+                "AND h.PostedByUserId=@actor AND l.PostedByUserId=@actor AND h.PostedAtUtc=l.PostedAtUtc;",
+                new { receiptId = created.Id, actor = seed.UserId }));
+            Assert.NotEqual(Convert.FromBase64String(created.Version), await connection.QuerySingleAsync<byte[]>(
+                "SELECT RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId=@receiptId;", new { receiptId = created.Id }));
         }
         finally
         {
