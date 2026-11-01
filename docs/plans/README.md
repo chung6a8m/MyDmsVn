@@ -1,6 +1,6 @@
 # Execution-plan index
 
-**Updated:** 2026-10-30 · **Status:** ACTIVE — EDITABLE LINES COMPOSITION AND SAL ADOPTION · **Activation source:** [`main@014e82d0`](https://github.com/chung6a8m/MyDmsVn/commit/014e82d0013b0a16d73da0b35287d79d5848cc10)
+**Updated:** 2026-11-01 (WEB2 closeout only) · **Status:** ACTIVE — EDITABLE LINES COMPOSITION AND SAL ADOPTION · **Activation source:** [`main@014e82d0`](https://github.com/chung6a8m/MyDmsVn/commit/014e82d0013b0a16d73da0b35287d79d5848cc10)
 
 ## Completed parallel workstream — WEB2 net48 HTTP/JWT/Sales
 
