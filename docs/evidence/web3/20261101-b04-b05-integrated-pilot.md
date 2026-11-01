@@ -1,6 +1,6 @@
 # WEB3-06 — B04/B05 integrated SQL and HTTPS pilot evidence
 
-**Date:** 2026-11-01 (Asia/Bangkok). **State:** IN_PROGRESS / implementation and bounded verification complete, pending Owner acceptance. The Owner explicitly authorized bounded backend tests/fixture/oracle/documentation plus designated nonproduction SQL and existing IIS Express HTTPS, with separate fresh Chromium and Edge fixtures. This is not acceptance, merge or production approval. The [backend plan](../../plans/20261101-002-web3-goods-receipt-inventory-http.md) owns B04/B05; [frontend evidence](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/evidence/web3/README.md) owns F06 results.
+**Date:** 2026-11-01 (Asia/Bangkok). **State:** DONE (bounded) / Owner accepted and PR #78 merged; backend WEB3 companion COMPLETED (bounded). The Owner explicitly authorized bounded backend tests/fixture/oracle/documentation plus designated nonproduction SQL and existing IIS Express HTTPS, with separate fresh Chromium and Edge fixtures. That initial execution authorization did not itself grant acceptance or merge; the subsequent Owner decision is recorded in section 7. Production remains NOT APPROVED. The [backend plan](../../plans/20261101-002-web3-goods-receipt-inventory-http.md) owns B04/B05; [frontend evidence](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/evidence/web3/README.md) owns F06 results.
 
 ## 1. Candidate, scope and implementation
 
@@ -148,9 +148,9 @@ dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.In
 
 All six live invocations passed the independent physical assertions: receipt 10 @ 10 then 10 @ 20 gives Q20/V300; Sale 4 @ 25 freezes unit cost 15 / COGS 60 / profit 40 and leaves Q16/V240; a later-posted backdated receipt 2 @ 50 leaves Q18/V340 without recosting that Sale. Same product in the other warehouse receives 3 @ 7, Q3/V21. Original regression keys remain independently reconciled and the complete global posted-source/ledger/value/key set is checked.
 
-## 5. Limits and disposition
+## 5. Pre-acceptance limits and disposition
 
-B04/B05 remain **IN_PROGRESS — implementation and bounded verification complete, pending Owner acceptance**. Final Chromium/Edge browser assertions, inspected screenshots, independent physical oracle and cleanup are verified; prior attempts remain recorded with their source-specific limits. Owner closeout/merge remains a separate decision; this record does not mark B04/B05 DONE. Backend CI is not added or claimed PASS; frontend secret-free CI belongs to F06 and its own evidence. No merge/archive/production approval is implied.
+At this implementation checkpoint, B04/B05 remained **IN_PROGRESS — implementation and bounded verification complete, pending Owner acceptance**. The subsequent Owner decision and merge are recorded in section 7 below. Final Chromium/Edge browser assertions, inspected screenshots, independent physical oracle and cleanup are verified; prior attempts remain recorded with their source-specific limits. At that checkpoint, Owner closeout/merge was a separate pending decision and B04/B05 were not marked DONE. Backend CI was not added or claimed PASS; frontend secret-free CI belongs to F06 and its own evidence. That checkpoint alone implied no merge/archive/production approval.
 
 Full IIS, production deployment, audit destination/retention, distributed limiter, durable drafts/idempotency, current-candidate attended Telex/VNI/Narrator and JWT-localStorage XSS residual remain deferred/not approved. Historical WEB2 and WEB3-04 evidence remains unchanged and candidate-specific. CEX/WinForms remains independent.
 
@@ -161,3 +161,23 @@ Owner requested pushing both branches, creating PRs and checking CI/review befor
 Fresh independent read-only source review found no actionable P0–P3 issue. It covered strict result union, independent valuation expectations, global source/ledger/value/key accounting including SQL NULL handling against schema constraints and surrounding assertions, legacy modes, ownership/cleanup and the focused HTTP/concurrency additions. Review was recorded as a [GitHub COMMENT](https://github.com/chung6a8m/MyDmsVn/pull/78#pullrequestreview-5727848116), not an approval or Owner acceptance. No runtime/test source changed after the recorded SQL/browser candidate; this publication checkpoint adds documentation only.
 
 GitHub was queried at the reviewed SHA: **0 configured Actions workflows, 0 check runs, 0 commit statuses**. Backend hosted CI is **NOT CONFIGURED / NOT RUN**, not PASS. The actual local net48/SQL/browser verification in sections 2–4 remains the execution evidence. The PR was mergeable, with no unresolved review threads at inspection; this does not close B04/B05 or waive the recorded limits. No new SQL/browser suite was run solely for PR publication because tested source is unchanged.
+
+
+## 7. Owner acceptance and merge — 2026-11-01
+
+The Owner explicitly accepted the recorded verified scope and limitations, authorized merging frontend PR #17 and backend PR #78, and requested completion of WEB3-06/B04/B05. **B04/B05 are DONE (bounded); the backend WEB3 companion is COMPLETED (bounded), with B01–B05 DONE within their recorded scopes.** This is acceptance of the existing evidence, not a new runtime execution or production release. Frontend task status remains owned by its companion plan.
+
+| Repository | Merged PR | Reviewed head accepted for merge | Actual merge commit |
+|---|---|---|---|
+| Backend | [PR #78](https://github.com/chung6a8m/MyDmsVn/pull/78) | `bc8217878f1f66888378a8d2af5cf6e09d06a190` | `07d3f09d94d117e83961b7c0cc0a890dd1f54ef8` |
+| Frontend companion | [PR #17](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/pull/17) | `89387a3fe55cdac22fc7fe20a516b6b68eaa3a3c` | `b67ce456c55c85b2b0303ef04798b8d039f6829d` |
+
+Read-only Git checks confirmed each merge tree exactly matches its reviewed head: backend tree `31eb6b397445879351223a9ef83136a7d6a5b87c`, frontend tree `c826a6fbef9e3f176a30090c9d15d43882135ad4`. The coordinator fast-forwarded both original clean `main` checkouts to these merge commits. This closeout edits documentation only; no source/test/SQL/browser/build was rerun and no new runtime PASS is claimed. The actual tested sources remain backend `82f235248b1b570d41ae42f5d8cffd53f8b9f46e` and final Web pilot `d2e416f0a99bafe3851b61bbc90771fb10af9907`, with the artifact hashes and earlier candidates preserved above.
+
+Accepted verification remains 54 Inventory SQL rows, 6 Security HTTP/SQL/provisioning rows and 26 pure oracle rows, all PASS with no failures/skips, plus the final fresh Chromium and Edge runs each with 18 browser cases and 1 wrapper PASS, independent physical oracle, guarded cleanup and reviewed screenshots. Prior attempts and review corrections are not removed or recast as different results.
+
+Backend hosted CI has **0 configured workflows and remains NOT CONFIGURED / NOT RUN**, explicitly accepted as a recorded limitation, **not CI PASS**. The frontend companion's final reviewed-head CI passed in both the [push run 41302677410](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/actions/runs/41302677410) and [PR run 41302682776](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/actions/runs/41302682776): each executed 763 unit/component, 134 fake-browser and 1 production-artifact case. Those secret-free frontend jobs are separately owned frontend evidence; they do not establish backend net48/SQL or production acceptance.
+
+Owner acceptance preserves every recorded limit: full IIS/production NOT RUN / NOT APPROVED; operational audit retention and distributed limiting deferred; durable drafts/idempotency not supplied; current-candidate attended Telex/VNI/Narrator NOT RUN; JWT-localStorage XSS residual retained. No physical archive/move is performed by this closeout. Historical WEB2 and prior WEB3 evidence remain untouched; the independent CEX workstream remains ACTIVE and unchanged. Further backend/runtime or release work requires a new explicit scope selection.
+
+Closeout documentation checks: all 286 local file links across the eight changed Markdown files resolved; UTF-8 without BOM and CRLF were verified; `git diff --check` passed. These are documentation checks only.
