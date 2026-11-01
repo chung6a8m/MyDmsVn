@@ -1,6 +1,7 @@
 # Roadmap 04 backend — Reliable mutations, operation journal, and CI
 
-**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / B01 DONE (bounded contract; Owner accepted; PR #80 merged 2026-11-01); B02–B06 PLANNED / NOT RUN. **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Activation baseline:** 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd; **B01 source baseline:** main@48e9cd7ae096ecadd184e6ea6a372306d77f41b1. Reinspect current main and existing test owners before starting each task. B01 publishes [source/schema decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), [canonical corpus](../contracts/web4-v1/README.md) and [evidence](../evidence/web4/20261101-b01-contract.md); it does not implement or verify runtime, SQL, browser, CI, or IIS.
+**Current selected task (2026-11-01): B02 Windows/net48 SQL-free CI DONE (bounded); Owner acceptance/merge pending.** [B02 evidence](../evidence/web4/20261101-b02-windows-ci.md) owns current execution/hosted results. B01 is accepted/merged; B03–B06 remain PLANNED. B02 execution is separate from the accepted B01 contract checkpoint.
+**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / B01 DONE (bounded contract; Owner accepted; PR #80 merged 2026-11-01); B03–B06 PLANNED / NOT RUN. **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Activation baseline:** 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd; **B01 source baseline:** main@48e9cd7ae096ecadd184e6ea6a372306d77f41b1. Reinspect current main and existing test owners before starting each task. B01 publishes [source/schema decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), [canonical corpus](../contracts/web4-v1/README.md) and [evidence](../evidence/web4/20261101-b01-contract.md); it does not implement or verify runtime, SQL, browser, CI, or IIS.
 
 ## 0. Mission, constraints, ownership
 
@@ -46,7 +47,7 @@ Sequence: activate docs PRs; B01/F01 contract; B02 may proceed independently aft
 
 **Exit:** reviewed and pinned backend canonical contract + frontend F01 consumer signoff; planned B03/B04 source paths and required grants are verified; no runtime, migration, CI, SQL or browser PASS asserted from this checkpoint. No repeat Owner approval needed for in-scope technical choices; escalate only an actual change of scope/guarantees.
 
-## 3. B02 — Windows/net48 backend CI, SQL-free (PLANNED)
+## 3. B02 — Windows/net48 backend CI, SQL-free (DONE — bounded)
 
 **Implement:** .github/workflows/backend-web.yml (proposed). On pull_request, push to main/codex/**, workflow_dispatch; windows-2022 or pinned suitable supported Windows runner; contents:read only, pinned actions, no pull_request_target, no publish/deploy, no secrets. Honor global.json 8.0.400/latestFeature, net48 targeting pack and existing locked restore constraints. Use source-confirmed csproj/sln and test filters; do not invent class names or rely on zero discovery.
 

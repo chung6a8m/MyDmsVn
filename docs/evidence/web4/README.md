@@ -10,3 +10,7 @@ Existing WEB2/WEB3 evidence remains immutable and candidate-specific. WEB4 sourc
 ## B01 — DONE (bounded contract)
 
 [2026-11-01 B01 evidence](20261101-b01-contract.md) records source/canonical corpus validation and the frontend pin/signoff gate. Runtime/SQL/CI/browser are not implied.
+
+## B02 — Windows/net48 CI
+
+[B02 execution evidence](20261101-b02-windows-ci.md): selected by Owner; DONE (bounded): final executable candidate hosted push/PR PASS, Owner acceptance/merge pending. B01 acceptance and old evidence remain unchanged.
