@@ -1,6 +1,8 @@
 # Codex handoff — WEB4 backend, atomic journal and Windows CI
 
-**Active selected direction; tasks B01–B06 PLANNED until source PRs/evidence.** Start with [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → [plan selector](../plans/README.md) → [owning WEB4 backend plan](../plans/20261101-003-web4-reliability-server.md) → [idempotency design](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) → [ADR 0014](../adr/0014-web4-durable-operations.md) → [acceptance](WEB4_BACKEND_ACCEPTANCE.md) → [TEST_POLICY](../TEST_POLICY.md). Frontend partner plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md.
+**Active selected direction; tasks B01–B06 PLANNED until source PRs/evidence.** Start with [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → [plan selector](../plans/README.md) → [owning WEB4 backend plan](../plans/20261101-003-web4-reliability-server.md) → [idempotency design](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) → [ADR 0014](../adr/0014-web4-durable-operations.md) → [acceptance](WEB4_BACKEND_ACCEPTANCE.md) → [TEST_POLICY](../TEST_POLICY.md). Frontend partner plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/codex/activate-web4-reliability/docs/plans/20261101-002-web4-reliability-web.md.
+
+**Cross-repo link lifecycle:** While PR #79 and companion ReactWebUI PR #18 remain unmerged, links to newly authored WEB4 documents intentionally use the existing `codex/activate-web4-reliability` branch to avoid 404. After BOTH PRs merge, normalize only the new WEB4 cross-repo links to `/blob/main/`, verify they resolve, and only then delete activation branches. Do not rewrite historical WEB1–03 links or describe the docs as runtime evidence.
 
 ## Source preflight before every task
 

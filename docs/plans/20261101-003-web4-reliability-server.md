@@ -1,6 +1,6 @@
 # Roadmap 04 backend — Reliable mutations, operation journal, and CI
 
-**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / ALL IMPLEMENTATION TASKS PLANNED (NOT RUN). **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Source baseline:** main at 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd. Reinspect current main and existing test owners before starting each task. This document-activation PR does not implement or verify runtime, SQL, browser, CI, or IIS.
+**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / ALL IMPLEMENTATION TASKS PLANNED (NOT RUN). **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/codex/activate-web4-reliability/docs/plans/20261101-002-web4-reliability-web.md. **Source baseline:** main at 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd. Reinspect current main and existing test owners before starting each task. This document-activation PR does not implement or verify runtime, SQL, browser, CI, or IIS.
 
 ## 0. Mission, constraints, ownership
 
