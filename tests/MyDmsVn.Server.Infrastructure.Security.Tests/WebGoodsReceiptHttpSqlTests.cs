@@ -125,6 +125,8 @@ public sealed class WebGoodsReceiptHttpSqlTests
         Assert.Contains(invalid.Json["error"]!["details"]!, detail => (string?)detail["field"] == "lines[1].productId" && (string?)detail["code"] == "GoodsReceipt.DuplicateProduct");
         var precision = data.Body(); precision["lines"]![0]!["quantity"] = "0.00001";
         Error(await data.Send(HttpMethod.Post, "goods-receipts", precision, access), 400, "ValidationError");
+        var empty = data.Body(); empty["lines"] = new JArray();
+        Error(await data.Send(HttpMethod.Post, "goods-receipts", empty, access), 400, "ValidationError");
         Assert.Equal(before, await data.State());
         await data.Http.Admin.ExecuteAsync("DBCC CHECKIDENT ('dbo.GoodsReceipts', RESEED, 9007199254740993) WITH NO_INFOMSGS; DBCC CHECKIDENT ('dbo.GoodsReceiptLines', RESEED, 9007199254740993) WITH NO_INFOMSGS;");
         var lines = new JArray();
@@ -133,6 +135,10 @@ public sealed class WebGoodsReceiptHttpSqlTests
             var product = await data.Http.Admin.QuerySingleAsync<int>("INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(@code,N'Batch',N'EA');", new { code = "B" + i.ToString(CultureInfo.InvariantCulture) });
             lines.Add(data.Line(product, "0.0001", "999999999999999.9999"));
         }
+        var oversized = data.Body();
+        oversized["lines"] = new JArray(lines.Select(line => line.DeepClone()).Concat(new[] { data.Line(data.OtherProduct, "1", "1") }));
+        Error(await data.Send(HttpMethod.Post, "goods-receipts", oversized, access), 400, "ValidationError");
+        Assert.Equal(before, await data.State());
         var body = data.Body(); body["lines"] = lines;
         var created = Success(await data.Send(HttpMethod.Post, "goods-receipts", body, access));
         Assert.Equal("9007199254740993", (string?)created["receiptId"]);
@@ -140,6 +146,21 @@ public sealed class WebGoodsReceiptHttpSqlTests
         Assert.Equal(Enumerable.Range(1, 200), created["lines"]!.Select(line => (int)line["lineNumber"]!));
         Assert.All(created["lines"]!, line => { Assert.True(long.Parse((string)line["receiptLineId"]!, CultureInfo.InvariantCulture) > 9007199254740992L); Assert.Equal(999999999999999.9999m, Number(line["unitCost"]!)); });
         Assert.Equal(200, await data.Http.Admin.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.GoodsReceiptLines;"));
+        Assert.Equal(0, await data.Http.Admin.QuerySingleAsync<int>("SELECT (SELECT COUNT(*) FROM dbo.StockBalances)+(SELECT COUNT(*) FROM dbo.StockLedger)+(SELECT COUNT(*) FROM dbo.StockValuationEntries);"));
+        var createIds = created["lines"]!.Select(line => (string)line["receiptLineId"]!).ToArray();
+        var replacement = Save(created);
+        replacement["lines"] = new JArray(created["lines"]!.Reverse().Select(line => data.Line((int)line["productId"]!, "0.0002", "999999999999999.9999")));
+        var updated = Success(await data.Send(HttpMethod.Put, "goods-receipts/" + (string)created["receiptId"]! + "/draft", replacement, access));
+        Assert.NotEqual((string?)created["version"], (string?)updated["version"]);
+        Assert.Equal(200, updated["lines"]!.Count());
+        Assert.Equal(Enumerable.Range(1, 200), updated["lines"]!.Select(line => (int)line["lineNumber"]!));
+        Assert.Equal(created["lines"]!.Reverse().Select(line => (int)line["productId"]!), updated["lines"]!.Select(line => (int)line["productId"]!));
+        Assert.All(updated["lines"]!, line => Assert.DoesNotContain((string)line["receiptLineId"]!, createIds));
+        Assert.Equal(updated["lines"]!.Select(line => (int)line["productId"]!), await data.Http.Admin.QueryAsync<int>("SELECT ProductId FROM dbo.GoodsReceiptLines ORDER BY [LineNo];"));
+        Assert.Equal(200, await data.Http.Admin.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE Quantity=0.0002 AND UnitCost=999999999999999.9999;"));
+        Assert.Equal(Convert.FromBase64String((string)updated["version"]!), await data.Http.Admin.QuerySingleAsync<byte[]>("SELECT RowVersion FROM dbo.GoodsReceipts;"));
+        Assert.Equal(1, await data.Http.Admin.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE Status='Draft' AND CreatedByUserId=@actor AND UpdatedByUserId=@actor AND PostedAtUtc IS NULL AND PostedByUserId IS NULL;", new { actor = data.Http.Alice }));
+        Assert.Equal(0, await data.Http.Admin.QuerySingleAsync<int>("SELECT (SELECT COUNT(*) FROM dbo.StockBalances)+(SELECT COUNT(*) FROM dbo.StockLedger)+(SELECT COUNT(*) FROM dbo.StockValuationEntries);"));
     });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
