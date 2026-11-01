@@ -1,0 +1,88 @@
+name: Backend Web checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, "codex/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-web-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  http-host:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "8.0.x" # global.json selects 8.0.400/latestFeature
+      - name: Verify Windows Framework toolchain
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet --info
+          if ($LASTEXITCODE -ne 0) { throw 'SDK inspection failed.' }
+          $references = "${env:ProgramFiles(x86)}/Reference Assemblies/Microsoft/Framework/.NETFramework/v4.8/mscorlib.dll"
+          if (-not (Test-Path -LiteralPath $references)) { throw 'net48 targeting pack missing.' }
+          $release = (Get-ItemProperty 'HKLM:/SOFTWARE/Microsoft/NET Framework Setup/NDP/v4/Full').Release
+          if ($release -lt 528040) { throw '.NET Framework 4.8 runtime missing.' }
+          Write-Host "Framework release: $release; runner image: $env:ImageVersion"
+      - name: Restore locked HTTP host test graph
+        run: |
+          dotnet restore tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj --locked-mode
+          if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed.' }
+      - name: Build HTTP host and tests
+        run: |
+          dotnet build tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Release/net48 build failed.' }
+      # Only this SQL-free OWIN TestServer/fake project; no SQL/GUI/IIS fixture,
+      # database credentials, publish, deployment or submodule checkout.
+      - name: Run HTTP host tests
+        run: |
+          dotnet test tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-build --no-restore --logger "trx;LogFileName=http-host.trx" --results-directory TestResults/backend-web
+          if ($LASTEXITCODE -ne 0) { throw 'HTTP host tests failed.' }
+      - name: Verify nonempty complete test execution
+        if: ${{ always() }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = 'TestResults/backend-web/http-host.trx'
+          if (-not (Test-Path -LiteralPath $path)) { throw 'Required TRX missing.' }
+          [xml]$trx = Get-Content -LiteralPath $path -Raw
+          $counts = $trx.TestRun.ResultSummary.Counters
+          $results = @($trx.TestRun.Results.UnitTestResult)
+          $total = [int]$counts.total
+          $executed = [int]$counts.executed
+          $passed = [int]$counts.passed
+          # Upload only counts, never raw test output, TRX, tokens or exceptions.
+          $summary = "HttpHost/net48: total=$total executed=$executed passed=$passed failed=$($counts.failed) notExecuted=$($counts.notExecuted)"
+          Write-Host $summary
+          $summary | Set-Content -LiteralPath TestResults/backend-web/summary.txt -Encoding utf8
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          if ($total -le 0 -or $executed -ne $total -or $passed -ne $total -or [int]$counts.failed -ne 0 -or [int]$counts.notExecuted -ne 0 -or
+              $results.Count -ne $total -or @($results | Where-Object outcome -ne 'Passed').Count -ne 0 -or
+              $trx.TestRun.ResultSummary.outcome -ne 'Completed') {
+            throw 'Required tests were absent, skipped, failed or aborted.'
+          }
+      - name: Upload count summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-web-counts
+          path: TestResults/backend-web/summary.txt
+          if-no-files-found: ignore
+          retention-days: 7

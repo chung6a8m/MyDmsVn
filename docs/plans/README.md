@@ -1,5 +1,6 @@
 # Execution-plan index
 
+**Current selected task (2026-11-01): B02 Windows/net48 SQL-free CI IN_PROGRESS.** [B02 evidence](../evidence/web4/20261101-b02-windows-ci.md) owns current execution/hosted results. B01 is accepted/merged; B03–B06 remain PLANNED. Earlier B02 PLANNED wording describes the prior checkpoint.
 
 ## Active parallel Web workstream — Roadmap 04 Reliability & Delivery Foundation (selected 2026-11-01)
 
