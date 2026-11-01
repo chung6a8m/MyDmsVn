@@ -15,7 +15,7 @@
 | B4-JRN-03 | B03 SQL transaction | Two calls same key but different request scope/expectedVersion return deterministic conflict without mutation |
 | B4-HTTP-01 | B04 SQL-free host | Required canonical GUIDv4 header, duplicate/empty/invalid key/unknown fields fail before handler; all six routes preserved |
 | B4-HTTP-02 | B04 Web auth | Current session/grants rechecked for new/replayed/status; revoked account/permission returns 401/403; cross-actor row existence never leaked |
-| B4-HTTP-03 | B04 readback | COMMITTED response is minimal, precise and authorized; absent/unknown never means safe to re-Post; Receipt Post ack never invents version |
+| B4-HTTP-03 | B04 readback | COMMITTED returns **exactly the original permitted command outcome** (complete Create/Update Write response, Sales Post with version, Receipt Post without) after fresh auth; no extra Get/Read-only fields; absent/unknown never means safe to re-Post |
 | B4-HTTP-04 | B04 compatibility | Existing strict WEB2/WEB3 wire and Local handler behavior unchanged; no unkeyed fallback when WEB4 mode enabled |
 | B4-RES-01 | B05 Security/Inventory SQL | Lost response AFTER physical Post commit and subsequent status: one source/ledger/value/balance effect and frozen COGS |
 | B4-RES-02 | B05 Security/Inventory SQL | SQL rollback, timeout, deadlock victim, stale rowversion, lost response BEFORE/around commit; no automatic replay |
@@ -37,9 +37,12 @@
 | B4-RES-04 | B05 Security/Inventory SQL | Never-dispatched browser intent then explicit same-key resend, concurrent delayed original and resend, exactly one posted document/ledger/value, no new key |
 | B4-LOCAL-01 | B03/B04 SQL Local | **On exact desktop schema10** Local/Application Create/Update/Post Sales and Goods Receipt WITHOUT WebOperationMetadata; unchanged auth/rowversion/lines/rollback/Q/V/COGS, zero journal query or new table dependency |
 | B4-LIVE-03 | B05-A→F04-A→B05-B/F04-B | Fixture/oracle ready independently of browser spec, then final paired acceptance on exact Web/backend commits and fresh owned Chromium/Edge SQL |
-
 | B4-OPS-02 | B05/B06 privileged operator rehearsal | Exact actor/epoch/key/fingerprint matched, authoritative SQL journal+source+ledger/valuation checked; committed vs indeterminate vs expired tombstone distinguished; never unlock Edit without version or claim 404 is safe, retain audit trail |
 
+| B4-CON-05 | B01 canonical corpus | Status envelope binds server-origin operationId/kind/method/route/resource/epoch/fingerprint; frontend rederives hash from immutable request, not copied local metadata |
+| B4-HTTP-06 | B04 HTTP + SQL | Six WEB4 writes and operation GET reject missing/malformed/duplicated/stale X-MyDmsVn-Deployment-Epoch against authoritative SQL; same origin + userId on switched database cannot commit/disclose |
+| B4-HTTP-07 | B04 HTTP + SQL | GET readback rejects missing/mismatched expected X-MyDmsVn-Operation-Fingerprint without revealing committed outcome; correct hash + actor + current grant gets original result only |
+| B4-RES-05 | B05 browser + SQL | Old tab with epoch A against database B, delayed status/POST or duplicate operation ID must remain fenced, no B write or recovered SETTLED; negative local/remote fingerprint drift checks |
 ### Gate execution and evidence rules
 
 - B02: GitHub-hosted Windows SQL-free tests only. It must report actual workflows, runner, commit SHA and discovered/executed rows. A green YAML lint or local build is not hosted CI.
