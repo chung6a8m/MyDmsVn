@@ -1,6 +1,6 @@
 # Execution-plan index
 
-**Current selected task (2026-11-01): B02 Windows/net48 SQL-free CI DONE (bounded); Owner acceptance/merge pending.** [B02 evidence](../evidence/web4/20261101-b02-windows-ci.md) owns current execution/hosted results. B01 is accepted/merged; B03–B06 remain PLANNED. B02 execution is separate from the accepted B01 contract checkpoint.
+**Current selected task (2026-11-01): B02 Windows/net48 SQL-free CI DONE (bounded); Owner accepted; PR #81 merged 2026-11-01.** [B02 evidence](../evidence/web4/20261101-b02-windows-ci.md) owns current execution/hosted results. B01 is accepted/merged; B03–B06 remain PLANNED. B02 execution is separate from the accepted B01 contract checkpoint.
 
 ## Active parallel Web workstream — Roadmap 04 Reliability & Delivery Foundation (selected 2026-11-01)
 
