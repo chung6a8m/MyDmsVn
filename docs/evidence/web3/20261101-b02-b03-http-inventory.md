@@ -1,6 +1,6 @@
 # WEB3-B02/B03 — Goods Receipt and Inventory HTTP implementation
 
-**Owner selection:** WEB3-03 backend B02/B03, 2026-11-01. **Result:** DONE within the implemented and automated-verified B02/B03 scope; local candidate is not merged or deployed. The [backend plan](../../plans/20261101-002-web3-goods-receipt-inventory-http.md) owns status; B04/B05 and frontend F tasks are separate.
+**Owner selection:** WEB3-03 backend B02/B03, 2026-11-01. **Result:** DONE within the implemented and automated-verified B02/B03 scope; candidate is published in [PR #76](https://github.com/chung6a8m/MyDmsVn/pull/76) and is not merged or deployed. The [backend plan](../../plans/20261101-002-web3-goods-receipt-inventory-http.md) owns status; B04/B05 and frontend F tasks are separate.
 
 ## Candidate and scope
 
@@ -67,3 +67,17 @@ Documentation verification: git diff --check passed; all 230 local links across 
 An independent source reviewer found no actionable implementation issue in routes, wire, permissions or SQL grants. Verification is bounded to automated net48 HTTP/TestServer and owned SQL cases. B04 cross-module Receipt → Sale → later Receipt acceptance, B05 IIS Express/Chromium/Edge integrated pilot, attended UI/IME, full IIS and production are NOT RUN for this candidate. Existing Sales regression coverage does not substitute for B04/B05. No browser acceptance or frontend Receipt implementation is implied.
 
 The [host runbook](../../../src/MyDmsVn.Server.HttpHost/README.md) records the exact additional grants and operator provisioning step for an existing Web database. B01 corpus is ready for pinned frontend consumption; the [handoff](../../development/WEB3_CODEX_HANDOFF.md) directs subsequent owners to the implementation and evidence. Full IIS, durable operation recovery/idempotency and operational release gates remain outside this selection.
+
+## PR #76 focused review — 2026-11-01
+
+Owner requested strict wire, minimum SQL rights and Sales/auth regression review. Reviewed PR head 23c5621b53e8222c2b5cf69ded81b5e90eb32aff against main feb3b6cbc3bec3fe505c2b575fd4a8050973524d, using three independent source reviewers plus coordinator inspection. Remote PR refs matched the local branch, and there were no existing GitHub review threads to resolve.
+
+**Result: no actionable implementation defect found in the reviewed scope.** No product source, tests, grants, canonical fixtures or dependency pins were changed for this review. The update corrects stale local-only publication wording and records this review; it does not claim merge or Owner acceptance.
+
+- Strict wire: compared Inventory input/output and shared transport primitives against the canonical corpus and actual DTO/SQL sources. Checked ID/count/decimal precision, Base64 canonical rowversion, calendar/UTC distinctions and seven-digit fractions, encoded duplicate query keys, nulls, replacement-line ordering and identities. Decimal scale/range checks prevent parse rounding within the accepted input domain; SQL paging offsets use long arithmetic.
+- SQL rights: compared both provisioner and runtime overgrant allowlists against actual Create/Replace/Post, number sequence and read queries, including the StockCard joins. Required rights match the B01 matrix; line UPDATE and header DELETE remain denied. The existing startup validator detects excess rights, not missing grants: operators must reprovision existing WEB2 principals before WEB3 use, as the runbook and missing-grant test specify.
+- Sales/auth: checked exact capability whitelist and unchanged Sales projection, request-scoped actor capture, current permission checks including active permission registry before superuser handling, separate Read/Write/Post admission, and the existing HTTP/SQL tests for denied operations, permission revocation, concurrent actors, Sales duplicate/gift lines, Local parity and rollback.
+
+Verification in this review was source/diff and documentation verification, plus inspection of the existing actual TRX counters. git diff --check passed; all 205 local links across six changed Markdown files resolved, with UTF-8/no-BOM/CRLF intact. All executable source/tests/deployment files still match implementation commit d2e7e3f3709a7e97cf91c7d4558c560303fa498d. The earlier 415 host, 8 principal, 32 Inventory and 19 effective HTTP/SQL passing cases remain applicable; the original 18/19 SQL run and 1/1 corrected-oracle rerun remain separately recorded above. Tests were not rerun solely for these Markdown changes, in accordance with TEST_POLICY. No additional SQL or browser PASS is claimed.
+
+B04's integrated Receipt/Sales/Receipt oracle and B05's IIS/browser pilot remain outside this review and unverified for this candidate. The existing source/test checks do not replace those acceptance gates.
