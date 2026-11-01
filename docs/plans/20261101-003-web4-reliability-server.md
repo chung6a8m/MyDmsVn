@@ -1,6 +1,6 @@
 # Roadmap 04 backend — Reliable mutations, operation journal, and CI
 
-**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / B01 IN_PROGRESS (source/contract candidate, F01 signoff pending); B02–B06 PLANNED / NOT RUN. **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Activation baseline:** 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd; **B01 source baseline:** main@48e9cd7ae096ecadd184e6ea6a372306d77f41b1. Reinspect current main and existing test owners before starting each task. B01 publishes [source/schema decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), [canonical corpus](../contracts/web4-v1/README.md) and [evidence](../evidence/web4/20261101-b01-contract.md); it does not implement or verify runtime, SQL, browser, CI, or IIS.
+**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / B01 DONE (bounded contract; Owner acceptance/merge pending); B02–B06 PLANNED / NOT RUN. **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Activation baseline:** 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd; **B01 source baseline:** main@48e9cd7ae096ecadd184e6ea6a372306d77f41b1. Reinspect current main and existing test owners before starting each task. B01 publishes [source/schema decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), [canonical corpus](../contracts/web4-v1/README.md) and [evidence](../evidence/web4/20261101-b01-contract.md); it does not implement or verify runtime, SQL, browser, CI, or IIS.
 
 ## 0. Mission, constraints, ownership
 
@@ -25,7 +25,7 @@ Authoritative ownership: this plan owns B01–B06; frontend companion owns F01�
 
 Sequence: activate docs PRs; B01/F01 contract; B02 may proceed independently after B01 with a separate PR; B03 then B04; F02 may develop against the frozen contract; F03 requires B04; B05 + F04 integrated acceptance; B06 + F05. NO broad branch that combines all tasks into a single unreviewable PR. Each implementation task uses a fresh branch from current main and narrow PR into main, with counterpart SHA and prerequisites recorded.
 
-## 2. B01 — Source audit, immutable reliability contract (IN_PROGRESS — F01 signoff pending)
+## 2. B01 — Source audit, immutable reliability contract (DONE — bounded contract)
 
 **Read exact sources first:**
 - src/MyDmsVn.Server.HttpHost/{SalesControllers.cs,InventoryControllers.cs,SalesWireInput.cs,InventoryWireInput.cs,Web2Pipeline.cs,AuthController.cs,RequestServices.cs,WebHostOptions.cs}

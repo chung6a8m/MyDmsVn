@@ -1,6 +1,6 @@
 # ADR 0014 — WEB4 transaction-owned operation journal and durable browser drafts
 
-**Date:** 2026-11-01. **Decision:** Owner SELECTED the Roadmap 04 direction; B01 now freezes the [canonical wire corpus](../contracts/web4-v1/README.md) and [source transaction/schema/retention decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), pending frontend F01 signoff. **Implementation:** NOT STARTED. [Backend roadmap](../plans/20261101-003-web4-reliability-server.md) | [canonical candidate design](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md).
+**Date:** 2026-11-01. **Decision:** Owner SELECTED the Roadmap 04 direction; B01 now freezes the [canonical wire corpus](../contracts/web4-v1/README.md) and [source transaction/schema/retention decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), with frontend F01 consumer signoff recorded in task evidence. **Implementation:** NOT STARTED. [Backend roadmap](../plans/20261101-003-web4-reliability-server.md) | [canonical candidate design](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md).
 
 ## Context
 
