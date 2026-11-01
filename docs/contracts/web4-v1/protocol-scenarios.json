@@ -1,0 +1,112 @@
+{
+  "scenarios": [
+    {
+      "name": "persist-before-dispatch",
+      "status": "Operation.NotObserved",
+      "httpStatus": 404,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "USER_CONFIRMED_SAME_INTENT_AFTER_B03_B04_PROOF"
+    },
+    {
+      "name": "delayed-first-attempt-races-confirmed-resend",
+      "status": "COMMITTED",
+      "httpStatus": 200,
+      "affirmative": true,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "ONE_SQL_SERIALIZED_COMMIT_REQUIRED_NOT_PROVEN_B01"
+    },
+    {
+      "name": "write-without-read",
+      "status": "COMMITTED",
+      "httpStatus": 200,
+      "affirmative": true,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "CURRENT_ORIGINAL_WRITE_PERMISSION_FULL_ORIGINAL_RESULT_NO_GET"
+    },
+    {
+      "name": "post-without-read",
+      "status": "COMMITTED",
+      "httpStatus": 200,
+      "affirmative": true,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "CURRENT_ORIGINAL_POST_PERMISSION_ORIGINAL_ACK_NO_GET"
+    },
+    {
+      "name": "expired-tombstone",
+      "status": "RESULT_EXPIRED",
+      "httpStatus": 200,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "OPERATOR_RECONCILIATION_EDIT_LOCKED"
+    },
+    {
+      "name": "revoked-current-grant",
+      "status": "Auth.Forbidden",
+      "httpStatus": 403,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "NO_OUTCOME_DISCLOSED_EDIT_LOCKED"
+    },
+    {
+      "name": "cross-actor-equals-missing",
+      "status": "Operation.NotObserved",
+      "httpStatus": 404,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "NO_EXISTENCE_LEAK_EDIT_LOCKED"
+    },
+    {
+      "name": "same-key-changed-body-route-version",
+      "status": "Idempotency.KeyConflict",
+      "httpStatus": 409,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "ORIGINAL_UNKNOWN_INTENT_REMAINS_LOCKED"
+    },
+    {
+      "name": "changed-db-same-origin-actor",
+      "status": "Deployment.EpochMismatch",
+      "httpStatus": 409,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "NO_DISPATCH_NO_DISCLOSURE"
+    },
+    {
+      "name": "client-fingerprint-corrupted",
+      "status": "Idempotency.FingerprintMismatch",
+      "httpStatus": 409,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "RECOMPUTE_FROM_FROZEN_INPUT_NEVER_TRUST_CACHED_HASH"
+    },
+    {
+      "name": "late-response-prior-session",
+      "status": "COMMITTED",
+      "httpStatus": 200,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "CALLER_ACTOR_GENERATION_EPOCH_ADMISSION_REJECTS"
+    },
+    {
+      "name": "timeout-or-abort",
+      "status": "UNKNOWN",
+      "httpStatus": null,
+      "affirmative": false,
+      "automaticResend": false,
+      "newKeyAllowed": false,
+      "resolution": "CLIENT_ABORT_IS_NOT_ROLLBACK_PROOF"
+    }
+  ]
+}

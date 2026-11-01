@@ -1,6 +1,6 @@
 # WEB4 backend acceptance matrix — protocol, SQL, CI, real pilot
 
-**Status:** PLANNED test scenarios, no results. **Owner:** [B01–B06 backend plan](../plans/20261101-003-web4-reliability-server.md). **Contract:** [operation/journal design](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md). The frontend-specific matrix is owned in ReactWebUI; these IDs are scenario identifiers, NOT discovered test names. Use [sole backend test policy](../TEST_POLICY.md) and [test owner commands](../../tests/README.md).
+**Status:** B01 canonical contract scenarios have SQL-free corpus evidence; all runtime/SQL/CI scenarios remain PLANNED / NOT RUN. [B01 execution evidence](../evidence/web4/20261101-b01-contract.md) records actual counts; B4-CON-04 delayed-request serialization is still a B03/B04 SQL obligation, not proven by scenario vectors. **Owner:** [B01–B06 backend plan](../plans/20261101-003-web4-reliability-server.md). **Contract:** [operation/journal design](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md). The frontend-specific matrix is owned in ReactWebUI; these IDs are scenario identifiers, NOT discovered test names. Use [sole backend test policy](../TEST_POLICY.md) and [test owner commands](../../tests/README.md).
 
 | ID | Gate/owner | Scenario and required assertion |
 |---|---|---|

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "ValidationError",
+    "message": "The request is invalid.",
+    "details": [],
+    "correlationId": "web4-corpus-001"
+  }
+}

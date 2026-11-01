@@ -1,0 +1,49 @@
+{
+  "data": {
+    "deploymentEpoch": "11111111-2222-4333-8444-555555555555",
+    "operationId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "operationKind": "Receipt.Create",
+    "method": "POST",
+    "routeScope": "/api/v1/goods-receipts",
+    "requestTargetId": null,
+    "requestFingerprint": "b963f81cae4fe681816b1a7a747d5452f5ce241247382d8dcfadac93b4f2ee89",
+    "state": "COMMITTED",
+    "outcome": {
+      "data": {
+        "receiptId": "9007199254740993",
+        "receiptNumber": "GR0000000042",
+        "receiptDate": "2024-02-29",
+        "warehouseId": 1,
+        "warehouseDisplayName": null,
+        "warehouseIsActive": true,
+        "employeeId": 2,
+        "employeeDisplayName": null,
+        "employeeIsActive": true,
+        "status": "Draft",
+        "note": null,
+        "postedAtUtc": null,
+        "version": "AAAAAAAAAAE=",
+        "lines": [
+          {
+            "receiptLineId": "9007199254740994",
+            "lineNumber": 1,
+            "productId": 7,
+            "quantity": "1.2500",
+            "unitCost": "12.3456",
+            "productDisplayName": null,
+            "productIsActive": true
+          },
+          {
+            "receiptLineId": "9007199254740995",
+            "lineNumber": 2,
+            "productId": 8,
+            "quantity": "2.0000",
+            "unitCost": "0.0000",
+            "productDisplayName": null,
+            "productIsActive": true
+          }
+        ]
+      }
+    }
+  }
+}

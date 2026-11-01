@@ -1,0 +1,24 @@
+{
+  "operationKind": "Receipt.Create",
+  "method": "POST",
+  "routeScope": "/api/v1/goods-receipts",
+  "requestTargetId": null,
+  "body": {
+    "receiptDate": "2024-02-29",
+    "warehouseId": 1,
+    "employeeId": 2,
+    "note": null,
+    "lines": [
+      {
+        "productId": 7,
+        "quantity": "1.2500",
+        "unitCost": "12.3456"
+      },
+      {
+        "productId": 8,
+        "quantity": "2.0000",
+        "unitCost": "0.0000"
+      }
+    ]
+  }
+}
