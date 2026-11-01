@@ -14,6 +14,8 @@ public sealed class AuditTests
         using var output = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
         var source = new TraceSource("Web2AuditTests", SourceLevels.Information);
         source.Listeners.Clear(); source.Listeners.Add(new TextWriterTraceListener(output));
+        // This test owns an enabled capture source; net48 lazy configuration initialization can leave its default switch Off.
+        source.Switch.Level = SourceLevels.Information;
         using var sink = new TraceSecurityAuditSink(source);
         await sink.WriteAsync(new SecurityAuditEntry(SecurityAuditAction.Authentication, SecurityAuditOutcome.Denied, 7,
             HostFixture.Now, "WebAuthSessionReplay", "secret-refresh-token-or-hash", "audit-123"), CancellationToken.None);
