@@ -1,0 +1,22 @@
+{
+  "data": {
+    "items": [
+      {
+        "warehouseId": 1,
+        "warehouseCode": "WH01",
+        "warehouseName": "Kho chính",
+        "warehouseIsActive": false,
+        "productId": 7,
+        "productCode": "P7",
+        "productName": "Sản phẩm",
+        "productIsActive": false,
+        "quantity": "16.0000",
+        "inventoryValue": "240.0000",
+        "averageUnitCost": "15.00000000"
+      }
+    ],
+    "pageNumber": 1,
+    "pageSize": 25,
+    "totalCount": "1"
+  }
+}

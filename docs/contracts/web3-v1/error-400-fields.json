@@ -1,0 +1,19 @@
+{
+  "error": {
+    "code": "ValidationError",
+    "message": "The request is invalid.",
+    "details": [
+      {
+        "code": "Validation.PrecisionScale",
+        "message": "The quantity precision is invalid.",
+        "field": "lines[0].quantity"
+      },
+      {
+        "code": "Validation.PrecisionScale",
+        "message": "The unit cost precision is invalid.",
+        "field": "lines[1].unitCost"
+      }
+    ],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

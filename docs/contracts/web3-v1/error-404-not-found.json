@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "GoodsReceipt.NotFound",
+    "message": "The goods receipt was not found.",
+    "details": [
+      {
+        "code": "GoodsReceipt.NotFound",
+        "message": "The goods receipt was not found."
+      }
+    ],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

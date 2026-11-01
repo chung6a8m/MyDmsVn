@@ -1,0 +1,14 @@
+{
+  "error": {
+    "code": "ValidationError",
+    "message": "The request is invalid.",
+    "details": [
+      {
+        "code": "Validation.InvalidValue",
+        "message": "The field or request format is invalid.",
+        "field": "pageSize"
+      }
+    ],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

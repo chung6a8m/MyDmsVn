@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "ValidationError",
+    "message": "The request is invalid.",
+    "details": [
+      {
+        "code": "GoodsReceipt.ValuationOutOfRange",
+        "message": "Receipt value or resulting stock exceeds the supported range."
+      }
+    ],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

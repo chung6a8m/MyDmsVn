@@ -1,6 +1,6 @@
-# WEB3 backend evidence index — NOT RUN
+# WEB3 backend evidence index — bounded contract checks
 
-**Selected:** 2026-11-01. This docs-only activation records **no WEB3 HTTP, SQL, IIS Express or production PASS**. Owner: [WEB3-B01–B05](../../plans/20261101-002-web3-goods-receipt-inventory-http.md); [physical Q/V/COGS oracle](../../design/WEB3_STOCK_LEDGER_ACCEPTANCE.md). [Frontend evidence](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/evidence/web3/README.md) is separately owned.
+**Selected:** 2026-11-01, with explicit additional B01 authorization. [B01 contract checkpoint](20261101-b01-contract-checkpoint.md) records only authored-corpus and source/document verification. **WEB3 HTTP, SQL, IIS Express, browser and production are NOT RUN.** Owner: [WEB3-B01–B05](../../plans/20261101-002-web3-goods-receipt-inventory-http.md); [physical Q/V/COGS oracle](../../design/WEB3_STOCK_LEDGER_ACCEPTANCE.md). [Frontend evidence](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/evidence/web3/README.md) is separately owned.
 
 After actual execution, add a dated evidence file with task/PR, exact Web/server SHA and canonical corpus revision, command/selector/discovered & executed test cases (PASS/FAIL/SKIP), nonproduction SQL instance/schema11/restricted principal, owned fixture and cleanup, physical StockLedger/StockValuationEntries/StockBalances/Sale COGS assertions, Chromium/Edge/IIS Express HTTPS context, rejected permission/malformed/unknown tests, failures/corrections and precise not-run blockers. Distinguish one .NET wrapper row from actual browser cases. Do not save JWT, SQL credentials, cookie headers, browser traces or HAR.
 

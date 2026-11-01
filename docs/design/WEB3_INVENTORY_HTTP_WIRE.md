@@ -1,6 +1,6 @@
-# WEB3 — Inventory / Goods Receipt HTTP wire contract v1 (PROPOSED)
+# WEB3 — Inventory / Goods Receipt HTTP wire contract v1 (B01 checkpoint)
 
-**Decision scope:** Owner chose WEB3 on 2026-11-01. This file is the **normative design to implement**, not a claim that endpoints exist. **Canonical executable fixtures must be created/frozen by WEB3-B01** under `docs/contracts/web3-v1/` after source reconciliation. Existing [WEB2 host/auth contract](WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [Contracts](../CONTRACTS.md), [Data model](../DATA_MODEL.md) and exact `main` source remain authorities for existing runtime behavior. This Web-specific wire must **not** change the Local/Desktop JSON DTO shape.
+**Decision scope:** Owner chose WEB3 on 2026-11-01 and explicitly authorized backend B01 to complete the contract checkpoint. This is the **normative design to implement**, not a claim that endpoints exist. [Canonical executable corpus and exhaustive field tables](../contracts/web3-v1/README.md), [manifest](../contracts/web3-v1/manifest.json) and [source/SQL gap checkpoint](WEB3_B01_SOURCE_CHECKPOINT.md) resolve the source reconciliation against `8b599c782816d9cd64f04a45d809a2b8eb1235c8`. Review/acceptance state remains in the [B01 owning plan](../plans/20261101-002-web3-goods-receipt-inventory-http.md). Existing [WEB2 host/auth contract](WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [Contracts](../CONTRACTS.md), [Data model](../DATA_MODEL.md) and exact source remain authorities for current runtime. This Web wire does **not** change Local/Desktop JSON DTO shape or Sales behavior.
 
 ## 1. Transport, security and authority
 
@@ -33,13 +33,14 @@ The existing `?feature=sales` continues to return exactly its current `{read,wri
 |---|---|---|
 | `receiptId`, `receiptLineId`, `ledgerId`, `documentId` (C# long) | JSON **string decimal integer** | Canonical 1..Int64.MaxValue (new receipt doesn't send an ID); reject JS JSON numeric token, exponent, leading zero, overflow |
 | `warehouseId`, `employeeId`, `productId` | JSON int32 number | Positive <= 2147483647; never trust display labels as IDs |
-| `lineNumber`, `pageNumber`, `pageSize`, `totalCount` | checked integer | 1-based pages; limits from validators, 1..200 pageSize; total count type/range verified at B01 |
+| `lineNumber`, `pageNumber`, `pageSize` | checked JSON int32 integer | 1-based pages; 1..200 pageSize; explicit required pageNumber/pageSize, no HTTP defaults |
+| `totalCount` (source long / SQL COUNT_BIG) | canonical nonnegative Int64 **string** | `"0"`..`"9223372036854775807"`; never JS Number |
 | All C# decimal including `quantity`, `unitCost`, `inventoryValue`, `averageUnitCost`, `quantityChange`, `valueChange` | **string** invariant decimal | No JSON number/float; no exponent; exact precision/scale, reject NaN or silent rounding |
-| Nullable `averageUnitCost` | string or explicit null | Null means undefined, not zero. Omitted/null behavior frozen by B01 fixtures |
+| Nullable `averageUnitCost` | string or explicit null | Null means undefined, not zero; response member required. Eight fractional digits/decimal28,8, unlike Save unitCost19,4. Amounts use decimal28,4. |
 | `receiptDate` | `yyyy-MM-dd` string | Calendar date, no timezone conversion; leap day valid |
-| `postedAtUtc`, `fromUtc`, `toUtc` | ISO 8601 UTC with `Z` | Preserve precision; require UTC, no browser-local drift or unspecified kinds |
+| `postedAtUtc`, `fromUtc`, `toUtc` | ISO 8601 UTC with `Z`, optional 1..7 fractional digits | SQL Unspecified-kind UTC is labeled without server-local shift; no browser-local drift |
 | `expectedVersion` / detail `version` | opaque Base64 string | Source rowversion is 8 bytes; no client comparison arithmetic |
-| `receiptNumber` | server-generated display string | Format `GR0000000001`... as currently implemented; gaps are valid; never client-supplied |
+| `receiptNumber` | server-generated display string | GR + ten digits, sequence1..9999999999/NO CYCLE; gaps valid; never client-supplied |
 
 **Source bounds:** Quantity SQL `decimal(18,4)` >0, <= `99999999999999.9999`; UnitCost SQL `decimal(19,4)` >=0, <= `999999999999999.9999`. Receipt 1..200 lines; Product IDs unique **within** one receipt, unlike Sales where repeated products are allowed. Costs/value Q/V are **server authoritative**. A UI line amount preview may be derived from exact decimal arithmetic but cannot post a precomputed valuation.
 
@@ -63,13 +64,13 @@ The existing `?feature=sales` continues to return exactly its current `{read,wri
 
 **Identity consequence:** `SaveGoodsReceiptLineRequest` carries no line ID. `UpdateGoodsReceiptDraftCommandHandler` uses `ReplaceDraftAsync` (full replacement) and builds new ordered lines. Client `clientLineId` is private UI identity; host maps request index to server `lineNumber`, verifies result order/cardinality, and must **not** claim server line IDs survive update. Server response IDs are fresh authoritative IDs where replacement occurs. No Product-ID-based reconcile/reorder; duplicate Products are validation errors.
 
-The existing Create/Update handlers compute `GoodsReceiptDto` **before COMMIT**, so a successful response is authoritative for Draft status, ID, number, version and lines without a later fallible Get. **Caveat:** source `ToDto` may return null header/line display names and default active flags, whereas an authorized query Get supplies historical reference labels. B01 must freeze the wire projection. Frontend must retain selected labels or fetch authorized detail separately, not fabricate historical names or treat a failed Read as a failed Save.
+The existing Create/Update handlers compute and materialize `GoodsReceiptDto` **before COMMIT**. Insert/replace assigns positive SQL IDs to the same line objects, so success is authoritative for Draft status, ID, number, version and ordered lines without a later Get. Source `ToDto` returns null header/line display names and default active flags true; authorized Get/List supply current reference labels/flags including inactive references. WEB3 emits explicit nullable members per the corpus, using a local projection that does not alter global null-ignore serialization. Frontend retains selected labels separately or fetches authorized detail, never fabricates historical names or treats failed Read as failed Save.
 
 ### 4.2 Detail and list pages
 
-Receipt detail **proposed** names: `receiptId`, `receiptNumber`, `receiptDate`, `warehouseId`, `warehouseDisplayName`, `warehouseIsActive`, `employeeId`, `employeeDisplayName`, `employeeIsActive`, `status`, `note`, `postedAtUtc` (nullable), `version`, ordered `lines[{receiptLineId,lineNumber,productId,productDisplayName,productIsActive,quantity,unitCost}]`. Enforce string int64/decimal as in `3`, no extra client-generated line ID.
+Receipt detail names/nullability are frozen in the [canonical field tables](../contracts/web3-v1/README.md#exhaustive-fields). Header ID maps from source `Id` to `receiptId`, line `Id` to `receiptLineId`, while `LineNumber` stays `lineNumber`. Enforce string int64/decimal, explicit response nulls and no extra client-generated ID.
 
-List query: `pageNumber` (1-based), `pageSize` (1..200), optional `warehouseId`, `status=Draft|Posted`, `search` <=128 (no NUL). **No date/Product query filter, no Sales cursor.** Response projection **proposed** `{items:[receipt summary/detail as source permits],pageNumber,pageSize,totalCount}`; B01 must confirm source `PagedResult<GoodsReceiptDto>` and freeze exact contents, sort, total/count encoding and nulls. Do not invent a new sort order or fetch every receipt's detail with N+1 calls.
+List query requires `pageNumber` (1-based), `pageSize` (1..200); optional warehouseId, exact status=Draft|Posted, search<=128/no NUL. **No date/Product query filter or Sales cursor.** Source is `PagedResult<GoodsReceiptDto>`: items are full detail including lines; sort ReceiptDate DESC/ReceiptId DESC, lines LineNo/ReceiptLineId. TotalCount is an Int64 string. Preserve the set-based batch query; no N+1. Inventory pages do not promise a transactional count/rows snapshot.
 
 ### 4.3 Receipt Post acknowledgement
 
@@ -85,7 +86,7 @@ Response successful `data`:
 
 ### 4.4 Inventory Balances (read-only)
 
-`GET /inventory/balances`: optional `warehouseId`, `productId`, `search` <=256, required or explicitly defaulted `pageNumber/pageSize` as frozen B01. Proposed row: `warehouseId/Code/Name/IsActive`; `productId/Code/Name/IsActive`; `quantity`, `inventoryValue`, nullable `averageUnitCost`. Preserve actual SQL materialized values; fail closed on invalid Q/V or missing valuation companion. No mutation endpoint or fake recalculated average.
+`GET /inventory/balances`: optional warehouseId/productId/search<=256, **required explicit** pageNumber/pageSize. Full row/scale/null table is in the corpus. Preserve actual SQL values; fail closed on invalid Q/V or missing valuation companion. No mutation endpoint or fake recalculated average.
 
 ### 4.5 Stock Card (read-only)
 
@@ -109,7 +110,7 @@ Read retry (GET/HEAD) after single refresh may be allowed within original actor 
 
 ## 6. Contract fixtures and verification before coding
 
-B01 owns actual files under `docs/contracts/web3-v1/`, e.g. `README.md`, `manifest.json`, request/response golden JSON for every route/error and exact parser tests; these paths are **planned**, not created by this docs activation. Corpus must cover:
+B01 owns the [actual files](../contracts/web3-v1/README.md), [manifest with SHA-256](../contracts/web3-v1/manifest.json), route golden payloads and pure Node semantic tests. These are authored fixtures, not running-server captures. Coverage includes:
 
 - `receiptId`/ledger/document IDs > 9007199254740991, max Int64, overflow, numeric token attack; int32 overflow, required/optional missing and duplicate keys.
 - 1 and 200 unique Product lines; 0/201 invalid; duplicate Product on 2 rows; maximum Qty/UnitCost, exact four-fraction digits and decimal carry/tie.
@@ -118,4 +119,4 @@ B01 owns actual files under `docs/contracts/web3-v1/`, e.g. `README.md`, `manife
 - Two independent StockCard source types, signed quantities/value, nullable balances, UTC with fractions, from>to rejected, page reset and total counts.
 - Each permission in allow/deny combinations, revocation, malformed response/Origin, restricted runtime SQL grants, clear unauthorized audit response.
 
-**Contract freeze is a gate:** do not hand-code frontend schema from loosely matched C# Local serializer or treat example payloads in this document as already executable/verified. All source/wire discrepancies must be resolved and covered in canonical fixtures before implementing Web ports.
+**Contract freeze is a gate:** consume the pinned corpus, not a loosely matched C# Local serializer. B01 source discrepancies are reconciled in the checkpoint; review/acceptance is tracked separately. B02/B03 must prove actual strict HTTP projection, permission denies and least-privilege SQL with source-owned tests before live Web ports are accepted. Pure corpus PASS is not HTTP/SQL PASS.

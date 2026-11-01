@@ -1,0 +1,2 @@
+# Canonical hashes must survive Windows checkouts without byte normalization.
+* text eol=lf

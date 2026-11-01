@@ -1,0 +1,8 @@
+{
+  "warehouseId": 1,
+  "productId": 7,
+  "fromUtc": "2026-11-01T02:03:04Z",
+  "toUtc": "2026-11-01T02:03:05.1234567Z",
+  "pageNumber": 1,
+  "pageSize": 25
+}

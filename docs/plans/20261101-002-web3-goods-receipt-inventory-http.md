@@ -1,6 +1,6 @@
 # WEB3 server companion — Goods Receipt & Inventory over net48 HTTP
 
-**Owner selection:** 2026-11-01. **Status:** ACTIVE / BACKEND IMPLEMENTATION NOT STARTED; docs-only activation. **Tasks owned here:** `WEB3-B01–B05`. The Web repo owns F01–F06 in its [Roadmap 03](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-001-web3-goods-receipt-inventory-web.md). **Milestones:** WEB3-01 through WEB3-06 cross-repo map. Never copy or independently mutate F task status here.
+**Owner selection:** 2026-11-01, subsequently extended explicitly to backend B01 for WEB3-01. **Status:** ACTIVE / B01 CONTRACT CHECKPOINT; HTTP/SQL runtime implementation NOT STARTED. **Tasks owned here:** `WEB3-B01–B05`. The Web repo owns F01–F06 in its [Roadmap 03](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-001-web3-goods-receipt-inventory-web.md). **Milestones:** WEB3-01 through WEB3-06 cross-repo map. Never copy or independently mutate F task status here.
 
 [HTTP/JSON authoritative proposed contract](../design/WEB3_INVENTORY_HTTP_WIRE.md) · [SQL/cross-module acceptance](../design/WEB3_STOCK_LEDGER_ACCEPTANCE.md) · [Codex handoff](../development/WEB3_CODEX_HANDOFF.md) · [evidence index](../evidence/web3/README.md) · [WEB2 archived contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) · [sole test policy](../TEST_POLICY.md).
 
@@ -35,7 +35,7 @@ Inspected against `main` when selected; Codex **must re-inspect working main bef
 
 ## 2. WEB3-B01 — authoritative source/wire/permission freeze (milestone 01)
 
-**State: PLANNED. Dependency:** WEB2 closeout already archived. **No runtime code yet.**
+**State: IN_PROGRESS — contract checkpoint implemented and SQL-free checks verified; cross-repo review/acceptance pending.** Owner explicitly authorized B01 on 2026-11-01. Source baseline `8b599c782816d9cd64f04a45d809a2b8eb1235c8`; [canonical field tables/corpus](../contracts/web3-v1/README.md), [manifest](../contracts/web3-v1/manifest.json), [source/SQL privilege gap matrix](../design/WEB3_B01_SOURCE_CHECKPOINT.md), [execution evidence](../evidence/web3/20261101-b01-contract-checkpoint.md). No runtime endpoint, SQL grant, .NET business source, shared push/PR/merge or production approval. B02–B05 remain PLANNED.
 
 1. Read current `InventoryContracts.cs`, actual DTO constructor/nullable behavior, receipt/stock query services and exact validation. Inventory List: 1..200 pageSize, search <=128 and status Draft/Posted; Balance search <=256 and 1..200 pageSize; StockCard requires positive warehouse/product, optional UTC-range and <=200 pageSize. Confirm these are still true on implementation commit. Establish exact server response names without leaking Local numerical JSON format.
 2. Author canonical `WEB3` wire field/route/status corpus in `docs/contracts/web3-v1/` (B01 implementation deliverable; not created by docs activation) with test-owned fixtures/manifest. All int64s/decimals strings; int32s JSON numbers; UTC vs calendar dates; nullable avg vs zero; 1/200 lines, duplication forbidden, version tokens, max boundary. Verify both backend and frontend parse identical authoritative fixtures. Never duplicate authoritative payloads in Web repo.

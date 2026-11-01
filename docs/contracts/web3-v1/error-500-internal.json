@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "InternalError",
+    "message": "An unexpected error occurred.",
+    "details": [],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

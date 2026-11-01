@@ -1,6 +1,6 @@
 # WEB3 backend Codex handoff — execution guide
 
-**Selected 2026-11-01; implementation not started.** Read in order: [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → [active index](../plans/README.md) → [WEB3 backend plan](../plans/20261101-002-web3-goods-receipt-inventory-http.md) → [WEB3 wire](../design/WEB3_INVENTORY_HTTP_WIRE.md) → [SQL oracle](../design/WEB3_STOCK_LEDGER_ACCEPTANCE.md) → sole [TEST_POLICY](../TEST_POLICY.md) and [tests README](../../tests/README.md). Web companion owns its own F tasks and [handoff](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/development/WEB3_CODEX_HANDOFF.md). WEB2 is archived; WinForms CEX-A01–A05 remains independently active.
+**Selected 2026-11-01; B01 contract checkpoint authored, runtime not started.** Read in order: [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → [active index](../plans/README.md) → [WEB3 backend plan](../plans/20261101-002-web3-goods-receipt-inventory-http.md) → [canonical corpus](../contracts/web3-v1/README.md) → [source/SQL gap checkpoint](../design/WEB3_B01_SOURCE_CHECKPOINT.md) → [WEB3 wire](../design/WEB3_INVENTORY_HTTP_WIRE.md) → [SQL oracle](../design/WEB3_STOCK_LEDGER_ACCEPTANCE.md) → sole [TEST_POLICY](../TEST_POLICY.md) and [tests README](../../tests/README.md). Web companion owns its own F tasks and [handoff](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/development/WEB3_CODEX_HANDOFF.md). WEB2 is archived; WinForms CEX-A01–A05 remains independently active.
 
 ## 1. Verify source before each PR
 
@@ -8,13 +8,13 @@
 2. Inspect `src/MyDmsVn.Server.HttpHost/{Startup,Web2Pipeline,AuthController,SalesControllers,SalesWireInput,SalesWireOutput,StrictWireJson}.cs` and `src/MyDmsVn.Server.HttpHost/README.md`. `SalesControllers.cs` owns `WireApiController` and current MediatR dispatch. Use that host and security pipeline; no second HTTP middleware service.
 3. Inspect `src/MyDmsVn.Contracts/InventoryContracts.cs`, `src/MyDmsVn.Server.Application/Inventory/{GoodsReceiptFeatures,GoodsReceiptQueries,InventoryQueries,InventoryPermissionDefinitions}.cs`, `src/MyDmsVn.Server.Infrastructure/Inventory/*`, [Data model](../DATA_MODEL.md), [Direct Sales costing](../DIRECT_SALES_COSTING.md) and [Contracts](../CONTRACTS.md).
 4. Inspect existing `tests/MyDmsVn.Server.HttpHost.Tests`, Inventory/Security SQL owners, and packaged `WebHostIisExpressTests`. Choose actual source-verified, nonempty test selectors; scenario IDs in plans are not runnable test names.
-5. Record current source-to-contract discrepancies. B01 must settle them *before* implementation, including actual `PagedResult<T>` field names and display labels on Create/Update.
+5. Recheck the B01 source checkpoint if main changes. It resolves count-as-string, full list lines, explicit nullable response fields, Save label defaults, positive replace-line IDs, required paging, eight-place average and UTC formatting. Preserve these corpus decisions; document new discrepancies before runtime implementation.
 
 ## 2. PR-by-PR implementation order
 
 ### PR B01 — contract freeze (no HTTP runtime change)
 
-- Freeze canonical `docs/contracts/web3-v1/` field tables, manifest and executable golden JSON corpus for receipt Create/Update/List/Get/Post, balance/card and errors. Backend owns fixtures; frontend consumes them. Include high int64, decimal extremes, 200 receipt lines, duplicate Product rejection, nullable avg, UTC dates and ack-without-version.
+- Canonical `docs/contracts/web3-v1/` now contains field tables, manifest, executable golden JSON and hostile/numeric/expansion controls. Backend owns fixtures; frontend consumes exact pinned bytes/provenance. Run `node docs/contracts/web3-v1/validate-corpus.mjs` and `node --test docs/contracts/web3-v1/validate-corpus.test.mjs`; these are SQL-free contract checks, not server endpoint tests.
 - Map each field to source `InventoryContracts.cs`/handlers and select exact wire output/null/paging projection. Update WEB3 design if source disagrees, with explicit reason. Never change Local DTO serialization just to simplify Web.
 - Verify contract, links and source review; record source hash and nonempty fixture-check execution evidence. Stop if new schema/permission policy is needed unexpectedly.
 
@@ -27,7 +27,7 @@
 ### PR B03 — precise inventory wire and SQL-backed endpoints
 
 - Add feature-specific strict input/output mappers: int64 JSON **strings**, invariant decimal **strings**, checked int32 IDs, calendar `yyyy-MM-dd`, UTC `Z` timestamps, opaque rowversion; reject extra/duplicate JSON/query keys and numeric decimal tokens before business dispatch.
-- Receipt Save request contains only header and lines `{productId,quantity,unitCost}`; Update includes `expectedVersion` and whole-line replacement (no receiptLineId in request). Existing Create/Update returns authoritative Draft DTO before transaction COMMIT; headers may omit display labels. Receipt Post ack has ID, status, UTC time **without version**. Do not add post-commit Get or fake version.
+- Receipt Save contains only header and lines `{productId,quantity,unitCost}`; Update includes expectedVersion and whole-line replacement (no receiptLineId request). Existing Create/Update materializes authoritative Draft DTO before COMMIT; WEB3 emits explicit null labels/time/note as applicable, locally overriding null omission without changing Sales/Local. Receipt Post ack has ID/status/UTC **without version**. No post-commit Get or fake version.
 - Preserve receipt list pageNumber/pageSize/warehouse/status/search and source ordering; balance/card query requirements and read-only behavior. No new stock adjustment or SQL writes through HTTP.
 - Test authorized restricted SQL principal, denied no-effect, pre-commit response, 1/200 lines, duplicate Product, rowversion, UTC/decimal and StockCard source joins. Review the exact runtime SELECT/EXEC privileges; do not grant db_owner or blanket DML.
 
@@ -66,4 +66,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Host tests failed' }
 
 For SQL set `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` explicitly to non-production `master` and run relevant owners **sequentially** as [tests README](../../tests/README.md) prescribes. Missing config/SQL skipped is NOT RUN. Packaged pilot needs explicit `MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY`, `MYDMSVN_WEB_TEST_TLS_THUMBPRINT`, `MYDMSVN_WEB_TEST_BROWSER_DIRECTORY` and `MYDMSVN_WEB_PILOT_PROJECT` as current runbook documents. Never include passwords/JWT/SQL strings in logs or commits.
 
-Record backend and Web SHAs, task IDs, exact commands and discovered/executed rows, pass/fail/skip, SQL ownership/drain/principal, browser versions/TLS, equations/physical rows, failures and remediation. File new evidence in `docs/evidence/web3/` only. This docs-only activation is verified by diff/links/status/encoding; it does not create runtime evidence.
+Record backend and Web SHAs, task IDs, exact commands and discovered/executed rows, pass/fail/skip, SQL ownership/drain/principal, browser versions/TLS, equations/physical rows, failures and remediation. File new evidence in `docs/evidence/web3/` only. B01 has corpus execution plus diff/link/encoding checks; it creates no HTTP/SQL/browser runtime evidence.
