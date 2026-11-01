@@ -99,6 +99,11 @@ Write deploy/admission runbook for Web11→12 with frozen source checker, restri
 
 Update docs/plans/README.md and all routing only after scope Owner acceptance. Freeze completed execution docs in archive per existing policy; preserve unchanged evidence in docs/evidence/web4 with exact task/source/runner/candidate; old WEB1–03/CEX/WinForms documents and runtime pin remain untouched.
 
+### B06 mandatory operator reconciliation runbook
+
+Document a concrete, audited handoff for an unresolved key: validate actor + DB epoch + fingerprint; inspect current grants and Web operation tombstone; reconcile authoritative source, line, version, stock/valuation and COGS with restricted maintenance tooling; prove per-key serialization/in-flight state before declaring NOT_EXECUTED; only release the protected client session on positive outcome and correct current authorization. Expired response may mark a committed document but MUST NOT fabricate an editable version. If proof is incomplete, remain UNKNOWN and give the user a support correlation ID. No manual duplicate Post or direct ledger alteration is permitted.
+
+
 ## 8. Mandatory acceptance and stop rules
 
 Status transitions: PLANNED → IN_PROGRESS only after source/review checkpoint; DONE only for verified approved scope; BLOCKED/NOT RUN never PASS. PR merge is not testing and docs activation is not runtime implementation. Protect security and cost invariants even if a simpler implementation would make tests green. Never widen privileges or silently change the schema contract for Desktop. After an uncertain SQL commit NEVER automatically replay the mutation. Keep every lifecycle proof on the exact candidate and prove test count is nonzero.

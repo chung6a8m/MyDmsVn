@@ -54,6 +54,19 @@ Store a versioned canonical result representation produced before the successful
 The B01 corpus must contain explicit examples for absent journal after local persist/crash-before-dispatch, delayed first request vs user-confirmed same-key resend, committed replay, different fingerprint 409, expired/tombstoned key and readback without Read but with Write/Post. A status 404 is **non-affirmative**, not permission to reuse a different key.
 
 
+### Operator-assisted reconciliation: mandatory positive proof
+
+For an UNKNOWN operation where replay payload has expired, journal is unavailable, current permission is revoked or client has lost the original immutable payload, B01/B06 must define an executable **privileged, audited, non-automated** workflow rather than an unconditional "unlock" button:
+
+1. Match authenticated user, server deployment epoch, exact operation ID, route/kind and request fingerprint; do not ask support staff for JWT, refresh cookie, password, full raw draft or connection string.
+2. Read journal result/tombstone and verify the authoritative SQL source/document, rowversion where available, complete Posted source set, line IDs, StockLedger, StockValuationEntries, StockBalances and frozen COGS for affected keys. The operator must use a separately authorized maintenance identity; the browser Web principal never gets elevated SQL grants.
+3. Check current transaction/lock/in-flight state through the reviewed per-key serialization mechanism; absence of a committed row alone does not prove a competing worker will not later commit.
+4. Outcome **CONFIRMED_COMMITTED** may only settle the local intent when there is positive journal/SQL evidence and sufficient current authority. If the original editable Create/Update detail/version is unavailable, acknowledge completion but **do not unlock Edit** until an authorized version/line snapshot is obtained. Outcome **CONFIRMED_NOT_EXECUTED** requires a source-proven exclusive key fence and audit record showing no past/future business effect; otherwise remain UNKNOWN.
+5. Record operator identity, correlation ID, decision, exact evidence source and timestamp; do not modify balances/ledger manually and do not clear/delete a tombstone to make replay pass. A user may start a new intent only after the safe disposition above, never simply because status returned 404.
+
+The operator procedure and denial/expiry/indeterminate examples belong to B06 runbook; B05 acceptance must test at least COMMITTED, INDETERMINATE and expired-tombstone paths. This review amendment is a **design requirement**, not a claim that an admin endpoint or manual tool already exists.
+
+
 ## 4. Atomic SQL state machine and lock ordering
 
 **Key invariant:** no committed success marker exists unless the business changes and result were committed in THE SAME SQL transaction. Likewise a transaction rollback cannot leave a committed success marker. A committed row has an immutable request fingerprint and deterministic replay output.

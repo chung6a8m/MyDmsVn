@@ -39,6 +39,9 @@
 | B4-LIVE-03 | B05-A→F04-A→B05-B/F04-B | Fixture/oracle ready independently of browser spec, then final paired acceptance on exact Web/backend commits and fresh owned Chromium/Edge SQL |
 
 
+| B4-OPS-02 | B05/B06 privileged operator rehearsal | Exact actor/epoch/key/fingerprint matched, authoritative SQL journal+source+ledger/valuation checked; committed vs indeterminate vs expired tombstone distinguished; never unlock Edit without version or claim 404 is safe, retain audit trail |
+
+
 ### Gate execution and evidence rules
 
 - B02: GitHub-hosted Windows SQL-free tests only. It must report actual workflows, runner, commit SHA and discovered/executed rows. A green YAML lint or local build is not hosted CI.
