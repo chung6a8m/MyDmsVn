@@ -24,11 +24,26 @@
 | B4-LIVE-02 | B05 recovery/browser | Web F04 verifies reload, IndexedDB, cross-tab actor fencing, one operation result, dirty other document and no replay |
 | B4-OPS-01 | B06 runbook | Operator schema12/provisioning/rollback limits, journal inspection/redaction, retention safety, backup/restore, release blockers recorded |
 
+### Review-driven mandatory negative and compatibility gates
+
+| ID | Gate/owner | Scenario and required assertion |
+|---|---|---|
+| B4-CON-03 | B01 corpus | Original success outcomes: Sales Create/Update full detail/version; Receipt Create/Update full detail/version and replacement line IDs; Sales Post with version; Receipt Post without version. 404/403/expired not a recovered success |
+| B4-CON-04 | B01 corpus | Status 404 for persisted-but-not-dispatched intent; user-confirmed same-key immutable resend only; delayed initial request vs resend serialized, no fresh key/no automatic replay |
+| B4-MIG-03 | B03 SQL migrations | Source-validated **exact11→12** path vs existing exact10→Web12, fresh12, fake/partial/spoofed11, schema9 and too-new; old 001–011 fingerprint immutable |
+| B4-GRT-02 | B03 Security SQL | Server-authenticated Web database epoch stable across workers/restart and rotated after clone/rewind; same-origin, same numeric userId different database must not see old drafts |
+| B4-JRN-04 | B03/B04 SQL | Immutable tombstone survives replay-payload expiry; status expired forbids new business effect, replay after expiry never starts Create/Post |
+| B4-HTTP-05 | B04 SQL-free + SQL | Current Write/Post (not Read) re-authorizes replay/status and recovers command-specific exact original outcomes; revoked grant fails closed; post-commit audit failure still reports journal COMMITTED |
+| B4-RES-04 | B05 Security/Inventory SQL | Never-dispatched browser intent then explicit same-key resend, concurrent delayed original and resend, exactly one posted document/ledger/value, no new key |
+| B4-LOCAL-01 | B03/B04 SQL Local | **On exact desktop schema10** Local/Application Create/Update/Post Sales and Goods Receipt WITHOUT WebOperationMetadata; unchanged auth/rowversion/lines/rollback/Q/V/COGS, zero journal query or new table dependency |
+| B4-LIVE-03 | B05-A→F04-A→B05-B/F04-B | Fixture/oracle ready independently of browser spec, then final paired acceptance on exact Web/backend commits and fresh owned Chromium/Edge SQL |
+
+
 ### Gate execution and evidence rules
 
 - B02: GitHub-hosted Windows SQL-free tests only. It must report actual workflows, runner, commit SHA and discovered/executed rows. A green YAML lint or local build is not hosted CI.
 - B03/B04: use existing net48 Migrations/HttpHost/Security/Inventory test owners; no restored global SQL runner, no blanket test policy rewrite, no test-only shortcut around journal.
-- B05: SQL nonproduction, explicit master input, owned fresh DB and SID-tracked runtime login, sequential SQL project owners, positively owned teardown and failed-cleanup quarantine. Backend security wrapper count is separate from Playwright browser case count; each browser uses a new DB.
+- B05 staging: **B05-A** prepares fixture/oracle after B04; **F04-A** prepares browser specs after F03 against B05-A protocol; **B05-B + F04-B** jointly run final acceptance. No circular task dependency. SQL nonproduction, explicit master input, owned fresh DB and SID-tracked runtime login, sequential SQL project owners, positively owned teardown and failed-cleanup quarantine. Backend security wrapper count is separate from Playwright browser case count; each browser uses a new DB.
 - Run complete necessary Sales/Receipt/auth/valuation concurrency negative regression when those boundaries change. Keep evidence of RED and corrections; do not fabricate failures or count 0/skipped cases as PASS.
 - Exact test selectors/paths, project names, source/test hashes, commands and result counts belong in new dated evidence. This matrix is not an execution log. Do not put credentials, bearer/refresh tokens, raw HAR, private traces, raw connection strings or production identifiers in repository.
 - Attended IME/Narrator, full IIS, multi-worker production controls and production approval remain NOT RUN, never inherited from WEB3.
