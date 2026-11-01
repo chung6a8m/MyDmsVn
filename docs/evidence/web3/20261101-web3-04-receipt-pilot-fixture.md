@@ -1,4 +1,4 @@
-# WEB3-04 — bounded Receipt pilot fixture preparation
+# WEB3-04 — Receipt fixture and bounded HTTPS/SQL/browser acceptance
 
 **Owner authorization:** 2026-11-01, "Cho phép mở rộng fixture và chạy nghiệm thu thật", for the frontend WEB3-04 real acceptance dependency. **State:** bounded F03/F04 fixture and real HTTPS/SQL/browser prerequisite verified on Chromium and Edge. The two earlier failed Chromium attempts remain recorded separately; this does not mark B04 or all B05 complete, approve production or constitute Owner closeout.
 
@@ -22,15 +22,15 @@ dotnet build tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.I
 dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --list-tests --filter FullyQualifiedName~WebHostIisExpressTests
 ```
 
-Build succeeded with 0 warnings and 0 errors. Discovery found exactly three packaged-host cases: original System.Web smoke, original Sales browser selector and new `Published_React_Receipt_browser_uses_real_HTTPS_SQL_and_independent_receipt_stock`. Discovery executed **zero tests**. No new runtime PASS is claimed; the fixture's required real-SQL and browser validation remains pending.
+Build succeeded with 0 warnings and 0 errors. Discovery found exactly three packaged-host cases: original System.Web smoke, original Sales browser selector and new `Published_React_Receipt_browser_uses_real_HTTPS_SQL_and_independent_receipt_stock`. Discovery executed **zero tests**. At this preparation checkpoint, no runtime PASS was claimed and real-SQL/browser validation was still pending; subsequent attempts and results are recorded below.
 
 Documentation checks: `git diff --check` passed; 20 local Markdown links across the three changed Markdown files resolved. All four changed files follow repository encoding/EOL rules (C# UTF-8 BOM/CRLF; Markdown UTF-8 without BOM/CRLF).
 
-Read-only inspection found an existing `0.0.0.0:44321` TLS binding; no binding/certificate was installed or changed. The designated SQL connection exists in this process (value not printed); publish directory, TLS test thumbprint and browser-directory inputs were initially unset. No IIS, SQL allocation or browser was started. Build/discovery and documentation checks alone do not establish seed/oracle execution.
+Read-only inspection found an existing `0.0.0.0:44321` TLS binding; no binding/certificate was installed or changed. The designated SQL connection existed in the process (value not printed); publish directory, TLS test thumbprint and browser-directory inputs were initially unset. No IIS, SQL allocation or browser was started at this preparation checkpoint. Build/discovery and documentation checks alone did not establish seed/oracle execution.
 
-## Remaining acceptance and retained boundaries
+## Preparation checkpoint — remaining acceptance and retained boundaries
 
-Run the new selector once per Chromium/Edge against fresh positively owned SQL fixtures after coordinator review, using the stable Web production build and both real pilot spec files. Record each candidate, wrapper/browser counts, first failures/corrections, independent SQL reconciliation and verified cleanup in this new evidence record. A skipped, missing or empty browser selection is NOT RUN.
+At preparation, the remaining step was to run the new selector once per Chromium/Edge against fresh positively owned SQL fixtures after coordinator review, using the stable Web production build and both real pilot spec files. The subsequent sections record those candidates, wrapper/browser counts, first failures/corrections, independent SQL reconciliation and verified cleanup. A skipped, missing or empty browser selection never establishes acceptance.
 
 B04 Receipt→Sale→later Receipt valuation, Inventory read UI, all B05/F06 acceptance, attended IME/accessibility, full IIS/production and durable mutation recovery remain outside this bounded fixture checkpoint. Existing WEB2 and B02/B03 results remain their original candidate-specific evidence.
 
@@ -47,7 +47,7 @@ dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.In
 dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --filter FullyQualifiedName~WebReceiptPilotResultTests --logger 'trx;LogFileName=receipt-result-green.trx' --results-directory TestResults/web3-04-result-green
 ```
 
-Both selected commands built the affected net48 Security target successfully. Raw TRX stays local/ignored. SQL/IIS/browser execution remains NOT RUN pending coordinated pilot; the pure correction tests do not establish live seed/oracle acceptance. The correction is ready for scoped rereview before that pilot.
+Both selected commands built the affected net48 Security target successfully. Raw TRX stays local/ignored. At that pure-test correction checkpoint, SQL/IIS/browser execution was still NOT RUN pending scoped rereview and the coordinated pilot; those pure tests did not establish live seed/oracle acceptance.
 
 ## Chromium attempt 1 — fixture process-budget failure
 
@@ -68,7 +68,7 @@ Actual result: **one .NET wrapper FAIL, zero PASS/SKIP; zero browser tests execu
 
 Cleanup: the sole inner error was the invalid timeout, with no cleanup failure. Existing finally awaited exact IIS termination/drain, SID-owned login cleanup and ownership-checked database disposal. Post-run inspection found no IIS/testhost/vstest processes, both ports free, and temporary manifest/public PEM removed. Browser result, browser output and screenshots did not exist because Node was never started. The ignored first-attempt TRX remains at the command's results path. Edge was not started.
 
-Parent triage authorized the minimal correction: both modes now pass the existing five-minute budget at the shared callsite. `GuiOwnedProcess`, its maximum and cleanup policy remain unchanged. No frontend or production/business source changed. No constant-mirroring test was added. The affected Release/net48 Security build succeeded with 0 warnings/errors; existing `WebReceiptPilotResultTests` reran with 12 PASS, 0 FAIL/SKIP using `--no-restore --no-build`, logger `receipt-result-timeout-regression.trx` and results path `TestResults/web3-04-timeout-regression`. `git diff --check` passed. These pure tests do not prove the live timeout correction; Chromium attempt 2 must use a fresh owned fixture and different results path after scoped rereview. Edge remains dependent on its successful result and cleanup.
+Parent triage authorized the minimal correction: both modes now pass the existing five-minute budget at the shared callsite. `GuiOwnedProcess`, its maximum and cleanup policy remain unchanged. No frontend or production/business source changed. No constant-mirroring test was added. The affected Release/net48 Security build succeeded with 0 warnings/errors; existing `WebReceiptPilotResultTests` reran with 12 PASS, 0 FAIL/SKIP using `--no-restore --no-build`, logger `receipt-result-timeout-regression.trx` and results path `TestResults/web3-04-timeout-regression`. `git diff --check` passed. These pure tests did not prove the live timeout correction; at triage, Chromium attempt 2 was held for scoped rereview, a fresh fixture and a different results path. Edge was kept dependent on Chromium success and cleanup.
 
 ## Chromium attempt 2 — pilot logout synchronization failure
 
